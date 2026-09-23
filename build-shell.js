@@ -166,24 +166,28 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        // Moved to v52. The web mark is the ball on firm ground and the product
-        // name is HardPan Tournaments. A device on v51 still installs the old
+        // Moved to v52. The install icons became the ball and the product name
+        // followed the consumer word. A device on v51 still installs the old
         // banner and still says GolfApp Tournaments. The hostname
         // tournaments.rattlegolf.com is unchanged.
-        // Moved to v53. The landing already sets HardPan as HTML beside the
-        // ball (logo-mark.png), so it never used the condensed lockup. The
-        // key moves with the consumer header so an installed tournament
-        // device does not stay on the v52 generation. The hostname
-        // tournaments.rattlegolf.com is unchanged.
-        cacheName: 'tournament-v53-hardpan-word',
-        appName: 'HardPan Tournaments',
+        // Moved to v53. The landing set the consumer word as HTML beside the
+        // ball (logo-mark.png). The key moved with the consumer header so an
+        // installed tournament device does not stay on the v52 generation.
+        // Moved to v54. The product name is Rattle Golf Tournaments again.
+        // The landing says Rattle Golf under the ball and Tournaments on the
+        // right. The install icons are the Rattle Golf banner restored from
+        // before the ball. A device on v53 still installs the ball and still
+        // says the consumer word. The hostname tournaments.rattlegolf.com
+        // is unchanged.
+        cacheName: 'tournament-v54-rattle-golf',
+        appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
-        // ITS OWN FILES, AND "any" ONLY. The picture is the same ball on firm
-        // ground the consumer web icon uses. Purpose stays "any" so an install
-        // from this product does not inherit the other product's manifest
-        // declaration. The ball sits inside the inner 80% circle.
+        // ITS OWN FILES, AND "any" ONLY. The picture is the Rattle Golf banner
+        // (cream field, green R, RATTLE GOLF / TOURNAMENTS). Purpose stays
+        // "any": on the 1024 master TOURNAMENTS spans past the inner 80%
+        // circle, and a maskable crop reads URNAMEN.
         icons: [
             { src: 'tournament-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: 'tournament-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

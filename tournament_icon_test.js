@@ -81,7 +81,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         px.forEach(([name, [r, g, b]]) => {
             const isWhite = r > 250 && g > 250 && b > 250;
             assert.ok(!isWhite, `${name} corner is white (${r},${g},${b}) — artwork must bleed to the edge`);
-            assert.ok(r < 20 && g < 25 && b < 20, `${name} corner should be the near-black field, got (${r},${g},${b})`);
+            assert.ok(r > 200 && g > 200 && b > 180, `${name} corner should be the cream field, got (${r},${g},${b})`);
         });
     });
 
@@ -209,7 +209,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // Read as JSON, not matched as a string. The name, the start_url and the
         // icons are what an install prompt actually shows.
         const m = JSON.parse(read('tournament-manifest.json'));
-        assert.equal(m.name, 'HardPan Tournaments');
+        assert.equal(m.name, 'Rattle Golf Tournaments');
         assert.equal(m.start_url, './tournament.html');
         assert.ok(m.icons.length >= 2);
         m.icons.forEach(i => {
@@ -246,7 +246,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // installed device keeps serving the old mark and a page whose head has
         // no manifest link in it at all.
         const block = BUILD.slice(BUILD.indexOf('tournament: {'));
-        assert.match(block, /cacheName: 'tournament-v53-hardpan-word'/);
+        assert.match(block, /cacheName: 'tournament-v54-rattle-golf'/);
     });
 
     // Minimal PNG corner reader — same approach as rattle_identity_test.js, kept

@@ -37,7 +37,7 @@ const DIST = path.join(ROOT, 'dist');
 // exact bytes or this check fails.
 // Consumer web icons are the ball on firm ground. logo-mark.png is the same
 // ball with a transparent field (receipt and tournament landing). Tournament
-// ships its own files of that ball, so these digests must not appear there.
+// ships the Rattle Golf banner, so these consumer digests must not appear there.
 const CONSUMER_BEFORE = {
     '50c7b7c463021e8b017bc0e248af3a54a84629f2490d54c2f17f413f037408cc': 'consumer icon 192 ball',
     'f9a9150f1a02840f1ad685697f90524b3431c433c6a5cb61e0db8a59ad3154e4': 'consumer icon 512 ball',
@@ -71,7 +71,7 @@ function resolveManifest(dir, page) {
     if (!fs.existsSync(target)) return null;
     try { return JSON.parse(fs.readFileSync(target, 'utf8')); } catch (e) { return null; }
 }
-const isTournamentManifest = m => !!m && m.name === 'HardPan Tournaments'
+const isTournamentManifest = m => !!m && m.name === 'Rattle Golf Tournaments'
     && m.start_url === './tournament.html'
     && Array.isArray(m.icons) && m.icons.length > 0
     && m.icons.every(i => /^tournament-icon-/.test(i.src) && i.purpose === 'any');

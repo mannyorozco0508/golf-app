@@ -12,8 +12,8 @@
 // PNG are the same HardPan ball, flattened to an opaque near-black square.
 // They are pinned below. Do not archive until 1.0.3 is approved and released;
 // this only prepares the files. The repo display name is HardPan. Tournament
-// web icons are already that product's own files of the web ball; they do not
-// share these native files.
+// web icons are the Rattle Golf banner, not these native files and not the
+// HardPan ball.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -199,19 +199,22 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.ok(bone > 0, 'the master has no bone');
     });
 
-    test('tournament icons are already the web ball and do not share the native master', () => {
-        // Separate files, already the HardPan ball (the web rendering), not the
-        // Stroke R. They are not copies of icon-1024.png, so this prep does not
-        // rewrite them.
+    test('tournament icons are the Rattle Golf banner, not the HardPan ball', () => {
+        // Restored 2026-09-23 from the banner that says RATTLE GOLF / TOURNAMENTS.
+        // They stay separate files from the native HardPan ball.
         assert.notEqual(sha('tournament-icon-1024.png'), sha('icon-1024.png'),
             'the tournament master is a copy of the native master');
-        const web = readPng(path.join(__dirname, 'icon-512.png'));
-        const tour = readPng(path.join(__dirname, 'tournament-icon-512.png'));
-        assert.equal(tour.width, web.width);
-        assert.deepEqual(px(tour, 0, 0), px(web, 0, 0));
-        assert.deepEqual(px(tour, 256, 200), px(web, 256, 200));
         const img = readPng(path.join(__dirname, 'tournament-icon-1024.png'));
-        assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
+        const corner = px(img, 0, 0);
+        assert.ok(corner[0] > 200 && corner[1] > 200 && corner[2] > 180,
+            'tournament icon corner should be the cream banner field, got ' + corner);
+        assert.notDeepEqual(corner, [0x0B, 0x0F, 0x0C]);
+        let green = 0;
+        for (let i = 0; i < img.data.length; i += 4) {
+            const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
+            if (r < 40 && g > 70 && g < 140 && b < 80) green++;
+        }
+        assert.ok(green > 1000, 'the Rattle Golf banner has no green R');
     });
 
     test('the native display name in the repo is HardPan', () => {
@@ -250,11 +253,12 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.ok(green > 0, 'the splash has no forest-green ground');
     });
 
-    test('tournaments say HardPan beside the ball mark', () => {
+    test('tournaments say Rattle Golf beside the ball mark', () => {
         const t = read('tournament.html');
         assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/);
-        assert.match(t, /<span class="wm-rattle">HardPan<\/span>/);
+        assert.match(t, /<span class="wm-rattle">Rattle Golf<\/span>/);
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/);
+        assert.ok(!/HardPan/.test(t), 'the tournament page must not say HardPan');
     });
 
     test('the lobby still has the email-link card', () => {

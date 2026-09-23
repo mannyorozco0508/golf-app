@@ -74,7 +74,7 @@ const DELIBERATE = [
     {
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
-        to: '|HardPan|Tournaments|' + HERO_LINE + '|'
+        to: '|Rattle Golf|Tournaments|' + HERO_LINE + '|'
     },
     {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
@@ -128,8 +128,8 @@ describe('THE HERO BAND', () => {
         const hero = region.slice(at, region.indexOf('id="signin-panel-setup"'));
         assert.match(hero, /<img class="wm-mark" src="logo-mark\.png" alt="" width="56" height="56">/,
             'the parent brand is the mark file');
-        assert.match(hero, /<span class="wm-rattle">HardPan<\/span>/,
-            'HardPan sits with the mark');
+        assert.match(hero, /<span class="wm-rattle">Rattle Golf<\/span>/,
+            'Rattle Golf sits with the mark');
         assert.match(hero, /<span class="wm-product">Tournaments<\/span>/,
             'Tournaments is the product word on the right');
         assert.ok(!/wm-slash/.test(hero), 'the slash wordmark must not return');

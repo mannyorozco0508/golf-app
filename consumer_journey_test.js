@@ -204,7 +204,7 @@ describe('THE TOURNAMENT TRANSITION IS OUTBOUND, AND CONFIGURED', () => {
 describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () => {
     test('each product declares its own identity', () => {
         assert.match(BUILD, /appName: 'HardPan',[\s\S]{0,80}shortName: 'HardPan',/);
-        assert.match(BUILD, /appName: 'HardPan Tournaments',/);
+        assert.match(BUILD, /appName: 'Rattle Golf Tournaments',/);
     });
 
     test('NEGATIVE CONTROL — renaming Consumer must not rename Tournament', () => {
