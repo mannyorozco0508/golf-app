@@ -39,12 +39,12 @@
 </header>
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 2 September 2026</p>
+<p class="updated">Last updated: 23 September 2026</p>
 
 <p>Rattle Golf is a golf scoring app for private groups. This policy explains what it stores, why, and what it does not do. It is written to be read, not to be survived.</p>
 
 <div class="callout">
-    <strong>The short version.</strong> Rattle Golf has no accounts and asks for no email address. It stores the golf information you type in — names, scores, and the games your group is playing — so everyone in the round sees the same card. It does not sell anything, does not show ads, contains no analytics or tracking SDK, and never touches your money.
+    <strong>The short version.</strong> Rattle Golf has no accounts and asks for no email address. It stores the golf information you type in — names, scores, and the games your group is playing — so everyone in the round sees the same card. If you search for a course online, the text you type is sent through our proxy to a course directory, only to find a published scorecard. It does not sell anything, does not show ads, contains no analytics or tracking SDK, and never touches your money.
 </div>
 
 <h2>What is stored</h2>
@@ -53,6 +53,8 @@
     <tr><th>Data</th><th>Why</th></tr>
     <tr><td>Player names as you type them</td><td>So a scorecard and a settlement can name who owes who. A nickname works as well as a real name.</td></tr>
     <tr><td>Hole-by-hole scores, handicaps, and the games and stakes your group selected</td><td>This is the app's entire function.</td></tr>
+    <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our Cloudflare Worker to golfcourseapi.com, only to look up a published reference scorecard. This is text you type, not your phone's location. Used for that lookup. Not sold.</td></tr>
+    <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
     <tr><td>Round codes and group numbers</td><td>To keep one foursome's card separate from another's.</td></tr>
     <tr><td>Preferences and recent codes saved on your device</td><td>So the app can remember your dark-mode choice, prefill your last roster, offer to resume your last round or trip, and remember which player is you. This stays on your device and is never sent anywhere.</td></tr>
 </table>
@@ -60,7 +62,7 @@
 <h2>What is never collected</h2>
 <ul>
     <li>No account, password, email address or phone number</li>
-    <li>No location or GPS data</li>
+    <li>No device location or GPS</li>
     <li>No contacts, photos, camera or microphone access</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No payment details of any kind — see below</li>
@@ -71,15 +73,17 @@
 <p><strong>The app does not accept wagers, hold funds, process payments, or pay winnings.</strong> If money changes hands, it happens between the people involved, outside the app, using whatever they normally use. Rattle Golf never sees it and takes no share of it.</p>
 
 <h2>Where data is stored</h2>
-<p>Round data is stored in Google Firebase Realtime Database, operated by Google Cloud. Google processes it as a service provider under its own security and privacy terms.</p>
+<p>Round data is stored in Google Firebase Realtime Database, operated by Google Cloud. Google processes it as a service provider under its own security and privacy terms. Looking up a course sends the search text through our Cloudflare Worker, as described under Third-party directories.</p>
 <p>Your dark-mode setting and saved roster stay in your browser's local storage on your own device and are never sent anywhere.</p>
 
 <h2>Who can see a round</h2>
-<p>A round is reached through its code. Anyone holding a round link can view that round, which is the point — you send it to your group. Anyone who can guess a code could view it too, so the practical guidance is simple: <strong>treat a round link like a group chat, and don't put anything in a player name you wouldn't want a stranger to read.</strong></p>
-<p>Database rules restrict what each link can change. A scorekeeper link edits only its own group's scores; a plain round link is read-only.</p>
+<p>Rounds are shared by link or code with the group. Anyone holding a round link can view that round, which is the point — you send it to your group. Anyone who can guess a code could view it too, so the practical guidance is simple: <strong>treat a round link like a group chat, and don't put anything in a player name you wouldn't want a stranger to read.</strong></p>
 
 <h2>Sharing</h2>
-<p>Data is not sold, rented, or shared for advertising. It is not shared with anyone except Google Firebase as the hosting provider, or where the law requires it.</p>
+<p>Data is not sold, rented, or shared for advertising. Round data is stored with Google Firebase, the hosting provider. Course search text is sent only as described under Third-party directories. We also share data where the law requires it.</p>
+
+<h2>Third-party directories</h2>
+<p>Online course search reaches golfcourseapi.com only through our own Cloudflare Worker. That provider receives the search text needed to find a course. We may keep that search text on our proxy for a short time so the same lookup is not repeated. Round scores and player names are not sent to golfcourseapi.</p>
 
 <h2>Children</h2>
 <p>Rattle Golf is not directed at children under 13 and does not knowingly collect information from them. It has no accounts, no messaging, and no profiles.</p>
