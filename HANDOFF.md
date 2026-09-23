@@ -1,6 +1,6 @@
 # Rattle Golf — Project Handoff
 
-> **Web brand: HardPan.** Consumer and tournaments. The mark is a dimpled ball on a firm ground line (bone, then forest green). The lobby header is that ball (`hardpan-icon.svg`) beside the HTML word HARDPAN, on `#0B0F0C`. The outlined lockup SVG is not the header: on a phone its counters filled. Tab and PWA icons are the ball alone. Tournaments landing says HardPan Tournaments in HTML beside the ball. `support@rattlegolf.com`, Rattle Golf LLC, bundle id `com.rattlegolf.app`, and `tournaments.rattlegolf.com` stay. The repo display name is HardPan. **Do not archive, upload, or sync a binary until 1.0.3 is approved and released.** Native icons, splash, and Xcode display name are HardPan on main (prep only). Shell cache `golfapp-v208-owner-setup`; consumer cache `consumer-v51-owner-setup`; tournament cache `tournament-v53-hardpan-word`.
+> **Web brand split (2026-09-23).** Consumer is **HardPan**. Tournaments are **Rattle Golf** again (Rattle Golf Tournaments), not HardPan Tournaments. The consumer mark is a dimpled ball on a firm ground line (bone, then forest green). The lobby header is that ball (`hardpan-icon.svg`) beside the HTML word HARDPAN, on `#0B0F0C`. The outlined lockup SVG is not the header: on a phone its counters filled. Consumer tab and PWA icons are the ball alone. The tournaments landing says Rattle Golf under the ball and Tournaments on the right. Tournament favicon and PWA icons are the prior Rattle Golf banner (cream field, green R, RATTLE GOLF / TOURNAMENTS), not the HardPan ball and not the word HARDPAN. `support@rattlegolf.com`, Rattle Golf LLC, bundle id `com.rattlegolf.app`, and `tournaments.rattlegolf.com` stay. The repo display name is HardPan. **Do not archive, upload, or sync a binary until 1.0.3 is approved and released.** Native icons, splash, and Xcode display name are HardPan on main (prep only). Shell cache `golfapp-v209-rattle-tournaments` because `tournament.html` is in that shell; consumer cache stays `consumer-v51-owner-setup`; tournament cache `tournament-v54-rattle-golf`.
 
 
 
@@ -615,7 +615,7 @@ would have needed the domain listed first; it is listed now.
 
 `/tournament` opens on a hero band: `assets/tournament-hero.svg` (a brand-green
 fairway, not a photograph) under a dark gradient. The lockup is **logo-mark.png**
-(the ball on firm ground) on a near-black disc at left, the word **HardPan**
+(the ball on firm ground, no word on the file) on a near-black disc at left, the words **Rattle Golf**
 directly under the mark, and **Tournaments** large on the right. One line under that: "Live scoring + registration for charity,
 member-guest, and club events." Below it, in order: the organizer sign-in as a
 compact class-styled card (`.signin-card`; same ids, same sentence, same button, same
@@ -629,7 +629,7 @@ baseline (`tournament_landing_prev.fixture.json`, sha-pinned) plus exactly three
 deliberate substitutions. `tools/tournament-landing-check.js` measures the layout cold in
 Chrome at 390 and 768px, signed out and signed in, and taps the page's own buttons.
 
-**The band says HardPan Tournaments.** The two products share one Pages project;
+**The band says Rattle Golf Tournaments.** Consumer stays HardPan. The two products share one Pages project;
 `tournaments.rattlegolf.com/` lands on this product (302 to `/tournament`) and
 that hostname stays. The band names which product this page is. `logo-mark.png`
 stays in CONSUMER_SHELL; the hero references it from the combined origin.

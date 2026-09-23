@@ -1802,7 +1802,13 @@
 // link alone can edit the round. The rules file is not in this cache;
 // publishing it is a console step. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v208-owner-setup';
+// Moved to v209 because tournament.html says Rattle Golf again. The landing
+// word is Rattle Golf under the ball, Tournaments on the right, and the page
+// title is Rattle Golf Tournaments. tournament.html is in this shell list, so
+// a device on v208 keeps serving the consumer word on that page. The consumer
+// product cache stays consumer-v51-owner-setup. The tournament product cache
+// is tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v209-rattle-tournaments';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

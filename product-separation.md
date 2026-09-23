@@ -1,6 +1,6 @@
 # PRODUCT SEPARATION MANIFEST
 
-**Status:** Consumer separated at the Rattle Golf polish batch. The web brand, consumer and tournaments, is **HardPan** (2026-09-23). The hostname stays `tournaments.rattlegolf.com`.
+**Status:** Consumer is **HardPan**. Tournaments are **Rattle Golf** again (Rattle Golf Tournaments), locked 2026-09-23. The hostname stays `tournaments.rattlegolf.com`.
 
 This is an engineering handoff, not marketing copy. Its job is to let the second app begin without rediscovering the architecture — and, more importantly, to stop someone deleting code that looks unused but is load-bearing for a product that does not exist yet.
 
@@ -264,7 +264,7 @@ The refusal in (3) is right. The way out of it does not exist yet.
 ## Do not
 
 - Delete `tournament*` files, or the `tournaments` node, or the retained helpers
-- Rename `tournaments.rattlegolf.com` or the bundle id `com.rattlegolf.app`. The web product name is HardPan Tournaments
+- Rename `tournaments.rattlegolf.com` or the bundle id `com.rattlegolf.app`. The web product name is Rattle Golf Tournaments
 - Add Tournament pages to the Consumer native bundle
 - Run a schema migration on the `tournaments` node
 - Rename persisted identifiers for tidiness

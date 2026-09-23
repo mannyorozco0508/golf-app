@@ -152,11 +152,12 @@ async function measure(width, auth) {
         if (a.hero.height < 180) failures.push(`${label}: hero is ${a.hero.height}px tall - not a band`);
         if (Math.abs(a.hero.width - a.card.width) > 2) failures.push(`${label}: hero ${a.hero.width}px wide inside a ${a.card.width}px card - it should bleed to the card's edges`);
         if (a.scrollWidth > a.innerWidth) failures.push(`${label}: the page scrolls sideways (${a.scrollWidth} > ${a.innerWidth})`);
-        // innerText is the quiet "Rattle" label plus "Tournaments", not the old slash wordmark.
-        if (!/\bRattle\b/.test(a.heroText || '')) failures.push(`${label}: quiet Rattle label not on screen: ${JSON.stringify(a.heroText)}`);
+        // innerText is "Rattle Golf" under the mark plus "Tournaments", not the old slash wordmark.
+        if (!/\bRattle Golf\b/.test(a.heroText || '')) failures.push(`${label}: Rattle Golf not on screen: ${JSON.stringify(a.heroText)}`);
         if (!/\bTournaments\b/.test(a.heroText || '')) failures.push(`${label}: Tournaments not on screen: ${JSON.stringify(a.heroText)}`);
+        if (/HardPan/.test(a.heroText || '')) failures.push(`${label}: HardPan is on the tournament landing: ${JSON.stringify(a.heroText)}`);
         if (/Rattle\s*\/\s*Tournaments/i.test(a.heroText || '')) failures.push(`${label}: the slash wordmark came back: ${JSON.stringify(a.heroText)}`);
-        if (a.rattleText !== 'Rattle') failures.push(`${label}: the quiet label is ${JSON.stringify(a.rattleText)}, wanted mixed-case Rattle`);
+        if (a.rattleText !== 'Rattle Golf') failures.push(`${label}: the quiet label is ${JSON.stringify(a.rattleText)}, wanted Rattle Golf`);
         if (a.rattleTransform && a.rattleTransform !== 'none' && a.rattleTransform !== 'inherit') failures.push(`${label}: the quiet label is transformed (${a.rattleTransform}) - that is the old uppercase RATTLE`);
         if (a.markSrc !== 'logo-mark.png') failures.push(`${label}: the mark src is ${JSON.stringify(a.markSrc)}, wanted logo-mark.png`);
         if (!m.mark || m.mark.decoded !== true) failures.push(`${label}: logo-mark.png did not decode: ${JSON.stringify(m.mark)}`);

@@ -273,11 +273,12 @@ describe('PWA — two independent installable apps', () => {
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
         // The two versions are ALLOWED to diverge. Consumer is v51: the
-        // organizer-link sentences match owner-only setup. Tournament is v53.
+        // organizer-link sentences match owner-only setup. Tournament is v54:
+        // the product name is Rattle Golf Tournaments again.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
         assert.match(c, /^consumer-v51-owner-setup$/);
-        assert.match(t, /^tournament-v53-hardpan-word$/);
+        assert.match(t, /^tournament-v54-rattle-golf$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {

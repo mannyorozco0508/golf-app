@@ -428,7 +428,7 @@ describe('tournament-scorecard.html TELLS THE HOLDER WHAT THE LINK IS', () => {
         // real assertion rather than a match against an empty page.
         assert.ok(lines.length >= 5,
             `only ${lines.length} markup lines survived stripping the card: ${JSON.stringify(lines)}`);
-        assert.ok(lines.some((l) => /^Tournament Scorecard$/.test(l)), 'the card title is not in the stripped markup');
+        assert.ok(lines.some((l) => /^Rattle Golf Tournaments$/.test(l)), 'the card title is not in the stripped markup');
     });
 
     test('the card carries the admission, byte-exact, in static markup', () => {

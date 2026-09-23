@@ -179,11 +179,11 @@ describe('THE CLUB/TOURNAMENT IMPLEMENTATION SURVIVED — DO NOT DELETE THIS COD
 
     test('the Tournament build target is untouched', () => {
         const build = read('build-shell.js');
-        assert.match(build, /appName: 'HardPan Tournaments'/, 'Tournament identity is HardPan Tournaments');
-        assert.match(build, /cacheName: 'tournament-v53-hardpan-word'/,
+        assert.match(build, /appName: 'Rattle Golf Tournaments'/, 'Tournament identity is Rattle Golf Tournaments');
+        assert.match(build, /cacheName: 'tournament-v54-rattle-golf'/,
             'the Tournament manifest is precached, so the key must move with it');
-        assert.ok(!/Rattle/.test(build.slice(build.indexOf('tournament: {'))),
-            'Tournament must never be renamed Rattle Golf');
+        assert.ok(!/HardPan/.test(build.slice(build.indexOf('tournament: {'))),
+            'Tournament must not be renamed HardPan');
     });
 });
 
