@@ -1765,7 +1765,12 @@
 // round that plays a match, and the leader banner is one line - the first golfer
 // is 375px down instead of 614, with nine on screen instead of four.
 // leaderboard.html is precached.
-const CACHE_VERSION = 'golfapp-v202-board-header';
+// Moved to v203 because an organizer can keep the same anonymous account by
+// email link. admin.html loads email-link-auth.js (new, precached) and the
+// lobby card sends the link and finishes it with linkWithCredential, so the
+// trial and a founder pass stay on that uid. A device on v202 has no card,
+// and a cached admin.html would call a file the shell never stored.
+const CACHE_VERSION = 'golfapp-v203-email-link';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1877,6 +1882,9 @@ const SHELL_FILES = [
     // auth-boot.js; it awaits the token, writes the organizer clock and stamps
     // ownerUid on every round they create, and says the wall in words.
     './organizer-gate.js',
+    // Email-link sign-in (v203). admin.html loads it on the lobby. A cached
+    // shell without this file shows the button and the click does nothing.
+    './email-link-auth.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png',

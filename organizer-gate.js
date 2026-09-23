@@ -51,10 +51,24 @@
     // Steps 1 and 2. Resolves to the uid. Rejects only when there is no token
     // (auth-boot rejected: offline, or the SDK absent) or the organizer write
     // failed for a reason OTHER than write-once.
+    // The uid the NEXT write will present as auth.uid. authReady captured whoever
+    // was signed in at boot. Email-link sign-in (email-link-auth.js) can replace
+    // that user afterwards — a second device adopts the account that already
+    // holds the trial — and the rules compare ownerUid to the token, not to the
+    // boot-time uid. Stamp the live one. Absent a live user, the boot uid stands.
+    function liveUid() {
+        try {
+            var u = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
+            if (u && u.uid) return String(u.uid);
+        } catch (e) {}
+        return null;
+    }
     function ensureOrganizer(db) {
         var ready = window.authReady;
         if (!ready || typeof ready.then !== 'function') return Promise.reject(Object.assign(new Error('organizer-gate: no authReady on this page'), { code: 'no-auth' }));
         return ready.then(function (uid) {
+            var live = liveUid();
+            if (live) uid = live;
             var sv = (window.firebase && window.firebase.database && window.firebase.database.ServerValue) ? window.firebase.database.ServerValue.TIMESTAMP : Date.now();
             return db.ref('organizers/' + uid + '/firstSeenAt').set(sv).then(function () { return uid; }, function (err) {
                 if (isPermissionDenied(err)) return uid;   // write-once: the clock was already running

@@ -2421,22 +2421,17 @@ who gets the link is that round's organizer on their device, forever. The doors
 are hidden, not locked — `database.rules.json` still lets any client holding the
 code write an existing round.
 
-## ROADMAP — recorded 2026-09-22, NOT BUILT
+## ROADMAP — recorded 2026-09-22
 
-1. **(c) Email-link sign-in, after 1.0.3 is approved.** Firebase Auth email
-   link (passwordless), taken on the EXISTING anonymous user with
-   `linkWithCredential` so the uid is PRESERVED — link, never a fresh sign-in,
-   or every `organizers/<uid>` record and every round's `ownerUid` is orphaned.
-   Migration plan required before a line is written: `organizers/<uid>/
-   firstSeenAt` (the 21-day trial clock) and `organizers/<uid>/pass` (the
-   founder pass, `.write false`, server-set) are keyed on the thing being
-   changed; the other three origins each hold their own anonymous uid and
-   cannot be linked to the same account, so they sign in, adopt the account's
-   uid, and their old records become dead (which also turns "21 free days per
-   browser" into "per account" — stricter, and better). Apple's Guideline 4.8
-   requires Sign in with Apple only once another third-party social login
-   exists; email link alone does not trigger it, and it is the only provider
-   that works unchanged in Safari and on a Mac.
+1. **(c) Email-link sign-in — Wave 1 is in the app (2026-09-23).** The lobby
+   card on `admin.html` and `email-link-auth.js` send a Firebase email link and
+   finish it with `linkWithCredential` on the anonymous user, so the uid does
+   not change. `signInWithEmailLink` runs only when there is no anonymous user,
+   the user is already linked, or the link reports the email is already on an
+   account (the second device adopts the original uid). It does not ship until
+   Manny enables it in the Firebase console — see the checklist below. Apple's
+   Guideline 4.8 requires Sign in with Apple only once another third-party
+   social login exists; email link alone does not trigger it.
 2. **Security rules AFTER (c), never before.** Setup keys owner-only
    (`players`, `groupSizeOverrides`, `moneyPool`, `flights`,
    `additionalGames`, `courseData`, `settlementMode`, `supersededBy`,
@@ -2449,6 +2444,59 @@ code write an existing round.
    NO INTERIM RULES: owner-only writes before accounts exist would turn the
    2026-09-21 experience from "doors hidden" into "doors shut" on the
    organizer's own second device.
+
+## Email-link sign-in — Wave 1, 2026-09-23
+
+**What shipped.** `email-link-auth.js` (Consumer shell only) and a lobby card
+on `admin.html`. Send stores the email and the anonymous uid
+(`golfapp_email_for_sign_in`, `golfapp_email_link_uid`) and calls
+`sendSignInLinkToEmail`. Opening the link on `admin.html`, or pasting it into
+the card, calls `linkWithCredential` while the current user is anonymous, and
+`signInWithEmailLink` otherwise. `auth/email-already-in-use`,
+`auth/credential-already-in-use` and `auth/provider-already-linked` fall back
+to `signInWithEmailLink` so a second device can adopt the original uid.
+`organizer-gate.js` `ensureOrganizer` stamps `ownerUid` from
+`auth.currentUser` when one is present, so a save after that adoption writes
+the account that holds the trial, not the anonymous uid from boot.
+
+**Trial and founder pass — nothing is copied.** Both live at
+`organizers/<uid>`. `firstSeenAt` is write-once by the uid that owns it.
+`pass` is `.write: false`. Linking the anonymous user keeps that uid, so the
+clock and the pass stay with the rounds (`ownerUid` still matches). A second
+device that signs in becomes that same uid; the anonymous record it had
+before is not merged, and rounds created on it are not moved. The card says
+so. This client must not write a pass onto a new uid to "fix" that.
+
+**Continue URL.** `shareBaseUrl() + 'admin.html'`. On the web that is the
+page's own origin (a preview deploy stays on the preview). Inside Capacitor
+it is `https://golf-app-5a5.pages.dev/admin.html`, never
+`capacitor://localhost` (Build 9: that URL opens on nobody else's phone, and
+it is not an authorized domain). `index.html` with no `?game=` redirects to
+the lobby and would drop the code, so the continue URL is the lobby.
+`handleCodeInApp: true`, iOS bundle and Android package `com.rattlegolf.app`.
+Until an associated domain opens the mail link inside the app, paste the link
+back into the app that sent it. Opening it in another browser first attaches
+the email there.
+
+**Manny must flip these in the Firebase console (project `golfapp-9fb21`)
+before a link can be sent.** Until then `sendSignInLinkToEmail` fails with
+`auth/operation-not-allowed` and the card says email sign-in is not turned on.
+The code path is live; the provider is not.
+
+1. Authentication → Sign-in method → Email/Password → Enable, and enable
+   **Email link (passwordless sign-in)**. The password half can stay off.
+2. Authentication → Settings → Authorized domains. Add
+   `golf-app-5a5.pages.dev` and `localhost`. `golfapp-9fb21.firebaseapp.com`
+   and `golfapp-9fb21.web.app` are defaults and must stay. Do **not** add
+   `capacitor://localhost` — authorized domains are http(s) only, and the
+   continue URL does not use it. A Cloudflare preview host is not covered by
+   a wildcard; add that exact host or the link fails with
+   `auth/unauthorized-domain`.
+3. Optional: Authentication → Templates → Email address verification / magic
+   link, so the message sounds like Rattle Golf. The default template works.
+4. Do **not** publish owner-only Realtime Database rules in this wave. Existing
+   rounds stay writable by anyone with the code. Owner-only setup keys come
+   after organizers can sign in on a second device (roadmap item 2).
 
 ## Move a golfer to another group — Wave v199, 2026-09-22
 

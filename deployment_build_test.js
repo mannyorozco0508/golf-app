@@ -272,14 +272,11 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        // The two versions are ALLOWED to diverge, and here they do: waves 19 and
-        // 20 gave Tournament its own icon and its own manifest, so only Tournament
-        // bumped. Consumer's artwork and manifest are byte-identical and its worker
-        // must NOT move - a bump would re-download the Consumer shell for a change
-        // that is not in it.
+        // The two versions are ALLOWED to diverge. Consumer moved at v46 because
+        // email-link-auth.js joined that shell; Tournament stayed on v51.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v45-no-native-print$/);
+        assert.match(c, /^consumer-v46-email-link$/);
         assert.match(t, /^tournament-v51-import-name$/);
     });
 

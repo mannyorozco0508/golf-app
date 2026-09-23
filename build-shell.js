@@ -58,7 +58,10 @@ const GENERATED = ['sw.js', 'manifest.json'];
 const PRODUCTS = {
     consumer: {
         files: SHARED.concat(CONSUMER),
-        cacheName: 'consumer-v45-no-native-print',
+        // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
+        // that keeps the anonymous uid. A device on v45 has no card and cannot
+        // finish a link. Tournament is unchanged.
+        cacheName: 'consumer-v46-email-link',
         appName: 'Rattle Golf',
         shortName: 'Rattle Golf',
         description: 'Live-syncing golf scorecard and betting tracker',
