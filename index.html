@@ -1400,6 +1400,7 @@ html {
          renderGroupMissingNote() from renderScorecard(); static and above both
          view mounts for the same reason #save-state is. -->
     <div class="group-missing-note" id="group-missing-note" role="alert" style="display:none;"></div>
+    <div id="handicap-basis-note" class="match-hcp-note" style="display:none; white-space:pre-line;"></div>
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
@@ -1986,6 +1987,39 @@ html {
         return String(n);
     }
 
+    // Legacy rounds have no Handicap Index. Their line stays "HCP n", the
+    // sentence the card has always shown. A converted golfer's column is the
+    // Playing Handicap — the number net math uses — and Hole View shows
+    // Index, Course, and Playing together.
+    function golferHandicapLabel(p) {
+        const facing = (typeof handicapFacingLabel === 'function') ? handicapFacingLabel(p) : null;
+        if (!facing) return 'HCP ' + formatHcpDisplay(p ? p.hcp : '');
+        if (p.handicapUnconverted) return 'Index ' + formatHcpDisplay(p.handicapIndex);
+        return 'Playing ' + formatHcpDisplay(p.hcp);
+    }
+    function holeViewHandicapLabel(p) {
+        const facing = (typeof handicapFacingLabel === 'function') ? handicapFacingLabel(p) : null;
+        if (facing) return facing;
+        return 'HCP ' + formatHcpDisplay(p ? p.hcp : '');
+    }
+    function refreshHandicapBasisNote(players) {
+        const el = document.getElementById('handicap-basis-note');
+        if (!el) return;
+        const indexed = (players || []).filter(p => p && p.handicapIndex != null && String(p.handicapIndex).trim() !== '');
+        if (!indexed.length || typeof handicapFacingLabel !== 'function') {
+            el.style.display = 'none';
+            el.textContent = '';
+            return;
+        }
+        const lines = [];
+        if (indexed.some(p => p.handicapUnconverted) && typeof handicapUnconvertedNote === 'function') {
+            lines.push(handicapUnconvertedNote());
+        }
+        indexed.forEach(p => lines.push((p.name || 'Golfer') + ' \u2014 ' + handicapFacingLabel(p)));
+        el.style.display = 'block';
+        el.textContent = lines.join('\n');
+    }
+
     // NO TWO GOLFERS MAY SHARE A VISIBLE LABEL.
     //
     // The Full Card header showed p.name.split(" ")[0] and nothing else. On live
@@ -2489,7 +2523,7 @@ html {
             // while the teal dots answer "where do I stroke in this match?".
             const hvPlayer = filteredPlayers[i - 3];
             const hvHcpHtml = hvPlayer
-                ? `<div class="hv-hcp">HCP ${formatHcpDisplay(hvPlayer.hcp)}</div>` : '';
+                ? `<div class="hv-hcp">${escapeHtml(holeViewHandicapLabel(hvPlayer))}</div>` : '';
             html += `<div class="hv-player-row${hvPlayer && hvPlayer.out === true ? ' golfer-out' : ''}"><div class="hv-player-name">${escapeHtml(name)}${hvHcpHtml}`;
             // DOTS ARE DRAWN ONCE, BY THE CELL ITSELF.
             //
@@ -3491,7 +3525,7 @@ html {
                  // header and Hole View have always used for the same value, and a
                  // plus handicap depends on it too - a scratch golfer reads "HCP 0"
                  // and a plus-2 reads "HCP +2", never the internal "-2".
-                 + '<span class="lb-c-name">' + esc(r.name) + '<span class="lb-hcp">HCP ' + esc(formatHcpDisplay(r.hcp)) + '</span></span>'
+                 + '<span class="lb-c-name">' + esc(r.name) + '<span class="lb-hcp">' + esc(holeViewHandicapLabel((currentData.players || []).find(p => String(p.id) === String(r.id)) || { hcp: r.hcp })) + '</span></span>'
                  + '<span class="lb-c-score">' + score + '</span>'
                  + '<span class="lb-c-par">' + (r.started ? formatToPar(r.toPar) : '\u2014') + '</span>'
                  + '<span class="lb-c-thru">' + r.thru + '</span>'
@@ -8623,11 +8657,12 @@ html {
         // shortener cannot know that the golfer three columns over reduces to the
         // same word.
         const fcLabels = shortPlayerLabels(filteredPlayers);
+        if (typeof refreshHandicapBasisNote === 'function') refreshHandicapBasisNote(filteredPlayers);
         filteredPlayers.forEach((p, i) => {
             const label = fcLabels[i];
             headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}"${p.out === true ? ' class="golfer-out"' : ''}>`
                 + `<span class="fc-name">${label}</span>`
-                + `<span class="fc-hcp">HCP ${formatHcpDisplay(p.hcp)}</span></th>`;
+                + `<span class="fc-hcp">${escapeHtml(golferHandicapLabel(p))}</span></th>`;
         });
 
         // THE MATCH-HANDICAP CONTEXT LINE.

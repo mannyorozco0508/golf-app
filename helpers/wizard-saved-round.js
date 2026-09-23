@@ -32,7 +32,7 @@ const PAYLOAD_KEYS = ['eventName', 'roundDay', 'settlementMode', 'skinsRounding'
     'matchScoringStyle', 'matchStake', 'matchPressRule', 'nassauType', 'nassauScoring', 'nassauStake', 'nassauPressRule',
     'wolfPointVal', 'wolfLoneMult', 'wolfBlindMult', 'wolfTieRule', 'wolfLastPlaceRule', 'stablefordPointVal', 'groupSizeOverrides',
     'stablefordScoring', 'stablefordPoints', 'dotPointVal', 'greenieCarryover', 'skinsBuyIn', 'skinsPotFormat', 'skinsCarryOver',
-    'courseData', 'players'];
+    'courseData', 'teeRating', 'players'];
 
 function wizardSavedRound(opts) {
     const o = opts || {};
@@ -81,7 +81,12 @@ function wizardSavedRound(opts) {
         stablefordPointVal: 0, groupSizeOverrides, stablefordScoring: 'net',
         stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 4, albatross: 5 },
         dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsPotFormat: null, skinsCarryOver: false,
-        courseData, players,
+        courseData,
+        // teeRating since 2026-09-23: every save writes the Slope / Course Rating /
+        // Par the wizard had, including an empty set. Nulls here mean the fields
+        // were blank, so a reopen must not invent a conversion.
+        teeRating: { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 },
+        players,
         // What the round gains after setup.
         scores, kpWinners: { h3: '101' }, kpConfirmed: { confirmed: false }
     };

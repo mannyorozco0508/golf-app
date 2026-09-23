@@ -715,7 +715,16 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // organizer's create on that code was then refused. Found by the live
         // probe, not by targaryen (every row wrote to a record that existed).
         'database.rules.json': '2a7a491827e0e9adedafab5f2e43c8135de0ef776a4b2411f422ab3e1d09d42d',
-        'handicap.js': '558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9',
+        // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
+        // conversion. The seven stroke functions (parseHcp, getStrokes,
+        // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,
+        // relativeMatchStrokes, isRelativeMatchFormat) are unchanged. The new
+        // block at the bottom derives Course Handicap and Playing Handicap;
+        // player.hcp stays the number getStrokes already reads.
+        // handicap_index_test.js pins the formula, including .5 rounding up.
+        // Previous hash, for the record:
+        //   558a3e4c54189209553a734fa461fc9766b62fffa5cee990a493f82b0a46c3e9
+        'handicap.js': '2d3b2f7fd916a4b83a10491e822ece946203d2bbb11264962e7d888a7b450f17',
         'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     };
 

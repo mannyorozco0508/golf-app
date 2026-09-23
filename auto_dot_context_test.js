@@ -508,7 +508,7 @@ describe('DISPLAY ONLY — NOTHING ELSE MOVES', () => {
         assert.ok(!/dotPlanById|allocateMatchStrokes/.test(HV));
         assert.equal((SRC.match(/class="stroke-dots"/g) || []).length, 1,
             'dots are constructed in exactly one place in the file');
-        assert.match(HV, /<div class="hv-hcp">HCP \$\{formatHcpDisplay\(hvPlayer\.hcp\)\}<\/div>/,
+        assert.match(HV, /<div class="hv-hcp">\$\{escapeHtml\(holeViewHandicapLabel\(hvPlayer\)\)\}<\/div>/,
             'Hole View still shows the ACTUAL Playing Handicap');
     });
 });
@@ -519,7 +519,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v207-handicap-index';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');

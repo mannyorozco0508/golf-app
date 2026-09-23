@@ -383,6 +383,7 @@ html {
         </div>
     </div>
 
+    <div id="handicap-basis-note" style="display:none; white-space:pre-line; font-size:0.78rem; color:var(--text-muted); line-height:1.4; margin:0 0 10px 0;"></div>
     <div id="board-content">
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading Leaderboard...</div>
     </div>
@@ -1156,7 +1157,11 @@ html {
         // same line as the name (v201: one line, left-aligned, half the height) and
         // the net line under the gross.
         const hcpText = String(r.hcp === undefined || r.hcp === null ? '' : r.hcp).trim();
-        const hcpHtml = hcpText === '' ? '' : `<span class="player-hcp">HCP ${escapeHtml(hcpText)}</span>`;
+        const boardPlayer = (currentBoardData && currentBoardData.players || []).find(p => String(p.id) === String(r.id));
+        const facing = (boardPlayer && typeof handicapFacingLabel === 'function') ? handicapFacingLabel(boardPlayer) : null;
+        const hcpHtml = facing
+            ? `<span class="player-hcp">${escapeHtml(facing)}</span>`
+            : (hcpText === '' ? '' : `<span class="player-hcp">HCP ${escapeHtml(hcpText)}</span>`);
         return `<tr class="${posClass}"${pid}>
 ${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
 ${ind}<td class="player-name">${escapeHtml(r.name)}${badge}${skinsBadgeHtml(r.id)}${hcpHtml}</td>
@@ -1336,6 +1341,23 @@ ${ind.slice(4)}</tr>`;
         let matchScoringType = "net";
         if (gameFormat === 'nassau') matchScoringType = currentBoardData.nassauScoring || "net";
         if (gameFormat === 'match' || gameFormat === 'bestball') matchScoringType = currentBoardData.matchScoring || "net";
+
+        const basisNote = document.getElementById('handicap-basis-note');
+        if (basisNote) {
+            const indexed = players.filter(p => p && p.handicapIndex != null && String(p.handicapIndex).trim() !== '');
+            if (indexed.length && typeof handicapFacingLabel === 'function') {
+                const lines = [];
+                if (indexed.some(p => p.handicapUnconverted) && typeof handicapUnconvertedNote === 'function') {
+                    lines.push(handicapUnconvertedNote());
+                }
+                indexed.forEach(p => lines.push((p.name || 'Golfer') + ' \u2014 ' + handicapFacingLabel(p)));
+                basisNote.style.display = 'block';
+                basisNote.textContent = lines.join('\n');
+            } else {
+                basisNote.style.display = 'none';
+                basisNote.textContent = '';
+            }
+        }
 
         if (players.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 20px;">No players active. Admin needs to set up this game.</div>`;

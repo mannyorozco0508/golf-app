@@ -277,7 +277,7 @@ describe('PWA — two independent installable apps', () => {
         // sets HardPan in HTML, and the key moved with the consumer header.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v49-hardpan-word$/);
+        assert.match(c, /^consumer-v50-handicap-index$/);
         assert.match(t, /^tournament-v53-hardpan-word$/);
     });
 
