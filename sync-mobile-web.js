@@ -116,6 +116,10 @@ const CONSUMER_SHELL = [
     // the iOS bundle would ship a scorecard that cannot render the Cup card while
     // the browser can - the exact web/native divergence this list exists to stop.
     'ryder-cup.js',
+    // Email-link sign-in (Wave 1). Consumer only: admin.html loads it, and it
+    // links the anonymous uid rather than minting an account. Tournament keeps
+    // email-and-password and must not inherit this file.
+    'email-link-auth.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

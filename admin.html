@@ -32,6 +32,10 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <!-- Email-link sign-in (Wave 1). Links the anonymous uid in place so the
+         trial and a founder pass stay. Consumer only; tournament.html keeps
+         its own email-and-password form and does not load this. -->
+    <script src="email-link-auth.js"></script>
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="action-model.js"></script>
@@ -289,6 +293,13 @@
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        .email-link-card { text-align: left; max-width: 420px; margin: 0 auto 16px auto; padding: 12px 14px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
+        .email-link-card h2 { font-size: 0.95rem; color: var(--brand-green); margin: 0 0 6px 0; }
+        .email-link-card p, .email-link-card label { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 8px 0; display: block; }
+        .email-link-card input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.95rem; background: var(--bg-card); color: var(--text-main); }
+        .email-link-card button { margin-top: 8px; width: 100%; }
+        #email-link-status { font-weight: bold; color: var(--text-main); }
+        #email-link-status:empty { display: none; }
         /* v191: the offer to retire the round this one replaces (Round Ready). */
         .rr-retire-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 0 0; padding: 10px 12px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; font-size: 0.9rem; line-height: 1.4; cursor: pointer; }
         .rr-retire-row input { width: 22px; height: 22px; flex: 0 0 auto; }
@@ -467,6 +478,26 @@ html {
          (loadOrganizerStanding / renderOrganizerStanding). Above Resume, under the
          tiles: the first thing after "what are you setting up". -->
     <div id="lobby-standing" class="organizer-standing" role="status"></div>
+
+    <!-- KEEP THIS ORGANIZER. Anonymous auth is per browser, so a round set up
+         in the app is a spectator's round in Safari. The card is static markup
+         on the lobby — the screen a golfer gets by opening Home and touching
+         nothing — and email-link-auth.js does the send and the finish.
+         Finishing here calls linkWithCredential on the anonymous user, so the
+         uid does not change and the trial / founder pass stay on it. -->
+    <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title">
+        <h2 id="email-link-title">Keep this organizer</h2>
+        <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a sign-in link and finish it in this same app. It stays the same account, so the free trial and a founder pass stay with the rounds already set up on it.</p>
+        <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
+            <label for="email-link-input">Email</label>
+            <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
+            <button type="submit" id="email-link-send" class="btn-primary">Email me a sign-in link</button>
+        </form>
+        <label for="email-link-paste">Paste the link from the email</label>
+        <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link" aria-label="Sign-in link from the email">
+        <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
+        <p id="email-link-status" role="status"></p>
+    </section>
 
     <!-- RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 14px;">
