@@ -3,9 +3,9 @@
 //
 // The consumer web brand is HardPan (lobby, PWA manifest, share titles,
 // instructions, legal pages). The iOS bundle identifier is com.rattlegolf.app
-// and is permanent. The native display name stays "Rattle Golf" while iOS
-// 1.0.3 is Waiting for Review; capacitor.config.ts and Info.plist say when
-// it moves to HardPan. Tournaments stay Rattle, not HardPan.
+// and is permanent. The native display name in the repo is HardPan. Do not
+// archive a new iOS binary while 1.0.3 is in review. Tournaments on the web
+// are HardPan Tournaments. tournaments.rattlegolf.com stays the hostname.
 //
 // This file pins the identity surfaces that a golfer or the App Store actually
 // sees, and pins the boundary that keeps Tournament from being dragged along
@@ -50,22 +50,22 @@ const ADMIN = read('admin.html');
 const INSTRUCTIONS = read('instructions.html');
 
 const BRAND = 'HardPan';
-const NATIVE_NAME_HELD = 'Rattle Golf';
+const NATIVE_NAME = 'HardPan';
 const BUNDLE_ID = 'com.rattlegolf.app';
 
 // ---------------------------------------------------------------------------
 describe('RATTLE GOLF — THE NATIVE SHELL IDENTITY IS LOCKED', () => {
 
-    test('Capacitor appName stays Rattle Golf while 1.0.3 is in review', () => {
-        assert.match(CAP, /appName: 'Rattle Golf'/,
-            'the installed app must keep presenting itself as Rattle Golf until 1.0.3 ships');
-        assert.match(CAP, /After 1\.0\.3 is released, set appName to 'HardPan'/);
-        assert.ok(!/appName: 'HardPan'/.test(CAP),
-            'do not flip the native display name during the 1.0.3 review');
+    test('Capacitor appName is HardPan, and the 1.0.3 binary is not resubmitted from here', () => {
+        assert.match(CAP, /appName: 'HardPan'/,
+            'the repo display name is HardPan');
+        assert.match(CAP, /after 1\.0\.3 clears/);
+        assert.ok(!/appName: 'Rattle Golf'/.test(CAP),
+            'the repo display name is no longer Rattle Golf');
         const plist = read('ios/App/App/Info.plist');
-        assert.match(plist, /<key>CFBundleDisplayName<\/key>\s*<string>Rattle Golf<\/string>/);
-        assert.match(plist, /After that version ships/);
-        assert.match(read('android/app/src/main/res/values/strings.xml'), /<string name="app_name">Rattle Golf<\/string>/);
+        assert.match(plist, /<key>CFBundleDisplayName<\/key>\s*<string>HardPan<\/string>/);
+        assert.match(plist, /after 1\.0\.3 clears/);
+        assert.match(read('android/app/src/main/res/values/strings.xml'), /<string name="app_name">HardPan<\/string>/);
     });
 
     test('Capacitor appId is the permanent production bundle identifier', () => {
@@ -98,8 +98,8 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
     test('the manifest name and short_name are HardPan', () => {
         assert.equal(MANIFEST.name, BRAND);
         assert.equal(MANIFEST.short_name, BRAND);
-        assert.notEqual(MANIFEST.name, NATIVE_NAME_HELD,
-            'the web install name moved; the native display name is a separate hold');
+        assert.equal(MANIFEST.name, NATIVE_NAME,
+            'the web install name and the repo display name are both HardPan');
     });
 
     test('short_name fits the home screen without truncation', () => {
@@ -134,7 +134,7 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 describe('RATTLE GOLF — THE GOLFER-FACING SURFACES', () => {
 
     test('the lobby shows HardPan', () => {
-        assert.match(ADMIN, /<div class="lobby-title">HardPan<\/div>/);
+        assert.match(ADMIN, /<img src="hardpan-lockup\.svg" alt="HardPan"/);
     });
 
     test('a shared invite says HardPan and no longer says Beta', () => {
@@ -170,11 +170,11 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
     test('the Tournament shell keeps its own independent identity', () => {
         const tournament = BUILD.slice(BUILD.indexOf('tournament: {'));
         assert.ok(!/Rattle/.test(tournament),
-            'Tournament shell identity stays GolfApp Tournaments — not the consumer name');
-        assert.ok(!/HardPan/.test(tournament),
-            'Tournament must not be renamed HardPan');
-        assert.match(tournament, /appName: 'GolfApp Tournaments'/,
-            'Tournament keeps its working name until it is deliberately named');
+            'Tournament shell identity is HardPan Tournaments, not Rattle');
+        assert.match(tournament, /appName: 'HardPan Tournaments'/,
+            'Tournament web product is HardPan Tournaments');
+        assert.ok(!/appName: 'HardPan',/.test(tournament),
+            'Tournament must not reuse the consumer name literal');
     });
 
     test('the two products still declare two independent name literals', () => {
@@ -186,21 +186,13 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
     });
 
     test('the Tournament pages carry no Rattle Golf branding', () => {
-        // NARROWED 2026-09-16 (tournament landing polish), then 2026-09-18 (mark
-        // lockup). The guard was /Rattle/ - any occurrence. The landing carries
-        // the parent brand as logo-mark.png with a quiet "Rattle" label under
-        // it, then the product name "Tournaments" to the right. That is not the
-        // rename this test exists to refuse - the product is not called Rattle
-        // Golf, build-shell.js still says appName 'GolfApp Tournaments', and the
-        // manifest still says GolfApp Tournaments. So the refusal is the
-        // Consumer product's NAME, now "HardPan" (formerly "Rattle Golf"), plus the word "Rattle" is
-        // pinned to the one place it lives: tournament.html carries it only
-        // inside .tourney-wordmark and the comment above it, and the other two
-        // files not at all.
+        // The landing wordmark is HardPan + Tournaments. The hostname and the
+        // LLC stay. "Rattle Golf" as a product name must not return on these
+        // files. The scorecard and the engine carry no Rattle.
         ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js']
             .forEach(f => assert.ok(!/Rattle Golf/.test(read(f)), `${f} must not carry the old consumer product name`));
-        ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js', 'tournament-manifest.json']
-            .forEach(f => assert.ok(!/HardPan/.test(read(f)), `${f} must not be renamed HardPan`));
+        assert.match(read('tournament-manifest.json'), /HardPan Tournaments/);
+        assert.match(read('tournament.html'), /aria-label="HardPan Tournaments"/);
         ['tournament-scorecard.html', 'tournament-engine.js']
             .forEach(f => assert.ok(!/Rattle/.test(read(f)), `${f} must not carry Consumer branding`));
         const t = read('tournament.html');
@@ -208,8 +200,8 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         assert.ok(!/Rattle/.test(outside), 'tournament.html says Rattle somewhere other than the landing wordmark');
         assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/,
             'the parent brand is the mark file, not a text stand-in');
-        assert.match(t, /<span class="wm-rattle">Rattle<\/span>/,
-            'a quiet Rattle label sits with the mark');
+        assert.match(t, /<span class="wm-rattle">HardPan<\/span>/,
+            'HardPan sits with the mark');
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/,
             'Tournaments is the product word');
         assert.ok(!/wm-slash/.test(t), 'the slash wordmark is gone');
@@ -254,7 +246,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v205-hardpan-logo';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -338,12 +330,23 @@ describe('APP ICON ASSET SEAM', () => {
         });
     });
 
-    test('the shipped icons are downscales of the master, not independent art', () => {
+    test('the web icons are the ball mark; the App Store master stays the Stroke R', () => {
+        // icon-192 and icon-512 are the consumer PWA icons. They are no longer
+        // downscales of icon-1024.png. That master, and the copy in the iOS
+        // asset catalog, stay the Stroke R while 1.0.3 is in review.
+        const crypto = require('crypto');
+        const sha = f => crypto.createHash('sha256')
+            .update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
+        const MASTER_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
+        assert.equal(sha(MASTER), MASTER_SHA, 'icon-1024.png moved');
+        assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png'), MASTER_SHA,
+            'the iOS AppIcon moved');
+        assert.notEqual(sha('icon-512.png'), MASTER_SHA, 'the web icon is still the App Store master');
         const master = pngSize(MASTER);
         ICONS.forEach(({ file, size }) => {
             const s = pngSize(file);
-            assert.ok(size < master.w, `${file} must be smaller than the master — never upscale`);
-            assert.equal(s.w, s.h, `${file} must be square like the master`);
+            assert.ok(size < master.w, `${file} must be smaller than the master`);
+            assert.equal(s.w, s.h, `${file} must be square`);
         });
     });
 
@@ -459,35 +462,35 @@ describe('SERVICE WORKER SUPPRESSION SURVIVES THE RENAME', () => {
 // ---------------------------------------------------------------------------
 describe('THE HOMEPAGE BRAND MARK', () => {
 
-    // The lobby header is: theme toggle / brand mark / "HardPan" / prompt.
-    // Everything here is scoped to that header. ⛳ is still perfectly legitimate
-    // elsewhere on the page — the Club Round widget uses it — so a blanket ban on
-    // the emoji would be wrong and would fail for the wrong reason.
+    // The lobby header is: theme toggle / HardPan lockup / prompt.
+    // HARDPAN is inside hardpan-lockup.svg, beside the ball.
+    // A second HTML title would say the name twice. ⛳ is still legitimate
+    // elsewhere on the page, so a blanket ban on the emoji would be wrong.
     const header = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'), ADMIN.indexOf('class="home-widgets"'));
 
-    test('the header shows the Stroke R mark, not a generic emoji', () => {
-        assert.match(header, /<img src="logo-mark\.png"/,
-            'the homepage brand mark must be the approved artwork');
+    test('the header shows the ball lockup, not the Stroke R', () => {
+        assert.match(header, /<img src="hardpan-lockup\.svg" alt="HardPan"/,
+            'the homepage brand mark must be the approved lockup');
+        assert.ok(!/logo-mark\.png/.test(header),
+            'the Stroke R must not sit in the lobby header');
         assert.ok(!/class="lobby-logo[^"]*"[^>]*>\u26f3</.test(header),
             'the generic golf-hole emoji must not return as the brand mark');
     });
 
-    test('the five-tap admin gesture still lives on the mark', () => {
+    test('the five-tap admin gesture still lives on the lockup', () => {
         // The hidden admin panel is opened by tapping this element five times. A
         // visual change that dropped the handler would silently remove the only way
         // into the course-database tools.
-        assert.match(header, /class="lobby-logo lobby-mark" onclick="handleSecretTap\(\)"/,
+        assert.match(header, /class="lobby-lockup" onclick="handleSecretTap\(\)"/,
             'handleSecretTap must survive any restyling of the brand mark');
     });
 
-    test('the mark is the symbol only — the wordmark is not doubled', () => {
-        assert.match(header, /<div class="lobby-title">HardPan<\/div>/);
-        // Case-insensitive on purpose: a stacked wordmark would very likely be set
-        // in caps, and a case-sensitive count let exactly that slip through a
-        // negative control.
+    test('the wordmark is not doubled in HTML', () => {
+        assert.ok(!/<div class="lobby-title">HardPan<\/div>/.test(header),
+            'HARDPAN is in the lockup; a second heading says the name twice');
         const marks = header.match(/hardpan/gi) || [];
         assert.equal(marks.length, 2,
-            'exactly two: the img alt text and the heading. A third means a wordmark was stacked above the title.');
+            'exactly two: the lockup filename and the img alt. A third means a wordmark was stacked under the lockup.');
     });
 
     test('the two Consumer mode icons are the approved pair', () => {
@@ -503,34 +506,18 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'that is a different screen and must not inherit the brand mark');
     });
 
-    test('the mark reads in both themes', () => {
-        // The forest-green R is nearly invisible on the dark card. The cream disc is
-        // what makes it legible, so it is declared for BOTH themes, not just one.
-        assert.match(ADMIN, /--brand-cream: #F6F4EC;/);
-        const light = ADMIN.slice(ADMIN.indexOf(':root'), ADMIN.indexOf('html.dark-mode'));
-        const dark = ADMIN.slice(ADMIN.indexOf('html.dark-mode'));
-        assert.match(light, /--brand-cream: #F6F4EC;/, 'light theme');
-        assert.match(dark, /--brand-cream: #F6F4EC;/, 'dark theme');
-        assert.match(ADMIN, /\.lobby-mark \{[^}]*background: var\(--brand-cream\)/,
-            'the disc must use the brand variable, not a hardcoded colour');
+    test('the lockup sits on the near-black field in both themes', () => {
+        // The wordmark is bone. On the light card that colour disappears, so the
+        // chip carries #0B0F0C itself and dark mode does not repaint it.
+        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
+        const dark = ADMIN.slice(ADMIN.indexOf('html.dark-mode'), ADMIN.indexOf('.lobby-lockup'));
+        assert.ok(!/\.lobby-lockup/.test(dark),
+            'dark mode must not repaint the lockup off the near-black field');
     });
 
-    // REVERSED DELIBERATELY. This asserted the disc stayed within roughly the
-    // footprint of the 3.5rem emoji it replaced - the mark was supporting cast.
-    // The decision changed: the mark leads the home screen and the wordmark
-    // supports it. A ceiling is the wrong guard for that, because it would pass
-    // just as happily with the wordmark set larger again. What matters is the
-    // RELATIONSHIP, so that is what is asserted now.
-    test('the mark leads, and the wordmark supports it', () => {
-        const [, disc] = /\.lobby-mark \{ width: (\d+)px/.exec(ADMIN);
-        const [, sym] = /\.lobby-mark img \{ width: (\d+)px/.exec(ADMIN);
-        const [, word] = /\.lobby-title \{ font-size: ([\d.]+)rem/.exec(ADMIN);
-        assert.ok(Number(sym) < Number(disc), 'the symbol does not fit inside its disc');
-        // 1rem is 16px at the root, so the wordmark's cap height is nowhere near
-        // the disc. Compared as rendered box against rendered box.
-        assert.ok(Number(disc) > Number(word) * 16 * 2,
-            `a ${disc}px disc does not lead a ${word}rem wordmark`);
-        assert.ok(Number(disc) >= 120, `the disc is ${disc}px and does not dominate`);
+    test('the lockup is one wide bar', () => {
+        const [, w] = /\.lobby-lockup \{[^}]*width:\s*(\d+)px/.exec(ADMIN);
+        assert.ok(Number(w) >= 280, 'the lockup is ' + w + 'px wide');
     });
 });
 
@@ -543,12 +530,9 @@ describe('THE BRAND MARK ASSET', () => {
         assert.equal(buf.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
         const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
         assert.equal(w, h);
-        // Retina, expressed as the rule rather than a number: the asset must carry
-        // at least 2x the size it is DISPLAYED at, so growing the mark on screen
-        // cannot quietly leave a soft logo behind.
-        const [, sym] = /\.lobby-mark img \{ width: (\d+)px/.exec(read('admin.html'));
-        assert.ok(w >= Number(sym) * 2,
-            `the asset is ${w}px but is displayed at ${sym}px, below 2x for retina`);
+        // The receipt prints it at 64 CSS px. 2x of that is 128. The lobby no
+        // longer displays this file; the lockup does.
+        assert.ok(w >= 128, `logo-mark.png is ${w}px, below 2x of the 64px print size`);
     });
 
     test('the mark is transparent — it sits on the disc, it does not carry a field', () => {
@@ -580,9 +564,9 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';/);
-        assert.match(BUILD, /cacheName: 'consumer-v47-hardpan-email-link'/);
-        assert.match(BUILD, /cacheName: 'tournament-v51-import-name'/,
-            'Tournament got its own manifest in wave 20 and its cache moved with it');
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v205-hardpan-logo';/);
+        assert.match(BUILD, /cacheName: 'consumer-v48-hardpan-logo'/);
+        assert.match(BUILD, /cacheName: 'tournament-v52-hardpan'/,
+            'Tournament cache moved with the ball mark and the HardPan name');
     });
 });

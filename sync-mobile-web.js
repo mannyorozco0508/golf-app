@@ -107,6 +107,8 @@ const CONSUMER_SHELL = [
     // ships exactly what it always shipped; what changed is that Tournament no
     // longer gets it for free.
     'icon-192.png', 'icon-512.png',
+    // The ball-on-firm lockup and the tab icon. Consumer only.
+    'hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
     // live-skins.js: which config each live skins surface builds its ledger

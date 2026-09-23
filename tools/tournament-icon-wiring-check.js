@@ -35,10 +35,14 @@ const DIST = path.join(ROOT, 'dist');
 // The Consumer artwork as it shipped before this wave. Digests, not names - if
 // somebody renames icon-192.png the Consumer bundle still has to contain these
 // exact bytes or this check fails.
+// Consumer web icons are the ball on firm ground. logo-mark.png is the same
+// ball with a transparent field (receipt and tournament landing). Tournament
+// ships its own files of that ball, so these digests must not appear there.
 const CONSUMER_BEFORE = {
-    '5719179d6fc26ad325402deff46129b63af6d4c2462c4a2101f1d8cc635c4a4f': 'consumer icon 192',
-    '7d3bf7c95b7cfcdaad13c88825ecaf17253ef17f6c67dd8427f840bfac5e2f89': 'consumer icon 512',
-    '976628c5908a98468afff8cdea3c356ebca3c2e4aa59b1c7633d9ff51845d110': 'consumer logo-mark 256',
+    '50c7b7c463021e8b017bc0e248af3a54a84629f2490d54c2f17f413f037408cc': 'consumer icon 192 ball',
+    'f9a9150f1a02840f1ad685697f90524b3431c433c6a5cb61e0db8a59ad3154e4': 'consumer icon 512 ball',
+    '5fd6924427a4c8959eca59ce15a39d981a54dee2579b0078fb0789e9d2816a24': 'consumer logo-mark 256 ball',
+    '55e4ee5c6ca06df9cae7a64a11bc0f92593d91a962a244a053dfe41e0c97bbca': 'consumer favicon 32 ball',
 };
 const CONSUMER_MASTER_1024 = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
 
@@ -49,7 +53,7 @@ const TOURNAMENT_MASTERS = [
 
 const CONSUMER_PAGES = ['index.html', 'admin.html', 'leaderboard.html', 'settlement.html',
     'sidematches.html', 'skins.html', 'stats.html', 'trip.html', 'instructions.html',
-    'shared.html'];
+    'shared.html', 'game.html'];
 const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 // The four that have linked the Consumer manifest since before either wave. The
 // other six Consumer pages have never had one, and that is not this wave to change.
@@ -67,7 +71,7 @@ function resolveManifest(dir, page) {
     if (!fs.existsSync(target)) return null;
     try { return JSON.parse(fs.readFileSync(target, 'utf8')); } catch (e) { return null; }
 }
-const isTournamentManifest = m => !!m && m.name === 'GolfApp Tournaments'
+const isTournamentManifest = m => !!m && m.name === 'HardPan Tournaments'
     && m.start_url === './tournament.html'
     && Array.isArray(m.icons) && m.icons.length > 0
     && m.icons.every(i => /^tournament-icon-/.test(i.src) && i.purpose === 'any');
@@ -227,8 +231,13 @@ function swPngs(dir) {
             const row = inv.tournament.find(r => r.file === m[1].replace(/^\.\//, ''));
             return !!row && row.w === 180 && !!tourSha[row.sha];
         }),
-        noConsumerPageGainedOne: CONSUMER_PAGES.every(p =>
-            !/apple-touch-icon/i.test(fs.readFileSync(path.join(ROOT, p), 'utf8'))),
+        // Consumer pages now declare an apple-touch icon, and it is the consumer
+        // mark (icon-192.png), never a tournament file.
+        consumerAppleTouchIsTheConsumerIcon: CONSUMER_PAGES.every(p => {
+            const src = fs.readFileSync(path.join(ROOT, p), 'utf8');
+            return /<link rel="apple-touch-icon" href="icon-192\.png">/.test(src)
+                && !/tournament-icon-/.test(src);
+        }),
 
         // 8. THE MANIFEST LINK - RESOLVED, NOT READ AS A STRING.
         //

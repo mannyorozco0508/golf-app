@@ -323,7 +323,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v205-hardpan-logo';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -341,7 +341,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it issues every round, trip and tournament code and
         // checks the code is free first. A cached shell without it cannot start
         // anything at all.
-        assert.equal(entries.length, 46);  // 46: email-link-auth.js joined (v203: lobby email-link sign-in, keeps the anonymous uid);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 49);  // 46: email-link-auth.js joined (v203: lobby email-link sign-in, keeps the anonymous uid);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         ['./index.html','./score-marks.js','./firebase-app-compat.js','./firebase-database-compat.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));
     });

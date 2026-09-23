@@ -74,7 +74,7 @@ const DELIBERATE = [
     {
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
-        to: '|Rattle|Tournaments|' + HERO_LINE + '|'
+        to: '|HardPan|Tournaments|' + HERO_LINE + '|'
     },
     {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
@@ -128,8 +128,8 @@ describe('THE HERO BAND', () => {
         const hero = region.slice(at, region.indexOf('id="signin-panel-setup"'));
         assert.match(hero, /<img class="wm-mark" src="logo-mark\.png" alt="" width="56" height="56">/,
             'the parent brand is the mark file');
-        assert.match(hero, /<span class="wm-rattle">Rattle<\/span>/,
-            'a quiet Rattle label sits with the mark');
+        assert.match(hero, /<span class="wm-rattle">HardPan<\/span>/,
+            'HardPan sits with the mark');
         assert.match(hero, /<span class="wm-product">Tournaments<\/span>/,
             'Tournaments is the product word on the right');
         assert.ok(!/wm-slash/.test(hero), 'the slash wordmark must not return');
@@ -178,7 +178,7 @@ describe('THE HERO BAND', () => {
         assert.ok(disc, 'no .wm-disc rule');
         assert.match(disc[0], /grid-column:\s*1/, 'the mark is in column 1');
         assert.match(disc[0], /grid-row:\s*1/, 'the mark is in row 1');
-        assert.match(disc[0], /#F6F4EC/, 'the disc is cream so the forest-green R reads on the dark band');
+        assert.match(disc[0], /#0B0F0C/, 'the disc is near-black so the bone ball reads on the dark band');
         const rattle = /\.tourney-wordmark \.wm-rattle\s*\{[^}]*\}/.exec(style);
         assert.ok(rattle, 'no .wm-rattle rule');
         assert.match(rattle[0], /grid-column:\s*1/, 'Rattle sits under the mark, same column');

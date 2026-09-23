@@ -218,7 +218,7 @@ describe('THEY LOOK LIKE RATTLE GOLF', () => {
         // Golf Tournaments is named as out of scope rather than silently covered.
         PAGES.forEach(p => {
             const src = read(p);
-            assert.match(src, /<div class="brand">HardPan<\/div>/);
+            assert.match(src, /<img src="hardpan-lockup\.svg" alt="HardPan"/);
             assert.match(src, /Rattle Golf/);
             assert.match(src, /support@rattlegolf\.com/);
         });

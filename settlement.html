@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <title>Round Settlement</title>
     <script src="./firebase-app-compat.js"></script>
     <!-- Anonymous Auth at boot (MONETIZATION.md step 1). One tag, fire-and-forget:
@@ -228,7 +231,7 @@
         .receipt-head { text-align: center; margin-bottom: 14px; }
         /* THE MARK, PRINT ONLY. The printed receipt is the one thing that leaves the
            app - paper, a saved PDF, a group chat - so it carries the brand mark
-           (logo-mark.png, the lobby's own asset, precached by sw.js and shipped in
+           (logo-mark.png, the print mark, precached by sw.js and shipped in
            the native bundle - never a network fetch). On SCREEN it is display:none:
            the element is in the header so the print path needs no second header,
            and it takes no space, so nothing on the page moves. The size is set in

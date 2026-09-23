@@ -60,16 +60,41 @@ const PROBE = `
     out.linkHeightPx = Math.round(link.getBoundingClientRect().height);
   }
 
-  // The mark leads. Rendered, not declared.
-  const mark = document.querySelector('.lobby-mark');
-  const sym = document.querySelector('.lobby-mark img');
-  const word = document.querySelector('.lobby-title');
-  const h = el => el ? Math.round(el.getBoundingClientRect().height) : 0;
-  const w = el => el ? Math.round(el.getBoundingClientRect().width) : 0;
-  out.markPx = w(mark);
-  out.symbolPx = w(sym);
-  out.wordmarkPx = h(word);
-  out.wordmarkText = word ? (word.textContent || '').trim() : null;
+  // The lockup is the header. HARDPAN is inside the SVG, so the probe reads
+  // the file the img actually loaded, and measures the bar on screen.
+  const lock = document.querySelector('.lobby-lockup');
+  const img = lock ? lock.querySelector('img') : null;
+  const lr = lock ? lock.getBoundingClientRect() : null;
+  let green = false, bone = false;
+  if (img && img.naturalWidth > 0) {
+      try {
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          const g = c.getContext('2d');
+          g.drawImage(img, 0, 0);
+          const data = g.getImageData(0, 0, c.width, c.height).data;
+          for (let i = 0; i < data.length; i += 16) {
+              const R = data[i], G = data[i + 1], B = data[i + 2];
+              if (R > 30 && R < 70 && G > 100 && G < 150 && B > 50 && B < 100) green = true;
+              if (R > 220 && G > 210 && B > 200) bone = true;
+          }
+      } catch (e) { out.lockupDrawError = String(e); }
+  }
+  out.lockup = {
+      w: lr ? Math.round(lr.width) : 0,
+      h: lr ? Math.round(lr.height) : 0,
+      alt: img ? img.alt : null,
+      src: img ? img.getAttribute('src') : null,
+      natural: img ? img.naturalWidth : 0,
+      bg: lock ? getComputedStyle(lock).backgroundColor : null,
+      green: green, bone: bone
+  };
+  const card = document.getElementById('email-link-card');
+  const title = document.getElementById('email-link-title');
+  out.email = {
+      shown: !!(card && card.getClientRects().length > 0),
+      title: title ? (title.innerText || '').trim() : null
+  };
 
   // EXACTLY ONE THING IS ASKED FOR, and it is the game code. Scoped to the lobby:
   // the setup wizard lives in the same document behind display:none and has plenty
@@ -115,11 +140,18 @@ const PROBE = `
   if (out.linkHeightPx < 40) problems.push('the resume control is '
       + out.linkHeightPx + 'px tall, below a usable touch target');
 
-  if (!(out.markPx > out.wordmarkPx)) problems.push('the wordmark (' + out.wordmarkPx
-      + 'px) is not led by the mark (' + out.markPx + 'px)');
-  if (!(out.symbolPx > 0 && out.symbolPx < out.markPx))
-      problems.push('the symbol does not sit inside its disc');
-  if (!out.wordmarkText) problems.push('the wordmark is gone - a symbol alone names nothing');
+  if (!(out.lockup && out.lockup.w >= 240 && out.lockup.h >= 40))
+      problems.push('the lockup is not a wide bar on screen: ' + JSON.stringify(out.lockup));
+  if (!out.lockup || out.lockup.alt !== 'HardPan' || out.lockup.src !== 'hardpan-lockup.svg')
+      problems.push('the header img is not the HardPan lockup: ' + JSON.stringify(out.lockup));
+  if (!(out.lockup && out.lockup.natural > 0))
+      problems.push('the lockup image did not decode');
+  if (!(out.lockup && out.lockup.green && out.lockup.bone))
+      problems.push('the lockup pixels are not green and bone: ' + JSON.stringify(out.lockup));
+  if (!out.lockup || out.lockup.bg !== 'rgb(11, 15, 12)')
+      problems.push('the lockup field is not near-black #0B0F0C: ' + (out.lockup && out.lockup.bg));
+  if (!out.email || !out.email.shown || out.email.title !== 'Keep this organizer')
+      problems.push('the email-link card is not on the home screen: ' + JSON.stringify(out.email));
 
   // RE-PINNED 2026-09-20. The lobby asks for TWO typed things, deliberately: the
   // game code (Open) and the code of a previous round to start from - the copy
@@ -127,10 +159,14 @@ const PROBE = `
   // prefill admin.html?game=NEW&copyFrom=OLD is emitted from"). This check kept
   // the older rule, "the game code and nothing else", and had been red since the
   // field returned. Exactly these two, in this order, and no third.
-  if (out.textInputs.length !== 2 || out.textInputs[0] !== 'join-code-input' || out.textInputs[1] !== 'copy-code-input')
+  // RE-PINNED 2026-09-23. The email-link paste field is a third text input,
+  // ahead of the two round-code fields. The sign-in email is type=email and
+  // is checked separately above.
+  if (out.textInputs.length !== 3 || out.textInputs[0] !== 'email-link-paste'
+      || out.textInputs[1] !== 'join-code-input' || out.textInputs[2] !== 'copy-code-input')
       problems.push('the lobby asks for ' + out.textInputs.length + ' typed things: '
-          + JSON.stringify(out.textInputs) + ' - it should ask for the game code and '
-          + 'the code of a round to start from, and nothing else');
+          + JSON.stringify(out.textInputs) + ' - it should ask for the pasted sign-in '
+          + 'link, the game code, and the code of a round to start from');
   if (!out.code.onScreen) problems.push('the game-code row is not on screen');
   if (out.code.inputH < 44) problems.push('the code field is ' + out.code.inputH
       + 'px tall, below a usable touch target');

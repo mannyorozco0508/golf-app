@@ -6,11 +6,12 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<!-- DISPLAY NAME HELD while iOS 1.0.3 is Waiting for Review as Rattle Golf.
-	     After that version ships, set this string and capacitor.config.ts appName
-	     to HardPan together. Do not change this during the 1.0.3 review. -->
+	<!-- DISPLAY NAME is HardPan in the repo. Do not archive or upload a new
+	     iOS binary while 1.0.3 is in review — that binary still says Rattle
+	     Golf. Update the App Store Connect listing and archive the next build
+	     only after 1.0.3 clears. The bundle id stays com.rattlegolf.app. -->
 	<key>CFBundleDisplayName</key>
-        <string>Rattle Golf</string>
+        <string>HardPan</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

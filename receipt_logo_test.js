@@ -43,8 +43,10 @@ describe('THE MARKUP: one header, the mark first in it, adjacent to the opening 
         assert.ok(fn.includes('<div class="receipt-head" id="receipt-export-head">' + IMG + '\n'), 'the mark sits against the opening tag so the tag-stripped text does not change');
         assert.equal((code.match(/receipt-mark/g) || []).length, 3, 'one in the builder, one screen rule, one print rule');
     });
-    test('it is the lobby\'s asset - admin.html shows the same file - and nothing else on the page names an image', () => {
-        assert.match(read('admin.html'), /<img src="logo-mark\.png" alt="HardPan"/);
+    test('the receipt still uses the precached print mark, and the page has exactly one image', () => {
+        // The lobby header is hardpan-lockup.svg. This page keeps logo-mark.png,
+        // which is what the print path and the native PDF already decode.
+        assert.match(code, /src="logo-mark\.png"/);
         assert.equal((code.match(/<img /g) || []).length, 1, 'the receipt has exactly one image');
     });
     test('a rendered header carries the tag, and its tag-stripped text is unchanged by it', () => {
