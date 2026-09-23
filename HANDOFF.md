@@ -2282,6 +2282,73 @@ wrong.
   flight is a tee-time wave in `tournament.html`; a round flight is a payout
   scope. They share a word and nothing else. Do not "unify" them.
 
+## The organizer link, shared and claimed — Wave v200, 2026-09-22
+
+**The problem.** `ownerUid` is an anonymous Firebase uid, and anonymous auth is
+per browser ORIGIN: the App Store app, Safari, the home-screen PWA and a Mac are
+four organizers on one person's desk. On 2026-09-21 Manny created X7Z8HM in the
+app and Safari showed him his own round as a spectator. The cure already existed
+— `?organizer=TOKEN`, remembered per device — and was rendered ONLY on the Group
+Links panel, which only somebody the gate already calls the organizer can see.
+
+**(a) Share.** `organizer-gate.js` owns the URL, the words and the paths:
+`organizerShareUrl` = `shareBaseUrl() + 'index.html?game=CODE&organizer=TOKEN'`
+(never `location` — inside the shell that is `capacitor://localhost`, the Build-9
+failure); `organizerShareText` = "Organizer link for CODE — opens setup on any
+device. Keep it to yourself."; `shareOrganizerLink` goes to @capacitor/share
+through `Capacitor.Plugins` (the native injected bridge — the only runtime the
+device has, see `native-export.js`), else `navigator.share`, else the clipboard,
+else a prompt, resolving `shared | copied | shown | failed`. Three callers:
+Round Ready (`admin.html` — "Your own devices"), the Game tab, and the
+scorecard's Group Links panel (a Share beside the Copy). Organizer-only, at the
+function as well as the button. `game.html` now loads `product-links.js`.
+
+**(d) Paste-to-claim.** `claimOrganizerToken(code, data, text)` reads a pasted
+URL **or** a bare token (`tokenFromPaste`), checks it against THIS round's
+`organizerToken`, and stores `golfapp_organizer_<CODE>`. Nothing is written to
+Firebase and no round is read — a claim is a device fact. Offered on
+admin.html's refusal card, the scorecard and the Game tab, and only on a BARE
+link whose doors are hidden: never on a group link (a scorekeeper is not a
+locked-out organizer), never when the doors are already open, never on a round
+with no token (nothing to check against). Wrong token: "That link isn't for this
+round."; rubbish: "Paste the whole link, or the token from it."
+`organizer_link_share_test.js` (34, incl. Chrome: a non-organizer device types
+the pasted link into the real box, taps Unlock setup, and ✏️ + 👥 appear).
+
+**Still true, and still the sharp edge.** The token is a BEARER SECRET: anyone
+who gets the link is that round's organizer on their device, forever. The doors
+are hidden, not locked — `database.rules.json` still lets any client holding the
+code write an existing round.
+
+## ROADMAP — recorded 2026-09-22, NOT BUILT
+
+1. **(c) Email-link sign-in, after 1.0.3 is approved.** Firebase Auth email
+   link (passwordless), taken on the EXISTING anonymous user with
+   `linkWithCredential` so the uid is PRESERVED — link, never a fresh sign-in,
+   or every `organizers/<uid>` record and every round's `ownerUid` is orphaned.
+   Migration plan required before a line is written: `organizers/<uid>/
+   firstSeenAt` (the 21-day trial clock) and `organizers/<uid>/pass` (the
+   founder pass, `.write false`, server-set) are keyed on the thing being
+   changed; the other three origins each hold their own anonymous uid and
+   cannot be linked to the same account, so they sign in, adopt the account's
+   uid, and their old records become dead (which also turns "21 free days per
+   browser" into "per account" — stricter, and better). Apple's Guideline 4.8
+   requires Sign in with Apple only once another third-party social login
+   exists; email link alone does not trigger it, and it is the only provider
+   that works unchanged in Safari and on a Mac.
+2. **Security rules AFTER (c), never before.** Setup keys owner-only
+   (`players`, `groupSizeOverrides`, `moneyPool`, `flights`,
+   `additionalGames`, `courseData`, `settlementMode`, `supersededBy`,
+   `organizerToken`), scores and the KP/marker keys open to any scorekeeper
+   holding the code. `auth.uid === data.child('ownerUid').val()` is the only
+   check the rules can make cheaply and correctly — the shape
+   `tournaments/$code` already uses, where the rules ALREADY demand a
+   non-anonymous provider. A token or a PIN cannot be verified while
+   `events/$code` is world-readable: every client can already read them.
+   NO INTERIM RULES: owner-only writes before accounts exist would turn the
+   2026-09-21 experience from "doors hidden" into "doors shut" on the
+   organizer's own second device.
+
 ## Move a golfer to another group — Wave v199, 2026-09-22
 
 **The control.** A `[G1 ▾]` selector on every row of the 👥 Players sheet

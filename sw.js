@@ -1749,7 +1749,13 @@
 // "(Group N)" reads the live roster, not the kpLeaders stamp a v199 move can
 // leave stale. A phone that installed v199 in the meantime would otherwise keep
 // the version that shows the old group.
-const CACHE_VERSION = 'golfapp-v199-kp-live-group';
+// Moved to v200 because the organizer link is offered where the organizer is and
+// can be claimed where a device is stuck: "Share organizer link" on Round Ready,
+// the Game tab and the Group Links panel, and "Are you the organizer? Paste your
+// organizer link." on the refusal card, the scorecard and the Game tab.
+// organizer-gate.js, index.html, admin.html and game.html are precached; a device
+// on v199 has neither button and cannot claim a round it set up elsewhere.
+const CACHE_VERSION = 'golfapp-v200-organizer-link';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

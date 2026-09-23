@@ -8,8 +8,12 @@
     <!-- Anonymous Auth at boot, the way every consumer page does it: one tag, never
          blocks render. This page writes nothing; the token only keeps the boot uniform. -->
     <script src="auth-boot.js"></script>
-    <!-- organizer-gate.js: isRoundOrganizer, behind the Edit round setup button (v189). -->
+    <!-- organizer-gate.js: isRoundOrganizer, behind the Edit round setup button
+         (v189), and the organizer link's share + claim (v200). -->
     <script src="organizer-gate.js"></script>
+    <!-- product-links.js: shareBaseUrl() - the organizer link must carry the web
+         origin, never capacitor://localhost (v200). -->
+    <script src="product-links.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- THE GAME TAB (2026-09-20). What is being played, in plain language, on every
          link - read-only, touches no round data. It renders from the same engines
@@ -126,6 +130,12 @@
         .game-group .g-who { flex: 1 1 auto; }
         .game-group .g-mine { font-size: 0.72rem; font-weight: bold; color: var(--accent-red); }
         /* The organizer's way into the setup this page describes (v189). */
+        /* v200: paste-to-claim (the same shape as the scorecard's). */
+        .claim-box { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; background: var(--bg-card); margin: 10px 0; }
+        .claim-label { display: block; font-size: 0.88rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .claim-input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-page); color: var(--text-main); }
+        .claim-btn { width: 100%; margin-top: 8px; min-height: 44px; border-radius: 8px; border: 2px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 1rem; cursor: pointer; }
+        .claim-note { margin-top: 8px; font-size: 0.82rem; color: var(--accent-red); min-height: 1em; }
         .game-setup-link { display: block; text-align: center; text-decoration: none; margin: 0 0 12px 0; padding: 12px; min-height: 48px; box-sizing: border-box; border: 1px solid var(--brand-navy); border-radius: 12px; color: var(--brand-navy); font-weight: bold; font-size: 0.95rem; background: var(--bg-card); }
     </style>
 <style>
@@ -165,6 +175,9 @@ html {
 
     <!-- Rendered for the organizer only (canReachSetup); empty for everyone else. -->
     <div id="game-setup-mount"></div>
+    <!-- PASTE-TO-CLAIM (v200): on a bare link whose doors are hidden, the organizer
+         link unlocks setup on this device. Empty on a group link. -->
+    <div id="game-claim-mount"></div>
 
     <div id="game-content">
         <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading the round...</div>
@@ -406,10 +419,48 @@ html {
         const mount = document.getElementById('game-setup-mount');
         if (!mount) return;
         const players = (data && data.players) || [];
-        mount.innerHTML = (players.length > 0 && canReachSetup(data))
+        const isOrg = players.length > 0 && canReachSetup(data);
+        mount.innerHTML = isOrg
             ? '<a class="game-setup-link" href="admin.html?game=' + currentMode + '">\u270F\uFE0F Edit round setup</a>'
               + '<a class="game-setup-link" href="index.html?game=' + currentMode + '&players=1">\uD83D\uDC65 Players</a>'
+              // (a) v200: the link that makes another device the organizer, offered
+              // where the organizer already is. organizer-gate.js owns the words.
+              + (data && data.organizerToken ? '<button type="button" class="game-setup-link" onclick="shareOrganizerLinkFromGame(this)">\uD83D\uDD11 Share organizer link</button>' : '')
             : '';
+        renderGameClaim(data);
+    }
+    function shareOrganizerLinkFromGame(btn) {
+        const was = btn ? btn.textContent : null;
+        return window.organizerGate.shareOrganizerLink(currentMode, currentData || {}).then(how => {
+            if (btn) { btn.textContent = how === 'copied' ? '\u2713 Copied' : (how === 'failed' ? 'Not shared' : '\u2713 Shared'); setTimeout(() => { btn.textContent = was; }, 2000); }
+            return how;
+        });
+    }
+    // (d) v200: the stuck device unsticks itself, here as on the scorecard and the
+    // refusal card. Never on a group link; never when the doors are already open.
+    function renderGameClaim(data) {
+        const mount = document.getElementById('game-claim-mount');
+        if (!mount) return;
+        const onGroupLink = urlParams.get('group') !== null;
+        const show = !onGroupLink && !canReachSetup(data) && !!(data && data.organizerToken) && !!window.organizerGate;
+        if (!show) { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<div class="claim-box">'
+            + '<label class="claim-label" for="gc-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
+            + '<input id="gc-input" class="claim-input" type="text" inputmode="url" autocomplete="off" placeholder="Paste the link or token">'
+            + '<button type="button" class="claim-btn" onclick="submitGameClaim()">Unlock setup</button>'
+            + '<div id="gc-note" class="claim-note" role="status"></div>'
+            + '</div>';
+    }
+    function submitGameClaim() {
+        const input = document.getElementById('gc-input');
+        const note = document.getElementById('gc-note');
+        const result = window.organizerGate.claimOrganizerToken(currentMode, currentData || {}, input ? input.value : '');
+        if (result !== 'ok') {
+            if (note) note.textContent = result === 'empty' ? 'Paste the whole link, or the token from it.' : window.organizerGate.CLAIM_WRONG;
+            return result;
+        }
+        renderSetupLink(currentData || {});
+        return 'ok';
     }
 
     function renderGame(data) {

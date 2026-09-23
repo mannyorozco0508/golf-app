@@ -202,6 +202,110 @@
         }).then(function (v) { return v; }, function () { return undefined; });
     }
 
+    // ---- THE ORGANIZER LINK, SHARED AND CLAIMED (2026-09-22, v200) ----------
+    //
+    // WHY THIS EXISTS. ownerUid is an anonymous uid, and anonymous auth is per
+    // browser ORIGIN: the App Store app, Safari, the home-screen PWA and a Mac
+    // are four organizers on one person's desk. On 2026-09-21 Manny created a
+    // round in the app and Safari showed him his own round as a spectator. The
+    // cure already existed - ?organizer=TOKEN, remembered per device - and was
+    // rendered ONLY on the Group Links panel, which only somebody the gate
+    // already calls the organizer can see. The fix that needs the fix was
+    // invisible to the person who needed it. So:
+    //   SHARE (a)   organizerShareUrl/organizerShareText build the link and the
+    //               words; the organizer's Round Ready and Game tab offer it.
+    //   CLAIM (d)   claimOrganizerToken takes what a golfer PASTES - the whole
+    //               URL or the bare token - validates it against this round's
+    //               organizerToken and stores it. The refusal screens offer the
+    //               box, so the device that is stuck can unstick itself.
+    // NOTHING IS WRITTEN TO FIREBASE by either: the token is already on the
+    // record, and a claim is a localStorage write on this device. The token is a
+    // bearer secret - the share text says to keep it - and the rules still let
+    // any client holding the code write an existing round (HANDOFF).
+    // THE URL IS BUILT FROM shareBaseUrl() (product-links.js), never from
+    // location: inside the shell that is capacitor://localhost and the link
+    // would open nothing on anybody else's phone (the Build-9 failure).
+    function organizerShareUrl(code, token) {
+        var base = (typeof shareBaseUrl === 'function') ? shareBaseUrl()
+            : ((typeof window !== 'undefined' && window.shareBaseUrl) ? window.shareBaseUrl() : '/');
+        return base + 'index.html?game=' + encodeURIComponent(String(code || '').toUpperCase())
+            + '&organizer=' + encodeURIComponent(String(token || ''));
+    }
+    function organizerShareText(code) {
+        return 'Organizer link for ' + String(code || '').toUpperCase()
+            + ' \u2014 opens setup on any device. Keep it to yourself.';
+    }
+    // A pasted URL, a pasted token, or rubbish. Returns the 32-hex token or null;
+    // reads nothing and writes nothing.
+    function tokenFromPaste(text) {
+        var t = String(text == null ? '' : text).trim();
+        if (!t) return null;
+        var m = /[?&]organizer=([^&#\s]+)/.exec(t);
+        if (m) { try { t = decodeURIComponent(m[1]); } catch (e) { t = m[1]; } }
+        t = t.trim();
+        return /^[A-Za-z0-9_-]{8,128}$/.test(t) ? t : null;
+    }
+    // Validate against THIS round's token and remember it on this device.
+    // 'ok' | 'wrong' (a token, but not this round's) | 'empty' (nothing usable).
+    // A round with no organizerToken (before 2026-08-24) cannot be claimed - there
+    // is nothing to check against - and says so as 'wrong' rather than opening.
+    function claimOrganizerToken(code, data, text) {
+        var token = tokenFromPaste(text);
+        if (!token) return 'empty';
+        var want = data && data.organizerToken;
+        if (!want || String(token) !== String(want)) return 'wrong';
+        try { localStorage.setItem(tokenKey(code), String(token)); } catch (e) { /* private mode: the doors open for this render only */ }
+        return 'ok';
+    }
+    // ONE SHARE PATH FOR THREE CALLERS (Round Ready, the Game tab, the scorecard's
+    // panel). Inside the shell: @capacitor/share through Capacitor.Plugins - the
+    // NATIVE injected bridge, which is the only runtime this app has (see
+    // native-export.js nativePlugins: there is no registerPlugin on the device).
+    // On the web: navigator.share where it exists (iOS Safari, Android), else the
+    // clipboard, else a prompt the golfer can copy out of. Resolves to
+    // 'shared' | 'copied' | 'shown' | 'failed' so a caller can say what happened.
+    function nativeShare() {
+        try {
+            var cap = window.Capacitor;
+            if (!cap || !(cap.isNativePlatform && cap.isNativePlatform())) return null;
+            var bag = cap.Plugins || {};
+            if (bag.Share && typeof bag.Share.share === 'function') return bag.Share;
+            if (typeof cap.registerPlugin === 'function') { var p = cap.registerPlugin('Share'); if (p && p.share) return p; }
+        } catch (e) { /* no bridge: the web path */ }
+        return null;
+    }
+    function shareOrganizerLink(code, data) {
+        var token = data && data.organizerToken;
+        if (!token) return Promise.resolve('failed');
+        var url = organizerShareUrl(code, token);
+        var text = organizerShareText(code);
+        var plugin = nativeShare();
+        if (plugin) {
+            return Promise.resolve(plugin.share({ title: 'Rattle Golf', text: text, url: url, dialogTitle: 'Organizer link' }))
+                .then(function () { return 'shared'; }, function () { return copyOrganizerLink(url, text); });
+        }
+        if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+            return Promise.resolve(navigator.share({ title: 'Rattle Golf', text: text, url: url }))
+                .then(function () { return 'shared'; }, function () { return copyOrganizerLink(url, text); });
+        }
+        return copyOrganizerLink(url, text);
+    }
+    function copyOrganizerLink(url, text) {
+        var msg = text + '\n' + url;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(msg).then(function () { return 'copied'; }, function () { return showOrganizerLink(msg); });
+            }
+        } catch (e) { /* fall through */ }
+        return Promise.resolve(showOrganizerLink(msg));
+    }
+    function showOrganizerLink(msg) {
+        try { window.prompt('Organizer link \u2014 copy this and keep it to yourself:', msg); return 'shown'; }
+        catch (e) { return 'failed'; }
+    }
+    var CLAIM_PROMPT = 'Are you the organizer? Paste your organizer link.';
+    var CLAIM_WRONG = 'That link isn\u2019t for this round.';
+
     window.organizerGate = {
         TRIAL_MS: TRIAL_MS,
         NOTICE_DAYS: NOTICE_DAYS,
@@ -216,6 +320,13 @@
         explainRefusal: explainRefusal,
         standingOf: standingOf,
         standingLine: standingLine,
-        readStanding: readStanding
+        readStanding: readStanding,
+        organizerShareUrl: organizerShareUrl,
+        shareOrganizerLink: shareOrganizerLink,
+        organizerShareText: organizerShareText,
+        tokenFromPaste: tokenFromPaste,
+        claimOrganizerToken: claimOrganizerToken,
+        CLAIM_PROMPT: CLAIM_PROMPT,
+        CLAIM_WRONG: CLAIM_WRONG
     };
 })();

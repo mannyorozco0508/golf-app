@@ -780,6 +780,13 @@
         .superseded-link { display: block; text-align: center; text-decoration: none; margin: 8px 0 10px 0; padding: 14px 12px; min-height: 48px; box-sizing: border-box; border-radius: 12px; background: var(--accent-red); color: #ffffff; font-weight: bold; font-size: 1rem; line-height: 1.35; }
         /* The organizer's way into the setup (v189): an anchor drawn as a pill, the
            navy of the Matches pill so it reads as a door, not a filter. */
+        /* v200: paste-to-claim, and the Share button on the organizer row. */
+        .claim-box { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; background: var(--bg-card); margin: 10px 0; }
+        .claim-label { display: block; font-size: 0.88rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .claim-input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-page); color: var(--text-main); }
+        .claim-btn { width: 100%; margin-top: 8px; min-height: 44px; border-radius: 8px; border: 2px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); font-weight: bold; font-size: 1rem; cursor: pointer; }
+        .claim-note { margin-top: 8px; font-size: 0.82rem; color: var(--accent-red); min-height: 1em; }
+        .glr-share { margin-left: 6px; }
         a.group-setup-btn { text-decoration: none; display: inline-flex; align-items: center; min-height: 32px; border-color: var(--brand-navy); color: var(--brand-navy); }
 
         .card-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1345,6 +1352,11 @@ html {
     <div class="scorecard-main" id="scorecard-main">
     <div class="group-filter-bar" id="group-filter-container"></div>
     <div id="group-links-panel" style="display:none;"></div>
+    <!-- PASTE-TO-CLAIM (v200): on a BARE link whose doors are hidden, the device
+         that was set up somewhere else pastes the organizer link and unlocks
+         setup here - nothing is written to Firebase. Empty on a group link, and
+         for the organizer, whose doors are already open. -->
+    <div id="organizer-claim-mount"></div>
 
     <!-- The 1-18 circle strip lived here. It was clickable hole navigation plus a
          progress indicator, but on tablet widths the Live Action panel overlapped its
@@ -5471,6 +5483,48 @@ html {
     }
     function setupHref() { return 'admin.html?game=' + currentMode; }
 
+    // ---- THE ORGANIZER LINK: SHARED, AND CLAIMED (v200) ----------------------
+    // organizer-gate.js owns the URL, the words, the three share paths and the
+    // validation; these two are the page's surfaces.
+    function shareOrganizerLinkFromScorecard(btn) {
+        if (!canReachSetup()) return Promise.resolve('failed');
+        const was = btn ? btn.textContent : null;
+        return window.organizerGate.shareOrganizerLink(currentMode, currentData || {}).then(how => {
+            if (btn) { btn.textContent = how === 'copied' ? '\u2713 Copied' : (how === 'failed' ? 'Not shared' : '\u2713 Shared'); setTimeout(() => { btn.textContent = was; }, 2000); }
+            return how;
+        });
+    }
+    // THE STUCK DEVICE CAN UNSTICK ITSELF. On a BARE link (no ?group=) where the
+    // doors are hidden, one line and a box: paste the organizer link. Not on a
+    // group link - a scorekeeper is not a locked-out organizer. Not when the doors
+    // are already open, and not on a round with no token (nothing to check).
+    function renderOrganizerClaim() {
+        const mount = document.getElementById('organizer-claim-mount');
+        if (!mount) return;
+        const show = !hasGroupLock && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
+        if (!show) { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<div class="claim-box">'
+            + '<label class="claim-label" for="oc-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
+            + '<input id="oc-input" class="claim-input" type="text" inputmode="url" autocomplete="off" placeholder="Paste the link or token">'
+            + '<button type="button" class="claim-btn" onclick="submitOrganizerClaim()">Unlock setup</button>'
+            + '<div id="oc-note" class="claim-note" role="status"></div>'
+            + '</div>';
+    }
+    function submitOrganizerClaim() {
+        const input = document.getElementById('oc-input');
+        const note = document.getElementById('oc-note');
+        const result = window.organizerGate.claimOrganizerToken(currentMode, currentData || {}, input ? input.value : '');
+        if (result !== 'ok') {
+            if (note) note.textContent = result === 'empty' ? 'Paste the whole link, or the token from it.' : window.organizerGate.CLAIM_WRONG;
+            return result;
+        }
+        // The doors are a render away: the token is held now, so re-render the
+        // surfaces that read canReachSetup() and drop the box.
+        renderScorecard();
+        renderOrganizerClaim();
+        return 'ok';
+    }
+
     function toggleGroupLinksPanel() {
         if (!canReachSetup()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
@@ -5509,6 +5563,10 @@ html {
                 + '<div class="glr-names">Full final-score review \u2014 keep this one private</div>'
                 + '</div>'
                 + '<button class="glr-copy" onclick="copyOrganizerLinkFromScorecard(\'' + orgUrl + '\', this)">\uD83D\uDCCB Copy</button>'
+                // v200: Share hands it to the phone's own sheet (the app's Share
+                // plugin inside the shell), which is how it reaches a Mac or the
+                // organizer's Safari without being typed.
+                + '<button class="glr-copy glr-share" onclick="shareOrganizerLinkFromScorecard(this)">\uD83D\uDD11 Share</button>'
                 + '</div>';
         }
 
@@ -5610,6 +5668,8 @@ html {
 
         container.innerHTML = html;
         renderGroupLinksPanel();
+        // v200: and, when the doors are hidden on a bare link, the way to open them.
+        renderOrganizerClaim();
     }
 
     function filterGroup(grp) {

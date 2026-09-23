@@ -174,8 +174,11 @@ async function gameTab(data, search, opts) {
     await tick();
     return String(run(sb, "document.getElementById('game-setup-mount').innerHTML"));
 }
-// v195: the Players pill sits under it, to the scorecard with ?players=1
-const GAME_SETUP = /^<a class="game-setup-link" href="admin\.html\?game=DOOR1">✏️ Edit round setup<\/a><a class="game-setup-link" href="index\.html\?game=DOOR1&players=1">👥 Players<\/a>$/;
+// v195: the Players pill sits under it, to the scorecard with ?players=1.
+// v200: and, on a round that carries an organizerToken, "Share organizer link" -
+// the link that makes another device the organizer (organizer_link_share_test.js).
+// OWNER and OTHER carry a token; LEGACY does not, so it gets the first two only.
+const GAME_SETUP = /^<a class="game-setup-link" href="admin\.html\?game=DOOR1">✏️ Edit round setup<\/a><a class="game-setup-link" href="index\.html\?game=DOOR1&players=1">👥 Players<\/a>(<button type="button" class="game-setup-link" onclick="shareOrganizerLinkFromGame\(this\)">🔑 Share organizer link<\/button>)?$/;
 describe('THE GAME TAB (game.html): the button under the title', () => {
     test("the organizer's device: the button", async () => { assert.match(await gameTab(OWNER, '?game=door1'), GAME_SETUP); });
     test('a group link: nothing, even for the owner (CONTROL)', async () => { assert.equal(await gameTab(OWNER, '?game=door1&group=1'), ''); });

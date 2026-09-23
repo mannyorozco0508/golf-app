@@ -343,6 +343,12 @@
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
         .btn-primary:hover { background-color: #125d48; }
         .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        /* v200: paste-to-claim on the refusal card. */
+        .claim-box { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; background: var(--bg-card); }
+        .claim-label { display: block; font-size: 0.88rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .claim-input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-page); color: var(--text-main); }
+        .claim-btn { margin-top: 8px; }
+        .claim-note { margin-top: 8px; font-size: 0.82rem; color: var(--accent-red); min-height: 1em; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
 
         .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
@@ -1431,6 +1437,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🔒</div>
     <div class="lobby-title">This round's setup belongs to its organizer.</div>
+    <!-- PASTE-TO-CLAIM (v200). The refusal used to be a dead end on the very
+         device that needed the link: the organizer link is only rendered where
+         the gate already says yes. This box takes the pasted link (or the bare
+         token), checks it against THIS round's organizerToken and stores it on
+         this device - no Firebase write, nothing read. -->
+    <div id="setup-claim" style="margin:0 0 18px 0;"></div>
     <p style="text-align:center; color:var(--text-muted); font-size:0.95rem; line-height:1.5; margin:0 0 20px 0;">If that is you, open the round on the device you set it up on, or use your organizer link &mdash; it is on the scorecard's Group Links panel there.</p>
     <a class="btn-primary" id="setup-refused-back" href="index.html" style="display:block; text-align:center; text-decoration:none;">⛳ Back to the scorecard</a>
 </div>
@@ -1894,7 +1906,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
     loadOrganizerStanding();
 
+    let currentSavedRound = null;   // the round Round Ready is showing - the share reads its token
     function renderRoundReady(data) {
+        currentSavedRound = data || null;
         renderOrganizerStanding();
         document.getElementById('rr-course-sub').textContent = `${data.eventName || 'Round'} — ${data.courseName || 'Course TBD'}`;
         // On arrival, from the data already fetched. Not behind a tap.
@@ -2046,6 +2060,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + b.group + ', ' + escapeHtml(JSON.stringify(names)) + ')">🔗 Copy Link</button>'
                 + '</div>';
         });
+        // (a) THE ORGANIZER LINK, OFFERED WHERE THE ORGANIZER IS (v200). One screen
+        // after Save, beside the links they are already sending: the link that makes
+        // any other device - Safari on the same phone, a Mac, a second phone - the
+        // organizer of this round. Worded so nobody sends it to the group chat.
+        if (data && data.organizerToken) {
+            html += '<div class="rr-organizer-link" style="margin-top:14px;">'
+                + '<div class="wr-label" style="margin-bottom:4px;">Your own devices</div>'
+                + '<button type="button" class="btn-outline" onclick="shareOrganizerLinkAction()">\uD83D\uDD11 Share organizer link</button>'
+                + '<div class="rr-organizer-note" style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Opens setup on any device. Keep it to yourself \u2014 anyone with it can edit this round.</div>'
+                + '<div id="rr-organizer-note" class="claim-note" style="color:var(--text-muted);" role="status"></div>'
+                + '</div>';
+        }
         box.innerHTML = html;
     }
 
@@ -5968,7 +5994,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return window.organizerGate.isRoundOrganizer(data, uid, window.organizerGate.heldOrganizerToken(currentMode, urlToken));
         });
     }
-    function showSetupRefused() {
+    function showSetupRefused(data) {
         ['admin-screen', 'round-ready-screen', 'lobby-screen'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
         const back = document.getElementById('setup-refused-back');
         if (back) {
@@ -5977,8 +6003,49 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (groupParam) href += '&group=' + groupParam;
             back.href = href;
         }
+        renderSetupClaim(data);
         const screen = document.getElementById('setup-refused-screen');
         if (screen) screen.style.display = 'block';
+    }
+    // The claim box on the refusal card. Never on a group link - a scorekeeper is
+    // not a locked-out organizer, and offering it there invites a golfer to hunt
+    // for a secret that is not theirs.
+    // The share action, for Round Ready. organizer-gate.js owns the URL, the words
+    // and the three paths (the app's Share plugin / navigator.share / the clipboard).
+    function shareOrganizerLinkAction() {
+        const note = document.getElementById('rr-organizer-note');
+        return window.organizerGate.shareOrganizerLink(currentMode, currentSavedRound || {}).then((how) => {
+            if (note) note.textContent = how === 'copied' ? 'Copied \u2014 paste it on your other device.'
+                : (how === 'failed' ? 'Could not share it just now.' : '');
+            return how;
+        });
+    }
+    function renderSetupClaim(data) {
+        const mount = document.getElementById('setup-claim');
+        if (!mount) return;
+        // ON window, NOT a module `let`: this page returns early on some arrivals
+        // (a ?group= link never reaches the wizard's own statements), and a `let`
+        // that never executes is a TDZ error the moment a renderer reads it.
+        window.__claimRound = data || window.__claimRound || null;
+        if (urlParams.get('group') !== null || !window.organizerGate) { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<div class="claim-box">'
+            + '<label class="claim-label" for="claim-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
+            + '<input id="claim-input" class="claim-input" type="text" inputmode="url" autocomplete="off" placeholder="Paste the link or token">'
+            + '<button type="button" class="btn-outline claim-btn" onclick="submitSetupClaim()">Unlock setup</button>'
+            + '<div id="claim-note" class="claim-note" role="status"></div>'
+            + '</div>';
+    }
+    function submitSetupClaim() {
+        const input = document.getElementById('claim-input');
+        const note = document.getElementById('claim-note');
+        const result = window.organizerGate.claimOrganizerToken(currentMode, window.__claimRound || {}, input ? input.value : '');
+        if (result !== 'ok') {
+            if (note) note.textContent = result === 'empty' ? 'Paste the whole link, or the token from it.' : window.organizerGate.CLAIM_WRONG;
+            return;
+        }
+        // The doors are this page's whole job, so it reloads into the round it was
+        // refused - the wizard reads the round again with the token now held.
+        window.location.href = 'admin.html?game=' + currentMode;
     }
 
     function loadModeData(modeKey) {
@@ -7220,7 +7287,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // a slow sign-in refuses nobody by mistake; a failed sign-in is a
                 // null uid, and the organizer link still gets in.
                 organizerDoor(data).then((isOrganizer) => {
-                    if (!isOrganizer) { showSetupRefused(); return; }
+                    if (!isOrganizer) { showSetupRefused(data); return; }
                     loadModeData(currentMode);
                     // loadModeData fetches its own data asynchronously, so give it a moment to actually
                     // populate the fields before building the review screen from them.
