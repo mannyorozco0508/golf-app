@@ -229,7 +229,7 @@ describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () =
         // If this count moves, the rename surface moved with it and the handoff note
         // in the next batch is out of date.
         const surfaces = [
-            ['admin.html', /<img src="hardpan-lockup\.svg" alt="HardPan"/],
+            ['admin.html', /<span class="lobby-word">HARDPAN<\/span>/],
             ['admin.html', /title: `HardPan`/],
             ['instructions.html', /<title>How HardPan Works<\/title>/],
             ['instructions.html', /How HardPan Works<\/h1>/],

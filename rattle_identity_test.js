@@ -134,7 +134,7 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 describe('RATTLE GOLF — THE GOLFER-FACING SURFACES', () => {
 
     test('the lobby shows HardPan', () => {
-        assert.match(ADMIN, /<img src="hardpan-lockup\.svg" alt="HardPan"/);
+        assert.match(ADMIN, /<span class="lobby-word">HARDPAN<\/span>/);
     });
 
     test('a shared invite says HardPan and no longer says Beta', () => {
@@ -246,7 +246,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v205-hardpan-logo';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -462,15 +462,19 @@ describe('SERVICE WORKER SUPPRESSION SURVIVES THE RENAME', () => {
 // ---------------------------------------------------------------------------
 describe('THE HOMEPAGE BRAND MARK', () => {
 
-    // The lobby header is: theme toggle / HardPan lockup / prompt.
-    // HARDPAN is inside hardpan-lockup.svg, beside the ball.
-    // A second HTML title would say the name twice. ⛳ is still legitimate
-    // elsewhere on the page, so a blanket ban on the emoji would be wrong.
+    // The lobby header is: theme toggle / ball icon + HTML word HARDPAN / prompt.
+    // The word is text. The icon is the ball only. A second heading under the
+    // bar would say the name twice. ⛳ is still legitimate elsewhere on the
+    // page, so a blanket ban on the emoji would be wrong.
     const header = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'), ADMIN.indexOf('class="home-widgets"'));
 
-    test('the header shows the ball lockup, not the Stroke R', () => {
-        assert.match(header, /<img src="hardpan-lockup\.svg" alt="HardPan"/,
-            'the homepage brand mark must be the approved lockup');
+    test('the header shows the ball icon and the HTML word, not the Stroke R', () => {
+        assert.match(header, /<img src="hardpan-icon\.svg" alt="" width="72" height="72">/,
+            'the homepage brand mark must be the ball icon');
+        assert.match(header, /<span class="lobby-word">HARDPAN<\/span>/,
+            'the word must be HTML, so a phone can read it');
+        assert.ok(!/hardpan-lockup\.svg/.test(header),
+            'the outlined lockup is illegible at phone width');
         assert.ok(!/logo-mark\.png/.test(header),
             'the Stroke R must not sit in the lobby header');
         assert.ok(!/class="lobby-logo[^"]*"[^>]*>\u26f3</.test(header),
@@ -487,10 +491,10 @@ describe('THE HOMEPAGE BRAND MARK', () => {
 
     test('the wordmark is not doubled in HTML', () => {
         assert.ok(!/<div class="lobby-title">HardPan<\/div>/.test(header),
-            'HARDPAN is in the lockup; a second heading says the name twice');
+            'a second heading under the bar says the name twice');
         const marks = header.match(/hardpan/gi) || [];
         assert.equal(marks.length, 2,
-            'exactly two: the lockup filename and the img alt. A third means a wordmark was stacked under the lockup.');
+            'exactly two: the icon filename and the HTML word. A third means the name was stacked again.');
     });
 
     test('the two Consumer mode icons are the approved pair', () => {
@@ -530,8 +534,8 @@ describe('THE BRAND MARK ASSET', () => {
         assert.equal(buf.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
         const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
         assert.equal(w, h);
-        // The receipt prints it at 64 CSS px. 2x of that is 128. The lobby no
-        // longer displays this file; the lockup does.
+        // The receipt prints it at 64 CSS px. 2x of that is 128. The lobby
+        // header is hardpan-icon.svg plus the HTML word, not this file.
         assert.ok(w >= 128, `logo-mark.png is ${w}px, below 2x of the 64px print size`);
     });
 
@@ -564,9 +568,9 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v205-hardpan-logo';/);
-        assert.match(BUILD, /cacheName: 'consumer-v48-hardpan-logo'/);
-        assert.match(BUILD, /cacheName: 'tournament-v52-hardpan'/,
-            'Tournament cache moved with the ball mark and the HardPan name');
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v206-hardpan-word';/);
+        assert.match(BUILD, /cacheName: 'consumer-v49-hardpan-word'/);
+        assert.match(BUILD, /cacheName: 'tournament-v53-hardpan-word'/,
+            'Tournament cache moved with the readable header');
     });
 });

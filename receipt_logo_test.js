@@ -44,7 +44,7 @@ describe('THE MARKUP: one header, the mark first in it, adjacent to the opening 
         assert.equal((code.match(/receipt-mark/g) || []).length, 3, 'one in the builder, one screen rule, one print rule');
     });
     test('the receipt still uses the precached print mark, and the page has exactly one image', () => {
-        // The lobby header is hardpan-lockup.svg. This page keeps logo-mark.png,
+        // The lobby header is the ball icon plus the HTML word. This page keeps logo-mark.png,
         // which is what the print path and the native PDF already decode.
         assert.match(code, /src="logo-mark\.png"/);
         assert.equal((code.match(/<img /g) || []).length, 1, 'the receipt has exactly one image');

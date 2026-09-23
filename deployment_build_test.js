@@ -272,13 +272,13 @@ describe('PWA — two independent installable apps', () => {
         const c = /const CACHE_VERSION = '([^']+)'/.exec(swOf('consumer'))[1];
         const t = /const CACHE_VERSION = '([^']+)'/.exec(swOf('tournament'))[1];
         assert.notEqual(c, t, 'both workers would evict each other');
-        // The two versions are ALLOWED to diverge. Consumer is v48: the ball
-        // lockup and tab icon. Tournament is v52: the same ball and the
-        // HardPan Tournaments name.
+        // The two versions are ALLOWED to diverge. Consumer is v49: the HTML
+        // word beside the ball icon. Tournament is v53: the landing already
+        // sets HardPan in HTML, and the key moved with the consumer header.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v48-hardpan-logo$/);
-        assert.match(t, /^tournament-v52-hardpan$/);
+        assert.match(c, /^consumer-v49-hardpan-word$/);
+        assert.match(t, /^tournament-v53-hardpan-word$/);
     });
 
     test('each worker precaches ONLY files present in its own output', () => {
