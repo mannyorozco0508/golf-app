@@ -153,7 +153,13 @@ describe('TRACKED: a buffered save is counted by the pill and the guard, on both
         // Wave 3: the chain now opens with the organizer gate (token, firstSeenAt,
         // ownerUid) and continues into the SAME update(); the whole chain is what
         // GolfNet tracks, so the buffered organizer write is under the pill too.
-        assert.match(fn, /const saveChain = window\.organizerGate\.ensureOrganizer\(db\)\.then\(\(uid\) => \{\s*window\.organizerGate\.stamp\(payload, uid\);\s*return db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\);\s*\}\)\.then\(/);
+        // RE-PINNED v203 (2026-09-23): stamp now takes a third argument - what the
+        // page loaded for THIS round - because ownerUid must NOT be stamped onto a
+        // round that already exists without one (the rules refuse the whole save).
+        // Nothing about the tracked chain changed: same ensureOrganizer, same one
+        // update(), same promise handed to GolfNet. legacy_round_setup_write_test.js
+        // owns the behaviour; this line only keeps the chain's shape honest.
+        assert.match(fn, /const saveChain = window\.organizerGate\.ensureOrganizer\(db\)\.then\(\(uid\) => \{\s*window\.organizerGate\.stamp\(payload, uid, \{ exists: loadedExistingRound, ownerUid: loadedOwnerUid \}\);\s*return db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\);\s*\}\)\.then\(/);
         assert.match(fn, /GolfNet\.track\(saveChain\)/);
         assert.match(fn, /saveChain\.then\(\(\) => \{/);
     });

@@ -208,7 +208,12 @@ describe('THE SEAM (source, comments stripped)', () => {
             assert.match(code, /why === 'trial-ended' \? window\.organizerGate\.WALL/, p);
         });
         const a = stripComments(read('admin.html'));
-        assert.match(a, /ensureOrganizer\(db\)\.then\(\(uid\) => \{\s*window\.organizerGate\.stamp\(payload, uid\);\s*return db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\);/, 'the same update() as before, after the stamp');
+        // RE-PINNED v203 (2026-09-23): the wizard now tells stamp what the server
+        // already holds for this round - { exists, ownerUid } - because stamping
+        // ownerUid onto a round that EXISTS WITHOUT ONE is refused by the rules and
+        // took the whole setup save down with it. The planner's call below is
+        // deliberately still two arguments: every round in its batch is a create.
+        assert.match(a, /ensureOrganizer\(db\)\.then\(\(uid\) => \{\s*window\.organizerGate\.stamp\(payload, uid, \{ exists: loadedExistingRound, ownerUid: loadedOwnerUid \}\);\s*return db\.ref\(`events\/\$\{currentMode\}`\)\.update\(payload\);/, 'the same update() as before, after the stamp');
         const t = stripComments(read('trip.html'));
         assert.match(t, /Object\.keys\(updates\)\.forEach\(\(k\) => \{ if \(\/\^events\\\/\[\^\/\]\+\$\/\.test\(k\)\) window\.organizerGate\.stamp\(updates\[k\], uid\); \}\);\s*return db\.ref\(\)\.update\(updates\);/, 'every events/<code> entry of the batch is stamped, then the one atomic update');
     });

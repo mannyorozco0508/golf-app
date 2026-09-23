@@ -78,7 +78,33 @@
     }
 
     // Step 3, for one round or a batch: the same uid on every record.
-    function stamp(payload, uid) { payload.ownerUid = uid; return payload; }
+    //
+    // NOT ONTO A ROUND THAT ALREADY EXISTS WITHOUT ONE (v203, 2026-09-23). The
+    // rules' events/$eventCode/ownerUid .validate has two arms and only two:
+    //     (!data.parent().exists() && auth != null && newData.val() === auth.uid)
+    //     || (data.exists() && newData.val() === data.val())
+    // "the round is being created", and "ownerUid is already set and is not
+    // changing". A round that EXISTS with NO ownerUid matches neither, so an
+    // ownerUid in that payload refuses the whole setup save - measured on
+    // production's own live ruleset, so this was already broken before any
+    // rules deploy, on the 96 of 105 production rounds that predate the gate.
+    //
+    // `existing` is what the page loaded from the server for THIS round:
+    //   omitted / falsy            a create. Stamp - the rules require it.
+    //   { exists: true, ownerUid } a round that has one. Stamp; the value is
+    //                              unchanged, which is the .validate's second arm.
+    //   { exists: true, ownerUid: null }  a LEGACY round. Do not stamp. The
+    //                              merge leaves the key absent and the write is
+    //                              allowed, exactly as it was before the gate.
+    // A load that FAILED leaves the caller with exists: false, so the payload is
+    // stamped and a legacy round refuses the save - the same as before this
+    // change, and the load failure is already reported in its own words.
+    // trip.html calls this with two arguments: every round in its batch is new.
+    function stamp(payload, uid, existing) {
+        if (existing && existing.exists && !existing.ownerUid) return payload;
+        payload.ownerUid = uid;
+        return payload;
+    }
 
     // ---- THE ORGANIZER DOOR (2026-09-21, v189) ------------------------------
     // "Is this the organizer of THIS round" - one predicate for the scorecard's

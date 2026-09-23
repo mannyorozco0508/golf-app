@@ -1816,7 +1816,19 @@
 // admin.html is precached. The consumer product cache is
 // consumer-v52-tee-autofill. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v210-tee-autofill';
+// Moved to v211 because editing setup on a LEGACY round (one with no ownerUid)
+// now saves instead of refusing. The wizard's save stopped stamping ownerUid
+// onto a round that already exists without one - the rules have no arm for
+// adding it, so the whole save was one PERMISSION_DENIED, measured in Chrome
+// against the real ruleset as `alert("Save error: PERMISSION_DENIED: Permission
+// denied")` with nothing written. 96 of the 105 rounds in production are that
+// shape. admin.html and organizer-gate.js are precached, so a device on v210
+// keeps refusing every legacy round's setup save. Creating a round and editing
+// an owned one are unchanged, and still stamp. The rules file is not in this
+// cache and is NOT being published. The consumer product cache is
+// consumer-v53-legacy-setup-save. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v211-legacy-setup-save';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

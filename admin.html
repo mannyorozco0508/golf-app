@@ -6305,6 +6305,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // token would hand its secret to a different round.
     let loadedOrganizerToken = null;
     let loadedExistingRound = false;
+    // THE ROUND'S OWNER, AS THE SERVER HOLDS IT (v203). null on a LEGACY round -
+    // one that exists and predates the organizer gate. The save must NOT stamp
+    // ownerUid onto those: the rules' ownerUid .validate has no arm for adding
+    // one to a round that already exists, so the whole setup save is refused.
+    // Set in the SAME isThisRound && snapshot.exists() guard as
+    // loadedExistingRound, because loadModeData is also the copy-a-round loader
+    // and a copied round must not inherit the source round's owner.
+    let loadedOwnerUid = null;
     // THE ROUND'S OWN CARD. A re-save rebuilt courseData from the LIVE global
     // card (previewCourseData), so a card edited by anyone since setup - or
     // hand-edited for this round - rewrote pars and stroke indexes under posted
@@ -6423,6 +6431,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (isThisRound && snapshot.exists()) {
                 loadedExistingRound = true;
                 loadedOrganizerToken = data.organizerToken || null;
+                loadedOwnerUid = data.ownerUid || null;
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
@@ -7479,12 +7488,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js), in the order the rules
             // dictate: the token is awaited, organizers/<uid>/firstSeenAt is written
             // (write-once - a second press is refused and that is expected), and the
-            // round carries ownerUid. Then the SAME update() as before - RTDB
+            // round carries ownerUid - EXCEPT a legacy round, which already
+            // exists with none and whose save the rules refuse if one is added
+            // (v203; organizer-gate.js's stamp). Then the SAME update() - RTDB
             // evaluates the merged newData, so the write's shape does not change.
             // Inside the window nothing is shown; the gate is invisible until it
             // refuses, and then the wall below says why in words.
             const saveChain = window.organizerGate.ensureOrganizer(db).then((uid) => {
-                window.organizerGate.stamp(payload, uid);
+                window.organizerGate.stamp(payload, uid, { exists: loadedExistingRound, ownerUid: loadedOwnerUid });
                 return db.ref(`events/${currentMode}`).update(payload);
             }).then(() => {
                 // THE ROUND NOW EXISTS. Only here is it true that there is
