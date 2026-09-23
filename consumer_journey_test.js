@@ -203,7 +203,7 @@ describe('THE TOURNAMENT TRANSITION IS OUTBOUND, AND CONFIGURED', () => {
 // ---------------------------------------------------------------------------
 describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () => {
     test('each product declares its own identity', () => {
-        assert.match(BUILD, /appName: 'Rattle Golf',[\s\S]{0,80}shortName: 'Rattle Golf',/);
+        assert.match(BUILD, /appName: 'HardPan',[\s\S]{0,80}shortName: 'HardPan',/);
         assert.match(BUILD, /appName: 'GolfApp Tournaments',/);
     });
 
@@ -229,10 +229,10 @@ describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () =
         // If this count moves, the rename surface moved with it and the handoff note
         // in the next batch is out of date.
         const surfaces = [
-            ['admin.html', /<div class="lobby-title">Rattle Golf<\/div>/],
-            ['admin.html', /title: `Rattle Golf`/],
-            ['instructions.html', /<title>How Rattle Golf Works<\/title>/],
-            ['instructions.html', /How Rattle Golf Works<\/h1>/],
+            ['admin.html', /<div class="lobby-title">HardPan<\/div>/],
+            ['admin.html', /title: `HardPan`/],
+            ['instructions.html', /<title>How HardPan Works<\/title>/],
+            ['instructions.html', /How HardPan Works<\/h1>/],
         ];
         surfaces.forEach(([f, re]) => assert.match(read(f), re, `${f} identity surface moved`));
     });

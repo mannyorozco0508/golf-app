@@ -53,7 +53,7 @@ function realm(opts) {
         btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
         setTimeout: (fn) => { if (o.runTimers) fn(); return 0; },
         document: {
-            title: 'Rattle Golf',
+            title: 'Live Scorecard',
             getElementById: () => null
         }
     };
@@ -156,7 +156,7 @@ describe('the browser path is untouched', () => {
         assert.equal(r.sandbox.document.title, 'Chambers-Bay-Receipt',
             'the title is what the browser uses as the default filename');
         r.listeners['afterprint'] && r.listeners['afterprint']();
-        assert.equal(r.sandbox.document.title, 'Rattle Golf', 'and it must be put back');
+        assert.equal(r.sandbox.document.title, 'Live Scorecard', 'and it must be put back');
     });
 
     test('afterprint drives the restore where the browser supports it', () => {

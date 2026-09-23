@@ -272,7 +272,7 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
         // tournament-manifest.json IS committed. Both tournament pages link it,
         // and they cannot link manifest.json: the live deployment is still the
         // combined repo root, where that name is the Consumer identity - measured
-        // on golf-app-5a5.pages.dev as name "Rattle Golf", start_url ./admin.html.
+        // on golf-app-5a5.pages.dev as the Consumer install name (HardPan), start_url ./admin.html.
         // A link to it would offer the wrong app to anyone installing from a
         // tournament page.
         //

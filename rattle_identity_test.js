@@ -1,9 +1,11 @@
 // ============================================================================
 // RATTLE GOLF — RELEASE IDENTITY
 //
-// The Consumer product is named Rattle Golf and its iOS bundle identifier is
-// com.rattlegolf.app. Both are permanent: a bundle id cannot be changed once a
-// record exists in App Store Connect, and the name is now the filed brand.
+// The consumer web brand is HardPan (lobby, PWA manifest, share titles,
+// instructions, legal pages). The iOS bundle identifier is com.rattlegolf.app
+// and is permanent. The native display name stays "Rattle Golf" while iOS
+// 1.0.3 is Waiting for Review; capacitor.config.ts and Info.plist say when
+// it moves to HardPan. Tournaments stay Rattle, not HardPan.
 //
 // This file pins the identity surfaces that a golfer or the App Store actually
 // sees, and pins the boundary that keeps Tournament from being dragged along
@@ -47,15 +49,23 @@ const BUILD = read('build-shell.js');
 const ADMIN = read('admin.html');
 const INSTRUCTIONS = read('instructions.html');
 
-const BRAND = 'Rattle Golf';
+const BRAND = 'HardPan';
+const NATIVE_NAME_HELD = 'Rattle Golf';
 const BUNDLE_ID = 'com.rattlegolf.app';
 
 // ---------------------------------------------------------------------------
 describe('RATTLE GOLF — THE NATIVE SHELL IDENTITY IS LOCKED', () => {
 
-    test('Capacitor appName is Rattle Golf', () => {
+    test('Capacitor appName stays Rattle Golf while 1.0.3 is in review', () => {
         assert.match(CAP, /appName: 'Rattle Golf'/,
-            'the installed app must present itself as Rattle Golf');
+            'the installed app must keep presenting itself as Rattle Golf until 1.0.3 ships');
+        assert.match(CAP, /After 1\.0\.3 is released, set appName to 'HardPan'/);
+        assert.ok(!/appName: 'HardPan'/.test(CAP),
+            'do not flip the native display name during the 1.0.3 review');
+        const plist = read('ios/App/App/Info.plist');
+        assert.match(plist, /<key>CFBundleDisplayName<\/key>\s*<string>Rattle Golf<\/string>/);
+        assert.match(plist, /After that version ships/);
+        assert.match(read('android/app/src/main/res/values/strings.xml'), /<string name="app_name">Rattle Golf<\/string>/);
     });
 
     test('Capacitor appId is the permanent production bundle identifier', () => {
@@ -85,14 +95,15 @@ describe('RATTLE GOLF — THE NATIVE SHELL IDENTITY IS LOCKED', () => {
 // ---------------------------------------------------------------------------
 describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 
-    test('the manifest name and short_name are Rattle Golf', () => {
+    test('the manifest name and short_name are HardPan', () => {
         assert.equal(MANIFEST.name, BRAND);
         assert.equal(MANIFEST.short_name, BRAND);
+        assert.notEqual(MANIFEST.name, NATIVE_NAME_HELD,
+            'the web install name moved; the native display name is a separate hold');
     });
 
     test('short_name fits the home screen without truncation', () => {
-        // iOS truncates around 12 characters. 'Rattle Golf' is 11, so no
-        // abbreviation is needed and none should be invented.
+        // iOS truncates around 12 characters. HardPan is 7.
         assert.ok(MANIFEST.short_name.length <= 12,
             `short_name is ${MANIFEST.short_name.length} chars; iOS truncates past ~12`);
     });
@@ -103,8 +114,8 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
     });
 
     test('the built Consumer shell declares the same identity as the manifest', () => {
-        assert.match(BUILD, /appName: 'Rattle Golf'/);
-        assert.match(BUILD, /shortName: 'Rattle Golf'/);
+        assert.match(BUILD, /appName: 'HardPan'/);
+        assert.match(BUILD, /shortName: 'HardPan'/);
         assert.match(BUILD, /themeColor: '#0E2B1F'/);
         assert.match(BUILD, /backgroundColor: '#F6F4EC'/);
     });
@@ -122,19 +133,19 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 // ---------------------------------------------------------------------------
 describe('RATTLE GOLF — THE GOLFER-FACING SURFACES', () => {
 
-    test('the lobby shows Rattle Golf', () => {
-        assert.match(ADMIN, /<div class="lobby-title">Rattle Golf<\/div>/);
+    test('the lobby shows HardPan', () => {
+        assert.match(ADMIN, /<div class="lobby-title">HardPan<\/div>/);
     });
 
-    test('a shared invite says Rattle Golf and no longer says Beta', () => {
-        assert.match(ADMIN, /navigator\.share\(\{ title: `Rattle Golf`/);
+    test('a shared invite says HardPan and no longer says Beta', () => {
+        assert.match(ADMIN, /navigator\.share\(\{ title: `HardPan`/);
         assert.ok(!/GolfApp Beta/.test(ADMIN),
             'Beta was removed from the golfer-facing production identity');
     });
 
     test('the instructions page is titled for the brand', () => {
-        assert.match(INSTRUCTIONS, /<title>How Rattle Golf Works<\/title>/);
-        assert.match(INSTRUCTIONS, /How Rattle Golf Works<\/h1>/);
+        assert.match(INSTRUCTIONS, /<title>How HardPan Works<\/title>/);
+        assert.match(INSTRUCTIONS, /How HardPan Works<\/h1>/);
     });
 
     test('no retired GolfApp branding is left on a Consumer-facing surface', () => {
@@ -159,7 +170,9 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
     test('the Tournament shell keeps its own independent identity', () => {
         const tournament = BUILD.slice(BUILD.indexOf('tournament: {'));
         assert.ok(!/Rattle/.test(tournament),
-            'Tournament must never be renamed Rattle Golf — it is a separate product');
+            'Tournament shell identity stays GolfApp Tournaments — not the consumer name');
+        assert.ok(!/HardPan/.test(tournament),
+            'Tournament must not be renamed HardPan');
         assert.match(tournament, /appName: 'GolfApp Tournaments'/,
             'Tournament keeps its working name until it is deliberately named');
     });
@@ -180,12 +193,14 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         // rename this test exists to refuse - the product is not called Rattle
         // Golf, build-shell.js still says appName 'GolfApp Tournaments', and the
         // manifest still says GolfApp Tournaments. So the refusal is the
-        // Consumer product's NAME, "Rattle Golf", plus the word "Rattle" is
+        // Consumer product's NAME, now "HardPan" (formerly "Rattle Golf"), plus the word "Rattle" is
         // pinned to the one place it lives: tournament.html carries it only
         // inside .tourney-wordmark and the comment above it, and the other two
         // files not at all.
         ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js']
-            .forEach(f => assert.ok(!/Rattle Golf/.test(read(f)), `${f} must not carry the Consumer product's name`));
+            .forEach(f => assert.ok(!/Rattle Golf/.test(read(f)), `${f} must not carry the old consumer product name`));
+        ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js', 'tournament-manifest.json']
+            .forEach(f => assert.ok(!/HardPan/.test(read(f)), `${f} must not be renamed HardPan`));
         ['tournament-scorecard.html', 'tournament-engine.js']
             .forEach(f => assert.ok(!/Rattle/.test(read(f)), `${f} must not carry Consumer branding`));
         const t = read('tournament.html');
@@ -239,7 +254,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v203-email-link';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -444,7 +459,7 @@ describe('SERVICE WORKER SUPPRESSION SURVIVES THE RENAME', () => {
 // ---------------------------------------------------------------------------
 describe('THE HOMEPAGE BRAND MARK', () => {
 
-    // The lobby header is: theme toggle / brand mark / "Rattle Golf" / prompt.
+    // The lobby header is: theme toggle / brand mark / "HardPan" / prompt.
     // Everything here is scoped to that header. ⛳ is still perfectly legitimate
     // elsewhere on the page — the Club Round widget uses it — so a blanket ban on
     // the emoji would be wrong and would fail for the wrong reason.
@@ -466,11 +481,11 @@ describe('THE HOMEPAGE BRAND MARK', () => {
     });
 
     test('the mark is the symbol only — the wordmark is not doubled', () => {
-        assert.match(header, /<div class="lobby-title">Rattle Golf<\/div>/);
+        assert.match(header, /<div class="lobby-title">HardPan<\/div>/);
         // Case-insensitive on purpose: a stacked wordmark would very likely be set
         // in caps, and a case-sensitive count let exactly that slip through a
         // negative control.
-        const marks = header.match(/rattle\s+golf/gi) || [];
+        const marks = header.match(/hardpan/gi) || [];
         assert.equal(marks.length, 2,
             'exactly two: the img alt text and the heading. A third means a wordmark was stacked above the title.');
     });
@@ -565,8 +580,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v203-email-link';/);
-        assert.match(BUILD, /cacheName: 'consumer-v46-email-link'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';/);
+        assert.match(BUILD, /cacheName: 'consumer-v47-hardpan-email-link'/);
         assert.match(BUILD, /cacheName: 'tournament-v51-import-name'/,
             'Tournament got its own manifest in wave 20 and its cache moved with it');
     });

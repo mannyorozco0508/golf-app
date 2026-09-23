@@ -47,9 +47,9 @@ describe('THE PAGES APPLE REQUIRES EXIST', () => {
     });
 
     test('each page states what it is in its title', () => {
-        assert.match(read('privacy.html'), /<title>Privacy Policy — Rattle Golf<\/title>/);
-        assert.match(read('terms.html'), /<title>Terms of Use — Rattle Golf<\/title>/);
-        assert.match(read('support.html'), /<title>Support — Rattle Golf<\/title>/);
+        assert.match(read('privacy.html'), /<title>Privacy Policy — HardPan<\/title>/);
+        assert.match(read('terms.html'), /<title>Terms of Use — HardPan<\/title>/);
+        assert.match(read('support.html'), /<title>Support — HardPan<\/title>/);
     });
 
     test('every page carries a working contact route', () => {
@@ -210,8 +210,18 @@ describe('THEY LOOK LIKE RATTLE GOLF', () => {
         });
     });
 
-    test('each page names the product', () => {
-        PAGES.forEach(p => assert.match(read(p), /<div class="brand">Rattle Golf<\/div>/));
+    test('each page names HardPan and still identifies the Rattle Golf listing', () => {
+        // The files stay privacy.html, terms.html, support.html — those are the
+        // URLs App Store Connect already has for 1.0.3. The product name on the
+        // page is HardPan. Each page still says Rattle Golf so a reviewer opening
+        // the listing's privacy URL can see it is the same app, and so Rattle
+        // Golf Tournaments is named as out of scope rather than silently covered.
+        PAGES.forEach(p => {
+            const src = read(p);
+            assert.match(src, /<div class="brand">HardPan<\/div>/);
+            assert.match(src, /Rattle Golf/);
+            assert.match(src, /support@rattlegolf\.com/);
+        });
     });
 
     test('they are self-contained — no external stylesheet or font to fail', () => {

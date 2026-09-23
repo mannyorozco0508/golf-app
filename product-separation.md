@@ -1,6 +1,6 @@
 # PRODUCT SEPARATION MANIFEST
 
-**Status:** Consumer separated at the Rattle Golf polish batch. The Club/Tournament app has not been started.
+**Status:** Consumer separated at the Rattle Golf polish batch. The consumer web brand is **HardPan** (2026-09-23). The Club/Tournament app has not been started and stays Rattle.
 
 This is an engineering handoff, not marketing copy. Its job is to let the second app begin without rediscovering the architecture — and, more importantly, to stop someone deleting code that looks unused but is load-bearing for a product that does not exist yet.
 
@@ -10,7 +10,7 @@ This is an engineering handoff, not marketing copy. Its job is to let the second
 
 | Product | Contains |
 |---|---|
-| **Rattle Golf Consumer** | **Game Day** (was Quick Round) · **Road Trip** (was Golf Trip) |
+| **HardPan** (consumer money games; was Rattle Golf) | **Game Day** (was Quick Round) · **Road Trip** (was Golf Trip) |
 | **Club / Tournament** *(not built)* | **Club Round** · **Tournament Round** · tournament management |
 | **Shared** | The round engine and everything under it |
 
@@ -264,7 +264,7 @@ The refusal in (3) is right. The way out of it does not exist yet.
 ## Do not
 
 - Delete `tournament*` files, or the `tournaments` node, or the retained helpers
-- Rename the Tournament product to Rattle Golf
+- Rename the Tournament product to Rattle Golf, or to HardPan. Tournaments stay Rattle, including `tournaments.rattlegolf.com`
 - Add Tournament pages to the Consumer native bundle
 - Run a schema migration on the `tournaments` node
 - Rename persisted identifiers for tidiness

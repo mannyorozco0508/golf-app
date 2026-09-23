@@ -60,10 +60,13 @@ const PRODUCTS = {
         files: SHARED.concat(CONSUMER),
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
-        // finish a link. Tournament is unchanged.
-        cacheName: 'consumer-v46-email-link',
-        appName: 'Rattle Golf',
-        shortName: 'Rattle Golf',
+        // finish a link.
+        // Moved to v47. That shell installs as HardPan (lobby wordmark, share
+        // titles, instructions, receipt alt). A device on v46 has the email-link
+        // card and still installs as Rattle Golf. Tournament is unchanged.
+        cacheName: 'consumer-v47-hardpan-email-link',
+        appName: 'HardPan',
+        shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
         startUrl: './admin.html',
         themeColor: '#0E2B1F',

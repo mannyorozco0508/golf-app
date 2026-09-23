@@ -1,6 +1,6 @@
 {
-  "name": "Rattle Golf",
-  "short_name": "Rattle Golf",
+  "name": "HardPan",
+  "short_name": "HardPan",
   "description": "Live-syncing golf scorecard and game tracker",
   "start_url": "./admin.html",
   "scope": "./",

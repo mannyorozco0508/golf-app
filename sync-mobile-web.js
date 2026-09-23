@@ -155,7 +155,7 @@ const TOURNAMENT_SHELL = [
     //
     // It exists because the LIVE deployment is still the combined repo root, where
     // manifest.json is the Consumer one. Measured on golf-app-5a5.pages.dev:
-    // /manifest.json is name "Rattle Golf", start_url ./admin.html, icon-192/512
+    // /manifest.json is the Consumer install name "HardPan", start_url ./admin.html, icon-192/512
     // maskable. A tournament page linking manifest.json would therefore offer the
     // OTHER product for installation - worse than the no-link state it replaced.
     //

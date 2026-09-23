@@ -295,11 +295,11 @@
         var text = organizerShareText(code);
         var plugin = nativeShare();
         if (plugin) {
-            return Promise.resolve(plugin.share({ title: 'Rattle Golf', text: text, url: url, dialogTitle: 'Organizer link' }))
+            return Promise.resolve(plugin.share({ title: 'HardPan', text: text, url: url, dialogTitle: 'Organizer link' }))
                 .then(function () { return 'shared'; }, function () { return copyOrganizerLink(url, text); });
         }
         if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-            return Promise.resolve(navigator.share({ title: 'Rattle Golf', text: text, url: url }))
+            return Promise.resolve(navigator.share({ title: 'HardPan', text: text, url: url }))
                 .then(function () { return 'shared'; }, function () { return copyOrganizerLink(url, text); });
         }
         return copyOrganizerLink(url, text);

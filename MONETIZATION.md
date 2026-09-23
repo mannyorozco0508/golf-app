@@ -1,4 +1,4 @@
-# Rattle Golf Consumer — v1.1 Monetization Spec
+# HardPan (consumer) — v1.1 Monetization Spec
 
 Rewritten 2026-09-14, revised twice the same day: after the round-code
 issuance investigation, then after the Firebase boot-path investigation.

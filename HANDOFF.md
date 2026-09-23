@@ -1,5 +1,9 @@
 # Rattle Golf — Project Handoff
 
+> **Consumer brand, Wave 1 (2026-09-23): HardPan.** The consumer web app — lobby wordmark, PWA manifest, share-sheet titles, instructions, and the product name on privacy, terms, and support — is HardPan. Rattle Golf stays the tournaments product, the LLC, `support@rattlegolf.com`, bundle id `com.rattlegolf.app`, and the App Store listing name while iOS 1.0.3 is Waiting for Review. Do not change `CFBundleDisplayName` or `capacitor.config.ts` `appName` until that version ships. Do not rename `tournaments.rattlegolf.com`.
+
+
+
 I'm building a golf scoring and betting app. I'm not a coder — an AI assistant writes the code, I review and commit it. I need you to get oriented before suggesting anything.
 
 ## What it is

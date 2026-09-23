@@ -1770,7 +1770,12 @@
 // lobby card sends the link and finishes it with linkWithCredential, so the
 // trial and a founder pass stay on that uid. A device on v202 has no card,
 // and a cached admin.html would call a file the shell never stored.
-const CACHE_VERSION = 'golfapp-v203-email-link';
+// Moved to v204 because that same shell is HardPan: the lobby wordmark, the
+// install manifest, share-sheet titles, the how-it-works page, and the
+// receipt mark's alt. A device on v203 has the email-link card and still
+// says Rattle Golf. The native home-screen name is unchanged while iOS 1.0.3
+// is in review. email-link-auth.js stays precached.
+const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

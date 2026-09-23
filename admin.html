@@ -132,7 +132,7 @@
         .lobby-logo { font-size: 3.5rem; margin-bottom: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
         /* RATTLE GOLF BRAND MARK.
            The symbol only - no wordmark. .lobby-title sits directly beneath this and
-           already says "Rattle Golf"; stacking a second wordmark would say the name
+           already says "HardPan"; stacking a second wordmark would say the name
            twice. The cream disc is not decoration: the forest-green R is nearly
            invisible against the dark card, and this is what makes the mark read in
            both themes. A circle also reads as a brand lockup where a rounded square
@@ -144,7 +144,8 @@
         /* THE MARK LEADS, and the wordmark supports it - it used to be the other way
            round, with the name set larger than the symbol above it. The wordmark
            STAYS: a symbol on its own does not tell a first-time golfer what this is. */
-        .lobby-title { font-size: 1.35rem; color: var(--brand-green); margin-bottom: 10px; font-weight: bold; letter-spacing: 0.5px; }
+        /* HardPan wordmark. One word, heavy, tight — the mark above it is the symbol. */
+        .lobby-title { font-size: 1.35rem; color: var(--brand-green); margin-bottom: 10px; font-weight: 800; letter-spacing: -0.03em; }
         /* A CONVENIENCE FOR ONE PERSON ON ONE DEVICE, not a third headline choice.
            It was a full-width primary button competing with the two tiles that are
            the actual question this screen asks. Still a 44px touch target: small is
@@ -418,8 +419,8 @@ html {
 
 <div class="container" id="lobby-screen">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-    <div class="lobby-logo lobby-mark" onclick="handleSecretTap()"><img src="logo-mark.png" alt="Rattle Golf" width="104" height="104"></div>
-    <div class="lobby-title">Rattle Golf</div>
+    <div class="lobby-logo lobby-mark" onclick="handleSecretTap()"><img src="logo-mark.png" alt="HardPan" width="104" height="104"></div>
+    <div class="lobby-title">HardPan</div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
 
     <div class="home-widgets">
@@ -434,7 +435,7 @@ html {
              'club' branch in selectHomeWidget() plus the Step 3 framing text are both
              still here and still work. A deep link carrying ?eventType=club continues
              to behave exactly as it did. The Club/Tournament app will own this entry
-             point; Rattle Golf Consumer presents Game Day and Road Trip only. -->
+             point; HardPan, the consumer app, presents Game Day and Road Trip only. -->
         <button type="button" class="home-widget active" id="hw-quick" onclick="selectHomeWidget('quick')">
             <div class="hw-icon">🏌️</div>
             <div class="hw-name">Game Day</div>
@@ -1449,7 +1450,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     </div>
 
     <!-- THE TOURNAMENT EXIT CARD WAS REMOVED AT THE PRODUCT SEPARATION.
-         Rattle Golf Consumer is Game Day and Road Trip. Organising a tournament is a
+         HardPan, the consumer app, is Game Day and Road Trip. Organising a tournament is a
          separate product with a separate binary, so Consumer no longer advertises it.
          openTournamentsApp() and tournamentUrl() are DELIBERATELY RETAINED below:
          selectHomeWidget('tournament') still routes through them for installed PWAs
@@ -2628,7 +2629,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
-            navigator.share({ title: `Rattle Golf`, text: textMsg, url: baseUrl }).catch(console.error);
+            navigator.share({ title: `HardPan`, text: textMsg, url: baseUrl }).catch(console.error);
         } else {
             navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
         }
@@ -3109,7 +3110,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     //
     // captureMoneyPool() rebuilds the pool from the controls, so any key the wizard
     // has no input for would vanish on the next save. participantIds is the live
-    // example: pool-engine.js honours it, and Rattle Golf 1.0 deliberately does not
+    // example: pool-engine.js honours it, and HardPan deliberately does not
     // expose a picker for it. A round that has one - set by hand, or by some future
     // version - must not lose it because this screen cannot draw it.
     //

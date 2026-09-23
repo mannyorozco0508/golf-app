@@ -111,17 +111,20 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
     // competing with the tiles. RE-PINNED 2026-09-13 (v123): the copy-an-old-round
     // field is BACK, deliberately, as a second compact row: it is the only place
     // on this product that emits the copyFrom prefill (the trip select's copy had
-    // never survived the lobby). Two inputs now: the game code, and the code of a
-    // previous round to start from.
-    test('below the tiles there is Resume and exactly two compact code inputs', () => {
+    // never survived the lobby). RE-PINNED 2026-09-23: the email-link card sits
+    // on this same lobby, so two more inputs (the address, and the pasted link)
+    // belong here too. Four, and no others.
+    test('below the tiles there is Resume, the email-link card, and exactly two compact code inputs', () => {
         // COMMENTS STRIPPED. The note explaining what stayed removed names
         // copyFrom=OLD, and an earlier version of this assertion matched that
         // sentence rather than any control - grading prose as though it were markup.
         const l = lobby().replace(/<!--[\s\S]*?-->/g, '');
         const afterWidgets = l.slice(l.indexOf('home-widgets'));
         const inputs = afterWidgets.match(/<input/g) || [];
-        assert.equal(inputs.length, 2,
+        assert.equal(inputs.length, 4,
             'the home screen asks for ' + inputs.length + ' things to be typed');
+        assert.match(afterWidgets, /id="email-link-input"/, 'the sign-in email');
+        assert.match(afterWidgets, /id="email-link-paste"/, 'the pasted sign-in link');
         assert.match(afterWidgets, /id="join-code-input"/, 'the game code');
         assert.match(afterWidgets, /id="copy-code-input"/, 'and the previous round to start from');
         assert.ok(!/lobby-divider/.test(afterWidgets),
@@ -240,7 +243,7 @@ describe('THE MARK LEADS THE SCREEN', () => {
     });
 
     test('but the wordmark survives — a symbol alone names nothing', () => {
-        assert.match(ADMIN, /class="lobby-title">Rattle Golf</,
+        assert.match(ADMIN, /class="lobby-title">HardPan</,
             'a first-time golfer is shown a symbol and no name');
     });
 
