@@ -240,7 +240,7 @@ describe('THE MARK LEADS THE SCREEN', () => {
     });
 
     test('but the wordmark survives — a symbol alone names nothing', () => {
-        assert.match(ADMIN, /class="lobby-title">Rattle Golf</,
+        assert.match(ADMIN, /class="lobby-title">HardPan</,
             'a first-time golfer is shown a symbol and no name');
     });
 

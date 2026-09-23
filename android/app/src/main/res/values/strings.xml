@@ -1,5 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <!-- DISPLAY NAME HELD with iOS. Consumer web is HardPan. Leave these as
+         Rattle Golf until CFBundleDisplayName moves after 1.0.3 ships, so the
+         two native shells rename together. -->
     <string name="app_name">Rattle Golf</string>
     <string name="title_activity_main">Rattle Golf</string>
     <string name="package_name">com.rattlegolf.app</string>

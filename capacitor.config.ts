@@ -2,6 +2,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.rattlegolf.app',
+  // DISPLAY NAME HELD while iOS 1.0.3 is Waiting for Review as Rattle Golf.
+  // The consumer web brand is HardPan (manifest.json, the lobby, share
+  // titles). After 1.0.3 is released, set appName to 'HardPan' in the same
+  // commit that changes ios/App/App/Info.plist CFBundleDisplayName and
+  // android/.../strings.xml app_name, then archive the next build. Changing
+  // it during review would make a resubmitted binary disagree with the
+  // listing. The bundle id stays com.rattlegolf.app forever.
   appName: 'Rattle Golf',
   webDir: 'www/app',
   ios: {

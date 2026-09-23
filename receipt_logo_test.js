@@ -33,7 +33,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const stripComments = s => s.replace(/<!--[\s\S]*?-->|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str !== undefined ? str : '');
 const PAGE = read('settlement.html');
 const code = stripComments(PAGE);
-const IMG = '<img class="receipt-mark" src="logo-mark.png" alt="Rattle Golf" width="64" height="64">';
+const IMG = '<img class="receipt-mark" src="logo-mark.png" alt="HardPan" width="64" height="64">';
 
 describe('THE MARKUP: one header, the mark first in it, adjacent to the opening tag', () => {
     test('buildReceiptHeader emits the mark once, as the precached file, with alt text', () => {
@@ -44,7 +44,7 @@ describe('THE MARKUP: one header, the mark first in it, adjacent to the opening 
         assert.equal((code.match(/receipt-mark/g) || []).length, 3, 'one in the builder, one screen rule, one print rule');
     });
     test('it is the lobby\'s asset - admin.html shows the same file - and nothing else on the page names an image', () => {
-        assert.match(read('admin.html'), /<img src="logo-mark\.png" alt="Rattle Golf"/);
+        assert.match(read('admin.html'), /<img src="logo-mark\.png" alt="HardPan"/);
         assert.equal((code.match(/<img /g) || []).length, 1, 'the receipt has exactly one image');
     });
     test('a rendered header carries the tag, and its tag-stripped text is unchanged by it', () => {

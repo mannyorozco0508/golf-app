@@ -115,13 +115,13 @@ describe('organizer-gate.js: the URL, the words, the paste (one builder for thre
         native.Capacitor = { isNativePlatform: () => true, Plugins: { Share: { share(o) { native.__calls.push(o); return Promise.resolve(); } } } };
         assert.equal(await native.organizerGate.shareOrganizerLink('org1', { organizerToken: TOKEN }), 'shared');
         assert.equal(native.__calls.length, 1);
-        assert.deepEqual(J(native.__calls[0]), { title: 'Rattle Golf', text: native.organizerGate.organizerShareText('org1'), url: native.organizerGate.organizerShareUrl('org1', TOKEN), dialogTitle: 'Organizer link' });
+        assert.deepEqual(J(native.__calls[0]), { title: 'HardPan', text: native.organizerGate.organizerShareText('org1'), url: native.organizerGate.organizerShareUrl('org1', TOKEN), dialogTitle: 'Organizer link' });
         // THE WEB: navigator.share
         const web = gate();
         web.__calls = [];
         web.navigator = { share(o) { web.__calls.push(o); return Promise.resolve(); } };
         assert.equal(await web.organizerGate.shareOrganizerLink('org1', { organizerToken: TOKEN }), 'shared');
-        assert.deepEqual(J(web.__calls[0]), { title: 'Rattle Golf', text: web.organizerGate.organizerShareText('org1'), url: web.organizerGate.organizerShareUrl('org1', TOKEN) });
+        assert.deepEqual(J(web.__calls[0]), { title: 'HardPan', text: web.organizerGate.organizerShareText('org1'), url: web.organizerGate.organizerShareUrl('org1', TOKEN) });
         // NEITHER: the clipboard, with the words and the URL
         const clip = gate();
         clip.__copied = [];

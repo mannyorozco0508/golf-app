@@ -424,10 +424,10 @@
     }
 
     function safeName(s) {
-        return String(s || 'Rattle-Golf')
+        return String(s || 'HardPan')
             .replace(/[^A-Za-z0-9]+/g, '-')
             .replace(/^-|-$/g, '')
-            .slice(0, 60) || 'Rattle-Golf';
+            .slice(0, 60) || 'HardPan';
     }
 
     // ---- THE ONE ENTRY POINT ------------------------------------------------
@@ -442,7 +442,7 @@
     // it exactly, so the catch path tells the golfer instead.
     function exportOrPrint(opts) {
         const options = opts || {};
-        const title = options.title || 'Rattle Golf';
+        const title = options.title || 'HardPan';
         const roots = options.roots || [document.body];
         const onBefore = typeof options.onBefore === 'function' ? options.onBefore : null;
         const onAfter = typeof options.onAfter === 'function' ? options.onAfter : null;

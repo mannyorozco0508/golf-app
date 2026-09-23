@@ -71,7 +71,7 @@ const isTournamentManifest = m => !!m && m.name === 'GolfApp Tournaments'
     && m.start_url === './tournament.html'
     && Array.isArray(m.icons) && m.icons.length > 0
     && m.icons.every(i => /^tournament-icon-/.test(i.src) && i.purpose === 'any');
-const isConsumerManifest = m => !!m && m.name === 'Rattle Golf'
+const isConsumerManifest = m => !!m && m.name === 'HardPan'
     && m.icons.every(i => i.purpose === 'any maskable');
 
 function bail(msg) {

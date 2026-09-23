@@ -17,7 +17,7 @@
 //            move down by the mark's height plus its 6 px margin and nothing
 //            else changes.
 //   EXPORT   RattleExport._linesFrom on the export roots - what the native PDF
-//            is built from - contains no "Rattle Golf": innerText carries no alt
+//            is built from - contains no "HardPan": innerText carries no alt
 //            text, so the native PDF is text-only exactly as before. That is a
 //            statement of fact, not a pass condition; see receipt_logo_test.js.
 //
@@ -46,7 +46,7 @@ const GEO = `(function(){ var q = s => document.querySelector(s);
   return JSON.stringify({ media: matchMedia('print').matches ? 'print' : 'screen',
     img: img ? { display: getComputedStyle(img).display, rect: r(img), complete: img.complete, natural: [img.naturalWidth, img.naturalHeight], src: img.getAttribute('src') } : null,
     head: r(head), course: r(q('.receipt-head-course')), firstCard: r(q('.settle-card')), docH: document.documentElement.scrollHeight, scrollW: document.documentElement.scrollWidth,
-    headText: head ? head.innerText : null, exportLines: lines ? lines.length : null, exportHasRattle: lines ? lines.some(l => /Rattle Golf/.test(l)) : null }); })()`;
+    headText: head ? head.innerText : null, exportLines: lines ? lines.length : null, exportHasRattle: lines ? lines.some(l => /HardPan|Rattle Golf/.test(l)) : null }); })()`;
 
 function bail(msg) { console.log(JSON.stringify({ result: 'COULD NOT RUN', reason: msg })); process.exit(2); }
 
