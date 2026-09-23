@@ -117,9 +117,9 @@ function pngSize(p) {
 }
 
 // THE CANVAS COLOUR of an opaque icon: the most common colour along its four
-// edges. Not pixel (0,0) - the very corner of icon-1024.png is one level off the
-// rest of its cream, and a tool and a test that sampled different pixels
-// disagreed about the same file.
+// edges. Not pixel (0,0) — a single corner can sit one level off the field,
+// and a tool and a test that sampled different pixels disagreed about the
+// same file.
 function canvasColour(img) {
     const counts = new Map();
     const bump = (x, y) => {

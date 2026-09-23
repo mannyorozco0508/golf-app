@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- The icon's own canvas colour, read from icon-1024.png by tools/android-icons.js.
-         The foreground layer is opaque cream around the mark, so this must match it. -->
-    <color name="ic_launcher_background">#FCF7ED</color>
+         The foreground layer is an opaque field around the mark, so this must match it. -->
+    <color name="ic_launcher_background">#0B0F0C</color>
 </resources>
