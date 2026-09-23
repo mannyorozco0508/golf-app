@@ -204,7 +204,7 @@ describe('THE TOURNAMENT TRANSITION IS OUTBOUND, AND CONFIGURED', () => {
 describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () => {
     test('each product declares its own identity', () => {
         assert.match(BUILD, /appName: 'HardPan',[\s\S]{0,80}shortName: 'HardPan',/);
-        assert.match(BUILD, /appName: 'GolfApp Tournaments',/);
+        assert.match(BUILD, /appName: 'HardPan Tournaments',/);
     });
 
     test('NEGATIVE CONTROL — renaming Consumer must not rename Tournament', () => {
@@ -229,7 +229,7 @@ describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () =
         // If this count moves, the rename surface moved with it and the handoff note
         // in the next batch is out of date.
         const surfaces = [
-            ['admin.html', /<div class="lobby-title">HardPan<\/div>/],
+            ['admin.html', /<img src="hardpan-lockup\.svg" alt="HardPan"/],
             ['admin.html', /title: `HardPan`/],
             ['instructions.html', /<title>How HardPan Works<\/title>/],
             ['instructions.html', /How HardPan Works<\/h1>/],

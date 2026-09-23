@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tournament Setup</title>
+    <title>HardPan Tournaments</title>
     <!-- THE HOME-SCREEN ICON WHEN A GOLFER ADDS THIS TO THEIR HOME SCREEN.
          iOS does not read the web manifest for the icon; without this tag it
          takes a SCREENSHOT OF THE PAGE and uses that. Every page in this repo
          was in that state until wave 19. 180x180 is the size iOS asks for at
          @3x, and the file is the one the manifest icons are derived from, so
          the home screen and the installed PWA cannot show two different marks. -->
+    <link rel="icon" href="tournament-icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="tournament-icon-180.png">
     <!-- THE INSTALL IDENTITY OF THIS PRODUCT, and deliberately NOT manifest.json.
          The live deployment is still the combined repo root, where manifest.json
@@ -168,7 +169,7 @@
         .tourney-hero-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,24,18,0.28) 0%, rgba(8,24,18,0.58) 55%, rgba(8,24,18,0.88) 100%); }
         .tourney-hero-body { position: relative; padding: 56px 20px 22px 20px; }
         .tourney-wordmark { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 16px; row-gap: 6px; align-items: center; width: max-content; line-height: 1; }
-        .tourney-wordmark .wm-disc { grid-column: 1; grid-row: 1; width: 72px; height: 72px; border-radius: 50%; background: #F6F4EC; display: flex; align-items: center; justify-content: center; }
+        .tourney-wordmark .wm-disc { grid-column: 1; grid-row: 1; width: 72px; height: 72px; border-radius: 50%; background: #0B0F0C; display: flex; align-items: center; justify-content: center; }
         .tourney-wordmark .wm-mark { width: 56px; height: 56px; display: block; }
         .tourney-wordmark .wm-rattle { grid-column: 1; grid-row: 2; justify-self: center; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: rgba(244,247,245,0.78); }
         .tourney-wordmark .wm-product { grid-column: 2; grid-row: 1; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.01em; color: #ffffff; }
@@ -318,11 +319,11 @@
          Presentation only: the sign-in line and panel below keep their ids and
          are rendered by the same renderSignedInAs/renderSignInPanels. Dark mode
          left this product on 2026-09-18; there is no toggle in the band.
-         Lockup: logo-mark.png (parent brand) on the left, the quiet word
-         "Rattle" under the mark, "Tournaments" large on the right. The PNG is
+         Lockup: the ball on firm ground (logo-mark.png) on the left, the word
+         HardPan under the mark, Tournaments large on the right. The PNG is
          the mark - not a big uppercase text stand-in. This hostname serves the
          WHOLE site: / is the round app. The band says which product this page
-         is, not what the site is, and is not a rename of this product.
+         is. tournaments.rattlegolf.com stays the hostname.
          The imagery is assets/tournament-hero.svg, a local brand-green fairway
          (no stock photo, no people). .tourney-hero-art paints solid brand-green
          under it so a missing or unfetched image is a plain band, not a hole. -->
@@ -330,7 +331,7 @@
         <div class="tourney-hero-art" aria-hidden="true"></div>
         <div class="tourney-hero-shade" aria-hidden="true"></div>
         <div class="tourney-hero-body">
-            <div class="tourney-wordmark" aria-label="Rattle Tournaments"><span class="wm-disc"><img class="wm-mark" src="logo-mark.png" alt="" width="56" height="56"></span><span class="wm-rattle">Rattle</span><span class="wm-product">Tournaments</span></div>
+            <div class="tourney-wordmark" aria-label="HardPan Tournaments"><span class="wm-disc"><img class="wm-mark" src="logo-mark.png" alt="" width="56" height="56"></span><span class="wm-rattle">HardPan</span><span class="wm-product">Tournaments</span></div>
             <p class="tourney-hero-line">Live scoring + registration for charity, member-guest, and club events.</p>
         </div>
     </header>

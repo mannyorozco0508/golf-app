@@ -64,7 +64,9 @@ const PRODUCTS = {
         // Moved to v47. That shell installs as HardPan (lobby wordmark, share
         // titles, instructions, receipt alt). A device on v46 has the email-link
         // card and still installs as Rattle Golf. Tournament is unchanged.
-        cacheName: 'consumer-v47-hardpan-email-link',
+        // Moved to v48. The install icons and the lobby lockup are the ball on
+        // firm ground. A device on v47 still installs the Stroke R.
+        cacheName: 'consumer-v48-hardpan-logo',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
@@ -72,9 +74,9 @@ const PRODUCTS = {
         themeColor: '#0E2B1F',
         backgroundColor: '#F6F4EC',
         // MASKABLE IS CORRECT HERE and is not a copy of what Tournament does.
-        // Android keeps only the inner 80% circle of a maskable icon; the brush
-        // R spans 74.7% of the canvas and sits centred, so the crop takes
-        // background and nothing else. Measured, not assumed.
+        // Android keeps only the inner 80% circle of a maskable icon. The
+        // ball sits inside the inner 80% circle and is centred, so the crop
+        // takes the near-black field and nothing else. Measured, not assumed.
         icons: [
             { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
             { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
@@ -153,26 +155,19 @@ const PRODUCTS = {
         // NOT sw.js. That file's CACHE_VERSION is the CONSUMER key; bumping it
         // would re-download the Consumer shell for changes that are not in it and
         // still leave Tournament devices on the old files.
-        cacheName: 'tournament-v51-import-name',
-        // WORKING NAME ONLY. The Tournament product has not been named; this is
-        // deliberately plain and trivially changeable, and nothing depends on it.
-        appName: 'GolfApp Tournaments',
+        // Moved to v52. The web mark is the ball on firm ground and the product
+        // name is HardPan Tournaments. A device on v51 still installs the old
+        // banner and still says GolfApp Tournaments. The hostname
+        // tournaments.rattlegolf.com is unchanged.
+        cacheName: 'tournament-v52-hardpan',
+        appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
-        // ITS OWN MARK, AND "any" ONLY - NOT "any maskable".
-        //
-        // The other product keeps maskable because its icon is a centred mark
-        // that survives the crop. This one carries the word TOURNAMENTS in a
-        // banner across the bottom, and a maskable crop destroys it. Measured on
-        // the 1024 master: the safe circle at the glyph mid-line is 485px wide
-        // and the word spans 801px, so 38.8% of the letter pixels fall outside
-        // it - T, O, T and S go entirely and a home screen reads "URNAMEN".
-        //
-        // Declaring "any" does not make the icon worse anywhere. It tells Android
-        // to letterbox the artwork inside its mask instead of cropping to it,
-        // which is exactly what a word-bearing icon needs. iOS is unaffected
-        // either way: its own corner mask clips ZERO pixels of this artwork.
+        // ITS OWN FILES, AND "any" ONLY. The picture is the same ball on firm
+        // ground the consumer web icon uses. Purpose stays "any" so an install
+        // from this product does not inherit the other product's manifest
+        // declaration. The ball sits inside the inner 80% circle.
         icons: [
             { src: 'tournament-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: 'tournament-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

@@ -1,6 +1,6 @@
 # PRODUCT SEPARATION MANIFEST
 
-**Status:** Consumer separated at the Rattle Golf polish batch. The consumer web brand is **HardPan** (2026-09-23). The Club/Tournament app has not been started and stays Rattle.
+**Status:** Consumer separated at the Rattle Golf polish batch. The web brand, consumer and tournaments, is **HardPan** (2026-09-23). The hostname stays `tournaments.rattlegolf.com`.
 
 This is an engineering handoff, not marketing copy. Its job is to let the second app begin without rediscovering the architecture — and, more importantly, to stop someone deleting code that looks unused but is load-bearing for a product that does not exist yet.
 
@@ -29,7 +29,7 @@ This is an engineering handoff, not marketing copy. Its job is to let the second
 | `stats.html` | Final scorecard |
 | `trip.html` | **Road Trip** |
 | `instructions.html`, `shared.html` | Support pages |
-| `logo-mark.png`, `icon-{192,512,1024}.png` | Brand assets |
+| `hardpan-lockup.svg`, `hardpan-icon.svg`, `favicon-32.png`, `icon-{192,512}.png` | Consumer web mark (ball on firm ground). `icon-1024.png` is the held App Store master |
 
 Consumer bundle: **31 files**, cache `consumer-v34-brand-mark`, `start_url: ./admin.html`.
 
@@ -264,7 +264,7 @@ The refusal in (3) is right. The way out of it does not exist yet.
 ## Do not
 
 - Delete `tournament*` files, or the `tournaments` node, or the retained helpers
-- Rename the Tournament product to Rattle Golf, or to HardPan. Tournaments stay Rattle, including `tournaments.rattlegolf.com`
+- Rename `tournaments.rattlegolf.com` or the bundle id `com.rattlegolf.app`. The web product name is HardPan Tournaments
 - Add Tournament pages to the Consumer native bundle
 - Run a schema migration on the `tournaments` node
 - Rename persisted identifiers for tidiness

@@ -103,7 +103,7 @@ describe('THE WRAPPER POINTS AT THE BUNDLE, NOT A SERVER', () => {
     test('the native identity is the locked App Store record', () => {
         // These three cannot change after the first App Store Connect upload.
         assert.match(CAP, /appId: 'com\.rattlegolf\.app'/);
-        assert.match(CAP, /appName: 'Rattle Golf'/);
+        assert.match(CAP, /appName: 'HardPan'/);
         assert.match(CAP, /webDir: 'www\/app'/);
     });
 

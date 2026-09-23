@@ -60,7 +60,7 @@
 // That harness CANNOT reach any of these entry points, and the reasons are the
 // ones CLAUDE.md already records:
 //
-//   - The logo is `<div class="lobby-logo" onclick="handleSecretTap()">`. Static
+//   - The logo is `<div class="lobby-lockup" onclick="handleSecretTap()">`. Static
 //     attributes are not parsed by mini-dom, so the handler does not exist and
 //     the only way to "tap" it would be to call handleSecretTap() by name -
 //     which tests the function, not the tap.
@@ -246,7 +246,7 @@ const LOBBY_DRIVER = `
       var iv = setInterval(function () {
         if (++tries > 200) { window.__trace.push('TIMEOUT waiting for the lobby'); clearInterval(iv); return; }
         try {
-          var logo = document.querySelector('.lobby-logo');
+          var logo = document.querySelector('.lobby-lockup');
           var vis = !!(logo && (logo.offsetParent !== null ||
                      (logo.getClientRects && logo.getClientRects().length > 0)));
           if (!vis) return;

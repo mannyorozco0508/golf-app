@@ -2,7 +2,7 @@
 // ============================================================================
 // THE MARK IS ON THE PRINTED RECEIPT AND NOWHERE ON THE SCREEN
 //
-// settlement.html carries the brand mark (logo-mark.png, the lobby's own asset)
+// settlement.html carries the print mark (logo-mark.png, precached)
 // inside buildReceiptHeader - display:none on screen, shown in @media print.
 // mini-dom has no layout and no print media, so the two claims that matter are
 // measured here, in Chrome, on a cold arrival with no page function called:

@@ -1775,7 +1775,14 @@
 // receipt mark's alt. A device on v203 has the email-link card and still
 // says Rattle Golf. The native home-screen name is unchanged while iOS 1.0.3
 // is in review. email-link-auth.js stays precached.
-const CACHE_VERSION = 'golfapp-v204-hardpan-email-link';
+// Moved to v205 because the web mark is the dimpled ball on firm ground.
+// The lobby header is hardpan-lockup.svg (ball + HARDPAN). The tab and PWA
+// icons are that ball. logo-mark.png is the same ball, for the receipt and
+// the tournament landing. tournament.html in this shell says HardPan
+// Tournaments. A device on v204 still shows the circular R above a text
+// wordmark. The iOS binary in review is not resubmitted. email-link-auth.js
+// stays precached.
+const CACHE_VERSION = 'golfapp-v205-hardpan-logo';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1893,7 +1900,12 @@ const SHELL_FILES = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png',
-    './logo-mark.png'
+    './logo-mark.png',
+    // HardPan lockup and tab icon (v205). Flat names: a slash in this list
+    // is refused, so these sit beside logo-mark.png.
+    './hardpan-lockup.svg',
+    './hardpan-icon.svg',
+    './favicon-32.png'
 ];
 
 self.addEventListener('install', (event) => {

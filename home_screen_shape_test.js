@@ -222,42 +222,24 @@ describe('RESUME IS A CONVENIENCE, NOT A HEADLINE', () => {
     });
 });
 
-describe('THE MARK LEADS THE SCREEN', () => {
+describe('THE LOCKUP LEADS THE SCREEN', () => {
 
-    test('the logo is bigger than it was', () => {
-        assert.ok(cssNum('.lobby-mark', 'width').n > 72,
-            'the mark did not grow');
-        assert.ok(cssNum('.lobby-mark img', 'width').n > 56,
-            'the disc grew but the symbol inside it did not');
+    test('the header is the horizontal lockup, on the near-black field', () => {
+        assert.ok(cssNum('.lobby-lockup', 'width').n >= 280, 'the lockup is not a wide bar');
+        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
+        assert.match(ADMIN, /<img src="hardpan-lockup\.svg" alt="HardPan"/);
     });
 
-    test('the symbol still fits inside its disc', () => {
-        assert.ok(cssNum('.lobby-mark img', 'width').n < cssNum('.lobby-mark', 'width').n,
-            'the symbol is as wide as or wider than the disc it sits in');
-    });
-
-    test('the wordmark is smaller than it was', () => {
-        const t = cssNum('.lobby-title', 'font-size');
-        assert.equal(t.unit, 'rem');
-        assert.ok(t.n < 2, 'the wordmark is still ' + t.n + 'rem');
-    });
-
-    test('but the wordmark survives — a symbol alone names nothing', () => {
-        assert.match(ADMIN, /class="lobby-title">HardPan</,
-            'a first-time golfer is shown a symbol and no name');
-    });
-
-    test('the img element is sized to match its rule', () => {
-        // width/height attributes on the tag override nothing but do describe the
-        // intrinsic box; leaving them at the old size makes the markup lie.
-        const tag = /<img src="logo-mark\.png"[^>]*>/.exec(ADMIN);
-        assert.ok(tag, 'the logo img is gone');
-        const w = /width="(\d+)"/.exec(tag[0]);
-        assert.ok(w && Number(w[1]) === cssNum('.lobby-mark img', 'width').n,
-            'the img attributes still describe the old size: ' + tag[0]);
+    test('the img attributes match the lockup aspect', () => {
+        const tag = /<img src="hardpan-lockup\.svg"[^>]*>/.exec(ADMIN);
+        assert.ok(tag, 'the lockup img is gone');
+        const w = Number(/width="(\d+)"/.exec(tag[0])[1]);
+        const h = Number(/height="(\d+)"/.exec(tag[0])[1]);
+        // viewBox is 914.32x276. The attributes describe that ratio.
+        assert.ok(Math.abs(w / h - 914.32 / 276) < 0.15, tag[0] + ' is not the lockup ratio');
     });
 
     test('the mark is still tappable for the secret panel', () => {
-        assert.match(ADMIN, /class="lobby-logo lobby-mark" onclick="handleSecretTap\(\)"/);
+        assert.match(ADMIN, /class="lobby-lockup" onclick="handleSecretTap\(\)"/);
     });
 });

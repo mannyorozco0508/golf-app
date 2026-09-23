@@ -1,6 +1,6 @@
 # Rattle Golf — Project Handoff
 
-> **Consumer brand, Wave 1 (2026-09-23): HardPan.** The consumer web app — lobby wordmark, PWA manifest, share-sheet titles, instructions, and the product name on privacy, terms, and support — is HardPan. Rattle Golf stays the tournaments product, the LLC, `support@rattlegolf.com`, bundle id `com.rattlegolf.app`, and the App Store listing name while iOS 1.0.3 is Waiting for Review. Do not change `CFBundleDisplayName` or `capacitor.config.ts` `appName` until that version ships. Do not rename `tournaments.rattlegolf.com`.
+> **Web brand: HardPan.** Consumer and tournaments. The mark is a dimpled ball on a firm ground line (bone, then forest green) beside HARDPAN. Lobby: `hardpan-lockup.svg` on `#0B0F0C`. Tab and PWA icons are the ball alone. Tournaments landing says HardPan Tournaments. `support@rattlegolf.com`, Rattle Golf LLC, bundle id `com.rattlegolf.app`, and `tournaments.rattlegolf.com` stay. The repo display name is HardPan. Do not archive or upload a new iOS binary while 1.0.3 is in review. `icon-1024.png`, the iOS AppIcon, and the Android mipmaps stay the Stroke R — do not sync Capacitor for icons. Shell cache `golfapp-v205-hardpan-logo`; consumer cache `consumer-v48-hardpan-logo`; tournament cache `tournament-v52-hardpan`.
 
 
 
@@ -615,9 +615,8 @@ would have needed the domain listed first; it is listed now.
 
 `/tournament` opens on a hero band: `assets/tournament-hero.svg` (a brand-green
 fairway, not a photograph) under a dark gradient. The lockup is **logo-mark.png**
-on a cream disc at left, the quiet word **Rattle** directly under the mark, and
-**Tournaments** large on the right — parent brand as the PNG, product as the
-word. One line under that: "Live scoring + registration for charity,
+(the ball on firm ground) on a near-black disc at left, the word **HardPan**
+directly under the mark, and **Tournaments** large on the right. One line under that: "Live scoring + registration for charity,
 member-guest, and club events." Below it, in order: the organizer sign-in as a
 compact class-styled card (`.signin-card`; same ids, same sentence, same button, same
 `signInWithEmailAndPassword`), then the restyled name / course / entry-fee fields
@@ -630,17 +629,10 @@ baseline (`tournament_landing_prev.fixture.json`, sha-pinned) plus exactly three
 deliberate substitutions. `tools/tournament-landing-check.js` measures the layout cold in
 Chrome at 390 and 768px, signed out and signed in, and taps the page's own buttons.
 
-**Why the band shows Rattle when the product is not called Rattle Golf.** The two
-products share one Pages project; `tournaments.rattlegolf.com/` now lands on this
-product (302 to `/tournament`). The band names WHICH product this page is — parent
-brand mark, then product — not what the site is. `rattle_identity_test.js`'s "no Rattle branding on tournament pages"
-guard was /Rattle/ anywhere; it is narrowed to the Consumer product's NAME ("Rattle Golf")
-plus a pin that `tournament.html` says "Rattle" only inside the wordmark (the quiet
-label under the PNG) and the comment above it, and the scorecard and engine not at all.
-`build-shell.js` still says `appName: 'GolfApp Tournaments'` and `product-separation.md`'s
-"do not rename the Tournament product to Rattle Golf" still stands — this is a parent
-brand lockup on one page, not a rename. `logo-mark.png` stays in CONSUMER_SHELL; the
-hero references it from the combined origin.
+**The band says HardPan Tournaments.** The two products share one Pages project;
+`tournaments.rattlegolf.com/` lands on this product (302 to `/tournament`) and
+that hostname stays. The band names which product this page is. `logo-mark.png`
+stays in CONSUMER_SHELL; the hero references it from the combined origin.
 
 **The hero image.** `assets/tournament-hero.svg` is local brand-green fairway art.
 The overlay darkens whatever is there. The file is NOT in `TOURNAMENT_SHELL` and is
