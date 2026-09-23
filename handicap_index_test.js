@@ -12,10 +12,12 @@
 // the Index was already a Playing Handicap: the golfer is flagged and the
 // sentence says so.
 //
-// THE UNTOUCHED SCREEN. The Course step's note and the three fields are in
-// the HTML. A test that only called syncTeeRatingFromCourse would miss a
-// page that never filled them. The default assertion reads the markup. The
-// tee-fill assertion clicks selectCourse, which is what a course row calls.
+// THE COURSE STEP. Slope, Course Rating and Par are not typed. A course row
+// calls selectCourse, which fills them from that course's tees and shows the
+// tee names. A course with no rated tees hides the block. An online result
+// calls openImportConfirm; the tees are on the fetched card before the course
+// is saved, and the dropdown has to show them then. A test that only called
+// syncTeeRatingFromCourse would miss a page that never did either.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -133,15 +135,26 @@ describe('missing tee rating is said, not silent', () => {
     });
 });
 
-describe('Setup shows the tee, and the default is the missing-rating sentence', () => {
-    test('the course step ships empty Slope, Course Rating, and Par', () => {
-        assert.match(ADMIN, /id="tee-slope"/);
-        assert.match(ADMIN, /id="tee-course-rating"/);
-        assert.match(ADMIN, /id="tee-par"/);
-        assert.match(ADMIN, /id="tee-allowance" value="100"/);
-        assert.ok(!/id="tee-slope"[^>]*value=/.test(ADMIN), 'Slope is empty until a tee fills it');
-        const note = H.handicapUnconvertedNote();
-        assert.ok(ADMIN.includes(note), 'the sentence on the page is the one the converter uses');
+describe('Setup fills the tee from the course, and does not ask for the numbers', () => {
+    test('the course step hides the rating block until a tee exists', () => {
+        const panel = ADMIN.slice(ADMIN.indexOf('id="tee-rating-panel"'), ADMIN.indexOf('id="wizard-step-2"'));
+        assert.ok(panel.length > 80, 'the course-step slice must contain the tee block');
+        assert.match(panel, /id="tee-rating-select"/);
+        assert.match(panel, /id="tee-rating-filled"/);
+        assert.match(panel, /display:\s*none/);
+        assert.match(panel, /type="hidden" id="tee-slope"/);
+        assert.match(panel, /type="hidden" id="tee-course-rating"/);
+        assert.match(panel, /type="hidden" id="tee-par"/);
+        assert.match(panel, /id="tee-allowance" value="100"/);
+        assert.ok(!/No tee rating on this course/.test(panel));
+        assert.ok(!/<label[^>]*for="tee-slope"/.test(panel));
+        assert.ok(!/<label[^>]*for="tee-course-rating"/.test(panel));
+        assert.ok(!/<label[^>]*for="tee-par"/.test(panel));
+        assert.ok(!/Allowance %/.test(panel));
+        assert.ok(!panel.includes(H.handicapUnconvertedNote()));
+        // The players step still says what an unconverted Index means. That
+        // sentence is not a form, and it is the one the converter uses.
+        assert.ok(ADMIN.includes(H.handicapUnconvertedNote()));
         assert.match(ADMIN, /playerHandicapFields\(/);
         const save = ADMIN.slice(ADMIN.indexOf('const playersList = []'), ADMIN.indexOf('playersList.push(entry)') + 'playersList.push(entry)'.length);
         assert.ok(save.length > 80);
@@ -150,10 +163,8 @@ describe('Setup shows the tee, and the default is the missing-rating sentence', 
         assert.match(ADMIN, /teeRating: teeForSave/);
     });
 
-    test('choosing a tee fills Slope, Course Rating, and Par', () => {
+    test('choosing a course with tees fills Slope, Course Rating, and Par', () => {
         const sb = loadHtmlInlineScript('admin.html', ['handicap.js', 'course-data.js', 'action-model.js']);
-        // mini-dom does not parse text nodes out of markup, so the sentence is
-        // pinned against the file above. The live fields start empty.
         assert.equal(sb.document.getElementById('tee-slope').value, '');
         const holes = [];
         for (let i = 1; i <= 18; i++) holes.push({ hole: i, par: 4, hcpIndex: i });
@@ -168,25 +179,95 @@ describe('Setup shows the tee, and the default is the missing-rating sentence', 
         };
         sb.__plain = { name: 'No Rating', data: holes };
         vm.runInContext(`globalCourses['gca_test'] = __course; globalCourses['gca_plain'] = __plain; selectCourse('gca_test', 'Test Club');`, sb);
+        const sel = sb.document.getElementById('tee-rating-select');
+        const names = Array.prototype.map.call(sel.options, o => o.textContent);
+        assert.deepEqual(names, ['Men · Blue', 'Women · Red']);
+        assert.equal(sb.document.getElementById('tee-rating-panel').style.display, 'block');
         assert.equal(sb.document.getElementById('tee-slope').value, '130');
         assert.equal(sb.document.getElementById('tee-course-rating').value, '71.8');
         assert.equal(sb.document.getElementById('tee-par').value, '72');
-        assert.match(sb.document.getElementById('tee-rating-note').textContent, /Slope 130/);
-        assert.match(sb.document.getElementById('tee-rating-note').textContent, /Playing Handicap/);
+        const filled = sb.document.getElementById('tee-rating-filled').textContent;
+        assert.match(filled, /Slope 130/);
+        assert.match(filled, /Course Rating 71\.8/);
+        assert.match(filled, /Par 72/);
         const fields = sb.playerHandicapFields('10', null, sb.readTeeRatingFromDom());
         assert.equal(fields.handicapIndex, '10');
         assert.equal(fields.hcp, '11');
         assert.equal(fields.handicapUnconverted, undefined);
         assert.equal(typeof fields.courseHandicap, 'number');
+        // The other tee, through the select's own onchange.
+        sel.value = 'female:0';
+        vm.runInContext(/onchange="([^"]+)"/.exec(ADMIN.slice(ADMIN.indexOf('id="tee-rating-select"'), ADMIN.indexOf('id="tee-rating-select"') + 200))[1], sb);
+        assert.equal(sb.document.getElementById('tee-slope').value, '121');
+        assert.equal(sb.document.getElementById('tee-course-rating').value, '69.4');
         vm.runInContext(`selectCourse('gca_plain', 'No Rating');`, sb);
+        assert.equal(sb.document.getElementById('tee-rating-panel').style.display, 'none');
         assert.equal(sb.document.getElementById('tee-slope').value, '');
         assert.equal(sb.document.getElementById('tee-course-rating').value, '');
         assert.equal(sb.document.getElementById('tee-par').value, '');
-        assert.equal(sb.document.getElementById('tee-rating-note').textContent, sb.handicapUnconvertedNote());
+        assert.equal(sb.document.getElementById('tee-rating-filled').textContent, '');
+        assert.ok(!Array.prototype.some.call(sb.document.getElementById('tee-rating-select').options, o => /No tee rating/.test(o.textContent || '')));
+        assert.match(sb.document.getElementById('handicap-index-note').textContent, /used as the Playing Handicap/);
         // A record can carry tees and no hole card. The grid write must not
-        // throw before the rating fields are filled.
-        vm.runInContext(`globalCourses['gca_teesonly'] = { name: 'Tees Only', tees: { male: [{ name: 'Blue', rating: 72, slope: 130, parTotal: 72 }] } }; selectCourse('gca_teesonly', 'Tees Only');`, sb);
-        assert.equal(sb.document.getElementById('tee-slope').value, '130');
-        assert.equal(sb.document.getElementById('tee-par').value, '72');
+        // throw before the rating fields are filled. Firebase may hand the
+        // tee list back as an object keyed "0","1" rather than an array.
+        vm.runInContext(`globalCourses['gca_teesonly'] = { name: 'Tees Only', tees: { male: { '0': { name: 'Gold', rating: 70.2, slope: 125, parTotal: 71 } } } }; selectCourse('gca_teesonly', 'Tees Only');`, sb);
+        assert.equal(sb.document.getElementById('tee-slope').value, '125');
+        assert.equal(sb.document.getElementById('tee-course-rating').value, '70.2');
+        assert.equal(sb.document.getElementById('tee-par').value, '71');
+        assert.equal(sb.document.getElementById('tee-rating-select').options[0].textContent, 'Men · Gold');
+    });
+
+    test('an online Continental card fills its tees before the course is saved', async () => {
+        const sb = loadHtmlInlineScript('admin.html', ['handicap.js', 'course-data.js', 'action-model.js', 'course-import-rules.js']);
+        const holes = [];
+        for (let i = 1; i <= 18; i++) holes.push({ par: i <= 6 ? 4 : 3, yardage: 150, handicap: i });
+        const tee = (name, rating, slope, yards) => ({
+            tee_name: name, course_rating: rating, slope_rating: slope,
+            par_total: 60, total_yards: yards, holes
+        });
+        // Live golfcourseapi card for Continental Golf Course, Scottsdale
+        // (id n4qjfdjd), measured 2026-09-23. Men's Blue is the longest men's
+        // set, so it is the canonical tee.
+        sb.__detail = {
+            id: 'n4qjfdjd',
+            club_name: 'Continental Golf Course',
+            course_name: 'Continental Golf Course',
+            location: { city: 'Scottsdale', state: 'AZ' },
+            tees: {
+                male: [tee('Blue', 58.4, 86, 3761), tee('Forward', 57.1, 83, 3361)],
+                female: [tee('Blue', 59.8, 90, 3766), tee('Forward', 57.6, 84, 3374)]
+            }
+        };
+        sb.fetch = () => Promise.resolve({ json: () => Promise.resolve({ status: 'ok', course: sb.__detail }) });
+        // mini-dom has no Event and no dispatchEvent. The import path fires one
+        // change after the tees are filled; the harness only needs it not to throw.
+        sb.Event = function () { return {}; };
+        sb.document.getElementById('enable-custom-course').dispatchEvent = function () {};
+        // The name was already typed, so the course identity does not change
+        // when the card arrives. That is the path that used to leave the
+        // manual block up.
+        vm.runInContext(`courseSearchInput.value = 'Continental Golf Course'; courseHiddenSelect.value = ''; handleCourseChange();`, sb);
+        assert.equal(sb.document.getElementById('tee-rating-panel').style.display, 'none');
+        await sb.openImportConfirm({ id: 'n4qjfdjd', club_name: 'Continental Golf Course', course_name: 'Continental Golf Course' });
+        const sel = sb.document.getElementById('tee-rating-select');
+        const names = Array.prototype.map.call(sel.options, o => o.textContent);
+        assert.deepEqual(names, ['Men · Blue', 'Men · Forward', 'Women · Blue', 'Women · Forward']);
+        assert.equal(sb.document.getElementById('tee-rating-panel').style.display, 'block');
+        assert.equal(sb.document.getElementById('tee-slope').value, '86');
+        assert.equal(sb.document.getElementById('tee-course-rating').value, '58.4');
+        assert.equal(sb.document.getElementById('tee-par').value, '60');
+        assert.match(sb.document.getElementById('tee-rating-filled').textContent, /Slope 86/);
+        assert.match(sb.document.getElementById('tee-rating-filled').textContent, /Course Rating 58\.4/);
+        assert.match(sb.document.getElementById('tee-rating-filled').textContent, /Par 60/);
+        assert.equal(sb.document.getElementById('course-select').value, '');
+        sel.value = 'male:1';
+        vm.runInContext(/onchange="([^"]+)"/.exec(ADMIN.slice(ADMIN.indexOf('id="tee-rating-select"'), ADMIN.indexOf('id="tee-rating-select"') + 200))[1], sb);
+        assert.equal(sb.document.getElementById('tee-slope').value, '83');
+        assert.equal(sb.document.getElementById('tee-course-rating').value, '57.1');
+        const playing = sb.playerHandicapFields('10', null, sb.readTeeRatingFromDom());
+        assert.equal(playing.handicapUnconverted, undefined);
+        assert.equal(typeof playing.hcp, 'string');
+        assert.ok(playing.hcp !== '10');
     });
 });
