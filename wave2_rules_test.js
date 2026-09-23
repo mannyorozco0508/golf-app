@@ -6,10 +6,18 @@
 //   CREATING a round (!data.exists()) needs an identified organizer - auth
 //   != null, ownerUid === auth.uid - AND a live trial window (now <
 //   firstSeenAt + 21 days) or a pass whose expiresAt is in the future.
-//   PARTICIPATING in an existing round - scores, KP, presses, side matches,
-//   dots, the audit log, verification, everything a golfer does after
-//   arriving by link - stays UNAUTHENTICATED, exactly as today. That is the
-//   row that breaks Mondays, so it gets the most coverage here.
+//   PARTICIPATING in an existing round - scores, KP markers, presses, side
+//   matches, dots, wolf calls, Ryder scoring, the audit log, verification -
+//   stays UNAUTHENTICATED, exactly as today. That is the row that breaks
+//   Mondays, so it gets the most coverage here. Those paths are child .write
+//   grants: a parent grant cannot be revoked, so setup is owner-only only
+//   because the parent no longer grants a code-holder write on an owned round.
+//   SETUP on a round that HAS ownerUid (players, group sizes, the pot, flights,
+//   additionalGames, courseData, settlementMode, supersededBy, organizerToken,
+//   and every other key with no child grant) requires auth.uid === ownerUid.
+//   A LEGACY round (no ownerUid) stays open, including its setup. The organizer
+//   token is NOT a rules credential: the round is world-readable, so the token
+//   is too. Email-link sign-in is how a second device becomes that uid.
 //   A LEGACY round (no ownerUid) is an existing round: unchanged, forever;
 //   and nobody can claim it (ownerUid can only be set while the round is
 //   being created - data.parent() does not exist).
@@ -63,7 +71,8 @@ const played = extra => Object.assign({ createdAt: 1, players: [{ id: 101, name:
 function scenario() {
     const root = {
         events: {
-            OWNED1: played({ eventName: 'Owned round', ownerUid: 'anon-org' }),
+            OWNED1: played({ eventName: 'Owned round', ownerUid: 'anon-org', organizerToken: 'tok-owned' }),
+            EMAIL1: played({ eventName: 'Email owner', ownerUid: 'u-email' }),
             OWNEDEMPTY: { eventName: 'Owned, unscored', ownerUid: 'anon-org', createdAt: 1, players: [{ id: 101, name: 'Ann' }], gameFormat: 'stroke' },
             EXPIRED1: played({ eventName: "Expired owner's round", ownerUid: 'anon-expired' }),
             LEGACY1: played({ eventName: 'Legacy round' }),
@@ -92,8 +101,11 @@ function scenario() {
         [`events/${code}/dots/h4`]: { canWrite: [{ auth: 'nobody', data: { p101: ['birdie'] } }] },
         [`events/${code}/auditLog/a1`]: { canWrite: [{ auth: 'nobody', data: { ts: 1, what: 'score' } }] },
         [`events/${code}/scoresVerified`]: { canWrite: [{ auth: 'nobody', data: { verified: true, verifiedAt: 1, verifiedBy: 'round' } }] },
-        [`events/${code}/groupSizeOverrides`]: { canWrite: [{ auth: 'nobody', data: [2] }] },
-        [`events/${code}/eventName`]: { canWrite: [{ auth: 'nobody', data: 'renamed by a code holder - as today' }] }
+        [`events/${code}/kpLeaders/h3`]: { canWrite: [{ auth: 'nobody', data: { playerId: '101', playerName: 'Ann' } }] },
+        [`events/${code}/wolfCalls/h3`]: { canWrite: [{ auth: 'nobody', data: { caller: 101 } }, { auth: 'nobody', data: null }] },
+        [`events/${code}/strokePresses/sp1`]: { canWrite: [{ auth: 'nobody', data: { startHole: 2, stake: 10 } }] },
+        [`events/${code}/ryderFoursomes/m1/A/h1`]: { canWrite: [{ auth: 'nobody', data: 4 }, { auth: 'nobody', data: null }] },
+        [`events/${code}/additionalGameInstances/i1`]: { canWrite: [{ auth: 'nobody', data: { format: 'skins' } }] }
     });
     const tests = Object.assign({
         // CREATION - the gate
@@ -113,16 +125,36 @@ function scenario() {
         'events/LEGACYEMPTY': { canWrite: [{ auth: 'nobody', data: null }, { auth: 'nobody', data: { eventName: 'still legacy', createdAt: 1, players: [{ id: 101, name: 'Ann' }], gameFormat: 'stroke' } }] },
         'events/LEGACY1/ownerUid': { cannotWrite: [{ auth: 'stranger', data: 'anon-stranger' }, { auth: 'nobody', data: 'anon-org' }, { auth: 'org', data: 'anon-org' }] },
         // OWNED whole-record writes: the owner re-saves; ownerUid never taken, changed or dropped; deletion as today (unscored only)
-        'events/OWNED1': { canWrite: [{ auth: 'org', data: played({ eventName: 'Owned, re-saved by its owner', ownerUid: 'anon-org', gameFormat: 'nassau' }) }],
+        'events/OWNED1': { canWrite: [{ auth: 'org', data: played({ eventName: 'Owned, re-saved by its owner', ownerUid: 'anon-org', organizerToken: 'tok-owned', gameFormat: 'nassau' }) }],
             cannotWrite: [{ auth: 'nobody', data: null }, { auth: 'org', data: null },
+                { auth: 'nobody', data: played({ eventName: 'wiped by a code holder', ownerUid: 'anon-org' }) },
                 { auth: 'stranger', data: played({ eventName: 'taken', ownerUid: 'anon-stranger' }) },
                 { auth: 'org', data: played({ eventName: 'owner dropped' }) }] },
-        'events/OWNEDEMPTY': { canWrite: [{ auth: 'nobody', data: null }, { auth: 'org', data: null }] },
+        'events/OWNEDEMPTY': { canWrite: [{ auth: 'org', data: null }], cannotWrite: [{ auth: 'nobody', data: null }, { auth: 'stranger', data: null }] },
         'events/OWNED1/ownerUid': { cannotWrite: [{ auth: 'stranger', data: 'anon-stranger' }, { auth: 'org', data: 'anon-stranger' }, { auth: 'nobody', data: null }, { auth: 'org', data: null }], canWrite: [{ auth: 'org', data: 'anon-org' }] },
         // THE OWNER AFTER THE TRIAL
-        'events/EXPIRED1': { canWrite: [{ auth: 'expired', data: played({ eventName: 'edited after the trial', ownerUid: 'anon-expired', gameFormat: 'nassau' }) }] },
-        'events/EXPIRED1/eventName': { canWrite: [{ auth: 'expired', data: 'renamed after the trial' }] },
+        'events/EXPIRED1': { canWrite: [{ auth: 'expired', data: played({ eventName: 'edited after the trial', ownerUid: 'anon-expired', gameFormat: 'nassau' }) }],
+            cannotWrite: [{ auth: 'nobody', data: played({ eventName: 'taken after the trial', ownerUid: 'anon-expired' }) }] },
+        'events/EXPIRED1/eventName': { canWrite: [{ auth: 'expired', data: 'renamed after the trial' }], cannotWrite: [{ auth: 'nobody', data: 'renamed by a code holder' }] },
         'events/EXPIRED1/scores/p101_h2': { canWrite: [{ auth: 'expired', data: 4 }, { auth: 'nobody', data: 4 }] },
+        // SETUP on an owned round is the owner's. The token is on the record and still does not authorize.
+        'events/OWNED1/players': { canWrite: [{ auth: 'org', data: [{ id: 101, name: 'Ann' }] }], cannotWrite: [{ auth: 'nobody', data: [] }, { auth: 'stranger', data: [{ id: 101, name: 'X' }] }] },
+        'events/OWNED1/groupSizeOverrides': { canWrite: [{ auth: 'org', data: [4] }], cannotWrite: [{ auth: 'nobody', data: [2] }, { auth: 'stranger', data: [2] }] },
+        'events/OWNED1/courseData': { canWrite: [{ auth: 'org', data: [{ hole: 1, par: 4, hcpIndex: 1 }] }], cannotWrite: [{ auth: 'nobody', data: [] }] },
+        'events/OWNED1/moneyPool': { cannotWrite: [{ auth: 'nobody', data: { enabled: false } }, { auth: 'stranger', data: { enabled: true } }] },
+        'events/OWNED1/flights': { cannotWrite: [{ auth: 'nobody', data: { enabled: true } }] },
+        'events/OWNED1/additionalGames': { cannotWrite: [{ auth: 'stranger', data: ['nassau'] }] },
+        'events/OWNED1/settlementMode': { cannotWrite: [{ auth: 'nobody', data: 'cents' }] },
+        'events/OWNED1/supersededBy': { canWrite: [{ auth: 'org', data: 'OTHER1' }], cannotWrite: [{ auth: 'nobody', data: 'OTHER1' }, { auth: 'stranger', data: 'OTHER1' }, { auth: 'nobody', data: null }] },
+        'events/OWNED1/organizerToken': { canWrite: [{ auth: 'org', data: 'tok-owned' }], cannotWrite: [{ auth: 'nobody', data: 'stolen' }, { auth: 'stranger', data: 'stolen' }, { auth: 'nobody', data: null }] },
+        'events/OWNED1/eventName': { canWrite: [{ auth: 'org', data: 'renamed by its owner' }], cannotWrite: [{ auth: 'nobody', data: 'renamed by a code holder' }, { auth: 'stranger', data: 'taken' }] },
+        'events/EMAIL1/players': { canWrite: [{ auth: 'email', data: [{ id: 101, name: 'Ann' }] }], cannotWrite: [{ auth: 'nobody', data: [] }, { auth: 'stranger', data: [] }, { auth: 'org', data: [{ id: 101, name: 'Ann' }] }] },
+        'events/EMAIL1/scores/p101_h2': { canWrite: [{ auth: 'nobody', data: 4 }] },
+        // LEGACY setup stays open. There is no owner to require.
+        'events/LEGACY1/players': { canWrite: [{ auth: 'nobody', data: [{ id: 101, name: 'Ann' }, { id: 102, name: 'Ben' }] }] },
+        'events/LEGACY1/groupSizeOverrides': { canWrite: [{ auth: 'nobody', data: [2] }] },
+        'events/LEGACY1/eventName': { canWrite: [{ auth: 'nobody', data: 'renamed by a code holder - legacy' }] },
+        'events/LEGACY1/organizerToken': { canWrite: [{ auth: 'nobody', data: 'late-token' }] },
         // ORGANIZERS
         'organizers/anon-new/firstSeenAt': { canWrite: [{ auth: 'newcomer', data: NOW - 1000 }], cannotWrite: [{ auth: 'nobody', data: NOW }, { auth: 'stranger', data: NOW }, { auth: 'newcomer', data: NOW + DAY }, { auth: 'newcomer', data: 'soon' }] },
         'organizers/anon-org/firstSeenAt': { cannotWrite: [{ auth: 'org', data: NOW }, { auth: 'org', data: NOW - 2 * DAY }, { auth: 'org', data: null }, { auth: 'stranger', data: NOW }] },
@@ -187,14 +219,23 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
         [[/^events\/NEW1$/, 'org']]);   // org creating with no owner / a stranger's uid gets through; the stranger still has no trial
     control('creation opened to nobody (auth != null dropped)', r => { r.events.$eventCode['.write'] = "(!data.exists()) || (data.exists() && (newData.exists() || !data.hasChild('scores')))"; r.events.$eventCode.ownerUid['.validate'] = '(!data.parent().exists()) || (data.exists() && newData.val() === data.val())'; },
         [[/^events\/NEW1$/, 'null'], [/^events\/NEW1$/, 'newcomer']]);
-    control('PARTICIPATION requiring auth - the mutation that breaks Mondays', r => { r.events.$eventCode['.write'] = write(r).replace('(data.exists() && (newData.exists()', '(data.exists() && auth != null && (newData.exists()'); },
-        [[/^events\/OWNED1\/scores\/p102_h1$/, 'null'], [/^events\/LEGACY1\/scores\/p102_h1$/, 'null'], [/^events\/OWNED1\/kpWinners\/h3$/, 'null'], [/^events\/LEGACY1\/sideMatches\/m1$/, 'null'], [/^events\/OWNED1\/dots\/h4$/, 'null']]);
+    control('PARTICIPATION requiring auth - the mutation that breaks Mondays', r => {
+        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances'].forEach(k => {
+            r.events.$eventCode[k]['.write'] = 'auth != null && ' + r.events.$eventCode[k]['.write'];
+        });
+    }, [[/^events\/OWNED1\/scores\/p102_h1$/, 'null'], [/^events\/OWNED1\/kpWinners\/h3$/, 'null'], [/^events\/OWNED1\/dots\/h4$/, 'null'], [/^events\/OWNED1\/ryderFoursomes\/m1\/A\/h1$/, 'null'], [/^events\/EMAIL1\/scores\/p101_h2$/, 'null']]);
+    // A child .write:false cannot revoke a parent grant. Legacy Monday is the
+    // parent clause, so requiring auth on the play grants does not touch it.
+    // The rows above are the owned rounds, where the child grant is the only
+    // reason a code-holder can score.
     control('a legacy round required to carry an owner', r => { r.events.$eventCode['.validate'] = "newData.val() === null || (newData.hasChildren() && newData.hasChild('ownerUid'))"; },
         [[/^events\/LEGACY1$/, 'null'], [/^events\/LEGACY1\/scores\/p102_h1$/, 'null']]);
-    control('the owner locked out after the trial (existing writes gated by the window)', r => { r.events.$eventCode['.write'] = write(r).replace('(data.exists() && (newData.exists()', "(data.exists() && (!data.hasChild('ownerUid') || now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) && (newData.exists()"); },
+    control('the owner locked out after the trial (existing owned writes gated by the window)', r => { r.events.$eventCode['.write'] = write(r).replace("auth.uid === data.child('ownerUid').val() && (newData.exists()", "auth.uid === data.child('ownerUid').val() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000 && (newData.exists()"); },
         [[/^events\/EXPIRED1$/, 'expired'], [/^events\/EXPIRED1\/eventName$/, 'expired']]);
-    control('ownerUid takeable (the immutability clause dropped)', r => { r.events.$eventCode.ownerUid['.validate'] = 'auth != null && newData.val() === auth.uid'; },
-        [[/^events\/OWNED1\/ownerUid$/, 'stranger'], [/^events\/LEGACY1\/ownerUid$/, 'stranger']]);
+    control('the owner check dropped from existing owned rounds (setup opens to any code-holder)', r => { r.events.$eventCode['.write'] = write(r).replace("data.hasChild('ownerUid') && auth != null && auth.uid === data.child('ownerUid').val() && ", "data.hasChild('ownerUid') && "); },
+        [[/^events\/OWNED1\/players$/, 'null'], [/^events\/OWNED1\/organizerToken$/, 'null'], [/^events\/OWNEDEMPTY$/, 'null'], [/^events\/EMAIL1\/players$/, 'null']]);
+    control('ownerUid takeable on a legacy round (the immutability clause dropped; an owned round is already refused by the parent write)', r => { r.events.$eventCode.ownerUid['.validate'] = 'auth != null && newData.val() === auth.uid'; },
+        [[/^events\/LEGACY1\/ownerUid$/, 'stranger'], [/^events\/LEGACY1\/ownerUid$/, 'org'], [/^events\/LEGACY1$/, 'org']]);
     control('ownerUid claimable on a legacy round (data.parent() check dropped)', r => { r.events.$eventCode.ownerUid['.validate'] = '(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())'; },
         [[/^events\/LEGACY1\/ownerUid$/, 'org'], [/^events\/LEGACY1$/, 'org']]);
     control('firstSeenAt overwritable (write-once dropped)', r => { r.organizers.$uid.firstSeenAt['.write'] = 'auth != null && auth.uid === $uid'; },
@@ -207,6 +248,16 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
         [[/^organizers\/anon-new\/pass$/, 'newcomer'], [/^organizers\/anon-passed\/pass\/expiresAt$/, 'passed'], [/^organizers\/anon-lapsed\/pass$/, 'lapsed']]);
     control('an organizer readable by anyone', r => { r.organizers.$uid['.read'] = true; },
         [[/^organizers\/anon-org$/], [/^organizers\/anon-passed\/pass$/]]);
+    test('removing ONLY the scores grant refuses a code-holder on an owned round and still allows the legacy round', () => {
+        const r = ev();
+        delete r.rules.events.$eventCode.scores['.write'];
+        const p = path.join(TMP, 'scores_grant_removed.json');
+        fs.writeFileSync(p, JSON.stringify(r));
+        const w = wrong(run(p).out);
+        assert.ok(w.some(x => /^events\/OWNED1\/scores\/p102_h1$/.test(x[0]) && x[2] === 'null'), 'owned score by nobody must go red: ' + JSON.stringify(w.map(x => x[0] + '/' + x[2])));
+        assert.ok(!w.some(x => /^events\/LEGACY1\/scores\/p102_h1$/.test(x[0])), 'legacy scores stay open through the parent: ' + JSON.stringify(w.filter(x => /LEGACY1\/scores/.test(x[0]))));
+        assert.ok(w.some(x => /^events\/EMAIL1\/scores\/p101_h2$/.test(x[0]) && x[2] === 'null'), 'an owned round must not keep scoring through the parent');
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -221,11 +272,22 @@ describe('THE SEAM - two meanings of auth, kept apart', () => {
         assert.match(rules.events.$eventCode['.write'], /newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/);
         assert.ok(!/sign_in_provider/.test(rules.events.$eventCode['.write']));
     });
-    test('the trial is 21 days (1814400000 ms) from a write-once firstSeenAt, or a pass with a future expiresAt; the existing-round branch is today\'s rule verbatim', () => {
+    test('the trial is 21 days or a pass on CREATE only; an owned round is the owner; a legacy round stays the old open rule; pass is unwritable', () => {
         const w = rules.events.$eventCode['.write'];
+        const ev = rules.events.$eventCode;
         assert.match(w, /now < root\.child\('organizers\/' \+ auth\.uid \+ '\/firstSeenAt'\)\.val\(\) \+ 1814400000/);
         assert.match(w, /root\.child\('organizers\/' \+ auth\.uid \+ '\/pass\/expiresAt'\)\.val\(\) > now/);
-        assert.ok(w.endsWith("|| (data.exists() && (newData.exists() || !data.hasChild('scores')))"), 'participation: ' + w.slice(-80));
+        assert.match(w, /data\.exists\(\) && data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)\)/);
+        assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"), 'legacy: ' + w.slice(-110));
+        assert.ok(!/organizerToken/.test(w), 'the token is world-readable and is not a rules credential');
+        const open = "root.child('events/' + $eventCode).exists()";
+        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances'].forEach(k => {
+            assert.equal(ev[k]['.write'], open, k);
+            assert.ok(!/auth/.test(ev[k]['.write']), k + ' must stay open to a code-holder');
+        });
+        ['players', 'groupSizeOverrides', 'moneyPool', 'flights', 'additionalGames', 'courseData', 'settlementMode', 'supersededBy', 'organizerToken', 'eventName', 'skinsBuyIn', 'kpCancelled'].forEach(k => {
+            assert.equal(ev[k] && ev[k]['.write'], undefined, k + ' has no child grant; the parent owner clause is the only write');
+        });
         assert.equal(rules.organizers.$uid.firstSeenAt['.write'], '!data.exists() && auth != null && auth.uid === $uid');
         assert.equal(rules.organizers.$uid.firstSeenAt['.validate'], 'newData.isNumber() && newData.val() <= now');
         assert.equal(rules.organizers.$uid.pass['.write'], false);

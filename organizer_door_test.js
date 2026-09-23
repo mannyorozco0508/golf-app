@@ -273,7 +273,7 @@ describe('THE WIZARD (admin.html?game=CODE) on an EXISTING round', () => {
         const card = src.slice(src.indexOf('id="setup-refused-screen"'), src.indexOf('id="round-ready-screen"'));
         assert.match(card, /🔒/);
         assert.match(card, /This round's setup belongs to its organizer\./);
-        assert.match(card, /If that is you, open the round on the device you set it up on, or use your organizer link &mdash; it is on the scorecard's Group Links panel there\./);
+        assert.match(card, /If that is you, sign in with the email for this round on this device &mdash; that is what saves setup\. The organizer link opens these screens; it is on the scorecard's Group Links panel on the device that set the round up\./);
         assert.match(card, /id="setup-refused-back"[^>]*>⛳ Back to the scorecard</);
         assert.doesNotMatch(card, /wizard-step|Save & Start/);
     });

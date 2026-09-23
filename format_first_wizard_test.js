@@ -714,7 +714,14 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // 1 let anyone create tournaments/<any code>/scores/<key>, and the real
         // organizer's create on that code was then refused. Found by the live
         // probe, not by targaryen (every row wrote to a record that existed).
-        'database.rules.json': '2a7a491827e0e9adedafab5f2e43c8135de0ef776a4b2411f422ab3e1d09d42d',
+        // RE-PINNED 2026-09-23, OWNER-ONLY CONSUMER SETUP (this change only;
+        // not published to the live database from here). events/$eventCode
+        // .write is three clauses: create (unchanged trial/pass gate), an
+        // owned round (auth.uid === ownerUid, delete still needs no scores),
+        // a legacy round with no ownerUid (the previous open rule). Play paths
+        // gained a child .write so a code-holder can still score. tournaments
+        // was not edited. wave2_rules_test.js holds the rows.
+        'database.rules.json': '3f2c646bd2896a912fc739ea43a5cb3c6b40feee1a9b285f477019530dbdb2e3',
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,

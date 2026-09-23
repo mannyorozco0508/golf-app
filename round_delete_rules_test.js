@@ -70,8 +70,10 @@ const UNPLAYED = {
     players: [{ id: 101, name: 'Dale Whitmore' }]
 };
 
+const OWNED = Object.assign({}, PLAYED, { ownerUid: 'u-org', organizerToken: 'tok-owned' });
+const OWNED_EMPTY = Object.assign({}, UNPLAYED, { ownerUid: 'u-org', organizerToken: 'tok-owned' });
 const ROOT = {
-    events: { PLAYED: PLAYED, EMPTY: UNPLAYED },
+    events: { PLAYED: PLAYED, EMPTY: UNPLAYED, OWNED: OWNED, OWNED_EMPTY: OWNED_EMPTY },
     trips: { T1: { rounds: { PLAYED: { label: 'Saturday' } } } },
     tournaments: {}, global_courses: {}, app_settings: {}
 };
@@ -152,11 +154,53 @@ const TABLE = [
       why: 'Rule A raises the cost from one write to two. It does not make it impossible, '
          + 'and it is not meant to.',
       path: 'events/EMPTY', data: null },
-    { id: 'X3', what: 'OVERWRITE a played round with an empty valid one', verdict: 'allow',
-      site: 'not a call site - the hole that matters most',
-      why: 'This destroys the round as completely as a delete and is not a delete, so no '
-         + 'rule keyed on newData.exists() sees it. Closing it needs a different rule.',
+    { id: 'X3', what: 'OVERWRITE a LEGACY played round with an empty valid one', verdict: 'allow',
+      site: 'not a call site - the hole that matters most on a round with no owner',
+      why: 'PLAYED has no ownerUid. This destroys the round as completely as a delete and is '
+         + 'not a delete, so no rule keyed on newData.exists() sees it. A legacy round stays '
+         + 'open. An owned round is row O1, and that overwrite is refused.',
       path: 'events/PLAYED', data: { gameFormat: 'stroke', players: [], courseData: [] } },
+
+    // --- owned rounds: setup is the owner, play stays open (2026-09-23) ----
+    { id: 'D3', what: 'delete an OWNED unscored round with no identity', verdict: 'refuse',
+      site: 'admin.html endAndClearRound, a device that did not create the round',
+      why: 'an owned round deletes only for its owner, and only when it has no scores',
+      path: 'events/OWNED_EMPTY', data: null },
+    { id: 'D4', what: 'delete an OWNED unscored round as its owner', verdict: 'allow',
+      auth: 'organizer-pass',
+      site: 'the same button, on the device that created it, before anyone teed off',
+      why: 'the owner must still be able to bin a mistake that has no scores',
+      path: 'events/OWNED_EMPTY', data: null },
+    { id: 'D5', what: 'delete an OWNED scored round as its owner', verdict: 'refuse',
+      auth: 'organizer-pass',
+      site: 'the same button, after a score exists',
+      why: 'the scores guard applies to the owner too: one write cannot destroy a played round',
+      path: 'events/OWNED', data: null },
+    { id: 'S1', what: 'a code-holder overwrites players on an owned round', verdict: 'refuse',
+      site: 'not a call site - the collision and the spectator write the owner clause closes',
+      why: 'players is setup. No child grant. The parent allows it only for the owner.',
+      path: 'events/OWNED/players', data: [] },
+    { id: 'S2', what: 'the owner rewrites players', verdict: 'allow',
+      auth: 'organizer-pass',
+      site: 'index.html players sheet and admin.html saveSettings',
+      why: 'the creating account, including one adopted by email-link sign-in, still edits the roster',
+      path: 'events/OWNED/players', data: [{ id: 101, name: 'Dale Whitmore' }] },
+    { id: 'S3', what: 'a code-holder writes a score on an owned round', verdict: 'allow',
+      site: 'index.html saveScore',
+      why: 'the scores child grant is what keeps Monday working after setup became owner-only',
+      path: 'events/OWNED/scores/p101_h4', data: 5 },
+    { id: 'S4', what: 'a code-holder overwrites courseData on an owned round', verdict: 'refuse',
+      site: 'not a call site',
+      why: 'courseData is setup. A code is not enough once the round has an owner.',
+      path: 'events/OWNED/courseData', data: [] },
+    { id: 'S5', what: 'a code-holder replaces organizerToken', verdict: 'refuse',
+      site: 'not a call site - the token is readable, so it cannot be the credential',
+      why: 'holding or rewriting the token does not authorize. Email-link sign-in is the second device.',
+      path: 'events/OWNED/organizerToken', data: 'stolen' },
+    { id: 'O1', what: 'OVERWRITE an owned played round, keeping ownerUid', verdict: 'refuse',
+      site: 'not a call site - the overwrite hole, closed for owned rounds',
+      why: 'the parent write is the owner. A code-holder cannot replace the record in one put.',
+      path: 'events/OWNED', data: { gameFormat: 'stroke', players: [], courseData: [], ownerUid: 'u-org' } },
 ];
 
 // Deferred rows are documentation, not scenarios: they state a requirement the
@@ -201,9 +245,9 @@ describe('events/<code> — a played round cannot be deleted in one write', () =
         // everything - which here would break score entry for the whole app.
         const refuse = ACTIVE.filter((r) => r.verdict === 'refuse');
         const allow = ACTIVE.filter((r) => r.verdict === 'allow');
-        // Wave 2 (draft): a second refusal - creation with no identity (W2b).
-        assert.equal(refuse.length, 2, 'exactly two scenarios are refused: the scored-round delete, and an unidentified creation');
-        assert.deepEqual(refuse.map(r => r.id).sort(), ['W2b', refuse.find(r => r.id !== 'W2b').id].sort());
+        // Wave 2: unidentified creation (W2b). Owner-only setup (2026-09-23):
+        // a code-holder cannot delete, overwrite, or edit setup on an owned round.
+        assert.deepEqual(refuse.map(r => r.id).sort(), ['D1', 'D3', 'D5', 'O1', 'S1', 'S4', 'S5', 'W2b']);
         assert.ok(allow.length >= 14, `only ${allow.length} allow rows - the app has more than that to protect`);
         allow.forEach((r) => assert.ok(r.why && r.why.length > 15,
             `${r.id} is allowed on purpose and must say why, or a later reader will "fix" it`));

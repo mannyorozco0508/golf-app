@@ -72,7 +72,12 @@ const PRODUCTS = {
         // Moved to v50. Setup converts a Handicap Index with the tee's Slope,
         // Course Rating, and Par. A device on v49 has no tee-rating fields and
         // still treats the typed number as the strokes.
-        cacheName: 'consumer-v50-handicap-index',
+        // Moved to v51. The organizer-link sentences match the owner-only
+        // setup rules: the link opens the screens, and saving needs the email
+        // sign-in. admin.html and organizer-gate.js are in this shell. A
+        // device on v50 still says the link alone can edit the round.
+        // Tournament is unchanged: it does not offer that link.
+        cacheName: 'consumer-v51-owner-setup',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

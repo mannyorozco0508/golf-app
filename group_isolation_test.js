@@ -322,14 +322,15 @@ describe('FIREBASE RULES — what the server can and cannot enforce', () => {
         const v = rules.events.$eventCode.scores.$scoreKey['.validate'];
         assert.ok(/isNumber/.test(v), 'shape is validated');
         assert.ok(!/auth/.test(v), 'there is no identity to check against');
-        // Wave 2 (draft, 2026-09-15): CREATING a round is gated on an identified
-        // organizer; writes to an EXISTING round are exactly the old rule - a round
-        // with scores in it cannot be deleted in one write, and writes are still
-        // otherwise open. Participation is not authorization, and this is the
-        // half that still says so.
+        // Creating a round is gated. An owned round's parent write is the owner
+        // (setup). A legacy round (no ownerUid) stays the old open rule, including
+        // the scores delete guard. A score on an owned round is a child grant with
+        // no identity check — shape only, which is what this test is about.
         const w = rules.events.$eventCode['.write'];
-        assert.ok(w.endsWith("|| (data.exists() && (newData.exists() || !data.hasChild('scores')))"), 'the existing-round branch is the old rule verbatim: ' + w.slice(-90));
-        assert.match(w, /^\(!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'the gate is on creation only');
+        assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"), 'a legacy round stays open: ' + w.slice(-110));
+        assert.match(w, /auth\.uid === data\.child\('ownerUid'\)\.val\(\)/, 'an owned round is the owner');
+        assert.equal(rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()", 'a score is still not an identity check');
+        assert.match(w, /^\(!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'creation stays gated');
     });
 
     test('the shared course library is still protected', () => {

@@ -350,7 +350,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/email-link-auth/.test(read('tournament.html')), 'tournament.html keeps its own sign-in');
     });
 
-    test('the file is Consumer, precached, and the rules are not owner-only', () => {
+    test('the file is Consumer, precached, and setup writes on an owned round are the owner', () => {
         const sync = read('sync-mobile-web.js');
         const consumer = /const CONSUMER_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         const shared = /const SHARED_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
@@ -359,7 +359,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v207-handicap-index';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v208-owner-setup';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);
@@ -370,10 +370,12 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
 
         const rules = JSON.parse(read('database.rules.json'));
         const write = rules.rules.events.$eventCode['.write'];
-        assert.match(write, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)\)/);
-        assert.ok(!/data\.exists\(\) && auth != null && auth\.uid === data\.child\('ownerUid'\)/.test(write),
-            'existing rounds are not owner-only in this wave');
+        assert.match(write, /data\.exists\(\) && data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
+        assert.match(write, /data\.exists\(\) && !data\.hasChild\('ownerUid'\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)\)/);
+        assert.equal(rules.rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()");
+        assert.equal(rules.rules.events.$eventCode.players, undefined, 'players has no child grant');
         assert.equal(rules.rules.organizers.$uid.pass['.write'], false);
+        assert.equal(rules.rules.tournaments.$tourneyCode['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
     });
 });
 
