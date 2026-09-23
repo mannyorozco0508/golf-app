@@ -219,6 +219,35 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.match(read('ios/App/App/Info.plist'), /<string>HardPan<\/string>/);
         assert.match(read('android/app/src/main/res/values/strings.xml'), /<string name="app_name">HardPan<\/string>/);
         assert.match(read('capacitor.config.ts'), /appId: 'com\.rattlegolf\.app'/);
+        // The Xcode build setting overrides Info.plist when both are set.
+        const names = [...read('ios/App/App.xcodeproj/project.pbxproj')
+            .matchAll(/INFOPLIST_KEY_CFBundleDisplayName = "([^"]+)";/g)].map(m => m[1]);
+        assert.deepEqual(names, ['HardPan', 'HardPan']);
+    });
+
+    test('the launch splash is the ball on the existing cream field', () => {
+        const files = [
+            'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png',
+            'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png',
+            'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png',
+        ];
+        const SPLASH_SHA = '70944081a8a6bc200faf20a52de649f3159fe9c84b04a79ad3c9a325eab5da12';
+        const STROKE_R_SPLASH = '5719f2b14f7327b1d55e49410908a65b0e56eae99de2276befe27730b07b60e1';
+        files.forEach(f => {
+            assert.equal(sha(f), SPLASH_SHA, f + ' is not the cream HardPan splash');
+            assert.notEqual(sha(f), STROKE_R_SPLASH, f + ' is still the Stroke R');
+        });
+        const img = readPng(path.join(__dirname, files[0]));
+        assert.equal(img.width, 2732);
+        assert.deepEqual(px(img, 0, 0), [0xFB, 0xF5, 0xEB]);
+        const mid = px(img, 1366, 1366);
+        assert.deepEqual(mid, [247, 244, 238], 'the centre is not the ball');
+        let green = 0;
+        for (let i = 0; i < img.data.length; i += 4) {
+            const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
+            if (r > 30 && r < 80 && g > 90 && g < 170 && b > 40 && b < 120) green++;
+        }
+        assert.ok(green > 0, 'the splash has no forest-green ground');
     });
 
     test('tournaments say HardPan beside the ball mark', () => {

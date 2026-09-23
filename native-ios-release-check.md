@@ -32,7 +32,7 @@ App: **Rattle Golf** · Bundle ID: **`com.rattlegolf.app`** (permanent after the
 - [ ] Signing & Capabilities → Automatically manage signing **ON**, paid team selected
 - [ ] No signing errors
 - [ ] Bundle Identifier = `com.rattlegolf.app`
-- [ ] **Display Name = `Rattle Golf`** — was blank; Xcode falls back to the target name
+- [x] **Display Name = `HardPan`** — `INFOPLIST_KEY_CFBundleDisplayName` matches `Info.plist`. Do not archive until 1.0.3 is approved and released
 - [ ] **Marketing Version = `1.0.0`** — was showing `1.0`
 - [ ] Build = `1`
 - [ ] Minimum Deployments = iOS 15.0 unless deliberately changed
