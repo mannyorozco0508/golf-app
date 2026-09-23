@@ -27,6 +27,11 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
+         Course 12" label, the full form, and the one basis sentence. Display
+         only; handicap.js owns every number it says. After handicap.js, which it
+         calls into. -->
+    <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
     <script src="money-engine.js"></script>
     <script src="action-model.js"></script>
@@ -205,6 +210,8 @@
         .board-table tr[data-player-id] td.player-name::after { content: '\25BE'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.7em; }
         .board-table tr[data-player-id]:has(+ tr.board-card-row) td.player-name::after { content: '\25B4'; }
         .board-card-row td { padding: 4px 0 10px 0; background: var(--nav-bg); }
+        /* v212: the full handicap form above the expanded card's scorecard. */
+        .board-card-hcp { font-size: 0.78rem; color: var(--text-muted); padding: 2px 8px 6px 8px; }
         .sc-stack { display: flex; flex-direction: column; gap: 6px; }
         .sc-stack .receipt-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.68rem; background: var(--bg-card); }
         .sc-stack .receipt-table th, .sc-stack .receipt-table td { padding: 4px 1px; text-align: center; border-bottom: 1px solid var(--border-faint); color: var(--text-main); font-size: 0.68rem; text-transform: none; }
@@ -1158,9 +1165,14 @@ html {
         // the net line under the gross.
         const hcpText = String(r.hcp === undefined || r.hcp === null ? '' : r.hcp).trim();
         const boardPlayer = (currentBoardData && currentBoardData.players || []).find(p => String(p.id) === String(r.id));
-        const facing = (boardPlayer && typeof handicapFacingLabel === 'function') ? handicapFacingLabel(boardPlayer) : null;
-        const hcpHtml = facing
-            ? `<span class="player-hcp">${escapeHtml(facing)}</span>`
+        // v212: the row is the COMPACT label - "Index 18 · Course 17". It used to
+        // carry handicap.js's full three-part form, which is the right sentence in
+        // the wrong place: on a 390px phone "Index 18 · Course 17.2 · Playing 17"
+        // is most of the line the golfer's NAME has to share. The full form, with
+        // the decimals and the Playing Handicap, is on the expanded card below.
+        const compact = (boardPlayer && typeof handicapCompactLabel === 'function') ? handicapCompactLabel(boardPlayer) : null;
+        const hcpHtml = compact
+            ? `<span class="player-hcp">${escapeHtml(compact)}</span>`
             : (hcpText === '' ? '' : `<span class="player-hcp">HCP ${escapeHtml(hcpText)}</span>`);
         return `<tr class="${posClass}"${pid}>
 ${ind}<td${posStyle}>${opts && opts.label !== undefined ? opts.label : idx + 1}</td>
@@ -1208,7 +1220,13 @@ ${ind.slice(4)}</tr>`;
             courseData: data.courseData || [], scores: data.scores || {}, players: [player],
             showNet: ScorecardRows.netMattersOn(data), ringOf: ringOf
         });
-        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${card}</td></tr>`;
+        // v212: THE FULL HANDICAP FORM, and this is the only place it is said in
+        // full on this page - the row above carries the compact one. Nothing is
+        // drawn for a golfer with no Index: an empty line would read as a bug,
+        // the same reason a blank handicap says nothing in the row.
+        const full = (typeof handicapFullLabel === 'function') ? handicapFullLabel(player) : null;
+        const hcpLine = full ? `<div class="board-card-hcp">${escapeHtml(full)}</div>` : '';
+        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`;
     }
     // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
     // (v201 - it used to need the name cell, so a tap on the score, the to-par or

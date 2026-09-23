@@ -20,8 +20,8 @@
 //   nothing the page defines. innerText on #email-link-card is the rendered
 //   card, which mini-dom cannot see. A second arrival types an email and taps
 //   Send. A third opens the continue-URL shape and reads the preserved-uid
-//   sentence. Chrome is required for those three; the path is CHROME_PATH or
-//   /usr/bin/google-chrome.
+//   sentence. Chrome is required for those three; the path is CHROME_PATH, or
+//   cold-arrival.js's own default for this platform.
 // ============================================================================
 
 const { describe, test } = require('node:test');
@@ -30,7 +30,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-process.env.CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome';
+// v212: DO NOT HARD-CODE A CHROME PATH HERE. This line pinned a Linux path, so
+// on a Mac the three cold-Chrome tests below failed with "Chrome not found at
+// /usr/bin/google-chrome" on a perfectly good checkout - two failures in every
+// `npm test` run that were nothing but this default. tools/lib/cold-arrival.js
+// already falls back to the macOS bundle, and it is the one place that should
+// decide: an explicit CHROME_PATH still wins, and nothing is set here.
 const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-script.js');
 const { decodeEscapes } = require('./helpers/decode-escapes.js');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
@@ -359,7 +364,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v211-legacy-setup-save';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v212-handicap-legible';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);

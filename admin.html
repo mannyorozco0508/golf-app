@@ -29,6 +29,10 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- v212: the handicap labels and the one basis sentence (display only).
+         The wizard uses that sentence for its own "as entered" note, so the
+         setup screen and the Game tab cannot say two different things. -->
+    <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
@@ -644,6 +648,19 @@ html {
         <input type="hidden" id="tee-course-rating">
         <input type="hidden" id="tee-par">
         <input type="hidden" id="tee-allowance" value="100">
+        <!-- WHAT THE NUMBER BESIDE EACH GOLFER MEANS (v212). The default is the
+             GHIN reading, which is what every round saved since the conversion
+             landed already does, so nothing about an existing round changes.
+             "As entered" is for a group that keeps its own numbers: the box is
+             the Playing Handicap and no tee conversion is applied. There is
+             deliberately NO allowance control here - 100% is the only allowance
+             this wave ships, and a setting nobody has asked for is a setting
+             that has to be explained on every screen that reads it. -->
+        <label for="handicap-basis-select" style="font-size:0.75rem; font-weight:bold; color:var(--brand-green); display:block; margin-top:10px;">Handicaps</label>
+        <select id="handicap-basis-select" onchange="refreshHandicapNote()" style="margin-bottom:4px;">
+            <option value="ghin-index" selected>GHIN index (convert by tee)</option>
+            <option value="as-entered">As entered</option>
+        </select>
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-1" onclick="wizardBack(1)">◀ Back</button>
@@ -4942,8 +4959,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : { complete: false, message: '' };
         const filled = document.getElementById('tee-rating-filled');
         const playerNote = document.getElementById('handicap-index-note');
+        // v212: AS ENTERED means no conversion, so the note must not print a
+        // conversion formula. The tee's own numbers still show above (the card is
+        // still the card); what changes is what happens to the golfers' numbers.
+        const basisEl = document.getElementById('handicap-basis-select');
+        const asEntered = !!(basisEl && basisEl.value === 'as-entered');
         let head;
-        if (status.complete) {
+        if (asEntered) {
+            head = (typeof handicapBasisSentence === 'function')
+                ? handicapBasisSentence({ handicapBasis: 'as-entered' })
+                : 'Handicaps are used as entered.';   // a safe degradation, not a second copy of the sentence
+        } else if (status.complete) {
             head = 'Playing Handicap = Course \u00d7 ' + status.allowance
                 + '% allowance, rounded (.5 up). Course = Index \u00d7 (Slope ' + status.slope
                 + ' / 113) + (' + status.courseRating + ' \u2212 ' + status.par + ').';
@@ -6447,6 +6473,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             
             handleCourseChange();
             if (data.teeRating) applyStoredTeeRating(data.teeRating);
+            // v212: AND THE BASIS THOSE NUMBERS WERE READ UNDER. A setting that is
+            // written and never read back is worse than none: reopening an
+            // "as entered" round would restore this control to GHIN, and the next
+            // save would convert every number in the roster - changing the
+            // handicaps the group is playing off, and every net and every dollar
+            // with them. Restored beside the tee for the same reason the tee is
+            // restored on a copied round too: it is part of how the round reads
+            // its numbers, not part of its identity.
+            const basisSel = document.getElementById('handicap-basis-select');
+            if (basisSel) basisSel.value = (data.handicapBasis === 'as-entered') ? 'as-entered' : 'ghin-index';
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
             loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
@@ -7247,6 +7283,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
             const playersList = [];
             const teeForSave = readTeeRatingFromDom();
+            // v212: the round's handicap basis, read once for the whole roster so
+            // no two golfers can be saved under different readings. The control
+            // ships on GHIN, and a round with no control at all (a legacy save,
+            // or a browser that never rendered step 1) reads as GHIN too - which
+            // is what those rounds were already doing.
+            const basisForSave = (() => {
+                const el = document.getElementById('handicap-basis-select');
+                return (el && el.value === 'as-entered') ? 'as-entered' : 'ghin-index';
+            })();
             rows.forEach((row, idx) => {
                 let nameVal = row.querySelector('.p-name-input').value.trim() || `Player ${idx + 1}`;
                 const hcpRaw = row.querySelector('.p-hcp-input') ? row.querySelector('.p-hcp-input').value : "";
@@ -7263,9 +7308,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // the engines already consume. A legacy row (saved before this
                 // conversion, box untouched) keeps its stored number.
                 const legacyAttr = row.getAttribute('data-legacy-hcp');
-                const hcpFields = (typeof playerHandicapFields === 'function')
-                    ? playerHandicapFields(hcpRaw, legacyAttr === null ? null : legacyAttr, teeForSave)
-                    : { hcp: String(hcpRaw || '').trim() };
+                // AS ENTERED (v212) means exactly that: the number in the box IS
+                // the Playing Handicap, no tee conversion, and no handicapIndex
+                // or courseHandicap written - so nothing on any screen claims an
+                // Index this round does not have. sanitizeHandicapIndex is still
+                // used for the 54 cap and the plus-index form; it does no
+                // conversion of its own. The GHIN arm is untouched and still goes
+                // through handicap.js's one builder.
+                const hcpFields = (basisForSave === 'as-entered')
+                    ? { hcp: (typeof sanitizeHandicapIndex === 'function') ? sanitizeHandicapIndex(hcpRaw) : String(hcpRaw || '').trim() }
+                    : ((typeof playerHandicapFields === 'function')
+                        ? playerHandicapFields(hcpRaw, legacyAttr === null ? null : legacyAttr, teeForSave)
+                        : { hcp: String(hcpRaw || '').trim() });
                 const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpFields.hcp, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
                 if (hcpFields.handicapIndex) entry.handicapIndex = hcpFields.handicapIndex;
                 if (typeof hcpFields.courseHandicap === 'number' && isFinite(hcpFields.courseHandicap)) entry.courseHandicap = hcpFields.courseHandicap;
@@ -7379,6 +7433,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
                 teeRating: teeForSave,
+                // v212: which reading the round's handicaps were saved under.
+                // Every surface that names an Index reads this, and absent it
+                // means GHIN - the reading every round already had.
+                handicapBasis: basisForSave,
                 players: playersList
             };
 

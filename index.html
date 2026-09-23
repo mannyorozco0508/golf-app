@@ -36,6 +36,11 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
+         Course 12" label, the full form, and the one basis sentence. Display
+         only; handicap.js owns every number it says. After handicap.js, which it
+         calls into. -->
+    <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
     <script src="product-links.js"></script>
     <script src="score-marks.js"></script>
@@ -1212,6 +1217,9 @@
         .ps-out { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
         .ps-out input { width: 20px; height: 20px; min-height: 0; padding: 0; }
         .ps-row.ps-is-out input.ps-name { text-decoration: line-through; color: var(--text-muted); }
+        /* v212: the Index/Course line, on its own line across the row so the
+           five controls above it keep their widths and their 40px targets. */
+        .ps-hcp-note { grid-column: 1 / -1; font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; padding: 0 0 2px 2px; }
         .ps-new { background: var(--bg-soft); border-radius: 8px; padding: 6px; }
         .ps-warn { color: var(--accent-red); font-size: 0.85rem; font-weight: bold; margin-top: 8px; }
         .ps-money { font-size: 0.85rem; color: var(--text-main); margin-top: 8px; }
@@ -5224,6 +5232,13 @@ html {
         if (el) el.style.display = 'none';
         psSnapshot = null;
     }
+    // v212: the Index/Course line beside a Players-sheet row's handicap box.
+    // One builder (handicap-labels.js) with the Board, so the two surfaces
+    // cannot drift into two different sentences about the same numbers.
+    function psHcpNote(p) {
+        const label = (typeof handicapCompactLabel === 'function') ? handicapCompactLabel(p) : null;
+        return label ? '<span class="ps-hcp-note">' + escapeHtml(label) + '</span>' : '';
+    }
     function renderPlayersSheet(data) {
         const body = document.getElementById('players-sheet-body');
         if (!body) return;
@@ -5243,6 +5258,15 @@ html {
                     + boundaries.map(x => '<option value="' + x.group + '"' + (x.group === b.group ? ' selected' : '') + '>G' + x.group + '</option>').join('')
                     + '</select>'
                     + '<label class="ps-out"><input type="checkbox" class="ps-out-box"' + (out ? ' checked' : '') + ' onchange="psRefreshMoney()"> Out</label>'
+                    // v212: WHICH NUMBER IS IN THAT BOX. It holds the Playing
+                    // Handicap - the number the nets use - and on a round
+                    // converted from GHIN indexes that is neither the number the
+                    // golfer knows nor the one on the tee sheet. So the row names
+                    // both: "Index 18 · Course 17". LAST in the markup and
+                    // spanning the whole row (.ps-hcp-note), because .ps-row is a
+                    // five-column grid and a sixth item mid-row would push the
+                    // flight, group and Out controls onto a third line.
+                    + psHcpNote(p)
                     + '</div>';
             }
             html += '<div class="ps-adds" id="ps-adds-' + b.group + '"></div>';

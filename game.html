@@ -27,6 +27,11 @@
          settlement will be made of. Load order: handicap before the engines, the
          engines before the inline block, so nothing below can shadow them. -->
     <script src="handicap.js"></script>
+    <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
+         Course 12" label, the full form, and the one basis sentence. Display
+         only; handicap.js owns every number it says. After handicap.js, which it
+         calls into. -->
+    <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
@@ -286,6 +291,25 @@ html {
         return amounts.map((a, i) => ordinal(i + 1) + ' ' + money(a)).join(', ');
     }
 
+    // WHERE THE HANDICAPS COME FROM, said ONCE (v212). Marty's group follows
+    // GHIN, so every golfer's Course Handicap is converted from their Index off
+    // the rated tee - and until now no screen said which tee, or what its Slope
+    // and Rating were, or that a conversion was happening at all. This card is
+    // the one place the round states its basis.
+    //
+    // NOT A ROSTER. It names the tee and the arithmetic, never the golfers: the
+    // Board row and the Players sheet carry each golfer's own Index and Course
+    // Handicap, and repeating twenty of them here would bury the one sentence
+    // this card exists to say. handicap-labels.js builds the sentence, shared
+    // with those two surfaces so they cannot drift apart.
+    function handicapBasisCard(data) {
+        if (typeof handicapBasisSentence !== 'function' || typeof handicapBasisWorthSaying !== 'function') return '';
+        if (!handicapBasisWorthSaying(data)) return '';
+        return '<div class="game-card"><div class="game-head">⛳ Handicaps</div>'
+            + '<div class="game-line">' + escapeHtml(handicapBasisSentence(data)) + '</div>'
+            + '</div>';
+    }
+
     function weeklyGameCard(data) {
         const mp = data.moneyPool;
         if (!mp || mp.enabled === false || typeof computeMoneyPool !== 'function') return '';
@@ -401,6 +425,7 @@ html {
             + '<div class="game-line"><strong>' + escapeHtml(fmt.label) + '</strong> · scored ' + fmt.how + '</div>'
             + (fmt.stake ? '<div class="game-sub">' + escapeHtml(fmt.stake) + '</div>' : '')
             + '</div>';
+        html += handicapBasisCard(data);
         html += weeklyGameCard(data);
         html += flightsCard(data);
         html += sideActionCard(data);

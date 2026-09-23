@@ -32,7 +32,9 @@ const PAYLOAD_KEYS = ['eventName', 'roundDay', 'settlementMode', 'skinsRounding'
     'matchScoringStyle', 'matchStake', 'matchPressRule', 'nassauType', 'nassauScoring', 'nassauStake', 'nassauPressRule',
     'wolfPointVal', 'wolfLoneMult', 'wolfBlindMult', 'wolfTieRule', 'wolfLastPlaceRule', 'stablefordPointVal', 'groupSizeOverrides',
     'stablefordScoring', 'stablefordPoints', 'dotPointVal', 'greenieCarryover', 'skinsBuyIn', 'skinsPotFormat', 'skinsCarryOver',
-    'courseData', 'teeRating', 'players'];
+    // handicapBasis since v212, right after teeRating: which reading the round's
+    // handicaps were saved under ('ghin-index' by default, 'as-entered' the other).
+    'courseData', 'teeRating', 'handicapBasis', 'players'];
 
 function wizardSavedRound(opts) {
     const o = opts || {};
@@ -86,6 +88,10 @@ function wizardSavedRound(opts) {
         // Par the wizard had, including an empty set. Nulls here mean the fields
         // were blank, so a reopen must not invent a conversion.
         teeRating: { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 },
+        // handicapBasis since v212: the wizard writes it on every save, and
+        // 'ghin-index' is what the control ships on - which is also how a round
+        // with no key at all is read, so a fixture without it means the same thing.
+        handicapBasis: o.handicapBasis === undefined ? 'ghin-index' : o.handicapBasis,
         players,
         // What the round gains after setup.
         scores, kpWinners: { h3: '101' }, kpConfirmed: { confirmed: false }

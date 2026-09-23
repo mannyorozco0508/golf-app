@@ -22,10 +22,26 @@
 //     before the golfer's last scored hole IN THAT WALK is a gap. The hole
 //     being played is never a gap (nothing after it is scored yet). A golfer
 //     who has not started has none.
-// KNOWN LIMIT (HANDOFF.md): a group that skips a hole together - every golfer
-// blank on hole 1, all scored 2-17 - reads as having started on 2, and the
-// missed hole is not a gap. Finish Round's "still missing" list, which counts
-// every blank in the field, is what catches that at the end.
+// A WHOLE GROUP THAT SKIPS A HOLE (v212, 2026-09-23). Until now a group that
+// skipped a hole together - every golfer blank on hole 1, all scored 2-17 -
+// read as having started on 2, and the missed hole was not a gap. One group's
+// start hole is no evidence on its own; the OTHER GROUPS are. So the field is
+// read across groups, in findScoreGapsByGroup, by resolveGroupStarts:
+//   the round's start is the MOST COMMON group start, counted only over groups
+//     that have teed off, and used only when that mode is UNIQUE and shared by
+//     at least TWO groups. A shotgun start puts every group on a different
+//     hole: no mode, nothing flagged. A two-tee start splits the field evenly:
+//     the mode ties, nothing flagged.
+//   a group starting LATER than that mode, by at most WHOLE_GROUP_SKIP_MAX
+//     holes, with every hole in between blank for EVERY golfer in the group, is
+//     re-based onto the mode - and those holes become ordinary gaps.
+// THE CAP IS WHAT KEEPS A STARTING TEE FROM READING AS A SKIP. Four groups off
+// hole 1 and two off hole 10 is a two-tee start whose mode does NOT tie;
+// without the cap those two groups would be accused of missing holes 1-9.
+// STILL A LIMIT: a round with ONE group has nothing to compare against, and a
+// skip of more than WHOLE_GROUP_SKIP_MAX holes is read as a different start.
+// Finish Round's "still missing" list, which counts every blank in the field,
+// is what catches those at the end.
 //
 // courseData is walked IN ITS OWN ORDER, never sorted: a back nine is 10..18,
 // a course entered out of order stays as entered.
@@ -64,13 +80,63 @@ function groupStartIndex(groupPlayers, courseData, scores) {
     return best.after;
 }
 
+// How far a group's start may sit AFTER the field's and still be read as a
+// skipped hole rather than a different starting tee (see the header).
+const WHOLE_GROUP_SKIP_MAX = 2;
+
+// Every group's start index, with a whole-group skip corrected against the rest
+// of the field. Returns { starts, mode, rebased } - `mode` null when the groups
+// do not agree on a start (a shotgun, a two-tee start, a single group), and
+// `rebased` naming each group moved: { group, from, to, holes }.
+function resolveGroupStarts(players, courseData, scores, boundaries) {
+    const holes = courseData || [];
+    const all = players || [];
+    const bs = (Array.isArray(boundaries) && boundaries.length) ? boundaries : [{ startIdx: 0, size: all.length }];
+    const s = scores || {};
+    const groups = bs.map(b => all.slice(b.startIdx, b.startIdx + b.size));
+    const raw = groups.map(g => groupStartIndex(g, holes, s));
+    const out = { starts: raw.slice(), mode: null, rebased: [] };
+    if (holes.length === 0) return out;
+    // A group that has not teed off reads as start 0 and says nothing about
+    // where the field began: it does not vote, and it is never re-based.
+    const teedOff = groups.map(g => g.some(p => p && holes.some(h => s['p' + p.id + '_h' + h.hole] > 0)));
+    const counts = {};
+    raw.forEach((v, i) => { if (teedOff[i]) counts[v] = (counts[v] || 0) + 1; });
+    let mode = null, best = 0, tied = false;
+    Object.keys(counts).forEach(k => {
+        const n = counts[k];
+        if (n > best) { best = n; mode = Number(k); tied = false; }
+        else if (n === best) tied = true;
+    });
+    // No agreement to measure against. `tied` is the whole guard: a mode reached
+    // by a single voting group cannot re-base anything (that group is never
+    // later than itself, and a group that has not teed off does not vote), so a
+    // "at least two groups must agree" floor would be a clause that never fires.
+    if (mode === null || tied) return out;
+    out.mode = mode;
+    raw.forEach((start, i) => {
+        if (!teedOff[i] || start <= mode) return;
+        if (start - mode > WHOLE_GROUP_SKIP_MAX) return;  // a different tee, not a skip
+        const between = [];
+        for (let k = mode; k < start; k++) between.push(holes[k]);
+        const allBlank = between.every(h => groups[i].every(p => p && !(s['p' + p.id + '_h' + h.hole] > 0)));
+        if (!allBlank) return;
+        out.starts[i] = mode;
+        out.rebased.push({ group: i, from: start, to: mode, holes: between.map(h => h.hole) });
+    });
+    return out;
+}
+
 // The gaps of one group: [{ id, name, holes: [hole numbers in walk order], last: hole }].
-function findScoreGaps(groupPlayers, courseData, scores) {
+// `startIndexOverride` is the field-level answer from resolveGroupStarts; absent,
+// the group is read on its own exactly as before.
+function findScoreGaps(groupPlayers, courseData, scores, startIndexOverride) {
     const holes = courseData || [];
     const n = holes.length;
     const s = scores || {};
     if (n === 0) return [];
-    const start = groupStartIndex(groupPlayers, holes, s);
+    const start = (typeof startIndexOverride === 'number' && startIndexOverride >= 0 && startIndexOverride < n)
+        ? startIndexOverride : groupStartIndex(groupPlayers, holes, s);
     const out = [];
     (groupPlayers || []).forEach(p => {
         if (!p) return;
@@ -91,8 +157,14 @@ function findScoreGaps(groupPlayers, courseData, scores) {
 function findScoreGapsByGroup(players, courseData, scores, boundaries) {
     const all = players || [];
     const bs = (Array.isArray(boundaries) && boundaries.length) ? boundaries : [{ startIdx: 0, size: all.length }];
+    // THE FIELD IS READ FIRST (v212). A group that skipped a hole together is
+    // only visible against the other groups' start holes, so the starts are
+    // resolved across the whole field before any group is walked.
+    const resolved = resolveGroupStarts(all, courseData, scores, bs);
     let out = [];
-    bs.forEach(b => { out = out.concat(findScoreGaps(all.slice(b.startIdx, b.startIdx + b.size), courseData, scores)); });
+    bs.forEach((b, i) => {
+        out = out.concat(findScoreGaps(all.slice(b.startIdx, b.startIdx + b.size), courseData, scores, resolved.starts[i]));
+    });
     return out;
 }
 
@@ -139,5 +211,5 @@ function holePlayedByField(players, scores, hole) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { groupStartIndex, findScoreGaps, findScoreGapsByGroup, holesPhrase, gapLine, notFinalLine, kpHeldHoles, kpHoldPhrase, holePlayedByField };
+    module.exports = { groupStartIndex, resolveGroupStarts, WHOLE_GROUP_SKIP_MAX, findScoreGaps, findScoreGapsByGroup, holesPhrase, gapLine, notFinalLine, kpHeldHoles, kpHoldPhrase, holePlayedByField };
 }

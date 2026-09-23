@@ -1828,7 +1828,24 @@
 // cache and is NOT being published. The consumer product cache is
 // consumer-v53-legacy-setup-save. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v211-legacy-setup-save';
+// Moved to v212 because two things changed on screen. (A) A whole group that
+// skipped a hole together is now flagged as a gap instead of reading as
+// "started later": the field's group start holes are compared with each other
+// (score-gaps.js resolveGroupStarts), so five groups off hole 1 and a sixth
+// whose card begins on hole 2 names all four of that group as missing hole 1. A
+// shotgun start, a two-tee start and a back-nine round are untouched. (B) The
+// handicap math is legible: the Board row and the Players sheet say "Index 18 ·
+// Course 17" instead of a bare number, the expanded board card carries the full
+// "Index · Course · Playing" form, and the Game tab states the basis once - the
+// tee, its Slope and Rating, and that Course Handicaps are converted from GHIN
+// Indexes. A round-level setting defaults to that GHIN reading, with "as
+// entered" available. index.html, leaderboard.html, game.html, admin.html,
+// score-gaps.js and the NEW handicap-labels.js are precached, so a device on
+// v211 keeps showing a bare handicap number and keeps missing a whole group's
+// skipped hole. No engine changed: handicap.js is byte-identical. The consumer
+// product cache is consumer-v54-handicap-legible. The tournament product cache
+// stays tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v212-handicap-legible';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1876,6 +1893,7 @@ const SHELL_FILES = [
     // call it unguarded, so a cached shell missing this file does not compute a
     // wrong number - it fails to render at all, which is the correct failure.
     './handicap.js',
+    './handicap-labels.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.
