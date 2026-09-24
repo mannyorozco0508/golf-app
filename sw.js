@@ -1998,7 +1998,16 @@
 // Display only: no engine and no money moved. The consumer product cache is
 // consumer-v64-board-team-engine. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v223-board-team-engine';
+// Moved to v224 because a pot-only trip's share text and recap card were
+// printing Who Pays Who debts the money card had already refused. A finished
+// Weekly Game showed Marty +$17 on the card and "Rocco owes Marty $9" in the
+// paste. trip.html now withholds that list unless a golfer actually owes a
+// golfer, and the paste carries the pot sentence and the same nets. An
+// installed device on v223 keeps the invented debts in the group chat. No
+// engine changed. The consumer product cache is consumer-v65-trip-pot-paid.
+// The tournament product cache stays tournament-v54-rattle-golf. The iOS
+// binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v224-trip-pot-paid';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

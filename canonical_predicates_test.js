@@ -285,10 +285,14 @@ describe('TRIP MODE HONOURS THE SAME RULE', () => {
         assert.match(t, /Net Across the Trip/, 'the money is still shown');
     });
 
-    test('CASE 1 — the engine still produces transactions', () => {
-        // Proves this is presentation, not a change to the accounting.
+    test('CASE 1 — the engine still produces transactions, and the paste does not publish them', () => {
+        // The accounting is unchanged: simplifyDebts still pairs the pot nets.
+        // The cache the recap and the share text read must not carry those
+        // pairings, or the group chat settles a debt the pot already paid.
         const b = trip({ side:false });
-        assert.ok(b.run('cachedMoneyTransactions.length') > 0);
+        const invented = b.run('simplifyDebts(Object.fromEntries((cachedTripTotals.once || []).map(v => [v.name, v.net]))).length');
+        assert.ok(invented > 0, 'the accounting still pairs the nets');
+        assert.equal(b.run('cachedMoneyTransactions.length'), 0);
     });
 
     test('CASE 2 — pool plus a side match shows Who Pays Who', () => {

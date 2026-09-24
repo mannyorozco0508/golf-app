@@ -3044,6 +3044,18 @@ branch still carries no money — Manny's decision, kept.
     "not started". Verification is SUFFICIENT, never necessary: a round with
     every hole scored is finished without it.
 
+- **DONE 2026-09-24 — a pot-only trip does not invent who-owes-who.** The money
+card already hid Who Pays Who when `hasPlayerToPlayerSettlement` was false (the
+pot paid the winners). The recap card and the share text still printed
+`simplifyDebts` pairings. Measured on one finished 12-golfer Weekly Game: the
+card showed Marty +$17, Manny +$17, Marcus +$17, Scott +$16 and the eight losers
+down to Jeremy −$9, and no pay list; the paste said "Rocco owes Marty $9" and
+nine more debts that nobody has. The card, the recap and the paste now say
+"Nobody pays another golfer. This money moved through the pot." and the same
+nets. A side match still prints the pay list (`trip_pot_settlement_test.js`).
+No engine change. In-play rounds still count in the running total and are
+named not final — that is the trip's rule, and it is not the season ledger's.
+
 - **DONE 2026-09-17 — trip identity, shape (b): ask on collision, show the roster.** A trip
 still keys golfers by normalised name, but now through ONE function, `tripGolferKey(roundCode,
 player)` in `trip.html`, which returns the mapping `trips/<code>/identity/<roundCode>/<playerId> =
