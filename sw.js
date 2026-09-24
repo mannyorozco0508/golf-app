@@ -2073,7 +2073,37 @@
 // dialog_await_guard_test.js. The consumer product cache is
 // consumer-v69-admin-dialogs. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v228-admin-dialogs';
+// Moved to v229 because the SWEEP IS FINISHED. UI Wave 4 takes the last three
+// consumer pages: trip.html (26 tells and the LAST native decision in the app),
+// skins.html (5) and season.html (9, tells only). No consumer page asks a golfer
+// anything through a browser dialog any more. A device on v228 keeps the browser
+// dialogs on the Road Trip, Skins and Season pages.
+//
+// THE LAST DECISION was unlinking a round from a trip. The round survives - that
+// is what the question says - but the trip leaderboard, the money settlement, the
+// points race and the awards all stop counting it, so it is money on three
+// surfaces. Awaited, driven both answers, and the organizer gate is asserted to
+// come before the question rather than instead of it.
+//
+// ONE BEHAVIOUR CHANGE, forced by the conversion rather than chosen: "Trip not
+// found" used to alert and then reload. A native alert BLOCKS so the sentence was
+// read first; an inline note does not, and the reload would have wiped it. Renaming
+// that line alone would have shipped an invisible message. The reload is gone; it
+// only stripped the query string, since the page never hid the setup screen on
+// that path, and the resume row it used to supply is now shown explicitly - so the
+// refusal and the way out are on screen together.
+//
+// The three clipboard fallbacks became notes rather than toasts, because by the
+// time one runs copying has already failed and the only useful thing left is text
+// that can be SELECTED. sidematches.html keeps its single native prompt, decided
+// in Wave 1 and asserted as kept rather than forgotten.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v70-sweep-done. The tournament product cache stays
+// tournament-v54-rattle-golf - that is the other product, still on its own
+// dialogs, and the guard names it as out of scope rather than omitting it. The iOS
+// binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v229-sweep-done';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

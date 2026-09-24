@@ -140,7 +140,7 @@ describe('1b. A ROUND THAT NEVER SAID SAYS SO ON THE RECEIPT', () => {
         // renderSettlement() needs page state the harness does not supply, and an
         // earlier draft died on it before rendering anything.
         vm.runInContext(`currentMode='POOL1'; currentData=${JSON.stringify(d)};
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`, sb);
         return String((sb.document.getElementById('money-pool-section') || {}).innerHTML || '')
             .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -170,7 +170,7 @@ describe('2. THE SUMMARY AND THE HOLE LINE COUNT THE SAME THING', () => {
         // the exact shape that made the summary and the line disagree.
         const d = round({ mode: 'remainder', scoring: 'net', carryOver: true });
         vm.runInContext(`currentMode='POOL1'; currentData=${JSON.stringify(d)};
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             renderMoneyPoolSection(currentData, currentData.courseData, currentData.scores);`, sb);
         return String((sb.document.getElementById('money-pool-section') || {}).innerHTML || '')
             .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();

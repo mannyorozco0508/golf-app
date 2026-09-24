@@ -87,8 +87,15 @@ function emptyRound() {
 }
 
 function alerts(sb) {
+    // UI WAVE 4: season.html speaks through ui-dialogs.js now. All four surfaces
+    // feed the SAME array, so every assertion below about what the organizer was
+    // told reads unchanged - what moved is HOW the page says it, not what it says.
+    // (These are sandbox PROPERTY writes rather than assignments inside the realm,
+    // which is why the mechanical pass over the suites skipped them: `sb.alert` has
+    // a dot in front of it and is not a stub of the global.)
     sb.__alerts = [];
-    sb.alert = m => { sb.__alerts.push(String(m)); };
+    const say = m => { sb.__alerts.push(String(m)); };
+    sb.alert = say; sb.uiRefuse = say; sb.uiFail = say; sb.uiToast = say;
     return sb;
 }
 function settle(ms) {
