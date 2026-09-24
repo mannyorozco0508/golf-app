@@ -53,6 +53,10 @@ function cupPage(existing) {
     vm.runInContext(`
         window.__written = []; window.__removed = [];
         alert = function () {}; confirm = function () { return true; };
+        // UI WAVE 1: rcRemove asks through uiConfirm, which is a PROMISE. The
+        // page awaits it; this answers yes so the removal proceeds as before.
+        uiConfirm = function () { return Promise.resolve(true); };
+        uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};
         db.ref = function (p) { return {
             set: function (v) { window.__written.push({ path: p, value: v });
                 return { then: function (f) { f && f(); return { catch: function () {} }; } }; },
@@ -253,7 +257,8 @@ describe('REMOVING THE CUP CLEARS THE POINTER', () => {
 
     // A ref left behind after the Cup is gone resolves to 'host-unavailable' -
     // the round would report a Cup it cannot read, forever.
-    test('removing the Cup removes the ref too', () => {
+    // ASYNC NOW: rcRemove awaits the decision sheet, so the removes land later.
+    test('removing the Cup removes the ref too', async () => {
         const sb = cupPage({
             ryderCup: { v: 1, name: 'X',
                 sides: { A: { id: 'A', name: 'A' }, B: { id: 'B', name: 'B' } },
@@ -261,6 +266,7 @@ describe('REMOVING THE CUP CLEARS THE POINTER', () => {
             ryderCupRef: { host: CODE, sessionId: 'd1s1' }
         });
         run(sb, 'rcRemove();');
+        await new Promise(res => setTimeout(res, 20));
         const paths = removed(sb);
         assert.ok(paths.some(p => p.endsWith('/ryderCup')), 'the Cup was not removed');
         assert.ok(paths.some(p => p.endsWith('/ryderCupRef')),

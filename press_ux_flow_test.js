@@ -43,8 +43,24 @@ function boot(page, groupParam, opts) {
     const gm = {}; p.forEach((pl, i) => { gm[pl.id] = Math.floor(i / 4) + 1; });
     vm.runInContext(`
         window.__writes = []; window.__alerts = []; window.__failWrites = ${!!(opts && opts.fail)};
+        // UI WAVE 1: the page no longer calls alert/confirm/prompt. Its three
+        // replacements are recorded the same way the alert recorder used to be,
+        // so every assertion below still reads what the golfer was told - and
+        // now also reads WHICH KIND it was, which alert() could never say.
+        window.__notes = []; window.__toasts = [];
+        // index.html is NOT YET CONVERTED (see dialog_await_guard_test.js's PENDING
+        // list), and this harness boots both pages. The alert recorder stays until
+        // the sweep reaches it; when it does, this line should go with it.
         alert = m => window.__alerts.push(String(m));
-        prompt = () => ${JSON.stringify(opts && 'promptValue' in opts ? opts.promptValue : '78')};
+        uiRefuse = m => { window.__notes.push({ kind: 'refuse', text: String(m) }); window.__alerts.push(String(m)); };
+        uiFail   = m => { window.__notes.push({ kind: 'fail',   text: String(m) }); window.__alerts.push(String(m)); };
+        uiToast  = m => { window.__toasts.push(String(m)); window.__alerts.push(String(m)); };
+        // THE AMOUNT SHEET IS DRIVEN, NOT REPLACED. It resolves with the number a
+        // golfer would have typed; ${'null'} is Cancel. Returning a NUMBER (not a
+        // string) is the real contract - uiAmount never resolves to NaN.
+        window.__amountAnswer = ${JSON.stringify(opts && 'promptValue' in opts ? opts.promptValue : 78)};
+        uiAmount = () => Promise.resolve(window.__amountAnswer);
+        uiConfirm = () => Promise.resolve(window.__confirmAnswer !== false);
         db.ref = function (pth) { return {
             set: function (v) {
                 if (window.__failWrites) return Promise.reject(new Error('offline'));
@@ -84,6 +100,81 @@ describe('ACTION PAGE — amount in, write, THEN confirmation', () => {
         const v = b.last().value;   // vm-realm object: compare fields, never deepEqual
         assert.equal(v.baseId, '18'); assert.equal(v.startHole, 6); assert.equal(v.stake, 78);
         assert.match(b.last().path, /sideMatches\/match1\/presses\//);
+    });
+
+    // ---- UI WAVE 1: THE AMOUNT SHEET REPLACED prompt() -------------------
+    //
+    // prompt() returned a STRING and could return null. uiAmount returns a NUMBER
+    // or null and NEVER NaN, which is the whole point: Number(Promise) is NaN, and
+    // a press created with a NaN stake is a bet nobody can settle.
+
+    test('MONEY: the number typed is the number stored — not NaN, not a string', async () => {
+        const b = boot('sidematches.html', 1, { promptValue: 78 });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        await tick(); await tick();
+        const w = b.last();
+        assert.ok(w, 'nothing was written');
+        assert.equal(w.value.stake, 78, 'the stake that landed was ' + w.value.stake);
+        assert.equal(typeof w.value.stake, 'number', 'the stake must be a number');
+        assert.ok(!Number.isNaN(w.value.stake), 'a NaN stake is a bet nobody can settle');
+        assert.equal(w.value.startHole, 6);
+    });
+
+    test('MONEY: a decimal amount survives — $12.50 is not rounded or dropped', async () => {
+        const b = boot('sidematches.html', 1, { promptValue: 12.5 });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        await tick(); await tick();
+        assert.equal(b.last().value.stake, 12.5);
+    });
+
+    test('CANCEL writes nothing and says nothing', async () => {
+        // null is Cancel. It must not be read as 0, and it must not refuse out
+        // loud either - changing your mind is not an error.
+        const b = boot('sidematches.html', 1, { promptValue: null });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        await tick(); await tick();
+        assert.equal(b.writes().length, 0, 'cancelling created a press');
+        assert.equal(b.sb.window.__notes.length, 0, 'cancelling scolded the golfer');
+        assert.equal(b.sb.window.__toasts.length, 0);
+    });
+
+    test('A REFUSAL IS A NOTE, NOT A TOAST — it must not float away', async () => {
+        // The distinction this wave exists for: the action did NOT happen, so the
+        // message has to stay on screen next to the dead button.
+        const b = boot('sidematches.html', 1, { promptValue: 0 });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        await tick(); await tick();
+        assert.equal(b.writes().length, 0, 'a $0 press was created');
+        const notes = b.sb.window.__notes;
+        assert.equal(notes.length, 1, 'expected one inline note, got ' + JSON.stringify(notes));
+        assert.equal(notes[0].kind, 'refuse');
+        assert.match(notes[0].text, /above 0/);
+        assert.equal(b.sb.window.__toasts.length, 0, 'a refusal must never be a toast');
+    });
+
+    test('A FAILED WRITE IS A FAIL NOTE, NOT A TOAST — it must never self-dismiss', async () => {
+        const b = boot('sidematches.html', 1, { promptValue: 78, fail: true });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        await tick(); await tick();
+        assert.equal(b.writes().length, 0);
+        const notes = b.sb.window.__notes;
+        assert.ok(notes.some(n => n.kind === 'fail' && /PRESS NOT SAVED/.test(n.text)),
+            'the failure must be a persistent note: ' + JSON.stringify(notes));
+        assert.equal(b.sb.window.__toasts.length, 0,
+            'a golfer who misses this believes they have a press that does not exist');
+    });
+
+    test('A RECEIPT IS A TOAST — and only after the write lands', async () => {
+        const b = boot('sidematches.html', 1, { promptValue: 78 });
+        b.run(`pressSideMatch('match1', '18', 6);`);
+        assert.equal(b.sb.window.__toasts.length, 0, 'claimed before it persisted');
+        await tick(); await tick();
+        const t = b.sb.window.__toasts;
+        assert.equal(t.length, 1, JSON.stringify(t));
+        assert.match(t[0], /PRESS CONFIRMED/);
+        assert.match(t[0], /\$78/);
+        assert.match(t[0], /Starts Hole 6/);
+        assert.equal(b.sb.window.__notes.length, 0, 'a success must not leave a warning behind');
     });
 
     test('the confirmation names the golfers, the money and the hole — AFTER the write', async () => {

@@ -32,6 +32,13 @@
     <script src="handicap.js"></script>
     <script src="match-engine.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI WAVE 1: the app speaks for itself. alert/confirm/prompt render
+         "golf-app-5a5.pages.dev says" over every message, which reads as a
+         website error. ui-dialogs.js is the shared replacement: an inline note
+         for a refusal, a persistent one for a failure, a toast for a receipt,
+         and promise-returning sheets for a decision and for a dollar amount.
+         After text-safe.js, whose escapeHtml it uses when the page has it. -->
+    <script src="ui-dialogs.js"></script>
     <script src="action-model.js"></script>
     <!-- v215: the Aloha bet. Its rules and its two sentences live here; this page
          draws the row and writes the record, and settlement-engine.js calls the
@@ -1703,7 +1710,7 @@ html {
     // silently no-op.
     function refuseGroupWrite(what) {
         console.warn('Blocked: this scorekeeper link may not ' + what + '.');
-        alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only manage Group '
+        uiRefuse('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only manage Group '
             + lockedGroup + '\u2019s action. Ask the organizer to ' + what + '.');
         return false;
     }
@@ -1750,7 +1757,19 @@ html {
     }
 
     function copySideMatchLink(url) {
-        navigator.clipboard.writeText(url).then(() => alert('✅ Link copied!')).catch(() => prompt('Copy this link:', url));
+        // THE ONE NATIVE DIALOG LEFT IN THIS PAGE, AND IT IS DELIBERATE.
+        //
+        // The .catch arm runs only when the clipboard API has ALREADY failed -
+        // no permission, an insecure context, an old webview. Its whole job is to
+        // put the URL somewhere a golfer can select and copy it by hand, which is
+        // exactly what a native prompt does and what a custom panel would have to
+        // reimplement worse. Its return value is discarded, so it decides nothing
+        // and cannot be caught by the missing-await class this wave is about.
+        // dialog_pilot_test.js asserts it is still here, so it reads as kept
+        // rather than missed.
+        navigator.clipboard.writeText(url)
+            .then(() => uiToast('\u2705 Link copied!'))
+            .catch(() => prompt('Copy this link:', url));
     }
 
     function closeSideMatchLinksModal() {
@@ -1801,14 +1820,14 @@ html {
         const startSel = document.getElementById('sm-field-start');
         const startHole = startSel ? (parseInt(startSel.value, 10) || 1) : 1;
 
-        if (stake <= 0) { alert('\u26A0\uFE0F Enter an amount first.'); return; }
+        if (stake <= 0) { uiRefuse('\u26A0\uFE0F Enter an amount first.'); return; }
 
         // Dots is a foursome game and is never created across groups. The chooser
         // already removes it from the Across Groups list; this is the write-site
         // half of that rule, because a removed <option> is not a guard.
         if (format === 'dots' && actionScope === 'cross') {
             console.warn('Blocked: Dots is a group-local game.');
-            alert('\u26A0\uFE0F Dots / Junk is played within one scoring group, so it can\u2019t be set up across groups.');
+            uiRefuse('\u26A0\uFE0F Dots / Junk is played within one scoring group, so it can\u2019t be set up across groups.');
             return;
         }
 
@@ -1826,16 +1845,16 @@ html {
 
         if (format === 'skins') {
             const chosen = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
-            if (chosen.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a skins game.'); return; }
+            if (chosen.length < 2) { uiRefuse('\u26A0\uFE0F Pick at least two golfers for a skins game.'); return; }
             if (!canCreateWagerWith(chosen)) {
                 console.warn('Blocked: a Group ' + lockedGroup + ' link may only enrol its own golfers in skins.');
-                alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a skins game here can '
+                uiRefuse('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so a skins game here can '
                     + 'only include Group ' + lockedGroup + ' golfers. Ask the organizer for a skins game across groups.');
                 return;
             }
             // A group game must not silently span groups, however it was assembled.
             if (actionScope === 'group' && !allPlayersInGroup(chosen, actionOwnerGroup)) {
-                alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s skins game, so it can only include Group '
+                uiRefuse('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s skins game, so it can only include Group '
                     + actionOwnerGroup + ' golfers. Use Across Groups for a game between foursomes.');
                 return;
             }
@@ -1862,15 +1881,15 @@ html {
             // golfer left out genuinely contributes $0 to this game and collects $0
             // from it, while their dots on the card remain their own business.
             const chosenD = Object.keys(fieldActionPick).filter(id => players.some(p => String(p.id) === id));
-            if (chosenD.length < 2) { alert('\u26A0\uFE0F Pick at least two golfers for a dots game.'); return; }
+            if (chosenD.length < 2) { uiRefuse('\u26A0\uFE0F Pick at least two golfers for a dots game.'); return; }
             if (!canCreateWagerWith(chosenD)) {
                 console.warn('Blocked: dots outside this link\u2019s group.');
-                alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start Group '
+                uiRefuse('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start Group '
                     + lockedGroup + '\u2019s dots game.');
                 return;
             }
             if (actionScope === 'group' && !allPlayersInGroup(chosenD, actionOwnerGroup)) {
-                alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s dots game, so it can only include Group '
+                uiRefuse('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s dots game, so it can only include Group '
                     + actionOwnerGroup + ' golfers.');
                 return;
             }
@@ -1885,7 +1904,7 @@ html {
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
         db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
             .then(() => { closeSideMatchModal(); })
-            .catch(err => alert('\u26A0\uFE0F Could not save: ' + err.message));
+            .catch(err => uiFail('\u26A0\uFE0F Could not save: ' + err.message));
     }
 
     function saveSideMatch() {
@@ -1912,11 +1931,11 @@ html {
         // the organizer does not have to go back and tally the roster.
         if (teamAIds.length < 1 || teamBIds.length < 1 || teamAIds.length !== teamBIds.length) {
             const n = teamAIds.length + teamBIds.length;
-            alert(`\u26A0\uFE0F Tap two golfers for a 1v1, or four for a 2v2 — you have picked ${n}.`);
+            uiRefuse(`\u26A0\uFE0F Tap two golfers for a 1v1, or four for a 2v2 — you have picked ${n}.`);
             return;
         }
         if (teamAIds.length > MAX_PER_SIDE || teamBIds.length > MAX_PER_SIDE) {
-            alert("⚠️ Side matches support 1v1 or 2v2 only.");
+            uiRefuse("⚠️ Side matches support 1v1 or 2v2 only.");
             return;
         }
 
@@ -1936,7 +1955,7 @@ html {
         // cross-group match, provided this foursome is actually in it.
         if (!canCreateWagerWith(teamAIds.concat(teamBIds))) {
             console.warn('Blocked: wager not anchored to Group ' + lockedGroup + '.');
-            alert(actionScope === 'cross'
+            uiRefuse(actionScope === 'cross'
                 ? '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so an Any Group match needs '
                     + 'at least one Group ' + lockedGroup + ' golfer in it. Ask the organizer to set up a match '
                     + 'between two other foursomes.'
@@ -1950,7 +1969,7 @@ html {
         // save it labelled as local - the silent conversion the scope chooser exists
         // to prevent.
         if (actionScope === 'group' && !allPlayersInGroup(teamAIds.concat(teamBIds), actionOwnerGroup)) {
-            alert('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s action, so everyone in it must be a Group '
+            uiRefuse('\u26A0\uFE0F This is Group ' + actionOwnerGroup + '\u2019s action, so everyone in it must be a Group '
                 + actionOwnerGroup + ' golfer. Use Across Groups for a match between foursomes.');
             return;
         }
@@ -1985,7 +2004,7 @@ html {
             const holeStake = parseFloat(document.getElementById("sm-holestake").value) || 0;
             const overallStake = parseFloat(document.getElementById("sm-overallstake").value) || 0;
             if (holeStake <= 0 && overallStake <= 0) {
-                alert("⚠️ Set a $ Per Hole or $ Overall amount above 0, or this match won't track any money.");
+                uiRefuse("⚠️ Set a $ Per Hole or $ Overall amount above 0, or this match won't track any money.");
                 return;
             }
             payload.holeStake = holeStake;
@@ -2026,7 +2045,7 @@ html {
                 closeSideMatchModal();
                 openSideMatchLinksModal(teamAIds, teamBIds);
             })
-            .catch(err => alert(`Failed to save: ${err.message}`));
+            .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
 
     let pendingDeleteMatchId = null;
@@ -2091,7 +2110,7 @@ html {
             return refuseGroupWrite('remove that match');
         }
         db.ref(`events/${currentMode}/sideMatches/${matchId}`).remove()
-            .catch(err => alert(`Failed to remove: ${err.message}`));
+            .catch(err => uiFail(`Failed to remove: ${err.message}`));
         closeSideMatchDeleteModal();
     }
 
@@ -2216,7 +2235,7 @@ html {
         // to a set of matches in a single tap.
         if (!isOrganizerView()) return refuseGroupWrite('set up the Any Group matchups');
         if (autoPairPreview.length === 0) {
-            alert("⚠️ No matchups to create.");
+            uiRefuse("⚠️ No matchups to create.");
             return;
         }
         const format = document.getElementById('autopair-format').value;
@@ -2225,7 +2244,7 @@ html {
         const pressRule = document.getElementById('autopair-press-rule').value;
 
         if (stake <= 0) {
-            alert("⚠️ Set a stake above $0 — otherwise these matchups won't track any money.");
+            uiRefuse("⚠️ Set a stake above $0 — otherwise these matchups won't track any money.");
             return;
         }
 
@@ -2244,9 +2263,9 @@ html {
         db.ref(`events/${currentMode}`).update(updates)
             .then(() => {
                 closeAutoPairModal();
-                alert(`✅ Created ${autoPairPreview.length} Any Group matchup${autoPairPreview.length === 1 ? '' : 's'}. Each player can find their match under Side Matches.`);
+                uiToast(`✅ Created ${autoPairPreview.length} Any Group matchup${autoPairPreview.length === 1 ? '' : 's'}. Each player can find their match under Side Matches.`);
             })
-            .catch(err => alert(`Failed to create matchups: ${err.message}`));
+            .catch(err => uiFail(`Failed to create matchups: ${err.message}`));
     }
 
     // A press is a real bet with a real amount, so it is entered, written, and only
@@ -2401,7 +2420,7 @@ html {
         const sm = alohaMatchFor(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('offer the Aloha on that match');
         const calc = String(matchId) === '__main' ? alohaCalcForMain(sm) : alohaCalcFor(sm);
-        if (!calc) { alert('\u26A0\uFE0F NOT OFFERED\nThat match could not be read \u2014 try again.'); return; }
+        if (!calc) { uiFail('\u26A0\uFE0F NOT OFFERED\nThat match could not be read \u2014 try again.'); return; }
         const rec = alohaOfferRecord({
             data: currentData, match: sm, matchHoles: alohaHolesFor(matchId, sm),
             participantIds: sideMatchParticipantIds(sm),
@@ -2411,11 +2430,11 @@ html {
             participantIds: sideMatchParticipantIds(sm),
             scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
         }).offeringSide, mode, Date.now());
-        if (!rec) { alert('\u26A0\uFE0F NOT OFFERED\nThe Aloha is not available on that match any more.'); return; }
+        if (!rec) { uiFail('\u26A0\uFE0F NOT OFFERED\nThe Aloha is not available on that match any more.'); return; }
         if (!requireOnlineForMoney('ALOHA NOT OFFERED', 'Reconnect before offering the Aloha.')) return;
         db.ref(alohaRefFor(matchId)).set(rec)
-            .then(() => alert(`\uD83C\uDF34 ALOHA OFFERED\n${alohaMoney(rec.amount)}${rec.mode === 'half' ? ' (half)' : ''} on hole ${rec.hole}\nThe other side has to accept.`))
-            .catch(err => alert(`\u26A0\uFE0F ALOHA NOT OFFERED\n${err.message}\nNothing was created \u2014 try again.`));
+            .then(() => uiToast(`\uD83C\uDF34 ALOHA OFFERED\n${alohaMoney(rec.amount)}${rec.mode === 'half' ? ' (half)' : ''} on hole ${rec.hole}\nThe other side has to accept.`))
+            .catch(err => uiFail(`\u26A0\uFE0F ALOHA NOT OFFERED\n${err.message}\nNothing was created \u2014 try again.`));
     }
     // THE ANSWER. Only an offered Aloha can be answered, and the write says which
     // way - there is no timer, because an unanswered offer settles as no bet.
@@ -2423,15 +2442,15 @@ html {
         const sm = alohaMatchFor(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('answer the Aloha on that match');
         const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm, currentData) : (sm && sm.aloha);
-        if (!rec || String(rec.status) !== 'offered') { alert('\u26A0\uFE0F That Aloha has already been answered.'); return; }
+        if (!rec || String(rec.status) !== 'offered') { uiRefuse('\u26A0\uFE0F That Aloha has already been answered.'); return; }
         const status = answer === 'accepted' ? 'accepted' : 'declined';
         if (!requireOnlineForMoney('ALOHA NOT SAVED', 'Reconnect before answering the Aloha.')) return;
         db.ref(alohaRefFor(matchId))
             .update({ status: status, respondedAt: Date.now() })
-            .then(() => alert(status === 'accepted'
+            .then(() => uiToast(status === 'accepted'
                 ? `\uD83C\uDF34 ALOHA ON\n${alohaMoney(rec.amount)} on hole ${rec.hole}.`
                 : '\u2716 ALOHA DECLINED\nThe match settles normally.'))
-            .catch(err => alert(`\u26A0\uFE0F ALOHA NOT SAVED\n${err.message}\nNothing changed \u2014 try again.`));
+            .catch(err => uiFail(`\u26A0\uFE0F ALOHA NOT SAVED\n${err.message}\nNothing changed \u2014 try again.`));
     }
     // The match's own engine result and its own holes, the same two the card
     // above builds - so an offer written from a button uses the number the button
@@ -2458,7 +2477,9 @@ html {
         } catch (e) { return null; }
     }
 
-    function pressSideMatch(matchId, baseId, nextHole) {
+    // ASYNC because the amount is now a sheet, not prompt(). Called only from an
+    // onclick, so nothing awaits this function itself and nothing needs to.
+    async function pressSideMatch(matchId, baseId, nextHole) {
         const sm = sideMatchById(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('press that match');
         // CUSTOM PRESS AMOUNTS. "Press you for $78" is a different bet from "press
@@ -2466,15 +2487,23 @@ html {
         // the number that settles. Default offered is the original stake, so the
         // common case is one tap of OK.
         const orig = sm && sm.stake ? sm.stake : 0;
-        const raw = prompt(`Press amount ($) \u2014 starts hole ${nextHole}`, String(orig || ''));
+        // AWAIT. Without it `raw` is a Promise and Number(Promise) is NaN, so the
+        // press below would be created with a NaN stake. dialog_await_guard_test.js
+        // reads this line, because the suite's confirm() returns true and no
+        // behavioural test can see a missing await here.
+        const raw = await uiAmount({
+            title: `Press amount ($) \u2014 starts hole ${nextHole}`,
+            body: 'This press runs from that hole to the end of the match.',
+            value: orig || '', confirmText: 'Start press'
+        });
         if (raw === null) return;   // golfer changed their mind - nothing happens
         const amt = parseFloat(raw);
-        if (isNaN(amt) || amt <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
+        if (isNaN(amt) || amt <= 0) { uiRefuse('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
-            .then(() => alert(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
-            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
+            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
+            .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
     // ---- OFFLINE MONEY GUARD ------------------------------------------------
@@ -2492,7 +2521,7 @@ html {
     // before Firebase sees it instead.
     function requireOnlineForMoney(title, line) {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            uiRefuse('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
             return false;
         }
         return true;
@@ -2572,19 +2601,20 @@ html {
         const input = document.getElementById(`sm-hole-press-amount-${matchId}`);
         if (!input) return;
         const rate = parseFloat(input.value);
-        if (isNaN(rate) || rate <= 0) { alert("Please enter a valid dollar amount."); return; }
+        if (isNaN(rate) || rate <= 0) { uiRefuse("Please enter a valid dollar amount."); return; }
         const smForAck = sideMatchById(matchId);
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
             .then(() => {
                 cancelSideHolePressInput(matchId, p1Id, p2Id);
-                alert(`\u2705 PRESS CONFIRMED\n${pressMatchNames(smForAck)}\n$${rate}/hole\nStarts Hole ${nextHole}`);
+                uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(smForAck)}\n$${rate}/hole\nStarts Hole ${nextHole}`);
             })
-            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
+            .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
-    function pressSideMatchOverall(matchId, p1Id, p2Id) {
+    // ASYNC for the same reason as pressSideMatch above.
+    async function pressSideMatchOverall(matchId, p1Id, p2Id) {
         if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
@@ -2598,15 +2628,19 @@ html {
         // never gave it one.
         const smO = sideMatchById(matchId);
         const origO = smO && smO.overallStake ? smO.overallStake : 0;
-        const rawO = prompt(`Press amount ($) \u2014 starts hole ${nextHole}`, String(origO || ''));
+        const rawO = await uiAmount({
+            title: `Press amount ($) \u2014 starts hole ${nextHole}`,
+            body: 'This press runs from that hole to the end of the bet.',
+            value: origO || '', confirmText: 'Start press'
+        });
         if (rawO === null) return;
         const amtO = parseFloat(rawO);
-        if (isNaN(amtO) || amtO <= 0) { alert('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
+        if (isNaN(amtO) || amtO <= 0) { uiRefuse('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
-            .then(() => alert(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
-            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
+            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
+            .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
     // Renders one stored press map as compact ledger lines: "HP1 \u00B7 H6 \u00B7 $78/hole".
@@ -2773,7 +2807,7 @@ html {
 
     function rcCopyGroupLink(url, groupNum) {
         navigator.clipboard.writeText(url).then(function () {
-            alert('Copied Group ' + groupNum + '\u2019s scorekeeper link. Send this ONLY to that group.');
+            uiToast('Copied Group ' + groupNum + '\u2019s scorekeeper link. Send this ONLY to that group.');
         });
     }
 
@@ -3301,7 +3335,7 @@ html {
     function rcDropMatch(i) {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
         const m = rcDraft.matches[i];
-        if (m && (m.lockedAt || rcMatchLocked(m))) { alert('That match has started \u2014 it cannot be removed.'); return; }
+        if (m && (m.lockedAt || rcMatchLocked(m))) { uiRefuse('That match has started \u2014 it cannot be removed.'); return; }
         rcDraft.matches.splice(i, 1);
         renderRyderCupSetup();
     }
@@ -3409,12 +3443,21 @@ html {
             .catch(e => rcShowProblems([{ message: 'Could not save: ' + e.message }]));
     }
 
-    function rcRemove() {
+    // ASYNC because the decision is now a sheet. Called from an onclick only.
+    async function rcRemove() {
         if (!isOrganizerView()) return refuseGroupWrite('change the Ryder Cup');
         const gate = canRemoveRyderCup(currentData, currentData.courseData || [],
             currentData.scores || {});
         if (!gate.ok) { rcShowProblems([{ message: gate.message || 'The Cup cannot be removed.' }]); return; }
-        if (!confirm('Remove this Ryder Cup? No scores are affected.')) return;
+        // AWAIT. `if (!uiConfirm(...))` without it is `if (!Promise)`, which is
+        // always false - the return would never run and the Cup would be removed
+        // without anyone being asked.
+        const ok = await uiConfirm({
+            title: 'Remove this Ryder Cup?',
+            body: 'No scores are affected. The matches and their points go.',
+            confirmText: 'Remove it', cancelText: 'Keep it', danger: true
+        });
+        if (!ok) return;
         db.ref('events/' + currentMode + '/ryderCup').remove()
             .then(() => {
                 // A POINTER TO A CUP THAT NO LONGER EXISTS IS WORSE THAN NONE. Left

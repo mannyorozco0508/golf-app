@@ -290,6 +290,9 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
         // read). So a check using this makes one real outbound GET; what it asserts
         // on is the request the PAGE issued, which no server can rewrite.
         const requests = [];
+        // Every native alert/confirm/prompt the page opened. A non-empty list is a
+        // failure: see the handler below.
+        const dialogs = [];
         await new Promise((res, rej) => {
             ws.addEventListener('open', res, { once: true });
             ws.addEventListener('error', () => rej(new Error('CDP socket error')), { once: true });
@@ -300,10 +303,31 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
             if (m.method === 'Network.requestWillBeSent' && m.params && m.params.request) {
                 requests.push(m.params.request.url);
             }
+            // A NATIVE DIALOG IS A FAILURE, NOT A PAUSE.
+            //
+            // alert/confirm/prompt block the renderer, so a check whose path
+            // crossed one used to sit there until the 30-second CDP timeout and
+            // report "CDP timeout on Runtime.evaluate" - which says nothing about
+            // the dialog and reads like a flake. That is not hypothetical: it is
+            // why none of these checks could drive a press or a Delete Round.
+            //
+            // Now it is recorded and DISMISSED (cancel, so a confirm() reads as
+            // "no" and nothing destructive proceeds), the run continues, and
+            // arriveCold fails at the end naming the message. UI Wave 1 replaced
+            // these with in-page sheets precisely so these flows became drivable;
+            // anything still reaching a native dialog needs to be seen, not
+            // silently waited on.
+            if (m.method === 'Page.javascriptDialogOpening' && m.params) {
+                dialogs.push({ type: m.params.type, message: String(m.params.message || '') });
+                try {
+                    ws.send(JSON.stringify({ id: 900000 + dialogs.length,
+                        method: 'Page.handleJavaScriptDialog', params: { accept: false } }));
+                } catch (e) { /* socket already closing */ }
+            }
         });
 
         let id = 1;
-        await rpc(ws, id++, 'Page.enable', {});
+        await rpc(ws, id++, 'Page.enable', {});   // also delivers Page.javascriptDialogOpening
         await rpc(ws, id++, 'Network.enable', {});
         await rpc(ws, id++, 'Runtime.enable', {});
         const v = viewport || { width: 390, height: 844 };
@@ -398,8 +422,19 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
             }
             value = m.result.result.value;
         }
+        // A NATIVE DIALOG FAILS THE RUN, LOUDLY AND BY NAME. It was dismissed when
+        // it opened so the steps could finish rather than hang, but a check that
+        // crossed one did not measure what it thinks it did: a confirm() read as
+        // "no", so whatever was behind it never happened.
+        if (dialogs.length) {
+            return { ok: false, dialogs: dialogs.slice(), value: value,
+                     reason: 'the page opened ' + dialogs.length + ' native dialog(s), which '
+                           + 'block the renderer and were auto-dismissed (cancel): '
+                           + dialogs.map(d => d.type + ' "' + d.message.slice(0, 70) + '"').join(' | ') };
+        }
         return { ok: true, value: value,
                  requests: requests.slice(),
+                 dialogs: dialogs.slice(),
                  finalUrl: (await rpc(ws, id++, 'Runtime.evaluate',
                      { expression: 'document.URL', returnByValue: true })).result.result.value };
     } catch (e) {

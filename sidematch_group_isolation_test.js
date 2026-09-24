@@ -204,17 +204,23 @@ describe('DELETE BYPASS — calling the write function directly is refused', () 
 // 5-8. PRESS
 // ---------------------------------------------------------------------------
 describe('PRESS — the index.html rule, now applied here too', () => {
-    test('Group 1 CAN press its own match, and the entered amount is STORED', () => {
+    // ASYNC NOW. The amount comes from a sheet, so pressSideMatch awaits it and
+    // the write lands a microtask later - these used to assert on the next line.
+    const settle = () => new Promise(r => setTimeout(r, 20));
+
+    test('Group 1 CAN press its own match, and the entered amount is STORED', async () => {
         const b = boot(1);
-        b.run(`prompt = () => '78'; pressSideMatch('m_g1', 'b0', 7);`);
+        b.run(`uiAmount = () => Promise.resolve(78); pressSideMatch('m_g1', 'b0', 7);`);
+        await settle();
         assert.equal(b.writes().length, 1);
         assert.equal(b.writes()[0].value.stake, 78, 'the amount the golfer typed is the amount stored');
         assert.equal(b.writes()[0].value.startHole, 7);
     });
 
-    test('cancelling the amount prompt creates NOTHING', () => {
+    test('cancelling the amount sheet creates NOTHING', async () => {
         const b = boot(1);
-        b.run(`prompt = () => null; pressSideMatch('m_g1', 'b0', 7);`);
+        b.run(`uiAmount = () => Promise.resolve(null); pressSideMatch('m_g1', 'b0', 7);`);
+        await settle();
         assert.equal(b.wrote(), false, 'a dismissed prompt is a changed mind, not a bet');
     });
 
@@ -230,13 +236,16 @@ describe('PRESS — the index.html rule, now applied here too', () => {
         assert.equal(b.wrote(), false);
     });
 
-    test('a CROSS-GROUP match is pressable by BOTH involved groups, at a custom amount', () => {
-        [1, 2].forEach(g => {
+    test('a CROSS-GROUP match is pressable by BOTH involved groups, at a custom amount', async () => {
+        // for...of, NOT forEach: the callback would have had to be async on its
+        // own and the test would not have waited for either iteration.
+        for (const g of [1, 2]) {
             const b = boot(g);
-            b.run(`prompt = () => '78'; pressSideMatch('m_cross', 'b0', 7);`);
+            b.run(`uiAmount = () => Promise.resolve(78); pressSideMatch('m_cross', 'b0', 7);`);
+            await settle();
             assert.equal(b.writes().length, 1, `Group ${g} should be able to press the cross-group match`);
             assert.equal(b.writes()[0].value.stake, 78, `Group ${g}'s $78 must be stored as $78`);
-        });
+        }
     });
 
     test('an unrelated Group 3 cannot press the cross-group match', () => {
