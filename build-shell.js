@@ -83,7 +83,12 @@ const PRODUCTS = {
         // Moved to v59. Confirm or mark out before tee time (attendance.js on the
         // scorecard, setup, Round Ready, and each trip day). A device on v58
         // has the roster and no headcount.
-        cacheName: 'consumer-v62-gross-means-gross',
+        // Moved to v63. A season ledger totals finalized Results across rounds
+        // (season.html, season.js, the Game Day entry on admin.html). A device on
+        // v62 has each round and no running total. The season branch asked for
+        // 'consumer-v60-season' - cut from v217, before v218 took v60 - so it moved
+        // to the next free key rather than reusing one an installed device holds.
+        cacheName: 'consumer-v63-season-ledger',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

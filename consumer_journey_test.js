@@ -66,7 +66,10 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
         // 1000 -> 1300 (2026-09-13): createRoom gained the copyFrom carry (the line
         // and its three-line note); measured 1188 from the signature to the
         // navigation, so 1300 is again the measurement plus headroom.
-        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1300}window\.location\.href/,
+        // 1300 -> 1550 (v218): the same navigation now also carries ?season=
+        // when the lobby was opened from a season. Measured 1431 from the
+        // signature to window.location.href.
+        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1550}window\.location\.href/,
             'createRoom no longer goes anywhere');
     });
 

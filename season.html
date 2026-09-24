@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Season — HardPan</title>
+    <script src="./firebase-app-compat.js"></script>
+    <script src="auth-boot.js"></script>
+    <script src="organizer-gate.js"></script>
+    <script src="./firebase-database-compat.js"></script>
+    <script src="handicap.js"></script>
+    <!-- match-engine.js (v222, at the merge): season.js totals a round through
+         computeCombinedNetTotals, which calls calculateMatchEngine through a typeof
+         guard. This branch was cut before v218 split the engine out, so without this
+         tag the ledger would total every match round at ZERO and report no error.
+         After handicap.js, before every caller - the rule the other nine pages follow,
+         pinned per page by match_engine_load_order_test.js. -->
+    <script src="match-engine.js"></script>
+    <script src="text-safe.js"></script>
+    <script src="action-model.js"></script>
+    <script src="money-engine.js"></script>
+    <script src="aloha-bet.js"></script>
+    <script src="settlement-engine.js"></script>
+    <script src="pool-engine.js"></script>
+    <script src="code-issuer.js"></script>
+    <script src="product-links.js"></script>
+    <script src="season.js"></script>
+    <script src="pwa-boot.js" defer></script>
+    <style>
+        :root {
+            --bg-page: #f4f6f8; --bg-card: #ffffff; --text-main: #1a1a1a; --text-muted: #666;
+            --brand-green: #0f4c3a; --border-mid: #d0e1db; --border-light: #e0e0e0;
+            --warn-bg: #fff4e5; --warn-border: #e08a00; --warn-text: #7a4a00;
+            --shadow-color: rgba(0,0,0,0.08);
+        }
+        html.dark-mode {
+            --bg-page: #14181a; --bg-card: #1e2426; --text-main: #e8ecec; --text-muted: #9aa8a7;
+            --brand-green: #2f9e78; --border-mid: #3a4a45; --border-light: #333c3e;
+            --warn-bg: #332508; --warn-border: #c98a2b; --warn-text: #f0b84f;
+            --shadow-color: rgba(0,0,0,0.4);
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-page); color: var(--text-main); margin: 0; padding: 12px 12px 40px; }
+        .container { max-width: 650px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
+        h1, h2 { color: var(--brand-green); margin: 0 0 8px; }
+        h1 { font-size: 1.35rem; }
+        a { color: var(--brand-green); }
+        .back { display: inline-block; margin-bottom: 12px; font-weight: bold; text-decoration: none; }
+        .muted { color: var(--text-muted); font-size: 0.82rem; line-height: 1.4; }
+        label { display: block; font-size: 0.75rem; font-weight: bold; margin: 10px 0 4px; }
+        input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 1rem; }
+        button, .btn { display: inline-block; margin-top: 10px; padding: 10px 14px; border-radius: 8px; font-weight: bold; border: 1px solid var(--brand-green); background: var(--brand-green); color: #F2EDE4; cursor: pointer; }
+        button.secondary { background: transparent; color: var(--brand-green); }
+        .row { display: flex; gap: 8px; align-items: center; }
+        .row input { flex: 1; }
+        .row button { margin-top: 0; white-space: nowrap; }
+        #season-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 14px; }
+        .season-list-link { font-weight: bold; text-decoration: none; padding: 8px 10px; border: 1px solid var(--border-mid); border-radius: 8px; }
+        .season-list-empty { margin: 8px 0 14px; }
+        #season-tools { display: none; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-light); }
+        .season-ledger-card { margin-top: 12px; }
+        .season-updated, .season-foot, .season-empty, .season-note { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+        .season-note { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; }
+        .season-rounds { margin: 8px 0; }
+        .season-round, .season-golfer, .season-head { display: grid; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border-light); }
+        .season-round { grid-template-columns: 1.4fr auto 1.6fr; font-size: 0.82rem; }
+        .season-round-code, .season-round-state, .season-played { color: var(--text-muted); font-size: 0.72rem; }
+        .season-head, .season-golfer { grid-template-columns: 1.6fr repeat(4, 0.7fr); font-size: 0.85rem; }
+        .season-head { font-size: 0.68rem; font-weight: bold; text-transform: uppercase; color: var(--text-muted); }
+        .season-name { font-weight: bold; }
+        .season-played { display: block; font-weight: normal; }
+        .season-money, .season-skins, .season-kp, .season-net { text-align: right; font-variant-numeric: tabular-nums; }
+        .season-unmatched { font-size: 0.78rem; color: var(--warn-text); padding: 6px 0; }
+        #season-notes-line { display: none; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a class="back" href="admin.html">← Game Day</a>
+    <div id="season-home">
+        <h1>Season</h1>
+        <p class="muted">Running money, skins and closest-to-the-pin for the same crew, week after week. Open a season you already have, or start one.</p>
+        <div id="season-list"></div>
+        <label for="season-name-input">Season name</label>
+        <input id="season-name-input" type="text" maxlength="80" placeholder="Monday skins" autocomplete="off">
+        <label for="season-notes-input">Notes (optional)</label>
+        <input id="season-notes-input" type="text" maxlength="280" placeholder="KP on 3, 7, 12 and 16" autocomplete="off">
+        <button type="button" id="season-create-btn" onclick="createSeason(this)">Start season</button>
+        <div class="row" style="margin-top:16px;">
+            <input id="season-open-input" type="text" maxlength="48" placeholder="SEASON CODE" aria-label="Season code" autocomplete="off">
+            <button type="button" class="secondary" id="season-open-btn" onclick="openSeason(this)">Open ledger</button>
+        </div>
+    </div>
+
+    <div id="season-view" style="display:none;">
+        <h1 id="season-title">Season</h1>
+        <p id="season-notes-line" class="muted"></p>
+        <p class="muted" id="season-share-line"></p>
+        <div id="season-ledger"></div>
+        <div id="season-tools">
+            <h2>Add a round</h2>
+            <p class="muted">A round already set up on Game Day can join this season. Starting the next one copies golfers and setup from the latest round here — the old round is not changed.</p>
+            <div class="row">
+                <input id="season-attach-code" type="text" maxlength="48" placeholder="GAME CODE" aria-label="Game code to add" autocomplete="off">
+                <button type="button" class="secondary" id="season-attach-btn" onclick="attachRound(this)">Add round</button>
+            </div>
+            <button type="button" id="season-next-btn" style="display:none;" onclick="startNextRound()">Start the next round</button>
+        </div>
+    </div>
+</div>
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentSeasonCode = seasonRoundCode(urlParams.get('season'));
+    let seasonData = {};
+    let seasonIsOwner = false;
+    let seasonLatestCopy = '';
+
+    function seasonUid() {
+        try {
+            const u = firebase.auth && firebase.auth().currentUser;
+            if (u && u.uid) return String(u.uid);
+        } catch (e) {}
+        return (window.authBootState && window.authBootState.uid) ? String(window.authBootState.uid) : '';
+    }
+
+    function paintSeasonList() {
+        const mount = document.getElementById('season-list');
+        if (!mount) return;
+        mount.innerHTML = seasonListHtml(readSeasonList(localStorage));
+    }
+
+    function setPending(el, text) {
+        if (!el) return function () {};
+        const was = el.textContent;
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+        el.textContent = text;
+        return function () {
+            el.disabled = false;
+            el.removeAttribute('aria-disabled');
+            el.textContent = was;
+        };
+    }
+
+    function createSeason(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const name = document.getElementById('season-name-input').value;
+        const notes = document.getElementById('season-notes-input').value;
+        if (!String(name || '').trim()) { alert('Give the season a name first.'); return; }
+        if (String(name).trim().length > 80) { alert('Keep the season name to 80 characters.'); return; }
+        if (String(notes || '').trim().length > 280) { alert('Keep the notes to 280 characters.'); return; }
+        const restore = setPending(pressedEl, 'Starting…');
+        const gate = window.organizerGate && typeof window.organizerGate.ensureOrganizer === 'function'
+            ? window.organizerGate.ensureOrganizer(db)
+            : Promise.reject(new Error('no organizer'));
+        gate.then(function (uid) {
+            return issueUniqueCode({ db: db, root: 'seasons' }).then(function (code) {
+                const rec = seasonCreateRecord(name, notes, uid, Date.now());
+                if (!rec) throw new Error('bad-season');
+                return db.ref('seasons/' + code).set(rec).then(function () {
+                    rememberSeason(localStorage, { code: code, name: rec.name });
+                    window.location.href = 'season.html?season=' + code;
+                });
+            });
+        }).catch(function (err) {
+            restore();
+            if (err && err.code === 'timeout') {
+                alert('Season not created. Nothing was saved. Try again.');
+                return;
+            }
+            alert(seasonWriteError(err));
+        });
+    }
+
+    function openSeason(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const code = seasonRoundCode(document.getElementById('season-open-input').value);
+        if (!code) { alert('Enter the season code.'); return; }
+        window.location.href = 'season.html?season=' + code;
+    }
+
+    function showLedgerShell() {
+        document.getElementById('season-home').style.display = 'none';
+        document.getElementById('season-view').style.display = 'block';
+    }
+
+    function paintLoadedSeason(val) {
+        seasonData = (val && typeof val === 'object') ? val : {};
+        document.getElementById('season-title').textContent = seasonData.name || currentSeasonCode;
+        const notes = document.getElementById('season-notes-line');
+        if (seasonData.notes) {
+            notes.style.display = 'block';
+            notes.textContent = seasonData.notes;
+        } else {
+            notes.style.display = 'none';
+            notes.textContent = '';
+        }
+        const share = document.getElementById('season-share-line');
+        const url = (typeof shareBaseUrl === 'function' ? shareBaseUrl() : '') + 'season.html?season=' + currentSeasonCode;
+        share.textContent = 'Anyone with this link can read the ledger. ' + url;
+        syncSeasonOwner();
+        if (seasonData.name) rememberSeason(localStorage, { code: currentSeasonCode, name: seasonData.name });
+        const rounds = (seasonData.rounds && typeof seasonData.rounds === 'object') ? seasonData.rounds : {};
+        const codes = Object.keys(rounds);
+        if (!codes.length) {
+            document.getElementById('season-ledger').innerHTML = seasonLedgerHtml(buildSeasonLedger([], { updatedAt: seasonData.updatedAt }));
+            return;
+        }
+        Promise.all(codes.map(function (code) {
+            return db.ref('events/' + code).once('value').then(function (snap) {
+                const data = snap && snap.exists && snap.exists() ? snap.val() : null;
+                const meta = rounds[code] || {};
+                return {
+                    code: code,
+                    label: meta.label || (data && (data.courseName || data.eventName)) || code,
+                    addedAt: meta.addedAt,
+                    facts: seasonRoundFacts(data)
+                };
+            });
+        })).then(function (slices) {
+            document.getElementById('season-ledger').innerHTML = seasonLedgerHtml(buildSeasonLedger(slices, { updatedAt: seasonData.updatedAt }));
+            const latest = slices.slice().sort(function (a, b) {
+                return (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0);
+            })[0];
+            seasonLatestCopy = (latest && latest.code) ? latest.code : '';
+            const btn = document.getElementById('season-next-btn');
+            if (latest && latest.code) {
+                btn.setAttribute('data-copy-from', latest.code);
+                btn.textContent = 'Start the next round from ' + (latest.label || latest.code);
+            }
+            syncSeasonOwner();
+        });
+    }
+
+    function syncSeasonOwner() {
+        seasonIsOwner = !!(seasonData.ownerUid && seasonUid() && String(seasonData.ownerUid) === seasonUid());
+        const tools = document.getElementById('season-tools');
+        if (tools) tools.style.display = seasonIsOwner ? 'block' : 'none';
+        const btn = document.getElementById('season-next-btn');
+        if (btn) btn.style.display = (seasonIsOwner && seasonLatestCopy) ? 'block' : 'none';
+    }
+
+    function attachRound(pressedEl) {
+        if (!seasonIsOwner || !currentSeasonCode) return;
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const code = seasonRoundCode(document.getElementById('season-attach-code').value);
+        if (!code) { alert('Enter the game code of a round that already exists.'); return; }
+        const restore = setPending(pressedEl, 'Adding…');
+        db.ref('events/' + code).once('value').then(function (snap) {
+            if (!snap || !snap.exists || !snap.exists()) {
+                restore();
+                alert('No round with the code ' + code + '. Nothing was added.');
+                return;
+            }
+            const data = snap.val() || {};
+            const label = data.courseName || data.eventName || code;
+            const existing = seasonData.rounds && seasonData.rounds[code];
+            const patch = seasonAttachPatch(code, label, Date.now(), existing && existing.addedAt);
+            if (!patch) { restore(); return; }
+            return db.ref('seasons/' + currentSeasonCode).update(patch).then(function () {
+                restore();
+                document.getElementById('season-attach-code').value = '';
+            });
+        }).catch(function (err) {
+            restore();
+            alert(seasonAttachError(err, false));
+        });
+    }
+
+    function startNextRound() {
+        if (!seasonIsOwner || !currentSeasonCode) return;
+        const from = document.getElementById('season-next-btn').getAttribute('data-copy-from');
+        if (!from) return;
+        window.location.href = 'admin.html?season=' + encodeURIComponent(currentSeasonCode)
+            + '&copyFrom=' + encodeURIComponent(from);
+    }
+
+    paintSeasonList();
+    if (currentSeasonCode) {
+        showLedgerShell();
+        document.getElementById('season-ledger').innerHTML = '<p class="season-empty">Loading the ledger…</p>';
+        if (window.authReady && typeof window.authReady.then === 'function') {
+            window.authReady.then(function () { syncSeasonOwner(); }, function () {});
+        }
+        db.ref('seasons/' + currentSeasonCode).on('value', function (snap) {
+            const val = snap && typeof snap.val === 'function' ? snap.val() : null;
+            if (!val) {
+                document.getElementById('season-title').textContent = 'Season not found';
+                document.getElementById('season-ledger').innerHTML = '<p class="season-empty">No season with the code ' + seasonEscape(currentSeasonCode) + '.</p>';
+                document.getElementById('season-tools').style.display = 'none';
+                return;
+            }
+            paintLoadedSeason(val);
+        });
+    }
+</script>
+</body>
+</html>

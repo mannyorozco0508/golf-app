@@ -1967,7 +1967,26 @@
 // No engine and no protected file changed. The consumer product cache is
 // consumer-v62-gross-means-gross. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v221-gross-means-gross';
+// Moved to v222 because the SEASON LEDGER landed: seasons/<code> totals finalized
+// Results money, skins and KP across every round one crew plays. season.html and
+// season.js are new and precached, admin.html links a saved round back to the
+// season, and Game Day opens the ledger. A device on v221 has each round's Results
+// and no running total.
+//
+// The season branch was cut from v217 and asked for 'golfapp-v218-season', which
+// v218 had already taken; landing it on this key would have handed every installed
+// device a cache name it already holds and no update. Its own note said
+// "consumer-v60-season" for the same reason - also taken, by v218. Both moved to
+// the next free pair.
+//
+// NO MONEY ENGINE CHANGED, and nothing v218 through v221a shipped was reverted to
+// make room: match-engine.js is still the ONE calculateMatchEngine and the season
+// pages never declare one. database.rules.json gains the seasons rows IN-REPO
+// ONLY - not published - so live season writes may refuse until they are, which is
+// expected. The consumer product cache is consumer-v63-season-ledger. The
+// tournament product cache stays tournament-v54-rattle-golf. The iOS binary in
+// review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v222-season-ledger';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1995,6 +2014,8 @@ const SHELL_FILES = [
     './settlement.html',
     './sidematches.html',
     './trip.html',
+    // season.html (v222): the running ledger. admin.html links here from Game Day.
+    './season.html',
     // Tournament Mode. Linked from admin.html and trip.html, and shipped to the
     // mobile bundle - but omitted here until v6, which is why a first-time offline
     // launch showed the "No connection" page.
@@ -2043,6 +2064,10 @@ const SHELL_FILES = [
     // break loudly, it settles rounds with no match money and no error. Precached
     // for exactly that reason.
     './match-engine.js',
+    // season.js (v222): the season record and the ledger. season.html and
+    // admin.html load it. A cached shell without it can open a round and
+    // cannot total one.
+    './season.js',
     './money-engine.js',
     './settlement-engine.js',
     // ryder-cup.js is loaded unguarded by index.html, so a cached shell without it

@@ -731,7 +731,14 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // A frozen-hash guard that nobody re-pins reports a change it cannot
         // explain, which is how this sat red from v217 to v219.
         // STILL NOT PUBLISHED to the live database. Nothing here publishes it.
-        'database.rules.json': '53fb40756a04be1b966f2b72c5448423dcce255ec95f606fae9600c0a409ada5',
+
+        // AND RE-PINNED AGAIN 2026-09-24 for v222 (was 53fb4075): the season
+        // ledger adds the seasons/<seasonCode> root - world-readable, written only
+        // by the owner uid that created it, with name/ownerUid/createdAt/updatedAt
+        // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
+        // still NOT published, so live season writes may refuse until it is, which
+        // is expected and is not a defect to chase.
+        'database.rules.json': 'a78a42c68837167f41fac2a6a0d2e08fd6b18e47613a3c18b41a845cff565ac4',
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,

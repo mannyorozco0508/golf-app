@@ -420,7 +420,14 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         // assertion had been red since v217. format_first_wizard_test.js carries the
         // full hash and the description of both changes.
         // The ruleset is STILL UNPUBLISHED; re-pinning a hash does not deploy it.
-        assert.equal(sha('database.rules.json'), '53fb4075');
+
+        // AND RE-PINNED AGAIN 2026-09-24 for v222 (was 53fb4075): the season
+        // ledger adds the seasons/<seasonCode> root - world-readable, written only
+        // by the owner uid that created it, with name/ownerUid/createdAt/updatedAt
+        // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
+        // still NOT published, so live season writes may refuse until it is, which
+        // is expected and is not a defect to chase.
+        assert.equal(sha('database.rules.json'), 'a78a42c6');
     });
 });
 

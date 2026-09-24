@@ -174,7 +174,9 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         const reads = [...ADMIN.matchAll(/urlParams\.get\('([A-Za-z]+)'\)/g)].map(m => m[1]);
         // 'organizer' since v189: organizerDoor reads ?organizer= (the link copied from
         // the scorecard's Group Links panel) to let a second device into the wizard.
-        assert.deepEqual([...new Set(reads)].sort(), ['copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'trip']);
+        // 'season' since v218: a round started from a season carries ?season= so Save
+        // can attach the new event code. It is read here and nowhere else on this page.
+        assert.deepEqual([...new Set(reads)].sort(), ['copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

@@ -114,19 +114,23 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
     // never survived the lobby). RE-PINNED 2026-09-23: the email-link card sits
     // on this same lobby, so two more inputs (the address, and the pasted link)
     // belong here too. Four, and no others.
-    test('below the tiles there is Resume, the email-link card, and exactly two compact code inputs', () => {
+    // RE-PINNED v218: the season code is a fifth input, the same compact row
+    // shape as the game code and the previous-round code. It opens a ledger,
+    // it does not start a round. Five, and no others.
+    test('below the tiles there is Resume, the email-link card, and exactly three compact code inputs', () => {
         // COMMENTS STRIPPED. The note explaining what stayed removed names
         // copyFrom=OLD, and an earlier version of this assertion matched that
         // sentence rather than any control - grading prose as though it were markup.
         const l = lobby().replace(/<!--[\s\S]*?-->/g, '');
         const afterWidgets = l.slice(l.indexOf('home-widgets'));
         const inputs = afterWidgets.match(/<input/g) || [];
-        assert.equal(inputs.length, 4,
+        assert.equal(inputs.length, 5,
             'the home screen asks for ' + inputs.length + ' things to be typed');
         assert.match(afterWidgets, /id="email-link-input"/, 'the sign-in email');
         assert.match(afterWidgets, /id="email-link-paste"/, 'the pasted sign-in link');
         assert.match(afterWidgets, /id="join-code-input"/, 'the game code');
-        assert.match(afterWidgets, /id="copy-code-input"/, 'and the previous round to start from');
+        assert.match(afterWidgets, /id="copy-code-input"/, 'the previous round to start from');
+        assert.match(afterWidgets, /id="season-open-input"/, 'and the season code that opens a ledger');
         assert.ok(!/lobby-divider/.test(afterWidgets),
             'a divider survives with nothing to divide');
     });
