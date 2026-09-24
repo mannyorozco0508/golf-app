@@ -8369,10 +8369,26 @@ html {
             if (spectatorBanner) spectatorBanner.style.display = "none";
         }
         
+        // THE MATCH BRANCH TAKES THE CANONICAL FORMAT LIST, not a shorter one.
+        // This named only match and bestball, so `ryder` and `scramble` - both match
+        // play - fell through to the "net" default and a GROSS round was scored with
+        // handicaps. That is not a label: this scoringType is passed into
+        // calculateMatchEngine below, so the money on screen was computed wrong.
+        // A gross Ryder round where every hole was halved read "FINAL: Ann 10&8"
+        // while money-engine.js paid nobody.
+        //
+        // NOT A BARE TERNARY, on purpose. money-engine.js:768 can use one because
+        // line 759 gates on this same list first and returns null otherwise. Here
+        // scoringType also serves stableford and plain stroke rounds, and a round can
+        // legitimately carry a leftover matchScoring from a format the organizer
+        // looked at and moved away from (v216's control C15). So the gate stays and
+        // only the list is corrected. The list is the one money-engine.js:759,
+        // settlement-engine.js:798, aloha-bet.js:57 and bet-strip.js:70 all use, and
+        // round_scoring_parity_test.js holds every copy of it to the same set.
         let scoringType = "net";
         if (gameFormat === 'nassau') scoringType = currentData.nassauScoring || "net";
-        if (gameFormat === 'match' || gameFormat === 'bestball') scoringType = currentData.matchScoring || "net";
-        if (gameFormat === 'stableford') scoringType = currentData.stablefordScoring || "net";
+        else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat)) scoringType = currentData.matchScoring || "net";
+        else if (gameFormat === 'stableford') scoringType = currentData.stablefordScoring || "net";
         window.__scScoringType = scoringType;
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";

@@ -265,10 +265,15 @@ html {
     function formatSentence(data) {
         const format = data.gameFormat || 'stroke';
         const label = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+        // The same correction as index.html:8372 and for the same reason - `ryder`
+        // and `scramble` are match play and were missing, so this sentence told a
+        // golfer a GROSS Ryder round counted handicap strokes. The gate stays because
+        // this also serves stableford and stroke; only the list is corrected, to the
+        // canonical one round_scoring_parity_test.js pins.
         let scoring = 'net';
         if (format === 'nassau') scoring = data.nassauScoring || 'net';
-        if (format === 'match' || format === 'bestball') scoring = data.matchScoring || 'net';
-        if (format === 'stableford') scoring = data.stablefordScoring || 'net';
+        else if (['match', 'bestball', 'scramble', 'ryder'].includes(format)) scoring = data.matchScoring || 'net';
+        else if (format === 'stableford') scoring = data.stablefordScoring || 'net';
         const how = scoring === 'gross' ? 'gross — no handicap strokes' : 'net — handicap strokes count';
         let stake = '';
         if (format === 'nassau') {

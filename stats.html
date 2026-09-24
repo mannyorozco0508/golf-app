@@ -952,7 +952,20 @@ html {
             `;
         }
 
-        let scoringType = data.nassauScoring || data.matchScoring || "net";
+        // THE WRONG SOURCE, not the wrong default. This read
+        // `nassauScoring || matchScoring || "net"`, so whichever field happened to
+        // carry a value won regardless of the format: a ryder round set to NET that
+        // still held a stale nassauScoring of 'gross' from an earlier look at Nassau
+        // was settled GROSS, and this card said "All Square ($0)" where the round was
+        // Ann +$20. Fixing the ORDER would only move which format got it wrong.
+        //
+        // The plain ternary is correct here - unlike index.html and game.html - because
+        // the format gate is already nine lines above: a non-match format has returned
+        // by now, so "everything that is not nassau" really is a match format. Same
+        // shape as money-engine.js:768 and settlement-engine.js:811.
+        let scoringType = gameFormat === 'nassau'
+            ? (data.nassauScoring || "net")
+            : (data.matchScoring || "net");
         let pressRule = gameFormat === 'nassau' ? (data.nassauPressRule || "none") : (data.matchPressRule || "none");
         let nassauStake = data.nassauStake || 10;
         let matchStake = data.matchStake || 0;

@@ -1952,7 +1952,22 @@
 // wrong. The consumer product cache is consumer-v61-board-gross-match. The
 // tournament product cache stays tournament-v54-rattle-golf. The iOS binary in
 // review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v220-board-gross-match';
+// Moved to v221 because three more surfaces were scoring GROSS Ryder Cup and
+// Scramble rounds as NET. v220 fixed the Board; these are the rest of the same
+// defect, and index.html's was the one that mattered most: its scoringType is
+// passed into calculateMatchEngine, so the number on the scorecard was COMPUTED
+// with handicaps, not merely labelled wrong. On a $20 gross Ryder round where
+// every hole was halved the ticker read "FINAL: Ann 10&8" while money-engine.js
+// paid nobody - the scorecard told a golfer they had won a match the Receipt
+// settles at zero. game.html's "how it is scored" sentence said the same thing in
+// words. stats.html had a different bug in the family: it read
+// `nassauScoring || matchScoring || "net"`, the wrong SOURCE rather than the wrong
+// default, so a ryder round holding a stale nassauScoring was settled gross.
+// An installed device on v220 keeps all three. The money was never wrong.
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v62-gross-means-gross. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v221-gross-means-gross';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
