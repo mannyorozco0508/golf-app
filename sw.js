@@ -1873,7 +1873,26 @@
 // itself always worked. No engine changed. The consumer product cache is
 // consumer-v56-link-note. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v214-link-note';
+// Moved to v215 because of the ALOHA BET: double or nothing on a match's last
+// hole, offered by the side that is DOWN money and accepted by the side that is
+// up. OFF by default per round ("Allow the Aloha bet on 18" on the wizard's
+// Extras card), matches only - Match Play, Nassau and side matches, never the
+// Weekly Game, skins, KP or the net finish. One per match, ever; only before a
+// score lands on that hole; never by the leader; an all-square match says there
+// is nothing to square. The amount is frozen when it is offered. Settled as one
+// winner-takes-the-stake wager on that hole: the losing side wins it and the day
+// is squared, the leading side wins it and the deficit doubles, a halved hole
+// pays nobody. NEW aloha-bet.js carries every rule and is precached; every page
+// that settles loads it BEFORE settlement-engine.js, because the engine's call is
+// guarded and a page without it would quietly settle the round with no Aloha.
+// admin.html, sidematches.html, index.html, leaderboard.html, settlement.html,
+// game.html, skins.html, stats.html and trip.html all gained the tag, so a device
+// on v214 would show and settle two different totals. money-engine.js is
+// byte-identical; settlement-engine.js changed in exactly three approved places
+// and carries no Aloha arithmetic. The consumer product cache is
+// consumer-v57-aloha. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v215-aloha';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1922,6 +1941,7 @@ const SHELL_FILES = [
     // wrong number - it fails to render at all, which is the correct failure.
     './handicap.js',
     './handicap-labels.js',
+    './aloha-bet.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.

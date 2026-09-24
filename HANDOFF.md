@@ -2805,6 +2805,28 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
 
+- **OPEN 2026-09-23 — `calculateMatchEngine` exists in THREE copies, with drifting
+  return shapes.** Found during the v215 recon, logged rather than fixed: it needs
+  its own wave.
+  - `money-engine.js:353` is the one every shared consumer calls.
+  - `index.html:7625` and `stats.html:821` each define their own full copy at the
+    top level of their inline script. An inline script parses after the external
+    one, so **on those two pages the page's copy is the one that runs.**
+  - Measured, normalised (comments and whitespace stripped): the three hash
+    `e92b70df8753` / `5c9525dbe88b` / `cc31ec965a4b`. What differs is not the
+    arithmetic — `escapeHtml(winnerName)` inside `finalResult` on the two pages,
+    `pressesByHole` added to index.html's return, `t1Players`/`t2Players` dropped
+    from stats.html's.
+  - The blocks that matter for money ARE byte-identical in all three:
+    `t1TotalMoney` accumulation `a00414309c7a`, the `holeWinner` assignment
+    `31ee91750fd4`, the `holeLog` entry `2e937f5e21cb`. That is why v215's Aloha
+    could safely read those two values from whichever copy runs.
+  - **Why it is still a risk.** The return SHAPES have already drifted, silently,
+    and nothing holds the three together. The next change to the engine has to be
+    made three times or it is only made on some pages. A wave that deletes the two
+    page copies needs to check what each page relies on in its own return first
+    (`pressesByHole` has a consumer; the dropped fields may not).
+
 - **CLOSED 2026-09-11 — a misspelled course is no longer cached as a genuine empty.**
 The proxy cached successful searches for 7 days, and a zero-result search *is* a
 success — the API answered, it just answered with nothing. So a golfer typing

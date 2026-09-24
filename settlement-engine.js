@@ -812,6 +812,22 @@
             stake: stake,
             pressRule: fmt === 'nassau' ? (data.nassauPressRule || 'none') : (data.matchPressRule || 'none'),
             presses: data.matchPresses || {},
+            // v215: NO ALOHA ON THE MAIN GAME, and the reason is worth the space.
+            //
+            // The approved plan carried the main game's Aloha here, on the belief
+            // that legacyMainAsSideMatch is the shared path for both the Receipt AND
+            // the ledger. It is not: it feeds buildSideMatchReceipts only. The main
+            // game's money is booked by getRoundGames/computeGameNetByPlayerId a few
+            // hundred lines below, which this shape never reaches.
+            //
+            // MEASURED, on a $20 main-game match with an accepted Aloha: the Receipt
+            // net moved 20 -> 40 and the golfer's ledger net stayed at 10. That is
+            // precisely the Receipt-disagrees-with-the-ledger defect this feature
+            // exists to avoid, so the main game is NOT in this wave rather than in it
+            // and wrong. A record at matchPresses/aloha is deliberately ignored, and
+            // aloha_bet_test.js holds that it pays nothing in either place.
+            // Doing the main game needs a fourth edit, in the ledger, and its own
+            // approval.
             teamAIds: teamA,
             teamBIds: teamB,
             startHole: 1,
@@ -1004,7 +1020,28 @@
                         toSideA: m.status > 0
                     });
                 });
-                receipt.net = calc.t1TotalMoney;
+                // v215, EDIT 2 OF 3 (approved): THE ALOHA LINE. One call, no golf
+                // math here - aloha-bet.js decides whether anything settles and
+                // for how much, from this same calc's holeLog and t1Name/t2Name.
+                // Absent the file, or with nothing accepted, this is a no-op and
+                // the receipt is byte-for-byte what it was.
+                const aloha = (typeof alohaSettledForMatch === 'function')
+                    ? alohaSettledForMatch(data, sm, calc, smCourse) : null;
+                if (aloha) {
+                    receipt.segments.push({
+                        label: aloha.label,
+                        startHole: aloha.hole,
+                        endHole: aloha.hole,
+                        stake: aloha.amount,
+                        result: aloha.result,
+                        winner: aloha.winnerName,
+                        // A halved last hole pays nobody, exactly as a halved
+                        // press does two blocks up.
+                        money: Math.abs(aloha.toSideA),
+                        toSideA: aloha.toSideA > 0
+                    });
+                }
+                receipt.net = calc.t1TotalMoney + (aloha ? aloha.toSideA : 0);
             }
 
             receipt.netTo = receipt.net > 0 ? nameA : (receipt.net < 0 ? nameB : null);
@@ -1288,6 +1325,28 @@
                     + (nPress2 > 0 ? ` (+${nPress2} press${nPress2 === 1 ? '' : 'es'})` : '');
                 teamAPlayers.forEach(p => addAmount(p, t1Share, smLabel2));
                 teamBPlayers.forEach(p => addAmount(p, t2Share, smLabel2));
+                // v215, EDIT 3 OF 3 (approved): THE ALOHA'S OWN LEDGER LINE.
+                // Its own line rather than folded into the share above, for two
+                // reasons: a golfer arguing about the number needs to see "Aloha"
+                // named, and folding it would make the side-match line disagree
+                // with the same wager's Receipt segment, which prints the match
+                // and the Aloha separately. addAmount ignores a zero, so a halved
+                // last hole adds no line - the same way it adds none for a halved
+                // press. The SAME call the Receipt made, so the two cannot differ.
+                const alohaLed = (typeof alohaSettledForMatch === 'function')
+                    ? alohaSettledForMatch(data, sm, calc, smCourse) : null;
+                if (alohaLed && alohaLed.toSideA !== 0) {
+                    // PREFIXED "Side Match ·" ON PURPOSE. trip.html's
+                    // TRIP_TOTAL_INCLUDES is the sentence that tells a golfer what a
+                    // trip total contains, and trip_money_truth_test.js holds every
+                    // ledger label against it: a label starting "Side Match" is
+                    // covered by the category "side matches and presses", which is
+                    // exactly what an Aloha is. Without the prefix this money would
+                    // reach a trip total under a name the footer never mentions.
+                    const aLabel = `Side Match · ${alohaLed.label} · ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')}`;
+                    teamAPlayers.forEach(p => addAmount(p, alohaLed.toSideA / teamAPlayers.length, aLabel));
+                    teamBPlayers.forEach(p => addAmount(p, -alohaLed.toSideA / teamBPlayers.length, aLabel));
+                }
             }
         });
 

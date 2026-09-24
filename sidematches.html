@@ -32,6 +32,11 @@
     <script src="handicap.js"></script>
     <script src="text-safe.js"></script>
     <script src="action-model.js"></script>
+    <!-- v215: the Aloha bet. Its rules and its two sentences live here; this page
+         draws the row and writes the record, and settlement-engine.js calls the
+         same file - so the offer a golfer sees and the money that settles cannot
+         come from two different readings. -->
+    <script src="aloha-bet.js"></script>
     <!-- THE CANONICAL STROKE ENGINES. This page used to carry its own copies of
          calculateHoleBetEngine / calculateOverallBetEngine, and those copies read
          p1/p2 only - they ignored config.sideA/sideB entirely. So a 2v2 Stroke Play
@@ -2252,6 +2257,155 @@ html {
         return `${(sm.teamAIds || []).map(nm).join(' / ')} vs ${(sm.teamBIds || []).map(nm).join(' / ')}`;
     }
 
+    // ---- THE ALOHA BET (v215) ------------------------------------------------
+    //
+    // "Double or nothing on the last hole", offered by the side that is DOWN and
+    // accepted by the side that is up. Every rule lives in aloha-bet.js; this
+    // draws it and writes it.
+    //
+    // SCOPE, NOT IDENTITY - and the row says so. The app has no per-golfer
+    // identity: it knows the round code and the group links, nothing more. So the
+    // Offer button is attributed to the LOSING side by construction (aloha-bet.js
+    // decides which side that is) and Accept/Decline is gated exactly as a press
+    // is - canPressSideMatch, the viewer's group has a stake. Anyone holding the
+    // round's link could tap Accept, and ALOHA_TRUST_NOTE says that on screen
+    // rather than implying an authorisation that does not exist.
+    function alohaSideNames(sm, side) {
+        const ids = (side === 'A' ? (sm.teamAIds || []) : (sm.teamBIds || [])).map(String);
+        const names = (currentData.players || []).filter(p => ids.indexOf(String(p.id)) > -1)
+            .map(p => (typeof getSmartDisplayName === 'function')
+                ? getSmartDisplayName(p, currentData.players || []) : p.name);
+        return names.join(' / ') || (side === 'A' ? 'Side A' : 'Side B');
+    }
+    function alohaMoney(n) {
+        const v = Math.abs(Number(n) || 0);
+        return '$' + (v % 1 === 0 ? String(v) : v.toFixed(2));
+    }
+    function alohaRowHtml(matchId, sm, calc, smCourse) {
+        if (typeof alohaOffer !== 'function') return '';
+        const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm) : (sm.aloha || null);
+        const trust = (typeof ALOHA_TRUST_NOTE === 'string') ? ALOHA_TRUST_NOTE : '';
+        const one = (typeof ALOHA_EXPLAINER === 'string') ? ALOHA_EXPLAINER : '';
+
+        // ALREADY STRUCK, in any state. One per match, ever - so this is the end
+        // of it either way, and the row says which.
+        if (rec) {
+            const who = alohaSideNames(sm, rec.offeredBySide);
+            const other = alohaSideNames(sm, rec.offeredBySide === 'A' ? 'B' : 'A');
+            const amt = alohaMoney(rec.amount);
+            if (String(rec.status) === 'accepted') {
+                return `<div class="side-match-row" style="flex-wrap:wrap; gap:6px;">`
+                    + `<span style="font-size:0.8rem;">\uD83C\uDF34 <strong>Aloha ON</strong> \u00B7 ${escapeHtml(amt)}`
+                    + `${String(rec.mode) === 'half' ? ' (half)' : ''} on hole ${Number(rec.hole)} \u00B7 `
+                    + `${escapeHtml(who)} offered, ${escapeHtml(other)} accepted</span></div>`;
+            }
+            if (String(rec.status) === 'declined') {
+                return `<div class="side-match-row"><span style="font-size:0.8rem; color:var(--text-muted);">`
+                    + `\uD83C\uDF34 Aloha declined \u2014 the match settles normally.</span></div>`;
+            }
+            // OFFERED and waiting. Only the other side should answer; the app can
+            // only check scope, which is what the note says.
+            let h = `<div class="side-match-row" style="flex-wrap:wrap; gap:6px;">`
+                + `<span style="font-size:0.8rem;">\uD83C\uDF34 <strong>${escapeHtml(who)} offers ${escapeHtml(amt)}`
+                + `${String(rec.mode) === 'half' ? ' (half)' : ''}</strong> on hole ${Number(rec.hole)} \u2014 `
+                + `${escapeHtml(other)} must accept.</span>`;
+            if (canPressSideMatch(sm)) {
+                h += `<button class="btn-primary-sm" onclick="respondAloha('${matchId}', 'accepted')">\u2705 Accept</button>`
+                    + `<button class="btn-outline-sm" onclick="respondAloha('${matchId}', 'declined')">\u2716 Decline</button>`;
+            }
+            h += `<div style="font-size:0.68rem; color:var(--text-muted); flex-basis:100%;">${escapeHtml(trust)}</div></div>`;
+            return h;
+        }
+
+        const o = alohaOffer({
+            data: currentData, match: sm, matchHoles: smCourse,
+            participantIds: sideMatchParticipantIds(sm),
+            scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
+        });
+        // OFF, or not a match format: say nothing at all. A group that has not
+        // agreed to this bet is not shown it.
+        if (o.reason === ALOHA_REASONS.off || o.reason === ALOHA_REASONS.format) return '';
+        if (!o.allowed) {
+            // WHY IT IS NOT AVAILABLE, in words - an all-square match especially,
+            // because "there is nothing to square" is the answer to a question
+            // the golfers will otherwise ask.
+            const why = o.reason === ALOHA_REASONS.square
+                ? 'All square \u2014 nothing to square up, so no Aloha.'
+                : (o.reason === ALOHA_REASONS.scored
+                    ? `Hole ${Number(o.lastHole)} is already scored \u2014 too late for an Aloha.`
+                    : 'No Aloha available on this match.');
+            return `<div class="side-match-row"><span style="font-size:0.78rem; color:var(--text-muted);">\uD83C\uDF34 ${escapeHtml(why)}</span></div>`;
+        }
+        if (!canPressSideMatch(sm)) return '';
+        const down = alohaSideNames(sm, o.offeringSide);
+        const up = alohaSideNames(sm, o.leadingSide);
+        return `<div class="side-match-row" style="flex-wrap:wrap; gap:6px;">`
+            + `<span style="font-size:0.8rem;">\uD83C\uDF34 <strong>Aloha on hole ${Number(o.lastHole)}</strong> \u00B7 `
+            + `${escapeHtml(down)} ${escapeHtml(alohaMoney(o.deficit))} down</span>`
+            + `<button class="btn-primary-sm" onclick="offerAloha('${matchId}', 'double')">Offer ${escapeHtml(alohaMoney(o.amounts.double))}</button>`
+            + `<button class="btn-outline-sm" onclick="offerAloha('${matchId}', 'half')">Offer ${escapeHtml(alohaMoney(o.amounts.half))} (half)</button>`
+            + `<div style="font-size:0.68rem; color:var(--text-muted); flex-basis:100%;">${escapeHtml(one)} ${escapeHtml(trust)}</div>`
+            + `</div>`;
+    }
+    // THE OFFER. aloha-bet.js builds the record, including the frozen amount, and
+    // refuses to build one the rules do not allow - so a stale screen cannot write
+    // an offer that is no longer legal.
+    function offerAloha(matchId, mode) {
+        const sm = sideMatchById(matchId);
+        if (!canPressSideMatch(sm)) return refuseGroupWrite('offer the Aloha on that match');
+        const calc = alohaCalcFor(sm);
+        if (!calc) { alert('\u26A0\uFE0F NOT OFFERED\nThat match could not be read \u2014 try again.'); return; }
+        const rec = alohaOfferRecord({
+            data: currentData, match: sm, matchHoles: alohaCourseFor(sm),
+            participantIds: sideMatchParticipantIds(sm),
+            scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
+        }, alohaOffer({
+            data: currentData, match: sm, matchHoles: alohaCourseFor(sm),
+            participantIds: sideMatchParticipantIds(sm),
+            scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
+        }).offeringSide, mode, Date.now());
+        if (!rec) { alert('\u26A0\uFE0F NOT OFFERED\nThe Aloha is not available on that match any more.'); return; }
+        if (!requireOnlineForMoney('ALOHA NOT OFFERED', 'Reconnect before offering the Aloha.')) return;
+        db.ref(`events/${currentMode}/sideMatches/${matchId}/aloha`).set(rec)
+            .then(() => alert(`\uD83C\uDF34 ALOHA OFFERED\n${alohaMoney(rec.amount)}${rec.mode === 'half' ? ' (half)' : ''} on hole ${rec.hole}\nThe other side has to accept.`))
+            .catch(err => alert(`\u26A0\uFE0F ALOHA NOT OFFERED\n${err.message}\nNothing was created \u2014 try again.`));
+    }
+    // THE ANSWER. Only an offered Aloha can be answered, and the write says which
+    // way - there is no timer, because an unanswered offer settles as no bet.
+    function respondAloha(matchId, answer) {
+        const sm = sideMatchById(matchId);
+        if (!canPressSideMatch(sm)) return refuseGroupWrite('answer the Aloha on that match');
+        const rec = sm && sm.aloha;
+        if (!rec || String(rec.status) !== 'offered') { alert('\u26A0\uFE0F That Aloha has already been answered.'); return; }
+        const status = answer === 'accepted' ? 'accepted' : 'declined';
+        if (!requireOnlineForMoney('ALOHA NOT SAVED', 'Reconnect before answering the Aloha.')) return;
+        db.ref(`events/${currentMode}/sideMatches/${matchId}/aloha`)
+            .update({ status: status, respondedAt: Date.now() })
+            .then(() => alert(status === 'accepted'
+                ? `\uD83C\uDF34 ALOHA ON\n${alohaMoney(rec.amount)} on hole ${rec.hole}.`
+                : '\u2716 ALOHA DECLINED\nThe match settles normally.'))
+            .catch(err => alert(`\u26A0\uFE0F ALOHA NOT SAVED\n${err.message}\nNothing changed \u2014 try again.`));
+    }
+    // The match's own engine result and its own holes, the same two the card
+    // above builds - so an offer written from a button uses the number the button
+    // was showing.
+    function alohaCourseFor(sm) {
+        return (typeof sideMatchHoles === 'function')
+            ? sideMatchHoles(sm, currentData.courseData || [])
+            : (currentData.courseData || []);
+    }
+    function alohaCalcFor(sm) {
+        const ps = sideMatchParticipants(sm, currentData.players || []);
+        const idsA = (sm.teamAIds || []).map(String);
+        const virtual = ps.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
+        const presses = sm.presses ? Object.values(sm.presses) : [];
+        try {
+            return calculateMatchEngine(virtual, alohaCourseFor(sm), currentData.scores || {},
+                sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses,
+                (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
+        } catch (e) { return null; }
+    }
+
     function pressSideMatch(matchId, baseId, nextHole) {
         const sm = sideMatchById(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('press that match');
@@ -3338,6 +3492,10 @@ html {
                         const openBase = calc.activeMatches.find(m => !m.closed && m.pressNum === 0) || calc.activeMatches.find(m => !m.closed);
                         if (openBase && canPressSideMatch(sm)) html += `<button class="btn-outline-sm" onclick="pressSideMatch('${matchId}', '${openBase.baseId}', ${nextPressHole})">➕ Press</button>`;
                     }
+                    // THE ALOHA BET (v215). Reads the same calc the press rule
+                    // above reads, so "who is down, and by how much" is the
+                    // engine's own number and not a second opinion.
+                    html += alohaRowHtml(matchId, sm, calc, smCourse);
                 }
             }
             html += `</div>`;

@@ -32,6 +32,12 @@
     <!-- The skins ledger below consumes computeSkinsPayoutLinesByFlight() and
          computeSkinsHoleLedger() from settlement-engine.js; this page used to
          carry its own copy of the resolvers and the pot arithmetic. -->
+    <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
+         calls into them. Every page that settles loads this: the call is guarded by
+         typeof, so a page missing it would quietly settle the round WITHOUT the
+         Aloha - two pages showing two different totals, which is the one failure
+         this feature must not have. -->
+    <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <!-- THE BETS TAB WATCHES A GROUP'S OWN ACTION. Three more shared files since the
          Bets/Matches split, none of them edited for it:

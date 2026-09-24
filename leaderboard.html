@@ -41,6 +41,12 @@
          after money-engine.js / action-model.js, whose globals they read. -->
     <script src="score-marks.js"></script>
     <script src="scorecard-rows.js"></script>
+    <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
+         calls into them. Every page that settles loads this: the call is guarded by
+         typeof, so a page missing it would quietly settle the round WITHOUT the
+         Aloha - two pages showing two different totals, which is the one failure
+         this feature must not have. -->
+    <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="live-skins.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is

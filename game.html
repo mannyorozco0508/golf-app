@@ -35,6 +35,12 @@
     <script src="text-safe.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
+    <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
+         calls into them. Every page that settles loads this: the call is guarded by
+         typeof, so a page missing it would quietly settle the round WITHOUT the
+         Aloha - two pages showing two different totals, which is the one failure
+         this feature must not have. -->
+    <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
     <script src="grouping.js"></script>

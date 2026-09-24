@@ -40,6 +40,12 @@
          defect. Depends on getStrokes / parseHcp, which this page still defines inline and
          parity_test.js pins to money-engine.js. money-engine.js is deliberately NOT loaded:
          Wolf, Stableford, point settlement and calculateMatchEngine stay local to Stats. -->
+    <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
+         calls into them. Every page that settles loads this: the call is guarded by
+         typeof, so a page missing it would quietly settle the round WITHOUT the
+         Aloha - two pages showing two different totals, which is the one failure
+         this feature must not have. -->
+    <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <!-- Grouping (v140): playerGroupMap / canLinkSeeWager, so the Side Matches
          section shows a group link only the matches its golfers are in - the

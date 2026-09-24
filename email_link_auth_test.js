@@ -364,7 +364,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v214-link-note';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v215-aloha';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);

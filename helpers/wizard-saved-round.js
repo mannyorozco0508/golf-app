@@ -34,7 +34,9 @@ const PAYLOAD_KEYS = ['eventName', 'roundDay', 'settlementMode', 'skinsRounding'
     'stablefordScoring', 'stablefordPoints', 'dotPointVal', 'greenieCarryover', 'skinsBuyIn', 'skinsPotFormat', 'skinsCarryOver',
     // handicapBasis since v212, right after teeRating: which reading the round's
     // handicaps were saved under ('ghin-index' by default, 'as-entered' the other).
-    'courseData', 'teeRating', 'handicapBasis', 'players'];
+    // alohaAllowed since v215, written right before handicapBasis: whether this
+    // round allows the Aloha bet on its last hole. Absent reads as OFF.
+    'courseData', 'teeRating', 'alohaAllowed', 'handicapBasis', 'players'];
 
 function wizardSavedRound(opts) {
     const o = opts || {};
@@ -91,6 +93,9 @@ function wizardSavedRound(opts) {
         // handicapBasis since v212: the wizard writes it on every save, and
         // 'ghin-index' is what the control ships on - which is also how a round
         // with no key at all is read, so a fixture without it means the same thing.
+        // v215: off unless a fixture asks for it, which is what the wizard writes
+        // for every round that does not tick the box.
+        alohaAllowed: o.alohaAllowed === undefined ? false : o.alohaAllowed,
         handicapBasis: o.handicapBasis === undefined ? 'ghin-index' : o.handicapBasis,
         players,
         // What the round gains after setup.

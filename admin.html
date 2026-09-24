@@ -33,6 +33,9 @@
          The wizard uses that sentence for its own "as entered" note, so the
          setup screen and the Game tab cannot say two different things. -->
     <script src="handicap-labels.js"></script>
+    <!-- v215: the Aloha bet's rules and its two sentences. The wizard uses the
+         sentences; the Matches tab uses the rules. One definition of both. -->
+    <script src="aloha-bet.js"></script>
     <script src="text-safe.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
@@ -1337,6 +1340,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
                 <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
             </div>
+
+            <!-- THE ALOHA BET (v215). OFF by default, and off means it is never
+                 offered - a group that has not agreed to it must not be shown a
+                 button that doubles somebody's losses. It belongs on the Extras
+                 card because it is a wager, not a scoring rule; it applies to
+                 MATCHES only (Match Play, Nassau, side matches) and never to the
+                 Weekly Game, skins, KP or the net finish.
+                 The sentence under it is the whole rule in one line, and it names
+                 the one thing the app cannot enforce: who is tapping. -->
+            <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-faint); padding-top: 10px;">
+                <input type="checkbox" id="enable-aloha" style="width: 18px; height: 18px; margin: 0;">
+                <strong>🌴 Allow the Aloha bet on 18</strong>
+            </label>
+            <p id="aloha-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 12px 26px;"></p>
 
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-mid); padding-top: 12px;">
         </div>
@@ -4954,6 +4971,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             + ', allowance ' + status.allowance + '%. Nets use Playing Handicap.';
     }
 
+    // v215: the Aloha's one line, from aloha-bet.js's own constants so the setup
+    // screen and the Matches tab cannot say two different things about the same
+    // bet. The trust note is part of it: the app cannot tell who is tapping.
+    function refreshAlohaBlurb() {
+        const el = document.getElementById('aloha-blurb');
+        if (!el) return;
+        const one = (typeof ALOHA_EXPLAINER === 'string') ? ALOHA_EXPLAINER : '';
+        const trust = (typeof ALOHA_TRUST_NOTE === 'string') ? ALOHA_TRUST_NOTE : '';
+        el.textContent = one + (trust ? ' ' + trust : '');
+    }
+
     function refreshHandicapNote() {
         const tee = readTeeRatingFromDom();
         const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : { complete: false, message: '' };
@@ -6483,6 +6511,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // its numbers, not part of its identity.
             const basisSel = document.getElementById('handicap-basis-select');
             if (basisSel) basisSel.value = (data.handicapBasis === 'as-entered') ? 'as-entered' : 'ghin-index';
+            // v215: and whether this round allows the Aloha. Read back for the same
+            // reason the basis is: a setting written and never restored would be
+            // silently turned OFF by the next save of a round that had it on.
+            const alohaBox = document.getElementById('enable-aloha');
+            if (alohaBox) alohaBox.checked = data.alohaAllowed === true;
+            if (typeof refreshAlohaBlurb === 'function') refreshAlohaBlurb();
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
             loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
@@ -7433,6 +7467,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
                 teeRating: teeForSave,
+                // v215: does this round allow the Aloha bet on the last hole?
+                // FALSE unless the box is ticked, and absent on every round saved
+                // before this existed - which aloha-bet.js reads as off, so no
+                // historical round can suddenly offer one.
+                alohaAllowed: !!(document.getElementById('enable-aloha') && document.getElementById('enable-aloha').checked),
                 // v212: which reading the round's handicaps were saved under.
                 // Every surface that names an Index reads this, and absent it
                 // means GHIN - the reading every round already had.

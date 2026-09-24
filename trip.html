@@ -44,6 +44,12 @@
     <script src="product-links.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
+    <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
+         calls into them. Every page that settles loads this: the call is guarded by
+         typeof, so a page missing it would quietly settle the round WITHOUT the
+         Aloha - two pages showing two different totals, which is the one failure
+         this feature must not have. -->
+    <script src="aloha-bet.js"></script>
 <script src="settlement-engine.js"></script>
 <!-- pool-engine.js: trip settlement asks each round whether its money is actually
      settled. Without this the check was unreachable - the typeof guard around it
@@ -1941,6 +1947,15 @@ html {
     // actually emits: every label computeCombinedNetTotals can add to a ledger must
     // be covered by a category named here, so a new money source fails the suite
     // until the copy catches up.
+    // v215, AND THE COMMENT IS ABOVE THE LITERAL ON PURPOSE: trip_money_truth_test.js
+    // pins this list as one contiguous source literal, so a comment inside the
+    // brackets breaks the pin - which is the guard doing its job.
+    // THE ALOHA BET is inside 'side matches and presses'. It is money on a side
+    // match, booked against that match, and its ledger label is prefixed
+    // 'Side Match ·' so the coverage rule in that suite sees it under this category.
+    // A seventh category would rewrite this sentence on six surfaces for no new
+    // truth; if the Aloha should be named in its own words, that is a one-line
+    // change here plus the trip goldens that pin the sentence.
     const TRIP_TOTAL_INCLUDES = [
         'the main game', 'side games', 'side matches and presses',
         'the Birdie Pool', 'KPs', 'the Weekly Game'

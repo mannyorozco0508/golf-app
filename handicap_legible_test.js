@@ -337,7 +337,14 @@ describe('5. THE ROUND-LEVEL SETTING, default GHIN', () => {
     test('the payload carries handicapBasis', () => {
         const at = ADMIN.indexOf('teeRating: teeForSave');
         assert.ok(at > 0, 'the payload still carries teeRating');
-        assert.match(ADMIN.slice(at - 300, at + 300), /handicapBasis:/, 'and now handicapBasis beside it');
+        // A WIDER WINDOW, not a bigger guess: v215 added alohaAllowed between these
+        // two keys and a 300-char window no longer reached handicapBasis. Bounded by
+        // the payload's own next key instead, so it cannot drift again.
+        const end = ADMIN.indexOf('players: playersList', at);
+        assert.ok(end > at, 'the payload still ends with its roster');
+        const tail = ADMIN.slice(at, end);
+        assert.match(tail, /handicapBasis:/, 'handicapBasis is still in the payload');
+        assert.match(tail, /alohaAllowed:/, 'and so is alohaAllowed (v215)');
     });
     test('AS ENTERED does not convert: the typed number becomes the handicap and no Index is stored', () => {
         const at = ADMIN.indexOf('const hcpFields =');

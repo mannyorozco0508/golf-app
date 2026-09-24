@@ -44,7 +44,7 @@ const DEST = path.join(ROOT, 'www', 'app');
 // the global_courses schema behind it are one directory both products read and
 // write. Two answers to any of those is a correctness bug, not a style choice.
 const SHARED_SHELL = [
-    'grouping.js', 'handicap.js', 'handicap-labels.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    'grouping.js', 'handicap.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',

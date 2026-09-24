@@ -127,7 +127,11 @@ describe('THE FOOTER SAYS WHAT IS IN THE TOTAL', () => {
             .filter(Boolean);
         const seen = Array.from(new Set(args)).sort();
         assert.deepEqual(seen,
-            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'label', 'smLabel', 'smLabel2'],
+            // aLabel since v215: the Aloha bet's own ledger line. It is named in
+            // TRIP_TOTAL_INCLUDES ('the Aloha bet'), which is what this test exists
+            // to force - a new money source cannot reach a golfer's total until the
+            // sentence that describes the total says it is in there.
+            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'aLabel', 'label', 'smLabel', 'smLabel2'],
             'settlement-engine gained or renamed a money source; the trip footer '
             + 'must name it too. Found: ' + JSON.stringify(seen));
     });
