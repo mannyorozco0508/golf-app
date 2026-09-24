@@ -41,7 +41,8 @@ const { decodeEscapes } = require('./helpers/decode-escapes.js');
 const read = f => decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 
 const CONSUMER = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
-    'skins.html', 'sidematches.html', 'stats.html', 'game.html', 'trip.html', 'instructions.html'];
+    'skins.html', 'sidematches.html', 'stats.html', 'game.html', 'trip.html', 'instructions.html',
+    'season.html'];
 
 const ADMIN = read('admin.html');
 const IDX = read('index.html');

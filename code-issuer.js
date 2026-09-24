@@ -61,7 +61,7 @@
     // Each code is issued against its OWN node. A round code colliding with a
     // trip code is not a collision at all, and an issuer that checked one
     // shared namespace would tell organizers a free code was taken.
-    var ROOTS = ['events', 'trips', 'tournaments'];
+    var ROOTS = ['events', 'trips', 'tournaments', 'seasons'];
 
     // No I, O, 0 or 1: a code is read aloud on a tee box and typed by someone
     // who did not write it down.
@@ -113,7 +113,7 @@
     }
 
     // db          anything with .ref(path).once('value') -> { exists() }
-    // root        'events' | 'trips' | 'tournaments'
+    // root        'events' | 'trips' | 'tournaments' | 'seasons'
     // generate    injected so a test can force a collision; defaults to the
     //             generator above, which is the only one the app has
     // maxAttempts a BOUND. Exhausting it REJECTS - returning a colliding code
@@ -136,7 +136,7 @@
 
         if (ROOTS.indexOf(root) === -1) {
             return Promise.reject(new Error('unknown root "' + root
-                + '" - a code is issued against events, trips or tournaments and nothing else'));
+                + '" - a code is issued against events, trips, tournaments or seasons and nothing else'));
         }
         if (!db || typeof db.ref !== 'function') {
             return Promise.reject(new Error('issueUniqueCode needs a database to check the '

@@ -125,6 +125,9 @@ const CONSUMER_SHELL = [
     // Confirm or mark out before tee time. index.html, admin.html and trip.html
     // load it. Consumer only: a tournament field is not this headcount.
     'attendance.js',
+    // Running money, skins and KP across rounds. season.html and admin.html
+    // load season.js. Consumer only.
+    'season.html', 'season.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

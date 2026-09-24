@@ -414,10 +414,9 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         assert.equal(sha('pool-engine.js'), '372e76d7');
         assert.equal(sha('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         assert.equal(sha('grouping.js'), '405b9774');
-        // RE-PINNED 2026-09-23. database.rules.json is this wave: owned setup
-        // is the owner's uid, play paths stay open. format_first_wizard_test.js
-        // holds the full hash. Was 2a7a4918.
-        assert.equal(sha('database.rules.json'), '3f2c646b');
+        // RE-PINNED v218. seasons/<code> is the new root (owner write, world
+        // read). format_first_wizard_test.js holds the full hash. Was 3f2c646b.
+        assert.equal(sha('database.rules.json'), 'a78a42c6');
     });
 });
 

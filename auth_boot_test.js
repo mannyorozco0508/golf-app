@@ -32,7 +32,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makePlayers, makeCourseData } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const CONSUMER = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html', 'sidematches.html', 'skins.html', 'stats.html', 'trip.html', 'shared.html'];
+const CONSUMER = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html', 'sidematches.html', 'skins.html', 'stats.html', 'trip.html', 'shared.html', 'season.html'];
 const tick = () => new Promise(r => setTimeout(r, 5));
 const settled = (p, ms) => Promise.race([
     p.then(v => ({ state: 'resolved', value: v }), e => ({ state: 'rejected', error: e })),
@@ -186,13 +186,16 @@ describe('FIRE AND FORGET — the page never waits', () => {
     // before and, on resolve, re-decide ONLY the organizer's setup control;
     // admin.html's organizerDoor awaits the uid before opening the WIZARD on an
     // existing round (the wizard is not the round, and the uid is what says
-    // whose round it is). Every chain carries a rejection handler, so a failed
+    // whose round it is). v218: season.html re-checks the owner when auth
+    // settles, which only shows or hides the attach tools — the ledger listener
+    // has already painted. Every chain carries a rejection handler, so a failed
     // sign-in still reaches nobody. The other pages keep the original rule.
     const ALLOWED_CHAINS = {
         // v195: the same chain also opens the Players sheet when the Game tab's pill arrived with ?players=1 (organizer only)
         'index.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) \{ renderScorecard\(\); maybeOpenPlayersSheetFromLink\(\); \} \}, \(\) => \{\}\)/],
         'game.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderSetupLink\(currentData\); \}, \(\) => \{\}\)/],
-        'admin.html': [/window\.authReady\.then\(\(uid\) => uid, \(\) => null\)/]
+        'admin.html': [/window\.authReady\.then\(\(uid\) => uid, \(\) => null\)/],
+        'season.html': [/window\.authReady\.then\(function \(\) \{ syncSeasonOwner\(\); \}, function \(\) \{\}\)/]
     };
     CONSUMER.forEach(p => test(p + ' never awaits or chains authReady in its own script, beyond the v189 organizer-door chains', () => {
         const inline = read(p).replace(/<script src=[^>]*><\/script>/g, '');

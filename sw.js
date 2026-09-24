@@ -1920,7 +1920,14 @@
 // changed. The consumer product cache is consumer-v59-attendance. The tournament
 // product cache stays tournament-v54-rattle-golf. The iOS binary in review is
 // not resubmitted.
-const CACHE_VERSION = 'golfapp-v217-attendance';
+// Moved to v218 because a Season ledger totals finalized Results money, skins
+// and KP across the rounds one crew plays. seasons/<code> is new. season.html
+// and season.js are new and precached; admin.html links a saved round back to
+// the season and Game Day opens the ledger. A device on v217 has each round's
+// Results and no running total. No money engine changed. The consumer product
+// cache is consumer-v60-season. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v218-season';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1948,6 +1955,8 @@ const SHELL_FILES = [
     './settlement.html',
     './sidematches.html',
     './trip.html',
+    // season.html (v218): the running ledger. admin.html links here from Game Day.
+    './season.html',
     // Tournament Mode. Linked from admin.html and trip.html, and shipped to the
     // mobile bundle - but omitted here until v6, which is why a first-time offline
     // launch showed the "No connection" page.
@@ -1988,6 +1997,10 @@ const SHELL_FILES = [
     // trip load it. A cached shell without it shows the roster and never the
     // headcount.
     './attendance.js',
+    // season.js (v218): the season record and the ledger. season.html and
+    // admin.html load it. A cached shell without it can open a round and
+    // cannot total one.
+    './season.js',
     './money-engine.js',
     './settlement-engine.js',
     // ryder-cup.js is loaded unguarded by index.html, so a cached shell without it

@@ -721,7 +721,14 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // a legacy round with no ownerUid (the previous open rule). Play paths
         // gained a child .write so a code-holder can still score. tournaments
         // was not edited. wave2_rules_test.js holds the rows.
-        'database.rules.json': '3f2c646bd2896a912fc739ea43a5cb3c6b40feee1a9b285f477019530dbdb2e3',
+        // RE-PINNED v218, with the season-ledger request as the per-file approval.
+        // The only new root is seasons/<code>: world read (the code is the grant,
+        // same as events), owner-only write, ownerUid immutable. No event rule,
+        // no money rule, and no tournament rule moved. wave2_rules_test.js holds
+        // the rows, including the controls that a dropped owner check and an
+        // owner-only read are each caught. Previous hash:
+        //   3f2c646bd2896a912fc739ea43a5cb3c6b40feee1a9b285f477019530dbdb2e3
+        'database.rules.json': 'a78a42c68837167f41fac2a6a0d2e08fd6b18e47613a3c18b41a845cff565ac4',
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,
