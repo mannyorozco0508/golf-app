@@ -1998,7 +1998,33 @@
 // Display only: no engine and no money moved. The consumer product cache is
 // consumer-v64-board-team-engine. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v223-board-team-engine';
+// Moved to v226 because the Action page no longer speaks through the browser.
+// alert/confirm/prompt put "golf-app-5a5.pages.dev says" (or the capacitor://
+// origin in the app) above every message, which reads as a website error rather
+// than a scorecard. sidematches.html is the pilot: its 45 calls are now 22 inline
+// refusals, 11 persistent failures, 8 toasts, one decision sheet and two amount
+// sheets - and ONE native prompt, kept on purpose, because it is the clipboard
+// fallback whose whole job is to hand a golfer selectable text after the
+// clipboard API has already failed.
+//
+// THE SPLIT IS THE POINT. A refusal means the action did not happen, so it is
+// inline next to the dead control and it stays. A failed write - "PRESS NOT
+// SAVED, nothing was created" - is persistent and never self-dismisses, because a
+// golfer who misses it believes they have a $20 press that does not exist. Only a
+// success receipt floats, and its dwell scales with its lines.
+//
+// ui-dialogs.js is new and precached. A device on v225 keeps the browser dialogs.
+// No money moved: no engine and no protected file changed, and the press amount
+// that lands is still the number typed - uiAmount returns a number or null and
+// never NaN, which prompt() could not promise.
+//
+// index.html, admin.html and trip.html are NOT converted yet; their remaining
+// native decisions are counted and pinned in dialog_await_guard_test.js so the
+// sweep cannot be forgotten. tournament.html is the other product and is out.
+// The consumer product cache is consumer-v67-ui-dialogs. The tournament product
+// cache stays tournament-v54-rattle-golf. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v226-ui-dialogs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -2064,6 +2090,15 @@ const SHELL_FILES = [
     './score-marks.js',
     './scorecard-rows.js',
     './text-safe.js',
+    // ui-dialogs.js (v226): the telling, asking and typing this app does for
+    // itself. NO APOSTROPHES IN THIS BLOCK - the shell list is read by matching
+    // single-quoted strings, so one apostrophe swallows the rest of the array.
+    // Replaces
+    // alert/confirm/prompt, which render "golf-app-5a5.pages.dev says" over every
+    // message. sidematches.html loads it UNGUARDED - it calls uiRefuse/uiFail/
+    // uiToast on paths a golfer reaches within seconds - so a cached shell without
+    // it does not degrade the page, it breaks it, which is the correct failure.
+    './ui-dialogs.js',
     // attendance.js (v217): Confirm or mark out before tee time. index, admin and
     // trip load it. A cached shell without it shows the roster and never the
     // headcount.

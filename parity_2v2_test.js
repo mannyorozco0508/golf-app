@@ -610,6 +610,12 @@ describe('BUILDING A SIDE MATCH — the picker offers 1v1 and 2v2 to every forma
         const pickState = () => plain(vm.runInContext('sidematchPickOrder', sb));
         const alerts = [];
         sb.alert = (msg) => alerts.push(String(msg));
+        // UI WAVE 1: sidematches.html refuses inline instead of alerting. The
+        // recorder collects both so this suite still reads what the golfer was
+        // told, whichever page it is booting.
+        sb.uiRefuse = (msg) => alerts.push(String(msg));
+        sb.uiFail = (msg) => alerts.push(String(msg));
+        sb.uiToast = (msg) => alerts.push(String(msg));
         return { sb, writes, setField, pickState, alerts };
     }
 

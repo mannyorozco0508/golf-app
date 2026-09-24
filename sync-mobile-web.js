@@ -110,6 +110,12 @@ const CONSUMER_SHELL = [
     // The ball-on-firm lockup and the tab icon. Consumer only.
     'hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
+    // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
+    // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
+    // without it ships a page that breaks on the first refusal. No apostrophes in
+    // this block - build-shell.js reads this list by matching single-quoted
+    // strings, and one apostrophe swallows the rest of the array.
+    'ui-dialogs.js',
     // match-engine.js (v218): calculateMatchEngine, the money every match play
     // format settles to. A Consumer engine, like the ones beside it. Every caller
     // reaches it through a typeof guard, so a bundle shipping without it would
