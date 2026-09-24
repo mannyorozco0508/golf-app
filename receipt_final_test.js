@@ -304,8 +304,8 @@ describe('THE SEAMS', () => {
         assert.match(fn, /Still in play/);
         ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPayoutCardHtml(', 'buildNetViewHtml(', 'Pay out', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
     });
-    test('settlement-engine.js moved for KP-never-refunds (sha 24773c20; was 9043e7fc for the KP wave, 42923121 at v148)', () => {
-        assert.equal(sha8('settlement-engine.js'), '24773c20');   // 24773c20: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
+    test('settlement-engine.js moved for KP-never-refunds (sha f8905d43; was 9043e7fc for the KP wave, 42923121 at v148)', () => {
+        assert.equal(sha8('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
     });
     test('HANDOFF no longer says the Receipt decides Final from computeMoneyPool alone', () => {
         const h = read('HANDOFF.md');

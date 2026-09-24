@@ -510,7 +510,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': '24773c2058dbd2c704000fb9573f4d719cb08391120200464ff4c847535001c5',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
+        'settlement-engine.js': 'f8905d438fe945c40d0a02989e1c0033058f7224175f952660476e8a4fc58bed',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's

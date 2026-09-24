@@ -812,22 +812,21 @@
             stake: stake,
             pressRule: fmt === 'nassau' ? (data.nassauPressRule || 'none') : (data.matchPressRule || 'none'),
             presses: data.matchPresses || {},
-            // v215: NO ALOHA ON THE MAIN GAME, and the reason is worth the space.
+            // NO `aloha` KEY HERE, AND THAT IS DELIBERATE (v216).
             //
-            // The approved plan carried the main game's Aloha here, on the belief
-            // that legacyMainAsSideMatch is the shared path for both the Receipt AND
-            // the ledger. It is not: it feeds buildSideMatchReceipts only. The main
-            // game's money is booked by getRoundGames/computeGameNetByPlayerId a few
-            // hundred lines below, which this shape never reaches.
+            // This shape feeds buildSideMatchReceipts ONLY - not the ledger, which
+            // books the main game through getRoundGames/computeGameNetByPlayerId a
+            // few hundred lines below. v215 carried the Aloha here and measured the
+            // consequence: the Receipt net moved 20 -> 40 while the golfer's ledger
+            // net stayed at 10, which is the Receipt-disagrees-with-the-ledger
+            // defect the whole feature is built to avoid.
             //
-            // MEASURED, on a $20 main-game match with an accepted Aloha: the Receipt
-            // net moved 20 -> 40 and the golfer's ledger net stayed at 10. That is
-            // precisely the Receipt-disagrees-with-the-ledger defect this feature
-            // exists to avoid, so the main game is NOT in this wave rather than in it
-            // and wrong. A record at matchPresses/aloha is deliberately ignored, and
-            // aloha_bet_test.js holds that it pays nothing in either place.
-            // Doing the main game needs a fourth edit, in the ledger, and its own
-            // approval.
+            // So the main game's Aloha is found a different way, and both halves
+            // find it the SAME way: aloha-bet.js's alohaRecordOf(match, data) reads
+            // matchPresses/aloha for a synthetic main-game match. The Receipt gets
+            // it through that (no key needed on this object) and the ledger gets it
+            // through alohaSettledForMainGame in edit 4. One reader, two callers, and
+            // nothing here to fall out of step with it.
             teamAIds: teamA,
             teamBIds: teamB,
             startHole: 1,

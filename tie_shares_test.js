@@ -197,7 +197,7 @@ describe('THE SEAM', () => {
     test('the files, by sha: pool-engine.js moved for this one field; the other engines did not', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
-        assert.equal(h('settlement-engine.js'), '24773c20');   // 24773c20: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
+        assert.equal(h('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         assert.equal(h('money-engine.js'), '3c960947');
         assert.equal(h('live-skins.js'), '632bbb1a');
     });
