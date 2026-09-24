@@ -1937,7 +1937,22 @@
 // comment, and nothing else in it moved. The consumer product cache is
 // consumer-v60-one-match-engine. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v218-one-match-engine';
+// Moved to v220 because the Board's team view was scoring GROSS Ryder Cup and
+// Scramble rounds as NET. leaderboard.html derived its match scoring type from a
+// cascade of ifs that named nassau, match and bestball only, so those two match
+// formats fell through to the default and the organizer's GROSS setting was
+// discarded. On a gross Ryder round where every hole was halved it gave an
+// 18-handicapper a stroke on all eighteen and printed "Ann 10 & 8", while
+// money-engine.js paid nobody and this page's OWN engine widget, a few lines
+// above it, read AS. An installed device on v219 keeps showing the invented
+// result. Now a ternary - nassau takes nassauScoring, everything else takes
+// matchScoring - which is the shape money-engine.js:768 and
+// settlement-engine.js:811 have always used, so no format list can go stale
+// again. Display only: no engine and no money moved, and the money was never
+// wrong. The consumer product cache is consumer-v61-board-gross-match. The
+// tournament product cache stays tournament-v54-rattle-golf. The iOS binary in
+// review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v220-board-gross-match';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

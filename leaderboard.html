@@ -1363,9 +1363,21 @@ ${ind.slice(4)}</tr>`;
         const fmt = document.getElementById('format-toggle');
         if (fmt) fmt.style.display = boardHasMatches(currentBoardData) ? 'flex' : 'none';
         
-        let matchScoringType = "net";
-        if (gameFormat === 'nassau') matchScoringType = currentBoardData.nassauScoring || "net";
-        if (gameFormat === 'match' || gameFormat === 'bestball') matchScoringType = currentBoardData.matchScoring || "net";
+        // A TERNARY, NOT A FORMAT LIST — the shape money-engine.js:768 and
+        // settlement-engine.js:811 have always used. This was a cascade of ifs that
+        // named nassau, match and bestball, so `ryder` and `scramble` - both match
+        // play - fell through to the default "net" and the organizer's GROSS setting
+        // was discarded. On a gross Ryder round where EVERY HOLE WAS HALVED it gave
+        // an 18-handicapper a stroke on all eighteen and declared "Ann 10 & 8", while
+        // money-engine.js paid nobody and this page's own engine widget, rendered a
+        // few lines above, read AS.
+        //
+        // Extending the list would have fixed those two and left the next match
+        // format to be found the same way. Nassau takes nassauScoring; EVERYTHING
+        // ELSE takes matchScoring, named or not.
+        let matchScoringType = gameFormat === 'nassau'
+            ? (currentBoardData.nassauScoring || "net")
+            : (currentBoardData.matchScoring || "net");
 
         const basisNote = document.getElementById('handicap-basis-note');
         if (basisNote) {
