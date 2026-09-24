@@ -62,7 +62,7 @@ function boot({ group = 2, hole = 7, leaders = null, kpWinners = {} } = {}) {
 
     vm.runInContext(`
         window.__writes = []; window.__alerts = [];
-        alert = m => window.__alerts.push(String(m));
+        alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         db.ref = function (pth) { return {
             set: function (v) { window.__writes.push({ path: pth, value: v }); return Promise.resolve(); },
             update: function (v) { window.__writes.push({ path: pth, value: v, atomic: true }); return Promise.resolve(); },

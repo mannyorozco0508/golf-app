@@ -51,7 +51,7 @@ function boot(page, groupParam, opts) {
         // index.html is NOT YET CONVERTED (see dialog_await_guard_test.js's PENDING
         // list), and this harness boots both pages. The alert recorder stays until
         // the sweep reaches it; when it does, this line should go with it.
-        alert = m => window.__alerts.push(String(m));
+        alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         uiRefuse = m => { window.__notes.push({ kind: 'refuse', text: String(m) }); window.__alerts.push(String(m)); };
         uiFail   = m => { window.__notes.push({ kind: 'fail',   text: String(m) }); window.__alerts.push(String(m)); };
         uiToast  = m => { window.__toasts.push(String(m)); window.__alerts.push(String(m)); };

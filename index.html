@@ -43,6 +43,10 @@
          calls into. -->
     <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI WAVE 2: the same shared telling, asking and typing the Action page
+         adopted in Wave 1. Not a fork - one file, and the scorecard reuses it.
+         After text-safe.js, whose escapeHtml it uses when the page has it. -->
+    <script src="ui-dialogs.js"></script>
     <script src="attendance.js"></script>
     <script src="product-links.js"></script>
     <script src="score-marks.js"></script>
@@ -3923,13 +3927,13 @@ html {
         // Permission and start hole are BOTH re-read at the moment of the tap, so a
         // score posted while the panel sat open can never leave a new wager pointing at
         // a hole the group has already finished.
-        if (!canAddAction()) { closeAddAction(); alert('That game can no longer be added.'); return; }
+        if (!canAddAction()) { closeAddAction(); uiRefuse('That game can no longer be added.'); return; }
         const format = addActionGame;
         const spec = ADDITIONAL_GAME_CATALOG[format];
         if (!spec) { closeAddAction(); return; }
 
         const startHole = addActionStartHole();
-        if (startHole === null) { closeAddAction(); alert('There are no holes left to play.'); return; }
+        if (startHole === null) { closeAddAction(); uiRefuse('There are no holes left to play.'); return; }
 
         const entry = Object.assign({}, spec.defaults, { format: format, enabled: true, startHole: startHole, createdAt: Date.now() });
         entry[spec.stakeField] = amount;
@@ -3948,7 +3952,7 @@ html {
         if (!requireOnlineForMoney('GAME NOT ADDED', 'Reconnect before adding a game to the round.')) return;
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
         db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
-            .catch(err => alert(`Couldn't add that game: ${err.message}`));
+            .catch(err => uiFail(`Couldn't add that game: ${err.message}`));
 
         closeAddAction();
         actionCenterOpen = true;
@@ -4117,7 +4121,7 @@ html {
     function confirmSidePressCustom(key) {
         const el = document.getElementById('side-press-amt');
         const amt = el ? parseFloat(el.value) : NaN;
-        if (isNaN(amt) || amt <= 0) { alert('Enter a dollar amount above 0.'); return; }
+        if (isNaN(amt) || amt <= 0) { uiRefuse('Enter a dollar amount above 0.'); return; }
         confirmSidePress(key, amt);
     }
 
@@ -4133,7 +4137,7 @@ html {
         const scoped = scopedPlayers();
         const fresh = buildSideActionRows(currentData, courseData, currentData.scores || {}, scoped)
             .find(r => r.key === key);
-        if (!fresh || !fresh.canPress) { closeSidePress(); alert('That match can no longer be pressed.'); return; }
+        if (!fresh || !fresh.canPress) { closeSidePress(); uiRefuse('That match can no longer be pressed.'); return; }
 
         // THE PRESS GOES WHERE ITS ENGINE READS.
         //
@@ -4156,8 +4160,8 @@ html {
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/${node}`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${key}/${node}/${pushKey}`)
             .set(payload)
-            .then(() => alert(`\u2705 PRESS CONFIRMED\n${fresh.label}\n$${stake}\nStarts Hole ${fresh.nextPressHole}`))
-            .catch(err => alert(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
+            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${fresh.label}\n$${stake}\nStarts Hole ${fresh.nextPressHole}`))
+            .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
         closeSidePress();
     }
 
@@ -4487,7 +4491,7 @@ html {
     function saveKpLeader(hole, pid, feet, inches) {
         if (!pid) return;
         if (!canSetKpLeader(pid)) {
-            alert('\u26A0\uFE0F NOT SAVED\nYou can only record a KP for a golfer in your own group.');
+            uiFail('\u26A0\uFE0F NOT SAVED\nYou can only record a KP for a golfer in your own group.');
             return;
         }
         if (!requireOnlineForMoney('KP NOT SAVED', 'Reconnect before recording the KP.')) return;
@@ -4512,7 +4516,7 @@ html {
                 kpEntryOpenHole = null;
                 renderKpEntryMount();
             })
-            .catch(err => alert('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
+            .catch(err => uiFail('\u26A0\uFE0F KP NOT SAVED\n' + err.message));
     }
 
     // RETAINED AS A DELEGATE, NOT A SECOND WRITER. saveKpLeader performs the only
@@ -4533,7 +4537,7 @@ html {
         const sel = document.getElementById('kp-pick-' + hole);
         const ft = document.getElementById('kp-ft-' + hole);
         const inch = document.getElementById('kp-in-' + hole);
-        if (!sel || !sel.value) { alert('Pick the golfer who is closest.'); return; }
+        if (!sel || !sel.value) { uiRefuse('Pick the golfer who is closest.'); return; }
         markKpAsked(hole);   // v193: a saved answer is an answer; saveKpLeader itself is unchanged
         saveKpLeader(hole, sel.value, ft ? ft.value : '', inch ? inch.value : '');
     }
@@ -5124,7 +5128,7 @@ html {
     function confirmStrokePressCustom() {
         const el = document.getElementById('press-custom-amt');
         const amt = el ? parseFloat(el.value) : NaN;
-        if (isNaN(amt) || amt <= 0) { alert('Enter a dollar amount above 0.'); return; }
+        if (isNaN(amt) || amt <= 0) { uiRefuse('Enter a dollar amount above 0.'); return; }
         confirmStrokePress(amt);
     }
 
@@ -5133,18 +5137,18 @@ html {
     // pointing at a hole that has since been completed.
     function confirmStrokePress(stake) {
         const model = currentBetStripModel();
-        if (!model || !model.canPress) { closePressPanel(); alert('That bet can no longer be pressed.'); return; }
+        if (!model || !model.canPress) { closePressPanel(); uiRefuse('That bet can no longer be pressed.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
         const pushKey = db.ref(`events/${currentMode}/strokePresses`).push().key;
         db.ref(`events/${currentMode}/strokePresses/${pushKey}`).set({ startHole: model.nextPressHole, stake })
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+            .catch(err => uiFail(`Press failed to save: ${err.message}`));
         closePressPanel();
     }
 
     function confirmMatchPressCustom() {
         const el = document.getElementById('press-custom-amt');
         const amt = el ? parseFloat(el.value) : NaN;
-        if (isNaN(amt) || amt <= 0) { alert('Enter a dollar amount above 0.'); return; }
+        if (isNaN(amt) || amt <= 0) { uiRefuse('Enter a dollar amount above 0.'); return; }
         confirmMatchPress(amt);
     }
 
@@ -5157,14 +5161,14 @@ html {
     // untouched - a $50 press is a new wager, not a re-pricing of the ladder.
     function confirmMatchPress(stake) {
         const model = currentBetStripModel();
-        if (!model || !model.canPress || !model.pressBaseId) { closePressPanel(); alert('That match can no longer be pressed.'); return; }
+        if (!model || !model.canPress || !model.pressBaseId) { closePressPanel(); uiRefuse('That match can no longer be pressed.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
         const payload = { baseId: model.pressBaseId, startHole: model.nextPressHole };
         const amt = Number(stake);
         if (stake !== undefined && stake !== null && isFinite(amt) && amt > 0) payload.stake = amt;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set(payload)
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+            .catch(err => uiFail(`Press failed to save: ${err.message}`));
         closePressPanel();
     }
 
@@ -5585,19 +5589,19 @@ html {
     // 'nothing' | 'refused' | 'written' for the caller and the tests.
     function commitPlayersDraft(draft) {
         const u = buildPlayersUpdate(currentData, draft);
-        if (u.refused) { alert('\u26A0\uFE0F NOT SAVED\n' + u.refused); return Promise.resolve('refused'); }
+        if (u.refused) { uiFail('\u26A0\uFE0F NOT SAVED\n' + u.refused); return Promise.resolve('refused'); }
         if (!u.changed) return Promise.resolve('nothing');
         if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the players.')) return Promise.resolve('offline');
         return db.ref('events/' + currentMode).once('value').then(snap => {
             const fresh = (snap && snap.val()) || {};
             if (rosterSignature(fresh.players) !== psSnapshot) {
-                alert('\u26A0\uFE0F NOT SAVED\nThe roster changed on another phone \u2014 reopen Players.');
+                uiFail('\u26A0\uFE0F NOT SAVED\nThe roster changed on another phone \u2014 reopen Players.');
                 return 'refused';
             }
             // Built again against the FRESH record (scores may have moved) - the
             // roster is the same by the guard, so the keys are the same.
             const fu = buildPlayersUpdate(Object.assign({}, currentData, fresh), draft);
-            if (fu.refused) { alert('\u26A0\uFE0F NOT SAVED\n' + fu.refused); return 'refused'; }
+            if (fu.refused) { uiFail('\u26A0\uFE0F NOT SAVED\n' + fu.refused); return 'refused'; }
             return db.ref('events/' + currentMode).update(fu.updates).then(() => 'written');
         });
     }
@@ -5608,7 +5612,7 @@ html {
         commitPlayersDraft(draft).then(result => {
             if (btn) btn.disabled = false;
             if (result === 'written' || result === 'nothing') closePlayersSheet();
-        }).catch(err => { if (btn) btn.disabled = false; alert('\u26A0\uFE0F NOT SAVED\n' + err.message); });
+        }).catch(err => { if (btn) btn.disabled = false; uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message); });
     }
 
     // ---- THE RETIRED ROUND (v191) --------------------------------------------
@@ -5827,7 +5831,7 @@ html {
     // and one sentence - an alert for now, with the rest of the inventory.
     function copyOrganizerLinkFromScorecard(url, btn) {
         copyGroupLinkFromScorecard(url, 0, btn);
-        alert('Copied your organizer link. It can correct any score in the round \u2014 keep it to yourself.');
+        uiToast('Copied your organizer link. It can correct any score in the round \u2014 keep it to yourself.');
     }
 
     function fallbackCopy(text, onDone) {
@@ -5838,7 +5842,11 @@ html {
         document.body.appendChild(ta);
         ta.select();
         try { document.execCommand('copy'); onDone(); }
-        catch (e) { alert(text); }
+        // LAST RESORT, and a note rather than an alert ON PURPOSE. Copying has
+        // already failed twice by here, so the job is to put the text where a
+        // golfer can select it by hand - which an uiRefuse() cannot do and a toast
+        // would float away from. A persistent inline note can.
+        catch (e) { uiFail('Couldn\u2019t copy it. Here it is \u2014 select and copy:\n' + text); }
         document.body.removeChild(ta);
     }
 
@@ -6167,7 +6175,7 @@ html {
 
     function requireOnlineForMoney(title, line) {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            uiRefuse('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
             return false;
         }
         return true;
@@ -6311,7 +6319,7 @@ html {
         db.ref('events/' + currentMode + '/scoresVerified').set(payload)
             .then(() => { currentData.scoresVerified = payload; if (onDone) onDone(true); })
             .catch(err => {
-                alert('\u26A0\uFE0F SCORES NOT CONFIRMED\n' + (err && err.message));
+                uiFail('\u26A0\uFE0F SCORES NOT CONFIRMED\n' + (err && err.message));
                 if (onDone) onDone(false);
             });
     }
@@ -7079,9 +7087,19 @@ html {
 
     // An explicit organizer call that a hole had no winner. The share goes into
     // the skins pot (2026-09-22, KP money never refunds).
-    function frKpDeclareNoWinner(hole) {
+    // ASYNC: the decision is a sheet now. Called only from an onclick, so nothing
+    // awaits this function and nothing needs to.
+    async function frKpDeclareNoWinner(hole) {
         if (!hasOrganizerAuthority()) return;
-        if (!confirm('Record that nobody won the KP on hole ' + hole + '?\n\nThat share goes into the skins pot.')) return;
+        // AWAIT. `if (!uiConfirm(...))` without it is `if (!Promise)`, always
+        // false - the return would never run and the KP share would move into the
+        // skins pot without anyone being asked.
+        const ok = await uiConfirm({
+            title: 'Record that nobody won the KP on hole ' + hole + '?',
+            body: 'That share goes into the skins pot.',
+            confirmText: 'Nobody won it', cancelText: 'Back', danger: true
+        });
+        if (!ok) return;
         if (!requireOnlineForMoney('NOT SAVED', 'Reconnect before recording KP results.')) return;
         const updates = {};
         updates['kpNoWinner/h' + hole] = true;
@@ -7093,7 +7111,7 @@ html {
                 if (currentData.kpWinners) delete currentData.kpWinners['h' + hole];
                 renderFinishRoundKp(); renderFinishRoundMoney();
             })
-            .catch(err => alert('⚠️ NOT SAVED\n' + (err && err.message)));
+            .catch(err => uiFail('⚠️ NOT SAVED\n' + (err && err.message)));
     }
 
     // ---- CANCEL THE KP GAME -------------------------------------------------
@@ -7107,7 +7125,8 @@ html {
     // ONE WRITE. kpCancelled alone is authoritative - the engine treats a cancelled
     // game as having no KP bucket at all - so there is no second field to fall out of
     // step and no half-cancelled state to recover from.
-    function frCancelKps() {
+    // ASYNC for the same reason. onclick only.
+    async function frCancelKps() {
         if (!hasOrganizerAuthority()) return;
         const r = frKpPool();
         if (!r || !r.kp || r.kp.amountCents <= 0) return;
@@ -7115,14 +7134,19 @@ html {
         const skinsMode = (currentData.moneyPool && currentData.moneyPool.skins
             && currentData.moneyPool.skins.mode) || 'none';
         if (skinsMode !== 'remainder') {
-            alert('\u26A0\uFE0F CAN\u2019T CANCEL KPs\n\nThis round uses a fixed skins amount, so there is '
+            uiFail('\u26A0\uFE0F CAN\u2019T CANCEL KPs\n\nThis round uses a fixed skins amount, so there is '
                 + 'nowhere for the KP money to go. Adjust the Weekly Game setup first.');
             return;
         }
 
         const amt = centsToMoney(r.kp.amountCents);
-        if (!confirm('Cancel all KPs for this round?\n\nThe ' + amt + ' KP allocation moves into the '
-            + 'skins pool.\n\nExisting KP leaders will no longer receive KP money.')) return;
+        const ok = await uiConfirm({
+            title: 'Cancel all KPs for this round?',
+            body: 'The ' + amt + ' KP allocation moves into the skins pool.\n\n'
+                + 'Existing KP leaders will no longer receive KP money.',
+            confirmText: 'Cancel the KPs', cancelText: 'Keep them', danger: true
+        });
+        if (!ok) return;
         if (!requireOnlineForMoney('KPs NOT CANCELLED', 'Reconnect before cancelling the KPs.')) return;
 
         const payload = { cancelled: true, cancelledAt: Date.now(), cancelledBy: 'organizer' };
@@ -7134,9 +7158,9 @@ html {
                 currentData.kpCancelled = payload;
                 renderFinishRoundKp();
                 renderFinishRoundMoney();
-                alert('\u2705 KPs CANCELLED\n' + amt + ' moved into the skins pool.');
+                uiToast('\u2705 KPs CANCELLED\n' + amt + ' moved into the skins pool.');
             })
-            .catch(err => alert('\u26A0\uFE0F KPs NOT CANCELLED\n' + (err && err.message)));
+            .catch(err => uiFail('\u26A0\uFE0F KPs NOT CANCELLED\n' + (err && err.message)));
     }
 
     function frOpenPlayer(playerId) {
@@ -7449,7 +7473,7 @@ html {
         // on a refusal, which is indistinguishable from a slow write.
         db.ref(`events/${currentMode}/dots/h${currentDotHole}`).set(tempDots).then(() => {
             closeDotsModal();
-        }).catch(err => alert('\u26A0\uFE0F DOTS NOT SAVED\n' + (err && err.message)));
+        }).catch(err => uiFail('\u26A0\uFE0F DOTS NOT SAVED\n' + (err && err.message)));
     }
 
     // ORGANIZER ONLY. Gated on isOrganizerView() - the single definition of
@@ -7480,7 +7504,9 @@ html {
             + '</div>';
     }
 
-    function endAndClearRound() {
+    // ASYNC: the most destructive decision in the app now goes through a sheet
+    // whose CANCEL is the focused control. onclick only.
+    async function endAndClearRound() {
         // Checked again here, not only at render: removing the button in
         // devtools must achieve nothing. Same belt-and-braces as filterGroup().
         if (typeof isOrganizerView === 'function' && !isOrganizerView()) {
@@ -7492,9 +7518,17 @@ html {
             + `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
             + `It cannot be undone.\n\n`
             + `You do not need to delete a round when you finish playing.`;
-        if (confirm(msg)) {
+        // AWAIT, and note the shape: this one was `if (confirm(msg))`, so a missed
+        // await makes it ALWAYS TRUE and deletes the round for everyone without
+        // asking. The inverted form is the more dangerous of the two.
+        const ok = await uiConfirm({
+            title: `Delete round ${currentMode} for everyone?`,
+            body: msg,
+            confirmText: 'Delete it', cancelText: 'Keep the round', danger: true
+        });
+        if (ok) {
             db.ref(`events/${currentMode}`).remove().then(() => {
-                alert("Round deleted. The scorecard is now clear.");
+                uiToast("Round deleted. The scorecard is now clear.");
                 window.location.href = "admin.html";
             }).catch((err) => {
                 // THE SAME CATCH FIRES ON A DROPPED CONNECTION. Saying "this
@@ -7502,11 +7536,11 @@ html {
                 // half the time, so the two are told apart by the error itself.
                 const m = String((err && err.message) || err || '');
                 if (/PERMISSION_DENIED/i.test(m)) {
-                    alert('This round has scores in it, so it cannot be deleted.\n\n'
+                    uiRefuse('This round has scores in it, so it cannot be deleted.\n\n'
                         + 'That is deliberate \u2014 it stops a round being wiped by accident '
                         + 'once anyone has started playing.');
                 } else {
-                    alert('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+                    uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
                 }
             });
         }
@@ -7807,7 +7841,7 @@ html {
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         db.ref(`events/${currentMode}/matchPresses/${pushKey}`).set({ baseId, startHole: nextHole })
-            .catch(err => alert(`Press failed to save: ${err.message}`));
+            .catch(err => uiFail(`Press failed to save: ${err.message}`));
     }
 
     // Stroke Play presses can be a different dollar amount than the original bet (or any other
@@ -8087,12 +8121,12 @@ html {
         const payload = { call: call };
         if (call === 'partner' && partnerId) payload.partnerId = partnerId;
         db.ref(`events/${currentMode}/wolfCalls/h${hole}`).set(payload)
-            .catch(err => alert(`Failed to save Wolf call: ${err.message}`));
+            .catch(err => uiFail(`Failed to save Wolf call: ${err.message}`));
     }
 
     function clearWolfCall(hole) {
         db.ref(`events/${currentMode}/wolfCalls/h${hole}`).remove()
-            .catch(err => alert(`Failed to clear: ${err.message}`));
+            .catch(err => uiFail(`Failed to clear: ${err.message}`));
     }
 
     function renderWolfCallBox(data, courseData, savedScores) {

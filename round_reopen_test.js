@@ -41,7 +41,7 @@ const CD = makeCourseData(18);
 const OLD = wizardSavedRound({ code: 'RRT001', courseData: CD, ownerUid: 'anon-cold', overrides: { stablefordPointVal: 2, stablefordScoring: 'gross',
     stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 4, eagle: 6, albatross: 8 }, flights: { enabled: true, scopes: { skins: 'field', birdies: 'flight' } } } });
 const DB = { events: { RRT001: OLD }, global_courses: { tidewater: { name: 'Tidewater', data: CD } }, trips: {}, tournaments: {} };
-const PRE = "window.__alerts = []; window.__errs = []; window.alert = function (m) { window.__alerts.push(String(m)); };"
+const PRE = "window.__alerts = []; window.__errs = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;"
     + " var ce = console.error; console.error = function () { window.__errs.push([].slice.call(arguments).map(function (x) { return x && x.stack ? x.stack : String(x); }).join(' ')); ce.apply(console, arguments); };"
     + " window.addEventListener('unhandledrejection', function (e) { window.__errs.push('unhandledrejection: ' + (e.reason && e.reason.stack || e.reason)); });";
 const PROBE = `JSON.stringify({

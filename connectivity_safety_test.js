@@ -127,7 +127,11 @@ describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while o
         const src = js.slice(start, js.indexOf('\n    }', start) + 6);
         const alerts = [];
         const run = (onLine) => {
-            const sandbox = { navigator: { onLine }, alert: (m) => alerts.push(m) };
+            // UI Wave 2: the guard refuses through uiRefuse, not alert. Both are
+            // provided so this executes the real extracted function either way and
+            // the assertions below still read what the golfer was told.
+            const say = (m) => alerts.push(m);
+            const sandbox = { navigator: { onLine }, alert: say, uiRefuse: say, uiFail: say, uiToast: say };
             vm.createContext(sandbox);
             vm.runInContext(src + '\n;globalThis.__r = requireOnlineForMoney("PRESS NOT SAVED","Reconnect before creating a press.");', sandbox);
             return sandbox.__r;

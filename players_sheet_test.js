@@ -52,7 +52,7 @@ function page(data, search, opts) {
         sandbox.firebase.database = Object.assign(function () { const dbi = realDatabase(); const o = dbi.ref.bind(dbi);
             dbi.ref = (p) => { const r = o(p); if (p === 'events/PS1') r.once = () => Promise.resolve({ val: () => J((opts && opts.fresh) || sandbox.__fresh || data), exists: () => true }); return r; }; return dbi; }, realDatabase);
     } });
-    run(sb, "['players-sheet', 'players-sheet-body', 'players-sheet-money', 'players-sheet-warn', 'group-filter-container', 'game-setup-mount'].forEach(function (id) { var e = document.getElementById(id); if (e) document.__mount(e); }); window.__alerts = []; alert = function (m) { window.__alerts.push(String(m)); }; navigator.onLine = true;");
+    run(sb, "['players-sheet', 'players-sheet-body', 'players-sheet-money', 'players-sheet-warn', 'group-filter-container', 'game-setup-mount'].forEach(function (id) { var e = document.getElementById(id); if (e) document.__mount(e); }); window.__alerts = []; alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert; navigator.onLine = true;");
     const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/PS1');
     h.cb({ val: () => J(data), exists: () => true });
     return sb;
@@ -354,7 +354,7 @@ describe('MOVE A GOLFER TO ANOTHER GROUP (v199)', () => {
     test('the refusal stops the commit before the re-read: alerted, nothing written', async () => {
         const d = round(); d.groupSizeOverrides = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 2, 6: 1 };
         const sb = page(d);
-        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
+        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
         const r = await run(sb, 'commitPlayersDraft(' + JSON.stringify(draftWithGroups(d, [{ idx: 22, group: 6 }])) + ')');
         assert.equal(r, 'refused');
         assert.equal(sb.__dbWrites.filter(w => w.path === 'events/PS1').length, 0);
@@ -386,7 +386,7 @@ describe('MOVE A GOLFER TO ANOTHER GROUP (v199)', () => {
     test('THE GUARD: the roster changed on another phone -> the move is refused, nothing written (CONTROL: the same roster writes the whole node)', async () => {
         const changed = J(data); changed.players[3].name = 'Dee Delta-Renamed';
         const sb = page(data, undefined, { fresh: changed });
-        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
+        run(sb, 'window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m)); psSnapshot = rosterSignature(currentData.players);');
         const dr = draftWithGroups(data, [{ idx: 9, group: 5 }]);
         const r1 = await run(sb, 'commitPlayersDraft(' + JSON.stringify(dr) + ')');
         assert.equal(r1, 'refused');

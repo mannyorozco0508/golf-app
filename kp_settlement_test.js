@@ -362,8 +362,8 @@ describe('FINISH ROUND - THE CEREMONY IS GONE', () => {
         const gm = {}; d.players.forEach((p,i)=>{ gm[String(p.id)] = Math.floor(i/4)+1; });
         vm.runInContext(`
             window.__writes = []; window.__alerts = [];
-            alert = m => window.__alerts.push(String(m));
-            confirm = () => true;
+            alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
+            confirm = () => true; uiConfirm = () => Promise.resolve(true);
             db.ref = function (p) { return {
                 set: function (v) { window.__writes.push({ path: p, value: v }); return Promise.resolve(); },
                 update: function (v) { window.__writes.push({ path: p, value: v, atomic: true }); return Promise.resolve(); },

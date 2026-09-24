@@ -110,7 +110,7 @@ function pageWithHungDb(page, opts) {
     const sb = loadHtmlInlineScript(page, ['pwa-boot.js'], Object.assign({ search: '' }, opts || {}));
     vm.runInContext(issuerWith(80), sb);            // replaces window.issueUniqueCode with the short-timeout real module
     vm.runInContext(`
-        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); };
+        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
         window.__navigated = null; try { Object.defineProperty(window.location, 'href', { set: function (v) { window.__navigated = v; }, get: function () { return 'x'; }, configurable: true }); } catch (e) {}
         db.ref = function (p) { return { once: function () { return new Promise(function () {}); }, set: function () { return Promise.resolve(); }, update: function () { return Promise.resolve(); } }; };
     `, sb);
@@ -282,7 +282,7 @@ describe('tournament.html - saveTournament gets a pending state and a restore it
 function arrivalWithHungDb(search) {
     return loadHtmlInlineScript('admin.html', [], { search, beforeRun: (sandbox) => {
         vm.runInContext(issuerWith(80), sandbox);
-        vm.runInContext("window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); };", sandbox);
+        vm.runInContext("window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;", sandbox);
         sandbox.db.ref = () => ({ once: () => new Promise(() => {}), on: () => {}, set: () => Promise.resolve(), update: () => Promise.resolve() });
     } });
 }
