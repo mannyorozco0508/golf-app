@@ -220,20 +220,35 @@ describe('3. THE PLAYERS SHEET names the Index and the Course Handicap', () => {
         assert.equal((html.match(/class="ps-hcp"/g) || []).length, 4, 'four rows, four boxes');
         assert.match(html, /class="ps-name"/);
     });
-    test('Ann\'s row names "Index 18 · Course 17" beside the box', () => {
-        assert.match(text(html), /Index 18 · Course 17/, text(html).slice(0, 300));
+    // RE-PINNED 2026-09-23 (v213). v212 put the COMPACT LABEL here - "Index 18 ·
+    // Course 17" beside a box holding the playing handicap. v213 made the box the
+    // INDEX itself, so repeating the index in the line beside it would say the same
+    // number twice and leave no room for the thing the organizer actually needs:
+    // what the index they are typing converts to. The line is now the DERIVED pair,
+    // "Course 17.2 · plays 17", and it moves as they type.
+    // players_sheet_index_test.js owns that behaviour; this keeps the surface
+    // honest - a row with an Index still never shows a bare number alone.
+    test('Ann\'s row names what her Index converts to, beside the box', () => {
+        const t = text(html);
+        assert.match(t, /Course 17\.2 · plays 17/, t.slice(0, 300));
+        assert.match(html, /class="ps-hcp"[^>]*value="18"/, 'and the box itself holds her Index');
     });
     test('THE CONTROL: a sheet row with an Index must not be a bare number alone', () => {
-        // Every golfer who HAS an index is named; Cal, who has none, is not.
-        assert.match(text(html), /Index 4\.5 · Course 4/, 'Ben: ' + text(html).slice(0, 300));
+        const t = text(html);
+        // Ben is off 4.5 on a 113/71.2/72 tee: course 3.7, plays 4.
+        assert.match(t, /Course 3\.7 · plays 4/, 'Ben: ' + t.slice(0, 300));
+        // Cal has no Index at all, so nothing is derived for him - his row is the
+        // one bare number on this sheet, and that is correct.
         const cal = html.slice(html.indexOf('data-id="103"'), html.indexOf('data-id="104"'));
-        assert.ok(!/Index /.test(cal), 'nothing invented for Cal: ' + text(cal));
+        assert.ok(!/Course /.test(cal), 'nothing invented for Cal: ' + text(cal));
+        assert.ok(/ps-hcp-note/.test(html), 'and the line is there for the golfers who do have one');
     });
-    test('the label is markup-safe and carries the ps-hcp-note class the CSS targets', () => {
+    test('the line is markup-safe and carries the ps-hcp-note class the CSS targets', () => {
         assert.match(html, /class="ps-hcp-note"/);
+        // A quote in the stored index must not escape the box's value attribute.
         const withQuote = round();
         withQuote.players[0].handicapIndex = '18"';
-        assert.ok(!/Index 18"/.test(sheet(withQuote)), 'the index is escaped into the label');
+        assert.ok(!/value="18""/.test(sheet(withQuote)), 'the index is escaped into the box');
     });
 });
 

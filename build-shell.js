@@ -80,7 +80,7 @@ const PRODUCTS = {
         // Moved to v52. The course step fills Slope and Course Rating from the
         // tee the golfer picks. A device on v51 still shows the hand-typed
         // Slope / Rating / Par block.
-        cacheName: 'consumer-v54-handicap-legible',
+        cacheName: 'consumer-v55-index-box',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

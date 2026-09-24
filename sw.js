@@ -1845,7 +1845,21 @@
 // skipped hole. No engine changed: handicap.js is byte-identical. The consumer
 // product cache is consumer-v54-handicap-legible. The tournament product cache
 // stays tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v212-handicap-legible';
+// Moved to v213 because the Players sheet's handicap box is now the golfer's
+// Handicap INDEX on a GHIN round, not their playing handicap. Typing into it
+// re-runs the conversion for the round's tee and writes handicapIndex,
+// courseHandicap and hcp together - v212 left the box editing hcp while the line
+// beside it named an Index, so a hand-edit left the stored Index describing a
+// number no longer derived from it. The box is labelled "Index", and the line
+// under it shows the Course Handicap the typed index gives, moving as they type.
+// An "as entered" round is unchanged: the box is the playing handicap, labelled
+// "HCP". A round with no rated tee stores the Index and uses the typed number as
+// it stands, marked unconverted. index.html and handicap-labels.js are
+// precached, so a device on v212 keeps editing the wrong number. No engine
+// changed: handicap.js is byte-identical and does the conversion. The consumer
+// product cache is consumer-v55-index-box. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v213-index-box';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

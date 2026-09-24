@@ -96,6 +96,42 @@
             + ', rounded (.5 up).';
     }
 
+    // THE LINE BESIDE AN INDEX BOX (v213). The Players sheet's box IS the
+    // Handicap Index on a GHIN round, so the line under it says what that index
+    // converts to on this round's tee - and it moves as the golfer types.
+    //
+    // `stored` is the golfer as the record holds them, and it is here for one
+    // case only: a golfer SAVED with no tee rating, on a round whose tee is rated
+    // NOW (the organizer set it afterwards). Converting their untouched index in
+    // the line would promise a Course Handicap the save does not write - the save
+    // only rewrites a golfer whose box actually changed - so the line says what
+    // is true instead, and what to do about it.
+    function handicapBoxNote(boxText, data, stored) {
+        var d = data || {};
+        if (handicapBasisOf(d) === 'as-entered') return null;
+        var text = String(boxText === undefined || boxText === null ? '' : boxText).trim();
+        if (text === '') return null;
+        // THE BOX IS UNCHANGED AND THIS GOLFER HAS NO COMPLETED CONVERSION - no
+        // stored Index at all (a round from before the conversion existed), or one
+        // stored without a usable tee rating. Converting the untouched text here
+        // would promise a Course Handicap the save does not write: the save only
+        // rewrites a golfer whose box actually CHANGED. So say what is true, and
+        // what to do about it.
+        if (stored) {
+            var idxRaw = stored.handicapIndex;
+            var hasIdx = !(idxRaw === undefined || idxRaw === null || String(idxRaw).trim() === '');
+            var converted = hasIdx && !stored.handicapUnconverted;
+            var shownText = String(hasIdx ? idxRaw : (stored.hcp || '')).trim();
+            if (!converted && shownText === text) return 'Not yet converted — retype to convert';
+        }
+        if (typeof convertHandicapIndex !== 'function') return null;
+        var conv = convertHandicapIndex(text, d.teeRating || null);
+        if (!conv) return null;
+        if (conv.reason === 'blank') return null;
+        if (!conv.ok) return 'No tee rating — used as entered';
+        return 'Course ' + formatCourseLabel(conv.course) + DOT + 'plays ' + conv.playingText;
+    }
+
     // Does this round have anything to say about handicaps at all? A round where
     // nobody has an Index and no tee is rated gets no card and no sentence.
     function handicapBasisWorthSaying(data) {
@@ -111,6 +147,7 @@
         handicapCompactLabel: handicapCompactLabel,
         handicapFullLabel: handicapFullLabel,
         handicapBasisSentence: handicapBasisSentence,
+        handicapBoxNote: handicapBoxNote,
         handicapBasisWorthSaying: handicapBasisWorthSaying
     };
     // Globals, the way every other shared file on these pages is consumed.

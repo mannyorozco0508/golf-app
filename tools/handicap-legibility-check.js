@@ -112,6 +112,20 @@ const CANDIDATES = `(function () {
         .map(function (e) { var b = e.getBoundingClientRect(); return e.tagName + '.' + (e.className || '') + ' onclick=' + (e.getAttribute('onclick') || '-') + ' ' + Math.round(b.width) + 'x' + Math.round(b.height); });
 })()`;
 
+// Row 0's box and the line under it - what it holds, what it is called, and what
+// the line says right now.
+const BOX_PROBE = `(function () {
+    var row = document.querySelector('#players-sheet-body .ps-row');
+    if (!row) return 'no row';
+    var box = row.querySelector('.ps-hcp');
+    var note = row.querySelector('.ps-hcp-note');
+    return JSON.stringify({
+        value: box ? String(box.value) : null,
+        placeholder: box ? String(box.getAttribute('placeholder') || '') : null,
+        note: note ? String(note.textContent || '') : null
+    });
+})()`;
+
 const fails = [];
 const log = (...a) => console.log(...a);
 const bad = (m) => { fails.push(m); log('  FAIL  ' + m); };
@@ -206,6 +220,23 @@ const ok = (m) => log('  ok    ' + m);
             { sleep: 250 },
             { tap: '[onclick="openPlayersSheet()"]' }, { sleep: 600 },
             { expression: SHEET_PROBE },
+            // v213: THE BOX IS THE INDEX, AND THE LINE MOVES AS THEY TYPE. mini-dom
+            // cannot do either - its innerHTML is a string, so the sheet's rows are
+            // not elements and no oninput can fire. So this is the only place the
+            // wire is actually exercised: a real tap into the box, the End key, and
+            // real inserted text, which is what fires the page's own oninput.
+            { expression: BOX_PROBE },
+            { tap: '#players-sheet-body .ps-row .ps-hcp' },
+            { cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'rawKeyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 } } },
+            { cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'keyUp', key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 } } },
+            // A DIGIT, not another decimal point. Typing ".4" onto "18.4" gives
+            // "18.4.4", which handicap.js sanitises back to 18.4 - so the line
+            // correctly did NOT move, and the first run of this check read that as
+            // a broken wire. "5" makes 18.45, a different index and a different
+            // Course Handicap, so a line that does not move is a real failure.
+            { cdp: { method: 'Input.insertText', params: { text: '5' } } },
+            { sleep: 300 },
+            { expression: BOX_PROBE },
             { expression: "JSON.stringify((window.__errs || []).slice(0, 4))" }
         ]
     });
@@ -216,7 +247,9 @@ const ok = (m) => log('  ok    ' + m);
     log('    ' + sheet.value[4]);
     log('    tap: ' + sheet.value[6]);
     const s = sheet.value[8];
-    const errs = sheet.value[9];
+    const boxBefore = (() => { try { return JSON.parse(sheet.value[9]); } catch (e) { return null; } })();
+    const boxAfter = (() => { try { return JSON.parse(sheet.value[15]); } catch (e) { return null; } })();
+    const errs = sheet.value[16];
     if (errs && errs !== '[]') log('    page errors: ' + errs);
     if (!s || !s.open) { bad('the Players sheet did not open on a real tap - nothing measured: ' + JSON.stringify(s)); }
     else {
@@ -267,6 +300,27 @@ const ok = (m) => log('  ok    ' + m);
         withNote.forEach(r => {
             if (r.note.w < r.rowW - 8) bad('id ' + r.id + ': the note does not span the row (' + r.note.w + ' of ' + r.rowW + 'px)');
         });
+    }
+
+    // ---- 3. THE INDEX BOX, TYPED INTO FOR REAL ------------------------------
+    log('');
+    log('THE INDEX BOX (v213): what it holds, and whether the line follows the typing');
+    if (!boxBefore || !boxAfter) bad('the box could not be read: ' + JSON.stringify([sheet.value[9], sheet.value[15]]));
+    else {
+        log('    before: ' + JSON.stringify(boxBefore));
+        log('    after typing "5": ' + JSON.stringify(boxAfter));
+        if (boxBefore.placeholder === 'Index') ok('the box is labelled Index on a GHIN round');
+        else bad('the box is labelled ' + JSON.stringify(boxBefore.placeholder) + ', not Index');
+        // Christopher is off 18.4 in this fixture, so his box holds 18.4 and the
+        // line under it is his Course Handicap off the 131/73.4/72 tee.
+        if (boxBefore.value === '18.4') ok('and it holds the golfer\'s INDEX (18.4), not their playing handicap');
+        else bad('the box holds ' + JSON.stringify(boxBefore.value) + ' - expected the index 18.4');
+        if (/Course 22\.73/.test(String(boxBefore.note))) ok('the line names the derived Course Handicap: ' + boxBefore.note);
+        else bad('the line does not name the Course Handicap: ' + JSON.stringify(boxBefore.note));
+        if (boxAfter.value === '18.45') ok('the typing landed in the box (18.4 -> 18.45)');
+        else bad('the typing did not land: box is ' + JSON.stringify(boxAfter.value));
+        if (/Course 22\.79/.test(String(boxAfter.note))) ok('and the line MOVED with it: ' + JSON.stringify(boxAfter.note));
+        else bad('the line did not follow the typing: ' + JSON.stringify(boxAfter.note) + ' (was ' + JSON.stringify(boxBefore.note) + ')');
     }
 
     log('');

@@ -76,10 +76,25 @@ describe('THE NARROW WRITES: rename, handicap, flight, Out - only the changed ke
         assert.equal(u.changed, true); assert.equal(u.whole, false);
         assert.deepEqual(u.updates, { 'players/1/name': 'Ben B' });
     });
-    test('handicap and flight on two golfers: four keys, by index; nothing for the untouched', () => {
+    // RE-PINNED 2026-09-23 (v213): the handicap box is the golfer's INDEX on a
+    // GHIN round - which every round is unless it says otherwise - so a typed
+    // number now writes the Index beside the playing handicap it produces, never
+    // hcp on its own. THIS FIXTURE'S TEE IS NOT RATED (wizardSavedRound's
+    // teeRating carries null slope/rating/par), so there is no conversion to do:
+    // hcp takes the typed number EXACTLY as before - 7.5 is still 7.5, and no
+    // money moved - and the round records the Index with handicapUnconverted, so
+    // every screen says the number was used as entered rather than inventing a
+    // Course Handicap. players_sheet_index_test.js owns the converted case.
+    test('handicap and flight on two golfers: by index; nothing for the untouched', () => {
         const sb = page(data);
         const u = build(sb, draftFrom(data, [{ idx: 0, hcp: '7.5' }, { idx: 12, flight: 'A', hcp: '10' }]));
-        assert.deepEqual(u.updates, { 'players/0/hcp': '7.5', 'players/12/flight': 'A', 'players/12/hcp': '10' });
+        assert.deepEqual(u.updates, {
+            'players/0/hcp': '7.5', 'players/0/handicapIndex': '7.5', 'players/0/handicapUnconverted': true,
+            'players/12/flight': 'A',
+            'players/12/hcp': '10', 'players/12/handicapIndex': '10', 'players/12/handicapUnconverted': true
+        });
+        // The number the money is computed from is untouched by this wave.
+        assert.equal(u.updates['players/0/hcp'], '7.5', 'the playing handicap is still what was typed');
         assert.ok(!Object.keys(u.updates).some(k => k === 'players'), 'CONTROL: never the whole array for a narrow edit');
     });
     test('nothing changed: no write', () => {
@@ -167,7 +182,12 @@ describe('ADD A GOLFER TO GROUP N', () => {
         const P = u.updates.players;
         assert.equal(P.length, 24);
         assert.deepEqual(P.slice(4, 9).map(p => p.name), [data.players[4].name, data.players[5].name, data.players[6].name, data.players[7].name, 'Zed Zulu']);
-        assert.deepEqual(P[8], { id: 901, name: 'Zed Zulu', hcp: '9', team: '', squad: 'red', playingForMoney: true, flight: 'B' });
+        // RE-PINNED 2026-09-23 (v213): a golfer added from the sheet goes through the
+        // same reading as an edited one. This round's tee is not rated, so his 9 is
+        // recorded as his Index and used as his playing handicap unchanged, marked
+        // handicapUnconverted - the same three-key shape an edit writes.
+        assert.deepEqual(P[8], { id: 901, name: 'Zed Zulu', hcp: '9', handicapIndex: '9', handicapUnconverted: true,
+            team: '', squad: 'red', playingForMoney: true, flight: 'B' });
         assert.deepEqual(P.slice(9).map(p => p.id), data.players.slice(8).map(p => p.id), 'groups 3-6: the same ids in the same order');
         assert.deepEqual(u.updates.groupSizeOverrides, { 0: 4, 1: 5, 2: 4, 3: 4, 4: 4, 5: 3 });
         assert.equal(u.money, 'Pot $460 → $480 · Flight B 11 → 12. Scores are in — net finish and skins will recompute.');

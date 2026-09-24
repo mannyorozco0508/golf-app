@@ -364,7 +364,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v212-handicap-legible';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v213-index-box';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);
@@ -475,6 +475,15 @@ describe('COLD CHROME: Home shows the card, the button sends, the link preserves
         const r = await arriveCold({
             url: fileUrl('admin.html', 'apiKey=test-key&oobCode=oob-cold&mode=signIn&lang=en'),
             db: DB,
+            // NOT A SETTLE-WINDOW PROBLEM, measured (v213). This test fails about
+            // half the time, always the same way: probe.linked is 1, probe.uid and
+            // authBootState.uid are both 'anon-cold' - so the credential HAS been
+            // linked onto the anonymous user and the uid is preserved - and only
+            // #email-link-status is empty. Raising this to 6000 did not help: 4 of
+            // 5 runs still failed, where 4000 failed 2 of 4. So the sentence is
+            // not written LATE on those runs, it is not written at all, and the
+            // race is in the page's own note rendering rather than in this check.
+            // Left at 4000 deliberately; the defect is reported, not papered over.
             settleMs: 4000,
             viewport: { width: 390, height: 844 },
             preScript: LINK_STUB,

@@ -174,9 +174,101 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
         });
     });
 
-    test('bulk paste still has its deferred path', () => {
+    // RE-PINNED 2026-09-23 (v213). WHAT HAPPENED, investigated before changing
+    // anything: this test had been red since the USGA Index wave (PR #12), and the
+    // deferred path was never dropped. That wave changed the batch call's SECOND
+    // argument - the box now shows the Handicap Index when the round has one, so
+    // `p.hcp` became `shown` (admin.html's appendPlayerFrom) - and this assertion
+    // pinned the call as one literal string including `p.hcp`. deferRefresh is
+    // still passed as `true` in the same position, and the batch still calls
+    // updateCount() exactly once at the end. So: the call changed on purpose, the
+    // one-refresh behaviour is intact, and the test was pinning a spelling.
+    //
+    // It is now pinned by ARGUMENT POSITION rather than by the whole call's text,
+    // and - because a source pin cannot tell a working optimisation from a
+    // comment - by what the rebuild actually does. "the rebuild refreshes ONCE"
+    // below is the assertion that would have caught a real regression here; this
+    // one would not have.
+    test('bulk paste still has its deferred path (pinned by position, not by spelling)', () => {
         assert.ok(/deferRefresh/.test(ADM), 'the bulk optimisation must survive');
-        assert.ok(/addPlayerRow\(p\.name, p\.hcp, p\.team, p\.squad, false, p\.playingForMoney !== false, existingData\.length, true, p\.id, p\.flight\)/.test(ADM),
-            'batch rebuilds still pass deferRefresh = true, and now carry the row id');
+        const at = ADM.indexOf('function appendPlayerFrom');
+        assert.ok(at > 0, 'the batch rebuild still goes through appendPlayerFrom');
+        const call = ADM.slice(ADM.indexOf('addPlayerRow(', at));
+        const args = call.slice(call.indexOf('(') + 1, call.indexOf(')')).split(',').map(a => a.trim());
+        assert.equal(args.length, 10, 'ten arguments: ' + JSON.stringify(args));
+        assert.equal(args[7], 'true', 'the 8th argument is deferRefresh, and the batch defers: ' + JSON.stringify(args));
+        assert.equal(args[8], 'p.id', 'and the row still carries the golfer\'s own id');
+        // The signature's 8th parameter really is deferRefresh - so position 8
+        // above is the right position, and this cannot drift silently.
+        const sig = ADM.slice(ADM.indexOf('function addPlayerRow('));
+        const params = sig.slice(sig.indexOf('(') + 1, sig.indexOf(')')).split(',').map(a => a.trim().split('=')[0].trim());
+        assert.equal(params[7], 'deferRefresh', 'the signature: ' + JSON.stringify(params));
+    });
+});
+
+// ============================================================================
+// AND WHAT THE REBUILD ACTUALLY DOES (v213). The pin above is a source pin, and
+// a source pin cannot tell a working optimisation from a comment about one. The
+// whole point of deferRefresh is that a roster rebuild calls updateCount() ONCE
+// instead of once per golfer - updateCount re-renders the group dividers, the
+// multi-group money rule, the flights count and the handicap note, so per-row is
+// the difference between one pass and eight over a foursome-and-a-half.
+//
+// This arrives on an existing round through the wizard's OWN loader and counts.
+// ============================================================================
+describe('THE REBUILD REFRESHES ONCE, not once per golfer', () => {
+    const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
+    const CD8 = makeCourseData(18);
+
+    // Eight golfers, as a real Monday. The wizard's arrival loader finds the
+    // record and rebuilds the list from it.
+    function round(n) {
+        const names = ['Ann', 'Ben', 'Cal', 'Dee', 'Eli', 'Fay', 'Gus', 'Hal'].slice(0, n);
+        return {
+            eventName: 'monday', roundDay: 'monday', gameFormat: 'stroke',
+            activeCourseKey: 'tst', courseName: 'Test Links', courseData: CD8,
+            players: makePlayers(names, names.map(() => 10), 101),
+            scores: {}, ownerUid: 'anon-stub', groupSizeOverrides: {}
+        };
+    }
+    // Returns how many times updateCount ran during the arrival rebuild, and how
+    // many rows the rebuild produced.
+    async function countRefreshes(n) {
+        const sb = loadHtmlInlineScript('admin.html', [], {
+            search: '?game=DEFER1',
+            beforeRun(sandbox) { sandbox.__dbReads = { 'events/DEFER1': JSON.parse(JSON.stringify(round(n))) }; }
+        });
+        sb.crypto = require('crypto').webcrypto;
+        vm.runInContext('alert = function () {};', sb);
+        // Wrapped BEFORE the arrival load resolves (it is on a timer), so the
+        // rebuild's own calls go through the counter. The page's function still
+        // runs - this counts, it does not replace.
+        vm.runInContext('window.__uc = 0; var __origUC = updateCount;'
+            + ' updateCount = function () { window.__uc++; return __origUC.apply(this, arguments); };', sb);
+        vm.runInContext('document.__mount(document.getElementById("player-list"));', sb);
+        await new Promise(r => setTimeout(r, 120));
+        return {
+            calls: Number(vm.runInContext('window.__uc', sb)),
+            rows: Number(vm.runInContext("document.querySelectorAll('#player-list .player-row').length", sb)),
+            loaded: vm.runInContext('loadedExistingRound', sb)
+        };
+    }
+
+    test('eight golfers rebuild with ONE refresh, not eight', async () => {
+        const r = await countRefreshes(8);
+        // POSITIVE FIRST: the rebuild really happened. Without this, "few
+        // refreshes" is trivially true of a rebuild that rendered nothing.
+        assert.equal(r.loaded, true, 'the wizard opened on the round');
+        assert.equal(r.rows, 8, 'eight rows were built: ' + r.rows);
+        assert.ok(r.calls <= 2, 'updateCount ran ' + r.calls + ' times for 8 golfers - the deferred path is gone');
+    });
+
+    test('and the count does not grow with the roster (4 vs 8 golfers)', async () => {
+        const four = await countRefreshes(4);
+        const eight = await countRefreshes(8);
+        assert.equal(four.rows, 4);
+        assert.equal(eight.rows, 8);
+        assert.equal(four.calls, eight.calls,
+            'the refresh count tracks the roster size: 4 golfers -> ' + four.calls + ', 8 -> ' + eight.calls);
     });
 });

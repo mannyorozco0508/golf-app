@@ -123,7 +123,18 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // the "repinned" entry); nothing else moved.
         // RE-PINNED 2026-09-22 (was ddf1e58b): v195 - the organizer strip gains the
         // 👥 Players pill (by hand, the "repinned" entry); nothing else moved.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'ab6b6f2e');
+        // RE-PINNED 2026-09-23 (was ab6b6f2e): v213 - every variant gains
+        // #handicap-basis-note display none. That element is index.html's, added by
+        // the USGA Index → Course → Playing wave (PR #12); this round's golfers have
+        // no handicapIndex, so the page hides it and writes no text into it. The
+        // three suites below had been red since that wave landed.
+        // MEASURED BEFORE RE-CAPTURING, which is the whole point of a golden: across
+        // all three links the only differences from the 6ff9332 capture were this key
+        // and #group-missing-note (which this suite deletes explicitly below), both
+        // "none", both in `display`. The `text` map was byte-identical - 0 entries
+        // added, 0 changed, 0 removed - so no sentence on any of the three links
+        // moved. Added by hand, the fixture's "repinned" entry.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'c3bb774b');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

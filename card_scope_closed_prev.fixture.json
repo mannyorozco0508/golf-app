@@ -39,7 +39,8 @@
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "none",
     "superseded-banner": "none",
-    "gap-banner": "none"
+    "gap-banner": "none",
+    "handicap-basis-note": "none"
    },
    "filtered": [
     "Ivy",
@@ -89,7 +90,8 @@
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "flex",
     "superseded-banner": "none",
-    "gap-banner": "none"
+    "gap-banner": "none",
+    "handicap-basis-note": "none"
    },
    "filtered": [
     "Ann",
@@ -153,7 +155,8 @@
     "wolfcall-payout-container": "none",
     "group-pick-overlay": "none",
     "superseded-banner": "none",
-    "gap-banner": "none"
+    "gap-banner": "none",
+    "handicap-basis-note": "none"
    },
    "filtered": [
     "Ann",
@@ -195,6 +198,10 @@
   {
    "date": "2026-09-22",
    "why": "v195: the organizer strip on the bare link gains the 👥 Players pill after ✏️ Edit round setup (players_sheet_test.js). Exactly that substring added by hand; every other character is the capture."
+  },
+  {
+   "date": "2026-09-23",
+   "why": "v213: every variant gains #handicap-basis-note display none. The element is index.html:1403, added by the USGA Index -> Course -> Playing wave (PR #12); this round's golfers have no handicapIndex, so refreshHandicapBasisNote hides it and writes no text. Verified before re-capturing: across all three links the ONLY differences from the capture were this key and #group-missing-note (which the suite deletes explicitly), both \"none\", in display - the text map was byte-identical, 0 changed and 0 removed entries. Added by hand, the \"repinned\" entry; every other character is still the 6ff9332 capture."
   }
  ]
 }

@@ -5232,12 +5232,51 @@ html {
         if (el) el.style.display = 'none';
         psSnapshot = null;
     }
-    // v212: the Index/Course line beside a Players-sheet row's handicap box.
-    // One builder (handicap-labels.js) with the Board, so the two surfaces
-    // cannot drift into two different sentences about the same numbers.
+    // v213: WHAT THE BOX HOLDS, and what it is called.
+    //
+    // On a GHIN round the box is the golfer's Handicap INDEX - the number they
+    // know, the number on the tee sheet - and the line under it says what that
+    // converts to on this round's tee. v212 showed the Playing Handicap in the box
+    // with an Index named beside it, which meant typing into it wrote hcp and left
+    // the stored Index describing a number no longer derived from it.
+    // On an "as entered" round nothing changed: the box is the Playing Handicap.
+    function psBoxIsIndex() {
+        return (typeof handicapBasisOf === 'function') && handicapBasisOf(currentData) === 'ghin-index';
+    }
+    function psBoxValue(p) {
+        if (!psBoxIsIndex()) return String((p && p.hcp) || '');
+        const idx = p && p.handicapIndex;
+        if (idx !== undefined && idx !== null && String(idx).trim() !== '') return String(idx);
+        // No stored Index: the box starts from the number the round does have, and
+        // on a GHIN round a change to it is read as an Index (the same rule
+        // admin.html's wizard uses for a row loaded from a pre-conversion round).
+        return String((p && p.hcp) || '');
+    }
+    function psBoxLabel() { return psBoxIsIndex() ? 'Index' : 'HCP'; }
+    // The line under the box. One builder (handicap-labels.js) with the Board and
+    // the Game tab, so the three surfaces cannot drift into three sentences about
+    // the same numbers.
     function psHcpNote(p) {
-        const label = (typeof handicapCompactLabel === 'function') ? handicapCompactLabel(p) : null;
-        return label ? '<span class="ps-hcp-note">' + escapeHtml(label) + '</span>' : '';
+        if (!psBoxIsIndex()) return '';
+        const note = (typeof handicapBoxNote === 'function') ? handicapBoxNote(psBoxValue(p), currentData, p) : null;
+        return note ? '<span class="ps-hcp-note">' + escapeHtml(note) + '</span>' : '';
+    }
+    // LIVE, as they type. The row's own note, recomputed from what is in the box
+    // now - so an organizer changing an index sees the Course Handicap it will
+    // become before they save, not after.
+    function psHcpBoxInput(box) {
+        const row = box && box.closest ? box.closest('.ps-row') : null;
+        if (!row) return;
+        let note = row.querySelector('.ps-hcp-note');
+        const text = (typeof handicapBoxNote === 'function')
+            ? handicapBoxNote(String(box.value || ''), currentData, null) : null;
+        if (!text) { if (note) note.textContent = ''; return; }
+        if (!note) {
+            note = document.createElement('span');
+            note.className = 'ps-hcp-note';
+            row.appendChild(note);
+        }
+        note.textContent = text;
     }
     function renderPlayersSheet(data) {
         const body = document.getElementById('players-sheet-body');
@@ -5252,7 +5291,7 @@ html {
                 const out = p.out === true;
                 html += '<div class="ps-row' + (out ? ' ps-is-out' : '') + '" data-idx="' + i + '" data-id="' + escapeAttr(p.id) + '">'
                     + '<input class="ps-name" type="text" value="' + escapeAttr(p.name) + '" placeholder="Name">'
-                    + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(p.hcp || '') + '" placeholder="HCP">'
+                    + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(psBoxValue(p)) + '" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
                     + '<button type="button" class="ps-flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
                     + '<select class="ps-grp" data-group="' + b.group + '" aria-label="Group" onchange="psRefreshMoney()">'
                     + boundaries.map(x => '<option value="' + x.group + '"' + (x.group === b.group ? ' selected' : '') + '>G' + x.group + '</option>').join('')
@@ -5285,7 +5324,7 @@ html {
         const row = document.createElement('div');
         row.className = 'ps-row ps-new'; row.setAttribute('data-group', String(group));
         row.innerHTML = '<input class="ps-name" type="text" value="" placeholder="New golfer">'
-            + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="HCP">'
+            + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
             + '<button type="button" class="ps-flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
             + '<span class="ps-grp-new">G' + group + '</span>'
             + '<span class="ps-out">new</span>';
@@ -5313,6 +5352,45 @@ html {
         });
         return draft;
     }
+    // v213: WHAT THE BOX'S TEXT MEANS, AND WHICH KEYS IT WRITES. The one place
+    // the sheet turns a typed number into stored fields, so the edit path and the
+    // add path cannot disagree.
+    //
+    //   as-entered   { hcp: text }  - exactly as before this wave.
+    //   GHIN         the text is an INDEX. handicap.js's convertHandicapIndex
+    //                (not reimplemented) gives the Course and Playing numbers, and
+    //                all three are written TOGETHER. hcp is never written alone,
+    //                because hcp is what every net and every dollar comes from and
+    //                an hcp with a stale Index beside it is a number nobody can
+    //                explain.
+    //   GHIN, tee not rated  the Index is still stored and hcp takes the typed
+    //                number, marked handicapUnconverted so every screen says so.
+    //                Any stored courseHandicap is DELETED rather than left to
+    //                describe a conversion that no longer holds.
+    // A null means "delete this key" - update() semantics, the same way Out
+    // already clears players/N/out.
+    function psHandicapFieldsFor(typed, data) {
+        const text = String(typed === undefined || typed === null ? '' : typed).trim();
+        const basis = (typeof handicapBasisOf === 'function') ? handicapBasisOf(data) : 'ghin-index';
+        if (basis === 'as-entered') return { hcp: text };
+        if (text === '') return { hcp: '', handicapIndex: null, courseHandicap: null, handicapUnconverted: null };
+        const conv = (typeof convertHandicapIndex === 'function') ? convertHandicapIndex(text, (data && data.teeRating) || null) : null;
+        if (!conv) return { hcp: text };
+        if (conv.ok) return { hcp: conv.playingText, handicapIndex: conv.indexText, courseHandicap: conv.course, handicapUnconverted: null };
+        return { hcp: conv.indexText, handicapIndex: conv.indexText, courseHandicap: null, handicapUnconverted: true };
+    }
+    // What the box SHOWS for a golfer as stored - the value an unchanged box
+    // holds, so "they did not touch it" can be told from "they typed the same
+    // thing", and neither writes anything.
+    function psShownHandicap(p, data) {
+        const basis = (typeof handicapBasisOf === 'function') ? handicapBasisOf(data) : 'ghin-index';
+        if (basis === 'ghin-index') {
+            const idx = p && p.handicapIndex;
+            if (idx !== undefined && idx !== null && String(idx).trim() !== '') return String(idx);
+        }
+        return String((p && p.hcp) || '');
+    }
+
     // PURE. From the record and a draft: the one update, the roster it would
     // leave, the warnings, the refusals and the money line. `whole` says the
     // write must be the whole players node (a golfer was added or moved).
@@ -5329,8 +5407,23 @@ html {
             const p = players[e.idx]; if (!p) return;
             const name = e.name === '' ? p.name : e.name;   // an emptied name is not a rename
             if (name !== p.name) { updates['players/' + e.idx + '/name'] = name; p.name = name; changed = true; }
-            const hcp = String(e.hcp === undefined ? (p.hcp || '') : e.hcp);
-            if (hcp !== String(p.hcp || '')) { updates['players/' + e.idx + '/hcp'] = hcp; p.hcp = hcp; changed = true; }
+            // THE HANDICAP BOX (v213). Compared as the box SHOWS it - the Index on
+            // a GHIN round - and then written through the one field builder, every
+            // derived key with it.
+            const shown = psShownHandicap(p, data);
+            const typedBox = String(e.hcp === undefined ? shown : e.hcp);
+            if (typedBox !== shown) {
+                const fields = psHandicapFieldsFor(typedBox, data);
+                Object.keys(fields).forEach(k => {
+                    const next = fields[k];
+                    const had = (p[k] === undefined) ? null : p[k];
+                    if (next === null && had === null) return;          // nothing to delete
+                    if (next !== null && String(had) === String(next) && typeof had === typeof next) return;
+                    updates['players/' + e.idx + '/' + k] = next;
+                    if (next === null) delete p[k]; else p[k] = next;
+                    changed = true;
+                });
+            }
             if (flightsOn) {
                 const flight = e.flight === 'B' ? 'B' : 'A';
                 if (flight !== (p.flight === 'B' ? 'B' : 'A')) { updates['players/' + e.idx + '/flight'] = flight; p.flight = flight; changed = true; }
@@ -5393,7 +5486,13 @@ html {
             adds.forEach(a => {
                 const g = Math.max(1, Math.min(sizes.length, parseInt(a.group, 10) || 1));
                 let end = 0; for (let k = 0; k < g; k++) end += sizes[k];
-                const np = { id: nextId++, name: a.name, hcp: String(a.hcp || ''), team: '', squad: end % 2 === 0 ? 'red' : 'blue', playingForMoney: true };
+                // v213: an added golfer goes through the same conversion as an
+                // edited one - a number typed into an "Index" box is an Index
+                // wherever it was typed. Null fields are simply not set on a new
+                // golfer (there is nothing to delete).
+                const np = { id: nextId++, name: a.name, hcp: '', team: '', squad: end % 2 === 0 ? 'red' : 'blue', playingForMoney: true };
+                const addFields = psHandicapFieldsFor(a.hcp, data);
+                Object.keys(addFields).forEach(k => { if (addFields[k] !== null) np[k] = addFields[k]; });
                 if (flightsOn) np.flight = a.flight === 'B' ? 'B' : 'A';
                 players.splice(end, 0, np);
                 sizes[g - 1] += 1;
