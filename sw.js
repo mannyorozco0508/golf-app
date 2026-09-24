@@ -1912,7 +1912,15 @@
 // The consumer product cache is consumer-v58-aloha-main. The tournament product
 // cache stays tournament-v54-rattle-golf. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v216-aloha-main';
+// Moved to v217 because a listed golfer can Confirm or mark out before tee time.
+// The headcount lives at events/<code>/attendance/<playerId> and is drawn on the
+// scorecard, on setup, on Round Ready, and on each Road Trip day. attendance.js
+// is new and precached; index.html, admin.html and trip.html load it. A device
+// on v216 has the roster and no way to say who is actually playing. No engine
+// changed. The consumer product cache is consumer-v59-attendance. The tournament
+// product cache stays tournament-v54-rattle-golf. The iOS binary in review is
+// not resubmitted.
+const CACHE_VERSION = 'golfapp-v217-attendance';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1976,6 +1984,10 @@ const SHELL_FILES = [
     './score-marks.js',
     './scorecard-rows.js',
     './text-safe.js',
+    // attendance.js (v217): Confirm or mark out before tee time. index, admin and
+    // trip load it. A cached shell without it shows the roster and never the
+    // headcount.
+    './attendance.js',
     './money-engine.js',
     './settlement-engine.js',
     // ryder-cup.js is loaded unguarded by index.html, so a cached shell without it

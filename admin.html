@@ -37,6 +37,7 @@
          sentences; the Matches tab uses the rules. One definition of both. -->
     <script src="aloha-bet.js"></script>
     <script src="text-safe.js"></script>
+    <script src="attendance.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
          which is what lets Consumer and Tournament stop sharing an origin without
@@ -608,6 +609,13 @@ html {
          a CDN at runtime, on the most-used screen, inside a native bundle where
          that fails offline. tournament.html keeps its own - a tournament pins one
          code for the whole field, which is the case a QR actually suits. -->
+
+    <!-- WHO'S PLAYING, on an existing round. Hidden until the roster is loaded.
+         Golfers confirm from the scorecard link; the organizer can mark someone
+         here too. Not a wizard step: Monday morning they open the round and the
+         count is the first thing under the code. -->
+    <div id="setup-attendance" style="display:none; margin:10px 0 4px 0;"></div>
+    <div id="setup-attendance-note" role="status" style="font-size:0.78rem; color:var(--accent-red); margin:0 0 12px 0;"></div>
 
     <div class="wizard-progress" id="wizard-progress"></div>
 
@@ -1552,7 +1560,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     <div id="rr-players-box" class="wizard-review-row" style="flex-direction:column; align-items:stretch; margin-bottom:14px;">
         <span class="wr-label" style="margin-bottom:6px;">Players</span>
+        <div id="rr-attendance-count" style="font-size:0.95rem; font-weight:800; color:var(--brand-green); margin-bottom:6px;"></div>
         <div id="rr-players-list" style="font-size:0.9rem; line-height:1.6;"></div>
+        <div id="rr-attendance-note" role="status" style="font-size:0.78rem; color:var(--accent-red); margin-top:6px;"></div>
     </div>
 
     <!-- Round Ready answers the two questions a golfer actually has, in the order they
@@ -1960,6 +1970,107 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         db.ref(`events/${modeKey}`).once('value').then((snapshot) => {
             const data = snapshot.val() || {};
             renderRoundReady(data);
+            watchRoundReadyAttendance(modeKey);
+        });
+    }
+
+    // Names, handicaps, and Confirm / Can't. The count is the same sentence the
+    // scorecard uses. A round with no attendance node — every round saved before
+    // this — reads as nobody having answered, not as everyone out.
+    function paintRoundReadyRoster(data) {
+        const players = (data && data.players) || [];
+        const list = document.getElementById('rr-players-list');
+        const countEl = document.getElementById('rr-attendance-count');
+        if (!list) return;
+        const summary = (typeof summarizeAttendance === 'function')
+            ? summarizeAttendance(players, data && data.attendance)
+            : null;
+        const byId = {};
+        if (summary) summary.rows.forEach(r => { byId[r.id] = r; });
+        list.innerHTML = players.length > 0
+            ? players.map(p => {
+                const facing = (typeof handicapFacingLabel === 'function') ? handicapFacingLabel(p) : null;
+                const hcpBit = facing
+                    ? ` <span style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(facing)}</span>`
+                    : (p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${escapeHtml(String(p.hcp))})</span>` : '');
+                const id = (typeof attendancePlayerId === 'function') ? attendancePlayerId(p) : null;
+                const word = (id && byId[id] && typeof attendanceStatusWord === 'function')
+                    ? attendanceStatusWord(byId[id].status) : '';
+                const statusBit = word
+                    ? ` <span class="att-state" style="color:var(--text-muted); font-size:0.8rem;">\u00B7 ${escapeHtml(word)}</span>`
+                    : '';
+                const buttons = (id && byId[id] && typeof attendanceChoiceButtons === 'function')
+                    ? attendanceChoiceButtons(id, byId[id].status) : '';
+                return `${escapeHtml(p.name)}${hcpBit}${statusBit}${buttons}`;
+            }).join('<br>')
+            : `<span style="color:var(--text-muted);">No players added yet</span>`;
+        if (countEl) {
+            countEl.textContent = (summary && players.length && typeof attendanceCountLine === 'function')
+                ? attendanceCountLine(summary) : '';
+        }
+    }
+
+    function watchRoundReadyAttendance(modeKey) {
+        if (window.__rrAttUnsub) window.__rrAttUnsub();
+        window.__rrAttUnsub = (typeof watchAttendance === 'function')
+            ? watchAttendance(db, modeKey, function (att) {
+                if (!currentSavedRound) return;
+                currentSavedRound.attendance = att;
+                paintRoundReadyRoster(currentSavedRound);
+            })
+            : function () {};
+    }
+
+    let setupAttendancePlayers = [];
+    let setupAttendanceMap = {};
+    function paintSetupAttendance(att) {
+        const mount = document.getElementById('setup-attendance');
+        if (!mount) return;
+        setupAttendanceMap = (att && typeof att === 'object') ? att : {};
+        if (!setupAttendancePlayers.length || typeof attendancePanelHtml !== 'function') {
+            mount.style.display = 'none';
+            mount.innerHTML = '';
+            return;
+        }
+        mount.style.display = 'block';
+        mount.innerHTML = attendancePanelHtml(setupAttendancePlayers, setupAttendanceMap, {
+            heading: "Who's playing",
+            note: 'Golfers confirm from the scorecard link. You can mark someone here too.'
+        });
+    }
+    function showSetupAttendance(code, players, attendance) {
+        setupAttendancePlayers = (players || []).slice();
+        paintSetupAttendance(attendance || {});
+        if (window.__setupAttUnsub) window.__setupAttUnsub();
+        window.__setupAttUnsub = (typeof watchAttendance === 'function' && setupAttendancePlayers.length)
+            ? watchAttendance(db, code, paintSetupAttendance)
+            : function () {};
+    }
+
+    function sayAttendance(msg) {
+        ['setup-attendance-note', 'rr-attendance-note'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = msg || '';
+        });
+    }
+
+    function confirmAttendance(playerId, status) {
+        if (typeof commitAttendance !== 'function') return;
+        commitAttendance(db, currentMode, playerId, status, Date.now()).then(function (rec) {
+            if (currentSavedRound && typeof applyLocalAttendance === 'function') {
+                applyLocalAttendance(currentSavedRound, playerId, rec);
+                paintRoundReadyRoster(currentSavedRound);
+            }
+            if (setupAttendancePlayers.length) {
+                if (!setupAttendanceMap || typeof setupAttendanceMap !== 'object') setupAttendanceMap = {};
+                setupAttendanceMap[String(playerId)] = rec;
+                paintSetupAttendance(setupAttendanceMap);
+            }
+            sayAttendance('');
+        }, function (err) {
+            sayAttendance(typeof attendanceWriteError === 'function'
+                ? attendanceWriteError(err)
+                : "Couldn't save that. Check your signal.");
         });
     }
 
@@ -2000,15 +2111,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         renderRoundReadyLinks(data);
 
         const players = data.players || [];
-        document.getElementById('rr-players-list').innerHTML = players.length > 0
-            ? players.map(p => {
-                const facing = (typeof handicapFacingLabel === 'function') ? handicapFacingLabel(p) : null;
-                const hcpBit = facing
-                    ? ` <span style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(facing)}</span>`
-                    : (p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${escapeHtml(String(p.hcp))})</span>` : '');
-                return `${escapeHtml(p.name)}${hcpBit}`;
-            }).join('<br>')
-            : `<span style="color:var(--text-muted);">No players added yet</span>`;
+        paintRoundReadyRoster(data);
 
         // SCORING vs ACTION.
         //
@@ -6702,6 +6805,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
 
             if (restoreFailure) reportRoundLoadFailure(modeKey, restoreFailure);
+            // The headcount, once the roster is on screen. A copy loads another
+            // round's setup into a new code, so it does not show that round's
+            // answers. A fresh code has no one to confirm yet.
+            if (isThisRound && snapshot.exists() && data.players && data.players.length) {
+                showSetupAttendance(modeKey, data.players, data.attendance);
+            }
         }).catch(err => {
             // The read itself, or the roster rebuild, failed: say so - never a
             // silent rejection with a half-drawn wizard behind it.

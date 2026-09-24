@@ -61,6 +61,22 @@
         "additionalGameInstances": {
           ".write": "root.child('events/' + $eventCode).exists()"
         },
+        "attendance": {
+          ".write": "root.child('events/' + $eventCode).exists()",
+          ".validate": "newData.val() === null || newData.hasChildren()",
+          "$playerId": {
+            ".validate": "$playerId.matches(/^[0-9]+$/) && (newData.val() === null || (newData.hasChildren(['status', 'at']) && newData.child('status').val().matches(/^(in|out)$/) && newData.child('at').isNumber() && newData.child('at').val() > 0))",
+            "status": {
+              ".validate": "newData.val().matches(/^(in|out)$/)"
+            },
+            "at": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "holeBetStake": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
         },

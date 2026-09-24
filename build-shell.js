@@ -80,7 +80,10 @@ const PRODUCTS = {
         // Moved to v52. The course step fills Slope and Course Rating from the
         // tee the golfer picks. A device on v51 still shows the hand-typed
         // Slope / Rating / Par block.
-        cacheName: 'consumer-v58-aloha-main',
+        // Moved to v59. Confirm or mark out before tee time (attendance.js on the
+        // scorecard, setup, Round Ready, and each trip day). A device on v58
+        // has the roster and no headcount.
+        cacheName: 'consumer-v59-attendance',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

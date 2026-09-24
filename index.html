@@ -42,6 +42,7 @@
          calls into. -->
     <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
+    <script src="attendance.js"></script>
     <script src="product-links.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
@@ -1414,6 +1415,11 @@ html {
          renderGroupMissingNote() from renderScorecard(); static and above both
          view mounts for the same reason #save-state is. -->
     <div class="group-missing-note" id="group-missing-note" role="alert" style="display:none;"></div>
+    <!-- WHO'S PLAYING, before any score. Static, like #save-state: the hole
+         card is rewritten on every snapshot and would wipe a card placed inside
+         it. Filled by renderAttendance() from the round listener. -->
+    <div id="attendance-mount"></div>
+    <div id="attendance-note" role="status" style="font-size:0.78rem; color:var(--accent-red); margin:-6px 0 10px 0;"></div>
     <div id="handicap-basis-note" class="match-hcp-note" style="display:none; white-space:pre-line;"></div>
 
     <div id="hole-view-container">
@@ -2634,6 +2640,46 @@ html {
     // The widgets under the hole card, in one list, so the closed path below and
     // the open path above cannot drift apart. Each closes itself on a link whose
     // group is not in this round (scopedPlayers() / scopeMissing()).
+    // WHO'S PLAYING. The round listener calls renderScorecard, which calls this.
+    // A group link sees its own four; the bare link and the organizer see the
+    // field. Confirming writes events/<code>/attendance/<playerId> only — it
+    // does not touch the roster and it does not make anyone the organizer.
+    function renderAttendance() {
+        const mount = document.getElementById('attendance-mount');
+        if (!mount) return;
+        if (typeof attendancePanelHtml !== 'function' || !currentData || scopeMissing() || !(currentData.players || []).length) {
+            mount.innerHTML = '';
+            return;
+        }
+        const players = scopedPlayers();
+        if (!players.length) { mount.innerHTML = ''; return; }
+        const grouped = !!lockedGroup;
+        mount.innerHTML = attendancePanelHtml(players, currentData.attendance, {
+            heading: grouped ? 'Your group' : "Who's playing",
+            note: grouped
+                ? 'Confirm for this group. The organizer sees the whole round.'
+                : 'Tap your name before tee time.'
+        });
+    }
+
+    function sayAttendance(msg) {
+        const el = document.getElementById('attendance-note');
+        if (el) el.textContent = msg || '';
+    }
+
+    function confirmAttendance(playerId, status) {
+        if (typeof commitAttendance !== 'function') return;
+        commitAttendance(db, currentMode, playerId, status, Date.now()).then(function (rec) {
+            if (typeof applyLocalAttendance === 'function') applyLocalAttendance(currentData, playerId, rec);
+            renderAttendance();
+            sayAttendance('');
+        }, function (err) {
+            sayAttendance(typeof attendanceWriteError === 'function'
+                ? attendanceWriteError(err)
+                : "Couldn't save that. Check your signal.");
+        });
+    }
+
     function renderCardWidgets() {
         renderKpEntryMount();
         renderWhoAmI();
@@ -8527,6 +8573,7 @@ html {
 
         if (!currentData || Object.keys(currentData).length === 0 || !currentData.players) {
             document.getElementById("card-body").innerHTML = `<tr><td colspan="5" style="padding: 20px; color: var(--text-muted);">${emptyRoundMessage()}</td></tr>`;
+            renderAttendance();
             return;
         }
 
@@ -8592,6 +8639,10 @@ html {
         }
         window.__scFilteredPlayers = filteredPlayers;
         window.__scGroupMissing = groupMissing;
+        // After the group filter is set, so a foursome link confirms its four
+        // and the bare link confirms the whole Monday. Before the money work:
+        // a later throw must not hide the headcount.
+        renderAttendance();
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
         renderSupersededBanner();
         renderGapBanner(viewGaps);

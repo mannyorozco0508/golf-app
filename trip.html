@@ -33,6 +33,7 @@
     <!-- Same native print failure as the Receipt; same shared fix. -->
     <script src="native-export.js"></script>
     <script src="text-safe.js"></script>
+    <script src="attendance.js"></script>
     <!-- Place and tie payout allocation, shared with Tournament Mode. The rule was
          written out twice - here and in tournament-engine.js - until the shared-core
          extraction. Loaded ahead of the inline block so nothing below can shadow it. -->
@@ -1362,6 +1363,7 @@ html {
                 <div class="rc-info">
                     <div class="rc-label">${r.label}</div>
                     <div class="rc-sub">Game code: ${code}</div>
+                    ${attendanceByRound[code] ? `<div class="rc-sub rc-attendance">${escapeHtml(attendanceByRound[code])}</div>` : ''}
                     ${isOrg
                         ? `<div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
                         ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
@@ -1424,6 +1426,7 @@ html {
     }
 
     let cachedRoundResults = [];      // every linked round, regardless of counted status
+    let attendanceByRound = {};       // code -> the headcount sentence, once that round has loaded
     let cachedCountedResults = [];    // only rounds still counting toward trip totals
     let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
     let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
@@ -1736,6 +1739,15 @@ html {
             .then(results => {
                 cachedRoundResults = results;
                 cachedCountedResults = results.filter(r => r.countsTowardTrip);
+                attendanceByRound = {};
+                if (typeof summarizeAttendance === 'function' && typeof attendanceCountLine === 'function') {
+                    results.forEach(r => {
+                        const players = (r.data && r.data.players) || [];
+                        if (!players.length) return;
+                        attendanceByRound[r.code] = attendanceCountLine(summarizeAttendance(players, r.data.attendance));
+                    });
+                }
+                renderRoundsList();
                 renderPlaceholderNameWarning(results);
                 // ONCE, BEFORE ANYTHING RENDERS. Every surface below reads the answer
                 // rather than asking the question again.
