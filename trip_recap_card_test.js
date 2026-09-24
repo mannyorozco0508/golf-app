@@ -67,7 +67,7 @@ function recap({ confirmed = true, rounds = 2, name = 'Myrtle Beach 2026',
         tripData = { name: ${JSON.stringify(name)} };
         cachedRoundResults = ${empty ? '[]' : JSON.stringify(linked)};
         cachedCountedResults = cachedRoundResults;
-        window.__alerts = []; alert = m => window.__alerts.push(String(m));
+        window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         if (!${empty}) { renderCumulativeLeaderboard(); renderTripMoneySettlement(); renderTripAwards(); }
     `, sb);
     return {

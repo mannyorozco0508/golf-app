@@ -257,7 +257,7 @@ function tripRecap(share) {
     const sb = loadHtmlInlineScript('trip.html', TRIP_DEPS, { search: '?trip=MYR1' });
     vm.runInContext(`
         window.__copied = []; window.__alerts = [];
-        alert = m => window.__alerts.push(String(m));
+        alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         navigator.clipboard.writeText = t => { window.__copied.push(String(t)); return Promise.resolve(); };
         currentTripCode = 'MYR1';
         tripData = { name: 'Myrtle Beach 2026' };

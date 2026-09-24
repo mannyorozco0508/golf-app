@@ -55,7 +55,7 @@ function wizard(opts) {
     const o = opts || {};
     const sb = loadHtmlInlineScript('admin.html', ['pwa-boot.js'], { search: '?game=GATE01' });
     vm.runInContext(`
-        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); };
+        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
         window.crypto = { getRandomValues: function (a) { for (var i = 0; i < a.length; i++) a[i] = (i * 37) & 255; return a; } };
         var key = Object.keys(coursePresets)[0];
         courseHiddenSelect.value = key; courseSearchInput.value = coursePresets[key].name;
@@ -157,7 +157,7 @@ describe('THE TRIP PLANNER BATCH stamps every round', () => {
         const o = opts || {};
         const sb = loadHtmlInlineScript('trip.html', ['course-data.js', 'code-issuer.js']);
         vm.runInContext(`
-            window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); };
+            window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
             // Distinct codes per issue (the planner reserves each one it mints).
             window.__seed = 0; window.crypto = { getRandomValues: function (a) { window.__seed++; for (var i = 0; i < a.length; i++) a[i] = (i * 37 + window.__seed * 53) & 255; return a; } };
             window.location = { href: '' };

@@ -684,7 +684,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         const gm = {}; P.forEach((pl, i) => { gm[pl.id] = Math.floor(i / 4) + 1; });
         vm.runInContext(`
             window.__writes = []; window.__alerts = [];
-            alert = m => window.__alerts.push(String(m));
+            alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
             db.ref = function (pth) { return { set: function (v) { window.__writes.push({ path: pth, value: v }); return Promise.resolve(); },
                 on: function () {}, push: function () { return { key: 'k' }; }, remove: function () { return Promise.resolve(); },
                 update: function (v) { window.__writes.push({ path: pth, value: v, atomic: true }); return Promise.resolve(); } }; };
@@ -851,7 +851,7 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
         const sb = loadHtmlInlineScript('index.html', PAGE);
         vm.runInContext(`
             window.__writes = []; window.__alerts = [];
-            alert = m => window.__alerts.push(String(m));
+            alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
             db.ref = function (pth) { return { set: function (v) { window.__writes.push({ path: pth, value: v }); return Promise.resolve(); },
                 on: function () {}, push: function () { return { key: 'k' }; },
                 remove: function () { return Promise.resolve(); },

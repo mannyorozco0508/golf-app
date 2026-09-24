@@ -2024,7 +2024,28 @@
 // The consumer product cache is consumer-v67-ui-dialogs. The tournament product
 // cache stays tournament-v54-rattle-golf. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v226-ui-dialogs';
+// Moved to v227 because the SCORECARD stops speaking as a website too. UI Wave 2
+// sweeps index.html the way Wave 1 swept the Action page: 35 alerts become 11
+// inline refusals, 20 persistent failures and 4 toasts, and its THREE decisions -
+// record that nobody won the KP, cancel all KPs for the round, and delete the
+// round for everyone - go through the shared sheet and are awaited.
+//
+// DELETE ROUND IS THE ONE THAT MATTERED. It was written `if (confirm(msg))`, so a
+// missed await would have made it ALWAYS TRUE and deleted every score, bet, press
+// and side match for everyone without asking. It is now driven both ways in real
+// Chrome, which was impossible before Wave 1 taught cold-arrival about native
+// dialogs, and Cancel is the focused control so nobody deletes a round by
+// double-tapping where the last button was.
+//
+// ui-dialogs.js is REUSED, not forked - no second copy of the component or its
+// CSS. A device on v226 keeps the browser dialogs on the scorecard. No engine and
+// no protected file changed; the KP money paths still ask before they move
+// anything, proven both ways. admin.html and trip.html are still unconverted and
+// their remaining decisions are counted in dialog_await_guard_test.js so the last
+// of the sweep cannot be forgotten. The consumer product cache is
+// consumer-v68-index-dialogs. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v227-index-dialogs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

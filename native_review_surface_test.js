@@ -131,7 +131,7 @@ const INSTRUMENT = `
     };
     window.__gcWrites = [];
     window.__alerts = [];
-    window.alert = function (m) { window.__alerts.push(String(m)); };
+    window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
     window.confirm = function () { return true; };
     (function () {
         var iv = setInterval(function () {

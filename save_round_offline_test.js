@@ -61,7 +61,7 @@ function pageReadyToSave(opts) {
         }
     });
     vm.runInContext(`
-        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); };
+        window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
         window.__updates = []; window.__sets = []; window.__setsResolve = {};
         window.crypto = { getRandomValues: function (a) { for (var i = 0; i < a.length; i++) a[i] = (i * 37) & 255; return a; } };
         db.ref = function (p) { return {

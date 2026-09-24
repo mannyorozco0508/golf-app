@@ -48,7 +48,7 @@ function round(kpHoles) {
 function boot(data, hole, group) {
     const sb = loadHtmlInlineScript('index.html', DEPS, { search: '?game=KPP1' + (group ? '&group=' + group : '') });
     vm.runInContext(`
-        window.__writes = []; window.__alerts = []; alert = m => window.__alerts.push(String(m));
+        window.__writes = []; window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         db.ref = function (p) { return { set: function (v) { window.__writes.push({ path: p, value: v }); return Promise.resolve(); },
             update: function (v) { window.__writes.push({ path: p, value: v }); return Promise.resolve(); }, remove: function () { return Promise.resolve(); },
             on: function () {}, push: function () { return { key: 'k' }; } }; };

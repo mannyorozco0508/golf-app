@@ -73,7 +73,7 @@ function arrive(search, records, delays, rejectNth) {
         };
         sandbox.crypto = require('crypto').webcrypto;
     } });
-    run(sb, 'alert = function (m) { window.__alerts.push(String(m)); }; window.__alerts = window.__alerts || [];');
+    run(sb, 'alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert; window.__alerts = window.__alerts || [];');
     run(sb, 'globalCourses = ' + JSON.stringify({ comm_links: { name: 'Test Links', data: CD } }) + ';');
     run(sb, 'document.__mount(document.getElementById("player-list"));');
     sb.__log = log;

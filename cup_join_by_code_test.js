@@ -170,7 +170,7 @@ describe('THE ENTRY: JOIN A CUP BY CODE', () => {
             currentMode = 'RB';
             currentData = ${JSON.stringify(roundOf(FOUR))};
             hasGroupLock = false; lockedGroup = null;
-            window.__alerts = []; alert = m => window.__alerts.push(String(m));
+            window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
             window.__writes = {};
             // db is a const on this page, so its REF is replaced rather than the
             // binding - an earlier draft assigned to db and died on "Assignment to

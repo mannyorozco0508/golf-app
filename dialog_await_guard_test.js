@@ -40,7 +40,7 @@ const { REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // CONVERTED — must be clean. Every page here has been through the wave.
-const CONVERTED = ['sidematches.html', 'skins.html', 'season.html',
+const CONVERTED = ['sidematches.html', 'index.html', 'skins.html', 'season.html',
                    'leaderboard.html', 'settlement.html', 'game.html'];
 
 // NOT YET CONVERTED, and the count of native decisions each still has.
@@ -50,7 +50,10 @@ const CONVERTED = ['sidematches.html', 'skins.html', 'season.html',
 // go wrong loudly: converting a page without moving it to CONVERTED above fails
 // here, and adding a FOURTEENTH native decision to a page that still has some
 // also fails here. Neither can drift quietly while the guard reports green.
-const PENDING = { 'index.html': 3, 'admin.html': 6, 'trip.html': 1 };
+// UI Wave 2 moved index.html out of here and into CONVERTED above: 35 alerts and
+// its 3 confirms - the KP nobody-won, cancel-all-KPs and delete-round decisions.
+// The count dropping is the point of pinning it.
+const PENDING = { 'admin.html': 6, 'trip.html': 1 };
 
 const CONSUMER = CONVERTED.concat(Object.keys(PENDING));
 const OUT_OF_SCOPE = ['tournament.html', 'tournament-scorecard.html'];

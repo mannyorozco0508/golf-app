@@ -52,7 +52,7 @@ function boot(data, hole, group) {
     const sb = loadHtmlInlineScript('index.html', [], { search: '?game=KPQ1' + (group ? '&group=' + group : '') });
     sb.__d = data;
     run(sb, `
-        window.__writes = []; window.__alerts = []; alert = m => window.__alerts.push(String(m));
+        window.__writes = []; window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         db.ref = function (p) { return { set: function (v) { window.__writes.push({ path: p, value: v }); return Promise.resolve(); },
             update: function (v) { window.__writes.push({ path: p, value: v }); return Promise.resolve(); }, remove: function () { return Promise.resolve(); },
             on: function () {}, once: function () { return Promise.resolve({ val: function () { return null; } }); }, push: function () { return { key: 'k' }; } }; };

@@ -58,7 +58,7 @@ function trip({ code = 'MYR1', href = 'https://golf-app-5a5.pages.dev/trip.html'
         linked.push({ label, countsTowardTrip: true, data: roundData(i, confirmed) }));
     vm.runInContext(`
         window.__copied = []; window.__alerts = [];
-        alert = m => window.__alerts.push(String(m));
+        alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         navigator.clipboard.writeText = t => { window.__copied.push(t); return Promise.resolve(); };
         window.location.href = ${JSON.stringify(href)};
         currentTripCode = ${code === null ? 'null' : JSON.stringify(code)};

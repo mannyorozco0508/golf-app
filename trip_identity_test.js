@@ -49,7 +49,7 @@ function arrive(rounds, identity) {
     const sb = loadHtmlInlineScript('trip.html', DEPS);
     vm.runInContext(`tripData = ${JSON.stringify({ name: 'Myrtle Beach 2026', identity })}; currentTripCode = 'TRIP1';
         cachedRoundResults = ${JSON.stringify(rounds)}; cachedCountedResults = cachedRoundResults.filter(r => r.countsTowardTrip);
-        window.__alerts = []; alert = m => window.__alerts.push(String(m));
+        window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         recomputeTripGate(); renderTripRoster(); renderTripIdentityQuestions();
         renderCumulativeLeaderboard(); renderTripMoneySettlement(); renderTripAwards(); renderPointsRace(); openTripRecap();`, sb);
     return sb;

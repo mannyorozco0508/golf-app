@@ -262,7 +262,10 @@ describe('THE SCORECARD PRESS AMOUNT PICKER', () => {
     });
 
     test('invalid custom input is rejected, never coerced', () => {
-        assert.match(CONFIRM, /if \(isNaN\(amt\) \|\| amt <= 0\) \{ alert\('Enter a dollar amount above 0\.'\); return; \}/);
+        // UI Wave 2: the refusal is an inline note now, not an alert. The shape
+        // this pins - reject, do not coerce, and return - is unchanged, which is
+        // the thing the test is actually about.
+        assert.match(CONFIRM, /if \(isNaN\(amt\) \|\| amt <= 0\) \{ uiRefuse\('Enter a dollar amount above 0\.'\); return; \}/);
         assert.ok(!/parseFloat\(el\.value\) \|\| /.test(CONFIRM), 'no silent fallback for a blank field');
     });
 
@@ -355,7 +358,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v226-ui-dialogs';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v227-index-dialogs';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

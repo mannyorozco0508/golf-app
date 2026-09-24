@@ -68,7 +68,7 @@ function trip(names, opts) {
         currentTripCode = 'TRIP1';
         cachedRoundResults = ${JSON.stringify(linked)};
         cachedCountedResults = cachedRoundResults.filter(r => r.countsTowardTrip);
-        window.__alerts = []; alert = m => window.__alerts.push(String(m));
+        window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m));
         renderCumulativeLeaderboard();
         renderTripMoneySettlement();
         renderTripAwards();

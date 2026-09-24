@@ -63,7 +63,7 @@ function tapButton(sb, html, buttonRe) {
 
 function ready(n) {
     const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js', 'code-issuer.js', 'grouping.js']);
-    vm.runInContext("window.__alerts = []; alert = m => window.__alerts.push(String(m)); document.__mount(document.getElementById('rr-links-box')); currentMode = 'MNDY2A'; location = { href: 'https://golf-app-5a5.pages.dev/admin.html', origin: 'https://golf-app-5a5.pages.dev', pathname: '/admin.html' }; window.location = location;", sb);
+    vm.runInContext("window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m)); document.__mount(document.getElementById('rr-links-box')); currentMode = 'MNDY2A'; location = { href: 'https://golf-app-5a5.pages.dev/admin.html', origin: 'https://golf-app-5a5.pages.dev', pathname: '/admin.html' }; window.location = location;", sb);
     sb.__d = round(n);
     vm.runInContext('renderRoundReadyLinks(__d);', sb);
     return { sb, html: String(vm.runInContext("document.getElementById('rr-links-box').innerHTML", sb)), alerts: () => JSON.parse(vm.runInContext('JSON.stringify(window.__alerts)', sb)) };
@@ -125,7 +125,7 @@ describe('ROUND READY (admin.html)', () => {
 function scorecard(n, opts) {
     const o = opts || {};
     const sb = loadHtmlInlineScript('index.html', [], { search: '?game=MNDY2A' + (o.organizer ? '&organizer=tok' : '') });
-    vm.runInContext("window.__alerts = []; alert = m => window.__alerts.push(String(m)); document.__mount(document.getElementById('group-links-panel'));", sb);
+    vm.runInContext("window.__alerts = []; alert = m => window.__alerts.push(String(m)); uiRefuse = m => window.__alerts.push(String(m)); uiFail = m => window.__alerts.push(String(m)); uiToast = m => window.__alerts.push(String(m)); document.__mount(document.getElementById('group-links-panel'));", sb);
     const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/MNDY2A');
     const d = round(n); if (o.organizer) d.organizerToken = 'tok';
     h.cb({ val: () => JSON.parse(JSON.stringify(d)), exists: () => true });
