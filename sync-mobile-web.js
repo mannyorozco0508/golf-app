@@ -122,6 +122,9 @@ const CONSUMER_SHELL = [
     // links the anonymous uid rather than minting an account. Tournament keeps
     // email-and-password and must not inherit this file.
     'email-link-auth.js',
+    // Confirm or mark out before tee time. index.html, admin.html and trip.html
+    // load it. Consumer only: a tournament field is not this headcount.
+    'attendance.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

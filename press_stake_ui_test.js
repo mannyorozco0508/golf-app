@@ -355,7 +355,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v216-aloha-main';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v217-attendance';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 
@@ -373,7 +373,7 @@ describe('SERVICE WORKER', () => {
         // all load it, and it issues every round, trip and tournament code and
         // checks the code is free first. A cached shell without it cannot start
         // anything at all.
-        assert.equal(entries.length, 51);  // 51: aloha-bet.js joined (v215)  // 50: handicap-labels.js joined (v212: the "Index 18 · Course 17" label, loaded unguarded by four pages);  // 46: email-link-auth.js joined (v203: lobby email-link sign-in, keeps the anonymous uid);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 52);  // 52: attendance.js joined (v217)  // 51: aloha-bet.js joined (v215)  // 50: handicap-labels.js joined (v212: the "Index 18 · Course 17" label, loaded unguarded by four pages);  // 46: email-link-auth.js joined (v203: lobby email-link sign-in, keeps the anonymous uid);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139, every Consumer page); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         assert.ok(entries.indexOf('./bet-strip.js') !== -1, 'bet-strip.js is precached and must stay so');
     });
 

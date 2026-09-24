@@ -548,7 +548,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v216-aloha-main';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v217-attendance';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -594,7 +594,7 @@ describe('SERVICE WORKER', () => {
         // 51 since aloha-bet.js joined (v215): nine pages load it, and every page
         // that SETTLES loads it before settlement-engine.js - a cached shell without
         // it settles rounds with no Aloha and shows a different total.
-        assert.equal(entries.length, 51, 'the shell list gained or lost an entry');  // 46: email-link-auth.js joined (v203);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement)
+        assert.equal(entries.length, 52, 'the shell list gained or lost an entry');  // 52: attendance.js joined (v217)  // 46: email-link-auth.js joined (v203);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement)
     });
 
     test('fetch strategy is unchanged - still network-first', () => {

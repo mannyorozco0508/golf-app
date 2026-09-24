@@ -105,7 +105,24 @@ function scenario() {
         [`events/${code}/wolfCalls/h3`]: { canWrite: [{ auth: 'nobody', data: { caller: 101 } }, { auth: 'nobody', data: null }] },
         [`events/${code}/strokePresses/sp1`]: { canWrite: [{ auth: 'nobody', data: { startHole: 2, stake: 10 } }] },
         [`events/${code}/ryderFoursomes/m1/A/h1`]: { canWrite: [{ auth: 'nobody', data: 4 }, { auth: 'nobody', data: null }] },
-        [`events/${code}/additionalGameInstances/i1`]: { canWrite: [{ auth: 'nobody', data: { format: 'skins' } }] }
+        [`events/${code}/additionalGameInstances/i1`]: { canWrite: [{ auth: 'nobody', data: { format: 'skins' } }] },
+        // Confirm / Can't. A code-holder, not the organizer. Same open grant as a score.
+        [`events/${code}/attendance/101`]: {
+            canWrite: [
+                { auth: 'nobody', data: { status: 'in', at: 1 } },
+                { auth: 'nobody', data: { status: 'out', at: 2 } },
+                { auth: 'nobody', data: null },
+                { auth: 'stranger', data: { status: 'in', at: 3 } }
+            ],
+            cannotWrite: [
+                { auth: 'nobody', data: { status: 'maybe', at: 1 } },
+                { auth: 'nobody', data: { status: 'in' } },
+                { auth: 'nobody', data: { status: 'in', at: 'now' } },
+                { auth: 'nobody', data: 'in' },
+                { auth: 'nobody', data: { status: 'in', at: 1, name: 'Ann' } }
+            ]
+        },
+        [`events/${code}/attendance/Marty`]: { cannotWrite: [{ auth: 'nobody', data: { status: 'in', at: 1 } }] }
     });
     const tests = Object.assign({
         // CREATION - the gate
@@ -192,7 +209,7 @@ describe('THE DRAFT, against every scenario', () => {
         assert.equal(r.code, 0);
     });
     test('THE MONDAY ROWS: every participation write by NOBODY on the owned round and on the legacy one is allowed', () => {
-        const monday = rs.filter(x => x[2] === 'null' && /^events\/(OWNED1|LEGACY1)\/(scores|kpWinners|kpConfirmed|sideMatches|matchPresses|dots|auditLog|scoresVerified|groupSizeOverrides|eventName)/.test(x[0]) && x[3] === '✓');
+        const monday = rs.filter(x => x[2] === 'null' && /^events\/(OWNED1|LEGACY1)\/(scores|kpWinners|kpConfirmed|sideMatches|matchPresses|dots|auditLog|scoresVerified|groupSizeOverrides|eventName|attendance)/.test(x[0]) && x[3] === '✓');
         assert.ok(monday.length >= 26, 'unauthenticated participation rows: ' + monday.length);
         monday.forEach(x => assert.equal(x[4], '✓', x.join(' | ')));
     });
@@ -220,10 +237,10 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
     control('creation opened to nobody (auth != null dropped)', r => { r.events.$eventCode['.write'] = "(!data.exists()) || (data.exists() && (newData.exists() || !data.hasChild('scores')))"; r.events.$eventCode.ownerUid['.validate'] = '(!data.parent().exists()) || (data.exists() && newData.val() === data.val())'; },
         [[/^events\/NEW1$/, 'null'], [/^events\/NEW1$/, 'newcomer']]);
     control('PARTICIPATION requiring auth - the mutation that breaks Mondays', r => {
-        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances'].forEach(k => {
+        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances', 'attendance'].forEach(k => {
             r.events.$eventCode[k]['.write'] = 'auth != null && ' + r.events.$eventCode[k]['.write'];
         });
-    }, [[/^events\/OWNED1\/scores\/p102_h1$/, 'null'], [/^events\/OWNED1\/kpWinners\/h3$/, 'null'], [/^events\/OWNED1\/dots\/h4$/, 'null'], [/^events\/OWNED1\/ryderFoursomes\/m1\/A\/h1$/, 'null'], [/^events\/EMAIL1\/scores\/p101_h2$/, 'null']]);
+    }, [[/^events\/OWNED1\/scores\/p102_h1$/, 'null'], [/^events\/OWNED1\/kpWinners\/h3$/, 'null'], [/^events\/OWNED1\/dots\/h4$/, 'null'], [/^events\/OWNED1\/ryderFoursomes\/m1\/A\/h1$/, 'null'], [/^events\/EMAIL1\/scores\/p101_h2$/, 'null'], [/^events\/OWNED1\/attendance\/101$/, 'null']]);
     // A child .write:false cannot revoke a parent grant. Legacy Monday is the
     // parent clause, so requiring auth on the play grants does not touch it.
     // The rows above are the owned rounds, where the child grant is the only
@@ -258,6 +275,19 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
         assert.ok(!w.some(x => /^events\/LEGACY1\/scores\/p102_h1$/.test(x[0])), 'legacy scores stay open through the parent: ' + JSON.stringify(w.filter(x => /LEGACY1\/scores/.test(x[0]))));
         assert.ok(w.some(x => /^events\/EMAIL1\/scores\/p101_h2$/.test(x[0]) && x[2] === 'null'), 'an owned round must not keep scoring through the parent');
     });
+    test('removing ONLY the attendance grant refuses a code-holder confirm on an owned round and still allows the legacy round', () => {
+        const r = ev();
+        delete r.rules.events.$eventCode.attendance['.write'];
+        const p = path.join(TMP, 'attendance_grant_removed.json');
+        fs.writeFileSync(p, JSON.stringify(r));
+        const w = wrong(run(p).out);
+        assert.ok(w.some(x => /^events\/OWNED1\/attendance\/101$/.test(x[0]) && x[2] === 'null'),
+            'owned confirm by nobody must go red: ' + JSON.stringify(w.filter(x => /attendance/.test(x[0])).map(x => x[0] + '/' + x[2])));
+        assert.ok(!w.some(x => /^events\/LEGACY1\/attendance\/101$/.test(x[0])),
+            'legacy confirms stay open through the parent: ' + JSON.stringify(w.filter(x => /LEGACY1\/attendance/.test(x[0]))));
+        assert.ok(!w.some(x => /^events\/OWNED1\/scores\/p102_h1$/.test(x[0])),
+            'pulling the attendance grant must not touch scoring');
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -281,7 +311,7 @@ describe('THE SEAM - two meanings of auth, kept apart', () => {
         assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"), 'legacy: ' + w.slice(-110));
         assert.ok(!/organizerToken/.test(w), 'the token is world-readable and is not a rules credential');
         const open = "root.child('events/' + $eventCode).exists()";
-        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances'].forEach(k => {
+        ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'auditLog', 'scoresVerified', 'wolfCalls', 'ryderCup', 'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances', 'attendance'].forEach(k => {
             assert.equal(ev[k]['.write'], open, k);
             assert.ok(!/auth/.test(ev[k]['.write']), k + ' must stay open to a code-holder');
         });
