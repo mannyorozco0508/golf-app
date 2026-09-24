@@ -1892,7 +1892,27 @@
 // and carries no Aloha arithmetic. The consumer product cache is
 // consumer-v57-aloha. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v215-aloha';
+// Moved to v216 because the ALOHA BET now works on the MAIN GAME too - the
+// round's own Match Play, Nassau, best ball, scramble or Ryder - and not only on
+// side matches. v215 shipped it for side matches alone because the approved wiring
+// put the main game's Aloha on the Receipt and NOT in the ledger: measured then at
+// Receipt net 20 -> 40 with the golfer's ledger net stuck at 10. The fourth edit
+// books it where the main game's money is actually booked
+// (computeCombinedNetTotals' getRoundGames branch), so the Receipt segment, the
+// itemised ledger line and the net totals now carry one number - asserted in both
+// directions, and the v215 measurement is kept as a guard. A stroke-play main game
+// refuses it, by FORMAT and not merely by a missing stake. The offer row is on the
+// Matches tab above the side matches; the main game's record lives at
+// matchPresses/aloha and a side match's on itself, one function knowing both.
+// aloha-bet.js and sidematches.html are precached, so a device on v215 would offer
+// nothing on the main game and settle nothing for it. money-engine.js is
+// byte-identical; settlement-engine.js carries the four approved edits and no
+// Aloha arithmetic. The trip footer sentence is unchanged: the ledger label is
+// prefixed "Main Game ·" so it is covered by the category already named there.
+// The consumer product cache is consumer-v58-aloha-main. The tournament product
+// cache stays tournament-v54-rattle-golf. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v216-aloha-main';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

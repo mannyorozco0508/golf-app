@@ -303,6 +303,13 @@ describe('THE RENDERER USES THE CANONICAL NORMALIZER', () => {
 
     test('side matches keep their own renderer on Matches, with the pointer prepended', () => {
         assert.ok(/visibleIds\.sort/.test(sm), 'the side match loop must remain');
-        assert.ok(/list\.innerHTML = roundGamesLine \+ html;/.test(sm), 'round games are named first, not merged in');
+        // RE-PINNED v216: the Aloha row for the ROUND'S OWN match is prepended
+        // between the pointer and the side-match list. The point of the original
+        // assertion stands and is what is checked - the round's games are NAMED
+        // first rather than merged into the side-match markup - and the side-match
+        // html is still the last thing concatenated, unchanged.
+        assert.ok(/list\.innerHTML = roundGamesLine \+ mainAlohaLine \+ html;/.test(sm),
+            'round games are named first, then the main game\'s Aloha row, then the side matches');
+        assert.ok(!/roundGamesLine \+ html\b/.test(sm), 'and the old two-part concatenation is gone');
     });
 });

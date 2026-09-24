@@ -69,6 +69,12 @@ function covered(list, label, catalogLabels, mainLabels) {
     const l = String(label);
     const has = re => list.some(x => re.test(x));
     if (/^Side Match/.test(l)) return has(/side match/i);
+    // v215/v216: the Aloha bet. Its ledger label always names the wager it sits on
+    // FIRST - "Side Match · Aloha …" or "Main Game · Aloha …" - so it is covered by
+    // the category that wager already belongs to. That is why the footer sentence
+    // did not need a seventh category: an Aloha is not a new kind of money, it is
+    // more of the money the golfer is already told about.
+    if (/^Main Game/.test(l)) return has(/main game/i);
     if (l === 'Birdie Pool') return has(/birdie/i);
     if (l === 'KP') return has(/\bKP/i);
     // The engine's ledger label is still MAIN_POOL_LEDGER_LABEL = 'Main Pool'
@@ -131,7 +137,11 @@ describe('THE FOOTER SAYS WHAT IS IN THE TOTAL', () => {
             // TRIP_TOTAL_INCLUDES ('the Aloha bet'), which is what this test exists
             // to force - a new money source cannot reach a golfer's total until the
             // sentence that describes the total says it is in there.
-            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'aLabel', 'label', 'smLabel', 'smLabel2'],
+            // mLabel since v216: the MAIN GAME's Aloha bet. Prefixed "Main Game ·"
+            // in settlement-engine.js so it is covered by the footer's own category
+            // "the main game" - covered() below has the rule, and the sentence a
+            // golfer reads is untouched.
+            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'aLabel', 'label', 'mLabel', 'smLabel', 'smLabel2'],
             'settlement-engine gained or renamed a money source; the trip footer '
             + 'must name it too. Found: ' + JSON.stringify(seen));
     });

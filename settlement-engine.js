@@ -1134,6 +1134,37 @@
             });
         });
 
+        // v216, EDIT 4 OF 4 (approved): THE MAIN GAME'S ALOHA.
+        //
+        // It has to be booked HERE, and that is the whole point of this edit. The
+        // main game's money is the loop above - getRoundGames into
+        // computeGameNetByPlayerId - and nothing in it ever sees a side-match shape.
+        // v215 wired the Aloha onto legacyMainAsSideMatch, which feeds
+        // buildSideMatchReceipts only, and measured the result: the Receipt net moved
+        // 20 -> 40 while the golfer's ledger net stayed at 10. A Receipt that
+        // disagrees with the ledger is the one failure this feature must not have, so
+        // the main game shipped without it until this line existed.
+        //
+        // NO GOLF MATH HERE. aloha-bet.js decides whether anything settles, for how
+        // much, and which side won the hole - it calls the same calculateMatchEngine
+        // the side-match path calls. This hands over the round and books what comes
+        // back, split per side exactly as the side-match branch below does.
+        //
+        // THE LABEL IS PREFIXED "Main Game ·" so trip.html's TRIP_TOTAL_INCLUDES
+        // covers it under "the main game" - the sentence that tells a golfer what a
+        // trip total contains stays true without being rewritten.
+        const mainAloha = (typeof alohaSettledForMainGame === 'function')
+            ? alohaSettledForMainGame(data, courseData, savedScores) : null;
+        if (mainAloha && mainAloha.toSideA !== 0) {
+            const sideA = allPlayers.filter(p => mainAloha.sideAIds.indexOf(String(p.id)) > -1);
+            const sideB = allPlayers.filter(p => mainAloha.sideBIds.indexOf(String(p.id)) > -1);
+            if (sideA.length > 0 && sideB.length > 0) {
+                const mLabel = `Main Game · ${mainAloha.label} · ${sideA.map(p => p.name).join('/')} vs ${sideB.map(p => p.name).join('/')}`;
+                sideA.forEach(p => addAmount(p, mainAloha.toSideA / sideA.length, mLabel));
+                sideB.forEach(p => addAmount(p, -mainAloha.toSideA / sideB.length, mLabel));
+            }
+        }
+
         // Birdie pool
         const birdieTotals = calculateBirdieGameTotalsForSettle(data, courseData, savedScores);
         Object.keys(birdieTotals).forEach(pid => {

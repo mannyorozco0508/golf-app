@@ -478,48 +478,173 @@ describe('7. IT NEVER TOUCHES THE OTHER POTS', () => {
     });
 });
 
-describe('8. THE MAIN GAME IS NOT IN THIS WAVE, AND A STRAY RECORD PAYS NOTHING', () => {
-    // WHY, measured. The approved plan carried the main game's Aloha through
-    // legacyMainAsSideMatch, on my reading that it is the shared path for the
-    // Receipt AND the ledger. It is not - it feeds buildSideMatchReceipts only, and
-    // the main game's money is booked by getRoundGames/computeGameNetByPlayerId.
-    // With the Aloha wired there, a $20 main-game match measured:
-    //     Receipt net  20 -> 40      ledger net  10 -> 10
-    // which is the Receipt-disagrees-with-the-ledger defect this feature exists to
-    // avoid. So the main game is OUT until it can be done in both places, and this
-    // holds that a record sitting at matchPresses/aloha moves nothing at all -
-    // no half-built path that pays on one screen and not the other.
-    const mainRound = (aloha) => {
-        const base = roundWith(null, { win: 'A' });
+describe('8. THE MAIN GAME, AND ALL THREE PLACES AGREE THERE TOO', () => {
+    // v216. v215 shipped the side match only, because the approved wiring put the
+    // main game's Aloha on the Receipt and NOT in the ledger - measured then as
+    //     Receipt net 20 -> 40      ledger net 10 -> 10
+    // which is the shape this block exists to prevent from ever coming back. The
+    // fourth edit books it where the main game's money is actually booked, and the
+    // last test here is that v215 measurement turned into a guard.
+    const mainRound = (aloha, opts) => {
+        const o = opts || {};
+        const base = roundWith(null, { win: o.win || 'A' });
         return Object.assign({}, base, {
             gameFormat: 'match', matchScoring: 'gross', matchStake: 20, sideMatches: {},
             matchPresses: aloha ? { aloha } : {}
         });
     };
-    const ACCEPTED = { offeredBySide: 'B', mode: 'double', amount: 20, hole: 18, status: 'accepted' };
+    const ACC = (extra) => Object.assign({ offeredBySide: 'B', mode: 'double', amount: 20, hole: 18, status: 'accepted' }, extra || {});
+    // Ann and Cal are Team 1 (side A); Ben and Dee are Team 2. A $20 match, closed
+    // 2 up before 18, so the hole itself cannot move the match's own money.
+    const alohaLine = (t, name) => linesOf(t, name).filter(l => !l.note).find(l => /Aloha/i.test(String(l.label)));
 
-    test('the Receipt does not show it', () => {
+    test('THE RECEIPT shows the Aloha segment on the main game', () => {
         const sb = ENGINE();
-        const withRec = receiptsOf(sb, mainRound(ACCEPTED));
-        const without = receiptsOf(sb, mainRound(null));
-        assert.ok(withRec.length > 0, 'the main game still has a receipt');
-        const labels = (withRec[0].segments || []).map(x => String(x.label));
-        assert.ok(!labels.some(l => /Aloha/i.test(l)), 'no Aloha segment: ' + JSON.stringify(labels));
-        assert.equal(withRec[0].net, without[0].net, 'and the net is untouched: ' + withRec[0].net);
+        const r = receiptsOf(sb, mainRound(ACC()))[0];
+        const seg = (r.segments || []).find(x => /Aloha/i.test(String(x.label)));
+        assert.ok(seg, 'a segment: ' + JSON.stringify((r.segments || []).map(x => x.label)));
+        assert.equal(seg.stake, 20);
+        assert.equal(seg.startHole, 18);
+        assert.equal(seg.money, 20);
+        assert.equal(r.net, 40, 'the match net doubles: ' + r.net);
     });
-    test('the ledger does not show it either - so the two still agree', () => {
+    test('THE LEDGER moves too - this is the v215 failure, fixed', () => {
         const sb = ENGINE();
-        const a = totalsOf(sb, mainRound(ACCEPTED));
-        const b = totalsOf(sb, mainRound(null));
-        assert.deepEqual(J(a.netByName), J(b.netByName), 'the ledger moved');
-        assert.ok(!linesOf(a, 'ann').some(l => /Aloha/i.test(String(l.label))), 'no Aloha line: '
-            + JSON.stringify(linesOf(a, 'ann').map(l => l.label)));
+        const withA = totalsOf(sb, mainRound(ACC()));
+        const without = totalsOf(sb, mainRound(null));
+        const line = alohaLine(withA, 'Ann');
+        assert.ok(line, "Ann's ledger names it: " + JSON.stringify(linesOf(withA, 'Ann').map(l => l.label)));
+        assert.equal(line.amount, 10, 'her half of the $20, two golfers a side: ' + line.amount);
+        assert.equal(netOf(withA, 'Ann') - netOf(without, 'Ann'), 10, 'and her net moves by it');
+        assert.equal(netOf(withA, 'Ben') - netOf(without, 'Ben'), -10, "and Ben's the other way");
     });
-    test('and there is no way to create one: the Matches tab only ever writes under sideMatches', () => {
-        const page = read('sidematches.html');
-        const writes = (page.match(/sideMatches\/\$\{matchId\}\/aloha/g) || []).length;
-        assert.ok(writes >= 2, 'the offer and the answer both write there: ' + writes);
-        assert.ok(!/matchPresses[^\n]*aloha/.test(page), 'nothing writes matchPresses/aloha');
+    test('THE THREE PLACES AGREE: the Receipt segment, the ledger line and the net totals', () => {
+        const sb = ENGINE();
+        const withA = totalsOf(sb, mainRound(ACC()));
+        const without = totalsOf(sb, mainRound(null));
+        const r = receiptsOf(sb, mainRound(ACC()))[0];
+        const seg = (r.segments || []).find(x => /Aloha/i.test(String(x.label)));
+        // one $20, three places: the segment, the four ledger lines, the four nets
+        assert.equal(seg.money, 20);
+        const booked = ['Ann', 'Cal'].reduce((n, k) => n + alohaLine(withA, k).amount, 0);
+        assert.equal(booked, 20, 'side A is booked the whole $20 between them: ' + booked);
+        const moved = ['Ann', 'Cal'].reduce((n, k) => n + (netOf(withA, k) - netOf(without, k)), 0);
+        assert.equal(moved, 20, 'and their nets move by exactly that: ' + moved);
+        const movedB = ['Ben', 'Dee'].reduce((n, k) => n + (netOf(withA, k) - netOf(without, k)), 0);
+        assert.equal(movedB, -20, 'with side B down the same: ' + movedB);
+    });
+    test('THE OTHER DIRECTION: the losing side wins 18 and the day is squared', () => {
+        const sb = ENGINE();
+        const withA = totalsOf(sb, mainRound(ACC(), { win: 'B' }));
+        const without = totalsOf(sb, mainRound(null, { win: 'B' }));
+        const r = receiptsOf(sb, mainRound(ACC(), { win: 'B' }))[0];
+        assert.equal(r.net, 0, 'squared: ' + r.net);
+        assert.equal(netOf(withA, 'Ann') - netOf(without, 'Ann'), -10, "Ann's net drops by her half");
+        assert.equal(netOf(withA, 'Ben') - netOf(without, 'Ben'), 10);
+    });
+    test('A HALVED LAST HOLE moves nothing, and DECLINED/UNANSWERED settle as no bet', () => {
+        const sb = ENGINE();
+        const none = totalsOf(sb, mainRound(null));
+        assert.deepEqual(J(totalsOf(sb, mainRound(ACC(), { win: 'halved' })).netByName),
+            J(totalsOf(sb, mainRound(null, { win: 'halved' })).netByName), 'a halved hole paid somebody');
+        ['declined', 'offered'].forEach(status => {
+            assert.deepEqual(J(totalsOf(sb, mainRound(ACC({ status }))).netByName), J(none.netByName), status + ' moved money');
+        });
+        // the positive control, in the same test
+        assert.notDeepEqual(J(totalsOf(sb, mainRound(ACC())).netByName), J(none.netByName));
+    });
+    test('THE HALF VARIANT on the main game', () => {
+        const sb = ENGINE();
+        const r = receiptsOf(sb, mainRound(ACC({ mode: 'half', amount: 10 })))[0];
+        const seg = (r.segments || []).find(x => /Aloha/i.test(String(x.label)));
+        assert.match(String(seg.label), /half/i, seg.label);
+        assert.equal(r.net, 30, 'a $20 deficit grows to $30: ' + r.net);
+        const withA = totalsOf(sb, mainRound(ACC({ mode: 'half', amount: 10 })));
+        assert.equal(alohaLine(withA, 'Ann').amount, 5, 'her quarter of the $10 pair-split: ' + alohaLine(withA, 'Ann').amount);
+    });
+    test('A STROKE-PLAY main game refuses it, the same as a stroke side match', () => {
+        const sb = ENGINE();
+        const stroke = Object.assign({}, mainRound(ACC()), { gameFormat: 'stroke', matchStake: 0 });
+        const none = Object.assign({}, mainRound(null), { gameFormat: 'stroke', matchStake: 0 });
+        assert.deepEqual(J(totalsOf(sb, stroke).netByName), J(totalsOf(sb, none).netByName),
+            'a stroke-play main game must not settle an Aloha');
+    });
+    test('...and it is the FORMAT that refuses it, not just the absence of a stake', () => {
+        // A stroke round can carry matchStake from a format the organizer looked at
+        // and moved away from, so "no stake" is not what makes this safe - the format
+        // list is. Without this case the format gate could be deleted and nothing
+        // would notice.
+        const sb = ENGINE();
+        const stroke = Object.assign({}, mainRound(ACC()), { gameFormat: 'stroke', matchStake: 20 });
+        const none = Object.assign({}, mainRound(null), { gameFormat: 'stroke', matchStake: 20 });
+        assert.deepEqual(J(totalsOf(sb, stroke).netByName), J(totalsOf(sb, none).netByName),
+            'a stroke-play round with a leftover matchStake must still refuse it');
+        assert.equal(A.alohaMainGameMatch({ gameFormat: 'stroke', matchStake: 20,
+            players: makePlayers(['Ann', 'Ben'], [0, 0], 101) }), null, 'and the shape refuses it outright');
+    });
+    test('THE LEDGER IS STILL ZERO-SUM with a main-game Aloha in it', () => {
+        const sb = ENGINE();
+        [null, ACC(), ACC({ status: 'declined' }), ACC({ mode: 'half', amount: 10 })].forEach(a => {
+            ['A', 'B', 'halved'].forEach(win => {
+                const t = totalsOf(sb, mainRound(a, { win }));
+                const sum = Object.keys(t.netByName).reduce((n, k) => n + t.netByName[k].net, 0);
+                assert.ok(Math.abs(sum) < 0.0001, JSON.stringify(a) + '/' + win + ' is not zero-sum: ' + sum);
+            });
+        });
+    });
+    test('THE v215 SHAPE, AS A GUARD: the Receipt and the ledger move together or not at all', () => {
+        const sb = ENGINE();
+        [{ win: 'A' }, { win: 'B' }, { win: 'halved' }].forEach(o => {
+            const rA = receiptsOf(sb, mainRound(ACC(), o))[0].net;
+            const rN = receiptsOf(sb, mainRound(null, o))[0].net;
+            const tA = netOf(totalsOf(sb, mainRound(ACC(), o)), 'Ann');
+            const tN = netOf(totalsOf(sb, mainRound(null, o)), 'Ann');
+            assert.equal(rA !== rN, tA !== tN,
+                o.win + ': the Receipt moved ' + (rA !== rN) + ' and the ledger moved ' + (tA !== tN)
+                + ' (Receipt ' + rN + '->' + rA + ', ledger ' + tN + '->' + tA + ')');
+        });
+    });
+    test('IT NEVER TOUCHES THE OTHER POTS on the main game either', () => {
+        const sb = ENGINE();
+        const pool = (d) => { sb.__d = J(d); return J(run(sb, 'computeMoneyPool(__d, __d.courseData, __d.scores)')); };
+        const skins = (d) => { sb.__d = J(d); return J(run(sb, 'computeSkinsHoleLedger(__d, __d.courseData, __d.scores)')); };
+        assert.deepEqual(pool(mainRound(ACC())), pool(mainRound(null)), 'the Weekly Game moved');
+        assert.deepEqual(skins(mainRound(ACC())), skins(mainRound(null)), 'the skins ledger moved');
+        // and the only money-moving line that appears anywhere is the Aloha
+        const acc = totalsOf(sb, mainRound(ACC()));
+        const dec = totalsOf(sb, mainRound(null));
+        ['ann', 'ben', 'cal', 'dee'].forEach(k => {
+            const moving = (t) => linesOf(t, k).filter(l => !l.note).map(l => l.label + ' | ' + l.amount).sort();
+            const added = moving(acc).filter(x => moving(dec).indexOf(x) === -1);
+            const lost = moving(dec).filter(x => moving(acc).indexOf(x) === -1);
+            assert.deepEqual(lost, [], k + ' lost a line: ' + JSON.stringify(lost));
+            assert.equal(added.length, 1, k + ' gains exactly one: ' + JSON.stringify(added));
+            assert.match(added[0], /Aloha/, k + ': ' + added[0]);
+        });
+    });
+    test('the main game\'s match shape agrees with the engine\'s own legacyMainAsSideMatch', () => {
+        // FORCED DUPLICATION, tested rather than hoped. legacyMainAsSideMatch lives
+        // in the protected file and cannot be exported to a page, so aloha-bet.js
+        // carries its own alohaMainGameMatch for the offer UI. If the two ever
+        // disagree about the teams, the scoring or the stake, the offer a golfer
+        // sees and the money that settles come from two different matches.
+        const sb = ENGINE();
+        const d = mainRound(null);
+        sb.__d = J(d);
+        const legacy = J(run(sb, 'legacyMainAsSideMatch(__d)'));
+        const mine = J(A.alohaMainGameMatch(d));
+        assert.ok(legacy && mine, 'both produce a shape');
+        ['format', 'scoring', 'stake', 'startHole'].forEach(k =>
+            assert.deepEqual(mine[k], legacy[k], k + ': ' + mine[k] + ' vs ' + legacy[k]));
+        assert.deepEqual(mine.teamAIds, legacy.teamAIds);
+        assert.deepEqual(mine.teamBIds, legacy.teamBIds);
+    });
+    test('and it refuses the shapes legacyMainAsSideMatch refuses', () => {
+        assert.equal(A.alohaMainGameMatch({ gameFormat: 'stroke', matchStake: 20, players: [] }), null, 'stroke play');
+        assert.equal(A.alohaMainGameMatch({ gameFormat: 'match', matchStake: 0, players: [] }), null, 'no stake');
+        const oneSided = { gameFormat: 'match', matchStake: 20, players: makePlayers(['Ann', 'Ben'], [0, 0], 101) };
+        oneSided.players.forEach(p => { p.team = 'Team 1'; });
+        assert.equal(A.alohaMainGameMatch(oneSided), null, 'nobody on the other side');
     });
 });
 
@@ -566,7 +691,7 @@ describe('9. THE ALOHA RECORD IS NOT A PRESS', () => {
         assert.notDeepEqual(changed, calcWith([]), 'a real press must move the match');
         assert.ok(changed.pressCount > 0, 'and it is counted: ' + changed.pressCount);
     });
-    test('and a stray record at matchPresses/aloha is not read as a press by the settled main game', () => {
+    test('and the settled main game reads it as an Aloha, never as a press', () => {
         const sb = ENGINE();
         const base = roundWith(null, { win: 'A' });
         const main = Object.assign({}, base, {
@@ -575,8 +700,7 @@ describe('9. THE ALOHA RECORD IS NOT A PRESS', () => {
         });
         const labels = (receiptsOf(sb, main)[0].segments || []).map(x => String(x.label));
         assert.ok(!labels.some(l => /^Press/i.test(l)), 'never a press: ' + JSON.stringify(labels));
-        // and nothing else either, per section 8 - it is simply ignored.
-        assert.ok(!labels.some(l => /Aloha/i.test(l)), 'and not an Aloha in this wave: ' + JSON.stringify(labels));
+        assert.ok(labels.some(l => /Aloha/i.test(l)), 'and it IS the Aloha: ' + JSON.stringify(labels));
     });
 });
 
@@ -644,5 +768,45 @@ describe('11. THE TRIP FOOTER ALREADY NAMES WHAT THIS IS', () => {
         const line = linesOf(t, 'ann').filter(l => !l.note).find(l => /Aloha/i.test(String(l.label)));
         assert.match(String(line.label), /double or nothing/i, 'the line says what the bet was: ' + line.label);
         assert.match(String(line.label), /Ann/, 'and who it was with: ' + line.label);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// THE MATCHES TAB'S WIRING FOR THE MAIN GAME (v216). The offer row is shared with
+// side matches, so what needs asserting is that the MAIN game's id routes to the
+// right node and the right card - a write to sideMatches/__main would create a
+// phantom side match, and the round's card is not a side match's scoped card.
+describe('12. THE MAIN GAME\'S OFFER WRITES TO matchPresses/aloha', () => {
+    const page = read('sidematches.html');
+    test('the row is drawn for the main game, above the side matches', () => {
+        assert.match(page, /const mainAlohaLine = mainGameAlohaRowHtml\(\);/, 'the row is built');
+        assert.equal((page.match(/roundGamesLine \+ mainAlohaLine/g) || []).length, 2,
+            'and rendered on both paths - with side matches and without');
+    });
+    test("'__main' routes to matchPresses/aloha, and a side match id to its own node", () => {
+        const at = page.indexOf('function alohaRefFor(');
+        assert.ok(at > 0, 'there is one place that decides the node');
+        const fn = page.slice(at, page.indexOf('\n    function ', at + 30));
+        assert.match(fn, /matchPresses\/aloha/, 'the main game: ' + fn);
+        assert.match(fn, /sideMatches\/\$\{matchId\}\/aloha/, 'a side match: ' + fn);
+        // and nothing writes a side match called __main
+        assert.ok(!/sideMatches\/__main/.test(page), 'no phantom side match');
+    });
+    test('both writes go through it - the offer and the answer', () => {
+        assert.equal((page.match(/db\.ref\(alohaRefFor\(matchId\)\)/g) || []).length, 2,
+            'the offer and the response both use it');
+        assert.ok(!/sideMatches\/\$\{matchId\}\/aloha`\)\s*\.(set|update)/.test(page),
+            'and neither writes the side-match path directly any more');
+    });
+    test('the main game is measured over the ROUND\'s card, not a scoped one', () => {
+        const at = page.indexOf('function alohaHolesFor(');
+        assert.ok(at > 0, 'one place decides the card');
+        const fn = page.slice(at, page.indexOf('\n    function ', at + 30));
+        assert.match(fn, /__main/, fn);
+        assert.match(fn, /currentData\.courseData/, fn);
+    });
+    test('a stroke-play round draws no row at all', () => {
+        // alohaMainGameMatch is the gate, and it is the same one the engine uses.
+        assert.equal(A.alohaMainGameMatch({ gameFormat: 'stroke', matchStake: 20, players: [] }), null);
     });
 });

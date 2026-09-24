@@ -98,8 +98,18 @@
             return s['p' + id + '_h' + hole] > 0;
         });
     }
-    function alohaRecordOf(match) {
-        return (match && match.aloha) || null;
+    // WHERE THE RECORD LIVES. A side match keeps it on itself. THE MAIN GAME keeps
+    // it at matchPresses/aloha - the only node under events/<code> that holds the
+    // main game's wagers and is writable by a code-holder under
+    // database.rules.json - so a synthetic main-game match (settlement-engine.js's
+    // legacyMainAsSideMatch, or alohaMainGameMatch below) reads it from `data`.
+    // Knowing that HERE is what keeps it out of the protected file.
+    function alohaRecordOf(match, data) {
+        if (match && match.aloha) return match.aloha;
+        if (match && (match.__legacyMain || match.__mainGame)) {
+            return (data && data.matchPresses && data.matchPresses.aloha) || null;
+        }
+        return null;
     }
     // 'A' when side A won the hole, 'B' for side B, null for a halved hole or
     // one with no result. holeWinner is a NAME from the engine's holeLog.
@@ -135,7 +145,7 @@
         };
         if (!isOn(data)) { out.reason = REASONS.off; return out; }
         if (!match || !isMatchFormat(match.format)) { out.reason = REASONS.format; return out; }
-        if (alohaRecordOf(match)) { out.reason = REASONS.exists; return out; }
+        if (alohaRecordOf(match, data)) { out.reason = REASONS.exists; return out; }
         if (!lastHole) { out.reason = REASONS.noHole; return out; }
         if (!holeIsUnscored(o.participantIds, lastHole, o.scores)) { out.reason = REASONS.scored; return out; }
         // Checked LAST of the refusals, so "all square" is what a level match is
@@ -212,7 +222,7 @@
     // already does, while the ledger - which ignores zero amounts - gains none.
     function alohaSettledForMatch(data, match, calc, matchHoles) {
         if (!isOn(data)) return null;
-        var aloha = alohaRecordOf(match);
+        var aloha = alohaRecordOf(match, data);
         if (!aloha || String(aloha.status) !== 'accepted') return null;
         if (!match || !isMatchFormat(match.format)) return null;
         var hole = Number(aloha.hole) || alohaLastHole(matchHoles);
@@ -231,6 +241,75 @@
             winnerName: winnerName || null,
             result: winnerName ? (winnerName + ' won the hole') : 'Halved — nobody pays'
         };
+    }
+
+    // THE MAIN GAME AS A MATCH (v216).
+    //
+    // A DELIBERATE, TESTED DUPLICATION. settlement-engine.js's
+    // legacyMainAsSideMatch already turns the main game into this shape, but it
+    // lives in a protected file and cannot be exported to a page - so the Matches
+    // tab needs its own copy to know who is down and by how much. The rules are
+    // identical on purpose: the same format list, the same stake fields, the same
+    // Team 1 / Team 2 derivation, the same "no stake or nobody on one side means no
+    // match". aloha_bet_test.js asserts the two shapes AGREE on a real round, so a
+    // drift between them fails the suite instead of quietly offering a bet the
+    // engine will settle differently.
+    function alohaMainGameMatch(data) {
+        var d = data || {};
+        var fmt = String(d.gameFormat || '');
+        if (!isMatchFormat(fmt)) return null;
+        var stake = fmt === 'nassau' ? Number(d.nassauStake || 0) : Number(d.matchStake || 0);
+        if (!(stake > 0)) return null;
+        var players = (d.players || []).filter(function (p) { return p && p.playingForMoney !== false; });
+        var a = players.filter(function (p) { return String(p.team || 'Team 1') === 'Team 1'; }).map(function (p) { return String(p.id); });
+        var b = players.filter(function (p) { return String(p.team || '') === 'Team 2'; }).map(function (p) { return String(p.id); });
+        if (a.length === 0 || b.length === 0) return null;
+        return {
+            __mainGame: true,
+            format: fmt,
+            scoring: fmt === 'nassau' ? (d.nassauScoring || 'net') : (d.matchScoring || 'net'),
+            stake: stake,
+            pressRule: fmt === 'nassau' ? (d.nassauPressRule || 'none') : (d.matchPressRule || 'none'),
+            presses: d.matchPresses || {},
+            teamAIds: a,
+            teamBIds: b,
+            startHole: 1
+        };
+    }
+
+    // THE MAIN GAME'S ACCEPTED ALOHA, for the one place its money is booked.
+    //
+    // settlement-engine.js's ledger books the main game through
+    // getRoundGames/computeGameNetByPlayerId, which never sees a side-match shape -
+    // which is exactly why v215 shipped a main game whose Receipt moved and whose
+    // ledger did not. This does the whole job so the protected file only has to
+    // hand over `data`, the card and the scores, and book what comes back.
+    //
+    // It calls calculateMatchEngine itself, guarded: the same engine, the same
+    // arguments the settled side-match path uses, so the hole's winner and the
+    // match's net are the engine's own numbers and not a second opinion.
+    function alohaSettledForMainGame(data, courseData, savedScores) {
+        var d = data || {};
+        var match = alohaMainGameMatch(d);
+        if (!match) return null;
+        if (!alohaRecordOf(match, d)) return null;
+        if (typeof calculateMatchEngine !== 'function') return null;
+        var idsA = match.teamAIds;
+        var players = (d.players || []).filter(function (p) { return p && p.playingForMoney !== false; });
+        var virtual = players.map(function (p) {
+            return Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' });
+        });
+        var presses = match.presses ? Object.keys(match.presses).map(function (k) { return match.presses[k]; }) : [];
+        var calc = null;
+        try {
+            calc = calculateMatchEngine(virtual, courseData || [], savedScores || {},
+                match.scoring, match.format, match.pressRule, match.stake, 0, presses,
+                (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(d) : undefined));
+        } catch (e) { return null; }
+        if (!calc) return null;
+        var settled = alohaSettledForMatch(d, match, calc, courseData || []);
+        if (!settled) return null;
+        return Object.assign({}, settled, { sideAIds: match.teamAIds, sideBIds: match.teamBIds });
     }
 
     // The Receipt's label for the line, and the one sentence the UI shows.
@@ -267,6 +346,8 @@
         alohaOfferRecord: alohaOfferRecord,
         alohaResult: alohaResult,
         alohaSettledForMatch: alohaSettledForMatch,
+        alohaMainGameMatch: alohaMainGameMatch,
+        alohaSettledForMainGame: alohaSettledForMainGame,
         alohaSegmentLabel: alohaSegmentLabel
     };
     Object.keys(api).forEach(function (k) { root[k] = api[k]; });

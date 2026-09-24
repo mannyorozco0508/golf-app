@@ -2257,6 +2257,40 @@ html {
         return `${(sm.teamAIds || []).map(nm).join(' / ')} vs ${(sm.teamBIds || []).map(nm).join(' / ')}`;
     }
 
+    // ---- THE MAIN GAME'S ALOHA (v216) ---------------------------------------
+    //
+    // The round's own match (Match Play, Nassau, best ball, scramble, Ryder) gets
+    // the same offer, the same rules and the same row as a side match. It is drawn
+    // here rather than on the scorecard's bet strip because the strip is a
+    // one-tap press control with nowhere to put an offer, a response and two side
+    // names - and because a golfer looking for "our bets" is on this tab.
+    //
+    // A STROKE-PLAY main game gets nothing, for the same reason a stroke side match
+    // does: two independent wagers, no single match net to be down in.
+    function mainGameAloha() {
+        if (typeof alohaMainGameMatch !== 'function') return null;
+        return alohaMainGameMatch(currentData);
+    }
+    function mainGameAlohaRowHtml() {
+        const sm = mainGameAloha();
+        if (!sm) return '';
+        const holes = currentData.courseData || [];
+        const calc = alohaCalcForMain(sm);
+        if (!calc) return '';
+        return alohaRowHtml('__main', sm, calc, holes);
+    }
+    function alohaCalcForMain(sm) {
+        const idsA = (sm.teamAIds || []).map(String);
+        const players = (currentData.players || []).filter(p => p && p.playingForMoney !== false);
+        const virtual = players.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
+        const presses = sm.presses ? Object.values(sm.presses) : [];
+        try {
+            return calculateMatchEngine(virtual, currentData.courseData || [], currentData.scores || {},
+                sm.scoring, sm.format, sm.pressRule, sm.stake, 0, presses,
+                (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(currentData) : undefined));
+        } catch (e) { return null; }
+    }
+
     // ---- THE ALOHA BET (v215) ------------------------------------------------
     //
     // "Double or nothing on the last hole", offered by the side that is DOWN and
@@ -2283,7 +2317,10 @@ html {
     }
     function alohaRowHtml(matchId, sm, calc, smCourse) {
         if (typeof alohaOffer !== 'function') return '';
-        const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm) : (sm.aloha || null);
+        // alohaRecordOf reads a side match's own node, and the MAIN game's from
+        // currentData.matchPresses.aloha - one function knows both, so this row
+        // does not have to.
+        const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm, currentData) : (sm.aloha || null);
         const trust = (typeof ALOHA_TRUST_NOTE === 'string') ? ALOHA_TRUST_NOTE : '';
         const one = (typeof ALOHA_EXPLAINER === 'string') ? ALOHA_EXPLAINER : '';
 
@@ -2350,36 +2387,45 @@ html {
     // THE OFFER. aloha-bet.js builds the record, including the frozen amount, and
     // refuses to build one the rules do not allow - so a stale screen cannot write
     // an offer that is no longer legal.
+    // '__main' is the round's own match. Everything else is a side match id.
+    function alohaMatchFor(matchId) {
+        return String(matchId) === '__main' ? mainGameAloha() : sideMatchById(matchId);
+    }
+    function alohaRefFor(matchId) {
+        return String(matchId) === '__main'
+            ? `events/${currentMode}/matchPresses/aloha`
+            : `events/${currentMode}/sideMatches/${matchId}/aloha`;
+    }
     function offerAloha(matchId, mode) {
-        const sm = sideMatchById(matchId);
+        const sm = alohaMatchFor(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('offer the Aloha on that match');
-        const calc = alohaCalcFor(sm);
+        const calc = String(matchId) === '__main' ? alohaCalcForMain(sm) : alohaCalcFor(sm);
         if (!calc) { alert('\u26A0\uFE0F NOT OFFERED\nThat match could not be read \u2014 try again.'); return; }
         const rec = alohaOfferRecord({
-            data: currentData, match: sm, matchHoles: alohaCourseFor(sm),
+            data: currentData, match: sm, matchHoles: alohaHolesFor(matchId, sm),
             participantIds: sideMatchParticipantIds(sm),
             scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
         }, alohaOffer({
-            data: currentData, match: sm, matchHoles: alohaCourseFor(sm),
+            data: currentData, match: sm, matchHoles: alohaHolesFor(matchId, sm),
             participantIds: sideMatchParticipantIds(sm),
             scores: currentData.scores || {}, matchNet: calc.t1TotalMoney
         }).offeringSide, mode, Date.now());
         if (!rec) { alert('\u26A0\uFE0F NOT OFFERED\nThe Aloha is not available on that match any more.'); return; }
         if (!requireOnlineForMoney('ALOHA NOT OFFERED', 'Reconnect before offering the Aloha.')) return;
-        db.ref(`events/${currentMode}/sideMatches/${matchId}/aloha`).set(rec)
+        db.ref(alohaRefFor(matchId)).set(rec)
             .then(() => alert(`\uD83C\uDF34 ALOHA OFFERED\n${alohaMoney(rec.amount)}${rec.mode === 'half' ? ' (half)' : ''} on hole ${rec.hole}\nThe other side has to accept.`))
             .catch(err => alert(`\u26A0\uFE0F ALOHA NOT OFFERED\n${err.message}\nNothing was created \u2014 try again.`));
     }
     // THE ANSWER. Only an offered Aloha can be answered, and the write says which
     // way - there is no timer, because an unanswered offer settles as no bet.
     function respondAloha(matchId, answer) {
-        const sm = sideMatchById(matchId);
+        const sm = alohaMatchFor(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('answer the Aloha on that match');
-        const rec = sm && sm.aloha;
+        const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm, currentData) : (sm && sm.aloha);
         if (!rec || String(rec.status) !== 'offered') { alert('\u26A0\uFE0F That Aloha has already been answered.'); return; }
         const status = answer === 'accepted' ? 'accepted' : 'declined';
         if (!requireOnlineForMoney('ALOHA NOT SAVED', 'Reconnect before answering the Aloha.')) return;
-        db.ref(`events/${currentMode}/sideMatches/${matchId}/aloha`)
+        db.ref(alohaRefFor(matchId))
             .update({ status: status, respondedAt: Date.now() })
             .then(() => alert(status === 'accepted'
                 ? `\uD83C\uDF34 ALOHA ON\n${alohaMoney(rec.amount)} on hole ${rec.hole}.`
@@ -2389,6 +2435,11 @@ html {
     // The match's own engine result and its own holes, the same two the card
     // above builds - so an offer written from a button uses the number the button
     // was showing.
+    // The holes the match is played over: the round's card for the main game, the
+    // side match's own scoped card otherwise.
+    function alohaHolesFor(matchId, sm) {
+        return String(matchId) === '__main' ? (currentData.courseData || []) : alohaCourseFor(sm);
+    }
     function alohaCourseFor(sm) {
         return (typeof sideMatchHoles === 'function')
             ? sideMatchHoles(sm, currentData.courseData || [])
@@ -3395,10 +3446,16 @@ html {
         });
 
         const roundGamesLine = buildRoundGamesPointer();
+        // v216: THE MAIN GAME'S ALOHA ROW, above the side matches. The round's own
+        // match play or Nassau is the one wager that has no card in this list, and
+        // the Aloha is the only thing here that needs one - the main game's presses
+        // are offered on the scorecard's bet strip, which has no room for a two-tap
+        // offer-and-accept handshake and no way to name which side is which.
+        const mainAlohaLine = mainGameAlohaRowHtml();
 
         if (visibleIds.length === 0) {
             const othersExist = Object.keys(sideMatches).length > 0 && hasGroupLock;
-            list.innerHTML = roundGamesLine + (othersExist
+            list.innerHTML = roundGamesLine + mainAlohaLine + (othersExist
                 ? `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No matches with a Group ${lockedGroup} golfer in them yet — tap below to add one.</div>`
                 : `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No action yet — tap below to add a bet between any players in the field.</div>`);
             return;
@@ -3508,7 +3565,7 @@ html {
             html += `</div>`;
         });
 
-        list.innerHTML = roundGamesLine + html;
+        list.innerHTML = roundGamesLine + mainAlohaLine + html;
     }
 
     // ONE SHORT RESULT LINE PER CARD, from bet-strip.js. The person deciding whether
