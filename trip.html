@@ -1430,7 +1430,8 @@ html {
     let attendanceByRound = {};       // code -> the headcount sentence, once that round has loaded
     let cachedCountedResults = [];    // only rounds still counting toward trip totals
     let cachedPlayerTotals = [];   // score leaderboard rows, unsorted — reused by the share recap
-    let cachedMoneyTransactions = []; // final "who pays who" list — reused by the share recap
+    let cachedMoneyTransactions = []; // who-pays-who ONLY when a golfer owes a golfer — reused by the share recap
+    let cachedTripPotOnly = false;    // money moved, and it moved through the pot, not between golfers
     let cachedTripSettled = true;     // false while any counted round is unfinished or has unresolved money
     // WHAT MAKES THE TRIP NOT FINAL - the rounds, by name, so the card and the
     // share text say the same thing the screen does. { inPlay:[{label,thru,
@@ -2175,9 +2176,14 @@ html {
         + 'Both are right \u2014 they are two different ways of settling up, and only your group knows which one it is doing.';
     const TRIP_TOTALS_AGREE_NOTE = 'Whether you settled up after each round or settle once at the end, the numbers are the same.';
     const TRIP_WHO_PAYS_WHO_NOTE = 'This list is for settling once at the end. If you settled up after each round there is nothing left to pay \u2014 see \u201CSettled after each round\u201D below.';
+    // A Weekly Game (the pot) can still be netted into golfer-to-golfer transfers.
+    // Those pairings are an artifact: nobody owes another golfer. The card, the
+    // recap and the paste all say this one sentence instead of inventing a debt.
+    const TRIP_POT_PAID_NOTE = 'Nobody pays another golfer. This money moved through the pot.';
 
     function renderTripMoneySettlement() {
         const container = document.getElementById('trip-money-settlement');
+        cachedTripPotOnly = false;
         if (cachedRoundResults.length === 0) return;
         if (cachedCountedResults.length === 0) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Every linked round is currently excluded from trip totals.</div>`;
@@ -2309,7 +2315,12 @@ html {
         const netTotals = {};
         onceList.forEach(v => { netTotals[v.name] = v.net; });
         const transactions = simplifyDebts(netTotals);
-        cachedMoneyTransactions = transactions;
+        // PUBLISH THE PAY LIST ONLY WHEN A GOLFER OWES A GOLFER. The same
+        // predicate the Receipt uses. A pot-only week still produces transfers
+        // (simplifyDebts can always pair a set of nets), and printing them tells
+        // the group chat that Rocco owes Marty for a debt the pot already paid.
+        // The cache is what the recap and the paste read, so the refusal has to
+        // land here, not only on the card.
 
         let html = "";
 
@@ -2345,6 +2356,9 @@ html {
         // ASK FIRST, THEN READ. tripAttributionBlocked() may recompute the gate and
         // assigns a NEW array, so a reference taken before the call is the stale one.
         const blocked = tripAttributionBlocked();
+        const playerPays = hasPlayerToPlayerSettlement(tripContributions);
+        cachedMoneyTransactions = (!blocked && playerPays) ? transactions : [];
+        cachedTripPotOnly = !blocked && !playerPays && onceList.some(v => Math.abs(v.net) > 0.005);
         const idProblems = cachedIdentityProblems;
         if (blocked) {
             html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
@@ -2356,14 +2370,14 @@ html {
             html += `</div>`;
         }
 
-        if (!blocked && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
+        if (cachedMoneyTransactions.length > 0) {
             html += `<div class="settle-card"><div class="settle-header">${tripSettled
                 ? '🏁 Final "Who Pays Who"'
                 : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
             if (!totalsAgree) {
                 html += `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0 0 6px;">${TRIP_WHO_PAYS_WHO_NOTE}</div>`;
             }
-            transactions.forEach(t => {
+            cachedMoneyTransactions.forEach(t => {
                 html += `<div class="ledger-row"><span>${t.from} \u2192 ${t.to}</span><span class="val-neg">$${fmtAmt(t.amount)}</span></div>`;
             });
             html += `</div>`;
@@ -2371,6 +2385,9 @@ html {
 
         if (idProblems.length === 0 && keys.length > 0) {
             html += `<div class="settle-card"><div class="settle-header">Net Across the Trip</div>`;
+            if (cachedTripPotOnly) {
+                html += `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0 0 6px;">${TRIP_POT_PAID_NOTE}</div>`;
+            }
             if (totalsAgree) {
                 // ONE NUMBER, and a sentence saying why there is only one.
                 onceList.slice().sort((a, b) => b.net - a.net).forEach(v => {
@@ -3036,6 +3053,21 @@ html {
              + 'If you settled up after each round, the days added up to: ' + row(cachedTripTotals.daily) + '. '
              + 'The two differ because each day rounded to whole dollars on its own.';
     }
+    // ONE LINE PER GOLFER, the settle-once net, best first. The paste and the
+    // recap use this when the pot paid and there is no who-pays-who list.
+    function tripOnceNetLines() {
+        const fmt = v => (v > 0.005 ? '+$' : v < -0.005 ? '-$' : '$') + fmtAmt(Math.abs(v));
+        return (cachedTripTotals.once || []).slice().sort((a, b) => b.net - a.net)
+            .map(v => ({ name: v.name, text: fmt(v.net) }));
+    }
+    function tripPotTotalsPlain() {
+        if (cachedTripTotals.agree) return TRIP_POT_PAID_NOTE;
+        const fmt = v => (v > 0.005 ? '+$' : v < -0.005 ? '-$' : '$') + fmtAmt(Math.abs(v));
+        const row = list => list.slice().sort((a, b) => b.net - a.net).map(v => v.name + ' ' + fmt(v.net)).join(', ');
+        return TRIP_POT_PAID_NOTE + ' Settled once at the end: ' + row(cachedTripTotals.once)
+             + '. Settled after each round, the days added up to: ' + row(cachedTripTotals.daily)
+             + '. The two differ because each day rounded to whole dollars on its own.';
+    }
 
     function renderTripRecapCard() {
         const mount = document.getElementById('trip-recap-card');
@@ -3094,7 +3126,15 @@ html {
         // ---- MONEY. The caveat travels with the card, not just the screen. ----
         html += '<div class="rc-block"><div class="rc-head">\uD83D\uDCB5 '
              + (cachedTripSettled ? 'FINAL SETTLEMENT' : 'SETTLEMENT SO FAR') + '</div>';
-        if (cachedMoneyTransactions.length === 0) {
+        if (cachedTripPotOnly) {
+            html += '<div class="rc-detail">' + esc(tripPotTotalsPlain()) + '</div>';
+            if (cachedTripTotals.agree) {
+                tripOnceNetLines().forEach(v => {
+                    html += '<div class="rc-row"><span class="rc-name">' + esc(v.name) + '</span>'
+                         + '<span class="rc-val">' + esc(v.text) + '</span></div>';
+                });
+            }
+        } else if (cachedMoneyTransactions.length === 0) {
             html += '<div class="rc-none">Everyone\u2019s settled up.</div>';
         } else {
             cachedMoneyTransactions.slice(0, 6).forEach(t => {
@@ -3106,7 +3146,7 @@ html {
                 html += '<div class="rc-detail">+ ' + (cachedMoneyTransactions.length - 6) + ' more</div>';
             }
         }
-        if (!cachedTripTotals.agree) {
+        if (!cachedTripTotals.agree && cachedMoneyTransactions.length > 0) {
             html += '<div class="rc-detail">' + esc(tripBothTotalsPlain()) + '</div>';
         }
         if (!cachedTripSettled) {
@@ -3253,14 +3293,21 @@ html {
             ? `\n💵 FINAL SETTLEMENT\n`
             : `\n💵 SETTLEMENT SO FAR — NOT FINAL\n`;
         if (!cachedTripSettled) text += `${tripNotFinalReason()}\n`;
-        if (cachedMoneyTransactions.length === 0) {
+        if (cachedTripPotOnly) {
+            text += tripPotTotalsPlain() + '\n';
+            if (cachedTripTotals.agree) {
+                tripOnceNetLines().forEach(v => { text += v.name + ' ' + v.text + '\n'; });
+            }
+        } else if (cachedMoneyTransactions.length === 0) {
             text += `Everyone's settled up — no money changes hands.\n`;
         } else {
             cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
         }
         // THE TWO TOTALS TRAVEL WITH THE PASTE, because the paste is what people
         // settle from. Silent when they agree - there is nothing to choose.
-        if (!cachedTripTotals.agree) text += `${tripBothTotalsPlain()}\n`;
+        // Silent on a pot-only trip too: that sentence names a Who Pays Who list
+        // the paste has refused to print.
+        if (!cachedTripTotals.agree && cachedMoneyTransactions.length > 0) text += `${tripBothTotalsPlain()}\n`;
         // THE PASTE IS WHAT PEOPLE SETTLE FROM, and it said nothing at all about
         // what the figure contains. Same sentence, same builder. Raw, not escaped:
         // this goes on the clipboard, where an entity would paste literally.

@@ -90,7 +90,10 @@ const PRODUCTS = {
         // to the next free key rather than reusing one an installed device holds.
         // Moved to v64. The Board's team view reads calculateMatchEngine, one
         // call per pair. A device on v63 still invents that margin itself.
-        cacheName: 'consumer-v64-board-team-engine',
+        // Moved to v65. A pot-only trip's recap and share text no longer invent
+        // golfer-to-golfer debts. trip.html is in this shell. A device on v64
+        // still pastes "Rocco owes Marty" for a Weekly Game the pot already paid.
+        cacheName: 'consumer-v65-trip-pot-paid',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
