@@ -32,7 +32,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const { escapeHtml } = loadJsFile('text-safe.js');
 
 const PAGES = ['admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
-    'sidematches.html', 'skins.html', 'stats.html', 'trip.html'];
+    'sidematches.html', 'skins.html', 'stats.html', 'trip.html', 'season.html'];
 
 // Names golfers actually have. Every one must survive intact.
 const REAL = ["O'Brien", 'José', 'A&B', 'Bob <the Hammer>', "Mike & Dave's Trip",

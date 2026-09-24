@@ -167,6 +167,16 @@ describe('CODE ISSUER — a code in use is never handed out again', () => {
             'a tournament must never be checked against events/');
     });
 
+    test('seasons are checked too, against seasons/', async () => {
+        const m = load();
+        const db = fakeDb(new Set(['seasons/TAKEN1']));
+        const code = await m.issueUniqueCode({
+            db, root: 'seasons', generate: scripted(['TAKEN1', 'FREE01'])
+        });
+        assert.equal(code, 'FREE01');
+        assert.deepEqual(db.reads, ['seasons/TAKEN1', 'seasons/FREE01']);
+    });
+
     test('an unknown root is refused rather than guessed at', async () => {
         const m = load();
         const db = fakeDb(new Set());

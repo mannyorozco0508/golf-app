@@ -408,6 +408,11 @@ describe('NOTHING ELSE MOVED', () => {
             '/registrations/$code/$entryId/.validate',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
+            // v218 season ledger, in-repo only (not published). Owner writes the
+            // season; the code is the read, same as events. Events rules are not
+            // in this list because they did not change.
+            '/seasons/$seasonCode/.write',
+            '/seasons/$seasonCode/ownerUid/.validate',
             // The narrowing (2026-09-18, published by hand): the parent .write
             // names the owner - a code-holder writes scores and nothing else.
             '/tournaments/$tourneyCode/.write',

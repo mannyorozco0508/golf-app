@@ -53,6 +53,7 @@
     <script src="money-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
+    <script src="season.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
          in which foursome, which is what every ?group=N scorekeeper link and every
          group-scoped write permission is measured against. This page carried its own
@@ -562,6 +563,25 @@ html {
     <p id="copy-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
         Copies that round&rsquo;s golfers, handicaps, flights, groups, course and money setup into a new round. The old round is not changed.
     </p>
+    <!-- SEASON. The ledger itself is season.html. This row is how Game Day
+         reaches it: the seasons this phone has opened, a link to start one,
+         and a code that opens the ledger. Creating the record happens on
+         season.html, which is the page that owns the write. -->
+    <div id="season-lobby" style="margin:8px auto 14px auto; max-width:360px; text-align:center;">
+        <div style="font-weight:bold; color:var(--brand-green); font-size:0.92rem;">Season</div>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 8px 0; line-height:1.4;">Running money, skins and closest-to-the-pin across the rounds this crew plays.</p>
+        <div id="season-list"></div>
+        <a id="season-start-link" href="season.html" class="btn-outline" style="display:inline-block; margin-bottom:8px; text-decoration:none;">Start a season</a>
+        <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+            <input type="text" id="season-open-input" class="join-code-input" maxlength="48" placeholder="SEASON CODE" aria-label="Season code">
+            <button type="button" class="btn-outline join-code-btn" id="season-open-btn" onclick="openSeasonFromLobby(this)">Open ledger</button>
+        </div>
+    </div>
+    <div id="season-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Season</div>
+        <div id="season-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;"></div>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Game Day will link this round to that season once you finish setup. Start from a previous round below, or tap Game Day for a blank one.</div>
+    </div>
 </div>
 
 <div class="container" id="admin-screen" style="display: none;">
@@ -579,6 +599,7 @@ html {
                 <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
                 <a href="game.html" class="top-nav-item nav-link">📖 Game</a>
                 <a href="trip.html" class="top-nav-item">🚐 Trip</a>
+                <a href="season.html" class="top-nav-item">Season</a>
                 <a href="admin.html" class="top-nav-item active nav-link">🏠 Home</a>
             </div>
         </details>
@@ -591,6 +612,9 @@ html {
 
     <div id="trip-context-banner-wizard" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--brand-green); font-weight:bold;">
         🚐 <span id="trip-context-name-wizard">Loading trip...</span> — this round will link back to that trip once saved.
+    </div>
+    <div id="season-context-banner-wizard" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--brand-green); font-weight:bold;">
+        <span id="season-context-name-wizard">Season</span> — this round will link back to that season once saved.
     </div>
 
     <div id="copy-from-banner" style="display:none; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--text-main);">
@@ -2712,6 +2736,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     let currentMode = urlParams.get('game');
     let tripLinkCode = urlParams.get('trip'); // present when this round is being set up FROM Trip Mode
+    let seasonLinkCode = urlParams.get('season'); // present when this round is being set up FROM a season
     let copyFromCode = urlParams.get('copyFrom'); // present when pre-filling from another round's setup
     let currentEventType = urlParams.get('eventType') || 'quick'; // 'club' or 'quick' — framing only, same Round engine either way
     let currentCategory = "weekend";
@@ -2748,6 +2773,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 document.getElementById("trip-context-name").textContent = trip ? trip.name : tripLinkCode;
             });
         }
+        const seasonListMount = document.getElementById('season-list');
+        if (seasonListMount && typeof seasonListHtml === 'function') {
+            seasonListMount.innerHTML = seasonListHtml(readSeasonList(localStorage));
+        }
+        if (seasonLinkCode) {
+            document.getElementById("season-context-banner").style.display = "block";
+            document.getElementById("season-context-name").textContent = seasonLinkCode;
+            db.ref(`seasons/${seasonLinkCode}`).once('value').then(snap => {
+                const season = snap.val();
+                document.getElementById("season-context-name").textContent = (season && season.name) ? season.name : seasonLinkCode;
+            });
+        }
     } else {
         currentMode = currentMode.toUpperCase();
         document.getElementById("lobby-screen").style.display = "none";
@@ -2771,6 +2808,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             db.ref(`trips/${tripLinkCode}`).once('value').then(snap => {
                 const trip = snap.val();
                 document.getElementById("trip-context-name-wizard").textContent = trip ? trip.name : tripLinkCode;
+            });
+        }
+        if (seasonLinkCode) {
+            document.getElementById("season-context-banner-wizard").style.display = "block";
+            document.getElementById("season-context-name-wizard").textContent = seasonLinkCode;
+            db.ref(`seasons/${seasonLinkCode}`).once('value').then(snap => {
+                const season = snap.val();
+                document.getElementById("season-context-name-wizard").textContent = (season && season.name) ? season.name : seasonLinkCode;
             });
         }
 
@@ -3873,6 +3918,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // CARRIED, NOT DROPPED: trip.html's copy select sends ?trip&copyFrom to
             // this lobby, and the minted URL used to lose the copy. See the note
             // above startFromPreviousRound for which params matter here.
+            // A season does the same with ?season&copyFrom — the ledger's
+            // "start the next round" lands here, and Game Day mints the code.
+            if (seasonLinkCode) dest += `&season=${encodeURIComponent(seasonLinkCode)}`;
             if (copyFromCode) dest += `&copyFrom=${encodeURIComponent(copyFromCode)}`;
             window.location.href = dest;
         } catch (err) {
@@ -3903,6 +3951,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const fromUrl = /[?&]game=([A-Za-z0-9]+)/.exec(text);
         return String(fromUrl ? fromUrl[1] : text).toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
+    function openSeasonFromLobby(pressedEl) {
+        if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
+        const code = (typeof seasonRoundCode === 'function')
+            ? seasonRoundCode(document.getElementById('season-open-input').value)
+            : '';
+        if (!code) { alert('Enter the season code.'); return; }
+        window.location.href = 'season.html?season=' + code;
+    }
+
     async function startFromPreviousRound(pressedEl) {
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const code = parseRoundCodeInput(document.getElementById('copy-code-input'));
@@ -3930,6 +3987,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const newCode = await issueUniqueCode({ db, root: 'events' });
             let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}&copyFrom=${code}`;
             if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
+            if (seasonLinkCode) dest += `&season=${encodeURIComponent(seasonLinkCode)}`;
             window.location.href = dest;
         } catch (err) {
             restore();
@@ -7718,6 +7776,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                         addedAt: Date.now()
                     });
                 }
+            }).then(() => {
+                // AFTER the round exists. A refused season write does not undo
+                // the round — the organizer is told the link did not land.
+                if (!seasonLinkCode || typeof seasonAttachPatch !== 'function') return;
+                const patch = seasonAttachPatch(currentMode, selectedCourseName, Date.now());
+                if (!patch) return;
+                return db.ref(`seasons/${seasonLinkCode}`).update(patch).catch((err) => {
+                    alert(typeof seasonAttachError === 'function' ? seasonAttachError(err, true) : String(err && err.message || err));
+                });
             });
             if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(saveChain);
             saveChain.then(() => {

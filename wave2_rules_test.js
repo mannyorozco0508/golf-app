@@ -85,6 +85,9 @@ function scenario() {
             'anon-lapsed': { firstSeenAt: NOW - 60 * DAY, pass: { type: 'trip', expiresAt: NOW - DAY, transactionId: 't2' } },
             'anon-edge': { firstSeenAt: NOW - 21 * DAY + 3600000 },
             'u-email': { firstSeenAt: NOW - DAY }
+        },
+        seasons: {
+            MON1: { name: 'Monday skins', ownerUid: 'anon-org', createdAt: 1, updatedAt: 1, rounds: { ABCD23: { addedAt: 2, label: 'Caledonia' } } }
         }
     };
     const users = { nobody: null, org: anon('anon-org'), stranger: anon('anon-stranger'), expired: anon('anon-expired'), passed: anon('anon-passed'), lapsed: anon('anon-lapsed'), edge: anon('anon-edge'), newcomer: anon('anon-new'),
@@ -180,7 +183,38 @@ function scenario() {
         'organizers/anon-lapsed/pass': { cannotWrite: [{ auth: 'lapsed', data: { type: 'season', expiresAt: NOW + 300 * DAY, transactionId: 'fake' } }] },
         'organizers/anon-new/anythingElse': { cannotWrite: [{ auth: 'newcomer', data: true }] },
         'organizers/anon-org': { canRead: ['org'], cannotRead: ['stranger', 'nobody', 'email'] },
-        'organizers/anon-passed/pass': { canRead: ['passed'], cannotRead: ['org', 'nobody'] }
+        'organizers/anon-passed/pass': { canRead: ['passed'], cannotRead: ['org', 'nobody'] },
+        // SEASON. Read is the round-share pattern (the code is the grant).
+        // Write is the owner only — not the trial window, which is the paywall
+        // and is not this path. A stranger cannot attach a round or rename it.
+        'seasons/NEW1': {
+            canWrite: [{ auth: 'org', data: { name: 'Monday skins', ownerUid: 'anon-org', createdAt: 1, updatedAt: 1, notes: 'KP' } },
+                { auth: 'stranger', data: { name: 'Theirs', ownerUid: 'anon-stranger', createdAt: 1, updatedAt: 1 } }],
+            cannotWrite: [
+                { auth: 'nobody', data: { name: 'Monday skins', ownerUid: 'anon-org', createdAt: 1, updatedAt: 1 } },
+                { auth: 'org', data: { name: 'Stolen', ownerUid: 'anon-stranger', createdAt: 1, updatedAt: 1 } },
+                { auth: 'org', data: { name: '', ownerUid: 'anon-org', createdAt: 1, updatedAt: 1 } }
+            ]
+        },
+        'seasons/MON1': {
+            canRead: ['nobody', 'stranger', 'org'],
+            canWrite: [{ auth: 'org', data: { name: 'Monday skins renamed', ownerUid: 'anon-org', createdAt: 1, updatedAt: 3, notes: 'KP', rounds: { ABCD23: { addedAt: 2, label: 'Caledonia' } } } },
+                { auth: 'org', data: null }],
+            cannotWrite: [
+                { auth: 'nobody', data: { name: 'taken', ownerUid: 'anon-org', createdAt: 1, updatedAt: 1 } },
+                { auth: 'stranger', data: { name: 'taken', ownerUid: 'anon-stranger', createdAt: 1, updatedAt: 1 } },
+                { auth: 'org', data: { name: 'Monday skins', ownerUid: 'anon-stranger', createdAt: 1, updatedAt: 1 } },
+                { auth: 'stranger', data: null }
+            ]
+        },
+        'seasons/MON1/rounds/ABCD23': {
+            canWrite: [{ auth: 'org', data: { addedAt: 2, label: 'True Blue' } }],
+            cannotWrite: [{ auth: 'nobody', data: { addedAt: 2, label: 'True Blue' } }, { auth: 'stranger', data: { addedAt: 9, label: 'True Blue' } }]
+        },
+        'seasons/MON1/name': {
+            canWrite: [{ auth: 'org', data: 'Renamed by its owner' }],
+            cannotWrite: [{ auth: 'nobody', data: 'Renamed by a stranger' }, { auth: 'stranger', data: 'Renamed by a stranger' }]
+        }
     }, participation('OWNED1'), participation('LEGACY1'));
     return { root, users, tests };
 }
@@ -192,7 +226,7 @@ function run(rulesPath) {
     catch (e) { return { code: e.status, out: strip((e.stdout || '') + (e.stderr || '')) }; }
 }
 // Every verdict row: [path, op, auth, expected, got]
-const rows = out => out.split('\n').filter(l => l.startsWith(BAR + ' events/') || l.startsWith(BAR + ' organizers/')).map(l => l.split(BAR).map(c => c.trim()).filter(Boolean));
+const rows = out => out.split('\n').filter(l => l.startsWith(BAR + ' events/') || l.startsWith(BAR + ' organizers/') || l.startsWith(BAR + ' seasons/')).map(l => l.split(BAR).map(c => c.trim()).filter(Boolean));
 const wrong = out => rows(out).filter(r => r[3] !== r[4]);
 const TOTAL = Object.values(scenario().tests).reduce((n, v) => n + ['canWrite', 'cannotWrite', 'canRead', 'cannotRead'].reduce((m, k) => m + (v[k] || []).length, 0), 0);
 
@@ -265,6 +299,10 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
         [[/^organizers\/anon-new\/pass$/, 'newcomer'], [/^organizers\/anon-passed\/pass\/expiresAt$/, 'passed'], [/^organizers\/anon-lapsed\/pass$/, 'lapsed']]);
     control('an organizer readable by anyone', r => { r.organizers.$uid['.read'] = true; },
         [[/^organizers\/anon-org$/], [/^organizers\/anon-passed\/pass$/]]);
+    control('season writes opened to any signed-in user (the owner check dropped)', r => { r.seasons.$seasonCode['.write'] = 'auth != null'; },
+        [[/^seasons\/MON1$/, 'stranger'], [/^seasons\/MON1\/name$/, 'stranger']]);
+    control('a season readable only by its owner (the share link would go dark)', r => { r.seasons.$seasonCode['.read'] = "auth != null && auth.uid === data.child('ownerUid').val()"; },
+        [[/^seasons\/MON1$/, 'null'], [/^seasons\/MON1$/, 'stranger']]);
     test('removing ONLY the scores grant refuses a code-holder on an owned round and still allows the legacy round', () => {
         const r = ev();
         delete r.rules.events.$eventCode.scores['.write'];
