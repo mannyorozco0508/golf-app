@@ -34,6 +34,11 @@
     <!-- Same native print failure as the Receipt; same shared fix. -->
     <script src="native-export.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
+         refusals and failures are inline and persistent, receipts float. Shared
+         with every other consumer page rather than copied; loaded before the
+         inline block so nothing below can shadow it. -->
+    <script src="ui-dialogs.js"></script>
     <script src="attendance.js"></script>
     <!-- Place and tie payout allocation, shared with Tournament Mode. The rule was
          written out twice - here and in tournament-engine.js - until the shared-core
@@ -842,8 +847,8 @@ html {
 
     function buildTrip() {
         const name = document.getElementById('trip-name-input').value.trim();
-        if (!name) { alert('⚠️ Give your trip a name first.'); return; }
-        if (roundConfigs.length === 0) { alert('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
+        if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
+        if (roundConfigs.length === 0) { uiRefuse('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
 
         // Pull one final read of every field in case the last edit didn't fire onchange yet.
         roundConfigs.forEach((cfg, i) => {
@@ -856,7 +861,7 @@ html {
         });
 
         if (roundConfigs.some(cfg => !cfg.courseId)) {
-            alert('⚠️ Pick a course for every round before building the trip.');
+            uiRefuse('⚠️ Pick a course for every round before building the trip.');
             return;
         }
 
@@ -934,18 +939,18 @@ html {
             // check never answered. Say what did not happen, not why - the app
             // cannot tell a dead socket from a slow one.
             if (err && err.code === 'timeout') {
-                alert('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
+                uiFail('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
                 return;
             }
             // THE WALL, the same sentence the wizard shows, and only when the
             // refusal is the gate (organizer-gate reads the uid's node back).
             if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
                 window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
-                    alert(why === 'trial-ended' ? window.organizerGate.WALL : `Error building trip: ${err.message}`);
+                    uiFail(why === 'trial-ended' ? window.organizerGate.WALL : `Error building trip: ${err.message}`);
                 });
                 return;
             }
-            alert(`Error building trip: ${err.message}`);
+            uiFail(`Error building trip: ${err.message}`);
         });
     }
 
@@ -990,7 +995,7 @@ html {
         // devtools, or reaching the handler another way, must achieve nothing.
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const name = document.getElementById('trip-name-input').value.trim();
-        if (!name) { alert('⚠️ Give your trip a name first.'); return; }
+        if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
         const restore = setControlPending(pressedEl, '\u23F3 Creating...');
         issueUniqueCode({ db, root: 'trips' }).then(code => {
             // Same as the planner path above: mint here, leave holding it.
@@ -1004,10 +1009,10 @@ html {
             // Same shape as the planner above: a timeout is "not created", never
             // "check your signal".
             if (err && err.code === 'timeout') {
-                alert('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
+                uiFail('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
                 return;
             }
-            alert(/could not issue a free/i.test(m)
+            uiFail(/could not issue a free/i.test(m)
                 ? 'Could not start a new trip just now.\n\nEvery code we tried was already '
                   + 'in use. Try again \u2014 the next one will almost certainly be free.'
                 : '\u26A0\uFE0F Could not start a new trip \u2014 check your signal and try again.');
@@ -1051,14 +1056,14 @@ html {
 
     function copyTripOrganizerLink(btn) {
         if (!currentTripCode || !(tripData && tripData.organizerToken)) {
-            alert('\u26A0\uFE0F This trip has no organizer link.');
+            uiRefuse('\u26A0\uFE0F This trip has no organizer link.');
             return;
         }
         copyTextToClipboard(tripOrganizerUrl(), btn);
     }
 
     function copyTripLink(btn) {
-        if (!currentTripCode) { alert('\u26A0\uFE0F Open a trip first.'); return; }
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
         copyTextToClipboard(tripShareUrl(), btn);
     }
 
@@ -1089,14 +1094,19 @@ html {
         ta.style.opacity = '0';
         document.body.appendChild(ta);
         ta.select();
+        // A NOTE, NOT AN ALERT AND NOT A TOAST. By the time this catch runs,
+        // copying has failed twice, and the only useful thing left is to put the
+        // text somewhere it can be SELECTED. An alert cannot be selected from and
+        // a toast takes it away again. (sidematches.html's equivalent is still a
+        // native prompt, decided in Wave 1 and left alone.)
         try { document.execCommand('copy'); onDone(); }
-        catch (e) { alert(text); }
+        catch (e) { uiFail('Couldn’t copy it. Here it is — select and copy:\n' + text); }
         document.body.removeChild(ta);
     }
 
     function joinTrip() {
         const code = document.getElementById('join-trip-input').value.trim().toUpperCase();
-        if (code.length < 2) { alert('⚠️ Enter a valid trip code.'); return; }
+        if (code.length < 2) { uiRefuse('⚠️ Enter a valid trip code.'); return; }
         window.location.href = `trip.html?trip=${code}`;
     }
 
@@ -1146,7 +1156,7 @@ html {
         const why = /PERMISSION_DENIED|permission[ _]denied/i.test(m)
             ? 'The database refused the change.'
             : 'Check your signal.';
-        alert('⚠️ ' + what + '\n\n' + why + ' ' + consequence);
+        uiFail('⚠️ ' + what + '\n\n' + why + ' ' + consequence);
     }
 
     function linkRound() {
@@ -1157,12 +1167,12 @@ html {
         if (!hasTripOrganizerAuthority()) return;
         const roundCode = document.getElementById('link-round-code').value.trim().toUpperCase();
         const label = document.getElementById('link-round-label').value.trim();
-        if (!roundCode) { alert('⚠️ Enter the game code for the round.'); return; }
-        if (!label) { alert('⚠️ Give this round a short label.'); return; }
+        if (!roundCode) { uiRefuse('⚠️ Enter the game code for the round.'); return; }
+        if (!label) { uiRefuse('⚠️ Give this round a short label.'); return; }
 
         db.ref(`events/${roundCode}`).once('value').then(snap => {
             if (!snap.exists()) {
-                alert("⚠️ Couldn't find a round with that game code. Double check it's already been set up on Home.");
+                uiRefuse("⚠️ Couldn't find a round with that game code. Double check it's already been set up on Home.");
                 return;
             }
             // RE-LINKING EDITS THE LABEL. IT DOES NOT RESET THE ROUND.
@@ -1203,13 +1213,30 @@ html {
         });
     }
 
-    function removeRound(roundCode) {
+    // THE LAST NATIVE DECISION IN THE APP, as of UI Wave 4.
+    //
+    // Unlinking a round is not destroying it - that is what the question says, and
+    // it is true - but the trip's leaderboard, its money settlement, its points
+    // race and its awards all stop counting the round, so this moves money on
+    // three surfaces at once. It was `if (!confirm(...)) return;`, where a missed
+    // await leaves a truthy Promise, `!ok` is always false, and the round is
+    // unlinked without anyone being asked. Driven both answers in
+    // dialog_sweep_test.js, and the gate below is asserted to come first.
+    async function removeRound(roundCode) {
         // CHECKED IN THE HANDLER, not only at render. Removing the visual state
         // in devtools, or calling this from the console, must achieve nothing -
         // the same belt-and-braces filterGroup() and endAndClearRound() already
         // use. Hiding a button is not a gate.
         if (!hasTripOrganizerAuthority()) return;
-        if (!confirm('Remove this round from the trip? The round itself is untouched, just its trip link.')) return;
+        const ok = await uiConfirm({
+            title: 'Remove this round from the trip?',
+            body: 'The round itself is untouched, just its trip link. It stops counting '
+                + 'toward the trip leaderboard, the money settlement, the points race and the awards.',
+            confirmText: 'Unlink it',
+            cancelText: 'Keep it in the trip',
+            danger: true
+        });
+        if (!ok) return;
         db.ref(`trips/${currentTripCode}/rounds/${roundCode}`).remove().catch(err => {
             // Silent, this read exactly like a slow render - the row stayed in the
             // list - so the organizer pressed it again.
@@ -1679,7 +1706,7 @@ html {
         const ref = db.ref('trips/' + currentTripCode + '/identity');
         const p = ref.update(updates);
         if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
-        p.catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe answer was not recorded \u2014 try again.'));
+        p.catch(err => uiFail('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe answer was not recorded \u2014 try again.'));
     }
     // CHANGE: the same node, the other answer.
     function changeTripIdentity(index) {
@@ -1704,7 +1731,7 @@ html {
         if (Object.keys(updates).length === 0) return;
         const p = db.ref('trips/' + currentTripCode + '/identity').update(updates);
         if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
-        p.catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe change was not recorded \u2014 try again.'));
+        p.catch(err => uiFail('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe change was not recorded \u2014 try again.'));
     }
 
     function refreshTripComputations() {
@@ -2966,7 +2993,7 @@ html {
 
     function printItinerary() {
         if (Object.keys(tripData.rounds || {}).length === 0) {
-            alert('⚠️ Add at least one round to this trip before printing an itinerary.');
+            uiRefuse('⚠️ Add at least one round to this trip before printing an itinerary.');
             return;
         }
         buildItineraryPrintView();
@@ -3004,7 +3031,7 @@ html {
     // round is not finished is worse than no recap at all.
     function openTripRecap() {
         if (cachedRoundResults.length === 0) {
-            alert('\u26A0\uFE0F Link at least one round with scores before making a recap card.');
+            uiRefuse('\u26A0\uFE0F Link at least one round with scores before making a recap card.');
             return;
         }
         renderTripRecapCard();
@@ -3297,7 +3324,7 @@ html {
 
     function shareRecap() {
         if (cachedRoundResults.length === 0) {
-            alert('⚠️ Link at least one round with scores before sharing the recap.');
+            uiRefuse('⚠️ Link at least one round with scores before sharing the recap.');
             return;
         }
         const text = buildShareRecapText();
@@ -3305,15 +3332,19 @@ html {
         // clipboard, the way admin.html's shareMainApp does. A share sheet that
         // FAILS lands there too, so the button is never a silent no-op; a share
         // sheet the golfer CLOSES is AbortError, a choice, and copies nothing.
+        // The receipt floats; both give-up arms do NOT. Once copying has failed the
+        // recap itself is the message, and it has to stay on screen long enough to
+        // be selected out of - which is exactly what a toast refuses to do.
+        const HERE_IT_IS = 'Couldn’t copy the recap. Here it is — select and copy:\n';
         const copyRecap = () => {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text).then(() => {
-                    alert('⧉ Recap copied to clipboard — paste it into your group chat.');
+                    uiToast('⧉ Recap copied to clipboard — paste it into your group chat.');
                 }).catch(() => {
-                    alert(text);
+                    uiFail(HERE_IT_IS + text);
                 });
             } else {
-                alert(text);
+                uiFail(HERE_IT_IS + text);
             }
         };
         if (navigator.share) {
@@ -3332,8 +3363,26 @@ html {
         db.ref(`trips/${code}`).on('value', (snap) => {
             tripData = snap.val();
             if (!tripData) {
-                alert("Trip not found.");
-                window.location.href = "trip.html";
+                // THE ONE BEHAVIOUR CHANGE IN UI WAVE 4, and it is forced by the
+                // conversion rather than chosen. This used to alert() and then
+                // reload to trip.html. A native alert BLOCKS, so the sentence was
+                // read before the reload happened; an inline note does not block,
+                // and the reload would have wiped it before anyone saw it. Renaming
+                // this line alone would have shipped an INVISIBLE message, which is
+                // worse than the browser dialog it replaced.
+                //
+                // THE RELOAD COST NOTHING. This branch never hid #setup-screen, so
+                // the screen someone lands on is the same one either way - the
+                // reload only stripped ?trip= from the URL. What it DID supply was
+                // the resume row that the arrival block shows when there is a last
+                // trip, so that is done here explicitly instead. Now the refusal and
+                // the way out are on screen together.
+                uiRefuse('Trip not found.');
+                const lastTrip = localStorage.getItem('lastTripCode');
+                if (lastTrip) {
+                    document.getElementById('resume-trip-container').style.display = 'block';
+                    document.getElementById('resume-trip-badge').textContent = lastTrip;
+                }
                 return;
             }
             localStorage.setItem('lastTripCode', code);

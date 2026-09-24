@@ -229,7 +229,7 @@ describe('A ROUND COUNT CANNOT EXCEED THE ROUNDS THAT COUNT', () => {
             tripData = { name: 'T' }; currentTripCode = 'T1';
             cachedRoundResults = ${JSON.stringify(linked)};
             cachedCountedResults = cachedRoundResults;
-            alert = function () {};
+            alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};
             tripIdentityProblems = function () { return []; };
             recomputeTripGate();
         `, sb);
@@ -249,7 +249,7 @@ describe('A ROUND COUNT CANNOT EXCEED THE ROUNDS THAT COUNT', () => {
             tripData = { name: 'T' }; currentTripCode = 'T1';
             cachedRoundResults = ${JSON.stringify(linked)};
             cachedCountedResults = cachedRoundResults;
-            alert = function () {};
+            alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};
             tripIdentityProblems = function () { return []; };
             recomputeTripGate();
         `, sb);

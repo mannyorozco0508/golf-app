@@ -232,7 +232,7 @@ function arriveOnTrip(rounds, counted) {
         ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
          'pool-engine.js', 'payouts.js', 'course-data.js'],
         { search: '?trip=MYR1', localStorage: true });
-    vm.runInContext('alert = function () {}; confirm = function () { return true; };', sb);
+    vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; confirm = function () { return true; }; uiConfirm = function (o) { return Promise.resolve(!!(function () { return true; })(o)); };', sb);
 
     const tripRounds = {};
     Object.keys(rounds).forEach(code => {

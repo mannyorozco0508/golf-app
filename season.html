@@ -20,6 +20,11 @@
          pinned per page by match_engine_load_order_test.js. -->
     <script src="match-engine.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
+         refusals and failures are inline and persistent, receipts float. Shared
+         with every other consumer page rather than copied; loaded before the
+         inline block so nothing below can shadow it. -->
+    <script src="ui-dialogs.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="aloha-bet.js"></script>
@@ -159,9 +164,9 @@
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const name = document.getElementById('season-name-input').value;
         const notes = document.getElementById('season-notes-input').value;
-        if (!String(name || '').trim()) { alert('Give the season a name first.'); return; }
-        if (String(name).trim().length > 80) { alert('Keep the season name to 80 characters.'); return; }
-        if (String(notes || '').trim().length > 280) { alert('Keep the notes to 280 characters.'); return; }
+        if (!String(name || '').trim()) { uiRefuse('Give the season a name first.'); return; }
+        if (String(name).trim().length > 80) { uiRefuse('Keep the season name to 80 characters.'); return; }
+        if (String(notes || '').trim().length > 280) { uiRefuse('Keep the notes to 280 characters.'); return; }
         const restore = setPending(pressedEl, 'Starting…');
         const gate = window.organizerGate && typeof window.organizerGate.ensureOrganizer === 'function'
             ? window.organizerGate.ensureOrganizer(db)
@@ -178,17 +183,17 @@
         }).catch(function (err) {
             restore();
             if (err && err.code === 'timeout') {
-                alert('Season not created. Nothing was saved. Try again.');
+                uiFail('Season not created. Nothing was saved. Try again.');
                 return;
             }
-            alert(seasonWriteError(err));
+            uiFail(seasonWriteError(err));
         });
     }
 
     function openSeason(pressedEl) {
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const code = seasonRoundCode(document.getElementById('season-open-input').value);
-        if (!code) { alert('Enter the season code.'); return; }
+        if (!code) { uiRefuse('Enter the season code.'); return; }
         window.location.href = 'season.html?season=' + code;
     }
 
@@ -257,12 +262,12 @@
         if (!seasonIsOwner || !currentSeasonCode) return;
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const code = seasonRoundCode(document.getElementById('season-attach-code').value);
-        if (!code) { alert('Enter the game code of a round that already exists.'); return; }
+        if (!code) { uiRefuse('Enter the game code of a round that already exists.'); return; }
         const restore = setPending(pressedEl, 'Adding…');
         db.ref('events/' + code).once('value').then(function (snap) {
             if (!snap || !snap.exists || !snap.exists()) {
                 restore();
-                alert('No round with the code ' + code + '. Nothing was added.');
+                uiRefuse('No round with the code ' + code + '. Nothing was added.');
                 return;
             }
             const data = snap.val() || {};
@@ -276,7 +281,7 @@
             });
         }).catch(function (err) {
             restore();
-            alert(seasonAttachError(err, false));
+            uiFail(seasonAttachError(err, false));
         });
     }
 

@@ -342,7 +342,11 @@ describe('BETS TAB — round configuration is read-only on a group link', () => 
         assert.match(sb.document.getElementById('skins-config-note').textContent, /organizer/);
         assert.equal(shown(sb, 'birdie-config-note'), true);
 
-        let alerts = 0; sb.alert = () => { alerts++; };
+        // UI WAVE 4: the refusals are inline notes now. Counted the same way, so
+        // "each refusal is said out loud" still means exactly what it meant.
+        let alerts = 0;
+        const say = () => { alerts++; };
+        sb.alert = say; sb.uiRefuse = say; sb.uiFail = say; sb.uiToast = say;
         sb.document.getElementById('skins-buyin').value = '99';
         vm.runInContext('saveSkinsConfig(); setSkinsCarryOver(false); saveBirdieConfig(); setBirdieScoring("net");', sb);
         assert.equal(sb.__dbWrites.length, 0, 'not one write from a group link');

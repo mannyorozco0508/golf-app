@@ -26,6 +26,11 @@
     <script src="handicap.js"></script>
     <script src="match-engine.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
+         refusals and failures are inline and persistent, receipts float. Shared
+         with every other consumer page rather than copied; loaded before the
+         inline block so nothing below can shadow it. -->
+    <script src="ui-dialogs.js"></script>
     <!-- roundHasSkinsGame(): the one predicate that knows a Money Pool bucket and a
          participant-scoped instance are both real Skins games. Without this the gate
          below degrades to the old unconditional render. -->
@@ -535,7 +540,7 @@ html {
 
     function refuseConfigWrite(what) {
         console.warn('Blocked: a Group ' + lockedGroup + ' link may not change ' + what + '.');
-        alert('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s link, so it can watch ' + what
+        uiRefuse('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s link, so it can watch ' + what
             + ' but not change it. Ask the organizer.');
         return false;
     }
@@ -566,7 +571,7 @@ html {
     // the old number. Refused before Firebase instead.
     function requireOnlineForMoney(title, line) {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            alert('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
+            uiRefuse('\u26A0\uFE0F ' + title + '\nYou\'re offline. ' + line);
             return false;
         }
         return true;
@@ -578,7 +583,7 @@ html {
         const scoringType = document.getElementById("birdie-scoring-type").value;
         if (!requireOnlineForMoney('BIRDIE STAKE NOT SAVED', 'Reconnect before changing the stake.')) return;
         db.ref(`events/${currentMode}`).update({ birdieUnitVal: unitVal, birdieScoringType: scoringType })
-            .catch(err => alert(`Failed to save: ${err.message}`));
+            .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
 
 
@@ -602,14 +607,14 @@ html {
         const buyIn = parseFloat(document.getElementById("skins-buyin").value) || 0;
         if (!requireOnlineForMoney('SKINS SETUP NOT SAVED', 'Reconnect before changing the pot.')) return;
         db.ref(`events/${currentMode}`).update({ skinsPotFormat: potFormat, skinsBuyIn: buyIn })
-            .catch(err => alert(`Failed to save: ${err.message}`));
+            .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
 
     function setSkinsCarryOver(val) {
         if (!canEditRoundConfig()) return refuseConfigWrite('the carry rule');
         if (!requireOnlineForMoney('CARRY RULE NOT SAVED', 'Reconnect before changing the carry rule.')) return;
         db.ref(`events/${currentMode}/skinsCarryOver`).set(val)
-            .catch(err => alert(`Failed to save: ${err.message}`));
+            .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
 
 

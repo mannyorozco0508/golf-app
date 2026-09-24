@@ -40,8 +40,8 @@ const { REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // CONVERTED — must be clean. Every page here has been through the wave.
-const CONVERTED = ['sidematches.html', 'index.html', 'admin.html', 'skins.html', 'season.html',
-                   'leaderboard.html', 'settlement.html', 'game.html'];
+const CONVERTED = ['sidematches.html', 'index.html', 'admin.html', 'trip.html', 'skins.html',
+                   'season.html', 'leaderboard.html', 'settlement.html', 'game.html'];
 
 // NOT YET CONVERTED, and the count of native decisions each still has.
 //
@@ -56,8 +56,13 @@ const CONVERTED = ['sidematches.html', 'index.html', 'admin.html', 'skins.html',
 // removing a skins game, removing a golfer with posted scores, saving with
 // unnamed placeholders, delete round) and the app's last prompt(), the game-code
 // tool behind the five-tap panel, which became uiPrompt.
-// The count dropping is the point of pinning it.
-const PENDING = { 'trip.html': 1 };
+// UI Wave 4 moved the last of it: trip.html's 26 tells and its ONE decision -
+// unlinking a round from a trip, which stops the trip's leaderboard, money
+// settlement, points race and awards counting it - plus skins.html's 5 and
+// season.html's 9, which were tells only.
+// The count dropping is the point of pinning it, AND IT IS NOW ZERO. See the
+// assertion below, which is what keeps an empty list from meaning "no check".
+const PENDING = {};
 
 const CONSUMER = CONVERTED.concat(Object.keys(PENDING));
 const OUT_OF_SCOPE = ['tournament.html', 'tournament-scorecard.html'];
@@ -166,6 +171,41 @@ describe('no dialog answer is used without awaiting it', () => {
             assert.deepEqual(hits.map(h => page + ':' + h.line + '  ' + h.text.slice(0, 90)), [],
                 'a browser dialog is still deciding something on this page');
         });
+    });
+
+    test('THE BACKLOG IS EMPTY - and an empty list is not the same as a missing check', () => {
+        // Object.keys({}).forEach() GENERATES NO TESTS. Left as it was, this file
+        // would have gone from pinning a backlog to asserting nothing at all about
+        // one, and it would have reported green either way - the empty-slice trap
+        // this repo has a written rule about, one level up.
+        //
+        // So the empty state is asserted POSITIVELY: nothing is pending, every
+        // consumer page is in CONVERTED, each one exists, and the per-page scans
+        // above therefore ran over all of them.
+        assert.deepEqual(Object.keys(PENDING), [],
+            'something is still pending - it should have its own test above');
+        assert.equal(CONSUMER.length, CONVERTED.length,
+            'a page is in neither list, so nothing checks it');
+        // THAT LAST LINE IS NOT ENOUGH ON ITS OWN, and I found out by doing it:
+        // dropping trip.html from PENDING without adding it to CONVERTED leaves
+        // both lengths equal and the page checked by NOTHING. So every page in the
+        // repo that loads the shared component must be named in CONVERTED - the
+        // repo is the source of truth, not this list.
+        const speaks = fs.readdirSync(REPO_ROOT)
+            .filter(f => /\.html$/.test(f))
+            .filter(f => /<script src="ui-dialogs\.js"><\/script>/.test(read(f)));
+        const unchecked = speaks.filter(f => CONSUMER.indexOf(f) === -1);
+        assert.deepEqual(unchecked, [],
+            'these pages use the shared dialogs and are in neither list, so the '
+            + 'awaited-shape scan never runs on them: ' + JSON.stringify(unchecked));
+        CONSUMER.forEach(p => assert.ok(fs.existsSync(path.join(REPO_ROOT, p)),
+            p + ' is named in the scan but is not in the repo'));
+        // And CONVERTED is not a list of files that were never involved: most of
+        // them really do load the shared component now.
+        const speaking = CONVERTED.filter(p => /ui-dialogs\.js/.test(read(p)));
+        assert.ok(speaking.length >= 6,
+            'only ' + speaking.length + ' converted pages load the component: '
+            + JSON.stringify(speaking));
     });
 
     Object.keys(PENDING).forEach(page => {
