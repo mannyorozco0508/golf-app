@@ -205,10 +205,54 @@
         if (state.status !== 'pending') state.status = 'signed-in';
     }
 
-    function setStatus(text) {
+    // ---- THE NOTE IS REMEMBERED, NOT DROPPED (v214) -------------------------
+    //
+    // install() runs at parse time, in the HEAD, and wraps window.authReady so the
+    // link is finished the moment the anonymous session resolves.
+    // #email-link-status is in the BODY. So this used to be a race between the
+    // auth promise and the parser, and the parser lost about half the time:
+    //
+    //     var el = document.getElementById('email-link-status');
+    //     if (!el) return;                    // ... and the sentence was gone
+    //
+    // Measured cold, five runs: the lookup happened at 14-22ms with the element
+    // absent (readyState 'loading') and the note was lost, or at 32-39ms with it
+    // present and the note landed. linked=1 and the uid correct in every run - the
+    // credential was always taken onto the anonymous user, and ONLY the
+    // confirmation went missing. More settle time never helped because the write
+    // had already happened and been thrown away.
+    //
+    // So the note is kept, and flushed when there is somewhere to put it: on
+    // DOMContentLoaded, on load (for a note set after DOMContentLoaded had already
+    // gone), and through flushStatus() for a caller that renders the area itself.
+    // Every path - publish, submitSend, submitPaste, and install()'s two error
+    // arms - goes through setStatus, so this is the only place it had to be fixed.
+    var lastNote = '';
+    var flushArmed = false;
+
+    function flushStatus() {
+        // Never blanks the element: with nothing remembered there is nothing to
+        // say, and clearing it would wipe whatever the page had put there.
+        if (!lastNote) return;
         var el = document.getElementById('email-link-status');
-        if (!el) return;
-        el.textContent = text || '';
+        if (el) el.textContent = lastNote;
+    }
+    function armFlush() {
+        if (flushArmed) return;
+        var rs = (typeof document !== 'undefined') ? document.readyState : null;
+        // Already loaded: neither event will fire again, and the element genuinely
+        // is not on this page. Arming would be a listener that never runs.
+        if (rs && rs !== 'loading' && rs !== 'interactive') return;
+        flushArmed = true;
+        try { document.addEventListener('DOMContentLoaded', flushStatus); } catch (e) { /* no document events */ }
+        try { window.addEventListener('load', flushStatus); } catch (e) { /* no window events */ }
+    }
+    function setStatus(text) {
+        lastNote = text || '';
+        if (window.emailLinkAuth) window.emailLinkAuth.lastNote = lastNote;
+        var el = document.getElementById('email-link-status');
+        if (el) { el.textContent = lastNote; return; }
+        armFlush();
     }
 
     function provider() {
@@ -406,6 +450,11 @@
         migrationNote: migrationNote,
         sameOrganizer: sameOrganizer,
         messageFor: messageFor,
+        // v214: the note, and the two ways to put it on screen. lastNote is what
+        // was said most recently, whether or not the element existed at the time.
+        lastNote: '',
+        setStatus: setStatus,
+        flushStatus: flushStatus,
         readPending: readPending,
         sendLink: sendLink,
         completeLink: completeLink,

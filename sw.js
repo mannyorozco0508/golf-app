@@ -1859,7 +1859,21 @@
 // changed: handicap.js is byte-identical and does the conversion. The consumer
 // product cache is consumer-v55-index-box. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v213-index-box';
+// Moved to v214 because the email-link confirmation is now written on every
+// run. email-link-auth.js's setStatus looked #email-link-status up once and gave
+// up if the parser had not reached it yet - install() runs in the HEAD and the
+// element is in the BODY, so the sentence was lost whenever the auth promise beat
+// the parser. Measured cold: the lookup happened at 14-22ms with the element
+// absent (note lost) or at 32-39ms with it present (note landed), and the
+// credential was correctly linked in EVERY run either way. The note is now
+// remembered and flushed on DOMContentLoaded and load. 15 of 15 cold runs across
+// the preserved, second-device and expired-link outcomes now write their
+// sentence, 6 of them after hitting the race. email-link-auth.js is precached, so
+// a device on v213 keeps losing the confirmation about half the time - the link
+// itself always worked. No engine changed. The consumer product cache is
+// consumer-v56-link-note. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v214-link-note';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
