@@ -490,16 +490,24 @@ describe('CHROME: real taps - move a golfer with the [Group] selector, Save', ()
     const d = round();
     d.ownerUid = 'anon-cold';
     const DB = { events: { PS1: d }, global_courses: {}, trips: {}, tournaments: {} };
-    const key = (type, k) => ({ cdp: { method: 'Input.dispatchKeyEvent', params: { type, key: k, code: k, windowsVirtualKeyCode: 40 } } });
+    const key = (type, k, code, vk) => ({ cdp: { method: 'Input.dispatchKeyEvent', params: { type, key: k, code: code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk } } });
     let r;
     before(async () => {
         r = await arriveCold({ url: fileUrl('index.html', 'game=PS1'), db: DB, settleMs: 4000, steps: [
             { tap: '#group-pick-overlay .btn-outline', nth: 0 }, { sleep: 250 },
             { tap: '.group-setup-btn', nth: 1 }, { sleep: 250 },
             { expression: "'SEL0:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"] .ps-grp').value" },
-            // a tap focuses the selector; two Down keys on a focused <select> move G3 -> G5 and fire change
+            // A tap focuses the selector. Two Down keys move G3 -> G5 and fire
+            // change, but only once the list is open: Chrome's headless select
+            // ignores ArrowDown while it is closed, so the value never moves
+            // and change never fires. Space opens it, the two Down keys move
+            // it, Enter commits. That is the same change a golfer gets from
+            // the keyboard.
             { tap: '#players-sheet-body .ps-row[data-idx="9"] .ps-grp', nth: 0 }, { sleep: 150 },
-            key('keyDown', 'ArrowDown'), key('keyUp', 'ArrowDown'), key('keyDown', 'ArrowDown'), key('keyUp', 'ArrowDown'), { sleep: 200 },
+            key('keyDown', ' ', 'Space', 32), key('keyUp', ' ', 'Space', 32), { sleep: 80 },
+            key('keyDown', 'ArrowDown', 'ArrowDown', 40), key('keyUp', 'ArrowDown', 'ArrowDown', 40),
+            key('keyDown', 'ArrowDown', 'ArrowDown', 40), key('keyUp', 'ArrowDown', 'ArrowDown', 40),
+            key('keyDown', 'Enter', 'Enter', 13), key('keyUp', 'Enter', 'Enter', 13), { sleep: 200 },
             { expression: "'SEL1:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"] .ps-grp').value" },
             { expression: "'ROW:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"]').className" },
             { expression: "'WARN:' + document.getElementById('players-sheet-warn').innerText" },
