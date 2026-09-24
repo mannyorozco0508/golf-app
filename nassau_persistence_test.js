@@ -64,7 +64,7 @@ function wizard({ playersAtStep3 = [], playersAtStep5 = PAUL_PETE,
     const sb = loadHtmlInlineScript('admin.html', ADMIN);
     vm.runInContext(`
         window.__writes = [];
-        alert = function(m){ window.__alert = m; };
+        alert = function(m){ window.__alert = m; }; uiRefuse = function(m){ window.__alert = m; }; uiFail = function(m){ window.__alert = m; }; uiToast = function(m){ window.__alert = m; };
         copyFromCode = null;
         currentMode = 'ABCD';
         window.__roster = ${JSON.stringify(playersAtStep3)};

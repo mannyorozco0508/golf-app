@@ -69,8 +69,12 @@ describe('EACH OF THE NINE, IN ITS OWN CONTEXT', () => {
         // Arrive at the wizard, reach the save with a pool that cannot validate
         // (a KP purse on a course with no KP holes chosen), and read the alert.
         const s = rendered('admin.html');
-        assert.match(s, /alert\('\\u26A0\\uFE0F Weekly Game:\\n' \+ mpCheck\.errors\.join\('\\n'\)\);/);
-        assert.doesNotMatch(s, /alert\('\\u26A0\\uFE0F Main Pool/);
+        // UI WAVE 3: the wizard refuses through uiRefuse now - inline next to the
+        // control, and PERSISTENT, which matters more here than anywhere: the round
+        // did not save, and a message that floats away leaves the organizer tapping
+        // Save again. Same sentence, same word, different surface.
+        assert.match(s, /uiRefuse\('\\u26A0\\uFE0F Weekly Game:\\n' \+ mpCheck\.errors\.join\('\\n'\)\);/);
+        assert.doesNotMatch(s, /(alert|uiRefuse|uiFail|uiToast)\('\\u26A0\\uFE0F Main Pool/);
     });
 
     test('index.html: the Card tab\'s action banner reads "🏆 Weekly Game · $<pot>" on a Weekly Game round', () => {

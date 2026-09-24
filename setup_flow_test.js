@@ -33,7 +33,7 @@ const PLAYERS = [{ id:101, name:'Marty', hcp:'0' }, { id:102, name:'Manny', hcp:
 function loadRound(gameFormat, { asCopy = false } = {}) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         copyFromCode = ${asCopy ? "'SRC1'" : 'null'};
         collectWizardPlayers = function(){ return ${JSON.stringify(PLAYERS)}; };
         var data = { gameFormat: '${gameFormat}' };
@@ -69,7 +69,7 @@ function review(gameFormat) {
     // populate. That is a harness limit, not a product fault, so the stubs below
     // stand in for the browser rather than the assertion being weakened.
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         collectWizardPlayers = function(){ return ${JSON.stringify(PLAYERS)}; };
         revealLegacyFormatOption('${gameFormat}');
         document.getElementById('game-format-select').value = '${gameFormat}';

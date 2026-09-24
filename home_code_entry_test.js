@@ -77,7 +77,7 @@ function lobby(href) {
     // the box now refuses before reading (the alphabet never issues them).
     sb.__dbReads = { 'events/AB2CDF': { players: [{ id: 101, name: 'A' }] }, 'events/R4HH': { players: [{ id: 101, name: 'A' }] },
                      'events/JLRL4H': { players: Array.from({ length: 12 }, (_, i) => ({ id: 101 + i, name: 'P' + i })) } };
-    vm.runInContext("alert = function (m) { window.__said = m; };"
+    vm.runInContext("alert = function (m) { window.__said = m; }; uiRefuse = function (m) { window.__said = m; }; uiFail = function (m) { window.__said = m; }; uiToast = function (m) { window.__said = m; };"
         + ' location = ' + JSON.stringify(loc) + '; window.location = location; navigator.onLine = true;', sb);
     return {
         sb,

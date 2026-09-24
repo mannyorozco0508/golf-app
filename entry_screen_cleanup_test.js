@@ -97,7 +97,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
         // the same tile handler. The only change is waiting for the answer.
         const sb = loadHtmlInlineScript('admin.html',
             ['course-data.js', 'action-model.js', 'code-issuer.js']);
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         // The issuer needs a database to ask. An empty one answers "free" to
         // everything, which is the case this test is about - a normal start.
         stubFreeDatabase(sb);
@@ -112,7 +112,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
     test('and the code it generates is a full six characters', async () => {
         const sb = loadHtmlInlineScript('admin.html',
             ['course-data.js', 'action-model.js', 'code-issuer.js']);
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         stubFreeDatabase(sb);
         vm.runInContext("selectHomeWidget('quick');", sb);
         await settle(sb);
@@ -122,7 +122,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
 
     test('tapping Road Trip still goes to the trip', () => {
         const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         vm.runInContext("selectHomeWidget('trip');", sb);
         assert.match(vm.runInContext('location.href', sb), /trip\.html/);
     });
@@ -133,7 +133,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
     test('the club preset still starts a round', async () => {
         const sb = loadHtmlInlineScript('admin.html',
             ['course-data.js', 'action-model.js', 'code-issuer.js']);
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         stubFreeDatabase(sb);
         vm.runInContext("selectHomeWidget('club');", sb);
         await settle(sb);
@@ -163,7 +163,7 @@ describe('THE HOME HAS TWO CHOICES, AND PICKING ONE STARTS IT', () => {
 function arrive(setup) {
     const sb = loadHtmlInlineScript('sidematches.html', SM_DEPS,
         { search: '?game=ENTRY' + (setup ? '&setup=ryder' : '') });
-    vm.runInContext('alert = function () {}; isOrganizerView = function () { return true; };', sb);
+    vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; isOrganizerView = function () { return true; };', sb);
     const handlers = sb.__dbHandlers.filter(h => h.event === 'value');
     assert.ok(handlers.length > 0, 'the page registered no value handler');
     handlers.forEach(h => h.cb({ val: () => ({ eventName: 'Single Round',

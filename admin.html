@@ -38,6 +38,12 @@
          sentences; the Matches tab uses the rules. One definition of both. -->
     <script src="aloha-bet.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI Wave 3: the telling, asking and typing this page does. 38 alerts,
+         five decisions and the last prompt() in the app became uiRefuse / uiFail /
+         uiToast / uiConfirm / uiPrompt. Loaded before the inline block so
+         nothing below can shadow it, and shared with the scorecard and the
+         side matches page rather than copied. -->
+    <script src="ui-dialogs.js"></script>
     <script src="attendance.js"></script>
     <!-- Cross-product navigation. consumerUrl()/tournamentUrl() return the same
          relative paths they always did until two deployment origins are configured,
@@ -1984,7 +1990,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // The one write. true -> events/OLD/supersededBy = NEW; false -> null (undo).
     function retireRound(oldCode, on) {
         return db.ref('events/' + oldCode + '/supersededBy').set(on ? currentMode : null)
-            .catch(err => alert('\u26A0\uFE0F NOT RETIRED\n' + oldCode + ': ' + err.message));
+            .catch(err => uiFail('\u26A0\uFE0F NOT RETIRED\n' + oldCode + ': ' + err.message));
     }
 
     function showRoundReadyScreen(modeKey) {
@@ -2332,7 +2338,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function wizardNext(fromStep) {
         if (fromStep === 1) {
             const courseVal = document.getElementById('course-search-input').value.trim();
-            if (!courseVal) { alert('⚠️ Please select a golf course before continuing.'); return; }
+            if (!courseVal) { uiRefuse('⚠️ Please select a golf course before continuing.'); return; }
         }
         // Step 2 owns the Par/HCP grid. Validate the COMPLETED card here, on the way
         // out - the golfer has finished typing by the time they reach for Next.
@@ -2340,12 +2346,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const customBox = document.getElementById('enable-custom-course');
             if (customBox && customBox.checked) {
                 const check = validateCourseGrid();
-                if (!check.ok) { alert('\u26A0\uFE0F ' + check.message); return; }
+                if (!check.ok) { uiRefuse('\u26A0\uFE0F ' + check.message); return; }
             }
         }
         if (fromStep === 3) {
             const formatVal = document.getElementById('game-format-select').value;
-            if (!formatVal) { alert('⚠️ Please select a game format before continuing.'); return; }
+            if (!formatVal) { uiRefuse('⚠️ Please select a game format before continuing.'); return; }
         }
         goToWizardStep(wizardNeighbourStep(fromStep, 1));
     }
@@ -2655,32 +2661,58 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }).catch(() => { el.textContent = 'Could not read that round.'; });
     }
 
-    function enableWholeDollarSettlement() {
+    // TWO QUESTIONS IN A ROW, AND BOTH ARE AWAITED (UI Wave 3).
+    //
+    // The typed one is the app's last prompt(). Its answer is not a yes/no: it
+    // NAMES THE ROUND whose payouts change, so a wrong value here either does
+    // nothing or rounds someone else's money. uiPrompt resolves to a trimmed,
+    // uppercased string or to null - null for cancelled AND for empty, because
+    // "never mind" and "" mean the same thing to every caller.
+    //
+    // A MISSED AWAIT ON EITHER: the typed one turns the code into the literal
+    // "[OBJECT PROMISE]" and db.ref() throws on the bracket; the decision one
+    // makes `!answer` always false, so the round is switched without anyone being
+    // asked. Only the second is silent, which is why the guard reads both.
+    async function enableWholeDollarSettlement() {
         // Uses the round in context when there is one; otherwise asks. The panel is
-        // usually reached from admin.html with no ?game=, so prompting is the normal
+        // usually reached from admin.html with no ?game=, so asking is the normal
         // path rather than the fallback.
         let code = currentMode ? String(currentMode).toUpperCase().trim() : '';
         if (!code) {
-            const typed = prompt('Game code of the round to switch to whole dollars:');
-            code = typed ? typed.toUpperCase().trim() : '';
+            const typed = await uiPrompt({
+                title: 'Which round?',
+                body: 'Type the game code of the round to switch to whole dollars.',
+                placeholder: 'GAME CODE',
+                confirmText: 'Look it up',
+                code: true,
+                maxLength: 8
+            });
+            code = typed ? String(typed).toUpperCase().trim() : '';
         }
         if (!code) return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            alert('\u26A0\uFE0F NOT SAVED\nYou\'re offline. Reconnect before changing settlement.');
+            uiRefuse('\u26A0\uFE0F NOT SAVED\nYou\'re offline. Reconnect before changing settlement.');
             return;
         }
-        db.ref('events/' + code).once('value').then(snap => {
+        db.ref('events/' + code).once('value').then(async snap => {
             const round = snap.val();
-            if (!round) { alert('\u26A0\uFE0F No round found for ' + code + '.'); return; }
-            if (round.settlementMode === 'whole-dollar') { alert('This round already settles in whole dollars.'); return; }
+            if (!round) { uiRefuse('\u26A0\uFE0F No round found for ' + code + '.'); return; }
+            if (round.settlementMode === 'whole-dollar') { uiRefuse('This round already settles in whole dollars.'); return; }
             // Changing this after the fact would move numbers people have already
             // been shown, so the organizer is told exactly what it does.
-            if (!confirm('Settle ' + code + ' in whole dollars?\n\nEvery payout becomes a whole dollar with no cents. '
-                + 'Do this before you settle up, not after.')) return;
+            const ok = await uiConfirm({
+                title: 'Settle ' + code + ' in whole dollars?',
+                body: 'Every payout becomes a whole dollar with no cents. '
+                    + 'Do this before you settle up, not after.',
+                confirmText: 'Switch it',
+                cancelText: 'Leave it as it is',
+                danger: false
+            });
+            if (!ok) return;
             db.ref('events/' + code + '/settlementMode').set('whole-dollar')
-                .then(() => { alert('\u2705 ' + code + ' will settle in whole dollars.'); refreshSettlementModeState(code); })
-                .catch(err => alert('\u26A0\uFE0F NOT SAVED\n' + (err && err.message)));
-        }).catch(err => alert('\u26A0\uFE0F Could not read that round.\n' + (err && err.message)));
+                .then(() => { uiToast('\u2705 ' + code + ' will settle in whole dollars.'); refreshSettlementModeState(code); })
+                .catch(err => uiFail('\u26A0\uFE0F NOT SAVED\n' + (err && err.message)));
+        }).catch(err => uiFail('\u26A0\uFE0F Could not read that round.\n' + (err && err.message)));
     }
 
     // 128 bits from the platform CSPRNG, hex encoded. Falls back only if
@@ -2707,10 +2739,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         
         db.ref('global_courses').update(updates).then(() => {
-            alert("✅ All preset courses successfully synced to Firebase global database!");
+            uiToast("✅ All preset courses successfully synced to Firebase global database!");
             document.getElementById('secret-master-panel').style.display = 'none';
         }).catch(err => {
-            alert("Error: " + err.message);
+            uiFail("Error: " + err.message);
         });
     }
     // -------------------------
@@ -2855,7 +2887,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (navigator.share) {
             navigator.share({ title: `HardPan`, text: textMsg, url: baseUrl }).catch(console.error);
         } else {
-            navigator.clipboard.writeText(baseUrl).then(() => alert("App link copied to clipboard!"));
+            navigator.clipboard.writeText(baseUrl).then(() => uiToast("App link copied to clipboard!"));
         }
     }
 
@@ -3107,11 +3139,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Removing a wager is consequential once it has results, and this screen cannot
     // know whether any have accrued - scores live on the round, not in the wizard - so
     // it always confirms rather than guessing.
-    function removeSkinsInstance(id) {
+    async function removeSkinsInstance(id) {
         const inst = skinsInstances.find(x => x.id === id);
         if (!inst) return;
         const n = (inst.participantIds || []).length;
-        if (!confirm(`Remove this $${inst.skinsBuyIn || 0} skins game between ${n} golfer${n === 1 ? '' : 's'}?\n\nAny skins already won in it stop counting.`)) return;
+        const ok = await uiConfirm({
+            title: `Remove this $${inst.skinsBuyIn || 0} skins game between ${n} golfer${n === 1 ? '' : 's'}?`,
+            body: 'Any skins already won in it stop counting.',
+            confirmText: 'Remove it',
+            cancelText: 'Keep the game',
+            danger: true
+        });
+        if (!ok) return;
         skinsInstances = skinsInstances.filter(x => x.id !== id);
         renderStackedGames();
         updateWizardReview();
@@ -3957,7 +3996,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const code = (typeof seasonRoundCode === 'function')
             ? seasonRoundCode(document.getElementById('season-open-input').value)
             : '';
-        if (!code) { alert('Enter the season code.'); return; }
+        if (!code) { uiRefuse('Enter the season code.'); return; }
         window.location.href = 'season.html?season=' + code;
     }
 
@@ -3965,7 +4004,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const code = parseRoundCodeInput(document.getElementById('copy-code-input'));
         if (code.length < 2) {
-            alert('\u26A0\uFE0F Enter the code of the round to start from.');
+            uiRefuse('\u26A0\uFE0F Enter the code of the round to start from.');
             return;
         }
         const restore = setControlPending(pressedEl, '\u23F3 Checking\u2026');
@@ -3977,12 +4016,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const source = (snap && snap.exists && snap.exists()) ? (snap.val() || {}) : null;
             if (!source) {
                 restore();
-                alert('\u26A0\uFE0F No round with the code ' + code + '. Nothing was started.');
+                uiRefuse('\u26A0\uFE0F No round with the code ' + code + '. Nothing was started.');
                 return;
             }
             if (!Array.isArray(source.players) || source.players.length === 0) {
                 restore();
-                alert('\u26A0\uFE0F Round ' + code + ' has no golfers to copy. Nothing was started.');
+                uiRefuse('\u26A0\uFE0F Round ' + code + ' has no golfers to copy. Nothing was started.');
                 return;
             }
             const newCode = await issueUniqueCode({ db, root: 'events' });
@@ -4010,14 +4049,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // offline emulation, so the app cannot honestly say why; it can say
         // what did not happen and what to do.
         if (err && err.code === 'timeout') {
-            alert('\u26A0\uFE0F ' + what.toUpperCase() + ' NOT CREATED\n'
+            uiFail('\u26A0\uFE0F ' + what.toUpperCase() + ' NOT CREATED\n'
                 + 'The new ' + what + ' could not be set up just now. Nothing was saved. Try again.');
         } else if (/could not issue a free/i.test(m)) {
-            alert('Could not start a new ' + what + ' just now.\n\n'
+            uiFail('Could not start a new ' + what + ' just now.\n\n'
                 + 'Every code we tried was already in use. Try again \u2014 the next one '
                 + 'will almost certainly be free.');
         } else {
-            alert('\u26A0\uFE0F Could not start a new ' + what + ' \u2014 check your signal '
+            uiFail('\u26A0\uFE0F Could not start a new ' + what + ' \u2014 check your signal '
                 + 'and try again.');
         }
     }
@@ -4610,7 +4649,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // provider sent - they may have corrected a cell, and the card that gets
         // written must be the card that was on screen.
         const gridCheck = validateCourseGrid();
-        if (!gridCheck.ok) { alert('⚠️ ' + gridCheck.message); return; }
+        if (!gridCheck.ok) { uiRefuse('⚠️ ' + gridCheck.message); return; }
         const importKey = pendingImport.key;
         const rec = Object.assign({}, pendingImport.record, { data: gridCheck.data });
         const p = db.ref(`global_courses/${importKey}`).update(rec);
@@ -4670,7 +4709,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function submitNewCourseName() {
         const name = document.getElementById('new-course-name-input').value.trim();
-        if (!name) { alert('⚠️ Enter a course name first.'); return; }
+        if (!name) { uiRefuse('⚠️ Enter a course name first.'); return; }
         document.getElementById('new-course-form').style.display = 'none';
         document.getElementById('new-course-name-input').value = '';
         addCustomCourse(name);
@@ -6015,7 +6054,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     // Same idea in reverse — removing a player could drop a 1v1 round back to exactly 2
     // players, which should hide the Team column again rather than leave it stale.
-    function removePlayerRowAndRefresh(btnEl) {
+    async function removePlayerRowAndRefresh(btnEl) {
         const row = btnEl.closest('.player-row');
         // A GOLFER WITH POSTED SCORES IS ASKED ABOUT. Their scores stay in the
         // record under their id (nothing here deletes a score, and ids are never
@@ -6025,9 +6064,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (holes > 0) {
             const nameEl = row.querySelector('.p-name-input');
             const name = (nameEl && nameEl.value.trim()) || 'This golfer';
-            if (!confirm(name + ' has posted scores on ' + holes + ' hole' + (holes === 1 ? '' : 's') + '.\n\n'
-                + 'Remove ' + name + ' from the round? Their posted scores will no longer appear anywhere, '
-                + 'and adding them back later starts a fresh card.')) return;
+            const ok = await uiConfirm({
+                title: name + ' has posted scores on ' + holes + ' hole' + (holes === 1 ? '' : 's') + '.',
+                body: 'Remove ' + name + ' from the round? Their posted scores will no longer appear anywhere, '
+                    + 'and adding them back later starts a fresh card.',
+                confirmText: 'Remove ' + name,
+                cancelText: 'Keep them in',
+                danger: true
+            });
+            if (!ok) return;
         }
         row.remove();
         const existingData = captureCurrentPlayerInputs();
@@ -6880,7 +6925,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function reportRoundLoadFailure(modeKey, err) {
         const msg = String((err && err.message) || err || 'unknown error');
         console.error('loadModeData(' + modeKey + ') failed:', err);
-        alert('\u26A0\uFE0F Some of round ' + String(modeKey).toUpperCase() + '\u2019s settings could not be loaded.\n\n'
+        uiFail('\u26A0\uFE0F Some of round ' + String(modeKey).toUpperCase() + '\u2019s settings could not be loaded.\n\n'
             + msg + '\n\nCheck every step before saving.');
     }
 
@@ -7243,11 +7288,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Still alerts, deliberately: three of the 213 dialogs in the inventory, gone
     // with the rest when the toast exists.
     function copyRoundLink(url) {
-        navigator.clipboard.writeText(url).then(() => alert('Copied. Paste it into your group text \u2014 everyone picks their own group when they open it.'));
+        navigator.clipboard.writeText(url).then(() => uiToast('Copied. Paste it into your group text \u2014 everyone picks their own group when they open it.'));
     }
     function copyGroupLink(url, groupNum, names) {
         const who = names ? ' \u2014 ' + names : '';
-        navigator.clipboard.writeText(url).then(() => alert('Copied Group ' + groupNum + '\u2019s link' + who + '.'));
+        navigator.clipboard.writeText(url).then(() => uiToast('Copied Group ' + groupNum + '\u2019s link' + who + '.'));
     }
 
     function getCategoryIcon(type) {
@@ -7276,7 +7321,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // golfer watching the button is told the truth before they start tapping.
     const SAVE_SLOW_MS = 3000;
 
-    function saveSettings() {
+    // ASYNC SINCE UI WAVE 3, for the unnamed-golfer warning below. Nothing
+    // awaits saveSettings' return value - it is only ever reached from
+    // onclick="saveSettings()" - and with named golfers no await executes, so the
+    // whole body still runs synchronously on that path.
+    async function saveSettings() {
 
         // THE BUTTON IS GIVEN BACK IN ONE PLACE, and that place is the finally at
         // the bottom of this function.
@@ -7321,7 +7370,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
 
             if (!courseKey && !selectedCourseName) { 
-                alert("⚠️ Please select or type a Golf Course name before saving!"); 
+                uiRefuse("⚠️ Please select or type a Golf Course name before saving!"); 
                 return; 
             }
             
@@ -7337,7 +7386,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // later, since rosters often aren't locked until close to the round.
 
             if (gameFormat === 'wolf' && rows.length > 0 && rows.length !== 4) {
-                alert("⚠️ Wolf Game Tracker requires exactly 4 active players!");
+                uiRefuse("⚠️ Wolf Game Tracker requires exactly 4 active players!");
                 return;
             }
 
@@ -7346,7 +7395,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // is saved with cannot be two different scorecards.
             const preview = previewCourseData(courseKey);
             if (!preview.ok) {
-                alert('\u26A0\uFE0F Course card problem: ' + preview.reason);
+                uiRefuse('\u26A0\uFE0F Course card problem: ' + preview.reason);
                 return;
             }
             let finalCourseData = preview.data;
@@ -7654,7 +7703,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (payload.moneyPool) {
                 const mpCheck = validateMoneyPool(payload, finalCourseData);
                 if (!mpCheck.valid) {
-                    alert('\u26A0\uFE0F Weekly Game:\n' + mpCheck.errors.join('\n'));
+                    uiRefuse('\u26A0\uFE0F Weekly Game:\n' + mpCheck.errors.join('\n'));
                     return;
                 }
             }
@@ -7714,14 +7763,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 : [];
             if (placeholderNames.length > 0) {
                 const n = placeholderNames.length;
-                const proceed = confirm(
-                    '\u26A0\uFE0F ' + n + (n === 1 ? ' golfer has' : ' golfers have') + ' no name.\n\n'
-                    + 'They will be saved as ' + placeholderNames.slice(0, 2).join(', ')
-                    + (n > 2 ? ' and so on' : '') + '.\n\n'
-                    + 'This round and its money work normally. But a placeholder cannot be '
-                    + 'matched to the same golfer in another round, so this round will not be '
-                    + 'able to join a trip or a Ryder Cup later.\n\n'
-                    + 'OK to start the round anyway, or Cancel to go back and name them.');
+                const proceed = await uiConfirm({
+                    title: '\u26A0\uFE0F ' + n + (n === 1 ? ' golfer has' : ' golfers have') + ' no name.',
+                    body: 'They will be saved as ' + placeholderNames.slice(0, 2).join(', ')
+                        + (n > 2 ? ' and so on' : '') + '.\n\n'
+                        + 'This round and its money work normally. But a placeholder cannot be '
+                        + 'matched to the same golfer in another round, so this round will not be '
+                        + 'able to join a trip or a Ryder Cup later.',
+                    confirmText: 'Start it anyway',
+                    cancelText: 'Go back and name them',
+                    // A warning, not a destruction: nothing is lost by starting.
+                    danger: false
+                });
                 if (!proceed) return;
             }
 
@@ -7784,7 +7837,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 const patch = seasonAttachPatch(currentMode, selectedCourseName, Date.now());
                 if (!patch) return;
                 return db.ref(`seasons/${seasonLinkCode}`).update(patch).catch((err) => {
-                    alert(typeof seasonAttachError === 'function' ? seasonAttachError(err, true) : String(err && err.message || err));
+                    uiFail(typeof seasonAttachError === 'function' ? seasonAttachError(err, true) : String(err && err.message || err));
                 });
             });
             if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(saveChain);
@@ -7817,15 +7870,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // SDK message, so the wall never explains a failure it did not cause.
                 if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
                     window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
-                        alert(why === 'trial-ended' ? window.organizerGate.WALL : `Save error: ${err.message}`);
+                        uiFail(why === 'trial-ended' ? window.organizerGate.WALL : `Save error: ${err.message}`);
                     });
                     return;
                 }
-                alert(`Save error: ${err.message}`); 
+                uiFail(`Save error: ${err.message}`); 
             });
 
         } catch (e) {
-            alert(`JavaScript Error: ${e.message}`);
+            uiFail(`JavaScript Error: ${e.message}`);
         } finally {
             // Every refusal, and every throw, lands here. Only a write in flight
             // does not.
@@ -7852,22 +7905,34 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
         + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
         + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';
-    function endAndClearRound() {
-        if (Object.keys(loadedScores || {}).length > 0) { alert(SCORED_ROUND_SENTENCE); return; }
+    async function endAndClearRound() {
+        if (Object.keys(loadedScores || {}).length > 0) { uiRefuse(SCORED_ROUND_SENTENCE); return; }
         const golferCount = loadedPlayerCount;
-        const msg = `Delete round ${currentMode} for everyone?\n\n`
-            + `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+        const msg = `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
             + `It cannot be undone.\n\n`
             + `You do not need to delete a round when you finish playing.`;
-        if (!confirm(msg)) return;
+        // THE DESTRUCTIVE BUTTON IS NOT THE DEFAULT. uiConfirm renders Cancel
+        // first and focuses it, so nobody erases a round by tapping twice where
+        // the previous button was. Driven both ways in real Chrome at 390x844 in
+        // dialog_admin_delete_chrome_test.js; this page's copy is proved
+        // separately from index.html's because each page's inline script is its
+        // own function.
+        const ok = await uiConfirm({
+            title: `Delete round ${currentMode} for everyone?`,
+            body: msg,
+            confirmText: 'Delete it',
+            cancelText: 'Keep the round',
+            danger: true
+        });
+        if (!ok) return;
         db.ref(`events/${currentMode}`).remove().then(() => {
             localStorage.removeItem('lastRoomCode');
-            alert('Round deleted. The scorecard is now clear.');
+            uiToast('Round deleted. The scorecard is now clear.');
             window.location.href = 'admin.html';
         }).catch((err) => {
             const m = String((err && err.message) || err || '');
-            if (/PERMISSION_DENIED/i.test(m)) alert(SCORED_ROUND_SENTENCE);
-            else alert('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+            if (/PERMISSION_DENIED/i.test(m)) uiRefuse(SCORED_ROUND_SENTENCE);
+            else uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
         });
     }
 
@@ -7938,7 +8003,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
         }).catch((err) => {
             if (copyFromCode) {
-                alert('\u26A0\uFE0F ROUND NOT COPIED\nThe round to copy (' + String(copyFromCode).toUpperCase()
+                uiFail('\u26A0\uFE0F ROUND NOT COPIED\nThe round to copy (' + String(copyFromCode).toUpperCase()
                     + ') could not be loaded just now. Nothing was saved. Go back and try again.');
             } else {
                 console.warn('arrival read for ' + currentMode + ' did not complete:', err);

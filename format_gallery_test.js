@@ -43,7 +43,7 @@ const NATIVE_PAGES = ['admin.html', 'index.html', 'leaderboard.html', 'settlemen
 function wizard(format) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         collectWizardPlayers = function(){ return []; };
         renderPlayerList = function(){};
         renderStackedGames = function(){};

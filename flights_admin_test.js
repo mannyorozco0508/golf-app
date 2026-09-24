@@ -50,7 +50,7 @@ const ENG = (() => {
 async function wizard(code) {
     const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + code });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function () {};');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
     await new Promise(r => setTimeout(r, 20));      // the arrival load, resolved (a fresh code)
     run(sb, 'document.__mount(document.getElementById("player-list"));');
     clearRows(sb);

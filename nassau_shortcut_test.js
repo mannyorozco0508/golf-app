@@ -61,7 +61,7 @@ function engines() {
 function wizard(selectValue, { players = TWO, stakes = null, picks = null, tick = null } = {}) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
-        alert = function(m){ window.__alert = m; };
+        alert = function(m){ window.__alert = m; }; uiRefuse = function(m){ window.__alert = m; }; uiFail = function(m){ window.__alert = m; }; uiToast = function(m){ window.__alert = m; };
         copyFromCode = null;
         // The mini-DOM does not seed .value from a markup value="..." attribute the
         // way a browser does, so the card's own defaults read as empty. Seeded from

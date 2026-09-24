@@ -77,7 +77,7 @@ function loadRound(gameFormat, { asCopy = false } = {}) {
             var _sr = sel.removeChild;
             sel.removeChild = function(n){ window.__appendedGroup = null; return _sr ? _sr.call(sel, n) : n; };
         })();
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         copyFromCode = ${asCopy ? "'SRC1'" : 'null'};
         collectWizardPlayers = function(){ return ${JSON.stringify(TWO)}; };
         var data = { gameFormat: '${gameFormat}' };
@@ -232,7 +232,7 @@ describe('THE MODERN SHORTCUT IS UNAFFECTED', () => {
         });
         const sb = loadHtmlInlineScript('admin.html', DEPS);
         vm.runInContext(`
-            alert = function(){};
+            alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers = function(){ return ${JSON.stringify(TWO)}; };
             document.getElementById('game-format-select').value = 'nassau-modern';
             handleFormatChange();
@@ -315,7 +315,7 @@ describe('MONEY IS UNCHANGED BY ANY OF THIS', () => {
         });
         const sb = loadHtmlInlineScript('admin.html', DEPS);
         vm.runInContext(`
-            alert = function(){};
+            alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers = function(){ return ${JSON.stringify(TWO)}; };
             document.getElementById('game-format-select').value = 'nassau-modern';
             handleFormatChange();

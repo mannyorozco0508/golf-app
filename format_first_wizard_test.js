@@ -42,7 +42,7 @@ const CARD_FORMATS = ['stroke', 'stableford', 'nassau-modern', 'bestball',
 function wizard(format) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         collectWizardPlayers = function(){ return []; };
         renderPlayerList = function(){};
         renderStackedGames = function(){};

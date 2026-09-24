@@ -93,7 +93,7 @@ function openRound(gameFormat, { asCopy = false } = {}) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
         window.__writes = [];
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         copyFromCode = ${asCopy ? "'SRC1'" : 'null'};
         collectWizardPlayers = function(){ return ${JSON.stringify(TWO)}; };
         db.ref = function(p){ return {
@@ -218,7 +218,7 @@ describe('SETUP OFFERS EXACTLY ONE NASSAU', () => {
         });
         const sb = loadHtmlInlineScript('admin.html', DEPS);
         vm.runInContext(`
-            alert = function(){};
+            alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers = function(){ return ${JSON.stringify(TWO)}; };
             document.getElementById('game-format-select').value = 'nassau-modern';
             handleFormatChange();

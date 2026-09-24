@@ -51,7 +51,13 @@ function baseRound(extra) {
 async function reopen(code, record) {
     const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + code });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function () {}; window.__confirms = []; confirm = function (m) { window.__confirms.push(String(m)); return true; };');
+    // UI WAVE 3: the page speaks through ui-dialogs.js now. The decision returns a
+    // PROMISE, so the stub must too - a synchronous stub would be asserting
+    // against itself rather than against the page's await.
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};'
+        + ' window.__confirms = [];'
+        + ' uiConfirm = function (o) { window.__confirms.push(JSON.parse(JSON.stringify(o || {}))); return Promise.resolve(true); };'
+        + ' uiPrompt = function () { return Promise.resolve(null); };');
     run(sb, 'globalCourses = ' + JSON.stringify(GLOBAL) + ';');
     const orig = sb.db.ref.bind(sb.db);
     sb.db.ref = (p) => {
@@ -80,6 +86,8 @@ async function save(sb, code) {
     return J(w[0].value);
 }
 const confirms = (sb) => J(run(sb, 'window.__confirms'));
+// The decisions are promises now; one macrotask is enough for an awaited answer.
+const settle = () => new Promise(r => setTimeout(r, 20));
 
 // ---------------------------------------------------------------------------
 describe('FIX 1 - instances the wizard does not own survive a re-save untouched', () => {
@@ -163,7 +171,8 @@ describe('FIX 3 - an existing round keeps its OWN card unless the course is deli
     test('a NEW round (no stored round) still takes the live card', async () => {
         const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=CARD3' });
         sb.crypto = require('crypto').webcrypto;
-        run(sb, 'alert = function () {}; confirm = function () { return true; };');
+        run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};'
+        + ' uiConfirm = function () { return Promise.resolve(true); };');
         run(sb, 'globalCourses = ' + JSON.stringify(GLOBAL) + ';');
         await new Promise(r => setTimeout(r, 30));
         run(sb, 'document.__mount(document.getElementById("player-list")); document.getElementById("player-list").innerHTML = "";');
@@ -225,17 +234,25 @@ describe('FIX 5 - deleting a golfer who has posted scores asks first', () => {
         const sb = await reopen('DEL1', baseRound({ scores: { p102_h1: 4, p102_h2: 5 } }));
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 4);
         run(sb, "removePlayerRowAndRefresh(document.querySelectorAll('.player-row')[1].querySelector('.btn-del') || document.querySelectorAll('.player-row')[1].appendChild(document.createElement('button')))");
+        // AWAITED NOW, so the removal lands a microtask later. Reading the row
+        // count without this settle would report 4 for a row that is about to go,
+        // and reading it after a dropped await would report 3 for a golfer nobody
+        // was asked about - which is the whole reason the guard exists.
+        await settle();
         const c = confirms(sb);
         assert.equal(c.length, 1, 'one confirm: ' + JSON.stringify(c));
-        assert.match(c[0], /Ben/);
-        assert.match(c[0], /2 holes|scores/i);
-        assert.match(c[0], /no longer appear/i);
+        const said = JSON.stringify(c[0]);
+        assert.match(said, /Ben/);
+        assert.match(said, /2 holes|scores/i);
+        assert.match(said, /no longer appear/i);
+        assert.equal(c[0].danger, true, 'removing a golfer with scores is destructive');
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 3, 'OK removed the row');
     });
     test('Cancel keeps the row and the golfer', async () => {
         const sb = await reopen('DEL2', baseRound({ scores: { p102_h1: 4 } }));
-        run(sb, 'confirm = function (m) { window.__confirms.push(String(m)); return false; };');
+        run(sb, 'uiConfirm = function (o) { window.__confirms.push(JSON.parse(JSON.stringify(o || {}))); return Promise.resolve(false); };');
         run(sb, "removePlayerRowAndRefresh(document.querySelectorAll('.player-row')[1].appendChild(document.createElement('button')))");
+        await settle();
         assert.equal(confirms(sb).length, 1);
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 4);
         assert.deepEqual(J(run(sb, 'captureCurrentPlayerInputs().map(function (p) { return p.id; })')), [101, 102, 103, 104]);
@@ -243,17 +260,20 @@ describe('FIX 5 - deleting a golfer who has posted scores asks first', () => {
     test('a golfer with NO scores, and a blank row, are removed without a prompt', async () => {
         const sb = await reopen('DEL3', baseRound({ scores: { p102_h1: 4 } }));
         run(sb, "removePlayerRowAndRefresh(document.querySelectorAll('.player-row')[2].appendChild(document.createElement('button')))");   // Cal, no scores
+        await settle();
         assert.equal(confirms(sb).length, 0);
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 3);
         run(sb, 'addNewPlayerAndRefresh()');
         reattach(sb, ['Ann', 'Ben', 'Dee', '']);
         run(sb, "removePlayerRowAndRefresh(document.querySelectorAll('.player-row')[3].appendChild(document.createElement('button')))");   // the blank row
+        await settle();
         assert.equal(confirms(sb).length, 0);
         assert.equal(run(sb, "document.querySelectorAll('.player-row').length"), 3);
     });
     test('the scores are NOT deleted and ids are not re-minted: the payload after OK carries the other three with their ids and no scores key', async () => {
         const sb = await reopen('DEL4', baseRound({ scores: { p102_h1: 4 } }));
         run(sb, "removePlayerRowAndRefresh(document.querySelectorAll('.player-row')[1].appendChild(document.createElement('button')))");
+        await settle();
         reattach(sb, ['Ann', 'Cal', 'Dee']);
         const p = await save(sb, 'DEL4');
         assert.deepEqual(p.players.map(x => x.id), [101, 103, 104]);
@@ -277,7 +297,9 @@ describe('THE SEAMS (source)', () => {
     test('the Nassau guard and the delete confirm exist', () => {
         assert.match(ADMIN, /function roundAlreadyHasNassau\(/);
         const del = ADMIN.slice(ADMIN.indexOf('function removePlayerRowAndRefresh('), ADMIN.indexOf('\n    function ', ADMIN.indexOf('function removePlayerRowAndRefresh(') + 10));
-        assert.match(del, /confirm\(/);
+        assert.match(del, /await uiConfirm\(/,
+            'the decision must be AWAITED: without it `!ok` is always false and the '
+            + 'golfer is removed unasked, which no behavioural test can see');
         assert.match(del, /no longer appear/);
         assert.ok(!/db\.ref|scores\//.test(del), 'the delete never touches stored scores');
         assert.match(del, /holesScoredFor\(playerIdOfRow\(row\)\)/, 'the count comes from the scores as loaded, by the row\'s own id');

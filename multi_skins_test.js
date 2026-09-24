@@ -607,10 +607,16 @@ describe('SKINS — the pot can never vanish', () => {
 describe('ADD / REMOVE SAFETY AND SCOPE CONTROL', () => {
     const adm = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
 
-    test('removing a skins game asks first', () => {
-        assert.ok(/function removeSkinsInstance/.test(adm));
-        assert.ok(/confirm\(/.test(adm.slice(adm.indexOf('function removeSkinsInstance'), adm.indexOf('function setInstanceField'))),
+    test('removing a skins game asks first, and the answer is AWAITED', () => {
+        assert.ok(/async function removeSkinsInstance/.test(adm));
+        const fn = adm.slice(adm.indexOf('function removeSkinsInstance'), adm.indexOf('function setInstanceField'));
+        assert.ok(/await uiConfirm\(/.test(fn),
             'deleting a money game must never be one silent tap');
+        // THIS ASSERTION USED TO BE THE ONLY GUARD ON THIS PATH, and /confirm\(/
+        // is satisfied by a dropped await - the pot would vanish without anyone
+        // being asked and this test would stay green. dialog_admin_test.js now
+        // drives it both ways.
+        assert.ok(!/(?<![\w.$])confirm\s*\(/.test(fn), 'the browser dialog is gone');
     });
 
     test('a game with fewer than two golfers is never saved', () => {

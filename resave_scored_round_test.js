@@ -76,7 +76,7 @@ async function openWizard(rec) {
     const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + CODE,
         beforeRun(sandbox) { sandbox.__dbReads = { ['events/' + CODE]: J(rec) }; } });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
+    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiRefuse = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiFail = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiToast = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
     await new Promise((r) => setTimeout(r, 80));       // the arrival load, resolved
     assert.equal(run(sb, 'loadedExistingRound'), true, 'the wizard knows it is editing this round');
     assert.equal(run(sb, 'Object.keys(loadedScores).length'), 54, 'and holds the 54 posted scores (6 golfers x 9 holes)');

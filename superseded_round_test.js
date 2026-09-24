@@ -113,7 +113,7 @@ async function wizardSave(opts) {
         }, realDatabase);
     } });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function () {}; window.organizerGate.ensureOrganizer = function () { return Promise.resolve("me"); };');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; window.organizerGate.ensureOrganizer = function () { return Promise.resolve("me"); };');
     await tick(30);
     run(sb, 'document.__mount(document.getElementById("player-list")); document.__mount(document.getElementById("rr-retire"));');
     run(sb, 'globalCourses = ' + JSON.stringify({ comm_links: { name: 'Test Links', data: CD } }) + "; courseHiddenSelect.value = 'comm_links'; courseSearchInput.value = 'Test Links';");

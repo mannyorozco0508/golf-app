@@ -98,7 +98,7 @@ async function saveThrough(code, rec, edit, urlExtra) {
         beforeRun(sandbox) { sandbox.__dbReads = rec ? { ['events/' + code]: J(rec) } : {}; }
     });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
+    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiRefuse = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiFail = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiToast = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
     await new Promise((r) => setTimeout(r, 80));
     // THE DOOR HAS TO BE OPEN. admin.html hides the wizard and never calls
     // loadModeData for a session isRoundOrganizer refuses - and then

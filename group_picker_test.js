@@ -170,7 +170,7 @@ describe('THE PICKER, ON ARRIVAL', () => {
 function lobby(reads) {
     const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js', 'code-issuer.js', 'grouping.js']);
     sb.__dbReads = reads || {};
-    vm.runInContext("alert = function (m) { window.__said = (window.__said || []).concat([String(m)]); };"
+    vm.runInContext("alert = function (m) { window.__said = (window.__said || []).concat([String(m)]); }; uiRefuse = function (m) { window.__said = (window.__said || []).concat([String(m)]); }; uiFail = function (m) { window.__said = (window.__said || []).concat([String(m)]); }; uiToast = function (m) { window.__said = (window.__said || []).concat([String(m)]); };"
         + " location = { href: 'https://golf-app-5a5.pages.dev/admin.html', origin: 'https://golf-app-5a5.pages.dev', pathname: '/admin.html' }; window.location = location;"
         + " navigator.onLine = true; document.__mount(document.getElementById('join-code-refusal'));"
         // record every once() read so a refusal can prove it asked nothing

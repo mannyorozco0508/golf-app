@@ -55,7 +55,7 @@ function setupWager({ players = P2, front = 10, back = 10, overall = 20,
                       autoAmount = '', pickA = null, pickB = null } = {}) {
     const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
     vm.runInContext(`
-        alert=function(){};
+        alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         collectWizardPlayers=function(){ return ${JSON.stringify(players)}; };
         document.getElementById('setup-nassau-enabled').checked = true;
         toggleSetupNassau();
@@ -80,7 +80,7 @@ function actionWager({ front = 10, back = 10, overall = 20, press = '2down',
                        scoring = 'net', autoMode = 'same', autoAmount = '' } = {}) {
     const sb = loadHtmlInlineScript('sidematches.html', SM_DEPS);
     vm.runInContext(`
-        window.__w=[]; alert=function(){};
+        window.__w=[]; alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         db.ref=function(p){return {push:function(){return {key:'K1'};},
             set:function(v){window.__w.push(v); return {then:function(f){f&&f(); return {catch:function(){}};}};},
             remove:function(){},on:function(){},
@@ -254,7 +254,7 @@ describe('WHO IS IN IT', () => {
 
     test('Nassau unchecked produces nothing', () => {
         const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
-        vm.runInContext(`alert=function(){};
+        vm.runInContext(`alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers=function(){return ${JSON.stringify(P2)};};
             window.__w = collectSetupNassauWager();`, sb);
         assert.equal(vm.runInContext('window.__w', sb), null);

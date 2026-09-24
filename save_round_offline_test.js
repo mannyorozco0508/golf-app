@@ -214,8 +214,16 @@ describe('HONEST BUTTON: Saving..., then Still saving - keep this page open; dis
 
 describe('NO COPY ON THE SAVE PATH SAYS NOTHING WAS SAVED, and nothing gates on navigator.onLine', () => {
     test('saveSettings, decoded, never says "nothing was saved" / "not saved" / "not created"', () => {
-        const at = ADMIN.indexOf('function saveSettings(');
-        const fn = decodeEscapes(ADMIN.slice(at, ADMIN.indexOf('\n    function ', at + 30))).replace(/^\s*\/\/.*$/gm, '');   // comments explain the rule; the code must not say it
+        // saveSettings is ASYNC since UI Wave 3, so the next declaration below it is
+        // `async function` and a search for '\n    function ' ran past the end of
+        // saveSettings into code that legitimately says NOT SAVED. Whichever form
+        // comes first is the end.
+        const at = ADMIN.indexOf('async function saveSettings(');
+        const plain = ADMIN.indexOf('\n    function ', at + 30);
+        const asy = ADMIN.indexOf('\n    async function ', at + 30);
+        const endAt = (plain === -1) ? asy : (asy === -1 ? plain : Math.min(plain, asy));
+        assert.ok(endAt > at, 'the end of saveSettings was not found');
+        const fn = decodeEscapes(ADMIN.slice(at, endAt)).replace(/^\s*\/\/.*$/gm, '');   // comments explain the rule; the code must not say it
         assert.ok(!/nothing was saved|not saved|not created|wasn.t saved/i.test(fn), 'the save path must not claim a buffered write was lost');
         assert.ok(!/navigator\.onLine/.test(fn), 'the threshold is a timer, not an onLine check');
         assert.match(fn, /keep this page open/i, 'the honest state reuses pwa-boot\'s vocabulary');

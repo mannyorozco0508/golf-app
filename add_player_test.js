@@ -239,7 +239,7 @@ describe('THE REBUILD REFRESHES ONCE, not once per golfer', () => {
             beforeRun(sandbox) { sandbox.__dbReads = { 'events/DEFER1': JSON.parse(JSON.stringify(round(n))) }; }
         });
         sb.crypto = require('crypto').webcrypto;
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         // Wrapped BEFORE the arrival load resolves (it is on a timer), so the
         // rebuild's own calls go through the counter. The page's function still
         // runs - this counts, it does not replace.
