@@ -145,7 +145,24 @@ function assertV196Mounts(assert, now, old, opts) {
             .map(m => ({ name: m[1].replace(/&amp;/g, '&'), net: (m[2] === '-' ? -1 : 1) * Number(m[3]) }));
         assert.deepEqual(rows, split.net, 'results-net: the old Final Results list');
     }
-    (o.equal || []).forEach(id => assert.equal(now(id).text, old[id], id));
+    // ENTITIES DECODED BEFORE COMPARING, the same way the results-net rows above
+    // already decode &amp; out of a golfer's name (line 146). This capture exists
+    // to prove a golfer READS the same receipt as at 8a02234, and `.text` returns
+    // the raw innerHTML text, entities and all.
+    //
+    // v218 moved HTML-escaping out of the match engine and onto the sinks, so
+    // settlement.html now escapes the Receipt's segment result. "Carp 2&0" - where
+    // the & is the match-play separator, "2 up with 0 to play" - is stored as
+    // "Carp 2&amp;0" and RENDERS as "Carp 2&0", unchanged on screen. Comparing raw
+    // markup would fail that while the receipt is identical, and re-recording the
+    // golden would have thrown away the proof that it is identical. Measured, not
+    // assumed: with the decode, every finished-receipt capture matches 8a02234
+    // byte for byte.
+    const deEntity = (s) => String(s)
+        .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+    (o.equal || []).forEach(id => assert.equal(deEntity(now(id).text), old[id], id));
 }
 
 module.exports = { poolV196, splitOldSummary, payoutRowsFromHtml, assertV196Mounts };

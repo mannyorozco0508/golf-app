@@ -78,19 +78,19 @@ function surfaces(opts) {
     const J = o => JSON.stringify(o);
     const out = {};
 
-    const a = loadHtmlInlineScript('index.html', ['score-marks.js','money-engine.js','action-model.js',
+    const a = loadHtmlInlineScript('index.html', ['score-marks.js','match-engine.js','money-engine.js','action-model.js',
         'settlement-engine.js','pool-engine.js','bet-strip.js','hole-events.js']);
     vm.runInContext(`currentMode='A'; currentData=${J(d)}; window.__scPlayerGroupMap=${J(gm)};
         renderLiveTicker(); renderLiveSkins();`, a);
     out.widget = a.document.getElementById('live-ticker-mount').innerHTML;
     out.strip  = a.document.getElementById('live-skins-mount').innerHTML;
 
-    const b = loadHtmlInlineScript('leaderboard.html', ['money-engine.js','action-model.js','settlement-engine.js']);
+    const b = loadHtmlInlineScript('leaderboard.html', ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js']);
     vm.runInContext(`currentBoardData=${J(d)}; activeView='individual'; groupViewMode='flat';
         activeScoring='net'; renderBoard();`, b);
     out.leaderboard = b.document.getElementById('live-skins-mount').innerHTML;
 
-    const c = loadHtmlInlineScript('settlement.html', ['score-marks.js','money-engine.js','action-model.js',
+    const c = loadHtmlInlineScript('settlement.html', ['score-marks.js','match-engine.js','money-engine.js','action-model.js',
         'settlement-engine.js','pool-engine.js']);
     vm.runInContext(`currentMode='A'; currentData=${J(d)};
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);`, c);
@@ -262,7 +262,7 @@ describe('THE SHARED RELEVANCE PREDICATE', () => {
 describe('TRIP MODE HONOURS THE SAME RULE', () => {
 
     function trip({ side = false, pool = true, confirmed = true, rounds = 1, thru = [18,18,18] } = {}) {
-        const sb = loadHtmlInlineScript('trip.html', ['money-engine.js','action-model.js',
+        const sb = loadHtmlInlineScript('trip.html', ['match-engine.js','money-engine.js','action-model.js',
             'settlement-engine.js','pool-engine.js','score-marks.js']);
         const linked = [];
         for (let i = 0; i < rounds; i++) {
@@ -334,7 +334,7 @@ describe('NO MATH MOVED', () => {
 
     test('settlement still produces the same transactions for a pool round', () => {
         const { d } = roundData({ thru:[18,18,18], confirmed:true });
-        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js','money-engine.js',
+        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js','match-engine.js','money-engine.js',
             'action-model.js','settlement-engine.js','pool-engine.js']);
         vm.runInContext(`currentMode='A'; currentData=${JSON.stringify(d)};`, sb);
         const c = vm.runInContext('computeCombinedNetTotals(currentData, currentData.courseData, currentData.scores)', sb);

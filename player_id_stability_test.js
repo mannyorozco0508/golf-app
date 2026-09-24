@@ -64,7 +64,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const ADMIN = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
-const DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 
 const run = (sb, expr) => vm.runInContext(expr, sb);

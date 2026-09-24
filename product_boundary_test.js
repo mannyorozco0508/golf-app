@@ -345,7 +345,7 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
     test('9. the scorecard has no Consumer wagering dependency', () => {
         const src = read('tournament-scorecard.html');
         const scripts = [...src.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1].replace(/^\.\//, ''));
-        ['money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js',
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js',
          'bet-strip.js', 'hole-events.js'].forEach(f =>
             assert.ok(!scripts.includes(f), 'the scoring surface must not load ' + f));
         const code = codeOf('tournament-scorecard.html');

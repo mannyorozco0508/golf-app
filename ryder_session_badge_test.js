@@ -40,7 +40,7 @@ const assert = require('node:assert/strict');
 const vm = require('vm');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 
-const DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'ryder-cup.js'];
 const CD = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
 

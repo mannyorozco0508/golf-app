@@ -35,8 +35,8 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-const LB_DEPS = ['money-engine.js','action-model.js','settlement-engine.js'];
-const ST_DEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+const LB_DEPS = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
+const ST_DEPS = ['match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
 // Brace-matched, so a nested rule cannot truncate the capture.
 function printBlock(src) {
@@ -396,7 +396,7 @@ describe('NO SECOND RESOLVER, NO DUPLICATE MATHS', () => {
 
     test('and declares the engines it now depends on', () => {
         const src = read('leaderboard.html');
-        ['money-engine.js','action-model.js','settlement-engine.js']
+        ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js']
             .forEach(f => assert.match(src, new RegExp('<script src="' + f + '"'),
                 `leaderboard.html must ship with ${f}`));
     });

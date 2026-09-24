@@ -1920,7 +1920,24 @@
 // changed. The consumer product cache is consumer-v59-attendance. The tournament
 // product cache stays tournament-v54-rattle-golf. The iOS binary in review is
 // not resubmitted.
-const CACHE_VERSION = 'golfapp-v217-attendance';
+// Moved to v218 because there is now ONE calculateMatchEngine. It was three: the
+// copy in money-engine.js plus a full inline copy in index.html and another in
+// stats.html, and because an inline <script> parses after the external ones, the
+// PAGE copy was the one that ran on the scorecard and on Stats. They had drifted -
+// both pages escaped the winner name inside the engine, index.html returned a
+// pressesByHole nothing read, stats.html dropped t1Players/t2Players. Measured
+// before deleting: 3 copies, 13 fixtures, 0 disagreements beyond those fields, so
+// no golfer had been paid wrongly yet. match-engine.js is new and precached; all
+// nine match pages load it right after handicap.js. A device on v217 that gets a
+// partial update has a page whose engine is missing and whose callers all guard
+// with typeof - it would show a match with no money rather than an error, which is
+// why the file is in the shell list above. Escaping moved to the sinks, which also
+// closed a pre-existing gap on the Receipt and on the Board's head-to-head banner.
+// No arithmetic changed: money-engine.js lost the function and gained a pointer
+// comment, and nothing else in it moved. The consumer product cache is
+// consumer-v60-one-match-engine. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v218-one-match-engine';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -1988,6 +2005,14 @@ const SHELL_FILES = [
     // trip load it. A cached shell without it shows the roster and never the
     // headcount.
     './attendance.js',
+    // match-engine.js (v218) is calculateMatchEngine - hole-by-hole match play, and
+    // the money every Match, Nassau, Best Ball, Scramble and Ryder round settles
+    // to. All NINE pages that touch a match load it, and money-engine.js,
+    // settlement-engine.js, ryder-cup.js, bet-strip.js and aloha-bet.js each call
+    // it through a `typeof` guard - so a cached shell missing this file does not
+    // break loudly, it settles rounds with no match money and no error. Precached
+    // for exactly that reason.
+    './match-engine.js',
     './money-engine.js',
     './settlement-engine.js',
     // ryder-cup.js is loaded unguarded by index.html, so a cached shell without it

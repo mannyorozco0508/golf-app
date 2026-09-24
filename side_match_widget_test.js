@@ -31,9 +31,9 @@ const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
-const LB = ['money-engine.js','action-model.js','settlement-engine.js'];
+const LB = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const NAMES = ['Marty','Manny','Carp','Scott','Randy','Kopp','Lance','Matt B'];
 

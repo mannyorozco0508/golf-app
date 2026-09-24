@@ -241,7 +241,7 @@ describe('HOW THE SHELL IS RECOGNISED', () => {
 // choice, not a failure: nothing may be copied behind their back.
 // ============================================================================
 
-const TRIP_DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const TRIP_DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 
 function tripRound(seed) {
     const ps = roster(4).map(p => Object.assign({}, p, { playingForMoney: true }));

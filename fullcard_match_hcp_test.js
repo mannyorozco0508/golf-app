@@ -40,7 +40,7 @@ const renderScorecardSrc = SRC.slice(SRC.indexOf('function renderScorecard'));
 const renderHoleViewSrc = SRC.slice(SRC.indexOf('function renderHoleView'),
                                    SRC.indexOf('function renderLiveTicker'));
 
-const PAGE_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const PAGE_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
 let _page = null;
 function page() {

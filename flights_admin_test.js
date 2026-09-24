@@ -42,7 +42,7 @@ const CD = makeCourseData(18);
 const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, 'flights_absent_golden.fixture.json'), 'utf8'));
 
 const ENG = (() => {
-    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
     vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, 'pool-engine.js'), 'utf8'), sb, { filename: 'pool-engine.js' });
     return sb;
 })();

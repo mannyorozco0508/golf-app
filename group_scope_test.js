@@ -31,9 +31,9 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
-const LB = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
+const LB = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 
 // Two foursomes: 101-104 in group 1, 105-108 in group 2.
@@ -243,7 +243,7 @@ describe('PERMISSIONS AND MONEY ARE UNTOUCHED', () => {
     });
 
     test('no engine or settlement file was touched', () => {
-        ['handicap.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
+        ['handicap.js','match-engine.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('__scFilteredPlayers'),
                 f + ' must know nothing about scorecard scoping'));
     });
@@ -253,7 +253,7 @@ describe('PERMISSIONS AND MONEY ARE UNTOUCHED', () => {
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                      parseInt, parseFloat, Date, Set, Map };
         vm.createContext(sb);
-        ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+        ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
             .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         const compute = vm.runInContext('computeCombinedNetTotals', sb);
         const d = round({ settlementMode: 'whole-dollar',

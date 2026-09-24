@@ -32,7 +32,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 const J = JSON.stringify;
 const CD = makeCourseData(18);
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'];
+const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'];
 
 // Renders BOTH real pages on the bare link and hands back their HTML: the Bets
 // tab's games rows and match cards, and the Matches tab's list. A page's render
@@ -268,7 +268,7 @@ describe('COVERAGE PARITY — Action / Live / Settlement / Receipt', () => {
 
     test('SETTLEMENT NON-REGRESSION: this was a display change only', () => {
         // The renderer must not appear anywhere in the money path.
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
             assert.ok(!/buildRoundGamesPointer|renderSideMatches|renderBets|bets-game/.test(read(f)),
                 `${f} gained display code`);
         });

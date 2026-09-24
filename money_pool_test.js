@@ -666,7 +666,7 @@ describe('20 POOL SIMULATIONS', () => {
 // ---------------------------------------------------------------------------
 describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
     const { loadHtmlInlineScript } = require('./helpers/load-script.js');
-    const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
+    const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
     const P = makeField(12);
     const SC = ladderScores(P);
     const ROUND = () => ({ players: P, courseData: CD, gameFormat: 'stroke', scores: SC,
@@ -847,7 +847,7 @@ describe('SCALE — 7 groups, 28 golfers, different money (Manny\'s pre-commit q
 
     test('the banner renders on a GROUP 6 link; the KP picker on GROUP 7\'s hole', () => {
         const { loadHtmlInlineScript } = require('./helpers/load-script.js');
-        const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
+        const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
         const sb = loadHtmlInlineScript('index.html', PAGE);
         vm.runInContext(`
             window.__writes = []; window.__alerts = [];

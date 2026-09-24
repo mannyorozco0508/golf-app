@@ -37,8 +37,8 @@ const vm = require('vm');
 const { loadJsFile } = require('./helpers/load-script.js');
 
 const M = loadJsFile('money-engine.js', ['handicap.js']);
-const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
-const BS = loadJsFile('bet-strip.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
+const BS = loadJsFile('bet-strip.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 
 const nassauStakeConfig = vm.runInContext('nassauStakeConfig', M);
 const calculateMatchEngine = vm.runInContext('calculateMatchEngine', M);

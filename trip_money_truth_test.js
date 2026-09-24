@@ -52,14 +52,14 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const TRIP = read('trip.html');
 const ENGINE = read('settlement-engine.js');
 
-const AM = loadJsFile('action-model.js', ['handicap.js', 'money-engine.js']);
-const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const AM = loadJsFile('action-model.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
+const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 const CD = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
 
 // The list the footer is built from, read out of the page.
 function declaredList() {
     const sb = loadHtmlInlineScript('trip.html',
-        ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
          'pool-engine.js', 'payouts.js', 'course-data.js']);
     return vm.runInContext('TRIP_TOTAL_INCLUDES', sb);
 }
@@ -229,7 +229,7 @@ describe('THE FOOTER SAYS WHAT IS IN THE TOTAL', () => {
 // the data source is replaced.
 function arriveOnTrip(rounds, counted) {
     const sb = loadHtmlInlineScript('trip.html',
-        ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
          'pool-engine.js', 'payouts.js', 'course-data.js'],
         { search: '?trip=MYR1', localStorage: true });
     vm.runInContext('alert = function () {}; confirm = function () { return true; };', sb);

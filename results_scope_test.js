@@ -38,7 +38,14 @@ const { wizardSavedRound } = require('./helpers/wizard-saved-round.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
-const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
+const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim()
+    // ENTITIES DECODED: strip() reads raw markup, and v218 moved HTML-escaping
+    // from inside the match engine onto the sinks, so settlement.html now escapes
+    // the segment result. "Ann 1&0" (the match separator, 1 up with 0 to play) is
+    // markup "Ann 1&amp;0" and renders identically. Without this the goldens below
+    // would have to be re-recorded, throwing away the very thing they prove.
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '\"').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 const CD = makeCourseData(18); const J = v => JSON.parse(JSON.stringify(v));
 
 // The captured round: 23 golfers (the wizard's), groups 4/4/4/4/4/3, a settled
@@ -246,7 +253,7 @@ describe('THE SEAM — the one rule from grouping.js; the money paths untouched'
         assert.equal(h('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).
         assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
-        assert.equal(h('money-engine.js'), '3c960947');
+        assert.equal(h('money-engine.js'), '9653b632');  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
         assert.equal(h('live-skins.js'), '632bbb1a');
     });
 });

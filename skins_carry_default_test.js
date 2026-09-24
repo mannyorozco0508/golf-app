@@ -49,8 +49,8 @@ const path = require('path');
 const { loadJsFile } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
-const AM = loadJsFile('action-model.js', ['handicap.js', 'money-engine.js']);
-const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const AM = loadJsFile('action-model.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
+const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 
 const ADMIN = read('admin.html');
 const SIDE = read('sidematches.html');

@@ -6,7 +6,7 @@ const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 const { decodeEscapes } = require('./helpers/decode-escapes.js');
 
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const engine = loadJsFile('money-engine.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');

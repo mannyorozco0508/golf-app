@@ -22,6 +22,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="match-engine.js"></script>
     <!-- pwa-boot.js owns GolfNet.isNative(), which native-export.js asks before
          choosing between window.print() and the iOS share sheet. Build 4 shipped
          without it on this page: GolfNet was undefined, the exporter concluded
@@ -921,22 +922,22 @@ html {
         if (!r) return '';
 
         let html = `<div class="receipt-match">`;
-        html += `<div class="receipt-title">${r.nameA} vs ${r.nameB}</div>`;
+        html += `<div class="receipt-title">${escapeHtml(r.nameA)} vs ${escapeHtml(r.nameB)}</div>`;
         html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
 
         r.segments.forEach(seg => {
             html += `<div class="receipt-seg">`;
             html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
             html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
-            html += `<div class="receipt-seg-result">${seg.result}</div>`;
+            html += `<div class="receipt-seg-result">${escapeHtml(seg.result)}</div>`;
             if (seg.winner && seg.money > 0) {
-                html += `<div class="receipt-seg-money">${seg.winner} +$${fmtWhole(seg.money)}</div>`;
+                html += `<div class="receipt-seg-money">${escapeHtml(seg.winner)} +$${fmtWhole(seg.money)}</div>`;
             }
             html += `</div>`;
         });
 
         html += `<div class="receipt-net">MATCH NET \u00B7 ` +
-            (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
+            (r.netTo ? `${escapeHtml(r.netTo)} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
             (r.isTeam && r.netTo ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
             `</div>`;
         html += `</div>`;

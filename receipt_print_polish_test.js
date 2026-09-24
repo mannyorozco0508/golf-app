@@ -52,12 +52,12 @@ const ENG = (() => {
 const call = c => { vm.runInContext(`window.__r = (function(){ ${c} })();`, ENG); return ENG.window.__r; };
 
 const PAGE = loadHtmlInlineScript('settlement.html',
-    ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+    ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const fmt = (fn, n) => { vm.runInContext(`window.__x = ${fn}(${n});`, PAGE); return String(PAGE.window.__x).replace(/<[^>]+>/g, ''); };
 
 function render(d) {
     const sb = loadHtmlInlineScript('settlement.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     vm.runInContext(`
         currentData = ${J(d)};
         renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
@@ -249,7 +249,7 @@ describe('THE PRINT GUARDS ARE ALL STILL THERE', () => {
 // ---------------------------------------------------------------------------
 describe('PROTECTED — formatting only', () => {
     test('no engine changed', () => {
-        ['handicap.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/nav-more|thousands|\\B\(\?=\(\\d\{3\}\)/.test(src), `${f} gained formatting code`);
         });

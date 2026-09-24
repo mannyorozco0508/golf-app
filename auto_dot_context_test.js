@@ -38,7 +38,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const SRC = read('index.html');
 const RS = SRC.slice(SRC.indexOf('function renderScorecard'));
 
-const PAGE_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const PAGE_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
 let _p = null;
 const page = () => (_p || (_p = loadHtmlInlineScript('index.html', PAGE_DEPS)));
@@ -435,7 +435,7 @@ describe('DISPLAY ONLY — NOTHING ELSE MOVES', () => {
     });
 
     test('the engines are untouched by this feature', () => {
-        ['money-engine.js','settlement-engine.js','action-model.js','bet-strip.js','hole-events.js']
+        ['match-engine.js','money-engine.js','settlement-engine.js','action-model.js','bet-strip.js','hole-events.js']
             .forEach(f => assert.ok(
                 !/dotPlanById|buildDotPlan|dotMatchesOverlap|selectedDotMatchId|dotNoteMode/.test(read(f)),
                 f + ' acquired dot-context logic'));
@@ -519,7 +519,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved for the Rattle Golf identity batch', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v217-attendance';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v218-one-match-engine';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
         assert.ok(!/const CACHE_VERSION = 'golfapp-v32-consumer-ready';/.test(sw),
             'the pre-rename shell must not be served to an installed device');
@@ -550,7 +550,7 @@ describe('SERVICE WORKER', () => {
         // 51 since aloha-bet.js joined (v215): nine pages load it, and every page
         // that SETTLES loads it before settlement-engine.js - a cached shell without
         // it settles rounds with no Aloha and shows a different total.
-        assert.equal(entries.length, 52, 'the shell list gained or lost an entry');  // 52: attendance.js joined (v217)  // 46: email-link-auth.js joined (v203);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147: admin and trip load it on every create); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
+        assert.equal(entries.length, 53, 'the shell list gained or lost an entry');  // 52: attendance.js joined (v217)  // 46: email-link-auth.js joined (v203);  // 45: score-gaps.js joined (v192: the missing-hole builder; index, leaderboard, settlement);  // 44: game.html joined (v186: the Game tab took Stats' nav slot; stats.html stays as the parity surface); 43: qrcode.min.js joined (2026-09-18: the Tournament QR library, vendored - it was a runtime CDN script; TOURNAMENT_SHELL only); 42: course-import-rules.js joined (v168: the pure import rules, lifted out of admin.html; tournament.html loads it too); 41: scorecard-rows.js joined (v163: settlement.html's Full Scorecard draws its rows from it, unguarded; leaderboard.html next); 40: organizer-gate.js joined (Wave 3, v147: admin and trip load it on every create); 39: auth-boot.js joined (v139); 38: live-skins.js joined (index, leaderboard, settlement); 37: firebase-auth-compat.js (tournament.html only)
         ['./index.html','./firebase-app-compat.js','./firebase-database-compat.js',
          './pwa-boot.js','./native-export.js']
             .forEach(f => assert.ok(entries.indexOf(f) !== -1, 'missing ' + f));

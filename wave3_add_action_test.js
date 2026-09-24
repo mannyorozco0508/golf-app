@@ -8,14 +8,14 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const AM = loadJsFile('action-model.js');
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
 function layered(files) {
     const sb = loadJsFile(files[0]);
     files.slice(1).forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
-const BS = layered(['action-model.js', 'money-engine.js', 'bet-strip.js']);
+const BS = layered(['action-model.js', 'match-engine.js', 'money-engine.js', 'bet-strip.js']);
 
 const ZERO = 0.005;
 const netOf = r => { const o = {}; Object.keys(r.netByName).forEach(k => o[k] = r.netByName[k].net); return o; };
@@ -473,7 +473,7 @@ describe('PERMISSIONS — only the organizer can change what the round plays for
 
 describe('SCORECARD — the Add Action flow renders correctly', () => {
     function render(state, extra) {
-        const sb = loadHtmlInlineScript('index.html', ['action-model.js', 'money-engine.js', 'bet-strip.js']);
+        const sb = loadHtmlInlineScript('index.html', ['action-model.js', 'match-engine.js', 'money-engine.js', 'bet-strip.js']);
         const cd = makeCourseData(18);
         const p = makePlayers(['Manny', 'Marty', 'John', 'Steve'], [0, 0, 0, 0]);
         p[0].team = 'Team 1'; p[1].team = 'Team 1'; p[2].team = 'Team 2'; p[3].team = 'Team 2';

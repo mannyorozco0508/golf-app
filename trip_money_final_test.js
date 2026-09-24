@@ -54,8 +54,8 @@ const strip0 = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+
 const strip = h => strip0(h).replace(/ ?\| ?/g, '|').replace(/\|+/g, '|');
 const stripComments = s => s.replace(/<!--[\s\S]*?-->|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str !== undefined ? str : '');
 
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
-const ENGINE_DEPS = ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const ENGINE_DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js'];
 
 // ---------------------------------------------------------------------------
 // FIXTURES

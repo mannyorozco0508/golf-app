@@ -42,7 +42,7 @@ const CANCELLED = { cancelled: true, cancelledAt: 1, cancelledBy: 'organizer' };
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -251,7 +251,7 @@ describe('NO SECOND ALLOCATION RULE', () => {
 
 describe('FINISH ROUND — PERMISSION AND UX', () => {
 
-    const DEPS = ['action-model.js','money-engine.js','pool-engine.js','settlement-engine.js',
+    const DEPS = ['action-model.js','match-engine.js','money-engine.js','pool-engine.js','settlement-engine.js',
                   'score-marks.js','bet-strip.js','hole-events.js'];
 
     function boot({ organizer = true, cancelled = false, fixedSkins = false, online = true,
@@ -378,7 +378,7 @@ describe('FINISH ROUND — PERMISSION AND UX', () => {
 
 describe('RECEIPT', () => {
 
-    const SDEPS = ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+    const SDEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
     function receipt(opts) {
         const sb = loadHtmlInlineScript('settlement.html', SDEPS);

@@ -60,8 +60,8 @@ const AM = loadJsFile('action-model.js');
 // the comparison mean what it reads as.
 const label = input => JSON.parse(JSON.stringify(AM.nassauAutoPressLabel(input)));
 
-const ADMIN_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const SM_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
+const ADMIN_DEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const SM_DEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 describe('THE SHARED BUILDER — what the label says', () => {
 
@@ -384,7 +384,9 @@ describe('THE MONEY CONTRACT DID NOT MOVE', () => {
     });
 
     test('the engine still resolves null per segment', () => {
-        const src = read('money-engine.js');
+        // v218: autoPressStakeFor is inside calculateMatchEngine, which is now
+        // match-engine.js. Same code, same rule, one file across.
+        const src = read('match-engine.js');
         assert.match(src, /const autoPressStakeFor = id =>/);
         assert.match(src, /return blank\(ap\) \? baseStakeFor\(id\) : Number\(ap\);/);
     });

@@ -24,7 +24,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const PAGE_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 function idx() {
@@ -361,10 +361,14 @@ describe('FROZEN — the surfaces that OWN press detail are untouched', () => {
     });
 
     test('press CREATION and start-hole logic were not touched', () => {
+        // SPLIT IN v218. The press-creation UI is still index.html's; the start-hole
+        // arithmetic is the ENGINE's and moved to match-engine.js with it. Asserting
+        // both against index.html would have silently stopped checking the arithmetic.
         const code = read('index.html');
         assert.ok(/function pressMatchBet/.test(code));
-        assert.ok(/startHole: hNum \+ 1/.test(code), 'the engine still starts a press on the next hole');
         assert.ok(/function confirmMatchPress|function openPressPanel/.test(code));
+        assert.ok(/startHole: hNum \+ 1/.test(read('match-engine.js')),
+            'the engine still starts a press on the next hole');
     });
 });
 
@@ -372,7 +376,7 @@ describe('FROZEN — the surfaces that OWN press detail are untouched', () => {
 describe('MONEY READS LIKE MONEY', () => {
     function settle() {
         return loadHtmlInlineScript('settlement.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     }
     const sb = settle();
     const call = (fn, n) => {
@@ -490,7 +494,7 @@ describe('THE RECEIPT — the money story, then the scorecard', () => {
 // ---------------------------------------------------------------------------
 describe('SIDE MATCH RECEIPT LANGUAGE — readable without a decoder ring', () => {
     const sb = loadHtmlInlineScript('settlement.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     const label = l => {
         vm.runInContext(`window.__l = receiptSegLabel(${JSON.stringify(l)});`, sb);
         return sb.window.__l;

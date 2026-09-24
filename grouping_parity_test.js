@@ -49,12 +49,12 @@ const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 // against the pages themselves, so the harness cannot quietly stop describing
 // production.
 const CONSUMERS = {
-    'admin.html': ['course-data.js', 'action-model.js', 'money-engine.js',
+    'admin.html': ['course-data.js', 'action-model.js', 'match-engine.js', 'money-engine.js',
                    'settlement-engine.js', 'pool-engine.js', 'grouping.js'],
-    'index.html': ['score-marks.js', 'money-engine.js', 'action-model.js',
+    'index.html': ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
                    'settlement-engine.js', 'pool-engine.js', 'bet-strip.js',
                    'hole-events.js', 'grouping.js'],
-    'leaderboard.html': ['money-engine.js', 'action-model.js', 'settlement-engine.js',
+    'leaderboard.html': ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                          'grouping.js'],
     'sidematches.html': ['action-model.js', 'settlement-engine.js', 'grouping.js'],
 };

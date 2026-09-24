@@ -37,7 +37,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
-const DEPS = ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js', 'score-marks.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js', 'score-marks.js'];
 const CD = makeCourseData(18);
 const J = (v) => JSON.parse(JSON.stringify(v));
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
@@ -97,7 +97,7 @@ function labels(payoutsHtml) {
     r.none.forEach(n => { out[n] = ['No payout', 'TOTAL PAYOUT']; });
     return out;
 }
-const ENGINE = (() => loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']))();
+const ENGINE = (() => loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']))();
 
 describe('7.1 a wager scoped per flight is labelled with the golfer\'s flight', () => {
     const data = round({ enabled: true, scopes: { skins: 'flight', birdies: 'flight' } }, TAGS);

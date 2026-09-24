@@ -36,7 +36,7 @@ const sha8 = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(R
 const stripComments = s => s.replace(/<!--[\s\S]*?-->|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str !== undefined ? str : '');
 const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
 const tight = s => s.replace(/ ?\| ?/g, '|').replace(/\|+/g, '|');
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 const CD = makeCourseData(18);
 
 function round(label, names, hcps, scoreFn) {

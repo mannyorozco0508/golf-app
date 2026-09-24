@@ -27,6 +27,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
          only; handicap.js owns every number it says. After handicap.js, which it
@@ -1519,7 +1520,7 @@ ${ind.slice(4)}</tr>`;
                     t1Badge = `<span style="color:var(--text-muted);">-</span>`;
                     t2Badge = `<span style="color:var(--text-muted);">-</span>`;
                 } else if (matchClosed) {
-                    statusText = `🏁 FINAL: ${finalResult}`;
+                    statusText = `🏁 FINAL: ${escapeHtml(finalResult)}`;
                     if (totalMatch > 0) {
                         t1Badge = `<span class="status-badge badge-up">WIN</span>`;
                         t2Badge = `<span class="status-badge badge-down">LOSS</span>`;
@@ -1530,11 +1531,11 @@ ${ind.slice(4)}</tr>`;
                 } else if (totalMatch === 0) {
                     statusText = "ALL SQUARE";
                 } else if (totalMatch > 0) {
-                    statusText = `🟢 ${t1Display} IS ${totalMatch} UP`;
+                    statusText = `🟢 ${escapeHtml(t1Display)} IS ${totalMatch} UP`;
                     t1Badge = `<span class="status-badge badge-up">${totalMatch}UP</span>`;
                     t2Badge = `<span class="status-badge badge-down">${totalMatch}DN</span>`;
                 } else {
-                    statusText = `🟢 ${t2Display} IS ${Math.abs(totalMatch)} UP`;
+                    statusText = `🟢 ${escapeHtml(t2Display)} IS ${Math.abs(totalMatch)} UP`;
                     t1Badge = `<span class="status-badge badge-down">${Math.abs(totalMatch)}DN</span>`;
                     t2Badge = `<span class="status-badge badge-up">${Math.abs(totalMatch)}UP</span>`;
                 }
@@ -1548,11 +1549,11 @@ ${ind.slice(4)}</tr>`;
                         <thead><tr><th style="text-align:left;">Matchup</th><th>Status</th><th>Thru</th></tr></thead>
                         <tbody>
                             <tr>
-                                <td class="player-name">${t1Display}</td>
+                                <td class="player-name">${escapeHtml(t1Display)}</td>
                                 <td>${t1Badge}</td><td>${thruCount}</td>
                             </tr>
                             <tr>
-                                <td class="player-name">${t2Display}</td>
+                                <td class="player-name">${escapeHtml(t2Display)}</td>
                                 <td>${t2Badge}</td><td>${thruCount}</td>
                             </tr>
                         </tbody>

@@ -96,6 +96,8 @@ describe('NOTHING A GOLFER READS SAYS GREENIE', () => {
 // ---------------------------------------------------------------------------
 describe('THE STORED IDENTIFIERS DID NOT FOLLOW THE LABEL', () => {
     test("the dot id is still exactly 'greenie' in every engine copy", () => {
+        // match-engine.js is NOT in this list: greenies live in the dots engine,
+        // and the match engine has never carried a dot id of any kind.
         ['money-engine.js', 'index.html', 'stats.html', 'hole-events.js'].forEach(f => {
             assert.match(read(f), /'greenie'/,
                 `${f} renamed the persisted dot id - every historical round would be orphaned`);

@@ -217,7 +217,7 @@ describe('PARITY — Birdie Pool\'s three independent copies', () => {
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                      parseInt, parseFloat, Date, Set, Map };
         vm.createContext(sb);
-        ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
             .forEach(f => vm.runInContext(
                 fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
         return sb;

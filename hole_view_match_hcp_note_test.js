@@ -61,7 +61,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const SRC = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
 
-const PAGE_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const PAGE_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 // THE SYMPTOM COURSE. Hole 1 is stroke index 3 - the reported hole - and no hole

@@ -207,7 +207,7 @@ describe('NOTHING CONSUMER-FACING REGRESSED', () => {
     });
 
     test('the round engine was not touched by a product rename', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js',
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js',
          'hole-events.js', 'score-marks.js', 'handicap.js', 'grouping.js', 'payouts.js']
             .forEach(f => assert.ok(!/Game Day|Road Trip/.test(read(f)),
                 f + ' is shared engine code and must stay product-neutral'));

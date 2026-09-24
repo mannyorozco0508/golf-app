@@ -46,7 +46,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 // The loader's second argument is the DEPENDENCY LIST the page loads via
 // <script src>, not the page name. Mirrors sidematch_group_isolation_test.js.
 const PAGE = 'sidematches.html';
-const DEPS = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
+const DEPS = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // Twelve generic golfers, three groups of four - the shape this batch is about.

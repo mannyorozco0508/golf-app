@@ -143,7 +143,7 @@ describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while o
     });
 
     test('money math files were not touched by any of this', () => {
-        ['money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js', 'score-marks.js'].forEach((f) => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js', 'score-marks.js'].forEach((f) => {
             assert.doesNotMatch(read(f), /requireOnlineForMoney|navigator\.onLine|GolfNet/, `${f} must contain no connectivity logic. Money math does not know or care whether there is signal.`);
         });
     });

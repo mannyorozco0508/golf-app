@@ -7,7 +7,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 // The exact round from the bug report: 4 golfers, 2 groups, stroke play, skins, dots,
 // birdie game, two 1v1 stroke side matches, one press.
@@ -260,7 +260,7 @@ describe('SERVICE WORKER — the actual cause of the stale iPad build', () => {
     });
 
     test('every shared engine the scorecard needs is precached', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js',
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js',
             'bet-strip.js', 'hole-events.js'].forEach(f =>
                 assert.ok(sw.includes(f), `${f} is not precached - index.html cannot render without it`));
     });
@@ -316,7 +316,7 @@ describe('SERVICE WORKER — the actual cause of the stale iPad build', () => {
 });
 
 describe('MONEY UNTOUCHED', () => {
-    ['money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
+    ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
         test(`${f} contains no rendering code`, () => {
             assert.ok(!/renderActionCenter|renderHoleRecap|sideRow|buildActionRows/.test(read(f)));
         });

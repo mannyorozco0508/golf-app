@@ -176,7 +176,7 @@ describe('THE SAME BUG ELSEWHERE', () => {
 });
 
 describe('WHAT THE GROUP 2 GOLFER ACTUALLY LANDS ON', () => {
-    const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+    const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
     function openAsGroup2() {
         const sb = loadHtmlInlineScript('index.html', PAGE);

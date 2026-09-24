@@ -31,7 +31,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const ADMIN = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const ADMIN = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const PAIR = [{ id:101, name:'Marty', hcp:'0', team:'Team 1' },
               { id:102, name:'Manny', hcp:'0', team:'Team 2' }];
@@ -45,7 +45,7 @@ function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     ['computeCombinedNetTotals','buildSideMatchReceipts','computeHiLoSettlementNet']
         .forEach(fn => { try { sb[fn] = vm.runInContext(fn, sb); } catch (e) {} });
@@ -197,7 +197,7 @@ describe('NO ENGINE OR SETTLEMENT CHANGED', () => {
     });
 
     test('the settlement and money engines were not edited', () => {
-        ['settlement-engine.js','money-engine.js','pool-engine.js','action-model.js']
+        ['settlement-engine.js','match-engine.js','money-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('formatsWithHoleBets'),
                 f + ' must know nothing about which formats show a control'));
     });

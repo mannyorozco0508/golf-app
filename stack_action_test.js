@@ -4,7 +4,7 @@ const { loadJsFile, loadHtmlInlineScript } = require('./helpers/load-script.js')
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const AM = loadJsFile('action-model.js');
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const engine = loadJsFile('money-engine.js');
 
 function netOf(result) {

@@ -132,7 +132,7 @@ describe('GOLFER LANGUAGE, NOT SPEC LANGUAGE', () => {
 
 // ---------------------------------------------------------------------------
 describe('LIVE ALLOCATION SUMMARY — the organizer does no arithmetic', () => {
-    const PAGE = ['course-data.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js'];
+    const PAGE = ['course-data.js', 'action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js'];
 
     // Boots admin with a real field and drives the actual setup handlers.
     function boot(n, opts) {
@@ -264,7 +264,7 @@ describe('LIVE ALLOCATION SUMMARY — the organizer does no arithmetic', () => {
 // untouched beside it.
 // ---------------------------------------------------------------------------
 describe('CUSTOM NET PAYOUTS — setup card', () => {
-    const PAGE2 = ['course-data.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js'];
+    const PAGE2 = ['course-data.js', 'action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js'];
 
     function boot2(n, o) {
         o = o || {};
@@ -467,7 +467,7 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
 
     test('the RECEIPT prints the custom amounts', () => {
         const sb = loadHtmlInlineScript('settlement.html',
-            ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']);
+            ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']);
         vm.runInContext(`
             db.ref = function () { return { on: function () {}, set: function () { return Promise.resolve(); } }; };
             currentMode = 'ABCD'; currentData = ${JSON.stringify(MARTY())};

@@ -24,7 +24,7 @@ const J = JSON.stringify;
 const CD = makeCourseData(18);
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const IDX = read('index.html');
-const DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 const ENG = (() => {
@@ -228,7 +228,7 @@ describe('DOTS IN THE RECEIPT', () => {
 
     function receipt() {
         const sb = loadHtmlInlineScript('settlement.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
         vm.runInContext(`
             currentData = ${J(d)};
             renderCombinedSummary(currentData, currentData.courseData, currentData.scores);
@@ -281,7 +281,7 @@ describe('DOTS IN THE RECEIPT', () => {
 // ---------------------------------------------------------------------------
 describe('PROTECTED — display only', () => {
     test('no engine gained display code', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(fn => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(fn => {
             assert.ok(!/dotIndicatorHtml|dot-pips|dotsForPlayerHole/.test(read(fn)),
                 `${fn} gained scorecard display code`);
         });

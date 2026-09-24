@@ -301,7 +301,7 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+    ['match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -568,10 +568,28 @@ describe('NO-COPY GUARD — stats.html owns no divergent Stroke engine', () => {
         // by accident - both worth failing over.
         const inline = inlineOnly();
         ['calcWolfEngine', 'calcStablefordEngine', 'calcPointSettlement',
-         'calculateMatchEngine', 'nassauStakeConfig'].forEach(fn => {
+         'nassauStakeConfig'].forEach(fn => {
             assert.ok(new RegExp('function\\s+' + fn + '\\s*\\(').test(inline),
                 'stats.html should STILL own ' + fn + ' - deliberately deferred');
         });
+
+        // calculateMatchEngine LEFT THIS LIST IN v218, and this is the deliberate
+        // confirmation that asks for.
+        //
+        // It sat here for the reason the handicap note below gives: adopting the
+        // canonical copy meant loading money-engine.js, and that was too much file
+        // for one function. What that deferral cost was measurable - the page copy
+        // DRIFTED from money-engine.js (it escaped the winner name inside the
+        // engine) and, because an inline script parses last, the drifted copy was
+        // the one this screen actually ran.
+        //
+        // Same resolution as the handicap family: the function got a file of its
+        // own. stats.html consumes match-engine.js and owns none of it. Asserted
+        // the other way round now, exactly as parseHcp and getStrokes are below.
+        assert.ok(!/function\s+calculateMatchEngine\s*\(/.test(inline),
+            'stats.html must not redeclare calculateMatchEngine - match-engine.js owns it now');
+        assert.match(read('stats.html'), /<script src="match-engine\.js">/,
+            'stats.html must LOAD the canonical engine it no longer carries');
 
         // THE HANDICAP FAMILY LEFT THIS LIST DELIBERATELY. Batch 3 deferred
         // parseHcp, getStrokes and the five relative-handicap helpers because

@@ -7,7 +7,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const ZERO = 0.005;
 
 const asNet = obj => {
@@ -216,7 +216,7 @@ describe('ONE CLEAN FINISH — the modal', () => {
 
     test('the modal really can total the money now', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']);
+            ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']);
         const cd = makeCourseData(18);
         const p = makePlayers(['Marty', 'John'], [0, 0]);
         const scores = {};

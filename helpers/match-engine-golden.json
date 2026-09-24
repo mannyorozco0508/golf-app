@@ -1,0 +1,431 @@
+{
+  "1v1 Match Play, gross, ends ALL SQUARE at $0": {
+    "t1TotalMoney": 0,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": false,
+    "matchBaseline": 0,
+    "finalResults": [
+      ""
+    ],
+    "holeWinners": [
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien"
+    ]
+  },
+  "1v1 Match Play, gross, CLOSED EARLY - 10&8": {
+    "t1TotalMoney": 20,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": false,
+    "matchBaseline": 0,
+    "finalResults": [
+      "O'Brien 10&8"
+    ],
+    "holeWinners": [
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien"
+    ]
+  },
+  "1v1 Match Play, NET - relative handicap, 18 vs 0": {
+    "t1TotalMoney": 20,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 0,
+    "finalResults": [
+      "O'Brien 8&6"
+    ],
+    "holeWinners": [
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien"
+    ]
+  },
+  "2v2 Nassau, net, auto-press at 2 down": {
+    "t1TotalMoney": -120,
+    "pressCount": 9,
+    "segments": 12,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 0,
+    "finalResults": [
+      "A<b>C/Dee\"Q 4&3",
+      "A<b>C/Dee\"Q 4&3",
+      "A<b>C/Dee\"Q 8&6",
+      "A<b>C/Dee\"Q 3&2",
+      "A<b>C/Dee\"Q 7&5",
+      "A<b>C/Dee\"Q 2&0",
+      "A<b>C/Dee\"Q 5&4",
+      "A<b>C/Dee\"Q 4&3",
+      "A<b>C/Dee\"Q 3&2",
+      "A<b>C/Dee\"Q 3&2",
+      "A<b>C/Dee\"Q 2&0",
+      "A<b>C/Dee\"Q 2&0"
+    ],
+    "holeWinners": [
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q"
+    ]
+  },
+  "2v2 Best Ball, net, per-hole bet": {
+    "t1TotalMoney": -40,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 2,
+    "finalResults": [
+      "A<b>C/Dee\"Q 8&6"
+    ],
+    "holeWinners": [
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q"
+    ]
+  },
+  "Nassau with a MANUAL press from hole 5": {
+    "t1TotalMoney": -70,
+    "pressCount": 1,
+    "segments": 4,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 3,
+    "finalResults": [
+      "Ben&Jerry 3&2",
+      "Ben&Jerry 3&1",
+      "Ben&Jerry 6&4",
+      "Ben&Jerry 4&2"
+    ],
+    "holeWinners": [
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "Halved",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "Halved",
+      "Halved",
+      "Ben&Jerry",
+      "Halved",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "O'Brien"
+    ]
+  },
+  "NASSAU where SIDE A WINS every segment - money POSITIVE": {
+    "t1TotalMoney": 30,
+    "pressCount": 0,
+    "segments": 3,
+    "maxThru": 18,
+    "usesRelativeHandicap": false,
+    "matchBaseline": 0,
+    "finalResults": [
+      "O'Brien 5&4",
+      "O'Brien 5&4",
+      "O'Brien 10&8"
+    ],
+    "holeWinners": [
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien",
+      "O'Brien"
+    ]
+  },
+  "Ryder Cup singles, gross - also ALL SQUARE, $0": {
+    "t1TotalMoney": 0,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": false,
+    "matchBaseline": 0,
+    "finalResults": [
+      ""
+    ],
+    "holeWinners": [
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien"
+    ]
+  },
+  "NINE-HOLE round, net match - the match ends on 9": {
+    "t1TotalMoney": -20,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 9,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 6,
+    "finalResults": [
+      "Ben&Jerry 3&2"
+    ],
+    "holeWinners": [
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "Halved",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "Halved"
+    ]
+  },
+  "BACK NINE only, holes 10-18, net Nassau": {
+    "t1TotalMoney": -10,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 9,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 4,
+    "finalResults": [
+      "Ben&Jerry 3&1"
+    ],
+    "holeWinners": [
+      "Halved",
+      "Ben&Jerry",
+      "Halved",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Ben&Jerry",
+      "Ben&Jerry",
+      "O'Brien"
+    ]
+  },
+  "PART-PLAYED: net Nassau thru 7 of 18, auto-press live": {
+    "t1TotalMoney": -40,
+    "pressCount": 4,
+    "segments": 7,
+    "maxThru": 7,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 1,
+    "finalResults": [
+      "A<b>C/Dee\"Q 4&2",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "holeWinners": [
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "O'Brien/Ben&Jerry",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q"
+    ]
+  },
+  "RELATIVE HANDICAP 2v2 bestball - baseline off a non-zero low": {
+    "t1TotalMoney": -20,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 9,
+    "finalResults": [
+      "A<b>C/Dee\"Q 7&6"
+    ],
+    "holeWinners": [
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q",
+      "A<b>C/Dee\"Q",
+      "Halved",
+      "A<b>C/Dee\"Q"
+    ]
+  },
+  "RELATIVE HANDICAP ryder 1v1, 24 vs 9 - strokes on 15 holes": {
+    "t1TotalMoney": 25,
+    "pressCount": 0,
+    "segments": 1,
+    "maxThru": 18,
+    "usesRelativeHandicap": true,
+    "matchBaseline": 9,
+    "finalResults": [
+      "O'Brien 7&6"
+    ],
+    "holeWinners": [
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien",
+      "Halved",
+      "Halved",
+      "O'Brien",
+      "Halved",
+      "Halved",
+      "O'Brien",
+      "O'Brien",
+      "Halved",
+      "O'Brien"
+    ]
+  },
+  "GROSS Nassau - the relative branch must NOT engage": {
+    "t1TotalMoney": 0,
+    "pressCount": 0,
+    "segments": 3,
+    "maxThru": 18,
+    "usesRelativeHandicap": false,
+    "matchBaseline": 0,
+    "finalResults": [
+      "",
+      "",
+      ""
+    ],
+    "holeWinners": [
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien",
+      "Halved",
+      "Ben&Jerry",
+      "O'Brien"
+    ]
+  }
+}

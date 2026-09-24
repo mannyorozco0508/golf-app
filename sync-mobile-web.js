@@ -110,6 +110,17 @@ const CONSUMER_SHELL = [
     // The ball-on-firm lockup and the tab icon. Consumer only.
     'hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
+    // match-engine.js (v218): calculateMatchEngine, the money every match play
+    // format settles to. A Consumer engine, like the ones beside it. Every caller
+    // reaches it through a typeof guard, so a bundle shipping without it would
+    // give the app a scorecard that shows a match and settles no money, with no
+    // error anywhere. It ships.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. build-shell.js reads this list by matching
+    // single-quoted strings out of the source, so one apostrophe in a comment
+    // opens a string that swallows the rest of the array - which is exactly what
+    // the first draft of this note did, and the build caught it.
+    'match-engine.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
     // live-skins.js: which config each live skins surface builds its ledger
     // from. index.html, leaderboard.html and settlement.html load it.

@@ -27,7 +27,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'trip.html';
-const DEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const DEPS = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
@@ -317,7 +317,7 @@ describe('NO MONEY BEHAVIOUR CHANGED', () => {
 
     test('trip.html still declares every engine it needs', () => {
         const src = read(PAGE);
-        ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js']
+        ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js']
             .forEach(f => assert.match(src, new RegExp('<script src="' + f + '"'),
                 `trip.html must load ${f}`));
     });

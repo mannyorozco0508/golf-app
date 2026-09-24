@@ -145,7 +145,7 @@ describe('SERVICE WORKER - offline behaviour against the URLs the app actually u
     test('scripts are matched exactly - loosening the match there would gain nothing', async () => {
         const sw = loadServiceWorker({ online: false });
         await sw.install();
-        for (const js of ['pool-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js', 'live-skins.js', 'score-marks.js']) {
+        for (const js of ['pool-engine.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js', 'live-skins.js', 'score-marks.js']) {
             const res = await sw.request(js, 'script');
             assert.ok(res && res !== '__PASSTHROUGH__' && res.status !== 503, `${js} was not served from cache offline.`);
         }
@@ -221,7 +221,7 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         // It is pinned to the shape, plus the current value, so a bump is a
         // deliberate one-line edit here rather than four mystery failures.
         assert.match(CACHE_NAME, /^golfapp-v\d+/, 'The cache key must carry a version number.');
-        assert.equal(CACHE_NAME, 'golfapp-v217-attendance', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
+        assert.equal(CACHE_NAME, 'golfapp-v218-one-match-engine', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
     });
 });
 

@@ -7,7 +7,7 @@ const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 // Three groups, three matches spanning them:
 //   Group 1: Marty, Jose   Group 2: Steve, John   Group 3: Ryan, Bo
@@ -256,7 +256,7 @@ describe('GROUP SCORE ISOLATION — unchanged by this work', () => {
 describe('2v2 MONEY WORDING — a team total is not a personal one', () => {
     const BS = (() => {
         const sb = loadJsFile('action-model.js');
-        ['money-engine.js', 'settlement-engine.js', 'bet-strip.js']
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']
             .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         return sb;
     })();
@@ -313,7 +313,7 @@ describe('2v2 MONEY WORDING — a team total is not a personal one', () => {
 
     test('the share matches what settlement actually pays', () => {
         const settle = loadHtmlInlineScript('settlement.html',
-            ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
         const { cd, p, scores, data } = matches();
         const full = Object.assign({ gameFormat: 'stroke', courseData: cd, scores },
             { players: p, sideMatches: { two: data.sideMatches.two } });
@@ -349,7 +349,7 @@ describe('2v2 MONEY WORDING — a team total is not a personal one', () => {
         const bs = read('bet-strip.js');
         const fn = bs.slice(bs.indexOf('function sideMoneyText'), bs.indexOf('function fmtMoney'));
         assert.ok(!/db\.ref|computeCombined/.test(fn));
-        ['money-engine.js', 'settlement-engine.js'].forEach(f =>
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js'].forEach(f =>
             assert.ok(!/sideMoneyText/.test(read(f)), `${f} was touched`));
     });
 });
@@ -361,7 +361,7 @@ describe('PHONE COPY', () => {
         const scores = {};
         cd.slice(0, 10).forEach(h => p.forEach(pl => { scores[`p${pl.id}_h${h.hole}`] = h.par; }));
         const BSsb = loadJsFile('action-model.js');
-        ['money-engine.js', 'settlement-engine.js', 'bet-strip.js']
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']
             .forEach(f => vm.runInContext(read(f), BSsb, { filename: f }));
         const data = {
             players: p, sideMatches: {

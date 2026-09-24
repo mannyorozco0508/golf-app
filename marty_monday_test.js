@@ -34,7 +34,7 @@ const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 function loadEngines() {
     const sandbox = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date };
     vm.createContext(sandbox);
-    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js'].forEach((f) => {
+    ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js'].forEach((f) => {
         vm.runInContext(read(f), sandbox, { filename: f });
     });
     return sandbox;
@@ -312,6 +312,8 @@ describe('THE OLD CHECKBOX IS GONE FROM SETUP', () => {
     test('playingForMoney is still honoured everywhere, so saved rounds are untouched', () => {
         // Nothing was removed from the engines. A round saved earlier with a golfer
         // set to false must settle exactly as it did before.
+        // match-engine.js is NOT here: the participant filter is money-engine.js's, and
+        // the match engine takes the already-filtered list.
         ['settlement-engine.js', 'pool-engine.js', 'money-engine.js', 'action-model.js'].forEach((f) => {
             assert.match(read(f), /playingForMoney/, `${f} must still read the legacy flag.`);
         });

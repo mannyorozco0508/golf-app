@@ -159,7 +159,7 @@ const VARIANTS = {
 };
 
 const ENG = (() => {
-    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     return sb;
 })();
 function engine(data) {

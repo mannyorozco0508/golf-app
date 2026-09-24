@@ -29,16 +29,16 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
-const LB = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
+const LB = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 // Every engine in one context, in production load order.
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -295,7 +295,7 @@ describe('BOTH SURFACES, ONE STATE', () => {
         // A SEARCH LIST, NOT A REALM. handicap.js is deliberately absent: this asks
         // which files DEFINE the Hi-Lo presenter, and the answer must stay
         // money-engine.js alone.
-        const defs = ['money-engine.js','index.html','leaderboard.html','settlement-engine.js']
+        const defs = ['match-engine.js','money-engine.js','index.html','leaderboard.html','settlement-engine.js']
             .filter(f => /function buildLiveHiLoState\(/.test(read(f)));
         assert.deepEqual(defs, ['money-engine.js']);
     });

@@ -56,7 +56,7 @@ const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, 'flights_absent_gold
 const CD = makeCourseData(18);
 
 const ENG = (() => {
-    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
     ['pool-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f =>
         vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
     return sb;
@@ -228,7 +228,7 @@ VARIANTS.forEach(([title, build]) => {
         // a round whose skins are net) produced four different winners than the page
         // shows, which is exactly the drift the badge exists not to have.
         const SKINS_BY_NAME = (() => {
-            const LS = loadJsFile('live-skins.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            const LS = loadJsFile('live-skins.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
             LS.__d = J(data);
             const entries = J(vm.runInContext('liveSkinsLedgerEntries(__d, ' + JSON.stringify(CD) + ', ' + JSON.stringify(SCORES) + ', {})', LS));
             const out = {};

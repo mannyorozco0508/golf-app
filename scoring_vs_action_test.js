@@ -155,7 +155,7 @@ describe('SIDE MATCH TERMINOLOGY — a bet, not a scoring change', () => {
 // These tests pin the real engine behaviour so the wording can never drift from it.
 describe('STROKE PLAY BET — what the carry control actually does', () => {
     const sb = loadHtmlInlineScript('sidematches.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     const cd = makeCourseData(18);
     const P = makePlayers(['Marty', 'Manny'], [0, 0]);
 
@@ -233,7 +233,7 @@ describe('STROKE PLAY BET — what the carry control actually does', () => {
 // ---------------------------------------------------------------------------
 describe('FROZEN — no engine or settlement moved in this phase', () => {
     test('the money and settlement engines carry no product-model wording', () => {
-        ['money-engine.js', 'settlement-engine.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/Scoring Format|What's The Action|rr-scoring|rr-action/.test(src),
                 `${f} must not know about presentation`);

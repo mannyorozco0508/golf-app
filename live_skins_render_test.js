@@ -22,7 +22,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const PAGE = 'index.html';
-const DEPS = ['action-model.js', 'money-engine.js', 'pool-engine.js',
+const DEPS = ['action-model.js', 'match-engine.js', 'money-engine.js', 'pool-engine.js',
     'settlement-engine.js', 'score-marks.js', 'bet-strip.js', 'hole-events.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 

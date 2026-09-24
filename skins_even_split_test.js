@@ -40,7 +40,7 @@ const { makeCourseData } = require('./helpers/fixtures.js');
 const J = v => JSON.parse(JSON.stringify(v));
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const CD = makeCourseData(18);
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = data => { ENG.__d = J(data); return J(vm.runInContext('computeMoneyPool(__d, __d.courseData, __d.scores)', ENG)); };
 const sumLines = lines => lines.reduce((a, l) => a + (l.cents || 0), 0);
 // 25 names (the helper's own list stops at 23).
@@ -231,7 +231,7 @@ describe('THE SURFACES say whichever split applies', () => {
         assert.match(receipt(round({})), /Split by flight, by headcount: Flight A \$384/);
     });
     const game = data => {
-        const sb = loadHtmlInlineScript('game.html', ['handicap.js', 'text-safe.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'grouping.js'], { search: '?game=even25' });
+        const sb = loadHtmlInlineScript('game.html', ['handicap.js', 'text-safe.js', 'action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'grouping.js'], { search: '?game=even25' });
         vm.runInContext("document.__mount(document.getElementById('game-content'))", sb);
         const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/EVEN25');
         h.cb({ val: () => J(data), exists: () => true });

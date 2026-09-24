@@ -88,7 +88,7 @@ const offerInput = (extra) => Object.assign({
 // ---------------------------------------------------------------------------
 describe('1. NO ENGINE MATH MOVED', () => {
     test('money-engine.js is byte-for-byte unchanged', () => {
-        assert.equal(sha('money-engine.js'), '3c960947ed62ebf5', 'money-engine.js changed: ' + sha('money-engine.js'));
+        assert.equal(sha('money-engine.js'), '9653b6320c583b97', 'money-engine.js changed: ' + sha('money-engine.js'));  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
     });
     test('aloha-bet.js computes no strokes and reads no scores except "is this hole blank"', () => {
         const src = read('aloha-bet.js');
@@ -275,7 +275,7 @@ describe('5. WHAT AN ACCEPTED ALOHA PAYS', () => {
 // pool-engine.js too: computeMoneyPool lives there, and section 7 asserts the
 // Weekly Game pool does not move.
 const ENGINE = () => loadJsFile('settlement-engine.js',
-    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'aloha-bet.js']);
+    ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'aloha-bet.js']);
 
 // A round with a real match on it, plus - deliberately - every other pot the
 // Aloha must never touch.

@@ -39,7 +39,7 @@ const assert = require('node:assert/strict');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 
 const settle = loadHtmlInlineScript('settlement.html',
-    ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+    ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
 const ZERO = 0.005;
 

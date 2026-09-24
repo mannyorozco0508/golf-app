@@ -48,7 +48,7 @@ const LABEL = '📤 Send';   // shortened from "Send Results" the same day: on a
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const sha8 = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT, f))).digest('hex').slice(0, 8);
-const DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js'];
+const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js'];
 const strip0 = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const norm = t => t.split('|' + TODAY + '|').join('|<today>|');

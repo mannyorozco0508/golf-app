@@ -53,8 +53,8 @@ const { generateCode } = require('./code-issuer.js');
 // The page dependency lists the link tests still need in order to load a page's
 // inline script. They no longer describe generators - there is one of those, in
 // code-issuer.js - only what each page must have loaded to run at all.
-const ADMIN_DEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const TRIP_DEPS  = ['money-engine.js','action-model.js','settlement-engine.js'];
+const ADMIN_DEPS = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const TRIP_DEPS  = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 // Real output, at volume. This used to be 200 codes per page through a vm.
 function generate(times) {
@@ -214,7 +214,7 @@ describe('EXISTING FOUR-CHARACTER CODES STILL WORK', () => {
 
         test(`and the scorecard opens on "${code}" too`, () => {
             const sb = loadHtmlInlineScript('index.html',
-                ['score-marks.js', 'money-engine.js', 'action-model.js',
+                ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
                  'settlement-engine.js', 'pool-engine.js', 'bet-strip.js',
                  'hole-events.js', 'ryder-cup.js'], { search: '?game=' + code });
             assert.equal(vm.runInContext('currentMode', sb), code);
@@ -413,7 +413,7 @@ describe('NOTHING ELSE MOVED', () => {
             '/tournaments/$tourneyCode/.write',
             '/tournaments/$tourneyCode/ownerUid/.validate'
         ], 'auth reached a rule outside the approved rules wave: ' + JSON.stringify(authSites));
-        ['money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
+        ['match-engine.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('generateRoomCode'),
                 f + ' must know nothing about code generation'));
     });

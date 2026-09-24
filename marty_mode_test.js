@@ -7,10 +7,10 @@ const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 function layered() {
     const sb = loadJsFile('action-model.js');
-    ['money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']
+    ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -287,7 +287,7 @@ describe('MARTY MODE — the scorecard', () => {
 
 describe('MARTY MODE — nothing was broken to get here', () => {
     test('the engines were not touched', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f =>
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f =>
             assert.ok(!/strokeSentence|matchProgress|mc-press-btn/.test(read(f)), `${f} changed`));
     });
 

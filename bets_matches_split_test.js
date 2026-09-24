@@ -318,7 +318,7 @@ describe('BETS TAB — a group watches its own action', () => {
         // Everything the page loads EXCEPT settlement-engine.js, so the first thing
         // missing is the stroke engine itself and not some earlier helper.
         const crippled = loadHtmlInlineScript('skins.html',
-            ['handicap.js', 'text-safe.js', 'action-model.js', 'grouping.js', 'money-engine.js', 'bet-strip.js'],
+            ['handicap.js', 'text-safe.js', 'action-model.js', 'grouping.js', 'match-engine.js', 'money-engine.js', 'bet-strip.js'],
             { search: BARE, only: true });
         assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined');
         const handler = crippled.__dbHandlers.find(h => h.event === 'value');
@@ -441,7 +441,7 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
     test('sidematches.html loads money-engine.js and bet-strip.js before its inline block, and owns no engine copy', () => {
         const s = read('sidematches.html');
         const inlineAt = s.indexOf('<script>');
-        ['money-engine.js', 'bet-strip.js', 'grouping.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'bet-strip.js', 'grouping.js'].forEach(f => {
             const at = s.indexOf('<script src="' + f + '">');
             assert.ok(at > -1 && at < inlineAt, f + ' must load before the inline block');
         });
@@ -455,7 +455,7 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
     test('skins.html loads grouping.js, money-engine.js and bet-strip.js before its inline block', () => {
         const s = read('skins.html');
         const inlineAt = s.indexOf('<script>');
-        ['grouping.js', 'money-engine.js', 'bet-strip.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
+        ['grouping.js', 'match-engine.js', 'money-engine.js', 'bet-strip.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
             const at = s.indexOf('<script src="' + f + '">');
             assert.ok(at > -1 && at < inlineAt, f + ' must load before the inline block');
         });
@@ -482,7 +482,7 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         const sha = f => crypto.createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
         // Pinned at the sha each file had at b6ab43b (v134), the commit this wave built on.
         assert.equal(sha('bet-strip.js'), '43880a61');
-        assert.equal(sha('money-engine.js'), '3c960947');
+        assert.equal(sha('money-engine.js'), '9653b632');  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
         assert.equal(sha('action-model.js'), 'ded86280');
         assert.equal(sha('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         // Wave A fix 1: pool-engine.js re-pinned - net lines now carry {shares}, the array the engine paid a tie from; additive, every figure unchanged (tie_shares_test.js).

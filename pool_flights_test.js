@@ -34,7 +34,7 @@ const { makeCourseData } = require('./helpers/fixtures.js');
 const J = (v) => JSON.parse(JSON.stringify(v));
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const CD = makeCourseData(18);
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = (data) => { ENG.__d = J(data); return J(vm.runInContext('computeMoneyPool(__d, __d.courseData, __d.scores)', ENG)); };
 const resolve = (players, data) => { ENG.__p = J(players); ENG.__d = J(data); return J(vm.runInContext("computeSkinsVoidForSettle(__p, __d.courseData, __d.scores, 'gross')", ENG)); };
 

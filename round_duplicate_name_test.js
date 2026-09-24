@@ -43,7 +43,7 @@ const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const SETTLE_SRC = read('settlement.html');
 const IDX_SRC = read('index.html');
-const AM = loadJsFile('action-model.js', ['handicap.js', 'money-engine.js']);
+const AM = loadJsFile('action-model.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
 const CD = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
 
 const teamed = list => list.map((p, i) => Object.assign({}, p, {
@@ -117,7 +117,7 @@ describe('THE DETECTOR, SHARED BY BOTH SURFACES', () => {
 describe('THE MERGE IS REAL — this is what is being refused', () => {
 
     const SE = loadJsFile('settlement-engine.js',
-        ['handicap.js', 'money-engine.js', 'action-model.js']);
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 
     test('the engine really does collapse two Mikes into one balance', () => {
         const d = roundOf(MIKES);
@@ -146,9 +146,9 @@ function arrive(page, deps, players) {
     return sb;
 }
 const run = (sb, e) => vm.runInContext(e, sb);
-const SETTLE_DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const SETTLE_DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'payouts.js'];
-const IDX_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const IDX_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js',
     'ryder-cup.js'];
 

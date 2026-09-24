@@ -210,21 +210,30 @@ describe('ALL FOUR COPIES ARE ACTUALLY BEING COMPARED', () => {
     test('each copy carries the segStake contract', () => {
         // Structural backstop: if a copy loses segStake, the money tests above catch
         // it, but this says plainly which file drifted.
+        // v218: ONE COPY, SO THE CONTRACT IS CHECKED ONCE AND THE ABSENCE IS PINNED
+        // EVERYWHERE ELSE.
+        //
+        // sidematches.html lost its inline engine in v135; index.html and stats.html
+        // lost theirs in v218, for the same reason and with the same result - the
+        // realms above now all resolve calculateMatchEngine to match-engine.js, so
+        // the behavioural comparisons in this file compare one implementation with
+        // itself and it is THIS test that carries the weight. It reads the source
+        // contract off the one owner, and asserts no page has regrown a copy.
         const fs = require('fs'), path = require('path');
         const { REPO_ROOT } = require('./helpers/load-script.js');
-        // sidematches.html has NO inline copy since the Bets/Matches split (v135):
-        // it loads money-engine.js and its realm's calculateMatchEngine above IS the
-        // canonical one. The source contract is checked on the files that still
-        // carry a copy, and the absence is pinned so the copy cannot quietly return.
-        NAMES.filter(n => n !== 'sidematches.html').forEach(n => {
-            const src = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8');
-            assert.match(src, /const segStake = m =>/, n + ' lost segStake');
-            assert.match(src, /manualPress && manualPress\.stake !== undefined/,
-                n + ' no longer stores an explicit press stake');
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'match-engine.js'), 'utf8');
+        assert.match(src, /const segStake = m =>/, 'match-engine.js lost segStake');
+        assert.match(src, /manualPress && manualPress\.stake !== undefined/,
+            'match-engine.js no longer stores an explicit press stake');
+        ['sidematches.html', 'index.html', 'stats.html', 'money-engine.js'].forEach(n => {
+            const s = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8')
+                .replace(/<script src=[^>]*><\/script>/g, '');
+            assert.ok(!/function calculateMatchEngine\s*\(/.test(s),
+                n + ' must not regrow an inline match engine');
         });
-        const sm = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
-        assert.ok(!/function calculateMatchEngine\s*\(/.test(sm.replace(/<script src=[^>]*><\/script>/g, '')),
-            'sidematches.html must not regrow an inline match engine');
-        assert.match(sm, /<script src="money-engine\.js">/);
+        // Every page that settles a match must LOAD the one engine.
+        ['sidematches.html', 'index.html', 'stats.html'].forEach(n =>
+            assert.match(fs.readFileSync(path.join(REPO_ROOT, n), 'utf8'),
+                /<script src="match-engine\.js">/, n + ' does not load match-engine.js'));
     });
 });

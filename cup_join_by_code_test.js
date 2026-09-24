@@ -54,7 +54,7 @@ const CUP = { ryderCup: {
     matches: { m1: { sessionId: 's1', playersA: ['101'], playersB: ['102'],
                      format: 'singles', scoring: 'scratch' } } } };
 
-const engine = () => loadJsFile('ryder-cup.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const engine = () => loadJsFile('ryder-cup.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 
 // ---------------------------------------------------------------------------
 describe('THE ENGINE CARRIES WHICH ROUND IS WRONG', () => {
@@ -116,7 +116,7 @@ describe('A DANGLING SESSION IS NOT USABLE', () => {
 describe('THE SENTENCE NAMES THE RIGHT ROUND', () => {
 
     const scorecard = (localNames, hostNames) => {
-        const sb = loadHtmlInlineScript('index.html', ['score-marks.js', 'money-engine.js',
+        const sb = loadHtmlInlineScript('index.html', ['score-marks.js', 'match-engine.js', 'money-engine.js',
             'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js',
             'hole-events.js', 'ryder-cup.js']);
         vm.runInContext(`
@@ -144,7 +144,7 @@ describe('THE SENTENCE NAMES THE RIGHT ROUND', () => {
     });
 
     test('a dangling session says what is missing', () => {
-        const sb = loadHtmlInlineScript('index.html', ['score-marks.js', 'money-engine.js',
+        const sb = loadHtmlInlineScript('index.html', ['score-marks.js', 'match-engine.js', 'money-engine.js',
             'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js',
             'hole-events.js', 'ryder-cup.js']);
         vm.runInContext(`

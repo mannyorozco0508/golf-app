@@ -31,7 +31,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADMIN = read('admin.html');
 const SIDEMATCHES = read('sidematches.html');
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 
 const CARD_FORMATS = ['stroke', 'stableford', 'nassau-modern', 'bestball',
     'scramble', 'hilo', 'wolf', 'ryder', 'ryder-cup'];
@@ -457,7 +457,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // round is affected.
         // skins_carry_and_labels_test.js asserts the BEHAVIOUR of all of it rather
         // than trusting these hashes to notice.
-        'money-engine.js': '3c960947ed62ebf5c179050e3ac65f9e1ed88c106ab0a759763fdd7da8931a68',
+        'money-engine.js': '9653b6320c583b97479d94f500df0637ff637cde702abfaf719433046e8494a8',  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
         // RE-PINNED, with per-file approval, for one change each and no arithmetic.
         // A Nassau is three independent wagers and both files settled all three - and
         // every press off them - at the single collapsed `stake`, which is the OVERALL

@@ -39,7 +39,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'settlement.html';
-const DEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+const DEPS = ['match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');

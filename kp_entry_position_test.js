@@ -36,7 +36,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const SRC = read('index.html');
 const CD = makeCourseData(18);   // par 3s at holes 3, 7, 12, 16
-const DEPS = ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'live-skins.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js', 'grouping.js'];
+const DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'live-skins.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js', 'grouping.js'];
 
 function round(kpHoles) {
     const players = makePlayers(['Ann', 'Ben', 'Cal', 'Dee'], [0, 4, 9, 13]);

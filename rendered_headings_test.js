@@ -29,7 +29,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 const NAMES = ['Marty', 'Manny', 'John', 'Steve', 'Stan', 'Greg', 'Tony', 'James'];
 
 const TROPHY = '\uD83C\uDFC6';   // U+1F3C6, as a surrogate pair — what SHOULD render

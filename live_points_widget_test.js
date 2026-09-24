@@ -25,9 +25,9 @@ const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
-const LB = ['money-engine.js','action-model.js','settlement-engine.js'];
+const LB = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const NAMES = ['Marty','Manny','Carp','Scott'];
 const SF_POINTS = { other:0, bogey:1, par:2, birdie:3, eagle:5, albatross:10 };
@@ -280,7 +280,7 @@ describe('LIVE PLAY, NOT SETTLEMENT', () => {
 describe('ONE PRESENTER, AND ONLY WHERE IT BELONGS', () => {
 
     test('buildLivePointsState is defined once, in money-engine.js', () => {
-        const defs = ['money-engine.js','index.html','leaderboard.html','action-model.js']
+        const defs = ['match-engine.js','money-engine.js','index.html','leaderboard.html','action-model.js']
             .filter(f => /function buildLivePointsState\(/.test(read(f)));
         assert.deepEqual(defs, ['money-engine.js']);
     });

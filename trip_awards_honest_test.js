@@ -45,7 +45,7 @@ const sha8 = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(R
 const stripComments = s => s.replace(/<!--[\s\S]*?-->|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str !== undefined ? str : '');
 const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();   // the fixture's stripper
 const tight = s => s.replace(/ ?\| ?/g, '|').replace(/\|+/g, '|');                              // bars without the whitespace beside them
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 const CD = makeCourseData(18);
 
 // hcps are stored AS GIVEN ('' stays blank - makePlayers would turn it into '0').

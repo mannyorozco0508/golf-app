@@ -57,7 +57,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const RYDER_SRC = read('ryder-cup.js');
 const SM_SRC = read('sidematches.html');
 
-const SM_DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const SM_DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'ryder-cup.js'];
 
 const cd18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
@@ -258,7 +258,11 @@ describe('A MODULE THAT THROWS WHEN LOADED ALONE IS A TRAP', () => {
     test('the prerequisite is declared once, in the loader', () => {
         const helper = read('helpers/load-script.js');
         assert.match(helper, /'ryder-cup\.js':\s*\[[^\]]*'handicap\.js'/);
-        assert.match(helper, /'ryder-cup\.js':\s*\[[^\]]*'money-engine\.js'/);
+        // v218: ryder-cup.js needs calculateMatchEngine, which is match-engine.js's.
+        // money-engine.js was only ever in this prerequisite to supply that one
+        // function, so naming the real owner is what keeps the silent-null warning in
+        // the loader enforceable.
+        assert.match(helper, /'ryder-cup\.js':\s*\[[^\]]*'match-engine\.js'/);
     });
 });
 

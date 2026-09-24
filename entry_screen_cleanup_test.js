@@ -45,7 +45,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADMIN = read('admin.html');
 const SM = read('sidematches.html');
 
-const SM_DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const SM_DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'ryder-cup.js'];
 const CD = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
 const P = [{ id: 101, name: 'Ann Adams', hcp: '0' }, { id: 102, name: 'Bob Brown', hcp: '0' },

@@ -158,7 +158,7 @@ describe('EVERY REAL WAY INTO A ROUND STILL WORKS', () => {
 
     test('the scorecard reads the same parameter', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
              'pool-engine.js', 'bet-strip.js', 'hole-events.js', 'ryder-cup.js'],
             { search: '?game=WXYZ99&group=2' });
         assert.equal(vm.runInContext('currentMode', sb), 'WXYZ99');

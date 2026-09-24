@@ -24,7 +24,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADMIN = read('admin.html');
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js', 'score-marks.js'];
 
 const WIDGET_FORMATS = ['stroke', 'stableford', 'nassau-modern', 'bestball',
     'scramble', 'hilo', 'wolf', 'ryder', 'ryder-cup'];

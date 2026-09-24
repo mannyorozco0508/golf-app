@@ -34,7 +34,7 @@ const { loadHtmlInlineScript, loadJsFile, REPO_ROOT } = require('./helpers/load-
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-const DEPS = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js'];
+const DEPS = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js'];
 
 const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
                'Marcus','Rocco','Matt H','Jeremy'];
@@ -397,7 +397,7 @@ describe('NO DUPLICATE MATH', () => {
     });
 
     test('no engine learned about this split', () => {
-        ['pool-engine.js','settlement-engine.js','money-engine.js']
+        ['pool-engine.js','settlement-engine.js','match-engine.js','money-engine.js']
             .forEach(f => assert.ok(!/LIVE RESULTS|buildLiveResultsHtml/.test(read(f)),
                 `${f} must not carry presentation state`));
     });

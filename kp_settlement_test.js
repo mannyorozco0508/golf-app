@@ -56,7 +56,7 @@ const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
 function engines(files) {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
     vm.createContext(sb);
-    (files || ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js'])
+    (files || ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js'])
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -350,7 +350,7 @@ describe('THE ENGINE OWNS THIS, NOT THE PAGES', () => {
 
 describe('FINISH ROUND - THE CEREMONY IS GONE', () => {
 
-    const DEPS = ['action-model.js','money-engine.js','pool-engine.js','settlement-engine.js',
+    const DEPS = ['action-model.js','match-engine.js','money-engine.js','pool-engine.js','settlement-engine.js',
                   'score-marks.js','bet-strip.js','hole-events.js'];
 
     function boot({ organizer = true, winners = {}, noWinner = null, leaders = null, online = true,
@@ -477,7 +477,7 @@ describe('FINISH ROUND - THE CEREMONY IS GONE', () => {
 
 describe('RECEIPT', () => {
 
-    const SDEPS = ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+    const SDEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
     function receipt(opts) {
         const sb = loadHtmlInlineScript('settlement.html', SDEPS);
@@ -540,7 +540,7 @@ describe('RECEIPT', () => {
 // ============================================================================
 
 describe('TRIP - THE KP HOLD IS GONE', () => {
-    const TDEPS = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+    const TDEPS = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
     test('a linked finished round with recorded KPs is settled; nothing says unconfirmed', () => {
         const sb = loadHtmlInlineScript('trip.html', TDEPS);
         const { d } = roundData({ winners: ALL_WON });

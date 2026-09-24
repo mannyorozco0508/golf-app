@@ -175,8 +175,18 @@ function makeStubSandbox() {
 //
 // Declared here, once, rather than in forty test files.
 const MODULE_PREREQS = {
-    'money-engine.js': ['handicap.js'],
-    'settlement-engine.js': ['handicap.js'],
+    // match-engine.js owns calculateMatchEngine (v218). Its ONLY dependency is
+    // handicap.js - no cycle - and everything that settles a match play format
+    // needs it as a plain global, exactly as the browser supplies it.
+    'match-engine.js': ['handicap.js'],
+    // computeRoundMoneyByPlayer and buildLiveMatchState call calculateMatchEngine.
+    // buildLiveMatchState guards it with typeof and returns null when it is
+    // missing, so without this entry a live-match test would compute NOTHING and
+    // still pass - the silent-null failure ryder-cup.js's note below describes.
+    'money-engine.js': ['handicap.js', 'match-engine.js'],
+    // computeCombinedNetTotals and buildSideMatchReceipts both call it, for side
+    // matches and for the main game's Aloha.
+    'settlement-engine.js': ['handicap.js', 'match-engine.js'],
     // computeTournamentPayouts() calls allocatePlacePayouts() as a global, exactly
     // as it does in the browser where both tournament pages load payouts.js first.
     // tournament-engine.js calls allocatePlacePayouts() for prize money and
@@ -189,7 +199,11 @@ const MODULE_PREREQS = {
     // ReferenceError and - far worse - ryderFourBallState bails at its first
     // line and returns a SILENT null, so a Four-Ball test passes having computed
     // nothing at all.
-    'ryder-cup.js': ['handicap.js', 'money-engine.js'],
+    // v218: calculateMatchEngine moved to match-engine.js, which is what this
+    // actually needs - money-engine.js was only ever here to supply that one
+    // function, and naming the real owner is what makes the silent-null warning
+    // above enforceable.
+    'ryder-cup.js': ['handicap.js', 'match-engine.js'],
 };
 
 // Loads a plain, standalone .js file (money-engine.js, tournament-engine.js,

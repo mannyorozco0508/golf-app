@@ -23,7 +23,7 @@ const CD = makeCourseData(18);
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const IDX = read('index.html');
 
-const DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 function page(data, hole) {
@@ -361,7 +361,7 @@ describe('RELEVANCE: the split orders, it does not hide', () => {
 // ---------------------------------------------------------------------------
 describe('PROTECTED — this was layout only', () => {
     test('no engine gained layout logic', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
             assert.ok(!/navRowHtml|hole-view-nav-row|scrollToHoleCard/.test(read(f)),
                 `${f} gained scorecard layout code`);
         });

@@ -103,7 +103,7 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+    ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -270,7 +270,7 @@ describe('HARNESS INTEGRITY — the realms are what we say they are', () => {
         // the loud-failure guard is on skins.html, loaded with everything it
         // declares EXCEPT settlement-engine.js.
         const crippled = loadHtmlInlineScript('skins.html',
-            ['handicap.js', 'text-safe.js', 'action-model.js', 'grouping.js', 'money-engine.js', 'bet-strip.js'],
+            ['handicap.js', 'text-safe.js', 'action-model.js', 'grouping.js', 'match-engine.js', 'money-engine.js', 'bet-strip.js'],
             { only: true, search: '?game=TESTCD' });
         assert.equal(typeof crippled.calculateOverallBetEngine, 'undefined',
             'without the script tag the page should have no engine at all');

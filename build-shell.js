@@ -83,7 +83,7 @@ const PRODUCTS = {
         // Moved to v59. Confirm or mark out before tee time (attendance.js on the
         // scorecard, setup, Round Ready, and each trip day). A device on v58
         // has the roster and no headcount.
-        cacheName: 'consumer-v59-attendance',
+        cacheName: 'consumer-v60-one-match-engine',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

@@ -199,7 +199,7 @@ const PINNED = {
 };
 
 function settle(data) {
-    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'settlement-engine.js']);
+    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js']);
     sb.__d = data;
     const r = vm.runInContext('computeMoneyPool(__d, __d.courseData, __d.scores)', sb);
     const j = JSON.parse(JSON.stringify(r));

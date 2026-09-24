@@ -39,7 +39,7 @@ const call = c => { vm.runInContext(`window.__r = (function(){ ${c} })();`, ENG)
 // buildBetEntries lives in index.html (the scorecard builds the ticker), not in the
 // engine files, so the blue-box tests need the page sandbox.
 const PAGE = loadHtmlInlineScript('index.html',
-    ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']);
+    ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']);
 const pageCall = c => { vm.runInContext(`window.__r = (function(){ ${c} })();`, PAGE); return PAGE.window.__r; };
 
 function duel(seedShift) {
@@ -262,6 +262,11 @@ describe('PROTECTED — display only', () => {
         // money-engine.js into handicap.js in the shared-core extraction; the
         // allocation itself is byte-identical and this still asserts it.
         assert.ok(/function getStrokes\(hcpIndex, numericHcp\)/.test(read('handicap.js')));
-        assert.ok(/function calculateMatchEngine/.test(me));
+        // v218: the engine is match-engine.js now. money-engine.js keeps every other
+        // engine; the point of this line - that the match engine still exists and was
+        // not quietly rewritten - is asserted on the file that owns it.
+        assert.ok(/function calculateMatchEngine/.test(read('match-engine.js')));
+        assert.ok(!/function calculateMatchEngine/.test(me),
+            'money-engine.js must not carry a second copy');
     });
 });

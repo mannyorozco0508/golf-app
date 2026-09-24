@@ -32,7 +32,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 const CD = makeCourseData(18);
 
 const P2 = makePlayers(['Marty', 'Matt'], [0, 0]);
@@ -292,7 +292,7 @@ describe('WHAT THIS FIX DID NOT TOUCH', () => {
 
     test('no engine file changed for a display fix', () => {
         // Display reads storage; it never earns the right to touch the math.
-        ['money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'action-model.js', 'hole-events.js']
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'action-model.js', 'hole-events.js']
             .forEach(f => assert.ok(!/strokePressHistory|pressChips/.test(read(f)),
                 `${f} must know nothing about the ledger rendering`));
     });

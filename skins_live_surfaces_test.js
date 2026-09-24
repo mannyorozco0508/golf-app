@@ -37,7 +37,7 @@ const FLAG = { skinsRounding: 'odd-dollar' };
 
 // The engine plus the two presenters, in index.html's load order.
 const LIVE = (() => {
-    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
     ['pool-engine.js', 'bet-strip.js', 'hole-events.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 })();
@@ -217,7 +217,7 @@ describe('skins.html - the Bets ledger is the engine\'s ledger', () => {
 // happened.
 // ---------------------------------------------------------------------------
 describe('ONE ALLOCATION, ONE FILE', () => {
-    const SURFACES = ['bet-strip.js', 'hole-events.js', 'skins.html', 'index.html', 'leaderboard.html', 'settlement.html', 'sidematches.html', 'trip.html', 'stats.html', 'pool-engine.js', 'money-engine.js', 'action-model.js'];
+    const SURFACES = ['bet-strip.js', 'hole-events.js', 'skins.html', 'index.html', 'leaderboard.html', 'settlement.html', 'sidematches.html', 'trip.html', 'stats.html', 'pool-engine.js', 'match-engine.js', 'money-engine.js', 'action-model.js'];
     const stripComments = s => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
     test('allocateSkinsOddDollar is DEFINED once, in settlement-engine.js, and CALLED only there and in bet-strip.js', () => {

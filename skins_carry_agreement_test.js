@@ -51,9 +51,9 @@ const path = require('path');
 const { loadJsFile } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
-const AM = loadJsFile('action-model.js', ['handicap.js', 'money-engine.js']);
-const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
-const BS = loadJsFile('bet-strip.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const AM = loadJsFile('action-model.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
+const SE = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
+const BS = loadJsFile('bet-strip.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 
 // THE FIXTURE FROM THE MEASUREMENT. Three golfers, $10 each, holes 2 and 5 won
 // outright, the other sixteen tied - so a carried pot has something to ride on

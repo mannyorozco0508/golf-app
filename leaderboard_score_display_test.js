@@ -37,7 +37,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'leaderboard.html';
-const DEPS = ['money-engine.js','action-model.js'];
+const DEPS = ['match-engine.js','money-engine.js','action-model.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 const NAMES = ['Marty','Scott','Carp','Randy','Manny','Matt B','Lance','Kopp',
@@ -266,7 +266,7 @@ describe('NO NEW MATH, NO ENGINE TOUCHED', () => {
     });
 
     test('no engine or settlement file carries board markup', () => {
-        ['pool-engine.js','settlement-engine.js','money-engine.js','action-model.js']
+        ['pool-engine.js','settlement-engine.js','match-engine.js','money-engine.js','action-model.js']
             .forEach(f => assert.ok(!/score-cell|score-gross/.test(read(f)),
                 `${f} must contain no leaderboard presentation`));
     });

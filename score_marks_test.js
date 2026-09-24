@@ -8,7 +8,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const SM = loadJsFile('score-marks.js');
-const PAGE = ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+const PAGE = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 describe('SCORE MARKS — gross score against par, nothing else', () => {
     test('the spec examples, exactly', () => {
@@ -106,7 +106,7 @@ function expectedMarks(cd, p, scores) {
 // OUT/IN/TOTAL, and everything else is a hole score in course order.
 function receiptMarks(cd, p, scores) {
     const sb = loadHtmlInlineScript('settlement.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     vm.runInContext(`currentData = ${JSON.stringify({ gameFormat: 'stroke', players: p, courseData: cd, scores })};` +
         `window.__out = buildReceiptScorecard();`, sb);
     const html = sb.window.__out;
@@ -304,7 +304,7 @@ describe('PRESENTATION', () => {
 
 describe('NOTHING ELSE CHANGED', () => {
     test('Birdie Game math, settlement and handicaps are untouched', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js']
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js']
             .forEach(f => assert.ok(!/scoreMark/.test(read(f)), `${f} was modified`));
     });
 

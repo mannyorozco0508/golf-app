@@ -32,7 +32,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
+const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
 
 // The eight golfers from the brief.
 //   GROUP 1  Marty  Manny  John  Steve

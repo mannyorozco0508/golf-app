@@ -31,7 +31,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const PAUL_PETE = [{ id:101, name:'Paul', hcp:'0' }, { id:102, name:'Pete', hcp:'0' }];
@@ -242,7 +242,7 @@ describe('FULL CARD IS UNTOUCHED', () => {
 describe('THIS WAS LAYOUT ONLY', () => {
 
     test('no engine, settlement or press file was touched', () => {
-        ['money-engine.js','settlement-engine.js','pool-engine.js','action-model.js','bet-strip.js']
+        ['match-engine.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js','bet-strip.js']
             .forEach(f => assert.ok(!read(f).includes('hole-view-header'),
                 f + ' must know nothing about the scorecard layout'));
     });

@@ -62,7 +62,7 @@ function build(o) {
     return r;
 }
 
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 function engine(data) { ENG.__d = J(data); return J(vm.runInContext('computeMoneyPool(__d, __d.courseData, __d.scores)', ENG)); }
 function receipt(data) {
     const st = loadHtmlInlineScript('settlement.html');

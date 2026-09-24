@@ -572,7 +572,7 @@ describe('SCOPE — the deferred player model has not leaked in', () => {
     test('23. flights added no Consumer dependency to the Tournament product', () => {
         const scripts = [...read('tournament.html').matchAll(/<script[^>]*\ssrc="([^"]+)"/g)]
             .map(m => m[1].replace(/^\.\//, ''));
-        ['money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js',
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js',
          'bet-strip.js', 'hole-events.js', 'grouping.js'].forEach(f =>
             assert.ok(!scripts.includes(f), 'tournament.html must not load ' + f));
     });

@@ -50,7 +50,7 @@ describe('THE MARKUP: one header, the mark first in it, adjacent to the opening 
         assert.equal((code.match(/<img /g) || []).length, 1, 'the receipt has exactly one image');
     });
     test('a rendered header carries the tag, and its tag-stripped text is unchanged by it', () => {
-        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js']);
+        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js']);
         vm.runInContext("currentMode='ABCD'; currentData={ courseName: 'Caledonia', gameFormat: 'stroke', players: [{id:101,name:'A'}] };", sb);
         const html = String(vm.runInContext('buildReceiptHeader()', sb));
         assert.ok(html.startsWith('<div class="receipt-head" id="receipt-export-head">' + IMG), html.slice(0, 160));

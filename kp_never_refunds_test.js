@@ -33,7 +33,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const run = (sb, e) => vm.runInContext(e, sb);
 const J = v => JSON.parse(JSON.stringify(v));
 const CD = makeCourseData(18);
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = d => { ENG.__d = J(d); return J(run(ENG, 'computeMoneyPool(__d, __d.courseData, __d.scores)')); };
 const sumLines = ls => ls.reduce((a, l) => a + (l.cents || 0), 0);
 // The pool_flights golden's flight variant: 23 golfers, $20 in, KP $40 on

@@ -308,7 +308,7 @@ describe('PROTECTED MATH — nothing in this batch touched an engine', () => {
     });
 
     test('no UI wording leaked into the engines', () => {
-        ['handicap.js', 'money-engine.js', 'settlement-engine.js'].forEach(f => {
+        ['handicap.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/ADD ACTION|Round Type|sm-field-|Today's Action/.test(src),
                 `${f} must not know about the setup screen`);

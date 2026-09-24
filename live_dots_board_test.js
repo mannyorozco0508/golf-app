@@ -27,7 +27,7 @@ const vm = require('vm');
 const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const IDX = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
-const DEPS = ['handicap.js', 'score-marks.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['handicap.js', 'score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 const engine = loadJsFile('money-engine.js');
 

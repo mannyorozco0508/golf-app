@@ -548,7 +548,7 @@ describe('NOTHING ELSE MOVED', () => {
     });
 
     test('the money and handicap engines were not touched', () => {
-        ['money-engine.js','settlement-engine.js','bet-strip.js','action-model.js','pool-engine.js']
+        ['match-engine.js','money-engine.js','settlement-engine.js','bet-strip.js','action-model.js','pool-engine.js']
             .forEach(f => assert.ok(
                 !/validateCourseGrid|lastCourseChangeKey|currentCourseIdentity/.test(read(f)), f));
     });

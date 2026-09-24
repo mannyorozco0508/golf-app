@@ -23,9 +23,9 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadJsFile, loadHtmlInlineScript } = require('./helpers/load-script.js');
 
-const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'money-engine.js']);
+const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
 const SETTLE = loadHtmlInlineScript('settlement.html',
-    ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+    ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
 const PAR = [4,4,3,5,4,4,4,5,3,4,4,4,5,4,3,4,3,5];
 const HCP = [3,9,15,13,5,7,1,17,11,4,8,18,14,2,16,10,6,12];

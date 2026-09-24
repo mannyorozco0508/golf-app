@@ -49,7 +49,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const run = (sb, e) => vm.runInContext(e, sb);
 const J = v => JSON.parse(JSON.stringify(v));
 const CD = makeCourseData(18);
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = d => { ENG.__d = J(d); return J(run(ENG, 'computeMoneyPool(__d, __d.courseData, __d.scores)')); };
 const strip = h => String(h).replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ');
 const MOUNTS = ['results-gap-line', 'results-top', 'money-pool-section', 'combined-settlement-summary', 'settle-content', 'results-net', 'receipt-scorecard'];

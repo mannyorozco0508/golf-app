@@ -118,7 +118,7 @@ const RESULT_KEYS = ['scores', 'dots', 'wolfCalls', 'matchPresses', 'strokePress
 
 // The engines, as the pages load them.
 const ENG = (() => {
-    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
     ['pool-engine.js', 'live-skins.js'].forEach((f) => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 })();

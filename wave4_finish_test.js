@@ -7,14 +7,14 @@ const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const settle = loadHtmlInlineScript('settlement.html', ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const settle = loadHtmlInlineScript('settlement.html', ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const ZERO = 0.005;
 const netOf = r => { const o = {}; Object.keys(r.netByName).forEach(k => o[k] = r.netByName[k].net); return o; };
 const sumOf = r => Object.values(netOf(r)).reduce((s, v) => s + v, 0);
 
 const PRODUCTION = ['admin.html', 'index.html', 'skins.html', 'settlement.html', 'stats.html',
     'trip.html', 'sidematches.html', 'leaderboard.html', 'instructions.html',
-    'action-model.js', 'bet-strip.js', 'money-engine.js'];
+    'action-model.js', 'bet-strip.js', 'match-engine.js', 'money-engine.js'];
 
 // The representative stacked round.
 function stacked(opts) {
@@ -214,7 +214,7 @@ describe('LEGACY KP DATA — history stays accurate, nothing new can be created'
 describe('FINISH ROUND — money first, from the canonical engine only', () => {
     function finish(opts) {
         const sb = loadHtmlInlineScript('index.html',
-            ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
+            ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
         const { data } = stacked(opts);
         vm.runInContext(`currentData = ${JSON.stringify(data)};` +
             `window.__scFilteredPlayers = currentData.players;` +
@@ -277,7 +277,7 @@ describe('FINISH ROUND — money first, from the canonical engine only', () => {
 
     test('a round with no money says so plainly rather than showing an empty box', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
+            ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
         const cd = makeCourseData(18);
         const p = makePlayers(['A', 'B'], [0, 0]);
         const scores = {};
@@ -343,7 +343,7 @@ describe('FINISH ROUND — money integrity', () => {
 describe('INCOMPLETE SCORES — no dead end, and no invented money', () => {
     function finish(opts) {
         const sb = loadHtmlInlineScript('index.html',
-            ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
+            ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js']);
         const { data } = stacked(opts);
         vm.runInContext(`currentData = ${JSON.stringify(data)};` +
             `window.__scFilteredPlayers = currentData.players;` +
@@ -404,7 +404,7 @@ describe('INCOMPLETE SCORES — no dead end, and no invented money', () => {
 describe('EARLY-FINALIZED WAGERS — announced once, then out of the way', () => {
     const BS = (() => {
         const sb = loadJsFile('action-model.js');
-        ['money-engine.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         return sb;
     })();
 
@@ -497,7 +497,7 @@ describe('WAVE 2 / WAVE 3 BEHAVIOUR IS PRESERVED', () => {
         // threw on every round and told the golfer to check another tab. Asserted as a
         // dependency ORDER so the graph, not just the presence of a tag, is protected.
         const idx = read('index.html');
-        ['money-engine.js', 'action-model.js', 'settlement-engine.js'].forEach(f =>
+        ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'].forEach(f =>
             assert.ok(idx.includes(`<script src="${f}"></script>`), `${f} is not loaded`));
         const tagAt = f => idx.indexOf(`<script src="${f}"></script>`);
         assert.ok(tagAt('money-engine.js') < tagAt('settlement-engine.js'),
@@ -505,12 +505,37 @@ describe('WAVE 2 / WAVE 3 BEHAVIOUR IS PRESERVED', () => {
         assert.ok(tagAt('action-model.js') < tagAt('settlement-engine.js'));
     });
 
-    test('REGRESSION: the scorecard\'s match engine returns the canonical shape', () => {
-        // index.html declares its own calculateMatchEngine, which SHADOWS the one in
-        // money-engine.js. Omitting t1Players/t2Players crashed computeRoundMoneyByPlayer
-        // outright the first time the scorecard asked for settlement.
-        const idx = read('index.html');
-        assert.ok(/return \{ t1Name, t2Name, t1Players, t2Players, activeMatches/.test(idx),
-            'the shadowing copy must match the canonical return shape');
+    test('REGRESSION: the match engine returns the canonical shape', () => {
+        // THE REGRESSION IS REAL AND STILL GUARDED; WHAT MOVED IS WHERE.
+        //
+        // This used to read index.html, because index.html declared its own
+        // calculateMatchEngine that SHADOWED money-engine.js's, and omitting
+        // t1Players/t2Players crashed computeRoundMoneyByPlayer outright the first
+        // time the scorecard asked for settlement.
+        //
+        // v218 deleted that copy: there is one engine now, in match-engine.js, so
+        // there is no longer an index.html return literal to pin. Repointed at the
+        // file that actually owns the shape - and asserted on the RETURNED OBJECT
+        // rather than on source text, which is what the regression was about. A
+        // renamed key or a reordered literal cannot satisfy this the way a regex
+        // over source could.
+        const sb = loadJsFile('match-engine.js', ['handicap.js']);
+        const players = [
+            { id: 1, name: 'Ann', hcp: '0', team: 'Team 1' },
+            { id: 2, name: 'Ben', hcp: '0', team: 'Team 2' }
+        ];
+        const holes = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
+        const scores = {};
+        players.forEach((p, i) => holes.forEach(h => { scores['p' + p.id + '_h' + h.hole] = 4 + i; }));
+        const r = sb.calculateMatchEngine(players, holes, scores, 'gross', 'match', 'none', 20, 0, [], undefined);
+        assert.ok(Array.isArray(r.t1Players) && r.t1Players.length > 0,
+            'computeRoundMoneyByPlayer reads t1Players - omitting it crashed settlement');
+        assert.ok(Array.isArray(r.t2Players) && r.t2Players.length > 0,
+            'computeRoundMoneyByPlayer reads t2Players too');
+        ['t1Name', 't2Name', 'activeMatches', 'maxThru', 'holeLog', 't1TotalMoney', 'pressCount']
+            .forEach(k => assert.ok(k in r, 'the canonical return must still carry ' + k));
+        // And the page that used to own it must not own it again.
+        assert.ok(!/function\s+calculateMatchEngine\s*\(/.test(read('index.html')),
+            'index.html must not re-declare the engine it now loads');
     });
 });

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { loadHtmlInlineScript } = require('./helpers/load-script.js');
 const { makeCourseData, buildScores } = require('./helpers/fixtures.js');
 
-const trip = loadHtmlInlineScript('trip.html', ['money-engine.js', 'course-data.js']);
+const trip = loadHtmlInlineScript('trip.html', ['match-engine.js', 'money-engine.js', 'course-data.js']);
 const { computeTripPointsRace } = trip;
 
 function round(label, players, totalsByName, holesPlayed, courseData) {

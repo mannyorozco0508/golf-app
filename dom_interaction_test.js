@@ -235,7 +235,7 @@ describe('ADD NEW PLAYER — driven through the real click handler', () => {
 describe('SIDE MATCH PLAYER PICKER — a second real interaction', () => {
     function actionPage() {
         const sb = loadHtmlInlineScript('sidematches.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
         vm.runInContext(`
             currentData = {
                 gameFormat: 'stroke', courseData: [],

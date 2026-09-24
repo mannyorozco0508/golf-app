@@ -65,7 +65,7 @@ function draftFrom(data, changes, added) {
     (changes || []).forEach(c => Object.assign(edits[c.idx], c));
     return { edits, added: added || [] };
 }
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = d => { ENG.__d = J(d); return J(run(ENG, 'computeMoneyPool(__d, __d.courseData, __d.scores)')); };
 
 describe('THE NARROW WRITES: rename, handicap, flight, Out - only the changed keys', () => {

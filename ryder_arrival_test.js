@@ -49,7 +49,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const SM_SRC = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
-const DEPS = ['handicap.js', 'money-engine.js', 'action-model.js',
+const DEPS = ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'ryder-cup.js'];
 
 const CD = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));

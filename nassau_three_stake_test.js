@@ -339,18 +339,26 @@ describe('ALL FOUR COPIES AGREE', () => {
     });
 
     test('each copy carries the three-stake contract', () => {
+        // v218: ONE COPY, SO THE CONTRACT IS CHECKED ONCE AND THE ABSENCE IS PINNED
+        // EVERYWHERE ELSE.
+        //
+        // sidematches.html lost its inline engine in v135; index.html and stats.html
+        // lost theirs in v218, for the same reason and with the same result - the
+        // realms above now all resolve calculateMatchEngine to match-engine.js, so
+        // the behavioural comparisons in this file compare one implementation with
+        // itself and it is THIS test that carries the weight. It reads the source
+        // contract off the one owner, and asserts no page has regrown a copy.
         const fs = require('fs'), path = require('path');
         const { REPO_ROOT } = require('./helpers/load-script.js');
-        // sidematches.html has NO inline copy since the Bets/Matches split (v135):
-        // it loads money-engine.js, so its realm's engine above is the canonical one.
-        NAMES.filter(n => n !== 'sidematches.html').forEach(n => {
-            const src = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8');
-            assert.match(src, /const baseStakeFor = id =>/, n + ' lost baseStakeFor');
-            assert.match(src, /const autoPressStakeFor = id =>/, n + ' lost autoPressStakeFor');
-            assert.match(src, /manualPresses, stakeConfig\)/, n + ' lost the stakeConfig parameter');
+        const src = fs.readFileSync(path.join(REPO_ROOT, 'match-engine.js'), 'utf8');
+        assert.match(src, /const baseStakeFor = id =>/, 'match-engine.js lost baseStakeFor');
+        assert.match(src, /const autoPressStakeFor = id =>/, 'match-engine.js lost autoPressStakeFor');
+        assert.match(src, /manualPresses, stakeConfig\)/, 'match-engine.js lost the stakeConfig parameter');
+        ['sidematches.html', 'index.html', 'stats.html', 'money-engine.js'].forEach(n => {
+            const s = fs.readFileSync(path.join(REPO_ROOT, n), 'utf8')
+                .replace(/<script src=[^>]*><\/script>/g, '');
+            assert.ok(!/function calculateMatchEngine\s*\(/.test(s),
+                n + ' must not regrow an inline match engine');
         });
-        const sm = fs.readFileSync(path.join(REPO_ROOT, 'sidematches.html'), 'utf8');
-        assert.ok(!/function calculateMatchEngine\s*\(/.test(sm.replace(/<script src=[^>]*><\/script>/g, '')),
-            'sidematches.html must not regrow an inline match engine');
     });
 });

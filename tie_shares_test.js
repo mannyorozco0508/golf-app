@@ -44,7 +44,7 @@ const { noFinalResults } = require('./helpers/no-final-results.js');   // v195b:
 const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
 
 // The engine alone, the way settlement-engine loads it.
-const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 function engine(data) { ENG.__d = J(data); return JSON.parse(vm.runInContext('JSON.stringify(computeMoneyPool(__d, __d.courseData, __d.scores))', ENG)); }
 // The page, the way a golfer arrives: the link in the URL, the round through
 // the page's own value listener.
@@ -198,7 +198,7 @@ describe('THE SEAM', () => {
         const h = f => sha(read(f)).slice(0, 8);
         assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
         assert.equal(h('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
-        assert.equal(h('money-engine.js'), '3c960947');
+        assert.equal(h('money-engine.js'), '9653b632');  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
         assert.equal(h('live-skins.js'), '632bbb1a');
     });
 });

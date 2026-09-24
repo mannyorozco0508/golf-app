@@ -35,12 +35,12 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
 const PAGE_DEPS = {
-    'index.html': ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+    'index.html': ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
                    'pool-engine.js','bet-strip.js','hole-events.js'],
     // sidematches.html (Batch 2) and stats.html (Batch 3) both load
     // settlement-engine.js for real - a <script src> on the page, not a harness
@@ -48,8 +48,16 @@ const PAGE_DEPS = {
     // Their stroke entries below therefore resolve to the canonical implementation;
     // the OTHER families here (calcPointSettlement, nassauStakeConfig) are still
     // genuine stats.html duplicates and are still guarded as such.
-    'sidematches.html': ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'],
-    'stats.html': ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'],
+    'sidematches.html': ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js'],
+    // stats.html's REAL script list, not an assumed one. loadHtmlInlineScript
+    // already loads a page's own <script src> tags and treats these as EXTRAS on
+    // top, so listing money-engine.js here described a stats.html that does not
+    // exist: the page has never loaded it. Measured before changing it - none of
+    // the 11 money-engine.js functions the harness was supplying is called by
+    // stats.html's inline code, so it hid no live defect - but a realm that does
+    // not describe production can only mislead, and after v218 it would actively
+    // lie: the canonical engine is in match-engine.js, which this page DOES load.
+    'stats.html': ['handicap.js','match-engine.js','action-model.js','settlement-engine.js'],
 };
 const pageRealms = {};
 function fromPage(page, name) {

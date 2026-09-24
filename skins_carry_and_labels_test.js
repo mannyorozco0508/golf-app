@@ -62,7 +62,7 @@ function round(skinsCfg) {
                  skins: skinsCfg } };
 }
 const pool = cfg => {
-    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'money-engine.js',
+    const sb = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js',
         'action-model.js', 'settlement-engine.js']);
     const d = round(cfg);
     return vm.runInContext('computeMoneyPool', sb)(d, CD, d.scores);
@@ -102,7 +102,7 @@ describe('1. AN ABSENT CARRY RULE MEANS NO CARRY', () => {
     });
 
     test('the standalone skins game defaults the same way', () => {
-        const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js',
+        const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js',
             'action-model.js']);
         const d = { players: NAMES.slice(0, 4).map((n, i) => ({ id: 101 + i, name: n, hcp: '0' })),
                     courseData: CD, scores: {}, skinsBuyIn: 5 };
@@ -133,7 +133,7 @@ describe('1. AN ABSENT CARRY RULE MEANS NO CARRY', () => {
 describe('1b. A ROUND THAT NEVER SAID SAYS SO ON THE RECEIPT', () => {
 
     const receipt = cfg => {
-        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'money-engine.js',
+        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'match-engine.js', 'money-engine.js',
             'action-model.js', 'settlement-engine.js', 'pool-engine.js']);
         const d = round(cfg);
         // renderMoneyPoolSection, the same entry receipt_skins_test drives -
@@ -164,7 +164,7 @@ describe('1b. A ROUND THAT NEVER SAID SAYS SO ON THE RECEIPT', () => {
 describe('2. THE SUMMARY AND THE HOLE LINE COUNT THE SAME THING', () => {
 
     const receipt = () => {
-        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'money-engine.js',
+        const sb = loadHtmlInlineScript('settlement.html', ['score-marks.js', 'match-engine.js', 'money-engine.js',
             'action-model.js', 'settlement-engine.js', 'pool-engine.js']);
         // Explicit carry, so hole 1 ties and hole 2 pays TWO units to one golfer -
         // the exact shape that made the summary and the line disagree.

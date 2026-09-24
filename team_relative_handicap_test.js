@@ -37,15 +37,23 @@ function engineRealm() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
+    ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'pool-engine.js', 'settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
 const PAGE_DEPS = {
-    'index.html': ['score-marks.js', 'money-engine.js', 'action-model.js',
+    'index.html': ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
                    'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js'],
-    'sidematches.html': ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'],
-    'stats.html': ['handicap.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'],
+    'sidematches.html': ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js'],
+    // stats.html's REAL script list, not an assumed one. loadHtmlInlineScript
+    // already loads a page's own <script src> tags and treats these as EXTRAS on
+    // top, so listing money-engine.js here described a stats.html that does not
+    // exist: the page has never loaded it. Measured before changing it - none of
+    // the 11 money-engine.js functions the harness was supplying is called by
+    // stats.html's inline code, so it hid no live defect - but a realm that does
+    // not describe production can only mislead, and after v218 it would actively
+    // lie: the canonical engine is in match-engine.js, which this page DOES load.
+    'stats.html': ['handicap.js', 'match-engine.js', 'action-model.js', 'settlement-engine.js'],
 };
 const realms = {};
 function fromPage(page, expr) {
@@ -630,11 +638,19 @@ describe('EVERY PRODUCTION COPY AGREES', () => {
         // sidematches.html left this list in v135 (Bets/Matches split): its inline
         // engine copy is gone and it loads money-engine.js, so the realm comparisons
         // above run against the canonical engine. The absence is pinned instead.
+        // v218: the relative-handicap allocation lives in ONE file now. index.html,
+        // stats.html and money-engine.js no longer carry an engine at all, so
+        // "is the gate gone from every copy" collapses to "is it gone from the copy",
+        // and the useful half of the old assertion is that no page has regrown one.
+        const src = read('match-engine.js');
+        assert.ok(!/const isSingles = scoringType === 'net' && t1Players\.length === 1/.test(src),
+            'match-engine.js still gates the relative allocation to 1v1');
+        assert.ok(/matchHandicapBaseline/.test(src),
+            'match-engine.js is missing the all-player baseline');
         ['money-engine.js', 'index.html', 'stats.html'].forEach(f => {
-            const src = read(f);
-            assert.ok(!/const isSingles = scoringType === 'net' && t1Players\.length === 1/.test(src),
-                f + ' still gates the relative allocation to 1v1');
-            assert.ok(/matchHandicapBaseline/.test(src), f + ' is missing the all-player baseline');
+            assert.ok(!/function calculateMatchEngine\s*\(/.test(
+                read(f).replace(/<script src=[^>]*><\/script>/g, '')),
+                f + ' regrew a match engine, so the gate could return unnoticed');
         });
         assert.ok(!/function calculateMatchEngine\s*\(/.test(read('sidematches.html').replace(/<script src=[^>]*><\/script>/g, '')),
             'sidematches.html must not regrow an inline match engine');

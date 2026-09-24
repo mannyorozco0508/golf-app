@@ -579,7 +579,7 @@ describe('SCORECARD — scoped to its own link', () => {
             assert.ok(!new RegExp(fn).test(card), 'no organizer control: ' + fn));
         const scripts = [...read('tournament-scorecard.html').matchAll(/<script[^>]*\ssrc="([^"]+)"/g)]
             .map(m => m[1].replace(/^\.\//, ''));
-        ['money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js']
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'action-model.js']
             .forEach(f => assert.ok(!scripts.includes(f), 'no Consumer dependency: ' + f));
     });
 

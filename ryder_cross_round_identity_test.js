@@ -47,7 +47,7 @@ const path = require('path');
 const { loadJsFile, REPO_ROOT } = require('./helpers/load-script.js');
 
 const AM = loadJsFile('action-model.js');
-const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
 const RC_SRC = fs.readFileSync(path.join(REPO_ROOT, 'ryder-cup.js'), 'utf8');
 
 const plain = v => (v == null ? v : JSON.parse(JSON.stringify(v)));

@@ -34,7 +34,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'index.html';
-const DEPS = ['action-model.js','money-engine.js','pool-engine.js','settlement-engine.js',
+const DEPS = ['action-model.js','match-engine.js','money-engine.js','pool-engine.js','settlement-engine.js',
               'score-marks.js','bet-strip.js','hole-events.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
@@ -366,7 +366,7 @@ describe('SAFETY RAILS PRESERVED', () => {
         // This test has carried each of those in turn - it is the seam, not the mechanism.
         const sb = { console, Math, Object, Array, String, Number, JSON, isNaN, parseInt, parseFloat, Date, Set };
         vm.createContext(sb);
-        ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+        ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
             .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
         const cd = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
         const ps = NAMES.map((n,i)=>({id:101+i,name:n,hcp:'9',playingForMoney:true}));

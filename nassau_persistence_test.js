@@ -32,8 +32,8 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const ADMIN = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const IDX = ['score-marks.js','money-engine.js','action-model.js','settlement-engine.js',
+const ADMIN = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const IDX = ['score-marks.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js',
              'pool-engine.js','bet-strip.js','hole-events.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const PAUL_PETE = [{ id:101, name:'Paul', hcp:'0' }, { id:102, name:'Pete', hcp:'0' }];
@@ -42,7 +42,7 @@ function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     ['buildLiveMatchStates','buildSideMatchReceipts','computeCombinedNetTotals']
         .forEach(fn => { try { sb[fn] = vm.runInContext(fn, sb); } catch (e) {} });
@@ -346,7 +346,7 @@ describe('SETTLEMENT IS UNAFFECTED', () => {
     });
 
     test('no engine or settlement file was touched by this batch', () => {
-        ['handicap.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
+        ['handicap.js','match-engine.js','money-engine.js','settlement-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('renderLandingSummary'),
                 f + ' must know nothing about the summary'));
     });

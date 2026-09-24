@@ -27,7 +27,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'index.html';
-const DEPS = ['action-model.js','money-engine.js','pool-engine.js','settlement-engine.js',
+const DEPS = ['action-model.js','match-engine.js','money-engine.js','pool-engine.js','settlement-engine.js',
               'score-marks.js','bet-strip.js','hole-events.js'];
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
@@ -271,7 +271,7 @@ describe('NO DUPLICATE MONEY MATH', () => {
 describe('RECEIPT — NET FINISH TIE EXPLANATION', () => {
 
     const { loadHtmlInlineScript: loadS } = require('./helpers/load-script.js');
-    const SDEPS = ['money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
+    const SDEPS = ['match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js','score-marks.js'];
 
     function receipt({ amount = 70, places = [57.142857, 42.857143], nets, mode = 'whole-dollar' }) {
         const sb = loadS('settlement.html', SDEPS);

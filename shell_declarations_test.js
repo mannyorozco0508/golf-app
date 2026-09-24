@@ -162,7 +162,7 @@ describe('OWNERSHIP — named, so a file cannot quietly change sides', () => {
         // the tournament pages have never loaded any of these - they pay places from
         // an entry fee. Declaring them shared would invite a future Tournament
         // feature to depend on Consumer settlement.
-        ['money-engine.js', 'settlement-engine.js', 'pool-engine.js',
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js',
          'action-model.js', 'bet-strip.js', 'hole-events.js'].forEach(f => {
             assert.ok(CONSUMER.includes(f), f + ' must be CONSUMER');
             assert.ok(!SHARED.includes(f), f + ' must NOT be declared shared');

@@ -69,7 +69,7 @@ const WAGER_ONLY = Object.assign(base(), { additionalGames: J(STACKED) });
 const BOTH = Object.assign(base(), { moneyPool: J(POOL), additionalGames: J(STACKED) });
 
 const ENG = (() => {
-    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'money-engine.js', 'action-model.js']);
+    const sb = loadJsFile('settlement-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js']);
     ['pool-engine.js', 'live-skins.js'].forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 })();

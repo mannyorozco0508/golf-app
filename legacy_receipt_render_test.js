@@ -34,7 +34,7 @@ const call = c => { vm.runInContext(`window.__r = (function(){ ${c} })();`, ENG)
 // Renders the REAL Receipt and hands back its containers.
 function render(d) {
     const sb = loadHtmlInlineScript('settlement.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
     vm.runInContext(`
         currentData = ${J(d)};
         // THE MAIN POOL CARD IS RENDERED HERE BECAUSE THE PAGE RENDERS IT - it is

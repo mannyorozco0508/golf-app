@@ -36,15 +36,15 @@ const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const P2 = [{ id:101, name:'Marty', hcp:'0' }, { id:102, name:'Manny', hcp:'0' }];
 const P4 = P2.concat([{ id:103, name:'Carp', hcp:'0' }, { id:104, name:'Scott', hcp:'0' }]);
 
-const ADMIN_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const SM_DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js'];
+const ADMIN_DEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const SM_DEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 // Every engine in one context, loaded in production order.
 function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -162,7 +162,7 @@ describe('STEP 6 OFFERS NASSAU — AND STEP 3 STAYS SCORING', () => {
 describe('ONE BUILDER, TWO ENTRY POINTS', () => {
 
     test('buildNassauWagerPayload exists once, in action-model.js', () => {
-        const defs = ['action-model.js','admin.html','sidematches.html','money-engine.js']
+        const defs = ['action-model.js','admin.html','sidematches.html','match-engine.js','money-engine.js']
             .filter(f => /function buildNassauWagerPayload\(/.test(read(f)));
         assert.deepEqual(defs, ['action-model.js'], 'exactly one implementation');
     });
@@ -343,9 +343,16 @@ describe('NOTHING ELSE MOVED', () => {
 
     test('there is still exactly one Nassau settlement implementation', () => {
         // A SEARCH LIST, NOT A REALM. handicap.js is deliberately absent: this asks
-        // which files DEFINE the builder, and the answer must stay money-engine.js.
-        const defs = ['money-engine.js','settlement-engine.js','action-model.js']
+        // which files DEFINE the builder, and there must be exactly one answer.
+        //
+        // v218: the answer is match-engine.js, not money-engine.js. The function was
+        // lifted out whole so that stats.html - which never loaded money-engine.js -
+        // could stop carrying its own drifted copy. money-engine.js keeps every other
+        // engine and a pointer comment; the ONE-implementation rule this test exists
+        // for is unchanged, and is now also enforced repo-wide by
+        // match_engine_parity_test.js.
+        const defs = ['match-engine.js','money-engine.js','settlement-engine.js','action-model.js']
             .filter(f => /function calculateMatchEngine\(/.test(read(f)));
-        assert.deepEqual(defs, ['money-engine.js']);
+        assert.deepEqual(defs, ['match-engine.js']);
     });
 });

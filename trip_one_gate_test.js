@@ -33,7 +33,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-const DEPS = ['money-engine.js', 'action-model.js', 'settlement-engine.js',
+const DEPS = ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
               'pool-engine.js', 'score-marks.js'];
 const cd18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
 

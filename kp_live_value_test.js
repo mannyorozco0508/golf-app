@@ -46,7 +46,7 @@ const moneyOf = (d, s) => engine.computeRoundMoneyByPlayer(round(d, s), CD, s ||
 // Drives the REAL presenter in index.html rather than re-deriving its output.
 function kpLine(extra, hole, scores) {
     const sb = loadHtmlInlineScript('index.html',
-        ['handicap.js', 'score-marks.js', 'money-engine.js', 'action-model.js',
+        ['handicap.js', 'score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
             'settlement-engine.js', 'bet-strip.js', 'hole-events.js']);
     const data = round(extra, scores);
     data.additionalGameInstances = { d: { format: 'dots', enabled: true, startHole: 1, createdAt: 1 } };
@@ -291,7 +291,7 @@ describe('NOTHING ELSE MOVED', () => {
 
     test('no kpCarryover, kpPot, kpStake or second engine appeared', () => {
         const prod = ['index.html', 'admin.html', 'settlement.html', 'stats.html',
-            'money-engine.js', 'hole-events.js', 'action-model.js'].map(read).join('\n');
+            'match-engine.js', 'money-engine.js', 'hole-events.js', 'action-model.js'].map(read).join('\n');
         assert.ok(!/kpCarryover|kpCarryMap|kpPot\b|kpStake|kpDotVal/i.test(prod));
     });
 

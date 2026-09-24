@@ -65,7 +65,7 @@ const FAMILY = [
 const OWNERS = { 'handicap.js': FAMILY };
 
 // Everything that CONSUMES the family without declaring it.
-const CONSUMER_MODULES = ['money-engine.js', 'settlement-engine.js'];
+const CONSUMER_MODULES = ['match-engine.js', 'money-engine.js', 'settlement-engine.js'];
 
 // Every page that loads handicap.js and must own no copy of its own.
 const MIGRATED_PAGES = ['admin.html', 'index.html', 'leaderboard.html',
@@ -199,7 +199,7 @@ describe('handicap.js — a shared module with nothing behind it', () => {
             const at = src.indexOf('<script src="handicap.js">');
             const inline = src.indexOf('<script>');
             assert.ok(at > -1 && at < inline, page + ' must load handicap.js before its inline block');
-            ['money-engine.js', 'settlement-engine.js'].forEach(engine => {
+            ['match-engine.js', 'money-engine.js', 'settlement-engine.js'].forEach(engine => {
                 const tag = src.indexOf('<script src="' + engine + '">');
                 if (tag > -1) assert.ok(at < tag,
                     page + ' must load handicap.js before ' + engine);
@@ -423,11 +423,15 @@ describe('MIGRATION STATE — this scaffolding is meant to come down', () => {
         // would have been silently fine right up until step 4. Pinned in both places
         // it is expressed: the harness prerequisite, and every page's script tags.
         const { MODULE_PREREQS } = require('./helpers/load-script.js');
-        assert.deepEqual(MODULE_PREREQS['money-engine.js'], ['handicap.js']);
+        // v218: money-engine.js also needs match-engine.js, because
+        // computeRoundMoneyByPlayer and buildLiveMatchState call calculateMatchEngine -
+        // and buildLiveMatchState returns a SILENT null without it.
+        assert.deepEqual(MODULE_PREREQS['money-engine.js'], ['handicap.js', 'match-engine.js']);
+        assert.deepEqual(MODULE_PREREQS['match-engine.js'], ['handicap.js']);
         MIGRATED_PAGES.forEach(page => {
             const src = read(page);
             const h = src.indexOf('<script src="handicap.js">');
-            ['money-engine.js', 'settlement-engine.js'].forEach(engine => {
+            ['match-engine.js', 'money-engine.js', 'settlement-engine.js'].forEach(engine => {
                 const e = src.indexOf('<script src="' + engine + '">');
                 if (e > -1) assert.ok(h > -1 && h < e, page + ': handicap.js must precede ' + engine);
             });

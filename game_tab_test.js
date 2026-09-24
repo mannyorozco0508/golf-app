@@ -34,7 +34,7 @@ const { decodeEscapes } = require('./helpers/decode-escapes.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const CD = makeCourseData(18);
-const DEPS = ['handicap.js', 'text-safe.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'grouping.js'];
+const DEPS = ['handicap.js', 'text-safe.js', 'action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'pool-engine.js', 'grouping.js'];
 
 function golden(flights) {
     const r = wizardSavedRound({ code: 'POOLGLD', courseData: CD, thru: 18, overrides: { additionalGames: {}, flights } });

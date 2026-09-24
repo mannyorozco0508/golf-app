@@ -170,7 +170,7 @@ describe('ONE RESOLVER. No page decides for itself what an absent carry flag mea
         assert.match(src, /skinsCarriesOver\(currentData\.skinsCarryOver\)/);
     });
     test('and the resolver is the one that pays: absent -> false, false -> false, true -> true', () => {
-        const AM = require('./helpers/load-script.js').loadJsFile('action-model.js', ['handicap.js', 'money-engine.js']);
+        const AM = require('./helpers/load-script.js').loadJsFile('action-model.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
         assert.equal(AM.skinsCarriesOver(undefined), false);
         assert.equal(AM.skinsCarriesOver(false), false);
         assert.equal(AM.skinsCarriesOver(true), true);

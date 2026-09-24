@@ -58,7 +58,7 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const ADMIN = read('admin.html');
 const IDX = read('index.html');
 const DEPS = ['course-data.js', 'action-model.js'];
-const IDX_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const IDX_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js',
     'ryder-cup.js'];
 

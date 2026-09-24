@@ -33,8 +33,8 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const ADMIN = ['money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
-const SM = ['money-engine.js','action-model.js','settlement-engine.js'];
+const ADMIN = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const SM = ['match-engine.js','money-engine.js','action-model.js','settlement-engine.js'];
 
 // Runs admin.html's OWN format-selection block, extracted from the file at test
 // time rather than reimplemented here.

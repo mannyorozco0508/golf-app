@@ -36,6 +36,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
          only; handicap.js owns every number it says. After handicap.js, which it
@@ -4992,9 +4993,9 @@ html {
             const from = (c.isPress && c.startHole) ? 'H' + c.startHole : '';
             const meta = [amt, from].filter(Boolean).join(' \u00B7 ');
             return '<button type="button" class="bet-chip tone-' + c.tone + sel + '" onclick="toggleBetChip(\'' + c.key + '\')">' +
-                '<span class="bc-key">' + c.short + '</span>' +
+                '<span class="bc-key">' + escapeHtml(c.short) + '</span>' +
                 (meta ? '<span class="bc-meta">' + meta + '</span>' : '') +
-                '<span class="bc-status">' + c.statusText + '</span>' +
+                '<span class="bc-status">' + escapeHtml(c.statusText) + '</span>' +
                 '</button>';
         }).join('');
 
@@ -5008,9 +5009,9 @@ html {
             const d = sel.detail;
             const moneyCls = d.live ? 'at-stake' : 'locked';
             detailHtml = '<div class="bet-chip-detail">' +
-                '<div class="bcd-title">' + d.title + '</div>' +
+                '<div class="bcd-title">' + escapeHtml(d.title) + '</div>' +
                 '<div class="bcd-meta">' + d.rangeText + ' \u00B7 $' + d.stake + (d.thruText ? ' \u00B7 ' + d.thruText : '') + '</div>' +
-                '<div class="bcd-status">' + d.stateLabel + ' \u2014 ' + d.statusLine + '</div>' +
+                '<div class="bcd-status">' + d.stateLabel + ' \u2014 ' + escapeHtml(d.statusLine) + '</div>' +
                 '<div class="bcd-money ' + moneyCls + '">' + d.moneyLine + '</div>' +
                 '</div>';
         }
@@ -7639,295 +7640,51 @@ html {
     // one player a side keeps its existing behaviour exactly.
 
     // ============================================================================
-    // RELATIVE MATCH-PLAY HANDICAPS - ONE BASELINE FOR THE WHOLE MATCH
+    // calculateMatchEngine IS NOT HERE ANY MORE — match-engine.js owns it (v218)
     // ============================================================================
-    // The lowest Playing Handicap among EVERY golfer in the match plays off zero, and
-    // every other golfer - INCLUDING THE LOWEST GOLFER'S OWN PARTNER - receives the
-    // arithmetic difference from that single baseline, allocated from stroke index 1
-    // upward. There is exactly ONE baseline per match. It is never recomputed per
-    // team, per Nassau segment, or per press.
+    // This page used to declare its own copy, which SHADOWED money-engine.js's
+    // because an inline <script> parses after the external ones - so this copy was
+    // the one that actually ran on this screen. It had drifted from the canonical
+    // one, and the divergence was in rendering, not arithmetic: it wrapped the
+    // winner's name in escapeHtml() INSIDE the engine.
     //
-    // 2v2 worked example, 5 and 12 against 8 and 17:
-    //   baseline = 5  ->  5 plays off 0, 12 receives 7, 8 receives 3, 17 receives 12
-    // The 12 is the 5's own partner and still receives 7. That is the intended rule:
-    // team membership does not decide the baseline, the field of the match does.
+    // That is now done at the SINKS in this file instead, which is the only place
+    // it can be done correctly: the engine's t1Name, t2Name and holeWinner are
+    // plain text too, and escaping one field inside the engine left the others raw
+    // in the very same innerHTML.
     //
-    // parseHcp stores a plus handicap as a negative (+2 -> -2), so the differential is
-    // plain arithmetic and needs no special case: +2, 3, 7, 10 gives a baseline of -2
-    // and relative handicaps of 0, 5, 9, 12. The ordinary course-based plus-handicap
-    // giveback that starts at SI 18 belongs to stroke-play net scoring and is
-    // deliberately NOT used here; getStrokes() keeps it, untouched.
+    // The match-engine.js tag is in the head above, right after handicap.js.
+    // (Deliberately not written out as a tag here: helpers/load-script.js finds a
+    // page's scripts by regex over the whole file, so a tag spelled out inside an
+    // inline comment is loaded as if it were real - which briefly made a control
+    // that DELETED the real tag look harmless.)
+    // match_engine_parity_test.js fails if a copy is ever re-declared here.
+    // ============================================================================
 
-    // Allocate a RELATIVE handicap across stroke indexes. Generalises past 18: every
-    // hole gets one stroke per full 18, and the remainder falls on the lowest indexes.
-    // rel 20 -> one everywhere plus a second on SI 1-2. rel 36 -> two everywhere.
-    // rel 40 -> two everywhere plus a third on SI 1-4.
-    // The one baseline for a match: the lowest parsed Playing Handicap among ALL
-    // participants, both sides counted together. Which team a golfer is on is
-    // irrelevant to this calculation, and player/team ORDER cannot change it because
-    // a minimum is order-independent.
-    // playerId -> relative match handicap, SCOPED TO THIS MATCH ONLY. Never written
-    // back onto the player record: the same golfer legitimately carries a different
-    // relative handicap in a simultaneous match against different opponents.
-    // Which formats are genuinely HOLE-BY-HOLE MATCH PLAY played with individual
-    // balls. Scramble is excluded ON PURPOSE: it is a single-ball team format, so
-    // there is no individual ball for an individual relative stroke to attach to. It
-    // keeps its existing behaviour exactly. A 1v1 is always treated as a match
-    // regardless of the format label, which preserves the committed singles contract.
-    function calculateMatchEngine(players, courseData, savedScores, scoringType, gameFormat, pressRule, stake, holeBet, manualPresses, stakeConfig) {
-    // THREE-STAKE NASSAU (authorized change).
+    // THE TWO BUILDERS THAT TURN ENGINE OUTPUT INTO MARKUP — AND WHERE THE
+    // ESCAPING LIVES NOW (v218).
     //
-    // A real Nassau is three independent wagers - "$5 front, $5 back, $10 overall" -
-    // and the app could only express one number for all three. stakeConfig carries
-    // them; when it is absent EVERY segment falls back to `stake`, so a legacy round
-    // settles to the cent exactly as before. No historical data is migrated.
+    // Every string these return is interpolated into innerHTML by the pill
+    // renderer, the live ticker and the matches list. They take BOTH the team
+    // names and finalResult, which is exactly why this is the right place: the
+    // page's old inline engine escaped finalResult only, so a CLOSED match was
+    // safe and a LIVE one - rendered from t1Name/t2Name on the very next line of
+    // the same ternary - was not. Escaping here covers both arms.
     //
-    //   stakeConfig = { F9: 5, B9: 5, '18': 10, autoPress: <amount>|null }
-    //
-    // AUTO-PRESS AMOUNT is its own setting, defaulting to the segment's own stake.
-    // A press on the $5 front must never settle at the $10 overall stake - and a
-    // manually enlarged press never cascades into later automatic ones, because the
-    // golfers agreed to the house auto-press amount, not that one-off escalation.
-    const segCfg = stakeConfig || {};
-    const baseStakeFor = id => {
-        const v = segCfg[id];
-        return (v === undefined || v === null || v === '') ? stake : Number(v);
-    };
-    // AUTO-PRESS AMOUNT, most specific wins:
-    //   autoPress.F9 / .B9 / .18   a per-segment amount, if the players set one
-    //   autoPress                  a single amount for every segment
-    //   (neither)                  that segment's own stake - the default
-    // Manual presses never reach here; they keep the amount the golfer typed.
-    const autoPressStakeFor = id => {
-        const ap = segCfg.autoPress;
-        const blank = v => v === undefined || v === null || v === '';
-        if (ap !== null && typeof ap === 'object') {
-            if (!blank(ap[id])) return Number(ap[id]);
-            return baseStakeFor(id);
-        }
-        return blank(ap) ? baseStakeFor(id) : Number(ap);
-    };
-        let teams = {};
-        players.forEach(p => {
-            let key = p.team || "Team 1";
-            if (!teams[key]) teams[key] = [];
-            teams[key].push(p);
-        });
-
-        const teamKeys = Object.keys(teams);
-        if (teamKeys.length < 2) return null;
-
-        let t1Key = teamKeys[0];
-        let t2Key = teamKeys[1];
-        let t1Players = teams[t1Key];
-        let t2Players = teams[t2Key];
-
-        let t1Name = t1Players.map(p => p.name.split(" ")[0]).join("/");
-        let t2Name = t2Players.map(p => p.name.split(" ")[0]).join("/");
-
-        let hasFront = courseData.some(h => h.hole <= 9);
-        let hasBack = courseData.some(h => h.hole > 9);
-
-        let activeMatches = [];
-        if (gameFormat === 'nassau') {
-            if (hasFront && hasBack) {
-                activeMatches = [
-                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: 'Front 9', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('F9') },
-                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: 'Back 9', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('B9') },
-                    { id: '18', baseId: '18', startHole: 1, endHole: 18, status: 0, label: 'Total', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('18') }
-                ];
-            } else if (hasFront) {
-                activeMatches = [
-                    { id: 'F9', baseId: 'F9', startHole: 1, endHole: 9, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('F9') }
-                ];
-            } else if (hasBack) {
-                activeMatches = [
-                    { id: 'B9', baseId: 'B9', startHole: 10, endHole: 18, status: 0, label: '9-Hole Match', triggers: 0, closed: false, pressNum: 0, stake: baseStakeFor('B9') }
-                ];
-            }
-        } else {
-            let startH = hasFront ? 1 : 10;
-            let endH = hasBack ? 18 : 9;
-            activeMatches = [
-                { id: '18', baseId: '18', startHole: startH, endHole: endH, status: 0, label: 'Overall Match', triggers: 0, closed: false, pressNum: 0 }
-            ];
-        }
-
-        // ONE relative handicap table for the ENTIRE match, computed once here rather
-        // than per hole. Presses reuse this table by construction - a press is another
-        // wager over the SAME hole decisions, so it cannot find a new lowest golfer,
-        // create a new baseline, or renumber stroke indexes from the press hole.
-        const allMatchPlayers = t1Players.concat(t2Players);
-        // A one-per-side match is always relative, whatever the format is labelled,
-        // which preserves the already-committed singles contract byte for byte.
-        const isSinglesMatch = t1Players.length === 1 && t2Players.length === 1;
-        const useRelativeHcp = scoringType === 'net'
-            && (isSinglesMatch || isRelativeMatchFormat(gameFormat));
-        const matchBaseline = useRelativeHcp ? matchHandicapBaseline(allMatchPlayers) : 0;
-        const relHcpById = useRelativeHcp ? matchRelativeHandicaps(allMatchPlayers) : {};
-        // Gross play and non-match team formats keep exactly what they had before.
-        const matchStrokesFor = (p, hcpIndex) => useRelativeHcp
-            ? allocateMatchStrokes(relHcpById[String(p.id)] || 0, hcpIndex)
-            : (scoringType === 'net' ? getStrokes(hcpIndex, parseHcp(p.hcp)) : 0);
-
-        let pressCount = 0;
-        let maxThru = 0;
-        let holeLog = {};
-
-        courseData.forEach(hole => {
-            let hNum = hole.hole;
-            let t1Best = 999, t2Best = 999;
-            let t1Valid = false, t2Valid = false;
-
-            // Strokes come from the ONE match-wide relative table built before this
-            // loop. Every golfer in the match, on either side, is measured against the
-            // same lowest handicap - see matchHandicapBaseline().
-            t1Players.forEach(p => {
-                let v = savedScores[`p${p.id}_h${hNum}`];
-                if (v && v > 0) {
-                    let str = matchStrokesFor(p, hole.hcpIndex);
-                    let s = parseInt(v, 10) - str;
-                    if (s < t1Best) t1Best = s;
-                    t1Valid = true;
-                }
-            });
-
-            t2Players.forEach(p => {
-                let v = savedScores[`p${p.id}_h${hNum}`];
-                if (v && v > 0) {
-                    let str = matchStrokesFor(p, hole.hcpIndex);
-                    let s = parseInt(v, 10) - str;
-                    if (s < t2Best) t2Best = s;
-                    t2Valid = true;
-                }
-            });
-
-            if (t1Valid && t2Valid) {
-                maxThru++;
-                let diff = 0;
-                if (t1Best < t2Best) diff = 1;
-                else if (t2Best < t1Best) diff = -1;
-
-                let holeWinner = diff === 1 ? t1Name : (diff === -1 ? t2Name : "Halved");
-                let newPresses = [];
-
-                activeMatches.forEach(m => {
-                    if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
-                        m.status += diff;
-
-                        let hLeft = m.endHole - hNum;
-                        if (Math.abs(m.status) > hLeft) {
-                            m.closed = true;
-                            let winnerName = m.status > 0 ? t1Name : t2Name;
-                            m.finalResult = `${escapeHtml(winnerName)} ${Math.abs(m.status)}&${hLeft}`;
-                        }
-
-                        if (hNum < m.endHole) {
-                            const threshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : null);
-                            const autoTrigger = threshold !== null && Math.abs(m.status) >= threshold;
-                            // PER-PRESS STAKE PARITY (ported verbatim from money-engine.js).
-                            //
-                            // "Press you for $25" is a different bet from "press you for the
-                            // same $10". This copy only DETECTED the manual press and then
-                            // settled it at the base wager, so a $10 Nassau with a $25 press
-                            // showed $30 here while the Receipt correctly paid $45. Same
-                            // press, same winner, two different numbers - which is worse than
-                            // being wrong once, because it makes the app contradict itself.
-                            //
-                            // Looked up rather than detected, exactly as canonical does.
-                            const manualPress = (manualPresses || []).find(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
-                            const manualTrigger = !!manualPress;
-
-                            if ((autoTrigger || manualTrigger) && m.triggers === 0) {
-                                m.triggers = 1;
-                                pressCount++;
-                                
-                                let existingPresses = activeMatches.filter(am => am.baseId === m.baseId && am.pressNum > 0).length + newPresses.filter(am => am.baseId === m.baseId).length;
-                                let nextPressNum = existingPresses + 1;
-                                
-                                newPresses.push({
-                                    id: `P${pressCount}`, 
-                                    baseId: m.baseId, 
-                                    // Stored ONLY when the golfer explicitly entered one. A press
-                                    // without a stake settles at the original wager, which keeps
-                                    // every legacy round to the cent.
-                                    stake: (manualPress && manualPress.stake !== undefined && manualPress.stake !== null)
-                                        ? manualPress.stake
-                                        : (gameFormat === 'nassau' ? autoPressStakeFor(m.baseId) : undefined),
-                                    startHole: hNum + 1, 
-                                    endHole: m.endHole, 
-                                    status: 0, 
-                                    label: `Press ${nextPressNum} (Hole ${hNum + 1})`, 
-                                    triggers: 0, 
-                                    closed: false, 
-                                    pressNum: nextPressNum
-                                });
-                            }
-                        }
-                    }
-                });
-                
-                activeMatches = activeMatches.concat(newPresses);
-
-                let f9 = activeMatches.find(m => m.id === 'F9');
-                let b9 = activeMatches.find(m => m.id === 'B9');
-                let t18 = activeMatches.find(m => m.id === '18');
-
-                holeLog[hNum] = {
-                    holeWinner: holeWinner,
-                    f9Match: f9 ? f9.status : 0, f9Closed: f9 ? f9.closed : false, f9Res: f9 ? f9.finalResult : "",
-                    b9Match: b9 ? b9.status : 0, b9Closed: b9 ? b9.closed : false, b9Res: b9 ? b9.finalResult : "",
-                    totMatch: t18 ? t18.status : 0, totClosed: t18 ? t18.closed : false, totRes: t18 ? t18.finalResult : ""
-                };
-            }
-        });
-
-        let t1TotalMoney = 0;
-        // Each segment settles at ITS stake. Base matches and auto presses never store
-        // one, so segStake is the original wager for them - byte-for-byte the old
-        // behaviour. Only a manual press that explicitly carried an amount differs.
-        const segStake = m => (m.stake === undefined || m.stake === null) ? stake : m.stake;
-        if (gameFormat === 'nassau') {
-            activeMatches.forEach(m => {
-                if (m.status > 0) t1TotalMoney += segStake(m);
-                else if (m.status < 0) t1TotalMoney -= segStake(m);
-            });
-        } else {
-            activeMatches.forEach(m => {
-                if (holeBet > 0) {
-                    t1TotalMoney += m.status * holeBet;
-                } else {
-                    if (m.status > 0) t1TotalMoney += segStake(m);
-                    else if (m.status < 0) t1TotalMoney -= segStake(m);
-                }
-            });
-        }
-
-        let pressesByHole = {};
-        activeMatches.filter(m => m.pressNum > 0).forEach(m => {
-            if (!pressesByHole[m.startHole]) pressesByHole[m.startHole] = [];
-            pressesByHole[m.startHole].push(m.label);
-        });
-
-        // t1Players/t2Players are part of the canonical shape in money-engine.js. This
-        // copy is declared later on the page and therefore SHADOWS that one, so anything
-        // calling computeRoundMoneyByPlayer from the scorecard - which Wave 4's Finish
-        // Round money does - gets this object. Omitting them crashed settlement outright.
-        return { t1Name, t2Name, t1Players, t2Players, activeMatches, maxThru, holeLog, t1TotalMoney, pressCount, pressesByHole,
-                 usesRelativeHandicap: useRelativeHcp, matchBaseline, relHcpById };
-    }
-
+    // A golfer called O'Brien is the reason this matters at all: the engine's
+    // plain text is "O'Brien 2&1", and "Ben&Jerry" or a name someone typed with
+    // an angle bracket in it reaches the same sink.
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
-        if (isClosed && finalResult) return finalResult;
+        if (isClosed && finalResult) return escapeHtml(finalResult);
         if (score === 0) return "AS";
-        if (score > 0) return `${t1Name} ${score}UP`;
-        return `${t2Name} ${Math.abs(score)}UP`;
+        if (score > 0) return `${escapeHtml(t1Name)} ${score}UP`;
+        return `${escapeHtml(t2Name)} ${Math.abs(score)}UP`;
     }
 
     function formatMatchStatusText(score, t1Name, t2Name) {
         if (score === 0) return "ALL SQUARE";
-        if (score > 0) return `${t1Name} IS ${score} UP`;
-        return `${t2Name} IS ${Math.abs(score)} UP`;
+        if (score > 0) return `${escapeHtml(t1Name)} IS ${score} UP`;
+        return `${escapeHtml(t2Name)} IS ${Math.abs(score)} UP`;
     }
 
     // --- GLOBAL BET REGISTRY: Bet 1 = Match, Bet 2 = Hole Bet, Bet 3 = Overall Bet, Bet 4+ = presses in the order they started ---
@@ -7945,14 +7702,14 @@ html {
                 bases.push({
                     key: `match-${m.id}`, startHole: m.startHole, label: m.label, isPrimaryMatch: true,
                     statusPlain: whosUpText(m.status, mCalc.t1Name, mCalc.t2Name),
-                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? mCalc.t1Name : mCalc.t2Name} ${Math.abs(m.status)} UP`)
+                    statusFull: (m.closed && m.finalResult) ? escapeHtml(m.finalResult) : (m.status === 0 ? "ALL SQUARE" : `${escapeHtml(m.status > 0 ? mCalc.t1Name : mCalc.t2Name)} ${Math.abs(m.status)} UP`)
                 });
             });
             mCalc.activeMatches.filter(m => m.pressNum > 0).forEach(m => {
                 presses.push({
                     key: `match-${m.id}`, startHole: m.startHole, label: m.label,
                     statusPlain: whosUpText(m.status, mCalc.t1Name, mCalc.t2Name),
-                    statusFull: (m.closed && m.finalResult) ? m.finalResult : (m.status === 0 ? "ALL SQUARE" : `${m.status > 0 ? mCalc.t1Name : mCalc.t2Name} ${Math.abs(m.status)} UP`)
+                    statusFull: (m.closed && m.finalResult) ? escapeHtml(m.finalResult) : (m.status === 0 ? "ALL SQUARE" : `${escapeHtml(m.status > 0 ? mCalc.t1Name : mCalc.t2Name)} ${Math.abs(m.status)} UP`)
                 });
             });
         }
@@ -9259,7 +9016,7 @@ html {
             titleEl.textContent = "⚔️ LIVE MATCH PLAY STATUS";
             
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
-            const matchStatusStr = t18.closed ? `FINAL: ${t18.finalResult}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
+            const matchStatusStr = t18.closed ? `FINAL: ${escapeHtml(t18.finalResult)}` : formatMatchStatusText(t18.status, matchCalc.t1Name, matchCalc.t2Name);
             const thruText = (t18.closed || matchCalc.maxThru === 0) ? "" : ` (Thru ${matchCalc.maxThru})`;
             // "Bet 2" here meant Press #1 - an off-by-one no golfer could be expected to
             // decode. Presses are counted as presses.
@@ -9387,7 +9144,7 @@ html {
                         let statusPrefix = m.closed
                             ? `<span style="color:var(--text-muted); font-weight:bold; font-size:0.68rem;">✅ FINAL</span>`
                             : `<span style="color:var(--accent-red); font-weight:bold; font-size:0.68rem;">🔴 LIVE</span>`;
-                        let finalNote = m.closed && m.finalResult ? ` — ${m.finalResult}` : '';
+                        let finalNote = m.closed && m.finalResult ? ` — ${escapeHtml(m.finalResult)}` : '';
 
                         // Was this press manually requested, or did it fire automatically? Cross-
                         // references the same manualMatchPresses list the engine itself checks —

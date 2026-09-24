@@ -23,11 +23,11 @@ const path = require('path');
 const vm = require('vm');
 const { loadJsFile, loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
-const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'money-engine.js']);
+const RC = loadJsFile('ryder-cup.js', ['handicap.js', 'match-engine.js', 'money-engine.js']);
 const SETTLE = loadHtmlInlineScript('settlement.html',
-    ['money-engine.js', 'action-model.js', 'settlement-engine.js']);
+    ['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 
-const PAGE_DEPS = ['score-marks.js', 'money-engine.js', 'action-model.js',
+const PAGE_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
     'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js',
     'ryder-cup.js'];
 let _p = null;

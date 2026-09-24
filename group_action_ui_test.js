@@ -27,7 +27,7 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const PAGE = ['action-model.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
+const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js'];
 
 // Boots sidematches.html with `count` golfers and a given ?group= context.
 // 8 golfers = two groups of four; 12 = three; 4 = one.
@@ -576,7 +576,7 @@ describe('GROUP GUARDS — narrowed to the anchor rule, not removed', () => {
 // ---------------------------------------------------------------------------
 describe('THE MONEY IS UNTOUCHED BY THIS BATCH', () => {
     test('scope and ownerGroup are metadata the engines never read', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/\bownerGroup\b/.test(src), `${f} must not read ownerGroup`);
             assert.ok(!/cfg\.scope|data\.scope|game\.scope/.test(src), `${f} must not read scope`);

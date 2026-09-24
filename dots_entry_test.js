@@ -43,7 +43,7 @@ function field(n) {
 // Loads index.html with a live DOM and the given round data, then renders Hole View.
 function scorecard(data, hole) {
     const sb = loadHtmlInlineScript('index.html',
-        ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
             'bet-strip.js', 'hole-events.js']);
     vm.runInContext(`
         currentData = ${J(data)};
@@ -184,7 +184,7 @@ describe('THE DOTS MODAL — reused, not rebuilt', () => {
 
     test('DOUBLE TAP cannot duplicate a dot — the modal toggles by index', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                 'bet-strip.js', 'hole-events.js']);
         vm.runInContext(`
             // Real signature: toggleDot(chipElement, playerId, dotId)
@@ -227,7 +227,7 @@ describe('FULL CARD — review and correction still work', () => {
 
     test('the Full Card cell still renders a working control', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                 'bet-strip.js', 'hole-events.js']);
         vm.runInContext(`window.__c = buildMatchBetsCell({
             gameFormat: 'stroke', hole: 7, dots: { count: 2, allowed: true } });`, sb);
@@ -237,7 +237,7 @@ describe('FULL CARD — review and correction still work', () => {
 
     test('a locked-out scorekeeper gets a disabled control, not a broken one', () => {
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                 'bet-strip.js', 'hole-events.js']);
         vm.runInContext(`window.__c = buildMatchBetsCell({
             gameFormat: 'stroke', hole: 7, dots: { count: 0, allowed: false } });`, sb);
@@ -255,7 +255,7 @@ describe('MULTI-GROUP AND PERSISTENCE', () => {
             additionalGameInstances: { d: { format: 'dots', enabled: true, startHole: 1, dotPointVal: 5 } }
         };
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                 'bet-strip.js', 'hole-events.js']);
         // A group-locked scorekeeper may write.
         vm.runInContext(`
@@ -275,7 +275,7 @@ describe('MULTI-GROUP AND PERSISTENCE', () => {
             additionalGameInstances: { d: { format: 'dots', enabled: true, startHole: 1, dotPointVal: 5 } }
         };
         const sb = loadHtmlInlineScript('index.html',
-            ['score-marks.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
+            ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js',
                 'bet-strip.js', 'hole-events.js']);
         vm.runInContext(`
             currentData = ${J(d)}; currentViewedHole = 3; hasGroupLock = false;

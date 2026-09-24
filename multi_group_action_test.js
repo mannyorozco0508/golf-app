@@ -325,7 +325,7 @@ describe('ONE-GROUP NON-REGRESSION', () => {
 // ---------------------------------------------------------------------------
 describe('PROTECTED MATH', () => {
     test('no engine was touched', () => {
-        ['money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
+        ['match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js'].forEach(f => {
             const src = read(f);
             assert.ok(!/multiGroupMoneySuppressed|currentGroupCount|loadedLegacyMainStake/.test(src),
                 `${f} gained setup logic`);

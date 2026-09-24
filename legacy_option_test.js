@@ -30,7 +30,7 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
-const DEPS = ['handicap.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
+const DEPS = ['handicap.js','match-engine.js','money-engine.js','action-model.js','settlement-engine.js','pool-engine.js','score-marks.js'];
 const cd18 = Array.from({length:18},(_,i)=>({hole:i+1,par:4,hcpIndex:i+1}));
 const TWO = [{ id:101, name:'Marty', hcp:'0' }, { id:102, name:'Manny', hcp:'0' }];
 
@@ -119,7 +119,7 @@ function engines() {
     const sb = { console, Math, Object, Array, String, Number, JSON, isNaN,
                  parseInt, parseFloat, Date, Set, Map };
     vm.createContext(sb);
-    ['handicap.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
+    ['handicap.js','match-engine.js','money-engine.js','action-model.js','pool-engine.js','settlement-engine.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }
@@ -335,7 +335,7 @@ describe('MONEY IS UNCHANGED BY ANY OF THIS', () => {
     });
 
     test('no engine or settlement file was touched', () => {
-        ['settlement-engine.js','money-engine.js','pool-engine.js','action-model.js']
+        ['settlement-engine.js','match-engine.js','money-engine.js','pool-engine.js','action-model.js']
             .forEach(f => assert.ok(!read(f).includes('legacy-current-group'),
                 f + ' must know nothing about a dropdown'));
     });
