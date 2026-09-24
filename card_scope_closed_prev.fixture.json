@@ -1,207 +1,219 @@
 {
- "capturedAt": "6ff9332",
- "links": {
-  "group-3": {
-   "query": "?game=WAVEB&group=3",
-   "text": {
-    "dot-context-select": "|Auto (each golfer's match)|Course|Ivy vs Jon|Kim vs Vic|",
-    "kp-pick-' + h + '": "' + opts + '",
-    "room-code-badge": "GAME: WAVEB",
-    "group-lock-badge": "🔒 Scorekeeper: Group 3 Only",
-    "hole-view-card": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
-    "card-body": "| |1| |4| |7| | | |II| | | | |2| |-2| |•| | | | | |JJ| | | | |E| | | | | | |KK| | | | | |E| | | | | | |LL| | | | |-1| | | | | |2| |4| |13| | | |II| | | | |-3| | | | | | |JJ| | | | | |+1| | | | | | |KK| | | | |-2| | | | | | |LL| | | | |-1| | | | | |3| |3| |17| | | |II| | | | | |-3| | | | | | |JJ| | | | |E| | | | | | |KK| | | | |-2| | | | | | |LL| | | | | |E| | | | | |4| |5| |1| | | |II| | | | |3| |-5| |•| | | | | |JJ| | | | |-1| | | | | | |KK| | | | | |-2| | | | | | |LL| | | | |3| |-2| |•| | | | |5| |4| |9| | | |II| | | | |3| |-6| |•| | | | | |JJ| | | | | |E| | | | | | |KK| | | | |-4| | | | | | |LL| | | | |-2| | | | | |6| |4| |3| | | |II| | | | | |-6| |•| | | | | |JJ| | | | |-2| | | | | | |KK| | | | |-5| | | | | | |LL| | | | | |-1| | | | | |7| |3| |15| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |8| |5| |5| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |9| |4| |11| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23| |10| |4| |8| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |11| |4| |14| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |12| |3| |18| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |13| |5| |2| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |14| |4| |10| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |15| |4| |4| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |16| |3| |16| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |17| |5| |6| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |18| |4| |12| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | |TOTAL &bull; Par 72|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|",
-    "action-center-mount": "|🔥 My Round|3 live · hide|🏆 Weekly Game · $480|📍 KP 0/2 claimed · 🥇 Ivy leads net · 🥩 0 skins won|🏅 NET FINISH · $100 · |PROJECTED|T1 · Ivy India / Quy Quebec · net 18|$50 each|📍 KP · $40|Hole 3 · |Pending|$20|Hole 7 · |Pending|$20|⚔️ Side Matches|⚔️ Ivy vs Jon|$20|›|Ivy is 2 up|$20 at stake|Thru 6|⚔️ Kim vs Vic|$30|›|Vic is 2 up|$30 at stake|Thru 6|Nothing here is settled yet.|+ GROUP 3 SIDE BETS|",
-    "whoami-mount": "|👋 Which one are you?|Ivy|Jon|Kim|Lee|Skip — just show everything|",
-    "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
-    "course-title": "Closed Links",
-    "format-subtitle": "Scope • STROKE (NET)",
-    "landing-group-names": "Ivy, Jon, Kim, Lee |Got it ✕|",
-    "landing-scoring": "Stroke Play",
-    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
-    "table-head-row": "|Hole|Par|HCP|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|",
-    "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
-    "ticker-title-label": "🏆 CURRENT GROUP SCORES",
-    "ticker-status-val": "|Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1|",
-    "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|Did anyone in your group get inside it?|No — leave it|Yes — pick who|"
-   },
-   "display": {
-    "detailed-breakdown-wrapper": "none",
-    "main-content": "block",
-    "group-lock-badge": "inline-block",
-    "spectator-hint-banner": "none",
-    "group-links-panel": "none",
-    "round-landing-summary": "block",
-    "dot-context-row": "flex",
-    "match-hcp-note": "block",
-    "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none",
-    "group-pick-overlay": "none",
-    "superseded-banner": "none",
-    "gap-banner": "none",
-    "handicap-basis-note": "none"
-   },
-   "filtered": [
-    "Ivy",
-    "Jon",
-    "Kim",
-    "Lee"
-   ]
+  "capturedAt": "6ff9332",
+  "links": {
+    "group-3": {
+      "query": "?game=WAVEB&group=3",
+      "text": {
+        "dot-context-select": "|Auto (each golfer's match)|Course|Ivy vs Jon|Kim vs Vic|",
+        "kp-pick-' + h + '": "' + opts + '",
+        "room-code-badge": "GAME: WAVEB",
+        "group-lock-badge": "🔒 Scorekeeper: Group 3 Only",
+        "hole-view-card": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
+        "card-body": "| |1| |4| |7| | | |II| | | | |2| |-2| |•| | | | | |JJ| | | | |E| | | | | | |KK| | | | | |E| | | | | | |LL| | | | |-1| | | | | |2| |4| |13| | | |II| | | | |-3| | | | | | |JJ| | | | | |+1| | | | | | |KK| | | | |-2| | | | | | |LL| | | | |-1| | | | | |3| |3| |17| | | |II| | | | | |-3| | | | | | |JJ| | | | |E| | | | | | |KK| | | | |-2| | | | | | |LL| | | | | |E| | | | | |4| |5| |1| | | |II| | | | |3| |-5| |•| | | | | |JJ| | | | |-1| | | | | | |KK| | | | | |-2| | | | | | |LL| | | | |3| |-2| |•| | | | |5| |4| |9| | | |II| | | | |3| |-6| |•| | | | | |JJ| | | | | |E| | | | | | |KK| | | | |-4| | | | | | |LL| | | | |-2| | | | | |6| |4| |3| | | |II| | | | | |-6| |•| | | | | |JJ| | | | |-2| | | | | | |KK| | | | |-5| | | | | | |LL| | | | | |-1| | | | | |7| |3| |15| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |8| |5| |5| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |9| |4| |11| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23| |10| |4| |8| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |11| |4| |14| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |12| |3| |18| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |13| |5| |2| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |14| |4| |10| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |15| |4| |4| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |16| |3| |16| | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |17| |5| |6| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | |18| |4| |12| | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | |TOTAL &bull; Par 72|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|",
+        "action-center-mount": "|🔥 My Round|3 live · hide|🏆 Weekly Game · $480|📍 KP 0/2 claimed · 🥇 Ivy leads net · 🥩 0 skins won|🏅 NET FINISH · $100 · |PROJECTED|T1 · Ivy India / Quy Quebec · net 18|$50 each|📍 KP · $40|Hole 3 · |Pending|$20|Hole 7 · |Pending|$20|⚔️ Side Matches|⚔️ Ivy vs Jon|$20|›|Ivy is 2 up|$20 at stake|Thru 6|⚔️ Kim vs Vic|$30|›|Vic is 2 up|$30 at stake|Thru 6|Nothing here is settled yet.|+ GROUP 3 SIDE BETS|",
+        "whoami-mount": "|👋 Which one are you?|Ivy|Jon|Kim|Lee|Skip — just show everything|",
+        "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
+        "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
+        "course-title": "Closed Links",
+        "format-subtitle": "Scope • STROKE (NET)",
+        "landing-group-names": "Ivy, Jon, Kim, Lee |Got it ✕|",
+        "landing-scoring": "Stroke Play",
+        "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
+        "table-head-row": "|Hole|Par|HCP|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|",
+        "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
+        "ticker-title-label": "🏆 CURRENT GROUP SCORES",
+        "ticker-status-val": "|Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1|",
+        "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
+        "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|Did anyone in your group get inside it?|No — leave it|Yes — pick who|",
+        "attendance-mount": "|Your group|4 haven&#39;t answered|Confirm for this group. The organizer sees the whole round.|Ivy India|No answer yet|Confirm|Can't|Jon Juliet|No answer yet|Confirm|Can't|Kim Kilo|No answer yet|Confirm|Can't|Lee Lima|No answer yet|Confirm|Can't|"
+      },
+      "display": {
+        "detailed-breakdown-wrapper": "none",
+        "main-content": "block",
+        "group-lock-badge": "inline-block",
+        "spectator-hint-banner": "none",
+        "group-links-panel": "none",
+        "round-landing-summary": "block",
+        "dot-context-row": "flex",
+        "match-hcp-note": "block",
+        "nassau-payout-container": "none",
+        "wolfcall-payout-container": "none",
+        "group-pick-overlay": "none",
+        "superseded-banner": "none",
+        "gap-banner": "none",
+        "handicap-basis-note": "none"
+      },
+      "filtered": [
+        "Ivy",
+        "Jon",
+        "Kim",
+        "Lee"
+      ]
+    },
+    "bare": {
+      "query": "?game=WAVEB",
+      "text": {
+        "dot-context-select": "|Auto (each golfer's match)|Course|Ivy vs Jon|Kim vs Vic|",
+        "kp-pick-' + h + '": "' + opts + '",
+        "room-code-badge": "GAME: WAVEB",
+        "end-round-mount": "|🗑️ Delete this round|Erases every score for everyone in this round. You do not need to do this when you finish — scores save as you enter them.|🗑️ Delete round for everyone|",
+        "hole-view-card": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
+        "card-body": "| |1| |4| |7| | | |AA| | | | |E| | | | | | |BB| | | | | |E| |•| | | | | |CC| | | | |2| |-2| |•| | | | | |DD| | | | |E| | | | | | |EE| | | | | |E| |•| | | | | |FF| | | | |2| |-2| |•| | | | | |GG| | | | |E| | | | | | |HH| | | | | |E| |•| | | | | |II| | | | |2| |-2| |•| | | | | |JJ| | | | |E| | | | | | |KK| | | | | |E| | | | | | |LL| | | | |-1| | | | | | |MM| | | | |3| |-1| |•| | | | | |NN| | | | | |E| |•| | | | | |OO| | | | |-1| | | | | | |PP| | | | |3| |-1| |•| | | | | |QQ| | | | | |E| |•| | | | | |RR| | | | |-1| | | | | | |SS| | | | |3| |-1| |•| | | | | |TT| | | | | |+1| | | | | | |UU| | | | |2| |-2| |•| | | | | |VV| | | | |-1| | | | | | |WW| | | | | |+1| | | | | | |XX| | | | |2| |-2| |•| | | | |2| |4| |13| | | |AA| | | | | |+1| | | | | | |BB| | | | |-1| | | | | | |CC| | | | |3| |-3| |•| | | | | |DD| | | | | |+1| | | | | | |EE| | | | |-1| | | | | | |FF| | | | |3| |-3| |•| | | | | |GG| | | | | |+1| | | | | | |HH| | | | |-1| | | | | | |II| | | | |-3| | | | | | |JJ| | | | | |+1| | | | | | |KK| | | | |-2| | | | | | |LL| | | | |-1| | | | | | |MM| | | | | |E| | | | | | |NN| | | | |2| |-2| |•| | | | | |OO| | | | |-1| | | | | | |PP| | | | | |E| | | | | | |QQ| | | | |2| |-2| |•| | | | | |RR| | | | |-1| | | | | | |SS| | | | | |E| | | | | | |TT| | | | |E| | | | | | |UU| | | | |-2| | | | | | |VV| | | | | |-1| | | | | | |WW| | | | |E| | | | | | |XX| | | | |-2| | | | | |3| |3| |17| | | |AA| | | | |E| | | | | | |BB| | | | |-1| | | | | | |CC| | | | | |-2| | | | | | |DD| | | | |E| | | | | | |EE| | | | |-1| | | | | | |FF| | | | | |-2| | | | | | |GG| | | | |E| | | | | | |HH| | | | |-1| | | | | | |II| | | | | |-3| | | | | | |JJ| | | | |E| | | | | | |KK| | | | |-2| | | | | | |LL| | | | | |E| | | | | | |MM| | | | |-1| | | | | | |NN| | | | |-2| | | | | | |OO| | | | | |E| | | | | | |PP| | | | |-1| | | | | | |QQ| | | | |2| |-3| |•| | | | | |RR| | | | | |E| | | | | | |SS| | | | |-1| | | | | | |TT| | | | |E| | | | | | |UU| | | | | |-1| | | | | | |VV| | | | |-2| | | | | | |WW| | | | |E| | | | | | |XX| | | | | |-1| | | | | |4| |5| |1| | | |AA| | | | |E| | | | | | |BB| | | | | |-1| |•| | | | | |CC| | | | |3| |-4| |•| | | | | |DD| | | | |4| |-1| |•| | | | | |EE| | | | | |-1| |•| | | | | |FF| | | | |3| |-4| |•| | | | | |GG| | | | |4| |-1| |•| | | | | |HH| | | | | |-1| |•| | | | | |II| | | | |3| |-5| |•| | | | | |JJ| | | | |-1| | | | | | |KK| | | | | |-2| | | | | | |LL| | | | |3| |-2| |•| | | | | |MM| | | | |4| |-2| |•| | | | | |NN| | | | | |-2| |•| | | | | |OO| | | | |3| |-2| |•| | | | | |PP| | | | |4| |-2| |•| | | | | |QQ| | | | | |-3| |•| | | | | |RR| | | | |3| |-2| |•| | | | | |SS| | | | |4| |-2| |•| | | | | |TT| | | | | |+1| | | | | | |UU| | | | |3| |-3| |•| | | | | |VV| | | | |4| |-3| |•| | | | | |WW| | | | | |E| |•| | | | | |XX| | | | |3| |-3| |•| | | | |5| |4| |9| | | |AA| | | | | |+1| | | | | | |BB| | | | |-2| | | | | | |CC| | | | |3| |-5| |•| | | | | |DD| | | | | |E| | | | | | |EE| | | | |2| |-3| |•| | | | | |FF| | | | |3| |-5| |•| | | | | |GG| | | | | |E| | | | | | |HH| | | | |2| |-3| |•| | | | | |II| | | | |3| |-6| |•| | | | | |JJ| | | | | |E| | | | | | |KK| | | | |-4| | | | | | |LL| | | | |-2| | | | | | |MM| | | | | |-1| | | | | | |NN| | | | |2| |-4| |•| | | | | |OO| | | | |-2| | | | | | |PP| | | | | |-2| |•| | | | | |QQ| | | | |2| |-5| |•| | | | | |RR| | | | |-2| | | | | | |SS| | | | | |-2| |•| | | | | |TT| | | | |E| | | | | | |UU| | | | |-3| | | | | | |VV| | | | | |-3| | | | | | |WW| | | | |-1| | | | | | |XX| | | | |3| |-4| |•| | | | |6| |4| |3| | | |AA| | | | |E| | | | | | |BB| | | | |3| |-3| |•| | | | | |CC| | | | | |-5| |•| | | | | |DD| | | | |-1| | | | | | |EE| | | | |3| |-4| |•| | | | | |FF| | | | | |-5| |•| | | | | |GG| | | | |2| |-2| |•| | | | | |HH| | | | |3| |-4| |•| | | | | |II| | | | | |-6| |•| | | | | |JJ| | | | |-2| | | | | | |KK| | | | |-5| | | | | | |LL| | | | | |-1| | | | | | |MM| | | | |2| |-3| |•| | | | | |NN| | | | |3| |-5| |•| | | | | |OO| | | | | |-2| |•| | | | | |PP| | | | |2| |-4| |•| | | | | |QQ| | | | |3| |-6| |•| | | | | |RR| | | | | |-2| |•| | | | | |SS| | | | |2| |-4| |•| | | | | |TT| | | | |E| | | | | | |UU| | | | | |-3| |•| | | | | |VV| | | | |-5| | | | | | |WW| | | | |-1| | | | | | |XX| | | | | |-4| |•| | | | |7| |3| |15| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |8| |5| |5| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |9| |4| |11| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|24|Net: 21|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 20|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20| |10| |4| |8| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |11| |4| |14| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |12| |3| |18| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | | | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | | | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | | | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |13| |5| |2| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | |•| | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | |•| | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | |•| | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | |•| | | | | |XX| | | | |•| | | | |14| |4| |10| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |15| |4| |4| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | |•| | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |16| |3| |16| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | | | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |17| |5| |6| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |18| |4| |12| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | |TOTAL &bull; Par 72|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|24|Net: 21|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 20|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|",
+        "action-center-mount": "|🔥 My Round|3 live · hide|🏆 Weekly Game · $480|📍 KP 0/2 claimed · 🥇 Ivy leads net · 🥩 0 skins won|🏅 NET FINISH · $100 · |PROJECTED|T1 · Ivy India / Quy Quebec · net 18|$50 each|📍 KP · $40|Hole 3 · |Pending|$20|Hole 7 · |Pending|$20|⚔️ Side Matches|⚔️ Ivy vs Jon|$20|›|Ivy is 2 up|$20 at stake|Thru 6|⚔️ Kim vs Vic|$30|›|Vic is 2 up|$30 at stake|Thru 6|Nothing here is settled yet.|+ SIDE BETS|",
+        "whoami-mount": "|👋 Which one are you?|Ann|Ben|Cal|Dee|Eli|Fay|Gus|Hal|Ivy|Jon|Kim|Lee|Max|Ned|Oli|Pat|Quy|Rae|Sam|Tia|Uma|Vic|Wes|Xan|Skip — just show everything|",
+        "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
+        "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
+        "group-lock-badge": "👁️ Spectator View (Read-Only)",
+        "course-title": "Closed Links",
+        "format-subtitle": "Scope • STROKE (NET)",
+        "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|👥 Players|",
+        "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
+        "landing-scoring": "Stroke Play",
+        "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
+        "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|Eli|HCP 9|Fay|HCP 16|Gus|HCP 4|Hal|HCP 11|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|Max|HCP 8|Ned|HCP 15|Oli|HCP 3|Pat|HCP 10|Quy|HCP 17|Rae|HCP 5|Sam|HCP 12|Tia|HCP 0|Uma|HCP 7|Vic|HCP 14|Wes|HCP 2|Xan|HCP 9|",
+        "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
+        "ticker-title-label": "🏆 CURRENT GROUP SCORES",
+        "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1| | |Eli: |-4| | |Fay: |-5| | |Gus: |-2| | |Hal: |-4| | |Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1| | |Max: |-3| | |Ned: |-5| | |Oli: |-2| | |Pat: |-4| | |Quy: |-6| | |Rae: |-2| | |Sam: |-4| | |Tia: |E| | |Uma: |-3| | |Vic: |-5| | |Wes: |-1| | |Xan: |-4|",
+        "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
+        "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|",
+        "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|",
+        "attendance-mount": "|Who&#39;s playing|24 haven&#39;t answered|Tap your name before tee time.|Ann Alpha|No answer yet|Confirm|Can't|Ben Bravo|No answer yet|Confirm|Can't|Cal Charlie|No answer yet|Confirm|Can't|Dee Delta|No answer yet|Confirm|Can't|Eli Echo|No answer yet|Confirm|Can't|Fay Foxtrot|No answer yet|Confirm|Can't|Gus Golf|No answer yet|Confirm|Can't|Hal Hotel|No answer yet|Confirm|Can't|Ivy India|No answer yet|Confirm|Can't|Jon Juliet|No answer yet|Confirm|Can't|Kim Kilo|No answer yet|Confirm|Can't|Lee Lima|No answer yet|Confirm|Can't|Max Mike|No answer yet|Confirm|Can't|Ned November|No answer yet|Confirm|Can't|Oli Oscar|No answer yet|Confirm|Can't|Pat Papa|No answer yet|Confirm|Can't|Quy Quebec|No answer yet|Confirm|Can't|Rae Romeo|No answer yet|Confirm|Can't|Sam Sierra|No answer yet|Confirm|Can't|Tia Tango|No answer yet|Confirm|Can't|Uma Uniform|No answer yet|Confirm|Can't|Vic Victor|No answer yet|Confirm|Can't|Wes Whiskey|No answer yet|Confirm|Can't|Xan Xray|No answer yet|Confirm|Can't|"
+      },
+      "display": {
+        "detailed-breakdown-wrapper": "none",
+        "main-content": "block",
+        "group-lock-badge": "inline-block",
+        "spectator-hint-banner": "block",
+        "group-links-panel": "none",
+        "round-landing-summary": "block",
+        "dot-context-row": "flex",
+        "match-hcp-note": "block",
+        "nassau-payout-container": "none",
+        "wolfcall-payout-container": "none",
+        "group-pick-overlay": "flex",
+        "superseded-banner": "none",
+        "gap-banner": "none",
+        "handicap-basis-note": "none"
+      },
+      "filtered": [
+        "Ann",
+        "Ben",
+        "Cal",
+        "Dee",
+        "Eli",
+        "Fay",
+        "Gus",
+        "Hal",
+        "Ivy",
+        "Jon",
+        "Kim",
+        "Lee",
+        "Max",
+        "Ned",
+        "Oli",
+        "Pat",
+        "Quy",
+        "Rae",
+        "Sam",
+        "Tia",
+        "Uma",
+        "Vic",
+        "Wes",
+        "Xan"
+      ]
+    },
+    "one-group-1": {
+      "query": "?game=WAVEB&group=1",
+      "text": {
+        "kp-pick-' + h + '": "' + opts + '",
+        "room-code-badge": "GAME: WAVEB",
+        "group-lock-badge": "🔒 Scorekeeper: Group 1 Only",
+        "hole-view-card": "|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
+        "card-body": "| |1| |4| |7| | | |AA| | | | |E| | | | | | |BB| | | | | |E| |•| | | | | |CC| | | | |2| |-2| |•| | | | | |DD| | | | |E| | | | | |2| |4| |13| | | |AA| | | | | |+1| | | | | | |BB| | | | |-1| | | | | | |CC| | | | |3| |-3| |•| | | | | |DD| | | | | |+1| | | | | |3| |3| |17| | | |AA| | | | |E| | | | | | |BB| | | | |-1| | | | | | |CC| | | | | |-2| | | | | | |DD| | | | |E| | | | | |4| |5| |1| | | |AA| | | | |E| | | | | | |BB| | | | | |-1| |•| | | | | |CC| | | | |3| |-4| |•| | | | | |DD| | | | |4| |-1| |•| | | | |5| |4| |9| | | |AA| | | | | |+1| | | | | | |BB| | | | |-2| | | | | | |CC| | | | |3| |-5| |•| | | | | |DD| | | | | |E| | | | | |6| |4| |3| | | |AA| | | | |E| | | | | | |BB| | | | |3| |-3| |•| | | | | |CC| | | | | |-5| |•| | | | | |DD| | | | |-1| | | | | |7| |3| |15| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |8| |5| |5| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |9| |4| |11| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23| |10| |4| |8| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |11| |4| |14| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |12| |3| |18| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |13| |5| |2| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | |•| | | | |14| |4| |10| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |15| |4| |4| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |16| |3| |16| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |17| |5| |6| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |18| |4| |12| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | |TOTAL &bull; Par 72|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|",
+        "action-center-mount": "|🔥 My Round|1 live · hide|🏆 Weekly Game · $80|⚠️ $60 over budget — the pot is $80 but $140 is allocated.|Nothing here is settled yet.|",
+        "whoami-mount": "|👋 Which one are you?|Ann|Ben|Cal|Dee|Skip — just show everything|",
+        "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|",
+        "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|Cal Charlie — 2|Latest: Hole 4 — Cal Charlie|Hole 7 — Waiting on Group 1|hide hole-by-hole|Hole 1 — Cal Charlie — Net 2 — Skin|Hole 4 — Cal Charlie — Net 3 — Skin|Hole 7 — Waiting on Group 1|Hole 8 — Waiting on Group 1|Hole 9 — Waiting on Group 1|Hole 10 — Waiting on Group 1|Hole 11 — Waiting on Group 1|Hole 12 — Waiting on Group 1|Hole 13 — Waiting on Group 1|Hole 14 — Waiting on Group 1|Hole 15 — Waiting on Group 1|Hole 16 — Waiting on Group 1|Hole 17 — Waiting on Group 1|Hole 18 — Waiting on Group 1|",
+        "course-title": "Closed Links",
+        "format-subtitle": "Scope • STROKE (NET)",
+        "landing-group-names": "Ann, Ben, Cal, Dee |Got it ✕|",
+        "landing-scoring": "Stroke Play",
+        "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|",
+        "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|",
+        "ticker-title-label": "🏆 CURRENT GROUP SCORES",
+        "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1|",
+        "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|",
+        "attendance-mount": "|Your group|4 haven&#39;t answered|Confirm for this group. The organizer sees the whole round.|Ann Alpha|No answer yet|Confirm|Can't|Ben Bravo|No answer yet|Confirm|Can't|Cal Charlie|No answer yet|Confirm|Can't|Dee Delta|No answer yet|Confirm|Can't|"
+      },
+      "display": {
+        "detailed-breakdown-wrapper": "none",
+        "main-content": "block",
+        "group-lock-badge": "inline-block",
+        "spectator-hint-banner": "none",
+        "group-links-panel": "none",
+        "round-landing-summary": "block",
+        "dot-context-row": "none",
+        "match-hcp-note": "none",
+        "nassau-payout-container": "none",
+        "wolfcall-payout-container": "none",
+        "group-pick-overlay": "none",
+        "superseded-banner": "none",
+        "gap-banner": "none",
+        "handicap-basis-note": "none"
+      },
+      "filtered": [
+        "Ann",
+        "Ben",
+        "Cal",
+        "Dee"
+      ]
+    }
   },
-  "bare": {
-   "query": "?game=WAVEB",
-   "text": {
-    "dot-context-select": "|Auto (each golfer's match)|Course|Ivy vs Jon|Kim vs Vic|",
-    "kp-pick-' + h + '": "' + opts + '",
-    "room-code-badge": "GAME: WAVEB",
-    "end-round-mount": "|🗑️ Delete this round|Erases every score for everyone in this round. You do not need to do this when you finish — scores save as you enter them.|🗑️ Delete round for everyone|",
-    "hole-view-card": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
-    "card-body": "| |1| |4| |7| | | |AA| | | | |E| | | | | | |BB| | | | | |E| |•| | | | | |CC| | | | |2| |-2| |•| | | | | |DD| | | | |E| | | | | | |EE| | | | | |E| |•| | | | | |FF| | | | |2| |-2| |•| | | | | |GG| | | | |E| | | | | | |HH| | | | | |E| |•| | | | | |II| | | | |2| |-2| |•| | | | | |JJ| | | | |E| | | | | | |KK| | | | | |E| | | | | | |LL| | | | |-1| | | | | | |MM| | | | |3| |-1| |•| | | | | |NN| | | | | |E| |•| | | | | |OO| | | | |-1| | | | | | |PP| | | | |3| |-1| |•| | | | | |QQ| | | | | |E| |•| | | | | |RR| | | | |-1| | | | | | |SS| | | | |3| |-1| |•| | | | | |TT| | | | | |+1| | | | | | |UU| | | | |2| |-2| |•| | | | | |VV| | | | |-1| | | | | | |WW| | | | | |+1| | | | | | |XX| | | | |2| |-2| |•| | | | |2| |4| |13| | | |AA| | | | | |+1| | | | | | |BB| | | | |-1| | | | | | |CC| | | | |3| |-3| |•| | | | | |DD| | | | | |+1| | | | | | |EE| | | | |-1| | | | | | |FF| | | | |3| |-3| |•| | | | | |GG| | | | | |+1| | | | | | |HH| | | | |-1| | | | | | |II| | | | |-3| | | | | | |JJ| | | | | |+1| | | | | | |KK| | | | |-2| | | | | | |LL| | | | |-1| | | | | | |MM| | | | | |E| | | | | | |NN| | | | |2| |-2| |•| | | | | |OO| | | | |-1| | | | | | |PP| | | | | |E| | | | | | |QQ| | | | |2| |-2| |•| | | | | |RR| | | | |-1| | | | | | |SS| | | | | |E| | | | | | |TT| | | | |E| | | | | | |UU| | | | |-2| | | | | | |VV| | | | | |-1| | | | | | |WW| | | | |E| | | | | | |XX| | | | |-2| | | | | |3| |3| |17| | | |AA| | | | |E| | | | | | |BB| | | | |-1| | | | | | |CC| | | | | |-2| | | | | | |DD| | | | |E| | | | | | |EE| | | | |-1| | | | | | |FF| | | | | |-2| | | | | | |GG| | | | |E| | | | | | |HH| | | | |-1| | | | | | |II| | | | | |-3| | | | | | |JJ| | | | |E| | | | | | |KK| | | | |-2| | | | | | |LL| | | | | |E| | | | | | |MM| | | | |-1| | | | | | |NN| | | | |-2| | | | | | |OO| | | | | |E| | | | | | |PP| | | | |-1| | | | | | |QQ| | | | |2| |-3| |•| | | | | |RR| | | | | |E| | | | | | |SS| | | | |-1| | | | | | |TT| | | | |E| | | | | | |UU| | | | | |-1| | | | | | |VV| | | | |-2| | | | | | |WW| | | | |E| | | | | | |XX| | | | | |-1| | | | | |4| |5| |1| | | |AA| | | | |E| | | | | | |BB| | | | | |-1| |•| | | | | |CC| | | | |3| |-4| |•| | | | | |DD| | | | |4| |-1| |•| | | | | |EE| | | | | |-1| |•| | | | | |FF| | | | |3| |-4| |•| | | | | |GG| | | | |4| |-1| |•| | | | | |HH| | | | | |-1| |•| | | | | |II| | | | |3| |-5| |•| | | | | |JJ| | | | |-1| | | | | | |KK| | | | | |-2| | | | | | |LL| | | | |3| |-2| |•| | | | | |MM| | | | |4| |-2| |•| | | | | |NN| | | | | |-2| |•| | | | | |OO| | | | |3| |-2| |•| | | | | |PP| | | | |4| |-2| |•| | | | | |QQ| | | | | |-3| |•| | | | | |RR| | | | |3| |-2| |•| | | | | |SS| | | | |4| |-2| |•| | | | | |TT| | | | | |+1| | | | | | |UU| | | | |3| |-3| |•| | | | | |VV| | | | |4| |-3| |•| | | | | |WW| | | | | |E| |•| | | | | |XX| | | | |3| |-3| |•| | | | |5| |4| |9| | | |AA| | | | | |+1| | | | | | |BB| | | | |-2| | | | | | |CC| | | | |3| |-5| |•| | | | | |DD| | | | | |E| | | | | | |EE| | | | |2| |-3| |•| | | | | |FF| | | | |3| |-5| |•| | | | | |GG| | | | | |E| | | | | | |HH| | | | |2| |-3| |•| | | | | |II| | | | |3| |-6| |•| | | | | |JJ| | | | | |E| | | | | | |KK| | | | |-4| | | | | | |LL| | | | |-2| | | | | | |MM| | | | | |-1| | | | | | |NN| | | | |2| |-4| |•| | | | | |OO| | | | |-2| | | | | | |PP| | | | | |-2| |•| | | | | |QQ| | | | |2| |-5| |•| | | | | |RR| | | | |-2| | | | | | |SS| | | | | |-2| |•| | | | | |TT| | | | |E| | | | | | |UU| | | | |-3| | | | | | |VV| | | | | |-3| | | | | | |WW| | | | |-1| | | | | | |XX| | | | |3| |-4| |•| | | | |6| |4| |3| | | |AA| | | | |E| | | | | | |BB| | | | |3| |-3| |•| | | | | |CC| | | | | |-5| |•| | | | | |DD| | | | |-1| | | | | | |EE| | | | |3| |-4| |•| | | | | |FF| | | | | |-5| |•| | | | | |GG| | | | |2| |-2| |•| | | | | |HH| | | | |3| |-4| |•| | | | | |II| | | | | |-6| |•| | | | | |JJ| | | | |-2| | | | | | |KK| | | | |-5| | | | | | |LL| | | | | |-1| | | | | | |MM| | | | |2| |-3| |•| | | | | |NN| | | | |3| |-5| |•| | | | | |OO| | | | | |-2| |•| | | | | |PP| | | | |2| |-4| |•| | | | | |QQ| | | | |3| |-6| |•| | | | | |RR| | | | | |-2| |•| | | | | |SS| | | | |2| |-4| |•| | | | | |TT| | | | |E| | | | | | |UU| | | | | |-3| |•| | | | | |VV| | | | |-5| | | | | | |WW| | | | |-1| | | | | | |XX| | | | | |-4| |•| | | | |7| |3| |15| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |8| |5| |5| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |9| |4| |11| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|24|Net: 21|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 20|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20| |10| |4| |8| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |11| |4| |14| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |12| |3| |18| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | | | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | | | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | | | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |13| |5| |2| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | |•| | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | |•| | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | |•| | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | |•| | | | | |XX| | | | |•| | | | |14| |4| |10| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |15| |4| |4| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | |•| | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | |•| | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |16| |3| |16| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | | | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | | | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | | | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | | |17| |5| |6| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | |•| | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | |•| | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | |•| | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | |•| | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | |•| | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | |•| | | | |18| |4| |12| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | | |EE| | | | | | | | | |FF| | | | |•| | | | | |GG| | | | | | | | | |HH| | | | | | | | | |II| | | | |•| | | | | |JJ| | | | | | | | | |KK| | | | | | | | | |LL| | | | | | | | | |MM| | | | | | | | | |NN| | | | |•| | | | | |OO| | | | | | | | | |PP| | | | | | | | | |QQ| | | | |•| | | | | |RR| | | | | | | | | |SS| | | | |•| | | | | |TT| | | | | | | | | |UU| | | | | | | | | |VV| | | | | | | | | |WW| | | | | | | | | |XX| | | | | | | |TOTAL &bull; Par 72|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 19|24|Net: 23|24|Net: 21|24|Net: 19|24|Net: 22|24|Net: 20|24|Net: 18|24|Net: 22|24|Net: 20|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|24|Net: 20|",
-    "action-center-mount": "|🔥 My Round|3 live · hide|🏆 Weekly Game · $480|📍 KP 0/2 claimed · 🥇 Ivy leads net · 🥩 0 skins won|🏅 NET FINISH · $100 · |PROJECTED|T1 · Ivy India / Quy Quebec · net 18|$50 each|📍 KP · $40|Hole 3 · |Pending|$20|Hole 7 · |Pending|$20|⚔️ Side Matches|⚔️ Ivy vs Jon|$20|›|Ivy is 2 up|$20 at stake|Thru 6|⚔️ Kim vs Vic|$30|›|Vic is 2 up|$30 at stake|Thru 6|Nothing here is settled yet.|+ SIDE BETS|",
-    "whoami-mount": "|👋 Which one are you?|Ann|Ben|Cal|Dee|Eli|Fay|Gus|Hal|Ivy|Jon|Kim|Lee|Max|Ned|Oli|Pat|Quy|Rae|Sam|Tia|Uma|Vic|Wes|Xan|Skip — just show everything|",
-    "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
-    "group-lock-badge": "👁️ Spectator View (Read-Only)",
-    "course-title": "Closed Links",
-    "format-subtitle": "Scope • STROKE (NET)",
-    "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|👥 Players|",
-    "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
-    "landing-scoring": "Stroke Play",
-    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
-    "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|Eli|HCP 9|Fay|HCP 16|Gus|HCP 4|Hal|HCP 11|Ivy|HCP 18|Jon|HCP 6|Kim|HCP 13|Lee|HCP 1|Max|HCP 8|Ned|HCP 15|Oli|HCP 3|Pat|HCP 10|Quy|HCP 17|Rae|HCP 5|Sam|HCP 12|Tia|HCP 0|Uma|HCP 7|Vic|HCP 14|Wes|HCP 2|Xan|HCP 9|",
-    "match-hcp-note": "|DOTS BY MATCH| · Ivy v Jon · Kim v Vic",
-    "ticker-title-label": "🏆 CURRENT GROUP SCORES",
-    "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1| | |Eli: |-4| | |Fay: |-5| | |Gus: |-2| | |Hal: |-4| | |Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1| | |Max: |-3| | |Ned: |-5| | |Oli: |-2| | |Pat: |-4| | |Quy: |-6| | |Rae: |-2| | |Sam: |-4| | |Tia: |E| | |Uma: |-3| | |Vic: |-5| | |Wes: |-1| | |Xan: |-4|",
-    "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|",
-    "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|"
-   },
-   "display": {
-    "detailed-breakdown-wrapper": "none",
-    "main-content": "block",
-    "group-lock-badge": "inline-block",
-    "spectator-hint-banner": "block",
-    "group-links-panel": "none",
-    "round-landing-summary": "block",
-    "dot-context-row": "flex",
-    "match-hcp-note": "block",
-    "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none",
-    "group-pick-overlay": "flex",
-    "superseded-banner": "none",
-    "gap-banner": "none",
-    "handicap-basis-note": "none"
-   },
-   "filtered": [
-    "Ann",
-    "Ben",
-    "Cal",
-    "Dee",
-    "Eli",
-    "Fay",
-    "Gus",
-    "Hal",
-    "Ivy",
-    "Jon",
-    "Kim",
-    "Lee",
-    "Max",
-    "Ned",
-    "Oli",
-    "Pat",
-    "Quy",
-    "Rae",
-    "Sam",
-    "Tia",
-    "Uma",
-    "Vic",
-    "Wes",
-    "Xan"
-   ]
-  },
-  "one-group-1": {
-   "query": "?game=WAVEB&group=1",
-   "text": {
-    "kp-pick-' + h + '": "' + opts + '",
-    "room-code-badge": "GAME: WAVEB",
-    "group-lock-badge": "🔒 Scorekeeper: Group 1 Only",
-    "hole-view-card": "|Hole 7|Par &bull; HCP | |◀ Prev| |Hole 7 of 18 ▾| |Next ▶| |",
-    "card-body": "| |1| |4| |7| | | |AA| | | | |E| | | | | | |BB| | | | | |E| |•| | | | | |CC| | | | |2| |-2| |•| | | | | |DD| | | | |E| | | | | |2| |4| |13| | | |AA| | | | | |+1| | | | | | |BB| | | | |-1| | | | | | |CC| | | | |3| |-3| |•| | | | | |DD| | | | | |+1| | | | | |3| |3| |17| | | |AA| | | | |E| | | | | | |BB| | | | |-1| | | | | | |CC| | | | | |-2| | | | | | |DD| | | | |E| | | | | |4| |5| |1| | | |AA| | | | |E| | | | | | |BB| | | | | |-1| |•| | | | | |CC| | | | |3| |-4| |•| | | | | |DD| | | | |4| |-1| |•| | | | |5| |4| |9| | | |AA| | | | | |+1| | | | | | |BB| | | | |-2| | | | | | |CC| | | | |3| |-5| |•| | | | | |DD| | | | | |E| | | | | |6| |4| |3| | | |AA| | | | |E| | | | | | |BB| | | | |3| |-3| |•| | | | | |CC| | | | | |-5| |•| | | | | |DD| | | | |-1| | | | | |7| |3| |15| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |8| |5| |5| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |9| |4| |11| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | |OUT (Front 9) &bull; Par 36|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23| |10| |4| |8| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |11| |4| |14| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |12| |3| |18| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |13| |5| |2| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | |•| | | | |14| |4| |10| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |15| |4| |4| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |16| |3| |16| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | | | | | | |DD| | | | | | | | |17| |5| |6| | | |AA| | | | | | | | | |BB| | | | |•| | | | | |CC| | | | |•| | | | | |DD| | | | | | | | |18| |4| |12| | | |AA| | | | | | | | | |BB| | | | | | | | | |CC| | | | |•| | | | | |DD| | | | | | | |TOTAL &bull; Par 72|24|Net: 24|24|Net: 21|24|Net: 19|24|Net: 23|",
-    "action-center-mount": "|🔥 My Round|1 live · hide|🏆 Weekly Game · $80|⚠️ $60 over budget — the pot is $80 but $140 is allocated.|Nothing here is settled yet.|",
-    "whoami-mount": "|👋 Which one are you?|Ann|Ben|Cal|Dee|Skip — just show everything|",
-    "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|",
-    "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|Cal Charlie — 2|Latest: Hole 4 — Cal Charlie|Hole 7 — Waiting on Group 1|hide hole-by-hole|Hole 1 — Cal Charlie — Net 2 — Skin|Hole 4 — Cal Charlie — Net 3 — Skin|Hole 7 — Waiting on Group 1|Hole 8 — Waiting on Group 1|Hole 9 — Waiting on Group 1|Hole 10 — Waiting on Group 1|Hole 11 — Waiting on Group 1|Hole 12 — Waiting on Group 1|Hole 13 — Waiting on Group 1|Hole 14 — Waiting on Group 1|Hole 15 — Waiting on Group 1|Hole 16 — Waiting on Group 1|Hole 17 — Waiting on Group 1|Hole 18 — Waiting on Group 1|",
-    "course-title": "Closed Links",
-    "format-subtitle": "Scope • STROKE (NET)",
-    "landing-group-names": "Ann, Ben, Cal, Dee |Got it ✕|",
-    "landing-scoring": "Stroke Play",
-    "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|",
-    "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|",
-    "ticker-title-label": "🏆 CURRENT GROUP SCORES",
-    "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1|",
-    "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|"
-   },
-   "display": {
-    "detailed-breakdown-wrapper": "none",
-    "main-content": "block",
-    "group-lock-badge": "inline-block",
-    "spectator-hint-banner": "none",
-    "group-links-panel": "none",
-    "round-landing-summary": "block",
-    "dot-context-row": "none",
-    "match-hcp-note": "none",
-    "nassau-payout-container": "none",
-    "wolfcall-payout-container": "none",
-    "group-pick-overlay": "none",
-    "superseded-banner": "none",
-    "gap-banner": "none",
-    "handicap-basis-note": "none"
-   },
-   "filtered": [
-    "Ann",
-    "Ben",
-    "Cal",
-    "Dee"
-   ]
-  }
- },
- "repinned": [
-  {
-   "date": "2026-09-19",
-   "why": "the KP entry block (Hole 7 KP / No leader yet / Set KP Leader) moved out of #action-center-mount into #kp-entry-mount under the Prev/Next row, and its head reads Weekly Game KP. Exactly those substrings were moved by hand; every other character is the 6ff9332 capture."
-  },
-  {
-   "date": "2026-09-20",
-   "why": "the group picker (group_picker_test.js): a bare link on a multi-group round shows #group-pick-overlay (display flex) with one row per group in #group-pick-body; a group link and a one-group round hide it (display none). Exactly those entries were added by hand; every other character is the 6ff9332 capture with the 2026-09-19 KP move."
-  },
-  {
-   "date": "2026-09-21",
-   "why": "the organizer doors (organizer_door_test.js): the bare link on a round with neither ownerUid nor organizerToken (this capture, a legacy round) shows the organizer's ✏️ Edit round setup pill after 🔗 Group Links in #group-filter-container; a group link shows neither. Exactly that substring was added by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-22",
-   "why": "the retired-round guard (superseded_round_test.js): renderSupersededBanner sets #superseded-banner display none on every round without supersededBy, so each link variant gains that one display entry. Added by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-22",
-   "why": "the missing-hole warning (score_gaps_test.js): renderGapBanner sets #gap-banner display none on a round with no gap inside any card, so each link variant gains that one display entry. Added by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-22",
-   "why": "the KP question (kp_prompt_test.js, v193): the block under the nav row is the question now - the head reads ⛳ Hole 7 — Closest to the Pin, the line No KP yet., and a writing link gets Did anyone in your group get inside it? with the two answers; a spectator gets the first two lines. Exactly those substrings moved by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-22",
-   "why": "v194: this round has a Weekly Game ($20 each), so the landing summary lists it first and no longer says \"Just for score — no bets this round\" on the one-group link. Exactly those entries moved by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-22",
-   "why": "v195: the organizer strip on the bare link gains the 👥 Players pill after ✏️ Edit round setup (players_sheet_test.js). Exactly that substring added by hand; every other character is the capture."
-  },
-  {
-   "date": "2026-09-23",
-   "why": "v213: every variant gains #handicap-basis-note display none. The element is index.html:1403, added by the USGA Index -> Course -> Playing wave (PR #12); this round's golfers have no handicapIndex, so refreshHandicapBasisNote hides it and writes no text. Verified before re-capturing: across all three links the ONLY differences from the capture were this key and #group-missing-note (which the suite deletes explicitly), both \"none\", in display - the text map was byte-identical, 0 changed and 0 removed entries. Added by hand, the \"repinned\" entry; every other character is still the 6ff9332 capture."
-  }
- ]
+  "repinned": [
+    {
+      "date": "2026-09-19",
+      "why": "the KP entry block (Hole 7 KP / No leader yet / Set KP Leader) moved out of #action-center-mount into #kp-entry-mount under the Prev/Next row, and its head reads Weekly Game KP. Exactly those substrings were moved by hand; every other character is the 6ff9332 capture."
+    },
+    {
+      "date": "2026-09-20",
+      "why": "the group picker (group_picker_test.js): a bare link on a multi-group round shows #group-pick-overlay (display flex) with one row per group in #group-pick-body; a group link and a one-group round hide it (display none). Exactly those entries were added by hand; every other character is the 6ff9332 capture with the 2026-09-19 KP move."
+    },
+    {
+      "date": "2026-09-21",
+      "why": "the organizer doors (organizer_door_test.js): the bare link on a round with neither ownerUid nor organizerToken (this capture, a legacy round) shows the organizer's ✏️ Edit round setup pill after 🔗 Group Links in #group-filter-container; a group link shows neither. Exactly that substring was added by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-22",
+      "why": "the retired-round guard (superseded_round_test.js): renderSupersededBanner sets #superseded-banner display none on every round without supersededBy, so each link variant gains that one display entry. Added by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-22",
+      "why": "the missing-hole warning (score_gaps_test.js): renderGapBanner sets #gap-banner display none on a round with no gap inside any card, so each link variant gains that one display entry. Added by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-22",
+      "why": "the KP question (kp_prompt_test.js, v193): the block under the nav row is the question now - the head reads ⛳ Hole 7 — Closest to the Pin, the line No KP yet., and a writing link gets Did anyone in your group get inside it? with the two answers; a spectator gets the first two lines. Exactly those substrings moved by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-22",
+      "why": "v194: this round has a Weekly Game ($20 each), so the landing summary lists it first and no longer says \"Just for score — no bets this round\" on the one-group link. Exactly those entries moved by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-22",
+      "why": "v195: the organizer strip on the bare link gains the 👥 Players pill after ✏️ Edit round setup (players_sheet_test.js). Exactly that substring added by hand; every other character is the capture."
+    },
+    {
+      "date": "2026-09-23",
+      "why": "v213: every variant gains #handicap-basis-note display none. The element is index.html:1403, added by the USGA Index -> Course -> Playing wave (PR #12); this round's golfers have no handicapIndex, so refreshHandicapBasisNote hides it and writes no text. Verified before re-capturing: across all three links the ONLY differences from the capture were this key and #group-missing-note (which the suite deletes explicitly), both \"none\", in display - the text map was byte-identical, 0 changed and 0 removed entries. Added by hand, the \"repinned\" entry; every other character is still the 6ff9332 capture."
+    },
+    {
+      "at": "dc8a078 (v219)",
+      "why": "v217 added the attendance panel to index.html (#attendance-mount) and never re-captured this golden, so all three links had been red since that wave landed. MEASURED before adding: across all three links the ONLY difference from the 6ff9332 capture was this key - 1 added, 0 changed, 0 removed in the text map, and 0 changed in display apart from group-missing-note which this suite deletes explicitly. No existing sentence moved. The panel is written with mount.innerHTML (index.html:2658), so attendance.js correctly passes its DYNAMIC strings through attEscape: the count line is captured as \"4 haven&#39;t answered\", which renders as an apostrophe. Hard-coded button labels like Can't are raw because a literal apostrophe in element text needs no escaping. Both are correct; the capture records the markup as the page emits it, exactly as it already records the static LIVE MATCHES &amp; PRESSES heading.",
+      "keys": [
+        "links.group-3.text.attendance-mount",
+        "links.bare.text.attendance-mount",
+        "links.one-group-1.text.attendance-mount"
+      ]
+    }
+  ]
 }

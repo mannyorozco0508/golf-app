@@ -134,7 +134,22 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // "none", both in `display`. The `text` map was byte-identical - 0 entries
         // added, 0 changed, 0 removed - so no sentence on any of the three links
         // moved. Added by hand, the fixture's "repinned" entry.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'c3bb774b');
+        // RE-PINNED 2026-09-24 (was c3bb774b): v219 - v217 added the attendance panel
+        // to index.html (#attendance-mount) and never re-captured this golden, so all
+        // three links below had been red since that wave landed. The fixture gains
+        // that ONE key per link and nothing else.
+        // MEASURED BEFORE ADDING, which is the whole point of a golden: across all
+        // three links the text map differed by 1 ADDED key, 0 changed, 0 removed, and
+        // display differed only by group-missing-note (which this suite deletes
+        // explicitly below). No sentence on any link moved.
+        // AND THE ESCAPING IN IT IS CORRECT, not a defect to fix: the panel is written
+        // with mount.innerHTML (index.html:2658), so attendance.js passes its DYNAMIC
+        // strings through attEscape and the count line is captured as
+        // "4 haven&#39;t answered" - which renders as an apostrophe. The hard-coded
+        // button label Can't stays raw because a literal apostrophe in element text
+        // needs no escaping. This capture records markup as the page emits it, the same
+        // way it already records the static "LIVE MATCHES &amp; PRESSES" heading.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'c72ced2a');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
@@ -174,11 +189,19 @@ describe('THE SEAM (source, comments stripped)', () => {
         // `|| []` (1), the helper (2), the Ryder YOUR MATCH ids - an empty list is no
         // match (3), renderLiveBoard's `|| []` (1), and the write in renderScorecard (1).
         assert.equal((code.match(/__scFilteredPlayers/g) || []).length, 8, 'every other reader goes through scopedPlayers()');
-        // The helper's definition plus its nine callers: liveStandings, the ticker,
+        // The helper's definition plus its TEN callers: liveStandings, the ticker,
         // ryderFoursomesContext, the bet strip, confirmSidePress, who-am-I, the recap,
-        // the action center, and (v194) fullCardEntryOrder - the Full Card's walk
-        // over the view's golfers.
-        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 10);
+        // the action center, (v194) fullCardEntryOrder - the Full Card's walk over the
+        // view's golfers - and (v217) renderAttendance at index.html:2655.
+        //
+        // RE-PINNED 2026-09-24 (was 10): v219. renderAttendance is a NEW READER of the
+        // scoped list and this assertion is exactly what should notice one. It is
+        // correct that it reads it: the attendance panel must show the view's golfers,
+        // and it does - a group-3 link lists Ivy, Jon, Kim and Lee and nobody else,
+        // which the golden above now records. It goes through scopedPlayers() rather
+        // than touching __scFilteredPlayers, so the count of raw mentions below stayed
+        // at 8 and the widening idioms this test forbids are still absent.
+        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 11);
     });
     test('the surfaces whose builders widen an empty list do not ask them: recap, action center, the ticker\'s match cards', () => {
         assert.match(fn('renderHoleRecap'), /if \(scopeMissing\(\)\) \{ mount\.innerHTML = ''; return; \}/);

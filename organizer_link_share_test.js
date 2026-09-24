@@ -414,10 +414,13 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         assert.equal(sha('pool-engine.js'), '372e76d7');
         assert.equal(sha('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         assert.equal(sha('grouping.js'), '405b9774');
-        // RE-PINNED 2026-09-23. database.rules.json is this wave: owned setup
-        // is the owner's uid, play paths stay open. format_first_wizard_test.js
-        // holds the full hash. Was 2a7a4918.
-        assert.equal(sha('database.rules.json'), '3f2c646b');
+        // RE-PINNED 2026-09-24 (was 3f2c646b): v219. This file is NOT part of v219 -
+        // 0 lines of diff. The pin went stale when PR #13's owner-only setup lock and
+        // then v217's attendance rules landed, neither of which re-pinned it, so this
+        // assertion had been red since v217. format_first_wizard_test.js carries the
+        // full hash and the description of both changes.
+        // The ruleset is STILL UNPUBLISHED; re-pinning a hash does not deploy it.
+        assert.equal(sha('database.rules.json'), '53fb4075');
     });
 });
 

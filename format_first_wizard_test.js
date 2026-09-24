@@ -721,7 +721,17 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // a legacy round with no ownerUid (the previous open rule). Play paths
         // gained a child .write so a code-holder can still score. tournaments
         // was not edited. wave2_rules_test.js holds the rows.
-        'database.rules.json': '3f2c646bd2896a912fc739ea43a5cb3c6b40feee1a9b285f477019530dbdb2e3',
+        // RE-PINNED 2026-09-24 (was 3f2c646b...): v219, and the file itself is
+        // UNTOUCHED by this wave - 0 lines of diff. The pin had gone stale TWICE
+        // over, and both times the change landed without moving it:
+        //   4f4ec0a (PR #13)  the owner-only consumer setup lock described above
+        //   ae22953 (v217)    the attendance node - events/$eventCode/attendance,
+        //                     writable by any code-holder, $playerId numeric, each
+        //                     record {status: in|out, at: number > 0}, $other false
+        // A frozen-hash guard that nobody re-pins reports a change it cannot
+        // explain, which is how this sat red from v217 to v219.
+        // STILL NOT PUBLISHED to the live database. Nothing here publishes it.
+        'database.rules.json': '53fb40756a04be1b966f2b72c5448423dcce255ec95f606fae9600c0a409ada5',
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,
