@@ -89,7 +89,7 @@ function lobbyAt(href) {
         origin: isWeb ? u.origin : APP_ORIGIN,
         pathname: isWeb ? u.pathname : '/admin.html',
     };
-    vm.runInContext("alert = function (m) { window.__said = m; };"
+    vm.runInContext("alert = function (m) { window.__said = m; }; uiRefuse = function (m) { window.__said = m; }; uiFail = function (m) { window.__said = m; }; uiToast = function (m) { window.__said = m; };"
         + ' location = ' + JSON.stringify(loc) + '; window.location = location; navigator.onLine = true;', sb);
     return {
         sb,

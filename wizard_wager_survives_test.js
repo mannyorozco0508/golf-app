@@ -45,7 +45,7 @@ function wizard(playerCount) {
     const players = NAMES.slice(0, playerCount).map((name, i) =>
         ({ id: 101 + i, name, hcp: '0' }));
     vm.runInContext(`
-        alert = function () {}; currentMode = 'WZRD';
+        alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; currentMode = 'WZRD';
         collectWizardPlayers = function () { return ${JSON.stringify(players)}; };
     `, sb);
     return sb;

@@ -367,7 +367,7 @@ describe('6. THE WIZARD READS THE SETTING BACK', () => {
             beforeRun(sandbox) { sandbox.__dbReads = rec ? { 'events/HB1': J(rec) } : {}; }
         });
         sb.crypto = require('crypto').webcrypto;
-        run(sb, 'alert = function () {};');
+        run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
         return sb;
     };
     const basisValue = (sb) => String(run(sb, "(document.getElementById('handicap-basis-select') || {}).value || ''"));
@@ -434,7 +434,7 @@ describe('7. THE SAVE, both bases, through the wizard\'s own save chain', () => 
             beforeRun(sandbox) { sandbox.__dbReads = {}; }
         });
         sb.crypto = require('crypto').webcrypto;
-        run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
+        run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiRefuse = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiFail = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiToast = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
         await new Promise(r => setTimeout(r, 80));
         run(sb, 'document.__mount(document.getElementById("player-list"));');
         run(sb, 'document.getElementById("player-list").innerHTML = "";');

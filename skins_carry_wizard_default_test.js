@@ -45,7 +45,7 @@ const CD = makeCourseData(18);
 async function freshWizard(code) {
     const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + code });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function () {};');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
     await new Promise(r => setTimeout(r, 20));
     return sb;
 }
@@ -61,7 +61,7 @@ function storeRound(sb, code, record) {
 async function reopen(code, record) {
     const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + code });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function () {};');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
     storeRound(sb, code, record);
     // The roster rows the load rebuilds must be attached for querySelectorAll to
     // see them (mini-dom), or collectWizardPlayers() reads an empty field and the
@@ -136,7 +136,7 @@ describe('a REOPENED round: the wizard shows what the engine pays', () => {
         const lineFor = async (record, code) => {
             const sb = loadHtmlInlineScript('admin.html', [], { search: '?game=' + code });
             sb.crypto = require('crypto').webcrypto;
-            run(sb, 'alert = function () {};');
+            run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
             storeRound(sb, code, record);
             run(sb, 'showRoundReadyScreen(' + JSON.stringify(code) + ')');      // the screen's own fetch + render
             await new Promise(r => setTimeout(r, 40));

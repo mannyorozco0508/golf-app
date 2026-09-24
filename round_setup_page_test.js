@@ -97,10 +97,15 @@ describe('THE DESTRUCTIVE CONTROL IS THE QUIETEST ONE', () => {
     });
 
     test('the confirmation in front of it is untouched', () => {
-        const fn = ADM.slice(ADM.indexOf('function endAndClearRound'),
-                             ADM.indexOf('function endAndClearRound') + 700);
-        assert.match(fn, /confirm\(/,
+        // UI WAVE 3: the question is the shared sheet, awaited. Read to the end of
+        // the function, not a fixed 700 characters - a comment above the decision
+        // pushed the code this test guards outside the old window.
+        const fnAt = ADM.indexOf('async function endAndClearRound');
+        const fn = ADM.slice(fnAt, ADM.indexOf('\n    }', fnAt));
+        assert.match(fn, /await uiConfirm\(/,
             'a small button is not a substitute for asking');
+        assert.match(fn, /cancelText: 'Keep the round'/,
+            'and the quiet way out must say what it keeps');
         assert.match(fn, /db\.ref\(`events\/\$\{currentMode\}`\)\.remove\(\)/);
     });
 

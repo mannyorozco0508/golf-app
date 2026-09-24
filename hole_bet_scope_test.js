@@ -83,7 +83,7 @@ function holeBetFormats() {
 function panelShownFor(format) {
     const sb = loadHtmlInlineScript('admin.html', ADMIN);
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         document.getElementById('game-format-select').value = '${format}';
         handleFormatChange();
     `, sb);

@@ -80,7 +80,7 @@ function settle(d) {
 function step6(loadedFormat, { tick = true } = {}) {
     const sb = loadHtmlInlineScript('admin.html', ADMIN);
     vm.runInContext(`
-        alert = function(m){ window.__alert = m; };
+        alert = function(m){ window.__alert = m; }; uiRefuse = function(m){ window.__alert = m; }; uiFail = function(m){ window.__alert = m; }; uiToast = function(m){ window.__alert = m; };
         copyFromCode = null;
         collectWizardPlayers = function(){ return ${JSON.stringify(TEAMS)}; };
         var data = { gameFormat: '${loadedFormat}' };
@@ -312,7 +312,7 @@ describe('NOTHING LEGITIMATE WAS BLOCKED', () => {
     test('a copied legacy Nassau becomes stroke, so Nassau stays available', () => {
         const sb = loadHtmlInlineScript('admin.html', ADMIN);
         vm.runInContext(`
-            alert=function(){}; copyFromCode='SRC1';
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){}; copyFromCode='SRC1';
             collectWizardPlayers = function(){ return ${JSON.stringify(TEAMS)}; };
             var data = { gameFormat: 'nassau' };
             const isCopy = !!copyFromCode;

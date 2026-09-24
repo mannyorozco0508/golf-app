@@ -60,7 +60,7 @@ function adminFormatBlock() {
 }
 function loadRound(data, { asCopy = false } = {}) {
     const sb = loadHtmlInlineScript('admin.html', ADMIN);
-    vm.runInContext(`alert=function(){}; copyFromCode=${asCopy ? "'SRC1'" : 'null'};`, sb);
+    vm.runInContext(`alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){}; copyFromCode=${asCopy ? "'SRC1'" : 'null'};`, sb);
     vm.runInContext(`var data = ${JSON.stringify(data)};\n` + adminFormatBlock(), sb);
     return {
         format: vm.runInContext('document.getElementById("game-format-select").value', sb),

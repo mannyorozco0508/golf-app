@@ -2045,7 +2045,35 @@
 // of the sweep cannot be forgotten. The consumer product cache is
 // consumer-v68-index-dialogs. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v227-index-dialogs';
+// Moved to v228 because the SETUP WIZARD stops speaking as a website. UI Wave 3
+// sweeps admin.html - the biggest of the three by a distance: 38 alerts become 18
+// inline refusals, 14 persistent failures and 6 toasts, five decisions go through
+// the shared sheet awaited (whole-dollar settling, removing a skins game, removing
+// a golfer who has posted scores, starting a round with unnamed golfers, and
+// delete round), and the LAST prompt() in the app - the game-code tool behind the
+// five-tap panel - becomes an inline field.
+//
+// THE TYPED ONE IS THE NEW SHAPE. uiPrompt resolves to a trimmed, uppercased
+// string or to null, and null covers cancelled AND empty so the two cannot
+// diverge. Its answer is not a yes or no: it names the round whose payouts change,
+// and a test drives three spellings of one code through the page to prove the
+// path that lands is the string typed.
+//
+// Delete round on this page got the same treatment index.html got in v227 - both
+// answers in real Chrome at 390x844, Cancel first in the DOM and holding the
+// focus - because each page's inline script owns its own copy of that function and
+// one page's proof is not the other's.
+//
+// A device on v227 keeps the browser dialogs on the setup wizard. No engine and no
+// protected file changed. admin.html's own .modal-overlay was deliberately LEFT as
+// it is rather than reconciled with the other two: after the sweep it dresses one
+// element and nothing in the shared component reads it, while lowering its z-index
+// to match would put that modal under this page's own dropdown. trip.html is the
+// last unconverted page and its one remaining decision is counted in
+// dialog_await_guard_test.js. The consumer product cache is
+// consumer-v69-admin-dialogs. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v228-admin-dialogs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

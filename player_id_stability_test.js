@@ -73,7 +73,7 @@ const run = (sb, expr) => vm.runInContext(expr, sb);
 // document.querySelectorAll('.player-row') see the rows production appends.
 function wizard() {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
-    run(sb, 'alert=function(){};');
+    run(sb, 'alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};');
     run(sb, 'document.__mount(document.getElementById("player-list"));');
     return sb;
 }

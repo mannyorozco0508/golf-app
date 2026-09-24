@@ -69,8 +69,19 @@ async function arrive(rec, opts) {
     const sb = loadHtmlInlineScript('admin.html', ['pwa-boot.js'], { search: '?game=' + CODE,
         beforeRun(sandbox) { sandbox.__dbReads = { ['events/' + CODE]: JSON.parse(JSON.stringify(rec)) }; } });
     await new Promise((r) => setTimeout(r, 60));   // the arrival's once() -> loadModeData -> its once(): real microtask chains
-    sb.__alerts = []; sb.alert = (m) => sb.__alerts.push(String(m));
-    sb.__confirms = []; sb.confirm = (m) => { sb.__confirms.push(String(m)); return (opts && opts.confirm === false) ? false : true; };
+    // UI WAVE 3: this page speaks through ui-dialogs.js now. The three tells feed
+    // the SAME array, so every assertion below about what the organizer was told
+    // reads unchanged - what changed is HOW the page says it, not what it says.
+    sb.__alerts = []; sb.__kinds = [];
+    const say = (kind) => (m) => { sb.__alerts.push(String(m)); sb.__kinds.push(kind); };
+    sb.alert = say('alert'); sb.uiRefuse = say('refuse'); sb.uiFail = say('fail'); sb.uiToast = say('toast');
+    // And the decision is a PROMISE now. A test that stubbed it synchronously
+    // would be asserting against its own mock rather than the page's await.
+    sb.__confirms = [];
+    sb.uiConfirm = (o) => {
+        sb.__confirms.push(JSON.parse(JSON.stringify(o || {})));
+        return Promise.resolve(!(opts && opts.confirm === false));
+    };
     sb.__nav = null; try { Object.defineProperty(sb.window.location, 'href', { set: (v) => { sb.__nav = v; }, get: () => 'admin.html?game=' + CODE, configurable: true }); } catch (e) { /* mini-dom location may be plain */ }
     if (opts && opts.refuse) sb.__dbRefuse = (p, op) => (op === 'remove' && /^events\/WDR1$/.test(p)) ? Object.assign(new Error(opts.refuse.message), { code: opts.refuse.code }) : null;
     return sb;
@@ -114,9 +125,19 @@ describe('2. AN UNSCORED ROUND wipes as it always did - Rule A\'s legitimate cas
         sb.localStorage.setItem('lastRoomCode', CODE);
         sb.endAndClearRound(); await settle();
         assert.equal(sb.__confirms.length, 1);
-        assert.equal(sb.__confirms[0], 'Delete round WDR1 for everyone?\n\n'
-            + 'This erases all scores for all 2 golfers, and every bet, press and side match with them. It cannot be undone.\n\n'
+        // The same sentences, split across the sheet's title and body. The title
+        // is the question; the body is what it costs.
+        assert.equal(sb.__confirms[0].title, 'Delete round WDR1 for everyone?');
+        assert.equal(sb.__confirms[0].body,
+            'This erases all scores for all 2 golfers, and every bet, press and side match with them. It cannot be undone.\n\n'
             + 'You do not need to delete a round when you finish playing.');
+        // AND THE DESTRUCTIVE BUTTON IS NOT THE DEFAULT. Cancel says what it
+        // keeps, the confirm says what it does, and ui-dialogs.js renders and
+        // focuses Cancel first - driven in real Chrome in
+        // dialog_admin_delete_chrome_test.js.
+        assert.equal(sb.__confirms[0].confirmText, 'Delete it');
+        assert.equal(sb.__confirms[0].cancelText, 'Keep the round');
+        assert.equal(sb.__confirms[0].danger, true);
         assert.equal(removes(sb).length, 1, 'exactly one delete of the round');
         assert.equal(sb.__dbWrites.length, 1);
         assert.deepEqual(sb.__alerts, [SUCCESS]);
@@ -168,16 +189,28 @@ describe('4. THE LABEL, THE HELPER LINE, THE SOURCE', () => {
         const fn = ADMIN.slice(at, ADMIN.indexOf('\n    }', at));
         assert.ok(fn.length > 200, 'the function exists');
         const check = fn.indexOf('loadedScores');
-        const conf = fn.indexOf('confirm(');
+        const conf = fn.indexOf('uiConfirm(');
         assert.ok(check > 0 && conf > 0 && check < conf, 'loadedScores is read before the confirm');
+        // AWAITED. Without the await `ok` is a truthy Promise and `if (!ok)` never
+        // returns, so the round is deleted even when the organizer says no - and
+        // the harness cannot see that, which is what dialog_await_guard_test.js is
+        // for. Pinned here too because this is the file that owns this function.
+        assert.match(fn, /await uiConfirm\(/, 'the decision must be awaited');
+        assert.ok(/async function endAndClearRound\s*\(/.test(ADMIN),
+            'endAndClearRound must be async');
         assert.match(fn, /PERMISSION_DENIED/i, 'the late refusal is told apart by the error text');
         assert.match(fn, /localStorage\.removeItem\('lastRoomCode'\)/);
         assert.doesNotMatch(fn, /currentData\.scores|snapshot|once\(/, 'the check reads what the page holds, not a fresh read');
     });
     test('the scorecard\'s own control (index.html) is untouched by this wave', () => {
         const idx = read('index.html');
-        assert.match(idx, /Delete round \$\{currentMode\} for everyone\?/);
+        // Both pages went through the dialog waves (index.html in Wave 2, this one
+        // in Wave 3) and both still say the same thing - which is the point of the
+        // twin. The title is now the sheet's title rather than a confirm() string.
+        assert.ok(idx.includes('Delete round ${currentMode} for everyone?'),
+            'the scorecard\'s question changed');
         assert.match(idx, /Round deleted\. The scorecard is now clear\./);
+        assert.match(idx, /await uiConfirm\(/, 'and the scorecard still awaits it');
     });
     test('sw.js moved for this wave (v178) and has not moved back', () => {
         assert.match(read('sw.js'), /Moved to v178:/);

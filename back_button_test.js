@@ -99,7 +99,7 @@ function walkToLastHole(sb) {
 
 function matches(players, extra) {
     const sb = loadHtmlInlineScript('sidematches.html', ['pwa-boot.js'], { search: '?game=' + CODE });
-    run(sb, 'alert = function () {}; confirm = function () { return true; };');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; confirm = function () { return true; }; uiConfirm = function (o) { return Promise.resolve(!!(function () { return true; })(o)); };');
     const data = Object.assign({ gameFormat: 'stroke', players: players || roster(8), courseData: CD,
                                  scores: {} }, extra || {});
     arrive(sb, data);
@@ -109,7 +109,7 @@ function matches(players, extra) {
 function setup() {
     const sb = loadHtmlInlineScript('admin.html', ['pwa-boot.js'], { search: '?game=' + CODE });
     sb.crypto = require('crypto').webcrypto;
-    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
+    run(sb, 'alert = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiRefuse = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiFail = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); }; uiToast = function (m) { window.__alerts = (window.__alerts || []).concat([String(m)]); };');
     run(sb, 'window.__writes = []; db.ref = function (p) { return {'
         + ' set: function (v) { window.__writes.push({ p: p, v: v }); return Promise.resolve(); },'
         + ' update: function (v) { window.__writes.push({ p: p, v: v }); return Promise.resolve(); },'
@@ -138,7 +138,7 @@ function walkWizard(sb, upToStep) {
 
 function trip(withRounds) {
     const sb = loadHtmlInlineScript('trip.html', ['pwa-boot.js']);
-    run(sb, 'alert = function () {};');
+    run(sb, 'alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};');
     if (withRounds) {
         const ps = roster(4).map(p => Object.assign({}, p, { playingForMoney: true }));
         const sc = {}; ps.forEach(p => CD.forEach(h => { sc['p' + p.id + '_h' + h.hole] = 4; }));

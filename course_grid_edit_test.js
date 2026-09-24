@@ -377,7 +377,12 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
         run(sb, `goToWizardStep(2); document.getElementById('enable-custom-course').checked = true;`);
         seed(sb, 'Manny Test Links'); fillValid(sb);
         setHcp(sb, 9, 18);
-        run(sb, `window.__alerts = []; window.alert = m => window.__alerts.push(m);`);
+        // UI WAVE 3: the page refuses through uiRefuse now. All four feed the same
+        // array so the assertion below still reads what the organizer was told.
+        run(sb, `window.__alerts = []; window.alert = m => window.__alerts.push(m);`
+            + `window.uiRefuse = m => window.__alerts.push(m);`
+            + `window.uiFail = m => window.__alerts.push(m);`
+            + `window.uiToast = m => window.__alerts.push(m);`);
         run(sb, `wizardNext(2);`);
         assert.equal(val(sb, 'currentWizardStep'), 2, 'must not advance');
         assert.match(sb.window.__alerts[0], /Handicap 18 is used on both hole 9 and hole 18/);

@@ -56,7 +56,7 @@ const roster = n => Array.from({ length: n }, (_, i) =>
 function ready(n) {
     const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js'],
         { search: '?game=RRDY' });
-    vm.runInContext('alert = function () {}; currentMode = "RRDY";', sb);
+    vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; currentMode = "RRDY";', sb);
     vm.runInContext('renderRoundReady(' + JSON.stringify({
         eventName: 'Weekend Round', courseName: 'Caledonia', gameFormat: 'stroke',
         players: roster(n), courseData: CD, scores: {} }) + ');', sb);

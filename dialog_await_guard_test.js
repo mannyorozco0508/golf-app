@@ -40,7 +40,7 @@ const { REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // CONVERTED — must be clean. Every page here has been through the wave.
-const CONVERTED = ['sidematches.html', 'index.html', 'skins.html', 'season.html',
+const CONVERTED = ['sidematches.html', 'index.html', 'admin.html', 'skins.html', 'season.html',
                    'leaderboard.html', 'settlement.html', 'game.html'];
 
 // NOT YET CONVERTED, and the count of native decisions each still has.
@@ -52,8 +52,12 @@ const CONVERTED = ['sidematches.html', 'index.html', 'skins.html', 'season.html'
 // also fails here. Neither can drift quietly while the guard reports green.
 // UI Wave 2 moved index.html out of here and into CONVERTED above: 35 alerts and
 // its 3 confirms - the KP nobody-won, cancel-all-KPs and delete-round decisions.
+// UI Wave 3 moved admin.html: 38 alerts, five decisions (whole-dollar settling,
+// removing a skins game, removing a golfer with posted scores, saving with
+// unnamed placeholders, delete round) and the app's last prompt(), the game-code
+// tool behind the five-tap panel, which became uiPrompt.
 // The count dropping is the point of pinning it.
-const PENDING = { 'admin.html': 6, 'trip.html': 1 };
+const PENDING = { 'trip.html': 1 };
 
 const CONSUMER = CONVERTED.concat(Object.keys(PENDING));
 const OUT_OF_SCOPE = ['tournament.html', 'tournament-scorecard.html'];
@@ -143,8 +147,8 @@ describe('no dialog answer is used without awaiting it', () => {
     });
 
     CONSUMER.forEach(page => {
-        test(page + ': every uiConfirm / uiAmount whose answer is used is awaited', () => {
-            const hits = sitesUsingAnswer(page, ['uiConfirm', 'uiAmount']);
+        test(page + ': every uiConfirm / uiAmount / uiPrompt whose answer is used is awaited', () => {
+            const hits = sitesUsingAnswer(page, ['uiConfirm', 'uiAmount', 'uiPrompt']);
             const missing = hits.filter(h => !/await\s*$/.test(h.before));
             assert.deepEqual(missing.map(h => page + ':' + h.line + '  ' + h.text.slice(0, 90)), [],
                 'a promise is being used as a value. `!uiConfirm(...)` is always false '
@@ -202,7 +206,7 @@ describe('no dialog answer is used without awaiting it', () => {
         const tmp = path.join(REPO_ROOT, '.dialog-scan-probe.html');
         fs.writeFileSync(tmp, '<script>\n' + fake + '\n</script>');
         try {
-            const hits = sitesUsingAnswer('.dialog-scan-probe.html', ['uiConfirm', 'uiAmount']);
+            const hits = sitesUsingAnswer('.dialog-scan-probe.html', ['uiConfirm', 'uiAmount', 'uiPrompt']);
             const missing = hits.filter(h => !/await\s*$/.test(h.before));
             assert.equal(missing.length, 2,
                 'the detector should find exactly the two unawaited uses, found '

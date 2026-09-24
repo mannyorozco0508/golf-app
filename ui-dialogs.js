@@ -4,10 +4,12 @@
 // WHAT THIS REPLACES. alert(), confirm() and prompt() render a browser chrome
 // that says "golf-app-5a5.pages.dev says" above the message — or the capacitor://
 // origin inside the native app. A golfer reads that as a website error, not as
-// their scorecard talking to them. There were 161 of them across the consumer
-// pages (tournament.html is the other product and is out of scope).
+// their scorecard talking to them. There were 168 of them across the consumer
+// pages — 154 alert, 10 confirm, 4 prompt, counted with the single-pass scanner
+// in dialog_await_guard_test.js after a regex-chain counter under-reported them
+// (tournament.html is the other product and is out of scope).
 //
-// FOUR THINGS, AND THE SPLIT IS NOT COSMETIC — IT IS WHAT THE MESSAGE IS FOR:
+// SIX THINGS, AND THE SPLIT IS NOT COSMETIC — IT IS WHAT THE MESSAGE IS FOR:
 //
 //   uiRefuse(msg)   THE ACTION DID NOT HAPPEN. Inline, next to the control that
 //                   was tapped, and it STAYS until something changes. A refusal
@@ -31,6 +33,10 @@
 //
 //   uiAmount(o)     A NUMBER. Returns a PROMISE<number|null>. inputmode="decimal"
 //                   so a phone gives a numeric keypad, which prompt() cannot do.
+//
+//   uiPrompt(o)     SOME TEXT. Returns a PROMISE<string|null>. Added in Wave 3
+//                   for admin.html's game-code tool, the app's last prompt().
+//                   Empty is null, so "never mind" and "" cannot diverge.
 //
 // THE PROMISES ARE THE WHOLE RISK OF THIS WAVE. confirm() and prompt() are
 // synchronous and these are not, so every caller must await. A MISSED AWAIT DOES
@@ -57,6 +63,11 @@
 // diverged from index.html's and sidematches.html's) and six consumer pages had
 // none at all, so "use the page's existing modal" would have meant adding a
 // fourth and fifth copy. One file, loaded by any page that needs to speak.
+//
+// Wave 3 LEFT admin.html's drifted copy alone rather than reconciling it: after
+// the sweep it dresses one surviving element (#paste-players-modal) and nothing
+// here reads it, while lowering it to 999 would put that modal under the page's
+// own z-index-1000 dropdown. dialog_admin_test.js pins that decision and why.
 // ============================================================================
 (function (root) {
     'use strict';
@@ -90,9 +101,14 @@
         '.ui-btn-cancel{background:var(--bg-card,#fff);color:var(--text-main,#1a1a1a);border:1px solid var(--border-mid,#d0e1db)}',
         '.ui-btn-go{background:var(--brand-green,#0f4c3a);color:#fff;border:1px solid var(--brand-green,#0f4c3a)}',
         '.ui-btn-danger{background:var(--accent-red,#e63946);color:#fff;border:1px solid var(--accent-red,#e63946)}',
-        '.ui-amount-input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;margin:0 0 12px 0;',
-        'border:1px solid var(--border-mid,#d0e1db);border-radius:8px;font-size:16px;',
-        'background:var(--bg-card,#fff);color:var(--text-main,#1a1a1a)}'
+        '.ui-amount-input,.ui-text-input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;',
+        'margin:0 0 12px 0;border:1px solid var(--border-mid,#d0e1db);border-radius:8px;font-size:16px;',
+        'background:var(--bg-card,#fff);color:var(--text-main,#1a1a1a)}',
+        // A game code is four or five characters and is read back out loud across
+        // a fairway. Monospace and wide tracking so O and 0 are not the same
+        // glyph; 16px minimum so iOS does not zoom the page on focus.
+        '.ui-text-input.ui-text-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;',
+        'letter-spacing:0.12em;text-transform:uppercase;font-size:17px}'
     ].join('');
 
     function ensureStyle() {
@@ -321,6 +337,90 @@
         });
     }
 
+    // ---- SOME TEXT ---------------------------------------------------------
+    // Returns a PROMISE<string|null>. null means cancelled OR empty, and a caller
+    // must be able to treat those the same way: changing your mind is not an
+    // error and must not be scolded.
+    //
+    // WHY THIS IS NOT uiAmount WITH A DIFFERENT KEYBOARD. uiAmount resolves to a
+    // NUMBER and exists to guarantee it is never NaN. The one thing this collects
+    // in the app is a GAME CODE - alphanumeric, uppercased, four or five
+    // characters - and it names the round whose money changes. A number field
+    // cannot hold it and Number() would turn it into NaN.
+    //
+    // WHAT A MISSED AWAIT DOES HERE, MEASURED. The caller's
+    // `typed ? String(typed).toUpperCase().trim() : ''` turns a Promise into the
+    // literal string "[OBJECT PROMISE]", so the path becomes
+    // events/[OBJECT PROMISE]. The real SDK rejects that key - `[` and `]` are two
+    // of the five characters Firebase forbids - but the test harness's db stub does
+    // not enforce keys, so it reads back nothing and looks like a round that is not
+    // there. Nothing on either side CHECKED anything; the throw is a side effect of
+    // one forbidden character. dialog_await_guard_test.js is what actually checks.
+    function uiPrompt(opts) {
+        var o = opts || {};
+        var title = o.title || 'Type it in';
+        var body = o.body || '';
+        var initial = (o.value === undefined || o.value === null) ? '' : String(o.value);
+        ensureStyle();
+        if (typeof document === 'undefined' || !document.createElement || typeof Promise === 'undefined') {
+            return Promise.resolve(null);
+        }
+        var s = sheet();
+        s.innerHTML =
+            '<div class="ui-sheet-card">'
+          + '<p class="ui-sheet-title">' + esc(title) + '</p>'
+          + (body ? '<p class="ui-sheet-body">' + esc(body) + '</p>' : '')
+          + '<input id="ui-text-input" class="ui-text-input' + (o.code ? ' ui-text-code' : '') + '" type="text" '
+          + 'autocomplete="off" spellcheck="false" '
+          + 'autocapitalize="' + (o.code ? 'characters' : 'sentences') + '" '
+          + (o.maxLength ? 'maxlength="' + Number(o.maxLength) + '" ' : '')
+          + (o.placeholder ? 'placeholder="' + esc(o.placeholder) + '" ' : '')
+          + 'aria-label="' + esc(title) + '">'
+          + '<div class="ui-sheet-row">'
+          + '<button type="button" class="ui-btn-cancel" id="ui-text-cancel">' + esc(o.cancelText || 'Cancel') + '</button>'
+          + '<button type="button" class="ui-btn-go" id="ui-text-ok">' + esc(o.confirmText || 'Go') + '</button>'
+          + '</div></div>';
+        if (s.classList) s.classList.add('open');
+        var box = document.getElementById('ui-text-input');
+        if (box) {
+            box.value = initial;
+            // The INPUT takes the focus here, not Cancel: there is nothing to
+            // decide yet and a golfer opened this to type. The
+            // destructive-button rule belongs to uiConfirm, and the decision
+            // that follows this field is a separate uiConfirm of its own.
+            if (box.focus) { try { box.focus(); } catch (e) {} }
+        }
+        return new Promise(function (resolve) {
+            var done = false;
+            function finish(v) {
+                if (done) return;
+                done = true;
+                closeSheet();
+                resolve(v);
+            }
+            function take() {
+                var raw = box ? String(box.value == null ? '' : box.value) : '';
+                var out = raw.trim();
+                if (o.code) out = out.toUpperCase();
+                // EMPTY IS A CANCEL, not an empty answer. Every caller in the app
+                // treats null as "never mind" and would treat '' as a code.
+                finish(out === '' ? null : out);
+            }
+            var ok = document.getElementById('ui-text-ok');
+            var cancel = document.getElementById('ui-text-cancel');
+            if (ok) ok.onclick = take;
+            if (cancel) cancel.onclick = function () { finish(null); };
+            // Return on a phone keyboard submits, the way prompt() did.
+            if (box) box.onkeydown = function (ev) {
+                if (ev && (ev.key === 'Enter' || ev.keyCode === 13)) {
+                    if (ev.preventDefault) ev.preventDefault();
+                    take();
+                }
+            };
+            s.__resolve = finish;
+        });
+    }
+
     installTapWatch();
 
     var api = {
@@ -329,6 +429,7 @@
         uiToast: uiToast,
         uiConfirm: uiConfirm,
         uiAmount: uiAmount,
+        uiPrompt: uiPrompt,
         uiClearNotes: clearNotes,
         uiCloseSheet: closeSheet,
         uiDwellFor: dwellFor,

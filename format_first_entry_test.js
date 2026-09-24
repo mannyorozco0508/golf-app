@@ -34,7 +34,7 @@ const STEP = { course: 1, length: 2, format: 3, settings: 4, players: 5, action:
 function wizard(format) {
     const sb = loadHtmlInlineScript('admin.html', DEPS);
     vm.runInContext(`
-        alert = function(){};
+        alert = function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
         collectWizardPlayers = function(){ return []; };
         renderPlayerList = function(){};
         renderStackedGames = function(){};

@@ -278,9 +278,15 @@ describe('ACTION ICONS — AND THE ONE THAT DELETES A ROUND', () => {
     test('the destructive confirmation was not weakened', () => {
         // Changing an icon must not have touched the safeguard behind it.
         assert.match(ADMIN, /function endAndClearRound/);
-        const fn = ADMIN.slice(ADMIN.indexOf('function endAndClearRound'),
-            ADMIN.indexOf('function endAndClearRound') + 900);
-        assert.match(fn, /confirm\(/, 'the confirmation prompt must survive');
+        // To the end of the function rather than a fixed window, so a comment added
+        // above the decision cannot make this report a missing safeguard.
+        const fnAt = ADMIN.indexOf('async function endAndClearRound');
+        const fn = ADMIN.slice(fnAt, ADMIN.indexOf('\n    }', fnAt));
+        // UI WAVE 3: the safeguard is the shared sheet now, and it must be AWAITED -
+        // `if (!uiConfirm(...))` without the await is always false and deletes the
+        // round unasked, which is a weaker safeguard than none because it looks
+        // like one.
+        assert.match(fn, /await uiConfirm\(/, 'the confirmation must survive, and be awaited');
     });
 
     test('📥 means join, and only join', () => {

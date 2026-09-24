@@ -239,7 +239,7 @@ describe('THE WIZARD — admin.html, driven for real', () => {
     function wizard(front, back, overall, mode) {
         const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
         vm.runInContext(`
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             document.getElementById('setup-nassau-front').value='${front}';
             document.getElementById('setup-nassau-back').value='${back}';
             document.getElementById('setup-nassau-overall').value='${overall}';
@@ -309,7 +309,7 @@ describe('THE SIDE-MATCH FORM — sidematches.html, driven for real', () => {
     function form(front, back, overall, mode) {
         const sb = loadHtmlInlineScript('sidematches.html', SM_DEPS);
         vm.runInContext(`
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             document.getElementById('sm-front-stake').value='${front}';
             document.getElementById('sm-back-stake').value='${back}';
             document.getElementById('sm-overall-stake').value='${overall}';
@@ -423,7 +423,7 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
     function openWizard(front, back, overall) {
         const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
         vm.runInContext(`
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers=function(){ return [{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}]; };
             document.getElementById('setup-nassau-front').value='${front}';
             document.getElementById('setup-nassau-back').value='${back}';
@@ -458,7 +458,7 @@ describe('THE LABEL IS PRICED WHEN THE CONTROL APPEARS', () => {
     function openSideMatch(front, back, overall) {
         const sb = loadHtmlInlineScript('sidematches.html', SM_DEPS);
         vm.runInContext(`
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             currentData={players:[{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}],courseData:[],scores:{}};
             document.getElementById('sm-front-stake').value='${front}';
             document.getElementById('sm-back-stake').value='${back}';
@@ -533,7 +533,7 @@ describe('THE WORD "SEGMENT" IS GONE FROM EVERYTHING A GOLFER READS', () => {
     test('what the wizard renders on open says "bet"', () => {
         const sb = loadHtmlInlineScript('admin.html', ADMIN_DEPS);
         vm.runInContext(`
-            alert=function(){};
+            alert=function(){}; uiRefuse = function(){}; uiFail = function(){}; uiToast = function(){};
             collectWizardPlayers=function(){ return [{id:101,name:'Marty',hcp:'0'},{id:102,name:'Manny',hcp:'0'}]; };
             document.getElementById('setup-nassau-front').value='10';
             document.getElementById('setup-nassau-back').value='10';

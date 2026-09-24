@@ -66,7 +66,7 @@ const IDX_DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'actio
 function home(search, seed) {
     const sb = loadHtmlInlineScript('admin.html', DEPS,
         { search: search, localStorage: true, seedStorage: seed });
-    vm.runInContext('alert = function () {}; confirm = function () { return true; };', sb);
+    vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; confirm = function () { return true; }; uiConfirm = function (o) { return Promise.resolve(!!(function () { return true; })(o)); };', sb);
     return sb;
 }
 const run = (sb, e) => vm.runInContext(e, sb);
@@ -119,8 +119,11 @@ describe('OPENING THE WIZARD DOES NOT CLAIM A ROUND EXISTS', () => {
 
     test('resume still reads it, and ending a round still clears it', () => {
         assert.match(ADMIN, /localStorage\.getItem\('lastRoomCode'\)/);
-        const end = ADMIN.slice(ADMIN.indexOf('function endAndClearRound'),
-                                ADMIN.indexOf('function endAndClearRound') + 900);
+        // To the END OF THE FUNCTION, not a fixed 900 characters: UI Wave 3 added a
+        // comment above the decision and a fixed window stopped short of the line
+        // this test exists to find, reporting a removed feature that was there.
+        const fnAt = ADMIN.indexOf('async function endAndClearRound');
+        const end = ADMIN.slice(fnAt, ADMIN.indexOf('\n    }', fnAt));
         assert.match(end, /localStorage\.removeItem\('lastRoomCode'\)/,
             'ending a round no longer clears the pointer to it');
     });
@@ -132,7 +135,7 @@ describe('A POINTER TO A ROUND THAT IS GONE CLEANS ITSELF UP', () => {
     function scorecard(code, seed) {
         const sb = loadHtmlInlineScript('index.html', IDX_DEPS,
             { search: '?game=' + code, localStorage: true, seedStorage: seed });
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         const handlers = sb.__dbHandlers.filter(h => h.event === 'value');
         assert.ok(handlers.length > 0, 'the scorecard registered no value handler');
         handlers.forEach(h => h.cb({ val: () => null }));
@@ -205,7 +208,7 @@ describe('A POINTER TO A ROUND THAT IS GONE CLEANS ITSELF UP', () => {
     test('a round WITH data never shows either message', () => {
         const sb = loadHtmlInlineScript('index.html', IDX_DEPS,
             { search: '?game=REALRD', localStorage: true, seedStorage: { lastRoomCode: 'REALRD' } });
-        vm.runInContext('alert = function () {};', sb);
+        vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {};', sb);
         sb.__dbHandlers.filter(h => h.event === 'value').forEach(h => h.cb({
             val: () => ({ players: [{ id: 101, name: 'Ann', hcp: '0' }],
                           courseData: [{ hole: 1, par: 4, hcpIndex: 1 }], scores: {} })

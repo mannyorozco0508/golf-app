@@ -51,7 +51,7 @@ const P = [{ id: 101, name: 'Ann Adams', hcp: '0' }, { id: 102, name: 'Bob Brown
 function arrive(setupParam) {
     const search = '?game=ARRIVE' + (setupParam ? '&setup=ryder' : '');
     const sb = loadHtmlInlineScript('sidematches.html', DEPS, { search: search });
-    vm.runInContext('alert = function () {}; isOrganizerView = function () { return true; };', sb);
+    vm.runInContext('alert = function () {}; uiRefuse = function () {}; uiFail = function () {}; uiToast = function () {}; isOrganizerView = function () { return true; };', sb);
     const round = { players: P, courseData: CD, scores: {} };
     const handlers = sb.__dbHandlers.filter(h => h.event === 'value');
     assert.ok(handlers.length > 0, 'the page registered no value handler');
