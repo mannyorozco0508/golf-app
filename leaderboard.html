@@ -547,11 +547,20 @@ html {
         document.getElementById('label-individual').classList.toggle('active', view === 'individual');
         document.getElementById('label-team').classList.toggle('active', view === 'team');
 
+        // Team view has no ranking and no By Group / By Flight control. Those
+        // belong to the stroke board. v202 replaced #group-view-toggle with
+        // #view-pills and left this branch reading the old id. getElementById
+        // returned null, .style threw, and renderBoard never ran: the Match
+        // label lit up and the stroke board stayed. A missing id must not be
+        // what stops the match from painting.
+        const rank = document.getElementById('scoring-toggle');
+        const pills = document.getElementById('view-pills');
         if (view === 'individual') {
-            document.getElementById('scoring-toggle').style.display = 'flex';
+            if (rank) rank.style.display = 'flex';
+            if (pills) pills.style.display = 'flex';
         } else {
-            document.getElementById('scoring-toggle').style.display = 'none';
-            document.getElementById('group-view-toggle').style.display = 'none';
+            if (rank) rank.style.display = 'none';
+            if (pills) pills.style.display = 'none';
         }
 
         renderBoard();
@@ -1469,59 +1478,54 @@ ${ind.slice(4)}</tr>`;
                 
                 const t1Name = teamKeys[i];
                 const t2Name = teamKeys[i+1];
-                let totalMatch = 0;
-                let thruCount = 0;
-                let matchClosed = false;
-                let finalResult = "";
-
                 const t1Display = teams[t1Name].map(p => getSmartDisplayName(p, players)).join(" / ");
                 const t2Display = teams[t2Name].map(p => getSmartDisplayName(p, players)).join(" / ");
 
-                courseData.forEach((hole) => {
-                    let team1BestNet = 999, team1BestGross = 999;
-                    let team2BestNet = 999, team2BestGross = 999;
-                    let t1Valid = false, t2Valid = false;
-
-                    teams[t1Name].forEach(p => {
-                        let v = savedScores[`p${p.id}_h${hole.hole}`];
-                        if (v && v > 0) {
-                            let gross = parseInt(v, 10);
-                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                            if (net < team1BestNet) team1BestNet = net;
-                            if (gross < team1BestGross) team1BestGross = gross;
-                            t1Valid = true;
-                        }
-                    });
-
-                    teams[t2Name].forEach(p => {
-                        let v = savedScores[`p${p.id}_h${hole.hole}`];
-                        if (v && v > 0) {
-                            let gross = parseInt(v, 10);
-                            let net = gross - getStrokes(hole.hcpIndex, parseHcp(p.hcp));
-                            if (net < team2BestNet) team2BestNet = net;
-                            if (gross < team2BestGross) team2BestGross = gross;
-                            t2Valid = true;
-                        }
-                    });
-
-                    if (t1Valid && t2Valid) {
-                        thruCount++;
-                        let compare1 = matchScoringType === 'net' ? team1BestNet : team1BestGross;
-                        let compare2 = matchScoringType === 'net' ? team2BestNet : team2BestGross;
-                        
-                        if (!matchClosed) {
-                            if (compare1 < compare2) totalMatch += 1;
-                            else if (compare2 < compare1) totalMatch -= 1;
-                        }
-
-                        let holesLeft = 18 - hole.hole;
-                        if (!matchClosed && Math.abs(totalMatch) > holesLeft) {
-                            matchClosed = true;
-                            let winner = totalMatch > 0 ? t1Display : t2Display;
-                            finalResult = `${winner} ${Math.abs(totalMatch)} & ${holesLeft}`;
-                        }
-                    }
-                });
+                // ONE CALL PER PAIR, on a virtual two-team roster — the same
+                // adapter the side-match receipt uses (settlement-engine.js) and
+                // ryderFourBallState uses for a Cup match. calculateMatchEngine
+                // scores only the first two team keys it is handed. One call on
+                // a four-team field would keep the first matchup and silently
+                // drop the second. The banner below still writes the board's
+                // own names and its own "3 & 2"; it reads only the numbers.
+                const virtual = teams[t1Name].map(p => Object.assign({}, p, { team: 'Team 1' }))
+                    .concat(teams[t2Name].map(p => Object.assign({}, p, { team: 'Team 2' })));
+                const pressRule = gameFormat === 'nassau'
+                    ? (currentBoardData.nassauPressRule || 'none')
+                    : (currentBoardData.matchPressRule || 'none');
+                const stake = gameFormat === 'nassau'
+                    ? (currentBoardData.nassauStake || 0)
+                    : (currentBoardData.matchStake || 0);
+                const manualPresses = currentBoardData.matchPresses
+                    ? Object.values(currentBoardData.matchPresses) : [];
+                let calc = null;
+                if (typeof calculateMatchEngine === 'function') {
+                    try {
+                        calc = calculateMatchEngine(virtual, courseData, savedScores,
+                            matchScoringType, gameFormat, pressRule, stake,
+                            Number(currentBoardData.holeBet) || 0, manualPresses,
+                            (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(currentBoardData) : undefined));
+                    } catch (e) { calc = null; }
+                }
+                // TOTAL MATCH ONLY. A Nassau also returns the front, the back
+                // and every press; the LIVE MATCHES widget above this banner
+                // already shows those. id '18' is the overall when the round
+                // has one. A nine-hole Nassau, or the back nine alone, has no
+                // overall — the only base segment is the match.
+                const bases = ((calc && calc.activeMatches) || []).filter(m => m.pressNum === 0);
+                const total = bases.find(m => m.id === '18') || bases[0] || null;
+                let totalMatch = total ? total.status : 0;
+                let thruCount = calc ? calc.maxThru : 0;
+                let matchClosed = !!(total && total.closed);
+                let holesLeftAtClose = 0;
+                if (matchClosed) {
+                    const hm = String(total.finalResult || '').match(/(\d+)&(\d+)\s*$/);
+                    if (hm) holesLeftAtClose = parseInt(hm[2], 10);
+                }
+                const winnerDisplay = totalMatch > 0 ? t1Display : t2Display;
+                let finalResult = matchClosed
+                    ? `${winnerDisplay} ${Math.abs(totalMatch)} & ${holesLeftAtClose}`
+                    : '';
 
                 let statusText = "";
                 let t1Badge = `<span class="status-badge badge-even">AS</span>`;

@@ -278,10 +278,15 @@ describe('NOTHING ELSE MOVED', () => {
                 'a section total was tainted: ' + l.trim()));
     });
 
-    test('the leaderboard is untouched', () => {
+    test('the leaderboard did not acquire a gross mark', () => {
         const lb = read('leaderboard.html');
         assert.ok(!/net-mark|grossDiff|displayNet|dotStrokes/.test(lb));
-        assert.match(lb, /getStrokes\(hole\.hcpIndex, parseHcp\(p\.hcp\)\)/);
+        // v221: the positive is the engine the board actually calls. The old
+        // getStrokes(hole.hcpIndex, parseHcp(p.hcp)) site was the team loop
+        // this wave removed; stroke standings go through the engine below.
+        assert.match(lb, /computeNetToParStandings\(/);
+        assert.match(lb, /calculateMatchEngine\(virtual,/);
+        assert.equal((lb.match(/getStrokes\([^)]*\)/g) || []).length, 0);
     });
 
     test('the settlement receipt is untouched', () => {
@@ -325,7 +330,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v222-season-ledger';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v223-board-team-engine';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

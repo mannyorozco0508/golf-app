@@ -529,11 +529,16 @@ describe('ROUND PERFORMANCE IS UNCHANGED', () => {
         assert.match(renderScorecardSrc, /if \(!dotPlanById\) return courseStrokes;/);
     });
 
-    test('the leaderboard\u2019s own net calculation was not touched', () => {
+    test('the leaderboard did not acquire match-dot logic', () => {
         const lb = read('leaderboard.html');
         assert.ok(!/dotStrokes|dotPlanById|allocateMatchStrokes/.test(lb),
             'leaderboard.html must not have acquired match-dot logic');
-        assert.match(lb, /getStrokes\(hole\.hcpIndex, parseHcp\(p\.hcp\)\)/,
-            'it still nets off the ordinary course allocation');
+        // v221: stroke standings still rank through computeNetToParStandings
+        // (course allocation, in money-engine.js). The team banner scores
+        // through calculateMatchEngine and no longer keeps a local net.
+        assert.match(lb, /computeNetToParStandings\(/);
+        assert.match(lb, /calculateMatchEngine\(virtual,/);
+        assert.equal((lb.match(/getStrokes\([^)]*\)/g) || []).length, 0,
+            'a local allocation on the board is a second formula');
     });
 });

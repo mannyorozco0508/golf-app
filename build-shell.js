@@ -88,7 +88,9 @@ const PRODUCTS = {
         // v62 has each round and no running total. The season branch asked for
         // 'consumer-v60-season' - cut from v217, before v218 took v60 - so it moved
         // to the next free key rather than reusing one an installed device holds.
-        cacheName: 'consumer-v63-season-ledger',
+        // Moved to v64. The Board's team view reads calculateMatchEngine, one
+        // call per pair. A device on v63 still invents that margin itself.
+        cacheName: 'consumer-v64-board-team-engine',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

@@ -1986,7 +1986,19 @@
 // expected. The consumer product cache is consumer-v63-season-ledger. The
 // tournament product cache stays tournament-v54-rattle-golf. The iOS binary in
 // review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v222-season-ledger';
+// Moved to v223 because the Board's team view was still scoring the match
+// itself: best net or best gross, absolute strokes, and a close window of
+// `18 - hole`. The LIVE MATCHES widget on the same screen calls
+// calculateMatchEngine. On five of the fourteen corpus rounds the two
+// disagreed — a 2v2 best ball read 7 & 6 against the engine's 8 & 6, a
+// nine-hole match read "1 UP" against "3 & 2". The banner now makes one
+// engine call per pair, on a virtual two-team roster, and keeps only the
+// total match. Names and the "3 & 2" wording stay the board's; the numbers
+// are the engine's. An installed device on v222 keeps the invented margin.
+// Display only: no engine and no money moved. The consumer product cache is
+// consumer-v64-board-team-engine. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v223-board-team-engine';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

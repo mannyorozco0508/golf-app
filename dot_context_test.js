@@ -516,10 +516,17 @@ describe('NOTHING ABOUT SCORING MOVED', () => {
             });
     });
 
-    test('the leaderboard still nets off the course allocation', () => {
+    test('the leaderboard does not net off the dot context', () => {
         const lb = read('leaderboard.html');
         assert.ok(!/dotStrokes|dotContextCalc|selectedDotMatchId/.test(lb));
-        assert.match(lb, /getStrokes\(hole\.hcpIndex, parseHcp\(p\.hcp\)\)/);
+        // v221: the team banner stopped allocating strokes itself. Stroke
+        // standings still go through computeNetToParStandings, which nets off
+        // the course allocation inside money-engine.js. The match banner goes
+        // through calculateMatchEngine. A local getStrokes( on this page would
+        // be the second formula the banner used to invent.
+        assert.match(lb, /computeNetToParStandings\(/);
+        assert.match(lb, /calculateMatchEngine\(virtual,/);
+        assert.equal((lb.match(/getStrokes\([^)]*\)/g) || []).length, 0);
     });
 
     test('settlement and press behaviour are unaffected by the selection', () => {
@@ -548,7 +555,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v222-season-ledger';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v223-board-team-engine';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });

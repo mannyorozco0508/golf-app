@@ -403,13 +403,18 @@ describe('NO SECOND RESOLVER, NO DUPLICATE MATHS', () => {
 
     test('the standings still allocate strokes canonically', () => {
         const src = read('leaderboard.html');
-        // Three sites exist, all pre-existing, and they name the hole variable either
-        // `h` or `hole`. What matters is the SHAPE: index plus parsed handicap, never
-        // a hand-rolled variant.
-        const calls = src.match(/getStrokes\([^)]*\)/g) || [];
-        assert.ok(calls.length > 0);
-        calls.forEach(c => assert.match(c, /^getStrokes\((h|hole)\.hcpIndex, parseHcp\(p\.hcp\)$/,
-            'an allocation site deviating from the canonical shape: ' + c));
+        const engine = read('money-engine.js');
+        // v221: the Board no longer calls getStrokes itself. Stroke standings
+        // go through computeNetToParStandings, which still allocates with the
+        // canonical pair. The team banner scores through calculateMatchEngine.
+        // A getStrokes( left on the page would be a second formula.
+        assert.match(src, /computeNetToParStandings\(/);
+        assert.match(src, /calculateMatchEngine\(virtual,/);
+        assert.deepEqual(src.match(/getStrokes\([^)]*\)/g) || [], []);
+        const at = engine.indexOf('function computeNetToParStandings');
+        const fn = engine.slice(at, engine.indexOf('\nfunction ', at + 30));
+        assert.match(fn, /getStrokes\(h\.hcpIndex, parseHcp\(p\.hcp\)\)/);
+        assert.ok(fn.length > 80);
     });
 });
 
