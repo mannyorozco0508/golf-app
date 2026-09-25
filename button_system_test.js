@@ -96,7 +96,17 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         const r = await arriveCold({
             url: fileUrl('admin.html', ''), db: DB, settleMs: 2600,
             viewport: { width: 390, height: 844 }, preScript: SEED,
-            steps: [{ expression: MEASURE }]
+            // UI WAVE 7 PUT THE THREE CODE CARDS BEHIND A DISCLOSURE, so they are
+            // not on the arrival screen any more. The button system still governs
+            // them - it is one tap away, not gone - so this opens the row the way a
+            // thumb does before measuring. Measuring the arrival screen alone would
+            // have quietly stopped checking three cards' worth of controls, which is
+            // the shape of a guard that reports green about nothing.
+            steps: [
+                { tap: '#open-else summary' },
+                { sleep: 350 },
+                { expression: MEASURE }
+            ]
         });
         assert.equal(r.ok, true, 'the arrival failed, so NOTHING is proven: ' + r.reason);
         const raw = (r.value || []).find(v => typeof v === 'string' && v.charAt(0) === '{');
@@ -219,16 +229,31 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         assert.ok(a, 'Start a season is not on screen');
         assert.equal(a.boxSizing, 'border-box',
             'the anchor is back on content-box, which is what made it 368px wide');
-        // 290 inside the season card, for the same reason as the fields above.
-        assert.equal(a.w, 290, 'Start a season is ' + a.w + 'px');
-        assert.equal(a.h, 48);
-        assert.equal(a.left, a.right, 'it is not centred: ' + a.left + ' / ' + a.right);
+        // REPOINTED BY UI WAVE 7: it is a LINK now, not a full-width button. It was
+        // 290 x 48 - the same weight as "Open ledger" beside it - for the rarer of
+        // the two actions. It keeps a 44px target and loses the button chrome, so
+        // the width is its label's and the height is still the system's.
+        assert.ok(a.w < 200, 'Start a season is ' + a.w + 'px - still a full-width button');
+        assert.ok(a.h >= 44, 'Start a season is ' + a.h + 'px tall - below a touch target');
+        // NOT CENTRED ANY MORE, and that is the point of it being a link: it sits on
+        // the card's content left edge like the heading and the helper line above
+        // and below it. A centred link inside a left-aligned card is the "words not
+        // lined up" complaint that started UI Wave 6.
+        assert.equal(a.left, 50, 'Start a season is not on the card gutter: ' + a.left);
         // AND ITS LABEL IS CENTRED IN IT NOW. This is what v230 got wrong and what
         // no assertion in this file could see: the box was right and the text sat
         // 2px from the top. widget_system_test.js measures that for every control;
         // it is pinned here too because this is the control it was wrong on.
-        assert.ok(/<a id="season-start-link" href="season\.html" class="btn-outline">/.test(ADMIN),
-            'the inline display is back on the season link - that is what stopped it centring');
+        // REPOINTED BY UI WAVE 7: the class changed from btn-outline to w-card-link
+        // when it became a link. The CLAIM has not changed and was never about the
+        // class - it is that this anchor carries NO inline style, because an inline
+        // display:inline-block is what beat the flex rule and pinned its label to
+        // the top of its box in v230. Asserted directly now.
+        const tag = /<a id="season-start-link"[^>]*>/.exec(ADMIN);
+        assert.ok(tag, 'the season link is gone');
+        assert.ok(!/\sstyle=/.test(tag[0]),
+            'an inline style is back on the season link - that is what stopped it '
+            + 'centring: ' + tag[0]);
     });
 
     test('THE TILES TOOK THE ONE WIDTH — Wave 5\'s exception is retired, deliberately', () => {

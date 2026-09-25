@@ -2193,7 +2193,52 @@
 // No engine and no protected file changed, and no dialog surface moved. The
 // consumer product cache is consumer-v73-widgets. The tournament product cache
 // stays tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v232-widgets';
+// Moved to v233 because THE SETUP SCREEN IS ONE SCREEN. A device on v232 keeps the
+// long one. admin.html only; no other page moved.
+//
+// THE DIAGNOSIS, MEASURED: 1172px in an 844px viewport - and the organizer's own
+// path (top row, lockup, tiles, Resume) already ended at 551px. NOTHING WAS
+// OVERFLOWING. 620px of material for a golfer JOINING a round was stacked under the
+// person who came to SET ONE UP. So this wave is about who the page is for, not
+// about pixels.
+//
+// AFTER: 494px collapsed - 0.6 of a viewport, nothing below the fold - and 1049px
+// with the row opened, still shorter than the screen shipped at v232. The
+// organizer's path ends at 414px.
+//
+// ONE COLLAPSED ROW, "Open something else", holding the three joiner cards. It
+// reuses the page's OWN disclosure pattern - <details>/<summary>, which admin.html
+// already used once for the wizard nav's More menu, marker-hiding CSS included -
+// rather than inventing a second one. No aria-expanded on the summary: the element
+// conveys expanded state natively, and the literal attribute would have required a
+// button+region pattern, which would BE the second pattern.
+//
+// THE COLLAPSE IS OURS, NOT THE BROWSER'S, and that is measured rather than
+// preferred: in the Chrome this repo drives a CLOSED <details> does not hide its
+// children - a bare, unstyled details/div pair still reports a client rect - so
+// relying on the native collapse would have shipped a row that hid nothing. Keyed
+// on [open] so the native state still drives it.
+//
+// ALSO CUT: the Game Day framing sentence no longer shows itself on arrival (the
+// element and both writers stay - eventTypeFraming is the preserved club preset
+// three suites pin); the trial standing line moved into the Account panel, because
+// it is what the account IS rather than a control; the helper lines are one line
+// each; the tile descriptions are one MEASURED line each - 118px and 125px in a
+// 131px box, short rather than clipped, because guard 6 forbids an ellipsis; dark
+// mode is a 44px labelled icon on the top row instead of owning a 58px row; and
+// Start a season is a link inside the Season card.
+//
+// Everything Waves 5 and 6 established survives: one left edge, one width, one gap,
+// one type, every label centred, no inline layout except display:none. The
+// dark-mode move needed its MARGIN zeroed, not its padding - margin: 0 auto 16px
+// auto grew the top row to 60px - and the row is held at --ctl-h rather than
+// exempted.
+//
+// No engine and no protected file changed, and no dialog surface moved. The consumer
+// product cache is consumer-v74-one-screen. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
+// does not archive or upload.
+const CACHE_VERSION = 'golfapp-v233-one-screen';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

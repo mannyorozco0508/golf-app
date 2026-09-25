@@ -149,7 +149,17 @@ describe('THE WIDGET SYSTEM (setup screen, real Chrome at 390x844)', () => {
         const r = await arriveCold({
             url: fileUrl('admin.html', ''), db: DB, settleMs: 2600,
             viewport: { width: 390, height: 844 }, preScript: SEED,
-            steps: [{ expression: MEASURE }]
+            // UI WAVE 7 PUT THE THREE CODE CARDS BEHIND A DISCLOSURE, so they are
+            // not on the arrival screen any more. The button system still governs
+            // them - it is one tap away, not gone - so this opens the row the way a
+            // thumb does before measuring. Measuring the arrival screen alone would
+            // have quietly stopped checking three cards' worth of controls, which is
+            // the shape of a guard that reports green about nothing.
+            steps: [
+                { tap: '#open-else summary' },
+                { sleep: 350 },
+                { expression: MEASURE }
+            ]
         });
         assert.equal(r.ok, true, 'the arrival failed, so NOTHING is proven: ' + r.reason);
         const raw = (r.value || []).find(v => typeof v === 'string' && v.charAt(0) === '{');
@@ -198,17 +208,30 @@ describe('THE WIDGET SYSTEM (setup screen, real Chrome at 390x844)', () => {
             'blocks are ' + widths.length + ' different widths: [' + widths.join(', ') + ']');
         assert.equal(widths[0], M.widgetMax,
             'the shared width is ' + widths[0] + ', not --widget-max (' + M.widgetMax + ')');
-        // The named exception is still there, so CENTRED_CHIP is not excusing the
-        // whole screen.
-        assert.equal(M.blocks.filter(b => CENTRED_CHIP.test(b.sel)).length, 1,
-            'the centred chip is gone - that exemption now covers nothing or too much');
+        // THE EXEMPTION IS RETIRED BY UI WAVE 7, and the rule got STRONGER for it.
+        // .theme-toggle-btn was the one block on this screen with no left edge to
+        // line up with, because it was a centred chip of intrinsic width sitting as
+        // a direct child. It is an icon inside the top row now, so it is not a block
+        // at all, and there is one left edge with NOTHING excused. Asserted in that
+        // direction rather than deleted, so a future centred block has to be a
+        // decision instead of a silent re-exemption.
+        assert.equal(M.blocks.filter(b => CENTRED_CHIP.test(b.sel)).length, 0,
+            'the dark-mode chip is a top-level block again - it belongs in the top row');
+        assert.equal(lefts.length, 1,
+            'there is more than one left edge, and nothing is exempt any more');
     });
 
     // ---- 3 --------------------------------------------------------------------
     test('3. ONE VERTICAL GAP between blocks', () => {
         assert.ok(M.widgetGap >= 8, '--widget-gap is ' + M.widgetGap + ' - not declared');
         const gaps = M.blocks.map(b => b.gapAbove).filter(g => g !== null);
-        assert.ok(gaps.length >= 6, 'only ' + gaps.length + ' gaps measured');
+        // FIVE, not six: UI Wave 7 collapsed three blocks into one disclosure and
+        // moved the dark-mode chip into the top row, so the collapsed screen has
+        // six blocks. The floor is here to stop this passing on a blank page, not
+        // to pin a block count - a count would have to be re-edited every time the
+        // screen changes shape, which is the fault that broke the other guard's
+        // before hook when Option A landed.
+        assert.ok(gaps.length >= 5, 'only ' + gaps.length + ' gaps measured');
         const odd = M.blocks.filter(b => b.gapAbove !== null && Math.abs(b.gapAbove - M.widgetGap) > 1)
             .map(b => b.sel + ' ' + b.gapAbove + 'px');
         assert.deepEqual(odd, [],

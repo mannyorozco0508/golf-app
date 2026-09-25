@@ -435,6 +435,32 @@ const PROBE = `
   return JSON.stringify(out, null, 2);
 })()`;
 
+// UI WAVE 7 PUT THE THREE CODE CARDS BEHIND A DISCLOSURE. This tool measures the
+// code row's geometry, which is now one tap away rather than on the arrival screen -
+// so the run taps the row open before the main probe. That is not a weakening: the
+// ARRIVAL state is measured first, by this probe, and a row that shipped open or a
+// card that renders while closed is a failure here too. Measuring only the opened
+// screen would have quietly stopped checking the thing the wave was for.
+const ARRIVAL = `
+(() => {
+  const det = document.getElementById('open-else');
+  const cards = ['open-round-card', 'copy-round-card', 'season-lobby']
+      .map(id => { const el = document.getElementById(id);
+                   return !!(el && el.getClientRects().length > 0); });
+  const lobby = document.getElementById('lobby-screen');
+  const resume = document.getElementById('resume-container');
+  return JSON.stringify({
+    disclosurePresent: !!det,
+    disclosureOpen: !!(det && det.open),
+    disclosureHasOpenAttr: !!(det && det.hasAttribute('open')),
+    cardsOnScreen: cards,
+    collapsedScreenH: lobby ? Math.round(lobby.getBoundingClientRect().height) : 0,
+    viewportH: window.innerHeight,
+    organizerEnd: resume && resume.getClientRects().length
+        ? Math.round(resume.getBoundingClientRect().bottom) : 0
+  });
+})()`;
+
 function bail(msg) {
     console.error('home-screen-check: ' + msg);
     console.error('exit 2 means NOTHING WAS PROVEN - this is not a pass.');
@@ -443,11 +469,41 @@ function bail(msg) {
 
 (async () => {
     const res = await arriveCold({
-        url: fileUrl('admin.html'), rounds: {}, preScript: SEED, expression: PROBE
+        url: fileUrl('admin.html'), rounds: {}, preScript: SEED,
+        steps: [
+            { expression: ARRIVAL },
+            { tap: '#open-else summary' },
+            { sleep: 350 },
+            { expression: PROBE }
+        ]
     });
     if (!res.ok) bail(res.reason);
-    console.log(res.value);
-    let v;
-    try { v = JSON.parse(res.value); } catch (e) { bail('unreadable probe output'); }
+    const jsons = (res.value || []).filter(x => typeof x === 'string' && x.trim().charAt(0) === '{');
+    if (jsons.length !== 2) bail('expected two probe results, got ' + jsons.length);
+    let arrival, v;
+    try { arrival = JSON.parse(jsons[0]); } catch (e) { bail('unreadable arrival probe'); }
+    try { v = JSON.parse(jsons[1]); } catch (e) { bail('unreadable probe output'); }
+
+    // THE COLLAPSE, checked here and not only in the node suite, because this tool
+    // is the one a person runs by hand before a release.
+    v.arrival = arrival;
+    if (!arrival.disclosurePresent)
+        v.problems.push('there is no "Open something else" row - the three code cards '
+            + 'are back on the first screen');
+    if (arrival.disclosureHasOpenAttr || arrival.disclosureOpen)
+        v.problems.push('the disclosure ships OPEN, so the screen is its old length '
+            + 'with an extra control on it');
+    if (arrival.cardsOnScreen.some(Boolean))
+        v.problems.push('a code card renders before the row is tapped: '
+            + JSON.stringify(arrival.cardsOnScreen));
+    if (arrival.collapsedScreenH > arrival.viewportH)
+        v.problems.push('the collapsed screen is ' + arrival.collapsedScreenH
+            + 'px in a ' + arrival.viewportH + 'px viewport');
+    if (!(arrival.organizerEnd > 0 && arrival.organizerEnd <= arrival.viewportH))
+        v.problems.push("the organizer's path ends at " + arrival.organizerEnd
+            + 'px in a ' + arrival.viewportH + 'px viewport');
+    v.verdict = v.problems.length ? 'FAIL' : 'PASS';
+
+    console.log(JSON.stringify(v, null, 2));
     process.exit(v.verdict === 'PASS' ? 0 : 1);
 })();

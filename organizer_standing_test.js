@@ -213,8 +213,26 @@ describe('THE PAGE: Round Ready and the Review step say the same line, from one 
     test('the mounts exist where the organizer stands: the lobby, Round Ready and the Review step, and nowhere the golfer does', () => {
         const a = read('admin.html');
         assert.match(a, /id="lobby-standing"/); assert.match(a, /id="rr-standing"/); assert.match(a, /id="wz-standing"/);
-        assert.ok(a.indexOf('id="lobby-standing"') < a.indexOf('id="resume-container"'), 'on the home screen, above Resume');
-        assert.ok(a.indexOf('id="lobby-standing"') > a.indexOf('class="home-widgets"'), 'and under the tiles');
+        // REPOINTED BY UI WAVE 7, and it needed repointing even though it was still
+        // PASSING - which is the interesting part. #account-modal happens to sit
+        // between the tiles and Resume in document order, so "above Resume, under
+        // the tiles" stayed true by POSITION after the element moved inside that
+        // modal, while the claim it was making - that the line is on the home screen
+        // - had become false. An assertion that survives the thing it describes is
+        // worse than one that fails.
+        //
+        // WHY IT MOVED: the standing line is what this account IS, not a control to
+        // act on, and it sat above Resume where it read as one. It is in the Account
+        // panel now. Same one read and the same writer - the id is unchanged, so
+        // renderOrganizerStanding still writes the same string into the same three
+        // places.
+        const panelStart = a.indexOf('id="account-modal"');
+        const panelEnd = a.indexOf('</div>', a.indexOf('id="email-link-status"'));
+        assert.ok(panelStart > -1, 'the account panel is gone');
+        assert.ok(a.indexOf('id="lobby-standing"') > panelStart,
+            'the standing line is back on the home screen instead of in the Account panel');
+        assert.ok(a.indexOf('id="lobby-standing"') < panelEnd,
+            'the standing line is outside the account panel');
         assert.ok(a.indexOf('id="wz-standing"') < a.indexOf('id="main-save-btn"'), 'on Review, above the Save button');
         assert.doesNotMatch(read('index.html'), /rr-standing|wz-standing|loadOrganizerStanding/, 'the scorecard has no organizer line');
         assert.match(a, /loadOrganizerStanding\(\)/, 'the page loads it');
