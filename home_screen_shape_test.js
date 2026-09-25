@@ -136,10 +136,22 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
     });
 
     test('the code row is not a full-width block competing with the tiles', () => {
-        const at = ADMIN.indexOf('id="join-code-row"');
-        assert.ok(at > -1);
-        assert.match(ADMIN.slice(at, at + 200), /display:\s*flex/,
-            'the field and its button are stacked again');
+        // REPOINTED (UI Wave 5). This read display:flex out of the row's INLINE
+        // style. The inline style is gone on purpose: an inline declaration beats
+        // any rule, which is precisely why the shared row rule could not reach
+        // #copy-code-row or the season row and they rendered 40px fields beside a
+        // correct one. The layout is declared once now, for all three rows.
+        assert.ok(ADMIN.indexOf('id="join-code-row"') > -1, 'the row is gone');
+        const rule = ADMIN.slice(ADMIN.indexOf('#join-code-row, #copy-code-row, #season-open-row {'));
+        const block = rule.slice(0, rule.indexOf('}'));
+        assert.ok(block.length > 20, 'the shared row rule is gone');
+        assert.match(block, /display:\s*flex/, 'the field and its button are stacked again');
+        assert.match(block, /max-width:\s*var\(--ctl-max\)/, 'the row is not contained');
+        // ALL THREE rows, by name: the whole defect this replaced was a fix that
+        // only ever covered the first one.
+        ['#join-code-row', '#copy-code-row', '#season-open-row'].forEach(sel =>
+            assert.ok(block.indexOf('{') === -1 || rule.indexOf(sel) < rule.indexOf('{'),
+                sel + ' is not in the shared row rule'));
     });
 });
 
@@ -223,6 +235,20 @@ describe('RESUME IS A CONVENIENCE, NOT A HEADLINE', () => {
         const h = cssNum('.resume-link', 'min-height');
         assert.ok(h.n >= 40, '.resume-link min-height is ' + h.n + h.unit
             + ', below a usable touch target');
+        // REPOINTED (UI Wave 5): the button system also gives .resume-link
+        // min-height: var(--ctl-h), and being later in the sheet that is the
+        // value that actually governs. cssNum above reads the FIRST rule for the
+        // class, so it would go on passing on 44px if the system's own number
+        // ever dropped below it - which is the shape of an inert assertion. The
+        // effective value is asserted here.
+        const SYS = ADMIN.slice(ADMIN.indexOf('THE BUTTON SYSTEM (UI Wave 5)'));
+        const ctlH = /--ctl-h:\s*([\d.]+)px/.exec(SYS);
+        assert.ok(ctlH, 'the system declares no --ctl-h');
+        assert.ok(Number(ctlH[1]) >= 44, '--ctl-h is ' + ctlH[1]
+            + 'px, and it is what sizes this control');
+        const rl = SYS.slice(SYS.indexOf('.resume-link {'));
+        assert.match(rl.slice(0, rl.indexOf('}')), /min-height:\s*var\(--ctl-h\)/,
+            '.resume-link is outside the system again');
     });
 });
 

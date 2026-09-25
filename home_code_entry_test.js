@@ -116,9 +116,14 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
         const at = ADM.indexOf('id="join-code-row"');
         assert.ok(at > -1, 'the row wrapper is missing');
         const row = ADM.slice(at - 200, at + 700);
-        assert.match(row, /display:\s*flex/, 'the field and button are not on one row');
         assert.ok(!/class="btn-outline"[^>]*style="[^"]*width:\s*100%/.test(row),
             'the button is full width again');
+        // REPOINTED (UI Wave 5): display:flex used to sit in this row's inline
+        // style and is now in the shared rule that covers all three code rows.
+        // The inline version is what stopped the other two rows ever getting it.
+        const shared = ADM.slice(ADM.indexOf('#join-code-row, #copy-code-row, #season-open-row {'));
+        assert.match(shared.slice(0, shared.indexOf('}')), /display:\s*flex/,
+            'the field and button are not on one row');
     });
 
     test('but both are still a real touch target', async () => {
@@ -134,6 +139,40 @@ describe('THE CONTROL IS BACK, AND IT IS ONE ROW', () => {
             const m = /min-height:\s*(\d+)px/.exec(rule(sel));
             assert.ok(m && Number(m[1]) >= 44, sel + ' is below a 44px touch target');
         });
+        // WIDENED (UI Wave 5), and this is the fault the old version of this test
+        // could not see. It named ONE row. #copy-code-row and the season row carry
+        // the same two classes, were outside that ID scope, and rendered 40px
+        // fields and a 58px button next to a correct row for two waves. The three
+        // rows share one rule now, and the height comes from --ctl-h rather than a
+        // literal, so the system has exactly one place to change.
+        const SYS = ADM.slice(ADM.indexOf('THE BUTTON SYSTEM (UI Wave 5)'));
+        assert.ok(SYS.length > 500, 'the button system block is gone');
+        const ctlH = /--ctl-h:\s*(\d+)px/.exec(SYS);
+        assert.ok(ctlH && Number(ctlH[1]) >= 44,
+            '--ctl-h is ' + (ctlH && ctlH[1]) + ' - the system height is below a touch target');
+        ['#copy-code-row', '#season-open-row'].forEach(sel => {
+            assert.ok(SYS.indexOf(sel) > -1, sel + ' is not in the shared row rule');
+        });
+        // And the rule that sizes the three fields and the three buttons asks for
+        // the variable, not a number.
+        const fieldRule = SYS.slice(SYS.indexOf('#join-code-row .join-code-input,'));
+        assert.match(fieldRule.slice(0, fieldRule.indexOf('}')), /min-height:\s*var\(--ctl-h\)/,
+            'the three fields no longer share one height');
+        // THE HEIGHT IS DECLARED ONCE, in the shared button rule, and NOT repeated
+        // on the paired-button rule. That is deliberate and a control proved it
+        // matters: with the number in both places, swapping one left the other in
+        // force and C61 was inert. So this asserts the single declaration and that
+        // the paired rule does not reintroduce a second one.
+        const btnRule = SYS.slice(SYS.indexOf('#join-code-row .join-code-btn,'));
+        const btnBlock = btnRule.slice(0, btnRule.indexOf('}'));
+        assert.match(btnBlock, /width:\s*var\(--ctl-pair-btn\)/,
+            'the three paired buttons no longer share one width');
+        assert.ok(!/(^|[^-])height:/.test(btnBlock),
+            'the paired-button rule declares a height again - it belongs in the shared '
+            + 'rule only, or a control that changes one leaves the other standing');
+        const shared = SYS.slice(SYS.indexOf('.modal-content a.btn-outline {'));
+        assert.match(shared.slice(0, shared.indexOf('}')), /height:\s*var\(--ctl-h\)/,
+            'the shared button rule no longer fixes the height');
     });
 
     test('it sits below Resume, not between the two tiles', async () => {
