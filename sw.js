@@ -2289,7 +2289,51 @@
 // product cache is consumer-v75-guide. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
 // does not archive or upload.
-const CACHE_VERSION = 'golfapp-v234-guide';
+// Moved to v235 because THE GOLFER CAN NOW REACH THE GUIDE, AND ITS CONTROLS ARE
+// TAPPABLE. A device on v234 keeps a guide whose only route is on the organizer's
+// page and whose every control is under 44px. index.html and instructions.html.
+//
+// WAVE 8 PUT THE ROUTE IN THE WRONG PLACE FOR HALF ITS AUDIENCE, and said so at
+// the time. The guide's first door is written for somebody who arrived by a link;
+// that person lands on index.html and may never open Home, where the ⋯ More menu
+// lives. So the scorecard now carries the route too.
+//
+// NOT A NINTH NAV PILL, and that is a measurement rather than a preference:
+// index.html's bar is eight pills that WRAP, laid out in three rows at 390px, and
+// nav_bar_test.js measures it on every page. A ninth spends fold space on every
+// screen of the round to fix something that belongs at the bottom. The route is a
+// third card in the .save-exit-box stack under score entry, beside Round Receipt
+// and Save & Exit: three cards at 342x166 from left 24, three controls at 310x50
+// from left 40, and the document grows 2472px -> 2648px entirely below the fold.
+//
+// IT IS AN <a>, NOT A BUTTON WITH AN onclick. A link is what a thumb long-presses
+// and what anything walking the page can see as a route - and that is not a nicety
+// here: this guide was unreachable for the entire history of the repo, and a
+// JavaScript navigation is invisible to every check that looks for a link. But
+// .btn-primary was written for <button>, which Chrome's UA stylesheet gives
+// box-sizing: border-box and display: inline-block; an <a> gets neither, and the
+// same class laid out 148x42 inline beside two 310x50 buttons. Three properties in
+// one scoped rule fix it, and the line-height is what makes it 50 and not 48.
+//
+// THE CONTROL PASS instructions.html NEVER HAD. Waves 5 to 7 built a button system
+// on the setup screen and nothing in them touched this file. Measured cold before
+// this wave, ALL TEN of its controls were under 44px - and the worst was not one of
+// the jump pills: "← Back to Home" was 16 x 109, an inline anchor with no box at
+// all, and Dark Mode was 34 x 106. box-sizing is the rule and not an extra:
+// min-height: 44px alone laid the pills out at 58px, because content-box applies it
+// before padding and border. AFTER: every control exactly 44px, labels centred
+// 15/15, pill rows unchanged at three, the nav block 99px -> 144px, the document
+// 8827px -> 8908px, no horizontal overflow.
+//
+// Two links stay small ON PURPOSE and the guard holds the exemption to its reason:
+// the door names inside the sentence above the jump nav are PROSE, and styling two
+// words mid-paragraph as buttons would break the line.
+//
+// No engine and no protected file changed, and no dialog surface moved. The consumer
+// product cache is consumer-v76-golfer-route. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
+// does not archive or upload.
+const CACHE_VERSION = 'golfapp-v235-golfer-route';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

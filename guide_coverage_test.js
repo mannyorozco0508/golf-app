@@ -77,13 +77,59 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
             'NO page links to instructions.html. It ships precached and bundled and '
             + 'nobody can open it - which is how it stayed unreachable in every build '
             + 'before this one.');
-        // And the route is a real control a thumb can hit, not a bare URL in prose.
+        // And EVERY route is a real control a thumb can hit, not a bare URL in
+        // prose. Checked at every occurrence rather than the first: this started as
+        // indexOf() once per page, which would have gone on passing if a second,
+        // worse route were added underneath a good one.
         linking.forEach(f => {
             const src = read(f);
-            const at = src.indexOf('href="instructions.html"');
-            const tag = src.slice(src.lastIndexOf('<', at), src.indexOf('>', at) + 1);
-            assert.match(tag, /^<a\b/, f + ' mentions the guide outside an anchor: ' + tag);
+            let at = src.indexOf('href="instructions.html"');
+            let n = 0;
+            while (at > -1) {
+                const tag = src.slice(src.lastIndexOf('<', at), src.indexOf('>', at) + 1);
+                assert.match(tag, /^<a\b/, f + ' mentions the guide outside an anchor: ' + tag);
+                n++;
+                at = src.indexOf('href="instructions.html"', at + 1);
+            }
+            assert.ok(n >= 1, f + ' was listed as linking and then no link was found');
         });
+    });
+
+    test('the scorecard links to it, so the golfer\'s door has a door', () => {
+        // WAVE 8b. The guide's FIRST door is written for somebody who arrived by a
+        // link, and until this wave that person could not open it: Wave 8's route is
+        // in admin.html's ⋯ More menu, and admin.html is the organizer's page. A
+        // golfer who taps a group link lands on index.html and may never see Home.
+        //
+        // NOT A NINTH NAV PILL. index.html's bar is eight pills that WRAP - measured
+        // at 390px, three rows already with the label lengths it carries - and it is
+        // measured on every page by nav_bar_test.js. A ninth pill spends fold space
+        // on every screen of the round to solve a problem that lives at the bottom.
+        //
+        // So: the bottom of the scorecard, in the .save-exit-box stack that already
+        // holds Round Receipt and Save & Exit, below score entry, where it costs no
+        // fold space at all.
+        const idx = INDEX.replace(/<!--[\s\S]*?-->/g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+        assert.match(idx, /href="instructions\.html"/,
+            'index.html does not link to the guide. The golfer door has no door: the '
+            + 'only route is admin.html\'s More menu, which is the organizer\'s page.');
+        // In the bottom stack, not smuggled into the nav bar - and the guard says
+        // which, so "somewhere on the page" cannot satisfy it.
+        const at = idx.indexOf('href="instructions.html"');
+        const navEnd = idx.indexOf('</div>', idx.indexOf('class="top-nav-bar"'));
+        assert.ok(at > navEnd,
+            'the guide link is inside the nav bar. Wave 8b measured that a ninth pill '
+            + 'takes that bar to another row at 390px; the route belongs at the bottom.');
+        const box = idx.lastIndexOf('class="save-exit-box"', at);
+        assert.ok(box > -1 && idx.slice(box, at).indexOf('</div>') === -1,
+            'the guide link is not inside a .save-exit-box, so it does not read as one '
+            + 'of the cards already at the bottom of the card');
+        // POSITIVE: the two cards it sits beside are still there. If the stack were
+        // renamed or removed, the assertion above would pass on a page with no
+        // bottom stack at all.
+        assert.ok((idx.match(/class="save-exit-box"/g) || []).length >= 3,
+            'the bottom stack lost a card - this guard is measuring a shape that is gone');
+        assert.match(idx, /Round Receipt/, 'the Receipt card is gone from the stack');
     });
 
     test('every page that HAS a More menu carries the route', () => {

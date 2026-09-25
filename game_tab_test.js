@@ -157,9 +157,30 @@ describe('THE NAV SLOT: 📖 Game where 📊 Stats was, on every bar', () => {
         });
     });
     test('nothing links to stats.html any more, and the file is still here for the parity tests', () => {
+        // COMMENTS STRIPPED (UI Wave 8b). This read the raw file, so the assertion
+        // was "the string stats.html appears nowhere in nine pages" - which forbade
+        // any comment in any of them from naming the file. It fired on a comment in
+        // index.html explaining which OTHER pages still have the anchor-button
+        // overflow to clean up, and the only ways to satisfy it were to edit the
+        // test or to make a true comment vaguer. A comment is not a link, and this
+        // repo already treats comments as not-copy in instructions_accuracy_test.js
+        // for exactly this reason. The pair below proves the narrowing kept its
+        // teeth: a real href in markup, and a JavaScript navigation, both still
+        // caught.
+        const noComments = (s) => s.replace(/<!--[\s\S]*?-->/g, ' ')
+            .replace(/^[ \t]*\/\/[^\n]*$/gm, ' ')
+            .replace(/\/\*[\s\S]*?\*\//g, ' ');
         ['index.html', 'leaderboard.html', 'settlement.html', 'skins.html', 'sidematches.html', 'admin.html', 'trip.html', 'instructions.html', 'game.html'].forEach(f =>
-            assert.doesNotMatch(read(f), /stats\.html/, f + ' links to stats.html'));
+            assert.doesNotMatch(noComments(read(f)), /stats\.html/, f + ' links to stats.html'));
         assert.ok(fs.existsSync(path.join(REPO_ROOT, 'stats.html')));
+        // The narrowing, held to its reason: both shapes of a real route are still
+        // seen, and a comment is not.
+        assert.match(noComments('<a href="stats.html">x</a>'), /stats\.html/,
+            'the strip swallowed a real link - this guard now guards nothing');
+        assert.match(noComments("location.href = 'stats.html';"), /stats\.html/,
+            'the strip swallowed a JavaScript navigation');
+        assert.doesNotMatch(noComments('<!-- see stats.html -->'), /stats\.html/,
+            'a comment is still being counted as a link');
     });
     test('the shell ships game.html: sw.js precache, sync-mobile-web.js CONSUMER_SHELL', () => {
         assert.match(read('sw.js'), /'\.\/game\.html',/);

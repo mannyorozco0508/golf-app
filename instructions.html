@@ -45,11 +45,36 @@
         h1, h2, h3 { color: var(--brand-green); }
         h1 { font-size: 1.5rem; text-align: center; margin-top: 0; margin-bottom: 4px; }
         .sub { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4; }
-        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
-        .back-btn { display: inline-block; margin-bottom: 14px; color: var(--brand-navy); font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; }
+        /* ---- THE CONTROL PASS (UI Wave 8b) -------------------------------------
+           This is the only page in the app that never had one. Waves 5 to 7 built a
+           button system on the setup screen - one height, one width, every label
+           centred, every target >= 44px - and nothing in those waves touched this
+           file. Measured cold at 390x844 before this rule, ALL TEN controls on the
+           page were under 44px, and the worst of them was not one of the pills:
+
+               ← Back to Home        16 x 109     an inline anchor with no box
+               🌙 Dark Mode          34 x 106
+               eight jump-nav pills  29 x 65..149
+
+           box-sizing IS THE RULE, NOT AN EXTRA. min-height: 44px on its own laid
+           the pills out at 58px, because they are content-box and the 44 was
+           applied to the content box before 12px of padding and 2px of border were
+           added on top. That is the same fault as Wave 5's 32px overhang: a
+           declared size means nothing until box-sizing says which box it means.
+
+           inline-flex, not block: these pills sit in a wrapping centred row and
+           must keep shrink-to-fit width. align-items is what centres the label in
+           the taller box - padding alone leaves it where it was, which is the
+           defect Wave 6 measured with a Range.
+
+           AFTER: every control exactly 44px, labels centred 15/15, the pill row
+           count unchanged at three, the nav block 99px -> 144px, the document
+           8827px -> 8908px. No horizontal overflow. */
+        .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; box-sizing: border-box; min-height: 44px; }
+        .back-btn { display: inline-flex; align-items: center; margin-bottom: 14px; color: var(--brand-navy); font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; box-sizing: border-box; min-height: 44px; }
 
         .jump-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; justify-content: center; }
-        .jump-nav a { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; padding: 6px 12px; font-size: 0.78rem; font-weight: bold; text-decoration: none; }
+        .jump-nav a { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; padding: 6px 12px; font-size: 0.78rem; font-weight: bold; text-decoration: none; box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 
         section { margin-bottom: 28px; }
         section h2 { font-size: 1.15rem; margin-bottom: 4px; scroll-margin-top: 12px; }
