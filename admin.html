@@ -585,6 +585,140 @@
             white-space: nowrap;
         }
         #season-lobby { max-width: var(--ctl-max); }
+
+        /* ====================================================================
+           WIDGETS, NOT FORM FIELDS (UI Wave 6). Last in this sheet, after the
+           button system, so it wins on order without an !important or an ID.
+
+           WHAT WAS WRONG, MEASURED IN CHROME ON THE BUILT v230/v231 PAGE:
+             "Start a season" sat 2px below the top of a correct 48px box with
+             26px of space under it, because an inline display:inline-block beat
+             the button system's inline-flex and align-items had nothing to act on.
+             Wave 5's guards assert the BOX and passed it.
+             Three code fields in identical 182x48 boxes were set in TWO different
+             fonts - 14.4px/700/1px/centre/UPPERCASE against 16px/400/normal/left -
+             because Wave 5 hoisted the sizing out of the row-scoped rule and left
+             the type behind.
+             "PREVIOUS ROUND CODE" needed 196.5px in a 160px field: cut off
+             mid-word.
+             The three code rows were the only blocks inset to 320 while every
+             sentence around them stayed 336, so each helper line hung 8px OUTSIDE
+             the control it describes. That was Wave 5's own --ctl-max doing it.
+             Seven different vertical gaps between twelve blocks.
+
+           THREE PROPERTIES, each declared once.
+           ==================================================================== */
+        :root {
+            /* ONE WIDTH for every block on this screen, prose included, so there is
+               exactly one left edge. 320 is the same number the button system's
+               own max width uses - one value, not two that nearly agree. */
+            --widget-max: 320px;
+            /* ONE INTERNAL PADDING for every card. */
+            --widget-pad: 14px;
+            /* ONE VERTICAL GAP between blocks. There were seven; 14 was the
+               commonest, so it is the one that survives. */
+            --widget-gap: 14px;
+        }
+
+        /* EVERY BLOCK, one width and one left edge. The theme chip is the single
+           exception and it is not an inset one: it is a centred chip of intrinsic
+           width, so it has no left edge to line up with. */
+        #lobby-screen > * {
+            max-width: var(--widget-max);
+            margin-left: auto;
+            margin-right: auto;
+        }
+        /* ONE GAP, expressed once. `* + *` means the first block needs no rule and
+           nothing has to zero a margin it never set. */
+        #lobby-screen > * { margin-top: 0; margin-bottom: 0; }
+        #lobby-screen > * + * { margin-top: var(--widget-gap); }
+
+        /* A CONTROL GROUP IS A CARD. The heading carries the sentence, the control
+           sits under it, and the helper line sits under the control sharing its left
+           edge - which is the whole of "words not lined up". */
+        .w-card {
+            box-sizing: border-box;
+            padding: var(--widget-pad);
+            border: 1px solid var(--border-mid);
+            border-radius: 12px;
+            background: var(--bg-card);
+            text-align: left;
+        }
+        .w-card-title {
+            margin: 0 0 10px 0;
+            font-size: 0.92rem;
+            font-weight: bold;
+            color: var(--brand-green);
+            line-height: 20px;
+        }
+        .w-card-note {
+            margin: 8px 0 0 0;
+            font-size: 0.72rem;
+            line-height: 1.4;
+            color: var(--text-muted);
+            text-align: left;
+        }
+        .w-card-refusal {
+            margin: 8px 0 0 0;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            line-height: 1.4;
+            text-align: left;
+            color: var(--warn-text);
+            background: var(--warn-bg);
+            border: 2px solid var(--warn-border);
+            border-radius: 8px;
+        }
+        /* Inside a card the row fills the card rather than being centred within it,
+           so the control's left edge IS the card's content left edge. */
+        .w-card #join-code-row,
+        .w-card #copy-code-row,
+        .w-card #season-open-row {
+            max-width: none;
+            margin: 0;
+        }
+        #season-lobby #season-list:not(:empty) { margin-bottom: 10px; }
+        #season-lobby #season-start-link { margin-bottom: 10px; }
+
+        /* ONE TYPE IN THE THREE CODE FIELDS. This is the other half of the job the
+           button system did for sizing: the font, weight, tracking, alignment and
+           case were still scoped to #join-code-row, so two of the three fields fell
+           through to input[type="text"] and read as different controls in matching
+           boxes. */
+        #join-code-row .join-code-input,
+        #copy-code-row .join-code-input,
+        #season-open-row .join-code-input {
+            font-size: 0.9rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-align: center;
+            text-transform: uppercase;
+            padding: 0 12px;
+        }
+
+        /* VERTICAL CENTRING, EVERYWHERE, AND AN EXPLICIT LINE BOX WITH IT. An emoji
+           label raises the line box ~6px, which is why ▶️ Resume and 🌙 Dark Mode
+           each sat 2px high in their own boxes. */
+        .resume-link, .theme-toggle-btn, .account-link {
+            line-height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* The prose that is not in a card. */
+        .lobby-lead { color: var(--text-muted); font-size: 0.95rem; line-height: 1.4; }
+        .lobby-framing { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; text-align: center; }
+        .lobby-context-banner {
+            box-sizing: border-box; padding: 12px; text-align: center;
+            background: var(--nassau-box-bg); border: 2px solid var(--accent-teal);
+            border-radius: 10px;
+        }
+        /* Organizer tooling behind five taps. It gets a class rather than an
+           exemption, so "no inline layout on this screen" stays an absolute rule. */
+        .smp-close-row { text-align: center; margin-top: 20px; }
+        .smp-close { font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer; }
     </style>
 <style>
 /* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
@@ -614,7 +748,7 @@ html {
     </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-lockup" onclick="handleSecretTap()"><img src="hardpan-icon.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN</span></div>
-    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
+    <p class="lobby-lead">What are you setting up?</p>
 
     <div class="home-widgets">
         <button type="button" class="home-widget" id="hw-trip" onclick="selectHomeWidget('trip')">
@@ -636,9 +770,9 @@ html {
         </button>
     </div>
 
-    <div id="event-type-framing" style="display:none; text-align:center; font-size:0.82rem; color:var(--text-muted); margin:-10px 0 18px 0; line-height:1.4;"></div>
+    <div id="event-type-framing" class="lobby-framing" style="display:none;"></div>
 
-    <div id="trip-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
+    <div id="trip-context-banner" class="lobby-context-banner" style="display:none;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">🚐 Setting Up A Round For</div>
         <div id="trip-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;">Loading trip...</div>
         <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">This round will link itself back to the trip automatically once you finish setup.</div>
@@ -662,8 +796,8 @@ html {
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
         <button class="btn-primary" style="background-color: var(--bg-card); color: var(--brand-navy);" onclick="shareMainApp()">📤 Share App Link</button>
 
-        <div style="text-align: center; margin-top: 20px;">
-            <span style="font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer;" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
+        <div class="smp-close-row">
+            <span class="smp-close" onclick="document.getElementById('secret-master-panel').style.display='none'; tapCount=0;">Close Panel</span>
         </div>
     </div>
 
@@ -711,7 +845,7 @@ html {
     </div>
 
     <!-- RESUME GAME BOX -->
-    <div id="resume-container" style="display: none; margin-bottom: 14px;">
+    <div id="resume-container" style="display: none;">
         <a class="resume-link" onclick="resumeGame()">▶️ Resume <span id="resume-room-badge"></span></a>
     </div>
 
@@ -732,6 +866,14 @@ html {
          display:flex and gap:8px inline, and an inline style beats any rule, so
          the shared row rule could never reach it. The three code rows now carry
          nothing but their id. -->
+    <!-- WIDGETS, NOT FORM FIELDS (UI Wave 6). Each control group is a card: the
+         heading carries the sentence, the field carries the short noun, and the
+         helper line sits under the control it describes and shares its left edge.
+         NO INLINE LAYOUT in here - an inline declaration beats every rule, and
+         three separate misalignments across two waves traced back to one. Only
+         display:none stays, because that is a visibility state the page's JS owns. -->
+    <div class="w-card" id="open-round-card">
+    <h3 class="w-card-title">Open a round you already have</h3>
     <div id="join-code-row">
         <input type="text" id="join-code-input" class="join-code-input" maxlength="48"
                placeholder="GAME CODE" aria-label="Game code or the link your organizer sent">
@@ -744,42 +886,55 @@ html {
     <!-- SAID INLINE, NOT IN A DIALOG (2026-09-20): the join box reads the round
          before it navigates, and what it finds is written here, under the field.
          An alert rendered as "golf-app-5a5.pages.dev says" on a phone. -->
-    <p id="join-code-refusal" role="alert" style="display:none; font-size:0.8rem; font-weight:bold; color:var(--warn-text); background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:8px; padding:8px 12px; margin:0 auto 8px auto; max-width:360px; text-align:center; line-height:1.4;"></p>
+    <p id="join-code-refusal" class="w-card-refusal" role="alert" style="display:none;"></p>
     <!-- Since 2026-09-20 a typed code on a bigger round lands on the group picker,
          so a golfer can keep score from a code alone. tools/code-entry-check.js
          types a code on four and on nine golfers and measures that the picker is
          on screen where this sentence says it is. -->
-    <p id="join-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
+    <p id="join-code-note" class="w-card-note">
         Type the code your organizer sent. On a round with more than four golfers you pick your group next.
     </p>
+    </div>
     <!-- STARTING FROM A PREVIOUS ROUND. The prefill (admin.html?game=NEW&copyFrom=OLD)
          has always worked from a link; this is the field that emits it. The order
          inside startFromPreviousRound is the point: check the source, MINT the new
          code, then navigate with both params - the trip select used to send
          ?trip=T&copyFrom=OLD to a lobby that minted a code and dropped copyFrom. -->
+    <div class="w-card" id="copy-round-card">
+    <!-- THE HEADING CARRIES THE SENTENCE AND THE FIELD CARRIES THE NOUN. The
+         placeholder was PREVIOUS ROUND CODE, which needed 196.5px in a 160px field
+         and was cut off mid-word on a phone. Shortening it is only honest because
+         the heading above it now says which round. -->
+    <h3 class="w-card-title">Start from a previous round</h3>
     <div id="copy-code-row">
         <input type="text" id="copy-code-input" class="join-code-input" maxlength="48"
-               placeholder="PREVIOUS ROUND CODE" aria-label="The code of a round to copy the golfers and setup from">
+               placeholder="ROUND CODE" aria-label="The code of a round to copy the golfers and setup from">
         <button class="btn-outline join-code-btn" id="copy-code-btn" onclick="startFromPreviousRound(this)">🔁 Start from it</button>
     </div>
-    <p id="copy-code-note" style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin:0 0 14px 0; line-height:1.4;">
+    <p id="copy-code-note" class="w-card-note">
         Copies that round&rsquo;s golfers, handicaps, flights, groups, course and money setup into a new round. The old round is not changed.
     </p>
+    </div>
     <!-- SEASON. The ledger itself is season.html. This row is how Game Day
          reaches it: the seasons this phone has opened, a link to start one,
          and a code that opens the ledger. Creating the record happens on
          season.html, which is the page that owns the write. -->
-    <div id="season-lobby" style="margin:8px auto 14px auto; text-align:center;">
-        <div style="font-weight:bold; color:var(--brand-green); font-size:0.92rem;">Season</div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 8px 0; line-height:1.4;">Running money, skins and closest-to-the-pin across the rounds this crew plays.</p>
+    <div class="w-card" id="season-lobby">
+        <h3 class="w-card-title">Season</h3>
+        <p class="w-card-note">Running money, skins and closest-to-the-pin across the rounds this crew plays.</p>
         <div id="season-list"></div>
-        <a id="season-start-link" href="season.html" class="btn-outline" style="display:inline-block; margin-bottom:8px; text-decoration:none;">Start a season</a>
+        <!-- NO INLINE display HERE ANY MORE. It was display:inline-block, which beat
+             the button system's inline-flex, so align-items never applied and the
+             label sat 2px below the top of a correct 48px box with 26px under it.
+             That is claim 1 of the Wave 6 recon and it shipped in v230 under two
+             green guards. -->
+        <a id="season-start-link" href="season.html" class="btn-outline">Start a season</a>
         <div id="season-open-row">
             <input type="text" id="season-open-input" class="join-code-input" maxlength="48" placeholder="SEASON CODE" aria-label="Season code">
             <button type="button" class="btn-outline join-code-btn" id="season-open-btn" onclick="openSeasonFromLobby(this)">Open ledger</button>
         </div>
     </div>
-    <div id="season-context-banner" style="display:none; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:12px; margin-bottom:20px; text-align:center;">
+    <div id="season-context-banner" class="lobby-context-banner" style="display:none;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Season</div>
         <div id="season-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;"></div>
         <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Game Day will link this round to that season once you finish setup. Start from a previous round below, or tap Game Day for a blank one.</div>

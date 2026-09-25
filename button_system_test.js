@@ -179,7 +179,11 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         const shape = inputs.map(c => c.w + 'x' + c.h + '@' + c.left);
         assert.equal(new Set(shape).size, 1,
             'the three code fields are three different sizes: ' + shape.join(' | '));
-        assert.equal(inputs[0].w, 182, 'the shared field width moved');
+        // REPOINTED BY UI WAVE 6. The three rows now sit INSIDE a card with 14px of
+        // padding and a 1px border, so the row is 290 rather than 320 and the field
+        // is 290 - 10 gap - 128 button = 152. The claim is unchanged and is still
+        // the one that matters: all three are the SAME, whatever that number is.
+        assert.equal(inputs[0].w, 152, 'the shared field width moved');
         assert.equal(inputs[0].h, 48);
         const bshape = btns.map(c => c.w + 'x' + c.h + '@' + c.right);
         assert.equal(new Set(bshape).size, 1,
@@ -187,8 +191,11 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         assert.equal(btns[0].w, 128, 'the paired button width moved off --ctl-pair-btn');
         // Centred: the same gutter on both sides, so the rows line up with the
         // single buttons above and below them.
-        inputs.forEach(c => assert.equal(c.left, 35, c.name + ' is not on the 35px gutter'));
-        btns.forEach(c => assert.equal(c.right, 35, c.name + ' is not on the 35px gutter'));
+        // 50, not 35: the card's own left edge is 35 and its content starts 15px in
+        // (14px padding + 1px border). Every control and every sentence inside a
+        // card shares that 50 - which is the whole of what Wave 6 fixed.
+        inputs.forEach(c => assert.equal(c.left, 50, c.name + ' is not on the card gutter'));
+        btns.forEach(c => assert.equal(c.right, 50, c.name + ' is not on the card gutter'));
     });
 
     test('AN EMOJI IN A LABEL NO LONGER CHANGES A BUTTON HEIGHT', () => {
@@ -212,23 +219,33 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         assert.ok(a, 'Start a season is not on screen');
         assert.equal(a.boxSizing, 'border-box',
             'the anchor is back on content-box, which is what made it 368px wide');
-        assert.equal(a.w, 320, 'Start a season is ' + a.w + 'px');
+        // 290 inside the season card, for the same reason as the fields above.
+        assert.equal(a.w, 290, 'Start a season is ' + a.w + 'px');
         assert.equal(a.h, 48);
         assert.equal(a.left, a.right, 'it is not centred: ' + a.left + ' / ' + a.right);
+        // AND ITS LABEL IS CENTRED IN IT NOW. This is what v230 got wrong and what
+        // no assertion in this file could see: the box was right and the text sat
+        // 2px from the top. widget_system_test.js measures that for every control;
+        // it is pinned here too because this is the control it was wrong on.
+        assert.ok(/<a id="season-start-link" href="season\.html" class="btn-outline">/.test(ADMIN),
+            'the inline display is back on the season link - that is what stopped it centring');
     });
 
-    test('THE TILES ARE THE ONE DELIBERATE EXCEPTION, and they did not grow', () => {
-        // .home-widgets keeps the card's full 336px rather than taking --ctl-max.
-        // Measured: at 320 the tiles narrow to 155 and their description wraps one
-        // more line, growing them from 129.3px to 143.4px tall. Asserted rather
-        // than commented, so the exception cannot quietly become a drift.
+    test('THE TILES TOOK THE ONE WIDTH — Wave 5\'s exception is retired, deliberately', () => {
+        // WAVE 5 EXEMPTED .home-widgets to keep the tiles at 336 and 129.3px tall,
+        // because narrowing them wraps their description and costs 14px of height.
+        // UI WAVE 6 RETIRES THAT EXEMPTION, and it is a reversal rather than a
+        // drift: with the tiles at 336 they would be the ONLY block left at the 27px
+        // edge, which reintroduces the exact two-left-edge problem Wave 6 exists to
+        // fix - it was the 320-vs-336 split that put every helper sentence 8px
+        // outside its own control. One left edge is worth 14px of height.
+        // The cost is named rather than hidden: 155 x 143.4 instead of 163 x 129.3.
         const t = [M.byId['#hw-trip'], M.byId['#hw-quick']];
         t.forEach(c => assert.ok(c, 'a home tile is not on screen'));
-        assert.equal(t[0].w, 163, 'the tiles took --ctl-max: ' + t[0].w);
-        assert.equal(t[1].w, 163);
-        assert.ok(t[0].h < 140,
-            'the tiles grew to ' + t[0].h + 'px - they are inside --ctl-max again');
+        assert.equal(t[0].w, 155, 'the tiles are not on the one width: ' + t[0].w);
+        assert.equal(t[1].w, 155);
         assert.equal(t[0].h, t[1].h, 'the two tiles are different heights');
+        assert.ok(t[0].h <= 150, 'the tiles grew past 150px: ' + t[0].h);
     });
 
     test('and the system is declared ONCE, as a system', () => {
