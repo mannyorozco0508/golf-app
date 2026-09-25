@@ -163,7 +163,24 @@ describe('Option A: the setup home does not open on the organizer card', () => {
             'a Create Game hero was invented; the brief rejected it');
         assert.match(lobby, /id="hw-trip"/, 'the Road Trip tile must still be the way in');
         assert.match(lobby, /id="hw-quick"/, 'and the Game Day tile');
-        assert.ok(!/<details/.test(lobby), 'an accordion was added to the lobby');
+        // REPOINTED BY UI WAVE 7, and the distinction is the whole reason it is
+        // allowed to move. What Option A rejected was an accordion AROUND THE
+        // SIGN-IN CARD - hiding the organizer-keeping flow behind a toggle on the
+        // screen whose job is to get an organizer set up. Wave 7 collapses the
+        // opposite material: the three JOINER cards, which serve a golfer opening
+        // somebody else's round, not the organizer standing on this page.
+        //
+        // So the rule is not "no <details> on the lobby" - it is "not around the
+        // sign-in flow, and not more than one of them". Both are asserted.
+        const details = lobby.match(/<details[^>]*>/g) || [];
+        assert.equal(details.length, 1,
+            'the lobby has ' + details.length + ' disclosures; one collapsed row was '
+            + 'approved, a second is the accordion pattern Option A rejected');
+        assert.match(details[0], /id="open-else"/,
+            'the one disclosure is not the approved Open-something-else row: ' + details[0]);
+        const det = lobby.slice(lobby.indexOf('<details'), lobby.indexOf('</details>'));
+        assert.ok(!/id="email-link-card"|id="account-link"|openAccountPanel/.test(det),
+            'the sign-in flow was put behind a toggle - THAT is what Option A rejected');
         assert.ok(!/one-time|dismiss-once|banner-once/i.test(lobby), 'a one-time banner was added');
     });
 });

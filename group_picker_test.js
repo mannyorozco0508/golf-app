@@ -280,7 +280,14 @@ describe('THE JOIN BOX LOOKS BEFORE IT LEAPS', () => {
         const src = read('admin.html');
         const at = src.indexOf('id="join-code-note"');
         const note = src.slice(src.indexOf('>', at) + 1, src.indexOf('</p>', at)).replace(/\s+/g, ' ').trim();
-        assert.equal(note, 'Type the code your organizer sent. On a round with more than four golfers you pick your group next.');
+        // REPOINTED BY UI WAVE 7, which cut the helper lines to one each. The
+        // sentence is shorter and SAYS THE SAME TWO THINGS, because both are
+        // measured claims rather than decoration: "pick your group" is what a typed
+        // code actually gives you since the picker landed, and "four" is
+        // index.html's own gate (players.length > 4). The brief's one-line version -
+        // "Type the code your organizer sent." - dropped both, so it was measured
+        // instead: this fits one line at 245.8px in a 290px box, with 44px to spare.
+        assert.equal(note, 'Organizer&rsquo;s code. Over four golfers, pick your group.');
     });
 });
 

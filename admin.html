@@ -719,6 +719,97 @@
            exemption, so "no inline layout on this screen" stays an absolute rule. */
         .smp-close-row { text-align: center; margin-top: 20px; }
         .smp-close { font-size: 0.75rem; color: #c5d2e0; text-decoration: underline; cursor: pointer; }
+
+        /* ====================================================================
+           ONE SCREEN (UI Wave 7). Last in this sheet, after the widget system.
+
+           WHAT WAS WRONG, MEASURED: 1172px in an 844px viewport, with the
+           organizer's own path - top row, lockup, tiles, Resume - already ending
+           at 551px. Nothing overflowed. 620px of material for a golfer JOINING a
+           round sat under the person who came to SET ONE UP.
+           ==================================================================== */
+
+        /* DARK MODE AS AN ICON ON THE TOP ROW. The margin is the point: this
+           button carries margin: 0 auto 16px auto from the rule far above, and a
+           16px bottom margin on a flex child grew this row from 48px to 60px when
+           the move was first measured - which fails the one-height rule. Zeroed
+           here rather than exempting the row. */
+        .lobby-account-row { justify-content: space-between; }
+        .lobby-account-row .theme-toggle-btn {
+            margin: 0;
+            padding: 0;
+            width: 44px;
+            min-width: 44px;
+            min-height: 44px;
+            font-size: 1.05rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 20px;
+        }
+
+        /* THE DISCLOSURE. Same width, same gap and same left edge as every other
+           block, so Waves 5 and 6 survive the new control. */
+        .w-disclosure {
+            box-sizing: border-box;
+            max-width: var(--widget-max);
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .w-disclosure-summary {
+            box-sizing: border-box;
+            list-style: none;
+            cursor: pointer;
+            height: var(--ctl-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            border: 1px solid var(--border-mid);
+            border-radius: 12px;
+            background: var(--bg-card);
+            font-size: 0.92rem;
+            font-weight: bold;
+            color: var(--brand-green);
+            line-height: 20px;
+        }
+        /* The same marker-hiding .nav-more already uses - one pattern, one trick. */
+        .w-disclosure-summary::-webkit-details-marker { display: none; }
+        /* THE COLLAPSE IS OURS, NOT THE BROWSER'S, AND THAT IS MEASURED RATHER THAN
+           preferred. In the Chrome this repo drives (154) a CLOSED <details> does
+           NOT hide its children: a bare, unstyled details/div pair injected into
+           document.body still reports one client rect for the div. So relying on
+           the native collapse would have shipped a "collapsed" row that hid
+           nothing and a screen still 1061px long - which is the whole wave undone,
+           and it is what one_screen_test.js caught on the first run.
+           Keyed on [open], so the native state still drives it and the summary
+           keeps its native semantics; only the hiding is explicit. */
+        .w-disclosure > *:not(summary) { display: none; }
+        .w-disclosure[open] > *:not(summary) { display: block; }
+        .w-disclosure-summary::after {
+            content: '\25BE';
+            font-size: 0.8rem;
+            transform: rotate(0deg);
+            transition: transform 0.15s ease;
+        }
+        .w-disclosure[open] .w-disclosure-summary::after { transform: rotate(180deg); }
+        .w-disclosure[open] .w-disclosure-summary { margin-bottom: var(--widget-gap); }
+        .w-disclosure > .w-card + .w-card { margin-top: var(--widget-gap); }
+
+        /* A LINK INSIDE A CARD. Keeps a 44px target and loses the button chrome. */
+        .w-card-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: var(--ctl-h);
+            padding: 0;
+            background: none;
+            border: 0;
+            color: var(--brand-green);
+            font-weight: bold;
+            font-size: 0.86rem;
+            line-height: 20px;
+            text-decoration: underline;
+        }
     </style>
 <style>
 /* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
@@ -743,10 +834,18 @@ html {
 <div class="container" id="lobby-screen">
     <!-- ACCOUNT. The email-link flow used to own this screen as a tall "Keep this
          organizer" card above Resume. It is the same flow, behind this link. -->
+    <!-- THE TOP ROW IS THE WHOLE OF THE CHROME (UI Wave 7). Dark mode owned a
+         44px row of its own plus a 14px gap - 58px of the screen for a control
+         nobody opens Home to use. It is an icon here, beside Account, with an
+         aria-label because an icon with no label says nothing to a screen reader.
+         ITS MARGIN, NOT ITS PADDING, was what grew this row to 60px when the move
+         was first measured: .theme-toggle-btn carries margin: 0 auto 16px auto, and
+         a 16px bottom margin on a flex child pushes the row. Zeroed in the sheet
+         rather than exempting the row from the one-height rule. -->
     <div class="lobby-account-row">
+        <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Dark mode">🌙</button>
         <button type="button" id="account-link" class="account-link" onclick="openAccountPanel()">Account</button>
     </div>
-    <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-lockup" onclick="handleSecretTap()"><img src="hardpan-icon.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN</span></div>
     <p class="lobby-lead">What are you setting up?</p>
 
@@ -754,7 +853,11 @@ html {
         <button type="button" class="home-widget" id="hw-trip" onclick="selectHomeWidget('trip')">
             <div class="hw-icon">🚐</div>
             <div class="hw-name">Road Trip</div>
-            <div class="hw-desc">Multiple rounds, games, teams, standings & money</div>
+            <!-- ONE LINE, AND IT FITS: 118px measured in a 131px box at 10.88px.
+                 Not held on one line by nowrap and an ellipsis - that would satisfy
+                 "one line" while hiding the words, which is what guard 6 in
+                 widget_system_test.js exists to forbid. -->
+            <div class="hw-desc">Rounds, teams, money</div>
         </button>
         <!-- CLUB ROUND LIVES IN THE OTHER PRODUCT NOW.
              The tile was removed at the Consumer/Club product separation, not deleted:
@@ -766,7 +869,7 @@ html {
         <button type="button" class="home-widget active" id="hw-quick" onclick="selectHomeWidget('quick')">
             <div class="hw-icon">🏌️</div>
             <div class="hw-name">Game Day</div>
-            <div class="hw-desc">Playing today? Set up in seconds</div>
+            <div class="hw-desc">Set up today in seconds</div>
         </button>
     </div>
 
@@ -801,11 +904,6 @@ html {
         </div>
     </div>
 
-    <!-- WHERE THE TRIAL STANDS, on the home screen too (2026-09-20): the organizer
-         who never reaches Review is warned here. Same one read, same line
-         (loadOrganizerStanding / renderOrganizerStanding). Above Resume, under the
-         tiles: the first thing after "what are you setting up". -->
-    <div id="lobby-standing" class="organizer-standing" role="status"></div>
 
     <!-- KEEP THIS ORGANIZER, NOW BEHIND "Account". Anonymous auth is per browser,
          so a round set up in the app is a spectator's round in Safari. This is the
@@ -828,6 +926,14 @@ html {
             <button class="close-modal" onclick="closeAccountPanel()" aria-label="Close">&times;</button>
         </div>
         <p id="account-linked-note" role="status">Organizer saved. Your rounds follow this account.</p>
+        <!-- WHERE THE TRIAL STANDS (moved here by UI Wave 7). It sat above Resume on
+             the home screen, which made standing look like a control. It is neither a
+             control nor a thing to act on - it is what this account IS - so it
+             belongs with the account. Same one read and the same writer: the id is
+             unchanged, so renderOrganizerStanding still writes the same string into
+             the same three places. It renders NOTHING until the trial read answers,
+             which is why it cost 0px on arrival and 30px on a phone with a pass. -->
+        <div id="lobby-standing" class="organizer-standing" role="status"></div>
     <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title">
         <h2 id="email-link-title">Keep this organizer</h2>
         <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a sign-in link and finish it in this same app. It stays the same account, so the free trial and a founder pass stay with the rounds already set up on it.</p>
@@ -872,6 +978,24 @@ html {
          NO INLINE LAYOUT in here - an inline declaration beats every rule, and
          three separate misalignments across two waves traced back to one. Only
          display:none stays, because that is a visibility state the page's JS owns. -->
+    <!-- ONE COLLAPSED ROW (UI Wave 7). Everything below this line serves a golfer
+         JOINING a round; the person on this page is the organizer. Measured before
+         the wave: the organizer's own path ended at 551px and 620px of joiner
+         material was stacked under it.
+         THE PAGE'S OWN PATTERN, NOT A NEW ONE. admin.html already uses
+         <details>/<summary> once, for the wizard nav's More menu, and already has
+         the CSS that hides the native marker. <details> carries the open/closed
+         state, the keyboard operation and the collapse for free.
+         NO aria-expanded ON THE SUMMARY: the element conveys expanded state
+         natively, and a hand-written one there is redundant at best and
+         conflicting at worst. The literal attribute would need a button+region
+         pattern, which would be a SECOND disclosure pattern on this page.
+         AND NO `open` ATTRIBUTE. .nav-more ships with one; copying that would be
+         this same screen at its old height with an extra control on it. Closed on
+         arrival is the whole wave, and one_screen_test.js asserts both the absent
+         attribute and the measured closed state. -->
+    <details id="open-else" class="w-disclosure">
+    <summary class="w-disclosure-summary">Open something else</summary>
     <div class="w-card" id="open-round-card">
     <h3 class="w-card-title">Open a round you already have</h3>
     <div id="join-code-row">
@@ -892,7 +1016,7 @@ html {
          types a code on four and on nine golfers and measures that the picker is
          on screen where this sentence says it is. -->
     <p id="join-code-note" class="w-card-note">
-        Type the code your organizer sent. On a round with more than four golfers you pick your group next.
+        Organizer&rsquo;s code. Over four golfers, pick your group.
     </p>
     </div>
     <!-- STARTING FROM A PREVIOUS ROUND. The prefill (admin.html?game=NEW&copyFrom=OLD)
@@ -912,7 +1036,7 @@ html {
         <button class="btn-outline join-code-btn" id="copy-code-btn" onclick="startFromPreviousRound(this)">🔁 Start from it</button>
     </div>
     <p id="copy-code-note" class="w-card-note">
-        Copies that round&rsquo;s golfers, handicaps, flights, groups, course and money setup into a new round. The old round is not changed.
+        Same golfers, handicaps, flights and money.
     </p>
     </div>
     <!-- SEASON. The ledger itself is season.html. This row is how Game Day
@@ -921,19 +1045,23 @@ html {
          season.html, which is the page that owns the write. -->
     <div class="w-card" id="season-lobby">
         <h3 class="w-card-title">Season</h3>
-        <p class="w-card-note">Running money, skins and closest-to-the-pin across the rounds this crew plays.</p>
+        <p class="w-card-note">Running money and skins across the rounds this crew plays.</p>
         <div id="season-list"></div>
         <!-- NO INLINE display HERE ANY MORE. It was display:inline-block, which beat
              the button system's inline-flex, so align-items never applied and the
              label sat 2px below the top of a correct 48px box with 26px under it.
              That is claim 1 of the Wave 6 recon and it shipped in v230 under two
              green guards. -->
-        <a id="season-start-link" href="season.html" class="btn-outline">Start a season</a>
+        <!-- A LINK, NOT A FULL-WIDTH BUTTON (UI Wave 7). It was 290 x 48 inside the
+             card, the same weight as "Open ledger" beside it, for the rarer of the
+             two actions. It keeps a 44px target and loses the button chrome. -->
+        <a id="season-start-link" href="season.html" class="w-card-link">Start a season</a>
         <div id="season-open-row">
             <input type="text" id="season-open-input" class="join-code-input" maxlength="48" placeholder="SEASON CODE" aria-label="Season code">
             <button type="button" class="btn-outline join-code-btn" id="season-open-btn" onclick="openSeasonFromLobby(this)">Open ledger</button>
         </div>
     </div>
+    </details>
     <div id="season-context-banner" class="lobby-context-banner" style="display:none;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Season</div>
         <div id="season-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;"></div>
@@ -8408,15 +8536,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             ? "Common club formats: Stroke Play, Stableford, Best Ball. Every other format below still works too."
             : "Tap what you're playing. Course, players and any bets come next.";
     }
-    // On the lobby screen itself (no game code yet), show the framing for the default
-    // Quick Round selection, matching whichever card starts active in the HTML.
-    if (!currentMode) {
-        const framingEl = document.getElementById('event-type-framing');
-        if (framingEl) {
-            framingEl.textContent = eventTypeFraming.quick;
-            framingEl.style.display = 'block';
-        }
-    }
+    // THE FRAMING SENTENCE NO LONGER SHOWS ITSELF ON ARRIVAL (UI Wave 7). It read
+    // "Game Day - just pick a course, add your group, choose a game, and go." above
+    // the tiles and cost 36.8px plus a 14px gap; the tile underneath already says
+    // what Game Day is.
+    //
+    // THE ELEMENT AND BOTH WRITERS STAY, deliberately rather than half-finished:
+    // eventTypeFraming is the PRESERVED CLUB PRESET. Three suites pin it as the
+    // evidence that separating Consumer from Club did not destroy Club -
+    // consumer_journey_test.js ("the framing table must survive"),
+    // product_boundary_test.js, and rattle_consumer_separation_test.js, which also
+    // uses this element's id as a slice boundary. A deep link carrying
+    // ?eventType=club still behaves exactly as it did. Only this block, the one
+    // that revealed the sentence with no tile chosen, is gone.
 
     if (currentMode) {
         // THE ONE LOADER ON ARRIVAL. This block decides, and nothing else loads:
