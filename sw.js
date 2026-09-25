@@ -2155,7 +2155,45 @@
 // The consumer product cache is consumer-v72-account-link. The tournament product
 // cache stays tournament-v54-rattle-golf. The iOS binary in review is not
 // resubmitted.
-const CACHE_VERSION = 'golfapp-v231-account-link';
+// Moved to v232 because the SETUP SCREEN IS WIDGETS NOW, not form fields. A device
+// on v231 keeps the old alignment. admin.html only; no other page's CSS moved.
+//
+// WHAT WAS WRONG, MEASURED IN CHROME ON THE BUILT PAGE:
+//   "Start a season" sat 2px below the top of a correct 48px box with 26px under
+//     it, because an inline display:inline-block beat the button system's
+//     inline-flex and align-items had nothing to act on. Both v230 guards assert
+//     the BOX and passed it - a label glued to the ceiling of a correct box was
+//     invisible to them.
+//   Three code fields in identical 182x48 boxes were set in TWO different fonts:
+//     14.4px/700/1px/centre/UPPERCASE against 16px/400/normal/left. v230 made the
+//     boxes match and left the type behind.
+//   "PREVIOUS ROUND CODE" needed 196.5px in a 160px field and was cut mid-word.
+//   The three code rows were the only blocks inset to 320 while every sentence
+//     around them stayed 336, so each helper line hung 8px OUTSIDE the control it
+//     describes. That was v230's own contained width doing it.
+//   Seven different vertical gaps between twelve blocks.
+//
+// THE RULE: three properties, declared once each - one width for every block
+// (prose included), one internal padding, one vertical gap. Every control group is
+// a card whose heading carries the sentence and whose field carries the short noun,
+// with the helper line under the control sharing its left edge. And NO INLINE
+// LAYOUT on this screen except display:none, because an inline declaration beats
+// every rule and three separate misalignments across two waves traced back to one.
+//
+// AFTER, on the built page: ONE left edge (35) for every block, ONE width (320),
+// ONE gap (14) between all nine, every label vertically centred in its own control,
+// one type across the three fields, and no placeholder clipped. 1172px tall - 1.4
+// viewports, against 1381 before Option A landed.
+//
+// THE TILE EXEMPTION FROM v230 IS RETIRED, deliberately: at 336 the tiles would be
+// the only block left on the old edge, which is the split this wave exists to
+// close. It costs 14px of height (155 x 143.4 against 163 x 129.3) and is named in
+// button_system_test.js rather than hidden.
+//
+// No engine and no protected file changed, and no dialog surface moved. The
+// consumer product cache is consumer-v73-widgets. The tournament product cache
+// stays tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v232-widgets';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
