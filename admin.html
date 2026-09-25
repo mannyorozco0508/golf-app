@@ -416,6 +416,148 @@
         .home-widget .hw-name { font-weight: bold; color: var(--brand-green); font-size: 0.92rem; margin-top: 5px; }
         .home-widget .hw-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; line-height: 1.3; }
         @media (max-width: 340px) { .home-widget .hw-desc { display: none; } }
+
+        /* ====================================================================
+           THE BUTTON SYSTEM (UI Wave 5). ONE width, ONE height, ONE gap.
+           Last in this sheet on purpose: .btn-primary and .btn-outline are
+           declared hundreds of lines above, so order is what lets these win
+           without an !important or an ID.
+
+           WHAT WAS WRONG, MEASURED IN CHROME AT 390x844 BEFORE ANY OF THIS:
+           the page could be dragged sideways (document.scrollWidth 395 against
+           a 390 viewport), fifteen controls rendered SEVEN widths and EIGHT
+           heights, five of them were under a 44px touch target, and the three
+           code rows that are meant to look identical were three different
+           layouts.
+
+           THE OVERHANG WAS box-sizing, not a width rule and not a max-width.
+           <button> and <input> get box-sizing:border-box from the UA
+           stylesheet; an <a> does not. #season-start-link is the one control
+           here styled as a button and written as an anchor, so .btn-outline's
+           width:100% (336px) plus 14px padding each side plus a 2px border each
+           side rendered 368px and hung 32px past the card. .email-link-card had
+           the same fault in a quieter form: its own max-width could not bite a
+           content box that was already narrower than it.
+
+           THE RESET IS SCOPED TO THIS SCREEN. A page-wide
+           * { box-sizing: border-box } would also shrink .grid-input
+           (width:34px !important with padding), which is the custom course
+           grid - a different screen and a different wave.
+           ==================================================================== */
+        /* ONE SOURCE FOR box-sizing, and .modal-content is in it for the same
+           reason the button rules below name it: a control that moves into a panel
+           has to keep the system. The first version of this wave ALSO declared
+           box-sizing on each rule below, which made this line redundant - removing
+           it changed nothing measurable, so it was defence in depth that could not
+           be proved. Now it is the only declaration, and control C59 (delete these
+           two selectors) puts the 32px overhang and the sideways scroll straight
+           back. */
+        #lobby-screen, #lobby-screen *, #lobby-screen *::before, #lobby-screen *::after,
+        .modal-content, .modal-content *, .modal-content *::before, .modal-content *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* CONTAINED, NOT EDGE TO EDGE. The card's content box is 336px at a
+               390px viewport, so 320 leaves a visible 35px gutter on each side
+               and these read as widgets rather than as a web form. */
+            --ctl-max: 320px;
+            /* ONE HEIGHT, and it is a HEIGHT rather than a min-height. Measured:
+               #copy-code-btn and #season-open-btn carry identical classes and
+               rendered 58px and 52px, and a controlled label swap proved the
+               cause is the leading emoji - it raises the line box 6px, and with
+               line-height:normal that goes straight into the button. An explicit
+               height and an explicit line-height are what stop a future emoji
+               moving a control. */
+            --ctl-h: 48px;
+            --ctl-line: 20px;
+            /* The gap .home-widgets already used, so the rhythm is one number. */
+            --ctl-gap: 10px;
+            /* THE PAIRED BUTTON IS FIXED so the three rows are one shape. 128 is
+               measured, not chosen: the three labels need 55.5, 79.4 and 97.9px
+               on one line at 0.85rem, and 97.9 + 14 + 14 rounded up to a
+               multiple of four is 128. None of them wraps at 128. */
+            --ctl-pair-btn: 128px;
+        }
+
+        /* EVERY BUTTON, AND EVERY ANCHOR WEARING A BUTTON CLASS. The anchor
+           selectors are not belt-and-braces - they are the ones that were
+           broken. .modal-content is included so the system follows the sign-in
+           controls if they move into a panel. */
+        #lobby-screen .btn-primary, #lobby-screen .btn-outline, #lobby-screen .btn-danger,
+        #lobby-screen a.btn-primary, #lobby-screen a.btn-outline, #lobby-screen a.btn-danger,
+        .modal-content .btn-primary, .modal-content .btn-outline, .modal-content .btn-danger,
+        .modal-content a.btn-primary, .modal-content a.btn-outline {
+            width: 100%;
+            max-width: var(--ctl-max);
+            height: var(--ctl-h);
+            padding: 0 14px;
+            line-height: var(--ctl-line);
+            margin-left: auto;
+            margin-right: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        /* Every field on this screen is the same height as every button on it.
+           Written against the CONTROLS rather than against .email-link-card, so
+           it still applies when those two fields move into a panel. */
+        #lobby-screen input, .modal-content input {
+            min-height: var(--ctl-h);
+        }
+        /* THE ONE DELIBERATE EXCEPTION. .home-widgets keeps the card's full
+           336px rather than taking --ctl-max. Measured: narrowing the tiles to
+           320 wraps their description one more line and grows them from 129.3px
+           to 143.4px tall, and the tiles are meant to be the two biggest things
+           on the screen. One exception, named, rather than a rule nobody can
+           see the edge of. */
+        .home-widgets { gap: var(--ctl-gap); }
+        /* Small is not the same as unhittable: the theme chip keeps its
+           intrinsic width and stops being a 34px target. */
+        .theme-toggle-btn { min-height: 44px; }
+        .resume-link { min-height: var(--ctl-h); max-width: var(--ctl-max); }
+
+        /* THE THREE PAIRED ROWS ARE ONE PATTERN NOW.
+           Before this, the fix that made the game-code row work was scoped to
+           #join-code-row, and the copy row and the season row - same two classes
+           - fell through to input[type="text"] { width:100% } and .btn-outline
+           { width:100%; padding:14px }. They rendered 40px fields and a 58px
+           button while the row above them was correct. */
+        #join-code-row, #copy-code-row, #season-open-row {
+            display: flex;
+            gap: var(--ctl-gap);
+            align-items: center;
+            justify-content: center;
+            max-width: var(--ctl-max);
+            margin: 0 auto 6px auto;
+        }
+        #join-code-row .join-code-input,
+        #copy-code-row .join-code-input,
+        #season-open-row .join-code-input {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: auto;
+            max-width: none;
+            min-height: var(--ctl-h);
+        }
+        #join-code-row .join-code-btn,
+        #copy-code-row .join-code-btn,
+        #season-open-row .join-code-btn {
+            /* The HEIGHT comes from the shared button rule above and is not
+               repeated here: two declarations of the same number is two places to
+               change it, and it made control C61 inert - swapping one left the
+               other in force. */
+            flex: 0 0 var(--ctl-pair-btn);
+            width: var(--ctl-pair-btn);
+            max-width: var(--ctl-pair-btn);
+            margin: 0;
+            padding: 0 8px;
+            font-size: 0.85rem;
+            line-height: var(--ctl-line);
+            white-space: nowrap;
+        }
+        #season-lobby { max-width: var(--ctl-max); }
     </style>
 <style>
 /* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
@@ -537,7 +679,11 @@ html {
          The copy-an-old-round field is BACK, below this row (#copy-code-row), as
          the one place the prefill admin.html?game=NEW&copyFrom=OLD is emitted
          from on this product; the prefill itself is untouched. -->
-    <div id="join-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
+    <!-- LAYOUT LIVES IN THE STYLESHEET (UI Wave 5). This row declared its own
+         display:flex and gap:8px inline, and an inline style beats any rule, so
+         the shared row rule could never reach it. The three code rows now carry
+         nothing but their id. -->
+    <div id="join-code-row">
         <input type="text" id="join-code-input" class="join-code-input" maxlength="48"
                placeholder="GAME CODE" aria-label="Game code or the link your organizer sent">
         <button class="btn-outline join-code-btn" onclick="openRoundByCode(this)">📥 Open</button>
@@ -562,7 +708,7 @@ html {
          inside startFromPreviousRound is the point: check the source, MINT the new
          code, then navigate with both params - the trip select used to send
          ?trip=T&copyFrom=OLD to a lobby that minted a code and dropped copyFrom. -->
-    <div id="copy-code-row" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:6px;">
+    <div id="copy-code-row">
         <input type="text" id="copy-code-input" class="join-code-input" maxlength="48"
                placeholder="PREVIOUS ROUND CODE" aria-label="The code of a round to copy the golfers and setup from">
         <button class="btn-outline join-code-btn" id="copy-code-btn" onclick="startFromPreviousRound(this)">🔁 Start from it</button>
@@ -574,12 +720,12 @@ html {
          reaches it: the seasons this phone has opened, a link to start one,
          and a code that opens the ledger. Creating the record happens on
          season.html, which is the page that owns the write. -->
-    <div id="season-lobby" style="margin:8px auto 14px auto; max-width:360px; text-align:center;">
+    <div id="season-lobby" style="margin:8px auto 14px auto; text-align:center;">
         <div style="font-weight:bold; color:var(--brand-green); font-size:0.92rem;">Season</div>
         <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 8px 0; line-height:1.4;">Running money, skins and closest-to-the-pin across the rounds this crew plays.</p>
         <div id="season-list"></div>
         <a id="season-start-link" href="season.html" class="btn-outline" style="display:inline-block; margin-bottom:8px; text-decoration:none;">Start a season</a>
-        <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+        <div id="season-open-row">
             <input type="text" id="season-open-input" class="join-code-input" maxlength="48" placeholder="SEASON CODE" aria-label="Season code">
             <button type="button" class="btn-outline join-code-btn" id="season-open-btn" onclick="openSeasonFromLobby(this)">Open ledger</button>
         </div>

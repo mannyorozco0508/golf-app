@@ -121,6 +121,22 @@ describe('THE DESTRUCTIVE CONTROL IS THE QUIETEST ONE', () => {
     });
 
     test('it is smaller than the primary action on the page', () => {
+        // UNTOUCHED BY THE BUTTON SYSTEM (UI Wave 5), and checked rather than
+        // assumed. That system's selectors are scoped to #lobby-screen and
+        // .modal-content; this control lives on wizard step 7 inside
+        // #admin-screen, and the system sets no font-size at all. So this ratio
+        // still compares what it always compared, and needed no repointing -
+        // said out loud because "it still passes" and "it still means anything"
+        // are different claims.
+        // (My first version of this said the system sets no font-size at all. It
+        // does: 0.85rem on the three PAIRED buttons, so their labels fit 128px on
+        // one line. This assertion is scoped to the rule that could actually move
+        // the ratio - the shared .btn-* block - which sets none.)
+        const SYS = ADM.slice(ADM.indexOf('THE BUTTON SYSTEM (UI Wave 5)'));
+        assert.ok(SYS.length > 500, 'the button system block is gone');
+        const btnBlock = SYS.slice(SYS.indexOf('.modal-content a.btn-outline {'));
+        assert.ok(!/font-size/.test(btnBlock.slice(0, btnBlock.indexOf('}'))),
+            'the shared button rule has started setting font-size - re-check this ratio');
         const end = rule('.end-round-btn');
         assert.ok(end, 'the End control has no rule of its own');
         const endSize = parseFloat((/font-size:\s*([\d.]+)rem/.exec(end) || [0, 1])[1]);

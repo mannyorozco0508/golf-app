@@ -2103,7 +2103,38 @@
 // tournament-v54-rattle-golf - that is the other product, still on its own
 // dialogs, and the guard names it as out of scope rather than omitting it. The iOS
 // binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v229-sweep-done';
+// Moved to v230 for the BUTTON SYSTEM on the setup screen. admin.html only; no
+// other page's CSS moved. A device on v229 keeps the old geometry.
+//
+// WHAT WAS MEASURED IN CHROME AT 390x844 BEFORE ANY OF IT: the page could be
+// dragged sideways - document.scrollWidth 395 against a 390 viewport - because
+// Start a season rendered 368px inside a 336px card and hung 32px past its right
+// edge. Fifteen controls produced SEVEN widths and EIGHT heights. FIVE were under
+// a 44px touch target. The three code rows that are meant to look identical were
+// three different layouts.
+//
+// THE OVERHANG WAS box-sizing, not a width rule and not a missing max-width.
+// <button> and <input> get border-box from the UA stylesheet; an <a> does not, and
+// Start a season is the one control styled as a button and written as an anchor.
+// The reset is scoped to #lobby-screen because a page-wide one would also shrink
+// the custom course grid.
+//
+// AFTER, on the built page: scrollWidth 390, nothing overflowing, nothing under
+// 44px, three heights instead of eight, and the three code rows identical at
+// 182 + 128 with the same 35px gutter each side. The tiles are the one deliberate
+// exception - they keep the card's full 336px, because narrowing them to 320
+// wraps their description and grows them from 129px to 143px tall.
+//
+// tools/home-screen-check.js now measures EVERY control on the screen rather than
+// the game-code row alone, which is how two 40px fields and a 58px button shipped
+// beside a correct row. It was also already failing on main for a different
+// reason - the season row added a fourth typed field and its count said three -
+// and that is fixed too.
+//
+// No engine and no protected file changed. No dialog surface moved. The consumer
+// product cache is consumer-v71-button-system. The tournament product cache stays
+// tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
+const CACHE_VERSION = 'golfapp-v230-button-system';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
