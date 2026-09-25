@@ -2238,7 +2238,58 @@
 // product cache is consumer-v74-one-screen. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
 // does not archive or upload.
-const CACHE_VERSION = 'golfapp-v233-one-screen';
+// Moved to v234 because THE IN-APP GUIDE IS REACHABLE, AND TRUE. A device on v233
+// keeps a guide it cannot open and, if it opens it, a guide that describes an app
+// from several waves ago. instructions.html and admin.html; no other page moved.
+//
+// THE FINDING THAT MATTERS WAS NOT STALENESS. Nothing in the app linked to
+// instructions.html. Not one page, and not at any point in the repo's history -
+// `git log -S'href="instructions.html"'` across every .html returns nothing. The
+// page has a "Back to Home" button and a goBack() that falls back to admin.html, so
+// it was built to be arrived at; there has never been a route. It was precached here
+// on line 2276 and shipped in the mobile bundle the whole time, so every installed
+// device has been carrying a page no golfer and no App Store reviewer could open.
+// Nothing had ever asserted a route, which is exactly why there was none.
+//
+// THE ROUTE: one "How it works" item in the wizard nav's More menu on admin.html,
+// where Trip, Season and Home already live. Not a new block on the setup screen -
+// Wave 7 just cut that screen from 1172px to 494px, and a guide link is precisely
+// the kind of thing that grew it.
+//
+// THE CLAIM THAT HAD TO GO: the guide told golfers a group link "shows everyone else
+// read-only". CLAUDE.md records why that is false - a ?group=N link is ALWAYS
+// writable, measured at 76 of 76 inputs on a foursome; what changes above four
+// golfers is who it covers, not what it permits. The guide was carrying a retired
+// lie in the one place a golfer would go to check it. The card now quotes
+// grouping.js's own groupLinkNoteText sentence verbatim, and guide_coverage_test.js
+// holds it against that function so the claim cannot come back.
+//
+// ALSO CORRECTED, EACH AGAINST THE CODE THAT OWNS IT: the main-format list was
+// eleven items and the wizard has nine real format cards - Skins and the Dot Game
+// are side games and Nassau is BOTH a format card and a side match, so each now
+// appears where it lives; "Settle" is not a page (settlement.html's heading is
+// "Payout Settlement", its control is "Pay out"); "no accounts, no sign-ups" was
+// contradicted by Option A's Account panel and is now code-first with Account
+// optional; the typed-code sentence says the field is behind "Open something else",
+// because Wave 7 closed that row by default; the nav sentence uses index.html's real
+// labels (Card, Board, Bets, Results, Matches, Game) per Manny's call, and
+// admin.html's disagreeing Scorecard/Leaderboard tabs are LOGGED, not renamed here.
+//
+// THE GUIDE NOW HAS TWO DOORS - "You were sent a link" and "You're setting up the
+// round" - because the two audiences barely overlap, and the old guide addressed one
+// undifferentiated "you" who was assumed to have set the round up.
+//
+// COVERAGE, MEASURED: instructions_accuracy_test.js pinned 2 of 84 prose sentences.
+// It is good at what it does and what it does is narrow, and its <strong> check asks
+// only whether a name exists SOMEWHERE in any page - so a control that MOVED, or a
+// sentence that described it wrongly, passed. That is how the read-only claim, the
+// wrong screen name and "Settle" all survived it.
+//
+// No engine and no protected file changed, and no dialog surface moved. The consumer
+// product cache is consumer-v75-guide. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
+// does not archive or upload.
+const CACHE_VERSION = 'golfapp-v234-guide';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

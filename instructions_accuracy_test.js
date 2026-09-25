@@ -311,8 +311,18 @@ function skinsCarryExplanations() {
     return m ? { true: m[1], false: m[2] } : null;
 }
 
+// WHEREVER THE SKINS CARD LIVES. It used to be one of the guide's format items
+// (f-name/f-desc), because the guide listed Skins as something you "pick as the
+// main format for the round". You cannot: the wizard's format cards are stroke,
+// bestball, scramble, stableford, wolf, hilo and ryder, and Skins is configured
+// with the round's money alongside whichever of those is chosen. UI Wave 8 moved
+// it into the side-games info cards (i-name/i-desc) for that reason, so this
+// reads either shape. What it must NOT do is stop finding the card - the three
+// assertions below are the only place the guide's carry sentence is held against
+// admin.html's own explanation, and a helper returning null would make all three
+// vacuous. The block asserts it found something before comparing anything.
 function guideSkinsCard() {
-    const m = /<div class="f-name">[^<]*Skins<\/div>\s*<div class="f-desc">([\s\S]*?)<\/div>/
+    const m = /<div class="(?:f|i)-name">[^<]*Skins<\/div>\s*<div class="(?:f|i)-desc">([\s\S]*?)<\/div>/
         .exec(guideMarkup());
     return m ? m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : null;
 }
