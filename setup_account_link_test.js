@@ -135,9 +135,19 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         const lobby = lobbyOnly();
         assert.match(lobby, /id="resume-container"/, 'Resume');
         assert.match(lobby, /onclick="resumeGame\(\)"/, 'Resume is still wired');
-        assert.match(lobby, /GAME CODE/, 'the game code field');
-        assert.match(lobby, /PREVIOUS ROUND/, 'the previous round field');
-        assert.match(lobby, /Start from it/, 'Start from it');
+        // REPOINTED BY UI WAVE 6, and it needed repointing for a reason worth
+        // naming: /PREVIOUS ROUND/ was still passing, satisfied by a COMMENT that
+        // records the old placeholder. Comments are not copy - this repo has been
+        // bitten by that before, when a comment naming a <script src> made a missing
+        // tag look harmless - so these now read the live attributes and the card
+        // heading, with comments stripped first.
+        const markup = lobby.replace(/<!--[\s\S]*?-->/g, '');
+        assert.match(markup, /placeholder="GAME CODE"/, 'the game code field');
+        assert.match(markup, /placeholder="ROUND CODE"/, 'the previous round field');
+        assert.match(markup, /Start from a previous round/,
+            'nothing says WHICH round the code belongs to - the heading carries that '
+            + 'sentence now, because the placeholder had to shorten to fit');
+        assert.match(markup, /Start from it/, 'Start from it');
     });
 
     test('NO Create Game hero was invented, and no accordion or banner', () => {
