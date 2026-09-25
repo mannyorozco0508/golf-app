@@ -1076,6 +1076,21 @@
         .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .group-pick-btn { margin-top: 8px; text-align: left; font-size: 1rem; }
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        /* AN ANCHOR WEARING .btn-primary (UI Wave 8b). The guide route at the bottom
+           of the card is a LINK, not a button with an onclick - a link is what a
+           thumb long-presses, what opens in a new tab, and what anything walking
+           the page can see as a route. That last one is not decoration: the guide
+           went unreachable for the whole history of this repo, and a button that
+           navigates in JavaScript is invisible to every check that looks for one.
+           But .btn-primary was written for <button>, which Chrome's UA stylesheet
+           gives box-sizing: border-box and display: inline-block. An <a> gets
+           neither, so the same class laid out 148x42 inline - MEASURED - beside two
+           buttons at 310x50. Three properties, and the line-height is the one that
+           makes it 50 rather than 48: 12px padding either side of a 26px line box.
+           Scoped to the bottom stack because index.html has no other anchor button;
+           the wider a.btn-primary cleanup on stats.html and sidematches.html is
+           logged and is not this wave. */
+        .save-exit-box a.btn-primary { display: block; box-sizing: border-box; text-decoration: none; line-height: 26px; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 
         .history-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); }
@@ -1461,6 +1476,24 @@ html {
         <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🚪 Save & Return to Home</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Scores sync automatically. You can safely leave and resume this game anytime from the home page.</span>
         <button class="btn-primary" style="margin-top: 0; background-color: var(--brand-navy);" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
+    </div>
+
+    <!-- THE GOLFER'S ROUTE TO THE GUIDE (UI Wave 8b).
+         The guide's first door is written for somebody who arrived by a link, and
+         until this card that person could not open it. Wave 8's only route is in
+         admin.html's ⋯ More menu - the ORGANIZER's page - and a golfer who taps a
+         group link lands here and may never see Home.
+         NOT A NINTH NAV PILL. Measured at 390px, this page's nav is eight pills
+         that WRAP to three rows already; a ninth spends fold space on every screen
+         of the round to fix something that belongs at the bottom. Here it costs
+         nothing: it is below score entry, in the stack that already holds the
+         Receipt and Save & Exit, and it lays out 310x50 at left 40 - the same
+         width, height and left edge as both of them.
+         An <a>, not a button with an onclick: see .save-exit-box a.btn-primary. -->
+    <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
+        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">📖 How it works</h3>
+        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Every screen in the app, explained — including what your group link does and what it does not.</span>
+        <a class="btn-primary" style="margin-top: 0;" href="instructions.html">📖 How it works</a>
     </div>
 
     <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.
