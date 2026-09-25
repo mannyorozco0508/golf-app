@@ -102,7 +102,14 @@ describe('THE BULLSEYE WAS REPLACED SEMANTICALLY, NOT SWEPT', () => {
         // (settleHeading), so the source carries the base label after the icon.
         assert.match(SETTLE, /\u2b50 \$\{settleHeading\('Stableford Settlement'/u, 'settlement');
         assert.match(STATS, /\u2b50 Round Settlement \(Stableford\)/u, 'stats');
-        assert.match(read('instructions.html'), /\u2b50 Net Stableford/u, 'instructions');
+        // Re-pinned 2026-09-25 (UI Wave 8): the guide's format list is now the
+        // wizard's own nine format cards, and the card reads "Stableford" - the
+        // only "Net Stableford" string left in the repo is in trip.html, a
+        // different product surface. Demanding the old wording here would have
+        // meant putting a name back in the guide that the consumer wizard does
+        // not use. The icon binding is what this file is about and it is intact:
+        // the label must still carry the star.
+        assert.match(read('instructions.html'), /\u2b50 Stableford/u, 'instructions');
     });
 
     test('handicap preview is 🧮 — a calculation, not a target', () => {

@@ -1086,6 +1086,20 @@ html {
                 <a href="trip.html" class="top-nav-item">🚐 Trip</a>
                 <a href="season.html" class="top-nav-item">Season</a>
                 <a href="admin.html" class="top-nav-item active nav-link">🏠 Home</a>
+                <!-- THE GUIDE'S ONLY ROUTE (UI Wave 8), and until this line it had
+                     none. instructions.html has always been precached in sw.js and
+                     bundled into the app, and NO page has ever linked to it: a
+                     history search for an href to it over every .html file returns
+                     no commit that added one. It shipped unreachable in every
+                     build, including the ones a reviewer opened.
+                     HERE BECAUSE THIS MENU IS WHERE THIS PAGE FAMILY PUTS THE
+                     THINGS THAT ARE NOT TABS - Trip, Season, Home - so it needs no
+                     new component. NOT on the setup screen as its own block: that
+                     screen is one viewport by design and a guide link is exactly
+                     the kind of thing that grew it to 1172px.
+                     guide_coverage_test.js asserts a route exists, which is the
+                     assertion that was missing rather than the link. -->
+                <a href="instructions.html" class="top-nav-item">📖 How it works</a>
             </div>
         </details>
     </div>
