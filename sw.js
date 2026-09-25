@@ -2134,7 +2134,28 @@
 // No engine and no protected file changed. No dialog surface moved. The consumer
 // product cache is consumer-v71-button-system. The tournament product cache stays
 // tournament-v54-rattle-golf. The iOS binary in review is not resubmitted.
-const CACHE_VERSION = 'golfapp-v230-button-system';
+// Moved to v231 because the SETUP SCREEN STOPS BEING OWNED BY THE SIGN-IN CARD.
+// Option A, rebased onto v230 and landed: the tall "Keep this organizer" block
+// leaves the home screen for a panel behind a small top-right Account link, and
+// the email-link flow is MOVED rather than rewritten - email-link-auth.js is
+// byte-identical and its sha is asserted, v214's held-note flush included.
+//
+// MEASURED RATHER THAN ASSUMED: admin.html auto-merged clean onto v230 even after
+// Wave 5's stylesheet - zero conflict markers - and the only collisions were the
+// cache pins, which took main's newer side before this bump.
+//
+// #account-link WAS RAISED FROM 20px TO 44px AS PART OF THIS MERGE. It measured
+// 54.4 x 20 on the branch, under half the touch minimum, and Wave 5's guard
+// asserts every control on this screen clears 44 - so it went red on rebase,
+// exactly as intended. The height is padding and a min-height; the type is
+// unchanged, so it still reads as the quiet text link the mock asked for.
+//
+// Resume, GAME CODE + Open and PREVIOUS ROUND + Start from it all stay on the main
+// screen. No engine and no protected file changed, and no dialog surface moved.
+// The consumer product cache is consumer-v72-account-link. The tournament product
+// cache stays tournament-v54-rattle-golf. The iOS binary in review is not
+// resubmitted.
+const CACHE_VERSION = 'golfapp-v231-account-link';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

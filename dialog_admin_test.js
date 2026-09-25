@@ -437,11 +437,19 @@ describe('5. THE PAGE\'S OWN OVERLAY IS LEFT ALONE, DELIBERATELY', () => {
         // ignores anything at or over 999 so an overlay cannot answer for itself.)
     });
 
-    test('and it now dresses ONE element, which is why matching the others buys nothing', () => {
+    test('and the two elements it dresses are why matching the others buys nothing', () => {
+        // WAS "ONE element" (the paste-players modal). Option A added a second:
+        // #account-modal, the panel the sign-in card moved into. THE CONCLUSION IS
+        // UNCHANGED AND THE ARGUMENT IS STRONGER - the account panel now also
+        // depends on this z-index being above the page's own 1000 dropdown, so
+        // lowering it to 999 to match index.html would put the panel underneath
+        // that dropdown as well as the paste modal.
         const users = (ADMIN.match(/class="modal-overlay"/g) || []).length;
-        assert.equal(users, 1, 'admin.html has ' + users + ' overlays now - re-read the note above');
+        assert.equal(users, 2, 'admin.html has ' + users + ' overlays now - re-read the note above');
         assert.ok(/<div class="modal-overlay" id="paste-players-modal">/.test(ADMIN),
             'the paste-players modal no longer uses .modal-overlay');
+        assert.ok(/<div class="modal-overlay" id="account-modal">/.test(ADMIN),
+            'the account panel no longer uses .modal-overlay');
     });
 
     test('the shared component brings its own, above both', () => {

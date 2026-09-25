@@ -102,10 +102,21 @@ describe('THE BUTTON SYSTEM (setup screen, real Chrome at 390x844)', () => {
         const raw = (r.value || []).find(v => typeof v === 'string' && v.charAt(0) === '{');
         assert.ok(raw, 'no measurement came back');
         M = JSON.parse(raw);
-        // The positive half FIRST. Every assertion below is about a list of
+        // THE POSITIVE HALF FIRST. Every assertion below is about a list of
         // controls, and an empty list satisfies all of them forever.
-        assert.ok(M.controls.length >= 14,
-            'only ' + M.controls.length + ' controls were measured - the screen did not render');
+        //
+        // A NAMED LIST RATHER THAN A COUNT. This was `>= 14`, which was the floor
+        // for the screen before Option A moved the sign-in card into a panel - four
+        // controls left the lobby, the count dropped to 12, and the whole file
+        // errored in this hook. A number has to be re-edited every time the screen
+        // changes shape; the controls that must be THERE do not.
+        const MUST = ['#join-code-input', '#copy-code-input', '#season-open-input',
+                      '#copy-code-btn', '#season-open-btn', '#season-start-link',
+                      '#hw-trip', '#hw-quick'];
+        const missing = MUST.filter(k => !M.byId[k]);
+        assert.deepEqual(missing, [],
+            'these controls did not render, so nothing below proves anything: '
+            + missing.join(', '));
     }, { timeout: 90000 });
 
     test('THE PAGE FITS THE PHONE: nothing can be dragged sideways', () => {

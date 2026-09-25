@@ -364,7 +364,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v230-button-system';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v231-account-link';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);
@@ -434,8 +434,21 @@ window.__emailLinkProbe = { linked: 0, signedIn: 0, uid: null };
 })();
 `;
 
-describe('COLD CHROME: Home shows the card, the button sends, the link preserves the uid', () => {
-    test('opening Home shows the card, and tapping Send emails a link for this account', { timeout: 90000 }, async () => {
+describe('COLD CHROME: Account opens the card, the button sends, the link preserves the uid', () => {
+    // REPOINTED WHEN OPTION A LANDED. This tapped #email-link-input on arrival,
+    // because the card used to be static markup on the home screen. Option A MOVED
+    // it behind a top-right Account link - the flow is unchanged and
+    // email-link-auth.js is byte-identical, asserted by sha in
+    // setup_account_link_test.js - so the card is inside #account-modal and is not
+    // on screen until the link is tapped. The old tap landed on nothing and the box
+    // read empty.
+    //
+    // AND IT IS A STRONGER TEST FOR IT: the card being absent on arrival is now
+    // asserted, then the panel is opened THE WAY A GOLFER OPENS IT, and only then
+    // is the address typed. Reading `display !== 'none'` on the card also proved
+    // nothing after the move - the card's own display is not none, its PANEL's is -
+    // so this counts client rects instead.
+    test('the card is not on Home; Account opens it and Send emails a link for this account', { timeout: 90000 }, async () => {
         const r = await arriveCold({
             url: fileUrl('admin.html'),
             db: DB,
@@ -443,7 +456,10 @@ describe('COLD CHROME: Home shows the card, the button sends, the link preserves
             viewport: { width: 390, height: 844 },
             preScript: SEND_STUB,
             steps: [
-                { expression: `(function () { var c = document.getElementById('email-link-card'); var s = c ? getComputedStyle(c) : null; return JSON.stringify({ text: c ? c.innerText : '', shown: !!(c && s && s.display !== 'none') }); })()` },
+                { expression: `(function () { var c = document.getElementById('email-link-card'); return JSON.stringify({ text: c ? c.innerText : '', onScreen: !!(c && c.getClientRects().length > 0), inPanel: !!(c && document.getElementById('account-modal') && document.getElementById('account-modal').contains(c)) }); })()` },
+                { tap: '#account-link' },
+                { sleep: 300 },
+                { expression: `(function () { var c = document.getElementById('email-link-card'); return JSON.stringify({ text: c ? c.innerText : '', onScreen: !!(c && c.getClientRects().length > 0) }); })()` },
                 { tap: '#email-link-input' },
                 { sleep: 150 },
                 { cdp: { method: 'Input.insertText', params: { text: 'a@b.co' } } },
@@ -455,20 +471,31 @@ describe('COLD CHROME: Home shows the card, the button sends, the link preserves
         });
         assert.equal(r.ok, true, r.reason);
         const objs = (r.value || []).filter((x) => typeof x === 'string' && x.charAt(0) === '{').map((x) => JSON.parse(x));
-        assert.equal(objs.length, 2, JSON.stringify(r.value));
-        assert.equal(objs[0].shown, true);
-        assert.match(objs[0].text, /Keep this organizer/);
-        assert.match(objs[0].text, /free trial and a founder pass/);
-        assert.doesNotMatch(objs[0].text, MONEY);
-        assert.equal(objs[1].value, 'a@b.co', 'the address was typed into the box');
-        assert.ok(objs[1].sent, 'Send did not call sendSignInLinkToEmail: ' + JSON.stringify(objs[1]));
-        assert.equal(objs[1].sent.email, 'a@b.co');
-        assert.equal(objs[1].sent.url, 'https://golf-app-5a5.pages.dev/admin.html');
-        assert.equal(objs[1].sent.handle, true);
-        assert.equal(objs[1].sent.bundle, 'com.rattlegolf.app');
-        assert.equal(objs[1].stored, 'a@b.co');
-        assert.match(objs[1].status, /Link sent/);
-        assert.match(objs[1].status, /free trial/);
+        assert.equal(objs.length, 3, JSON.stringify(r.value));
+        const [arrival, opened, sent] = objs;
+        // 1. NOT ON THE HOME SCREEN, and not deleted either.
+        assert.equal(arrival.onScreen, false,
+            'the tall organizer card is on Home again - Option A moved it on purpose');
+        assert.equal(arrival.inPanel, true,
+            'the card is not inside #account-modal, so the flow may have been deleted');
+        // 2. THE LINK OPENS IT, and the words are the same words.
+        assert.equal(opened.onScreen, true, 'tapping Account did not open the panel');
+        assert.match(opened.text, /Keep this organizer/);
+        assert.match(opened.text, /free trial and a founder pass/);
+        assert.doesNotMatch(opened.text, MONEY);
+        // 3. AND SENDING STILL WORKS, unchanged, from inside the panel.
+        assert.equal(sent.value, 'a@b.co', 'the address was typed into the box');
+        assert.ok(sent.sent, 'Send did not call sendSignInLinkToEmail: ' + JSON.stringify(sent));
+        assert.equal(sent.sent.email, 'a@b.co');
+        assert.equal(sent.sent.url, 'https://golf-app-5a5.pages.dev/admin.html');
+        assert.equal(sent.sent.handle, true);
+        assert.equal(sent.sent.bundle, 'com.rattlegolf.app');
+        assert.equal(sent.stored, 'a@b.co');
+        assert.match(sent.status, /Link sent/);
+        // objs[1] is the OPENED panel now, not the send result - a third step was
+        // inserted ahead of it when the card moved behind the Account link, and this
+        // line was reading a status off an object that has none.
+        assert.match(sent.status, /free trial/);
     });
 
     test('opening the email link on Home links this anonymous user and does not sign in a new one', { timeout: 90000 }, async () => {
@@ -507,5 +534,77 @@ describe('COLD CHROME: Home shows the card, the button sends, the link preserves
         assert.match(got.status, /free trial/);
         assert.match(got.status, /founder pass/);
         assert.ok(!got.writes.some((w) => /organizers\/|events\//.test(w)), 'finishing the link wrote ' + got.writes.join(' | '));
+    });
+
+    // ------------------------------------------------------------------
+    // THE ROUGH EDGE FROM THE OPTION A REVIEW, CLOSED.
+    //
+    // Finishing sign-in INSIDE the open panel left "Account" on the link behind
+    // it until you closed and reopened the panel, or reloaded. Nothing reloads:
+    // email-link-auth.js contains no location.reload / href / replace, and
+    // submitPaste() returns undefined, so the page had no signal.
+    //
+    // This drives the whole thing the way a golfer does - tap Account, paste the
+    // link, tap Finish - and then reads the link behind the panel WITHOUT closing
+    // it and WITHOUT reloading. A marker set on window before the tap proves the
+    // page did not navigate, because a reload would also "fix" the label and
+    // would prove nothing about the watcher.
+    // ------------------------------------------------------------------
+    test('paste and Finish inside the panel repaints the link, with no reopen and no reload',
+        { timeout: 90000 }, async () => {
+        const LINK = 'https://golf-app-5a5.pages.dev/admin.html?apiKey=test-key&oobCode=oob-paste&mode=signIn&lang=en';
+        const r = await arriveCold({
+            url: fileUrl('admin.html'),
+            db: DB,
+            settleMs: 2500,
+            viewport: { width: 390, height: 844 },
+            preScript: LINK_STUB,
+            steps: [
+                { expression: `(function () { window.__noReload = 'kept'; var a = document.getElementById('account-link'); return JSON.stringify({ stage: 'before', account: a ? a.innerText.trim() : '', marker: window.__noReload }); })()` },
+                { tap: '#account-link' },
+                { sleep: 200 },
+                { tap: '#email-link-paste' },
+                { sleep: 150 },
+                { cdp: { method: 'Input.insertText', params: { text: LINK } } },
+                { sleep: 150 },
+                { tap: '#email-link-finish' },
+                { sleep: 1800 },
+                { expression: `(function () {
+                    var a = document.getElementById('account-link');
+                    var o = document.getElementById('account-modal');
+                    var st = document.getElementById('email-link-status');
+                    return JSON.stringify({
+                        stage: 'after',
+                        account: a ? a.innerText.trim() : '',
+                        linkedAttr: a ? a.getAttribute('data-linked') : null,
+                        panelStillOpen: !!(o && o.classList.contains('open')),
+                        panelLinked: o ? o.getAttribute('data-linked') : null,
+                        status: st ? st.innerText : '',
+                        marker: window.__noReload || '(gone - the page reloaded)',
+                        linked: (window.__emailLinkProbe || {}).linked
+                    });
+                })()` }
+            ]
+        });
+        assert.equal(r.ok, true, r.reason);
+        const objs = (r.value || []).filter((x) => typeof x === 'string' && x.charAt(0) === '{').map((x) => JSON.parse(x));
+        assert.equal(objs.length, 2, JSON.stringify(r.value));
+        const [before, after] = objs;
+        assert.equal(before.account, 'Account', 'the link should start unlinked');
+        // The credential really was taken, or the repaint below would be measuring
+        // a link that never happened.
+        assert.equal(after.linked, 1, 'linkWithCredential did not run: ' + JSON.stringify(after));
+        assert.match(after.status, /same organizer account/, 'the finish did not succeed');
+        // THE FIX.
+        assert.equal(after.account, 'Organizer saved',
+            'the Account link did not repaint after finishing inside the panel: '
+            + JSON.stringify(after));
+        assert.equal(after.linkedAttr, '1');
+        assert.equal(after.panelLinked, '1', 'the panel did not switch to its linked state');
+        // AND IT WAS NOT A REOPEN OR A RELOAD.
+        assert.equal(after.panelStillOpen, true,
+            'the panel closed - this must repaint with the panel still open');
+        assert.equal(after.marker, 'kept',
+            'the page reloaded, so this proves nothing about the watcher');
     });
 });

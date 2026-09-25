@@ -315,6 +315,33 @@
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
         .email-link-card { text-align: left; max-width: 420px; margin: 0 auto 16px auto; padding: 12px 14px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
+        /* ACCOUNT (Option A). The email-link card moved off the lobby and into a
+           panel behind this link; inside the panel it is the whole content, so it
+           drops the card chrome it needed when it sat in the page. */
+        /* RAISED TO A REAL TOUCH TARGET AT THE MERGE (UI Wave 5's guard, option i).
+           Measured on this branch before it landed: 54.4 x 20px, from padding 2px
+           and font:inherit. Twenty pixels is under half the 44px minimum and the
+           smallest target on the screen by a distance - and the guard Wave 5 left
+           behind asserts every control on this screen clears 44, so it turned red
+           the moment the branch was rebased. That is the guard working, not a
+           problem with it.
+           IT STAYS A QUIET TEXT LINK. The height comes from a min-height, not from
+           a bigger font or a border, so it reads exactly as it did in the mock - the
+           tappable area grows, the type does not.
+           AND IT TAKES --ctl-h RATHER THAN A BARE 44, so it joins the one-height
+           rule instead of becoming a second exception to it. Four invisible pixels
+           are cheaper than diluting what --ctl-h means. */
+        .lobby-account-row { display: flex; justify-content: flex-end; align-items: center; margin: 0 0 6px 0; min-height: var(--ctl-h); }
+        .account-link { background: none; border: 0; padding: 0 6px; font: inherit; font-size: 0.82rem; color: var(--brand-green); cursor: pointer; text-decoration: none; min-height: var(--ctl-h); min-width: 44px; display: inline-flex; align-items: center; justify-content: center; line-height: 20px; }
+        .account-link:hover { text-decoration: underline; }
+        .account-link[data-linked="1"] { color: var(--text-muted); cursor: default; }
+        #account-modal .email-link-card { max-width: none; margin: 0; padding: 0; border: 0; background: transparent; }
+        /* The card's own heading STAYS. "Keep this organizer" is the sentence that
+           says what this panel is for; "Account" is only the way in. Hiding it as a
+           duplicate heading was a rewrite of the copy, and this wave moves UI. */
+        #account-modal .email-link-card h2 { margin-top: 0; }
+        #account-linked-note { display: none; font-size: 0.8rem; color: var(--brand-green); font-weight: bold; margin: 0 0 8px 0; }
+        #account-modal[data-linked="1"] #account-linked-note { display: block; }
         .email-link-card h2 { font-size: 0.95rem; color: var(--brand-green); margin: 0 0 6px 0; }
         .email-link-card p, .email-link-card label { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 8px 0; display: block; }
         .email-link-card input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.95rem; background: var(--bg-card); color: var(--text-main); }
@@ -580,6 +607,11 @@ html {
 <body>
 
 <div class="container" id="lobby-screen">
+    <!-- ACCOUNT. The email-link flow used to own this screen as a tall "Keep this
+         organizer" card above Resume. It is the same flow, behind this link. -->
+    <div class="lobby-account-row">
+        <button type="button" id="account-link" class="account-link" onclick="openAccountPanel()">Account</button>
+    </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-lockup" onclick="handleSecretTap()"><img src="hardpan-icon.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN</span></div>
     <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">What are you setting up?</p>
@@ -641,12 +673,27 @@ html {
          tiles: the first thing after "what are you setting up". -->
     <div id="lobby-standing" class="organizer-standing" role="status"></div>
 
-    <!-- KEEP THIS ORGANIZER. Anonymous auth is per browser, so a round set up
-         in the app is a spectator's round in Safari. The card is static markup
-         on the lobby — the screen a golfer gets by opening Home and touching
-         nothing — and email-link-auth.js does the send and the finish.
-         Finishing here calls linkWithCredential on the anonymous user, so the
-         uid does not change and the trial / founder pass stay on it. -->
+    <!-- KEEP THIS ORGANIZER, NOW BEHIND "Account". Anonymous auth is per browser,
+         so a round set up in the app is a spectator's round in Safari. This is the
+         SAME markup and the same flow - email-link-auth.js does the send and the
+         finish, and finishing calls linkWithCredential on the anonymous user so the
+         uid does not change and the trial / founder pass stay on it. Only where it
+         sits moved: it was a tall card above Resume and it owned the screen.
+         email-link-auth.js is BYTE-IDENTICAL; setup_account_link_test.js pins its
+         sha, because this wave is allowed to move the UI and not to touch the auth.
+
+         STATIC MARKUP, MERELY HIDDEN - NOT BUILT ON TAP. v214's held-note flush
+         writes a confirmation into #email-link-status on DOMContentLoaded and on
+         load, for the note set before the element existed. Building this panel when
+         Account is tapped would put those events before the element again and lose
+         the note a second time, which is the exact defect v214 fixed. -->
+    <div class="modal-overlay" id="account-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+            <span>Account</span>
+            <button class="close-modal" onclick="closeAccountPanel()" aria-label="Close">&times;</button>
+        </div>
+        <p id="account-linked-note" role="status">Organizer saved. Your rounds follow this account.</p>
     <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title">
         <h2 id="email-link-title">Keep this organizer</h2>
         <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a sign-in link and finish it in this same app. It stays the same account, so the free trial and a founder pass stay with the rounds already set up on it.</p>
@@ -660,6 +707,8 @@ html {
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
     </section>
+      </div>
+    </div>
 
     <!-- RESUME GAME BOX -->
     <div id="resume-container" style="display: none; margin-bottom: 14px;">
@@ -2275,9 +2324,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         window.organizerGate.readStanding(db).then(rec => {
             organizerRecord = rec;
             renderOrganizerStanding();
-        }, () => { /* nothing to say */ });
+            // THE QUIET STATE rides along here rather than chaining authReady
+            // itself. This read already happens after auth has landed, and
+            // auth_boot_test.js allows this page exactly ONE authReady chain
+            // because nothing on the setup screen may wait for auth to render.
+            // Account reads "Organizer saved" once the organizer has linked an
+            // email, so the screen stops inviting a job already done.
+            refreshAccountState();
+            watchAccountStatus();
+        }, () => { refreshAccountState(); watchAccountStatus(); });
     }
     loadOrganizerStanding();
+    try { refreshAccountState(); watchAccountStatus(); } catch (e) {}
+    
 
     let currentSavedRound = null;   // the round Round Ready is showing - the share reads its token
     function renderRoundReady(data) {
@@ -6108,6 +6167,103 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function closePastePlayersModal() {
         document.getElementById('paste-players-modal').classList.remove('open');
+    }
+
+    // ---- ACCOUNT PANEL (Option A) ------------------------------------------
+    //
+    // Open and close only. The flow inside is email-link-auth.js's, untouched:
+    // the form still posts to emailLinkAuth.submitSend and Finish still calls
+    // emailLinkAuth.submitPaste, by the same ids they have always used.
+    function openAccountPanel() {
+        const el = document.getElementById('account-modal');
+        if (!el) return;
+        refreshAccountState();
+        el.classList.add('open');
+        const box = document.getElementById('email-link-input');
+        if (box && typeof box.focus === 'function' && !accountIsLinked()) { try { box.focus(); } catch (e) {} }
+    }
+    function closeAccountPanel() {
+        const el = document.getElementById('account-modal');
+        if (el) el.classList.remove('open');
+    }
+    
+    // LINKED = the anonymous organizer has taken an email credential. That is
+    // exactly what linkWithCredential does: isAnonymous goes false and the address
+    // appears on the user. There was no signed-in detection on this page before,
+    // so this reads the Firebase user rather than inventing a second source of
+    // truth; it never throws on a page where auth has not landed.
+    function accountIsLinked() {
+        try {
+            const u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+            return !!(u && u.isAnonymous === false && u.email);
+        } catch (e) { return false; }
+    }
+    // THE LINK REPAINTS WITHOUT CLOSING THE PANEL.
+    //
+    // Finishing sign-in inside the open panel used to leave "Account" behind it
+    // until you closed and reopened, or reloaded: refreshAccountState ran on
+    // arrival, on the standing read, and on open — and finishing is none of those.
+    //
+    // WATCHED, NOT POLLED, AND NOT WIRED INTO THE AUTH. email-link-auth.js is
+    // byte-identical on purpose, and it gives the page no event and no promise:
+    // submitPaste() returns undefined and publish() only sets lastResult. What it
+    // DOES do, on every terminal state, is write its note into the panel through
+    // setStatus. So the page watches THE PANEL and re-reads the account state
+    // whenever anything in it changes. One observer, registered once, and it
+    // covers every route to being linked — the pasted link, the link opened in
+    // this app, and the second-device adopt — not just the button this was
+    // reported against.
+    //
+    // THE PANEL, NOT #email-link-status ITSELF. email_link_note_test.js holds that
+    // this page must not own the note: email-link-auth.js writes it and nothing
+    // here may reach for that element. Observing the panel subtree respects that -
+    // the page never touches the auth's element, it notices its own panel changed -
+    // and it is the right scope anyway, because what this cares about is "something
+    // happened in Account", not one particular paragraph.
+    // THE "ALREADY WATCHING" FLAG LIVES ON THE PANEL, not in a `let` beside this
+    // function. Function declarations hoist and `let` does not, and this is called
+    // from the arrival block thousands of lines above where it is written - a
+    // module-level `let` threw "Cannot access 'accountWatching' before
+    // initialization" on every Home arrival, swallowed by one try/catch and
+    // surfacing as an unhandled rejection from the other call site. A `var` would
+    // hoist but its own initialiser would later reset it to false and attach a
+    // second observer. An attribute on the element being watched cannot do either.
+    // Attributes are not in the observed set (childList/characterData only), so
+    // writing it does not re-fire the observer.
+    function watchAccountStatus() {
+        const panel = document.getElementById('account-modal');
+        if (!panel || typeof MutationObserver !== 'function') return;
+        if (panel.getAttribute('data-account-watched') === '1') return;
+        panel.setAttribute('data-account-watched', '1');
+        new MutationObserver(() => { refreshAccountState(); })
+            .observe(panel, { childList: true, characterData: true, subtree: true });
+    }
+
+    // EVERY WRITE HERE IS CONDITIONAL, and that is load-bearing rather than tidy.
+    // watchAccountStatus observes the panel, and the lead paragraph below is INSIDE
+    // the panel - so an unconditional assignment re-fires the observer, which calls
+    // this again, which writes again. Setting textContent to the same string still
+    // replaces the text node and still counts as a mutation, so "it is the same
+    // value" is not enough on its own: the write has to be skipped. The first
+    // version of this did not skip it and hung the page in a mutation loop; the
+    // Chrome test timed out at 33s and that is how it was found.
+    function setTextOnce(el, text) {
+        if (el && el.textContent !== text) el.textContent = text;
+    }
+    function setAttrOnce(el, name, value) {
+        if (el && el.getAttribute(name) !== value) el.setAttribute(name, value);
+    }
+    function refreshAccountState() {
+        const linked = accountIsLinked();
+        const flag = linked ? '1' : '0';
+        const link = document.getElementById('account-link');
+        setTextOnce(link, linked ? 'Organizer saved' : 'Account');
+        setAttrOnce(link, 'data-linked', flag);
+        setAttrOnce(document.getElementById('account-modal'), 'data-linked', flag);
+        if (linked) {
+            setTextOnce(document.getElementById('email-link-lead'),
+                'Signed in. Use this again only to move this organizer onto another browser or phone.');
+        }
     }
 
     function previewPastedPlayers() {

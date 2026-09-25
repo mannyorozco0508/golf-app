@@ -120,9 +120,19 @@ const PROBE = `
   } : null;
   const card = document.getElementById('email-link-card');
   const title = document.getElementById('email-link-title');
+  const acct = document.getElementById('account-link');
+  const panel = document.getElementById('account-modal');
   out.email = {
       shown: !!(card && card.getClientRects().length > 0),
-      title: title ? (title.innerText || '').trim() : null
+      title: title ? (title.innerText || '').trim() : null,
+      // OPTION A: the card MOVED into a panel behind a top-right Account link. It
+      // is still in the document - the flow is moved, not rewritten - so "is it in
+      // the markup" proves nothing; what matters is that it is not on the home
+      // screen and that the link that opens it is.
+      inPanel: !!(panel && card && panel.contains(card)),
+      accountLink: acct ? (acct.innerText || '').trim() : null,
+      accountLinkShown: !!(acct && acct.getClientRects().length > 0),
+      accountLinkH: acct ? Math.round(acct.getBoundingClientRect().height) : 0
   };
 
   // EXACTLY ONE THING IS ASKED FOR, and it is the game code. Scoped to the lobby:
@@ -278,8 +288,28 @@ const PROBE = `
       if (cur.left < prev.right - 0.6)
           problems.push('letters overlap: ' + prev.ch + ' ends ' + prev.right + ', ' + cur.ch + ' starts ' + cur.left);
   }
-  if (!out.email || !out.email.shown || out.email.title !== 'Keep this organizer')
-      problems.push('the email-link card is not on the home screen: ' + JSON.stringify(out.email));
+  // REPOINTED WHEN OPTION A LANDED. This asserted the tall "Keep this organizer"
+  // card IS on the home screen, which was true and deliberate until the setup
+  // cleanup moved it. It is now the opposite assertion, plus the two that make the
+  // move safe rather than just done: the link that opens it is on screen, and the
+  // card really is inside the panel rather than deleted. Measured: the card was
+  // 409px, 29.6% of a 1381px screen.
+  if (!out.email) problems.push('the email probe returned nothing');
+  else {
+      if (out.email.shown)
+          problems.push('the tall organizer card is back on the home screen - Option A '
+              + 'moved it behind the Account link on purpose');
+      if (!out.email.inPanel)
+          problems.push('the organizer card is not inside #account-modal, so the '
+              + 'sign-in flow may have been deleted rather than moved: '
+              + JSON.stringify(out.email));
+      if (!out.email.accountLinkShown || out.email.accountLink === null)
+          problems.push('nothing on the home screen opens the account panel: '
+              + JSON.stringify(out.email));
+      if (out.email.accountLinkH < 44)
+          problems.push('the Account link is ' + out.email.accountLinkH
+              + 'px tall, below a usable touch target');
+  }
 
   // RE-PINNED 2026-09-20. The lobby asks for TWO typed things, deliberately: the
   // game code (Open) and the code of a previous round to start from - the copy
