@@ -462,6 +462,63 @@
         });
     }
 
+    // THE SAME TABLE, WITH THE OPTIONS APPLIED (Wave 13).
+    //
+    // Four toggles, and every one is either a REPLACEMENT ALLOCATION that still sums
+    // to 9 (blitz: 9-0-0) or a WHOLE-HOLE MULTIPLIER. Nothing adds a fixed number of
+    // points, and that is the constraint that keeps the invariant: every hole is
+    // 9 x 2^k, so the three totals stay a multiple of 9, the mean stays an integer,
+    // and the zero-sum proof from Wave 11 survives every combination.
+    //
+    // BLITZ IS NET, BIRDIE IS GROSS, and this is the one that would cause an argument
+    // on the tee, so it is written down. The POINTS are net, so "I beat you by two"
+    // has to be net - otherwise a golfer getting a stroke could win by two while
+    // losing the hole. A BIRDIE is a fact about the golf, one under par with the ball;
+    // a net birdie is a stroke, not a birdie. Gross also matches
+    // calculateBirdieGameTotalsForSettle's `birdieScoringType || 'gross'`, so two
+    // wagers on the same card cannot disagree about what a birdie is.
+    //
+    // BLITZ+BIRDIE SUPPRESSES BIRDIES DOUBLE. One birdie must not double a hole twice:
+    // blitz+birdie IS the blitz rule's own birdie bonus.
+    //
+    // CEILING: 36 reachable here (9 x2 blitz+birdie x2 par 3). The design ceiling is
+    // 72, the spare x2 being the PRESS, which is not in this wave - a press is a live
+    // in-round write and belongs at a root node like dots and kpWinners, because an
+    // instance-nested one is clobbered by an organizer re-save.
+    function ninePointsForHoleWithOptions(nets, grossScores, hole, options) {
+        const base = ninePointsForHole(nets);
+        if (!base) return null;
+        const o = options || {};
+        const par = parseInt(hole && hole.par, 10);
+        let out = base;
+
+        // A BLITZ needs a UNIQUE net low and a two-stroke margin over the next best.
+        const sorted = nets.slice().sort((a, b) => a - b);
+        const uniqueLow = sorted[0] < sorted[1];
+        const margin = sorted[1] - sorted[0];
+        const blitzWon = !!o.blitz && uniqueLow && margin >= 2;
+
+        // GROSS birdie or better, on the hole and for the blitz winner specifically.
+        const hasPar = isFinite(par);
+        const grossBirdieAnywhere = hasPar && (grossScores || []).some(
+            g => typeof g === 'number' && isFinite(g) && g <= par - 1);
+        const lowIdx = nets.indexOf(sorted[0]);
+        const winnerGrossBirdie = hasPar && blitzWon
+            && typeof grossScores[lowIdx] === 'number' && grossScores[lowIdx] <= par - 1;
+
+        if (blitzWon) {
+            // The whole hole to one golfer. x2 when it was also a gross birdie; and
+            // birdiesDouble does NOT also apply, or one birdie doubles twice.
+            const total = 9 * ((o.blitzBirdie && winnerGrossBirdie) ? 2 : 1);
+            out = nets.map((_, i) => (i === lowIdx ? total : 0));
+        } else if (o.birdiesDouble && grossBirdieAnywhere) {
+            out = out.map(v => v * 2);
+        }
+
+        if (o.parThreesDouble && par === 3) out = out.map(v => v * 2);
+        return out;
+    }
+
     // Settles ONE 9 Points wager and returns { playerId: net }.
     //
     // NET, FROM THE ROUND'S OWN ALLOCATION. No handicap math lives here: the strokes
@@ -493,14 +550,17 @@
 
         const rate = Number(data.ninePointsRate) || 0;
         const holes = courseData || [];
+        const options = data.options || {};
         const totals = {};
         players.forEach(p => { totals[p.id] = 0; });
 
         holes.forEach(h => {
+            const grossScores = [];
             const nets = players.map(p => {
                 const raw = savedScores['p' + p.id + '_h' + h.hole];
                 const gross = Number(raw);
-                if (!raw || !isFinite(gross) || gross <= 0) return null;
+                if (!raw || !isFinite(gross) || gross <= 0) { grossScores.push(null); return null; }
+                grossScores.push(gross);
                 // The round's own allocation, unchanged. getStrokes is handicap.js's.
                 const strokes = (typeof getStrokes === 'function')
                     ? getStrokes(h.hcpIndex, (typeof parseHcp === 'function') ? parseHcp(p.hcp) : Number(p.hcp) || 0)
@@ -508,10 +568,31 @@
                 return gross - strokes;
             });
             if (nets.some(n => n === null)) return;      // a blank hole scores nobody
-            const pts = ninePointsForHole(nets);
+            // GROSS goes in beside NET: blitz is judged on net, a birdie on gross, and
+            // the allocator must not have to guess which list it is looking at.
+            const pts = ninePointsForHoleWithOptions(nets, grossScores, h, options);
             if (!pts) return;
             players.forEach((p, i) => { totals[p.id] += pts[i]; });
         });
+
+        // WINNER TAKES THE POT, if that is what the wager says. Everybody pays the
+        // buy-in and the most points takes it, so the POINTS still rank and every
+        // toggle above still matters - they just stop being the unit of money. Ties
+        // for most split the pot, which keeps it zero-sum without a tie-break nobody
+        // agreed to.
+        if (data.settlement === 'pot') {
+            const buyIn = Number(data.ninePointsBuyIn) || 0;
+            if (buyIn <= 0) { players.forEach(p => { out[p.id] = 0; }); return out; }
+            const best = Math.max.apply(null, players.map(p => totals[p.id]));
+            const winners = players.filter(p => totals[p.id] === best);
+            const pot = buyIn * players.length;
+            const share = pot / winners.length;
+            players.forEach(p => {
+                const won = winners.indexOf(p) > -1 ? share : 0;
+                out[p.id] = won - buyIn;
+            });
+            return out;
+        }
 
         const sum = players.reduce((acc, p) => acc + totals[p.id], 0);
         const mean = sum / players.length;

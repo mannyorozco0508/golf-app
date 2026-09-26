@@ -443,3 +443,251 @@ describe('9. A GOLFER CAN SEE IT WHILE PLAYING', () => {
         }
     });
 });
+
+// ---------------------------------------------------------------------------
+// WAVE 13 — THE OPTIONS. Four multipliers and a pot, all on the same instance.
+//
+//   blitz            win the hole by 2+ NET strokes            -> 9-0-0
+//   blitzBirdie      ...AND a GROSS birdie or better           -> 18-0-0
+//   birdiesDouble    any GROSS birdie on the hole doubles it   -> 5-3-1 becomes 10-6-2
+//   parThreesDouble  every par 3 is worth double
+//   settlement       'per-point' (Wave 11) or 'pot' (buy-in, most points takes it)
+//
+// BLITZ ON NET, BIRDIE ON GROSS, and the reasoning is the argument you would have on
+// the tee. The POINTS are net, so "I beat you by two" has to be net or a golfer
+// getting a stroke could win by two while losing the hole. A BIRDIE is a fact about
+// the golf - one under par with the ball - and a net birdie is a stroke, not a
+// birdie. It also matches calculateBirdieGameTotalsForSettle's `birdieScoringType ||
+// 'gross'`, so two wagers on one card cannot disagree about what a birdie is.
+//
+// BLITZ+BIRDIE SUPPRESSES BIRDIES DOUBLE. One birdie must not double a hole twice.
+// THE CEILING IS 72: base 9, x2 blitz+birdie, x2 par 3, x2 (reserved for the press,
+// which is NOT in this wave). Pinned as a number below so a future toggle cannot
+// quietly raise it.
+//
+// PRESS / REPRESS ARE NOT HERE. A press is a live in-round write and the right home
+// is a root node like dots and kpWinners, because an instance-nested press is
+// CLOBBERED by an organizer re-save (captureSkinsInstances writes back the clone
+// loadSkinsInstances held). That needs a database.rules.json row and is its own wave.
+describe('10. THE OPTIONS: EVERY COMBINATION KEEPS THE INVARIANT', () => {
+    const TOGGLES = ['blitz', 'blitzBirdie', 'birdiesDouble', 'parThreesDouble'];
+    const subsets = () => {
+        const out = [];
+        for (let m = 0; m < 16; m++) {
+            const cfg = {};
+            TOGGLES.forEach((t, i) => { if (m & (1 << i)) cfg[t] = true; });
+            out.push(cfg);
+        }
+        return out;
+    };
+
+    test('every hole, every toggle combination, sums to a multiple of nine', () => {
+        // THE INVARIANT THE WHOLE WAGER RESTS ON. Every rule is either a replacement
+        // allocation that still sums to 9 (blitz: 9-0-0) or a WHOLE-HOLE multiplier.
+        // Nothing adds a fixed number of points - that is the constraint, and this is
+        // what holds it.
+        let checked = 0;
+        const holes = [{ par: 3, hcpIndex: 1 }, { par: 4, hcpIndex: 2 }, { par: 5, hcpIndex: 3 }];
+        const netSets = [[4, 5, 6], [4, 4, 5], [4, 5, 5], [5, 5, 5], [3, 5, 6], [2, 5, 6], [3, 3, 6]];
+        subsets().forEach(cfg => holes.forEach(h => netSets.forEach(nets => {
+            // gross == net here except where a birdie is wanted; both are passed so the
+            // helper never has to guess which it is looking at.
+            const pts = E.ninePointsForHoleWithOptions(nets, nets, h, cfg);
+            assert.ok(pts, 'no points for ' + JSON.stringify([nets, h.par, cfg]));
+            assert.equal(pts.length, 3);
+            const sum = pts.reduce((a, b) => a + b, 0);
+            assert.equal(sum % 9, 0, 'sum ' + sum + ' is not a multiple of 9 for '
+                + JSON.stringify({ nets, par: h.par, cfg }));
+            pts.forEach(v => assert.ok(Number.isInteger(v),
+                'a share is not an integer: ' + pts.join('/') + ' for ' + JSON.stringify(cfg)));
+            checked++;
+        })));
+        assert.equal(checked, 16 * 3 * 7, 'the matrix did not run: ' + checked);
+    });
+
+    test('THE CEILING: 36 reachable in this wave, 72 by design with the press', () => {
+        // BOTH NUMBERS PINNED, and the distinction is not pedantry. Manny set the
+        // design ceiling at 72: base 9, x2 blitz+birdie, x2 par 3, x2 PRESS. The press
+        // is not in this wave, so the most a hole can actually be worth today is 36.
+        // Asserting 72 would have pinned a number no code path can produce - a guard
+        // that passes only because it is never reached. My first version did exactly
+        // that.
+        const DESIGN_CEILING = 72;      // with the press, when it ships
+        const PRESS_MULTIPLIER = 2;     // the slot reserved for it
+        let worst = 0;
+        subsets().forEach(cfg => [3, 4, 5].forEach(par => {
+            // a two-stroke win WITH a gross birdie - the most any hole can be worth
+            const pts = E.ninePointsForHoleWithOptions([2, 5, 6], [2, 5, 6], { par, hcpIndex: 1 }, cfg);
+            worst = Math.max(worst, pts.reduce((a, b) => a + b, 0));
+        }));
+        assert.equal(worst, 36, 'the reachable per-hole ceiling moved to ' + worst);
+        assert.equal(worst * PRESS_MULTIPLIER, DESIGN_CEILING,
+            'the reachable ceiling no longer doubles to the design ceiling, so either a '
+            + 'toggle was added or the press slot changed - say which');
+    });
+
+    test('BLITZ+BIRDIE SUPPRESSES BIRDIES DOUBLE - one birdie, one doubling', () => {
+        const h = { par: 4, hcpIndex: 1 };
+        const blitzBirdie = [2, 5, 6];   // wins by 3 and is 2 under par
+        const both = E.ninePointsForHoleWithOptions(blitzBirdie, blitzBirdie, h,
+            { blitz: true, blitzBirdie: true, birdiesDouble: true });
+        const justBlitzBirdie = E.ninePointsForHoleWithOptions(blitzBirdie, blitzBirdie, h,
+            { blitz: true, blitzBirdie: true });
+        assert.deepEqual(both, justBlitzBirdie,
+            'birdies-double stacked on top of blitz+birdie: ' + both.join('/'));
+        assert.equal(both.reduce((a, b) => a + b, 0), 18, 'blitz+birdie is 18-0-0');
+        assert.deepEqual(both, [18, 0, 0]);
+    });
+
+    test('BLITZ is NET and BIRDIE is GROSS, proved where the two answers DIFFER', () => {
+        // The fixture that makes this real: gross 5/4/6 - the first golfer does NOT
+        // win on gross - and net 3/4/6, where he wins by one... so no blitz. Then net
+        // 2/4/6, a two-stroke net win, on a par 4 where his GROSS 5 is not a birdie.
+        const h = { par: 4, hcpIndex: 1 };
+        const blitzOnNetOnly = E.ninePointsForHoleWithOptions([2, 4, 6], [5, 4, 6], h, { blitz: true });
+        assert.deepEqual(blitzOnNetOnly, [9, 0, 0], 'a NET two-stroke win must blitz');
+        // ...and it is NOT a birdie, because gross 5 on a par 4 is a bogey.
+        const notABirdie = E.ninePointsForHoleWithOptions([2, 4, 6], [5, 4, 6], h,
+            { blitz: true, blitzBirdie: true });
+        assert.deepEqual(notABirdie, [9, 0, 0],
+            'a NET birdie was counted as a birdie: ' + notABirdie.join('/'));
+        // The mirror: a gross birdie that does NOT win by two nets no blitz, but does
+        // double the hole under birdiesDouble.
+        const grossBirdieNoBlitz = E.ninePointsForHoleWithOptions([3, 4, 5], [3, 4, 5], h,
+            { birdiesDouble: true });
+        assert.deepEqual(grossBirdieNoBlitz, [10, 6, 2], 'a gross birdie must double the hole');
+    });
+
+    test('BIRDIES DOUBLE reads GROSS - a NET birdie does not double the hole', () => {
+        // WRITTEN BECAUSE A CONTROL WAS INERT. J6 switched birdiesDouble from gross to
+        // net and every test stayed green, because every fixture above had nets equal to
+        // gross - so the two answers could not differ and the assertion proved nothing
+        // about which list was read. This is the fixture where they DO differ.
+        const h = { par: 4, hcpIndex: 1 };
+        const nets = [3, 4, 5];     // the first golfer's NET is one under par
+        const gross = [4, 4, 5];    // ...but he actually made par with the ball
+        assert.deepEqual(
+            E.ninePointsForHoleWithOptions(nets, gross, h, { birdiesDouble: true }),
+            [5, 3, 1],
+            'a NET birdie doubled the hole - a stroke is not a birdie');
+        // And the same hole WITH a real gross birdie does double, so the assertion above
+        // is about the scoring basis and not about doubling being broken.
+        assert.deepEqual(
+            E.ninePointsForHoleWithOptions(nets, [3, 4, 5], h, { birdiesDouble: true }),
+            [10, 6, 2],
+            'a gross birdie must still double the hole');
+    });
+
+    test('PAR 3s DOUBLE, and only par 3s', () => {
+        const nets = [4, 5, 6];
+        assert.deepEqual(E.ninePointsForHoleWithOptions(nets, nets, { par: 3, hcpIndex: 1 },
+            { parThreesDouble: true }), [10, 6, 2]);
+        assert.deepEqual(E.ninePointsForHoleWithOptions(nets, nets, { par: 4, hcpIndex: 1 },
+            { parThreesDouble: true }), [5, 3, 1]);
+        assert.deepEqual(E.ninePointsForHoleWithOptions(nets, nets, { par: 5, hcpIndex: 1 },
+            { parThreesDouble: true }), [5, 3, 1]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('11. ALL TOGGLES OFF IS BYTE-IDENTICAL TO WAVE 11', () => {
+    // THE GUARD THAT MUST NOT BE SKIPPED. Everything above adds paths through the
+    // same function; this is the one that proves a round with no options set settles
+    // to exactly the numbers it did before the options existed.
+    test('the plain tie table is unchanged by the new code path', () => {
+        [[4, 5, 6], [4, 4, 5], [4, 5, 5], [5, 5, 5], [3, 4, 4], [2, 2, 2]].forEach(nets => {
+            assert.deepEqual(E.ninePointsForHoleWithOptions(nets, nets, { par: 4, hcpIndex: 1 }, {}),
+                E.ninePointsForHole(nets),
+                'the no-options path diverged from the Wave 11 table on ' + nets.join('/'));
+        });
+    });
+
+    test('a round with no options settles to the Wave 11 numbers, to the cent', () => {
+        const d = ninesRound({ rate: 0.5, score: (p) => (p.id === 101 ? 3 : (p.id === 102 ? 4 : 5)) });
+        const net = E.computeGameNetByPlayerId(gameOf(d), CD, d.scores);
+        // The exact figures test 4 pins, restated here so a regression shows up in the
+        // guard that is ABOUT regression rather than only in the original.
+        assert.equal(net['101'], 18);
+        assert.equal(net['102'], 0);
+        assert.equal(net['103'], -18);
+    });
+
+    test('and an instance carrying options:{} is the same as one carrying none', () => {
+        const plain = ninesRound({ rate: 0.5, score: (p) => 3 + (p.id % 3) });
+        const empty = ninesRound({ rate: 0.5, score: (p) => 3 + (p.id % 3), cfg: { options: {} } });
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(E.computeGameNetByPlayerId(gameOf(plain), CD, plain.scores))),
+            JSON.parse(JSON.stringify(E.computeGameNetByPlayerId(gameOf(empty), CD, empty.scores))));
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('12. THE POT: WINNER TAKES IT, AND IT STILL SUMS TO ZERO', () => {
+    const potRound = (opts) => ninesRound(Object.assign({
+        cfg: { settlement: 'pot', ninePointsBuyIn: 5 }
+    }, opts || {}));
+
+    test('an outright winner takes the pot: +2B / -B / -B', () => {
+        const d = potRound({ score: (p) => (p.id === 101 ? 3 : (p.id === 102 ? 4 : 5)) });
+        const net = E.computeGameNetByPlayerId(gameOf(d), CD, d.scores);
+        assert.equal(net['101'], 10);
+        assert.equal(net['102'], -5);
+        assert.equal(net['103'], -5);
+        assert.equal(net['101'] + net['102'] + net['103'], 0);
+    });
+
+    test('two tie for most: they split the pot', () => {
+        // 101 and 102 both beat 103 on every hole and tie each other: 4-4-1 x 18.
+        const d = potRound({ score: (p) => (p.id === 103 ? 6 : 4) });
+        const net = E.computeGameNetByPlayerId(gameOf(d), CD, d.scores);
+        assert.equal(net['101'], 2.5);
+        assert.equal(net['102'], 2.5);
+        assert.equal(net['103'], -5);
+        assert.equal(net['101'] + net['102'] + net['103'], 0);
+    });
+
+    test('all three tie: everybody gets their buy-in back', () => {
+        const d = potRound({ score: () => 4 });
+        const net = E.computeGameNetByPlayerId(gameOf(d), CD, d.scores);
+        [101, 102, 103].forEach(id => assert.equal(net[String(id)], 0));
+    });
+
+    test('the POINTS still rank, so the toggles CHANGE who takes the pot', () => {
+        // THE FIXTURE THAT ACTUALLY SHOWS IT, and my first one did not - it had the
+        // same golfer winning either way, which proves nothing about the toggles.
+        // Here: Marty is one shot better than the other two on all fourteen
+        // non-par-3 holes, and Lance takes every par 3 by two with a gross birdie.
+        //   toggles OFF  Marty 78, Manny 36, Lance 48   -> Marty takes the pot
+        //   toggles ON   Marty 70, Manny 28, Lance 172  -> Lance takes it
+        // Same scores, same buy-in, different winner. That is the claim.
+        const players = THREE;
+        const scoreFor = (p, h) => (h.par === 3)
+            ? (p.id === 103 ? h.par - 2 : h.par + 1)
+            : (p.id === 101 ? 4 : 5);
+        const build = (options) => {
+            const scores = {};
+            players.forEach(p => CD.forEach(h => { scores['p' + p.id + '_h' + h.hole] = scoreFor(p, h); }));
+            return { code: 'POT2', gameFormat: 'stroke', players, courseData: CD, scores,
+                additionalGameInstances: { g1: Object.assign({
+                    format: 'nines', enabled: true, participantIds: ['101', '102', '103'],
+                    settlement: 'pot', ninePointsBuyIn: 5, startHole: 1 }, options) } };
+        };
+        const off = build({});
+        const on = build({ options: { blitz: true, blitzBirdie: true, parThreesDouble: true } });
+        const netOff = E.computeGameNetByPlayerId(gameOf(off), CD, off.scores);
+        const netOn = E.computeGameNetByPlayerId(gameOf(on), CD, on.scores);
+        // POSITIVE: both are real pots that sum to zero.
+        [netOff, netOn].forEach(n => assert.equal(
+            n['101'] + n['102'] + n['103'], 0, 'the pot did not sum to zero'));
+        assert.equal(netOff['101'], 10, 'with the toggles off Marty must take it: ' + JSON.stringify(netOff));
+        assert.equal(netOn['103'], 10, 'with the toggles on Lance must take it: ' + JSON.stringify(netOn));
+        assert.equal(netOn['101'], -5, 'Marty must now be paying in: ' + JSON.stringify(netOn));
+    });
+
+    test('no buy-in, no money', () => {
+        const d = potRound({ cfg: { settlement: 'pot', ninePointsBuyIn: 0 },
+                             score: (p) => 3 + (p.id % 3) });
+        const net = E.computeGameNetByPlayerId(gameOf(d), CD, d.scores);
+        Object.keys(net).forEach(k => assert.equal(net[k], 0));
+    });
+});

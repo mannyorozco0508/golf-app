@@ -2497,7 +2497,81 @@
 // product cache is consumer-v79-nine-points. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // wave is web/Cap only and does not archive, upload or reopen 1.0.4.
-const CACHE_VERSION = 'golfapp-v238-nine-points';
+// Moved to v239 for THREE THINGS: handicaps default to AS ENTERED, ATTENDANCE IS GONE
+// ENTIRELY, and 9 POINTS GAINS FOUR EXTRAS AND A POT. A device on v238 defaults new
+// rounds to GHIN, still carries the attendance surfaces, and cannot set a blitz.
+//
+// 1. HANDICAPS DEFAULT TO AS ENTERED. Manny's group plays handicaps as entered and the
+// GHIN default was a wrong guess. It is NOT a one-line change, measured before
+// building: flipping the markup's `selected` attribute alone left a new round on GHIN,
+// because loadModeData overwrites the control from the record on every arrival. So the
+// READ-BACK now distinguishes two kinds of "no value" - a brand-new round (no record)
+// means as entered; a LEGACY round (players, no basis) still means GHIN, because that is
+// what its numbers already meant. A round that stored a basis reads back exactly what it
+// stored: a GHIN round must never convert on reopen. The save's fallback and
+// handicapBasisOf() therefore answer "no value" DIFFERENTLY, on purpose, and both say so
+// in a comment. No engine reads handicapBasis at all - it is display only - so no money
+// moves on any round.
+//
+// 2. ATTENDANCE IS GONE ENTIRELY - all four surfaces, the module, the shell entry, the
+// precache line and the database.rules.json rows. Wave 9 took the scorecard panel
+// (504x342 with sixteen buttons above score entry). This wave took the rest, and the
+// reason is Round Ready: showRoundReadyScreen had exactly ONE caller, saveSettings, with
+// no deep link and no way back except re-saving the round. So once the setup card went -
+// it duplicated 👥 Players - the only place left to mark anybody was the moment after a
+// save, before anyone could have answered. That is not a headcount, it is a checklist
+// nobody would revisit. The trip day line was read-only and, with no writer left, could
+// only ever have said "nobody has answered".
+//
+// WHAT HAPPENS TO RECORDS ALREADY WRITTEN: nothing reads them. They stay under
+// events/<code>/attendance, unreferenced - no migration, no deletion, no surface. The
+// Wave 9 report named this as the moment they stop being readable, and this is it. They
+// are inert data on old rounds rather than a half-removed feature: no code path can
+// surface them and none tries.
+//
+// ROUND READY KEEPS ITS ROSTER. The names and handicaps are what a golfer reads that
+// screen for; only the headcount, the per-name status word and the two buttons per row
+// went.
+//
+// 3. 9 POINTS: FOUR EXTRAS AND A POT.
+//     blitz            win the hole by 2+ NET strokes            -> 9-0-0
+//     blitz + birdie   ...and a GROSS birdie or better           -> 18-0-0
+//     birdies double   any GROSS birdie doubles every share      -> 5-3-1 becomes 10-6-2
+//     par 3s double    every par 3 is worth double
+//     settlement       per point (as before) or one pot: everyone pays in, most points
+//                      takes it, a tie splits it
+//
+// EVERY RULE IS A MULTIPLIER OR A REPLACEMENT ALLOCATION THAT STILL SUMS TO 9. Nothing
+// adds a fixed number of points, and that is the constraint: every hole is 9 x 2^k, so
+// the three totals stay a multiple of 9, the mean stays an integer, and Wave 11's exact
+// zero-sum survives every combination. Verified across all sixteen toggle subsets x
+// three pars x seven score patterns: every share an integer, every hole a multiple of 9.
+//
+// BLITZ ON NET, BIRDIE ON GROSS, and the card says so. The points are net, so "win by
+// two" must be net or a golfer getting a stroke could win by two while losing the hole.
+// A birdie is a fact about the golf - one under par with the ball - and it matches
+// calculateBirdieGameTotalsForSettle's gross default, so two wagers on one card cannot
+// disagree about what a birdie is.
+//
+// BLITZ+BIRDIE SUPPRESSES BIRDIES DOUBLE: one birdie must not double a hole twice.
+// CEILING 36 REACHABLE (9 x2 blitz-birdie x2 par 3), against a design ceiling of 72 -
+// the spare x2 being the PRESS, which is NOT in this wave. A press is a live in-round
+// write and belongs at a root node like dots and kpWinners, because an instance-nested
+// one is CLOBBERED by an organizer re-save: loadSkinsInstances holds a clone and
+// captureSkinsInstances writes it back. That needs a database.rules.json row and is its
+// own wave. Both numbers are pinned so a future toggle cannot quietly raise either.
+//
+// ABSENT MEANS THE PLAIN GAME. No `options` object and no `settlement` field is exactly
+// the Wave 11 wager, so every round saved before the extras settles to the same numbers -
+// asserted directly, because that is the real regression risk here.
+//
+// Three files carried the 9 Points work, all previously approved per-file:
+// settlement-engine.js, action-model.js and sidematches.html. database.rules.json lost
+// its attendance rows, per-file approved for that removal. It is NOT published.
+// The consumer product cache is consumer-v80-extras. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this wave is
+// web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v239-extras';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -2572,11 +2646,6 @@ const SHELL_FILES = [
     // uiToast on paths a golfer reaches within seconds - so a cached shell without
     // it does not degrade the page, it breaks it, which is the correct failure.
     './ui-dialogs.js',
-    // attendance.js (v217): who is in before tee time. admin.html and trip.html load
-    // it - NOT index.html any more (v236: the scorecard panel was removed and with it
-    // the script tag). A cached shell without this file shows the organizer the roster
-    // and never the headcount.
-    './attendance.js',
     // match-engine.js (v218) is calculateMatchEngine - hole-by-hole match play, and
     // the money every Match, Nassau, Best Ball, Scramble and Ryder round settles
     // to. All NINE pages that touch a match load it, and money-engine.js,

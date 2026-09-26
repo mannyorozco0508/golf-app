@@ -1448,19 +1448,15 @@ html {
          renderGroupMissingNote() from renderScorecard(); static and above both
          view mounts for the same reason #save-state is. -->
     <div class="group-missing-note" id="group-missing-note" role="alert" style="display:none;"></div>
-    <!-- WHO'S PLAYING WAS HERE, AND WENT (UI Wave 9). The panel asked a golfer to
-         Confirm or say Can't before tee time. Measured cold at 390x844 on a round of
-         eight: 504 x 342 with SIXTEEN buttons on the bare link, 319 x 342 with eight
-         on a group link, sitting directly above the hole view - the first score input
-         was at y=1414 and y=1077. It read as an unfilled form beside score entry, and
-         it asked something already answered: the person reading it is on the tee.
-         THE FEATURE STAYS WHERE IT BELONGS. attendance.js is untouched, and the
-         organizer's two surfaces - the setup card when a round is reopened, and Round
-         Ready - still show and still write the headcount, as does each Road Trip day
-         card. What changed is who writes: the organizer marks people, a golfer no
-         longer self-confirms. The 👥 Players sheet below is a DIFFERENT thing and is
-         deliberately kept: its Out box writes players[i].out on the roster, not
-         events/<code>/attendance/<id>. -->
+    <!-- WHO'S PLAYING WAS HERE, AND THE WHOLE FEATURE IS NOW GONE (Wave 9 took this
+         panel; Wave 13 took the rest). It asked each golfer to Confirm or say Can't
+         before tee time and measured 504 x 342 with SIXTEEN buttons above score entry.
+         The organizer's two surfaces went next: the setup card duplicated 👥 Players,
+         and Round Ready could only be reached in the moment after a save - before
+         anyone could have answered - so the headcount was a checklist nobody would
+         revisit. attendance.js, the shell entry and the database rules rows went with
+         them. 👥 Players below is where a roster is managed: its Out box writes
+         players[i].out on the ROSTER, which is a different thing entirely. -->
     <div id="handicap-basis-note" class="match-hcp-note" style="display:none; white-space:pre-line;"></div>
 
     <div id="hole-view-container">

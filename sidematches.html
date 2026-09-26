@@ -212,6 +212,13 @@
            repo drives, a CLOSED <details> does NOT hide its children on its own, so
            relying on the native collapse would ship a row that hides nothing. Keyed on
            [open] so the native state still drives it. */
+        /* 9 Points options (Wave 13). 44px rows, because a checkbox with a long label
+           is still a tap target. */
+        .np-opt { display: flex; align-items: flex-start; gap: 8px; min-height: 44px;
+            font-size: 0.82rem; color: var(--text-main); cursor: pointer; padding: 4px 0;
+            font-weight: normal; }
+        .np-opt input { width: 18px; height: 18px; margin: 2px 0 0 0; flex: 0 0 auto; }
+        .np-note { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
         .rcs-fold { border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
         .rcs-fold-summary { display: flex; align-items: center; min-height: 44px;
             box-sizing: border-box; padding: 0 14px; cursor: pointer;
@@ -598,6 +605,33 @@ html {
             <div class="control-group" style="margin-bottom:10px;">
                 <label id="sm-field-stake-label">Buy-in per golfer ($)</label>
                 <input type="number" id="sm-field-stake" value="10" min="0" oninput="renderFieldActionForm(document.getElementById('sm-format').value)">
+            </div>
+            <!-- 9 POINTS OPTIONS (Wave 13). Four toggles and a settlement choice, all
+                 hidden unless the format is 9 Points. Every toggle is a whole-hole
+                 MULTIPLIER or a replacement allocation that still sums to 9, so the
+                 nine-a-hole invariant - and the zero-sum proof that rests on it -
+                 holds for every combination.
+                 BLITZ IS JUDGED ON NET, A BIRDIE ON GROSS, and the card says so:
+                 the points are net, so "win by two" must be net, and a birdie is a
+                 fact about the golf rather than about the handicap. -->
+            <div id="sm-nines-only" style="display:none;">
+                <div class="control-group" style="margin-bottom:10px;">
+                    <label>Extras</label>
+                    <label class="np-opt"><input type="checkbox" id="np-blitz"> Blitz &mdash; win the hole by 2 net strokes and take all nine</label>
+                    <label class="np-opt"><input type="checkbox" id="np-blitz-birdie"> Blitz with a gross birdie doubles it (18&ndash;0&ndash;0)</label>
+                    <label class="np-opt"><input type="checkbox" id="np-birdies-double"> Any gross birdie on the hole doubles every share</label>
+                    <label class="np-opt"><input type="checkbox" id="np-par3-double"> Every par 3 is worth double</label>
+                    <div class="np-note" id="np-ceiling-note"></div>
+                </div>
+                <div class="control-group" style="margin-bottom:10px;">
+                    <label>How it settles</label>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" onclick="setNinesSettlement('per-point')" class="preset-btn" id="np-mode-point" style="flex:1; min-height:44px;">Per point</button>
+                        <button type="button" onclick="setNinesSettlement('pot')" class="preset-btn" id="np-mode-pot" style="flex:1; min-height:44px;">One pot</button>
+                    </div>
+                    <input type="hidden" id="np-settlement" value="per-point">
+                    <div class="np-note" id="np-settlement-note"></div>
+                </div>
             </div>
             <div id="sm-skins-only">
                 <div class="control-group" style="margin-bottom:10px;">
@@ -1225,8 +1259,18 @@ html {
         if (skinsOnly) skinsOnly.style.display = (format === 'skins') ? 'block' : 'none';
         // Skins takes a buy-in per golfer; Dots is priced per dot. Naming the amount
         // wrongly would misstate real money.
+        const ninesOnly = document.getElementById('sm-nines-only');
+        if (ninesOnly) ninesOnly.style.display = (format === 'nines') ? 'block' : 'none';
         const stakeLabel = document.getElementById('sm-field-stake-label');
-        if (stakeLabel) stakeLabel.textContent = (format === 'dots') ? '$ per dot' : 'Buy-in per golfer ($)';
+        if (stakeLabel) {
+            // Naming the amount wrongly would misstate real money, and 9 Points can be
+            // either a rate or a buy-in depending on how it settles.
+            stakeLabel.textContent = (format === 'dots') ? '$ per dot'
+                : (format === 'nines'
+                    ? (ninesSettlementNow() === 'pot' ? 'Buy-in per golfer ($)' : '$ per point')
+                    : 'Buy-in per golfer ($)');
+        }
+        if (format === 'nines') refreshNinesNotes();
         // A group Skins game starts with the whole foursome already in, so the fast
         // path is "type the money, save". Tapping a golfer off is the exception.
         // Both participant-scoped games start with the whole foursome already in,
@@ -1273,6 +1317,60 @@ html {
     // THE FRIENDLY HALF OF THE THREE-PLAYER RULE. It names the count, the way the
     // side-match guard does, rather than returning silently - this is the surface where
     // a silent return has already cost a round.
+    function ninesSettlementNow() {
+        const el = document.getElementById('np-settlement');
+        return (el && el.value === 'pot') ? 'pot' : 'per-point';
+    }
+
+    function setNinesSettlement(mode) {
+        const el = document.getElementById('np-settlement');
+        if (!el) return;
+        el.value = (mode === 'pot') ? 'pot' : 'per-point';
+        ['np-mode-point', 'np-mode-pot'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) b.classList.toggle('active', (id === 'np-mode-pot') === (el.value === 'pot'));
+        });
+        // The amount means a different thing in each mode, so its label follows.
+        renderFieldActionForm('nines');
+        const lbl = document.getElementById('sm-field-stake-label');
+        if (lbl) lbl.textContent = el.value === 'pot' ? 'Buy-in per golfer ($)' : '$ per point';
+        refreshNinesNotes();
+    }
+
+    function ninesOptionsNow() {
+        const on = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+        const out = {};
+        if (on('np-blitz')) out.blitz = true;
+        if (on('np-blitz-birdie')) out.blitzBirdie = true;
+        if (on('np-birdies-double')) out.birdiesDouble = true;
+        if (on('np-par3-double')) out.parThreesDouble = true;
+        return out;
+    }
+
+    // WHAT THE TOGGLES ADD UP TO, said before anybody agrees to it. A hole can be
+    // worth 36 with everything on, against 9 in the plain game - that is four times
+    // the money on one hole, and a golfer should read it on the card rather than
+    // discover it on the 18th.
+    function refreshNinesNotes() {
+        const o = ninesOptionsNow();
+        const ceil = 9 * ((o.blitz && o.blitzBirdie) ? 2 : 1) * (o.parThreesDouble ? 2 : 1)
+            * ((o.birdiesDouble && !(o.blitz && o.blitzBirdie)) ? 2 : 1);
+        const note = document.getElementById('np-ceiling-note');
+        if (note) {
+            note.textContent = 'Nine points a hole normally, ' + ceil + ' at most with these on'
+                + (o.blitz && o.blitzBirdie && o.birdiesDouble
+                    ? ' \u2014 a blitz birdie already doubles the hole, so it does not double twice.'
+                    : '.')
+                + ' Blitz is judged on net scores; a birdie on gross.';
+        }
+        const sn = document.getElementById('np-settlement-note');
+        if (sn) {
+            sn.textContent = ninesSettlementNow() === 'pot'
+                ? 'Everyone pays in. Most points takes the pot; a tie splits it.'
+                : 'Each golfer settles against the average, so the three totals cancel out.';
+        }
+    }
+
     function npCommit(players) {
         const chosen = npChosen(players);
         if (chosen.length !== 3) {
@@ -1963,8 +2061,21 @@ html {
             // The picker's three, and the rate. The stake field IS the rate - dollars
             // per point - which is what the catalog's stakeField names.
             entry.participantIds = npChosen(players);
-            entry.ninePointsRate = stake;
             entry.scoring = 'net';
+            // THE AMOUNT MEANS DIFFERENT THINGS IN THE TWO MODES, so it is stored under
+            // the field that settlement reads for that mode rather than under one name
+            // that would be wrong half the time.
+            const mode = ninesSettlementNow();
+            if (mode === 'pot') {
+                entry.settlement = 'pot';
+                entry.ninePointsBuyIn = stake;
+            } else {
+                entry.ninePointsRate = stake;
+            }
+            // ABSENT MEANS THE PLAIN GAME. An empty options object is not written, so a
+            // wager with no extras is byte-identical to one created before they existed.
+            const opts = ninesOptionsNow();
+            if (Object.keys(opts).length > 0) entry.options = opts;
         }
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;

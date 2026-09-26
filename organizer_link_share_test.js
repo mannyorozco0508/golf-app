@@ -412,7 +412,7 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
     test('the engines this wave must not touch are unchanged; the rules file moved for owner-only setup', () => {
         const sha = f => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
         assert.equal(sha('pool-engine.js'), '372e76d7');
-        assert.equal(sha('settlement-engine.js'), 'b5e22550');   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was f8905d43): approved per-file, ONE settlement branch - ninePointsForHole (the tie table as ranked shares) plus computeNinePointsNet, and one dispatch line beside skins and hilo in computeGameNetByPlayerId. No existing arithmetic moved: handicap strokes come from handicap.js getStrokes unchanged, and nothing rounds - the ledger still rounds exactly once at roundNetTotalsToWholeDollars. nine_points_test.js pins the four tie cases, the nine-a-hole invariant, zero-sum over 1,200 rounds, three-places-agree and never-touches-the-other-pots.   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
+        assert.equal(sha('settlement-engine.js'), 'ce69ae73');   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was f8905d43): approved per-file, ONE settlement branch - ninePointsForHole (the tie table as ranked shares) plus computeNinePointsNet, and one dispatch line beside skins and hilo in computeGameNetByPlayerId. No existing arithmetic moved: handicap strokes come from handicap.js getStrokes unchanged, and nothing rounds - the ledger still rounds exactly once at roundNetTotalsToWholeDollars. nine_points_test.js pins the four tie cases, the nine-a-hole invariant, zero-sum over 1,200 rounds, three-places-agree and never-touches-the-other-pots.   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
         assert.equal(sha('grouping.js'), '405b9774');
         // RE-PINNED 2026-09-24 (was 3f2c646b): v219. This file is NOT part of v219 -
         // 0 lines of diff. The pin went stale when PR #13's owner-only setup lock and
@@ -427,7 +427,7 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
         // still NOT published, so live season writes may refuse until it is, which
         // is expected and is not a defect to chase.
-        assert.equal(sha('database.rules.json'), 'a78a42c6');
+        assert.equal(sha('database.rules.json'), '3af7722b');   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
     });
 });
 

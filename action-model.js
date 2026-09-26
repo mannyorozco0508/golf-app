@@ -94,6 +94,11 @@ const ADDITIONAL_GAME_CATALOG = {
         blurb: 'Nine points a hole between three golfers — 5-3-1, ties split.',
         stakeField: 'ninePointsRate',
         stakeLabel: 'Per point',
+        // THE OPTIONS ARE ABSENT BY DEFAULT (Wave 13), and that is deliberate: an
+        // absent `options` object is the plain Wave 11 game, so every round saved
+        // before the toggles existed settles to exactly the same numbers. There is
+        // nothing to migrate and no version flag to carry. Same for `settlement`:
+        // absent means per-point, which is what every existing wager already is.
         defaults: { ninePointsRate: 0.5, scoring: 'net' }
     },
     stableford: {

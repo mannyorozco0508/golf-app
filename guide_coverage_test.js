@@ -346,13 +346,16 @@ describe('6. EVERY FEATURE SHIPPED THIS WEEK IS DESCRIBED', () => {
         });
     });
 
-    test('attendance is described, by whatever the app calls it', () => {
-        // /confirm/ passed on the COURSE CARD's "the confirm panel says so" - a word
-        // from an unrelated sentence. The phrase has to be about people.
-        assert.match(ADMIN, /setup-attendance/, 'the attendance surface is gone');
-        assert.ok(/who is playing/i.test(PROSE),
-            'the guide never explains confirming who is playing');
-    });
+    // THE ATTENDANCE ROW IS GONE (Wave 13), and this is the shape a feature-coverage
+    // guard has to take when the feature leaves: the row is REMOVED, not inverted into
+    // "the guide must not mention it". Wave 8's own comment explains why - a pin that
+    // outlives its feature is how a guard ends up demanding a lie be restored, which
+    // is what happened to the QR code. attendance_test.js now owns the removal, and it
+    // asserts the guide describes NO headcount, with a positive check that the guide is
+    // still a guide.
+    //
+    // WHAT REPLACED IT AS THE ROSTER ANSWER: the Players sheet row below, which was
+    // already here and is now the only roster claim the guide makes.
 });
 
 describe('7. TWO DOORS: THE ORGANIZER AND THE GOLFER ARE ADDRESSED SEPARATELY', () => {

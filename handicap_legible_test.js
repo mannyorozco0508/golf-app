@@ -310,15 +310,19 @@ describe('4. THE GAME TAB states the basis ONCE', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('5. THE ROUND-LEVEL SETTING, default GHIN', () => {
+describe('5. THE ROUND-LEVEL SETTING, default AS ENTERED', () => {
     const ADMIN = read('admin.html');
-    test('the wizard has the control, with GHIN selected by default and "as entered" available', () => {
+    test('the wizard has the control, with "as entered" selected by default and GHIN available', () => {
+        // RE-POINTED 2026-09-26 (Wave 13, was GHIN): Manny's group plays handicaps as
+        // entered, and the GHIN default was mine to get wrong. The describe title moved
+        // with it - a block heading that contradicts its own assertions is the next
+        // reader's trap.
         const at = ADMIN.indexOf('id="handicap-basis-select"');
         assert.ok(at > 0, 'the control exists in the wizard markup');
         const sel = ADMIN.slice(ADMIN.lastIndexOf('<select', at), ADMIN.indexOf('</select>', at) + 9);
-        assert.match(sel, /value="ghin-index"[^>]*selected/, 'GHIN is the default: ' + sel);
-        assert.match(sel, /value="as-entered"/, 'and "as entered" is offered: ' + sel);
-        assert.match(sel, /GHIN/, 'the default option says GHIN in words');
+        assert.match(sel, /value="as-entered"[^>]*selected/, '"as entered" is the default: ' + sel);
+        assert.match(sel, /value="ghin-index"/, 'and GHIN is still offered: ' + sel);
+        assert.match(sel, /GHIN/, 'the GHIN option says GHIN in words');
         assert.ok(!/allowance/i.test(sel), 'no allowance control this wave: ' + sel);
     });
     test('the control sits in the tee panel, beside the numbers it governs', () => {
@@ -388,10 +392,21 @@ describe('6. THE WIZARD READS THE SETTING BACK', () => {
         await new Promise(r => setTimeout(r, 80));
         assert.equal(basisValue(sb), 'ghin-index');
     });
-    test('a BRAND-NEW round starts on GHIN', async () => {
+    test('a BRAND-NEW round starts on AS ENTERED', async () => {
+        // RE-POINTED 2026-09-26 (Wave 13, was GHIN). The three tests above are
+        // UNTOUCHED and must stay that way: a round that stored a basis reads it back
+        // unchanged, and a LEGACY round with no basis still reads as GHIN, because that
+        // is what its numbers already meant. Only the empty-record case moved.
+        //
+        // AND THE MARKUP DEFAULT ALONE DOES NOT DO THIS - measured. loadModeData
+        // overwrites the control from the record on every arrival, including a
+        // brand-new code with no record, so the read-back's fallback is what a new
+        // round actually gets. That is why this test exists at the round-trip level
+        // rather than beside the markup assertion.
+    
         const sb = wizard(null);
         await new Promise(r => setTimeout(r, 80));
-        assert.equal(basisValue(sb), 'ghin-index');
+        assert.equal(basisValue(sb), 'as-entered');
     });
     test('the wizard\'s own note does not claim a conversion on an AS-ENTERED round', async () => {
         const sb = wizard(null);

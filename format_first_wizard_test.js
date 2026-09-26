@@ -518,7 +518,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': 'b5e22550d5d958b1b7ee22e9bd1b206cf32f32d29b9bea108e97be0d9d795379',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
+        'settlement-engine.js': 'ce69ae731e17fd4559dd61f055dc45b5c0a2703881b5b3336183d25ff77331d7',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
@@ -569,7 +569,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // yet (the same file pins zero production callers), so every existing
         // caller runs exactly what it ran. flights_absent_golden_test.js is
         // what guards the behaviour; this hash only proves nothing else moved.
-        'action-model.js': 'e44bd672ec71460b8c4c9c80130cc4e4592830342d8f5d11926f066c471a1138',   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was ded86280): approved per-file, ONE new descriptor - the 'nines' entry in ADDITIONAL_GAME_CATALOG (label, its own 9-keycap glyph, blurb, stakeField ninePointsRate, defaults). No function changed and no arithmetic entered the file: the catalog key is what makes getRoundGames stop SKIPPING the instance, and every consumer downstream then receives it through the path skins and dots already use.
+        'action-model.js': 'e1585501b9f0f1c34a2d9ee1bcab044bd58949a12a68cd1b0eaec4751be63b9e',   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was ded86280): approved per-file, ONE new descriptor - the 'nines' entry in ADDITIONAL_GAME_CATALOG (label, its own 9-keycap glyph, blurb, stakeField ninePointsRate, defaults). No function changed and no arithmetic entered the file: the catalog key is what makes getRoundGames stop SKIPPING the instance, and every consumer downstream then receives it through the path skins and dots already use.
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the
@@ -746,7 +746,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
         // still NOT published, so live season writes may refuse until it is, which
         // is expected and is not a defect to chase.
-        'database.rules.json': 'a78a42c68837167f41fac2a6a0d2e08fd6b18e47613a3c18b41a845cff565ac4',
+        'database.rules.json': '3af7722bf55606604324f982c4f2f26ae102e2d71aab6ad6485e2e687a94eca9',   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,
