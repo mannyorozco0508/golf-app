@@ -122,87 +122,157 @@ describe('THE BUILDER', () => {
     });
 });
 
-describe('THE SCORECARD, the way a golfer opens the link', () => {
-    test('the markup is on the page', () => {
+describe('THE SCORECARD DOES NOT ASK (UI Wave 9)', () => {
+
+    // WHY IT WENT. On a bare link with eight golfers the panel measured 504x342 at
+    // y=824 with SIXTEEN buttons on it, sitting directly above the hole view, which
+    // did not start until y=1334; the first score input was at y=1414. On a group
+    // link it was 319x342 with eight buttons. It read as an unfilled form beside
+    // score entry, and it asked a question that is already answered by the time a
+    // golfer is looking at a scorecard: they are standing on the tee.
+    //
+    // THE FEATURE IS NOT GONE. attendance.js stays, and so do the organizer's two
+    // surfaces and the Road Trip day line - the four blocks below this one still
+    // pass unchanged, which is the positive half of this wave: the removal took the
+    // scorecard panel and nothing else. What changes is WHO writes: after this wave
+    // the organizer marks people from setup, and a golfer no longer self-confirms.
+    //
+    // THE PLAYERS SHEET IS A DIFFERENT THING and is asserted here so a future sweep
+    // for the word "attendance" cannot take it too. Its Out box writes
+    // players[i].out on the ROSTER and clears playingForMoney; attendance writes
+    // events/<code>/attendance/<id> = { status, at }. Two separate ideas that both
+    // happen to say "out".
+
+    test('the panel, its note and its renderer are gone from the scorecard', () => {
         const src = read('index.html');
-        assert.match(src, /id="attendance-mount"/);
-        assert.match(src, /<script src="attendance\.js"><\/script>/);
-        assert.match(src, /renderAttendance\(\)/);
+        assert.ok(!/id="attendance-mount"/.test(src), 'the panel mount is still on the scorecard');
+        assert.ok(!/id="attendance-note"/.test(src), 'the panel\'s error line is still on the scorecard');
+        assert.ok(!/function renderAttendance/.test(src), 'renderAttendance is still defined');
+        assert.ok(!/renderAttendance\(\)/.test(src), 'something still calls renderAttendance');
+        assert.ok(!/function confirmAttendance/.test(src), 'confirmAttendance is still defined');
+        assert.ok(!/function sayAttendance/.test(src), 'sayAttendance is still defined');
     });
 
-    test('touching nothing: four golfers, no answers, Confirm and Can\'t on each name', () => {
+    test('the scorecard no longer loads attendance.js, and nothing on it calls in', () => {
+        const src = read('index.html');
+        assert.ok(!/<script src="attendance\.js"><\/script>/.test(src),
+            'index.html still loads attendance.js for a panel it no longer has');
+        // Every function the module exports, checked by name against the page with
+        // comments stripped - a leftover caller would throw at runtime now that the
+        // script tag is gone, and a typeof guard would hide it instead.
+        const code = src.replace(/<!--[\s\S]*?-->/g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+        ['attendancePanelHtml', 'commitAttendance', 'applyLocalAttendance', 'attendanceWriteError',
+         'summarizeAttendance', 'attendanceCountLine', 'attendanceChoiceButtons',
+         'attendanceStatusWord', 'attendancePlayerId', 'watchAttendance'].forEach(fn =>
+            assert.ok(!new RegExp('\\b' + fn + '\\s*\\(').test(code),
+                'index.html still calls ' + fn + ', and no longer loads the file that defines it'));
+    });
+
+    test('a golfer arrives, the panel is gone, and the page still paints its widgets', () => {
+        // THE BEHAVIOURAL HALF, AS FAR AS THIS HARNESS CAN TAKE IT. A source scan
+        // cannot tell a removed panel from a page that stopped rendering, so this
+        // arrives the way a golfer does and fires the page's own listener.
+        //
+        // WHAT mini-dom CANNOT PROVE, said plainly rather than faked: the hole view
+        // renders NOTHING here - #hole-view-container is 0 characters on arrival,
+        // measured, before and after this wave - so "score entry still works" is not
+        // a claim this file can make. It is made in Chrome, in
+        // scorecard_attendance_removed_test.js, where the rects are real.
+        // #whoami-mount is a widget mini-dom DOES fill, so it is the positive here.
+        //
+        // AND WHAT IT CANNOT PROVE EITHER: that the mount is GONE. mini-dom hands
+        // back a detached stub for any id that exists nowhere in the tree
+        // (helpers/mini-dom.js:295, deliberate, so production code finds its
+        // controls), so getElementById('attendance-mount') is never null here - it
+        // was not null before this wave and it is not null after. Asserting on it
+        // would have been a test that could never pass, which is worse than one that
+        // can never fail. The DOM-absence claim is made in Chrome; here the proof is
+        // that NOTHING FILLS IT, which is a real difference the stub does show.
         const sb = arriveScorecard(monday());
-        const html = panel(sb);
-        const text = plain(html);
-        assert.match(html, /att-count/);
-        assert.match(text, /4 haven't answered/);
-        assert.match(text, /Who's playing/);
-        assert.match(html, /data-att-id="101"/);
-        assert.match(html, /Marty/);
-        assert.match(html, />Confirm</);
-        assert.match(html, />Can't</);
-        assert.match(html, /No answer yet/);
-        assert.ok(!/att-on/.test(html));
-        assert.equal(sb.__dbWrites.filter(w => /attendance/.test(w.path)).length, 0);
+        const mount = sb.document.getElementById('attendance-mount');
+        assert.equal(String((mount && mount.innerHTML) || ''), '',
+            'something still paints an attendance panel on the scorecard');
+        const who = String(sb.document.getElementById('whoami-mount').innerHTML || '');
+        assert.ok(who.length > 100, 'the page painted no widgets at all: ' + who.length);
+        assert.match(who, /Marty/, 'the golfers are not on the page');
+        assert.equal(sb.__dbWrites.filter(w => /attendance/.test(w.path)).length, 0,
+            'something still writes attendance from the scorecard');
     });
 
-    test('a group link confirms its four, not the rest of the field', () => {
+    test('a group link still scopes to its own four - the panel was not what did that', () => {
         const sb = arriveScorecard(monday({ players: golfers(8) }), '?game=ATT1&group=1');
-        const html = panel(sb);
-        const text = plain(html);
-        assert.match(html, /Your group/);
-        assert.match(text, /4 haven't answered/);
-        assert.match(html, /data-att-id="101"/);
-        assert.match(html, /data-att-id="104"/);
-        assert.ok(!/data-att-id="105"/.test(html), html);
-        assert.ok(!/>Dee</.test(html));
+        const who = String(sb.document.getElementById('whoami-mount').innerHTML || '');
+        assert.match(who, /Marty/, 'group 1 is not on its own link');
+        assert.ok(!/\bDee\b/.test(who), 'a group-1 link is showing group 2: ' + who);
     });
 
-    test('the listener paints a later answer without anyone calling the renderer', () => {
-        const sb = arriveScorecard(monday());
-        const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/ATT1');
-        const next = monday({
-            attendance: {
-                '101': { status: 'in', at: 10 },
-                '102': { status: 'out', at: 11 }
-            }
-        });
-        h.cb({ val: () => JSON.parse(JSON.stringify(next)), exists: () => true });
-        const html = panel(sb);
-        const text = plain(html);
-        assert.match(text, /1 confirmed/);
-        assert.match(text, /1 can't make it/);
-        assert.match(text, /2 haven't answered/);
-        assert.match(html, /data-att-id="101"[\s\S]*att-on/);
-        assert.match(text, /Confirmed/);
-        assert.match(text, /Can't make it/);
+    test('the Players sheet is untouched, and it is a different thing entirely', () => {
+        const src = read('index.html');
+        // POSITIVE, and the reason this block is not just six negatives: the sheet a
+        // golfer actually uses to edit names, handicaps and flights is still here.
+        assert.match(src, /id="players-sheet"/, 'the Players sheet is gone');
+        assert.match(src, /id="players-sheet-save"/, 'the sheet cannot be saved');
+        assert.match(src, /class="ps-out-box"/, 'the sheet lost its Out box');
+        assert.match(src, /p\.out = true/, 'the Out box no longer writes the roster flag');
+        // And it is roster truth, not the RSVP: no attendance path anywhere near it.
+        // Sliced from the renderer to the money refresher - the whole sheet, and
+        // endpoints that exist rather than ones I assumed: my first attempt named a
+        // buildPlayersSheetDraft that this page has never had, and a slice that
+        // truncates to nothing satisfies the negative below it forever.
+        const from = src.indexOf('function renderPlayersSheet');
+        const to = src.indexOf('function psRefreshMoney', from);
+        assert.ok(from > -1 && to > from, 'the Players sheet renderer is gone');
+        const sheet = src.slice(from, to);
+        assert.ok(sheet.length > 500, 'the sheet could not be sliced: ' + sheet.length);
+        assert.match(sheet, /ps-out-box/, 'the slice does not contain the sheet');
+        assert.ok(!/attendance/i.test(sheet), 'the Players sheet now reads attendance');
+    });
+});
+
+describe('AND THE ORGANIZER\'S CARD DOES NOT DESCRIBE A SURFACE THAT IS GONE', () => {
+
+    // WRITTEN BECAUSE A CONTROL WAS INERT. UI Wave 9's fourth negative control put
+    // the old sentence back - "Golfers confirm from the scorecard link. You can mark
+    // someone here too" - and NOTHING in the suite noticed. The scorecard no longer
+    // asks, so the first half of that is false, and a confident wrong sentence about
+    // where to tap is the exact defect CLAUDE.md records twice: the trip money card
+    // that made a group pay twice, and the QR called "read-only" that was fully
+    // writable. Copy that describes behaviour IS behaviour, so it is tested here
+    // rather than left to whoever reads the diff.
+    //
+    // It asserts the SHAPE of the claim, not one wording: the note may not send
+    // anybody to the scorecard to confirm, and it must still say something, because
+    // an empty note would satisfy every negative in here.
+
+    test('the setup card does not send a golfer to the scorecard to confirm', () => {
+        const src = read('admin.html');
+        const at = src.indexOf('function paintSetupAttendance');
+        assert.ok(at > -1, 'the setup card renderer is gone - this test guards nothing');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
+        assert.ok(fn.length > 200, 'the renderer could not be sliced: ' + fn.length);
+        // POSITIVE FIRST: there is a heading and a note, so the negatives below are
+        // not being satisfied by an empty string.
+        const note = (fn.match(/note:\s*'([^']+)'/) || [])[1];
+        assert.ok(note && note.length > 20, 'the setup card has no note: ' + note);
+        assert.match(fn, /heading:\s*"Who's playing"/, 'the setup card lost its heading');
+        // THE CLAIM. No pointing at the scorecard, and no "golfers confirm".
+        assert.ok(!/scorecard/i.test(note),
+            'the setup note still points at the scorecard, which no longer asks: "' + note + '"');
+        assert.ok(!/golfers confirm/i.test(note),
+            'the setup note still says golfers confirm, and they have no surface to do '
+            + 'it on: "' + note + '"');
     });
 
-    test('Confirm writes only that golfer\'s attendance node', async () => {
-        const sb = arriveScorecard(monday());
-        const html = panel(sb);
-        assert.match(html, /onclick="confirmAttendance\('101','in'\)"/);
-        sb.confirmAttendance('101', 'in');
-        await new Promise(r => setTimeout(r, 0));
-        const w = sb.__dbWrites.filter(x => x.path === 'events/ATT1/attendance/101');
-        assert.equal(w.length, 1, JSON.stringify(sb.__dbWrites));
-        assert.equal(w[0].op, 'set');
-        assert.equal(w[0].value.status, 'in');
-        assert.ok(w[0].value.at > 0);
-        assert.equal(Object.keys(w[0].value).sort().join(','), 'at,status');
-        assert.match(panel(sb), /1 confirmed/);
-        assert.match(panel(sb), /data-att-id="101"[\s\S]*att-on/);
-        assert.equal(sb.__dbWrites.filter(x => x.path === 'events/ATT1').length, 0, 'the round itself was not rewritten');
-    });
-
-    test('a refused confirm says so and does not show the golfer as confirmed', async () => {
-        const sb = arriveScorecard(monday());
-        sb.__dbRefuse = () => Object.assign(new Error('PERMISSION_DENIED: attendance'), { code: 'PERMISSION_DENIED' });
-        sb.confirmAttendance('101', 'in');
-        await new Promise(r => setTimeout(r, 0));
-        assert.match(sb.document.getElementById('attendance-note').textContent, /Ask the organizer to mark you for now/);
-        assert.ok(!/att-on/.test(panel(sb)));
-        assert.match(plain(panel(sb)), /4 haven't answered/);
+    test('and neither does the guide', () => {
+        // instructions.html is the one page that describes every other page, and its
+        // card said the same thing. Same shape of assertion, same reason.
+        const card = (read('instructions.html')
+            .match(/Who is playing<\/div>\s*<div class="i-desc">([\s\S]*?)<\/div>/) || [])[1];
+        assert.ok(card && card.length > 80, 'the guide lost its who-is-playing card: ' + card);
+        assert.ok(!/confirm themselves from the scorecard/i.test(card),
+            'the guide still says golfers confirm from the scorecard link: "' + card + '"');
+        assert.ok(!/from the scorecard link/i.test(card),
+            'the guide still points at the scorecard link: "' + card + '"');
     });
 });
 

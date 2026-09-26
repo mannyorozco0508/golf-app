@@ -24,8 +24,7 @@
         "ticker-title-label": "🏆 CURRENT GROUP SCORES",
         "ticker-status-val": "|Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1|",
         "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-        "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|Did anyone in your group get inside it?|No — leave it|Yes — pick who|",
-        "attendance-mount": "|Your group|4 haven&#39;t answered|Confirm for this group. The organizer sees the whole round.|Ivy India|No answer yet|Confirm|Can't|Jon Juliet|No answer yet|Confirm|Can't|Kim Kilo|No answer yet|Confirm|Can't|Lee Lima|No answer yet|Confirm|Can't|"
+        "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|Did anyone in your group get inside it?|No — leave it|Yes — pick who|"
       },
       "display": {
         "detailed-breakdown-wrapper": "none",
@@ -76,8 +75,7 @@
         "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1| | |Eli: |-4| | |Fay: |-5| | |Gus: |-2| | |Hal: |-4| | |Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1| | |Max: |-3| | |Ned: |-5| | |Oli: |-2| | |Pat: |-4| | |Quy: |-6| | |Rae: |-2| | |Sam: |-4| | |Tia: |E| | |Uma: |-3| | |Vic: |-5| | |Wes: |-1| | |Xan: |-4|",
         "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
         "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|",
-        "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|",
-        "attendance-mount": "|Who&#39;s playing|24 haven&#39;t answered|Tap your name before tee time.|Ann Alpha|No answer yet|Confirm|Can't|Ben Bravo|No answer yet|Confirm|Can't|Cal Charlie|No answer yet|Confirm|Can't|Dee Delta|No answer yet|Confirm|Can't|Eli Echo|No answer yet|Confirm|Can't|Fay Foxtrot|No answer yet|Confirm|Can't|Gus Golf|No answer yet|Confirm|Can't|Hal Hotel|No answer yet|Confirm|Can't|Ivy India|No answer yet|Confirm|Can't|Jon Juliet|No answer yet|Confirm|Can't|Kim Kilo|No answer yet|Confirm|Can't|Lee Lima|No answer yet|Confirm|Can't|Max Mike|No answer yet|Confirm|Can't|Ned November|No answer yet|Confirm|Can't|Oli Oscar|No answer yet|Confirm|Can't|Pat Papa|No answer yet|Confirm|Can't|Quy Quebec|No answer yet|Confirm|Can't|Rae Romeo|No answer yet|Confirm|Can't|Sam Sierra|No answer yet|Confirm|Can't|Tia Tango|No answer yet|Confirm|Can't|Uma Uniform|No answer yet|Confirm|Can't|Vic Victor|No answer yet|Confirm|Can't|Wes Whiskey|No answer yet|Confirm|Can't|Xan Xray|No answer yet|Confirm|Can't|"
+        "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|"
       },
       "display": {
         "detailed-breakdown-wrapper": "none",
@@ -142,8 +140,7 @@
         "table-head-row": "|Hole|Par|HCP|Ann|HCP 0|Ben|HCP 7|Cal|HCP 14|Dee|HCP 2|",
         "ticker-title-label": "🏆 CURRENT GROUP SCORES",
         "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1|",
-        "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|",
-        "attendance-mount": "|Your group|4 haven&#39;t answered|Confirm for this group. The organizer sees the whole round.|Ann Alpha|No answer yet|Confirm|Can't|Ben Bravo|No answer yet|Confirm|Can't|Cal Charlie|No answer yet|Confirm|Can't|Dee Delta|No answer yet|Confirm|Can't|"
+        "live-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|"
       },
       "display": {
         "detailed-breakdown-wrapper": "none",
@@ -209,6 +206,15 @@
     {
       "at": "dc8a078 (v219)",
       "why": "v217 added the attendance panel to index.html (#attendance-mount) and never re-captured this golden, so all three links had been red since that wave landed. MEASURED before adding: across all three links the ONLY difference from the 6ff9332 capture was this key - 1 added, 0 changed, 0 removed in the text map, and 0 changed in display apart from group-missing-note which this suite deletes explicitly. No existing sentence moved. The panel is written with mount.innerHTML (index.html:2658), so attendance.js correctly passes its DYNAMIC strings through attEscape: the count line is captured as \"4 haven&#39;t answered\", which renders as an apostrophe. Hard-coded button labels like Can't are raw because a literal apostrophe in element text needs no escaping. Both are correct; the capture records the markup as the page emits it, exactly as it already records the static LIVE MATCHES &amp; PRESSES heading.",
+      "keys": [
+        "links.group-3.text.attendance-mount",
+        "links.bare.text.attendance-mount",
+        "links.one-group-1.text.attendance-mount"
+      ]
+    },
+    {
+      "at": "(v236) UI Wave 9",
+      "why": "the attendance panel is GONE from the scorecard. It asked a golfer to Confirm or say Can't before tee time and measured 504x342 with sixteen buttons on a bare link of eight (319x342 with eight on a group link), directly above the hole view. This capture therefore loses exactly the three keys the v219 entry above ADDED, and nothing else: 3 removed, 0 added, 0 changed in the text map, and 0 changed in display. The panel's own words are the only thing that left any of the three links - verified by diffing this file against its pre-wave copy before writing it. The feature itself is untouched: attendance.js, the organizer's setup card, Round Ready and the Road Trip day line all still show and write the headcount, and attendance_test.js's other ten tests pass unchanged.",
       "keys": [
         "links.group-3.text.attendance-mount",
         "links.bare.text.attendance-mount",

@@ -149,7 +149,13 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // button label Can't stays raw because a literal apostrophe in element text
         // needs no escaping. This capture records markup as the page emits it, the same
         // way it already records the static "LIVE MATCHES &amp; PRESSES" heading.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'c72ced2a');
+        // RE-PINNED (v236, UI Wave 9, was c72ced2a): the attendance panel is gone from
+        // the scorecard, so this capture loses exactly the three keys the v219 entry
+        // above added and nothing else. VERIFIED BY DIFF against the pre-wave copy
+        // before re-pinning: 0 added, 0 changed, 3 removed across text and display on
+        // all three links, every `filtered` list identical, capturedAt untouched. The
+        // fixture's own "repinned" array carries the same record.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '0260d661');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
@@ -201,7 +207,12 @@ describe('THE SEAM (source, comments stripped)', () => {
         // which the golden above now records. It goes through scopedPlayers() rather
         // than touching __scFilteredPlayers, so the count of raw mentions below stayed
         // at 8 and the widening idioms this test forbids are still absent.
-        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 11);
+        // RE-PINNED (v236, UI Wave 9, was 11): renderAttendance was the eleventh
+        // caller and it is deleted. It is the SAME assertion doing its job in the
+        // other direction - v219 re-pinned it upward when the panel arrived, and this
+        // wave re-pins it down by one because the panel left. The raw-mention count
+        // below stayed at 8, so nothing started touching __scFilteredPlayers directly.
+        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 10);
     });
     test('the surfaces whose builders widen an empty list do not ask them: recap, action center, the ticker\'s match cards', () => {
         assert.match(fn('renderHoleRecap'), /if \(scopeMissing\(\)\) \{ mount\.innerHTML = ''; return; \}/);
