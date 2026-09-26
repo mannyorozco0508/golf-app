@@ -33,7 +33,11 @@ const path = require('path');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
-const PAGES = ['index.html', 'leaderboard.html', 'settlement.html', 'skins.html', 'sidematches.html', 'game.html'];
+// stats.html JOINED 2026-09-26 (after Wave 14): its bar wraps correctly and has since
+// 2026-09-14, but it was absent from this list - right by accident rather than by
+// assertion. Wave 14 found admin.html drifting for exactly that reason, so the page that
+// was silently correct is now checked.
+const PAGES = ['index.html', 'leaderboard.html', 'settlement.html', 'skins.html', 'sidematches.html', 'game.html', 'stats.html'];
 const ORDER = [['index.html', '📝', 'Card'], ['leaderboard.html', '🏆', 'Board'], ['skins.html', '💰', 'Bets'], ['settlement.html', '🤝', 'Results'],
                ['sidematches.html', '⚔️', 'Matches'], ['game.html', '📖', 'Game'], ['trip.html', '🚐', 'Trip'], ['admin.html', '🏠', 'Home']];
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
@@ -88,6 +92,13 @@ PAGES.forEach(pg => {
             assert.equal(v.more, false, 'the More menu is gone');
         });
         test('the active pill is this page\'s own, and it is the filled one', () => {
+            // stats.html HAS NO PILL OF ITS OWN, so this one cannot apply to it. The Game
+            // tab took Stats' nav slot (v186) and stats.html stays only as the parity
+            // surface 43 tests read - there is no href="stats.html" anywhere in the app,
+            // so no pill can be active on it. Exempted rather than weakened: every OTHER
+            // assertion in this file runs against stats.html, including the geometry ones
+            // that would have caught admin.html's drifting strip.
+            if (pg === 'stats.html') return;
             const v = S[pg];
             const active = v.items.filter(i => i.active);
             assert.equal(active.length, 1); assert.equal(active[0].href.split('?')[0], pg);
@@ -141,14 +152,14 @@ describe('THE ROWS FIT WITH ROOM, and the cost on the scorecard', () => {
     });
 });
 
-describe('THE SEAM (source): the six pages carry the same bar; admin.html and tournament.html are left alone', () => {
+describe('THE SEAM (source): the seven pages carry the same bar; admin.html and tournament.html have their own', () => {
     const BAR = PAGES.map(f => { const s = read(f); const a = s.indexOf('<div class="app-nav-wrap">'); return s.slice(a, s.indexOf('</div>\n    </div>', a)); });
-    test('the same eight anchors in the same order on all six, the active class the only difference', () => {
+    test('the same eight anchors in the same order on all seven, the active class the only difference', () => {
         const norm = BAR.map(b => b.replace(/ active/g, ''));
         norm.forEach((b, i) => assert.equal(b, norm[0], PAGES[i] + ' differs from index.html'));
         ORDER.forEach(([href, emoji, label]) => assert.ok(norm[0].includes(`href="${href}" class="top-nav-item${href === 'trip.html' ? '' : ' nav-link'}${href === 'sidematches.html' ? ' matches-nav-link' : ''}">${emoji} ${label}</a>`), href));
     });
-    test('no More menu, no horizontal scroller, no outside-tap listener on any of the six', () => {
+    test('no More menu, no horizontal scroller, no outside-tap listener on any of the seven', () => {
         PAGES.forEach(f => {
             const s = read(f);
             assert.ok(!/<details class="nav-more"/.test(s), f + ' still has the More menu');
