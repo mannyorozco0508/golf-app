@@ -51,8 +51,8 @@ const MEASURE = `(function () {
         // inline <script>, and textContent would match the source of the very
         // function this wave deleted.
         saysWhosPlaying: /who's playing/i.test(text),
-        // NOT a bare /your group/: the KP question asks "Did anyone in your group
-        // get inside it?" and the spectator banner says "your group's link", both
+        // NOT a bare /your group/: the KP question asks "Did anyone get the KP in
+        // your group?" (Wave 16) and the spectator banner says "your group's link", both
         // unrelated to this panel and both correct. The panel's own note is unique.
         saysGroupNote: /confirm for this group/i.test(text),
         // The panel's own words. "Confirm" alone is too common to assert on.

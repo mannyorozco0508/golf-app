@@ -133,7 +133,8 @@ describe('2. WHEN IT SHOWS - the three gates and the pool guard, on the new moun
         const h = mount(boot(data, 7));
         assert.match(h, /Current KP: <strong>C<\/strong> \(Group 1\)/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
         assert.match(h, /8' 4"/);
-        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(h), 'seeing is not claiming');
+        // kp-names since Wave 16 (the select is gone); a dead token here would be inert.
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-names/.test(h), 'seeing is not claiming');
     });
 });
 
@@ -141,8 +142,10 @@ describe('3. THE SAVE RE-RENDERS ONE DIV', () => {
     test('toggle opens the picker in the mount; saving writes the atomic update and the mount shows the new leader', async () => {
         const sb = boot(round(), 7);
         run(sb, 'toggleKpEntry(7)');
-        assert.match(mount(sb), /kp-pick-7/);
-        assert.match(mount(sb), /Save KP/);
+        // Wave 16: the picker is the group's names as buttons, one tap each - no select,
+        // no Save step. What this test is about is WHERE the block sits, not its controls.
+        assert.match(mount(sb), /kp-names/);
+        assert.match(mount(sb), /class="kp-btn kp-name"/);
         run(sb, "saveKpLeader(7, '102', '6', '2')");
         await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
         const w = run(sb, 'JSON.stringify(window.__writes)');
@@ -151,8 +154,8 @@ describe('3. THE SAVE RE-RENDERS ONE DIV', () => {
         run(sb, "currentData.kpLeaders = { h7: { playerId: '102', playerName: 'Ben', group: null, distanceInches: 74, updatedAt: 2 } }; currentData.kpWinners = { h7: '102' }; renderKpEntryMount();");
         assert.match(mount(sb), /Current KP: <strong>Ben<\/strong>/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
         // saveKpLeader was called directly here (unchanged by v193); the ANSWER is
-        // recorded by the button path (submitKpEntry), so the question still shows.
-        assert.match(mount(sb), /Did anyone in your group get inside it\?/);
+        // recorded by the button path (pickKpLeader), so the question still shows.
+        assert.match(mount(sb), /Did anyone get the KP in your group\?/);   // Wave 16 wording
         assert.equal(run(sb, 'window.__alerts.length'), 0, 'no KP RECORDED dialog (2026-09-19) - the block is the confirmation');
     });
 });

@@ -206,14 +206,17 @@ describe('EVERYONE SEES THE MARKER', () => {
         assert.match(t, /Hole 7 — Closest to the Pin/);   // re-pinned 2026-09-22 (v193): the block is the question now - kp_prompt_test.js
         assert.match(t, /Current KP: Manny \(Group 2\)/);
         assert.match(t, /5' 9"/);
-        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(t), 'seeing is not claiming');
+        // kp-names since Wave 16 (the select is gone); a dead token here would be inert.
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-names/.test(t), 'seeing is not claiming');
     });
 
     test('another group sees the leader and may still claim it for their own', () => {
         const b = boot({ group: 3, hole: 7, leaders: LEADER });
         const t = strip(b.html());
         assert.match(t, /Current KP: Manny \(Group 2\)/, 'group 3 must see who holds it');
-        assert.match(t, /Did anyone in your group get inside it\? No — leave it Yes — pick who/, 'and be asked whether one of their own beat it (v193)');
+        // Wave 16 wording: "inside it" asked a golfer to compare against a marker the
+        // sentence never named. The two answers are unchanged, and equal weight now.
+        assert.match(t, /Did anyone get the KP in your group\? No — leave it Yes — pick who/, 'and be asked whether one of their own beat it (v193)');
     });
 
     test('an unclaimed hole says so', () => {

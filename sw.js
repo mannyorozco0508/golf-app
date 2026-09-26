@@ -2737,7 +2737,59 @@
 // consumer-v83-guideglyph. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v242-guideglyph';
+// Moved to v243 FOR THE KP QUESTION: better wording, one fewer step, equal button weight.
+// A device on v242 asks "Did anyone in your group get inside it?" - a sentence that asks a
+// golfer to compare against a marker it never names - and answering Yes opens a <select>
+// that has to be opened, changed, and then Saved.
+//
+// 1. THE WORDING is Manny's: "Did anyone get the KP in your group?"
+//
+// 2. ONE FEWER STEP. "Yes — pick who" now opens the group's names as BUTTONS, two to a
+// row, and ONE TAP records the KP. pickKpLeader(hole, id) replaces submitKpEntry(hole);
+// saveKpLeader is UNCHANGED - the same single update, the same kpLeaders/hN and
+// kpWinners/hN, the same last-write-wins a later group relies on - and pool-engine.js is
+// not touched. The optional ft/in boxes still ride along and now sit ABOVE the names,
+// because a tap on a name is the save and anything below it would never be read.
+// Interactions after "Yes": three became one, and the one that is left is a real tap.
+// MEASURED at 390x844: each name 158x48 at 17px, two to a row, no overflow at 3, 4 or 6
+// golfers or on a 22-character name; the open picker is 266px against 260px before.
+// 17px is not decoration - kp_picker_legibility_test.js requires the control that names
+// who gets the money to read at .score-input's size, and the first draft of this wave
+// used .kp-btn's 13.6px, which would have put the smallest type in the block back on the
+// money control. That suite caught it.
+//
+// pickKpLeader CHECKS THE ID through canSetKpLeader even though the markup only renders
+// this group's names: a function that writes money should not trust its caller, and
+// without it the only thing between another group's golfer and the pot would be whichever
+// markup happened to render.
+//
+// 3. EQUAL BUTTON WEIGHT. "Yes — pick who" was the filled brand-green button and
+// "No — leave it" the outline one, on a hole where most answers are No. Measured against
+// the block's own background: filled 9.16:1, outline 1.08:1, so the rarer answer was 8.5x
+// more prominent than the common one. Both are outline now, in ONE rule naming both
+// classes so they cannot drift apart, and kp-ask-now's 2px brand-green border keeps the
+// job of saying "answer now". The filled treatment moves to the name buttons, where a tap
+// really does write money. Both answers stay 48px; every name is 48px.
+// NOT FLIPPED, which was the other option offered: that fixes the complaint and creates
+// its mirror image, making a write-nothing dismissal the loudest control on the block.
+//
+// EVERYTHING v193 SETTLED IS UNCHANGED: the block is quiet on arrival and lit once the
+// group's hole is complete, "Change KP" stays after an answer, a spectator sees the
+// current KP and no buttons, and "No" writes nothing.
+//
+// SIX GUARD FILES AND ONE DEVICE CHECK pinned the select, which the brief did not
+// mention: kp_prompt_test.js, kp_picker_legibility_test.js (whose entire subject was the
+// select's legibility - re-pointed to the claim, not the element), kp_entry_position_test,
+// kp_leaders_test, money_pool_test, scorecard_attendance_removed_test and
+// tools/kp-entry-position-check.js. The negatives that named kp-select were re-pointed to
+// kp-names: a token that no longer exists anywhere makes a "must not contain" inert.
+//
+// No engine and no protected file changed; pool-engine.js is byte-identical and its sha
+// guard in kp_prompt_test.js still reads 372e76d7. The consumer product cache is
+// consumer-v84-kpask. The tournament product cache stays tournament-v54-rattle-golf. iOS
+// is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not archive,
+// upload or reopen it.
+const CACHE_VERSION = 'golfapp-v243-kpask';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
