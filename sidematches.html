@@ -204,6 +204,24 @@
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
         .btn-danger-sm { background-color: var(--bg-card); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         .btn-outline-sm { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
+        /* THE CUP, FOLDED (UI Wave 10). On a plain arrival at the Matches tab the whole
+           Cup card sits behind this one row, closed. A golfer here for side bets meets
+           44px of chrome; an organizer adding a Cup to a Stroke Play round - which
+           ryder-cup.js calls the whole point of the Cup being a LAYER - is one tap in.
+           EXPLICIT COLLAPSE, not the browser's. Measured in Wave 7: in the Chrome this
+           repo drives, a CLOSED <details> does NOT hide its children on its own, so
+           relying on the native collapse would ship a row that hides nothing. Keyed on
+           [open] so the native state still drives it. */
+        .rcs-fold { border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
+        .rcs-fold-summary { display: flex; align-items: center; min-height: 44px;
+            box-sizing: border-box; padding: 0 14px; cursor: pointer;
+            font-size: 0.9rem; font-weight: bold; color: var(--brand-green); list-style: none; }
+        .rcs-fold-summary::-webkit-details-marker { display: none; }
+        .rcs-fold-summary::after { content: '\25BE'; margin-left: auto; transition: transform 0.15s; }
+        .rcs-fold[open] .rcs-fold-summary::after { transform: rotate(180deg); }
+        .rcs-fold > *:not(summary) { display: none; }
+        .rcs-fold[open] > *:not(summary) { display: block; }
+        .rcs-fold-body { padding: 0 10px 10px 10px; }
 
         .rcs-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
         .rcs-head { font-weight: bold; color: var(--brand-green); margin-bottom: 8px; }
@@ -3008,16 +3026,73 @@ html {
         return !!(rcDraft && rcDraft.sessions && Object.keys(rcDraft.sessions).length);
     }
 
+    // IS THE CUP SURFACE WANTED ON THIS ARRIVAL? (UI Wave 10, option A1)
+    //
+    // The Matches tab is for side bets. A golfer who opens it to add a $10 bet met
+    // the Ryder Cup builder first - "Set Up a Ryder Cup", a Classic 3-day preset and
+    // "Join a Cup That Already Exists" - and it will never be used from there.
+    //
+    // GATED, NOT DELETED, and that is measured rather than timid. renderRyderCupSetup
+    // exists in exactly ONE file - this one - and tournament.html has no Ryder
+    // references at all, so these controls are the only way a Cup is ever built. The
+    // wizard DEPENDS on them: picking the Ryder Cup format card makes saveSettings()
+    // navigate here with ?setup=ryder instead of showing Round Ready (admin.html),
+    // and the organizer then taps one of them. Deleting them would leave a main format
+    // that navigates to an empty surface. "Join a Cup That Already Exists" is the only
+    // way days 2 and 3 of a multi-round Cup attach to day 1.
+    //
+    // THREE WAYS IN, and nothing else:
+    //   1  ?setup=ryder            the wizard handoff
+    //   2  hasRyderCup(currentData) this round already has a Cup, so it must stay
+    //                               manageable for the rest of the round
+    //   3  ryderCupRef             this round is a later day of somebody's Cup
+    // The predicates are the app's own - a second opinion here about what a Cup is
+    // would be a second definition to keep in step.
+    function rcSurfaceWanted() {
+        if (urlParams.get('setup') === 'ryder') return true;
+        if (typeof hasRyderCup === 'function' && hasRyderCup(currentData)) return true;
+        if (currentData && currentData.ryderCupRef) return true;
+        return false;
+    }
+
+    // WHY IT FOLDS INSTEAD OF DISAPPEARING, and this is a correction to the first
+    // version of this gate rather than a flourish.
+    //
+    // Emptying the mount on a plain arrival read correctly - a golfer adding a $10
+    // side bet met no Ryder Cup - and it BROKE A DOCUMENTED CAPABILITY. ryder-cup.js
+    // says it plainly: "A round can carry a Ryder Cup competition regardless of its
+    // gameFormat. That is the whole point: ryder-cup is a LAYER, not a format. A
+    // Stroke Play round with Skins and three side matches can also be Session 2 of
+    // the Cup." The only route to that is this tab WITHOUT ?setup=ryder, because the
+    // round was never set up as a Cup. Fourteen tests across five suites said so.
+    //
+    // So on a plain arrival the same card is rendered inside a CLOSED disclosure: one
+    // 44px row reading "Running a Ryder Cup?" and nothing else. A golfer here for side
+    // bets meets a single row instead of three buttons and a paragraph; an organizer
+    // adding a Cup to a Stroke Play round is one tap from it. Same pattern the setup
+    // screen uses for "Open something else", and for the same reason.
+    //
+    // NO aria-expanded ON THE SUMMARY: <details> conveys expanded state natively, and
+    // the literal attribute would require a button+region pattern - a second
+    // disclosure pattern to maintain. Wave 7 settled that argument on admin.html.
+    function rcFold(html) {
+        return '<details class="rcs-fold"><summary class="rcs-fold-summary">'
+             + '\uD83C\uDFC6 Running a Ryder Cup?</summary>'
+             + '<div class="rcs-fold-body">' + html + '</div></details>';
+    }
+
     function renderRyderCupSetup() {
         const mount = document.getElementById('ryder-cup-setup');
         if (!mount) return;
         if (!isOrganizerView()) { mount.innerHTML = ''; return; }
+        // The tab is for side bets unless one of the three conditions above holds -
+        // and on a plain arrival the Cup FOLDS rather than vanishes. See rcFold().
         if (!rcDraft) rcLoadDraft();
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
         const exists = (typeof hasRyderCup === 'function') && hasRyderCup(currentData);
 
         if (!exists && !rcDraft.__open) {
-            mount.innerHTML = '<div class="rcs-card"><button type="button" class="rcs-start"'
+            const entryHtml = '<div class="rcs-card"><button type="button" class="rcs-start"'
                 + ' onclick="rcOpen()">\uD83C\uDFC6 Set Up a Ryder Cup</button>'
                 + '<button type="button" class="rcs-add" style="width:100%;margin-top:8px"'
                 + ' onclick="rcOpenClassic()">\uD83D\uDCC5 Classic Ryder Cup \u2014 3 Days, 5 Sessions</button>'
@@ -3038,6 +3113,7 @@ html {
                     : '')
                 + 'A team competition played on top of this round. '
                 + 'Points, not money \u2014 your side games are unaffected.</div></div>';
+            mount.innerHTML = rcSurfaceWanted() ? entryHtml : rcFold(entryHtml);
             return;
         }
 
@@ -3104,7 +3180,7 @@ html {
             + '<button type="button" class="rcs-save" onclick="rcSave()">Save Ryder Cup</button>';
         if (exists) html += '<button type="button" class="rcs-remove" onclick="rcRemove()">Remove Cup</button>';
         html += '</div>';
-        mount.innerHTML = html;
+        mount.innerHTML = rcSurfaceWanted() ? html : rcFold(html);
     }
 
     function rcOpen() { rcLoadDraft(); rcDraft.__open = true; renderRyderCupSetup(); }

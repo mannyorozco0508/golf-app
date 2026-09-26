@@ -423,6 +423,48 @@
 
     installTapWatch();
 
+    // ---- AN EXPLANATION (UI Wave 10) ---------------------------------------
+    //
+    // THE SEVENTH FUNCTION, and the first one that is not a message or a decision.
+    // A "?" beside a control wants three or four sentences and one way out; the
+    // nearest existing thing was uiConfirm, which draws two buttons and returns a
+    // promise a tip has no use for - a Cancel on an explanation asks the reader to
+    // decline information.
+    //
+    // BULLETS COST NOTHING. .ui-sheet-body is already white-space: pre-line, so a
+    // "\n"-joined list renders as separate lines. No new CSS, and the class stays
+    // the one the other sheets use, so a theme change reaches all of them at once.
+    //
+    // IT RETURNS NOTHING ON PURPOSE. Every other sheet in this file returns a
+    // promise because a caller must know the answer. There is no answer here, and a
+    // promise nobody awaits is exactly the shape that hid an inverted guard in
+    // Wave 3 - see the header. Fire it and carry on.
+    function uiTip(opts) {
+        var o = opts || {};
+        var title = o.title || '';
+        var bullets = Array.isArray(o.bullets) ? o.bullets.filter(Boolean) : [];
+        var body = o.body || '';
+        var okText = o.okText || 'Got it';
+        ensureStyle();
+        if (typeof document === 'undefined' || !document.createElement) return;
+        var lines = bullets.map(function (b) { return '• ' + String(b); });
+        var text = (body ? String(body) + (lines.length ? '\n\n' : '') : '') + lines.join('\n');
+        var s = sheet();
+        s.innerHTML =
+            '<div class="ui-sheet-card">'
+          + (title ? '<p class="ui-sheet-title">' + esc(title) + '</p>' : '')
+          + (text ? '<p class="ui-sheet-body">' + esc(text) + '</p>' : '')
+          + '<div class="ui-sheet-row">'
+          + '<button type="button" class="ui-btn-go" id="ui-sheet-ok">' + esc(okText) + '</button>'
+          + '</div></div>';
+        if (s.classList) s.classList.add('open');
+        var ok = document.getElementById('ui-sheet-ok');
+        if (ok) ok.onclick = function () { closeSheet(); };
+        // Tapping the backdrop closes it too. A tip is not a decision, so there is
+        // nothing to lose by dismissing it the impatient way.
+        s.onclick = function (ev) { if (ev && ev.target === s) closeSheet(); };
+    }
+
     var api = {
         uiRefuse: uiRefuse,
         uiFail: uiFail,
@@ -430,6 +472,7 @@
         uiConfirm: uiConfirm,
         uiAmount: uiAmount,
         uiPrompt: uiPrompt,
+        uiTip: uiTip,
         uiClearNotes: clearNotes,
         uiCloseSheet: closeSheet,
         uiDwellFor: dwellFor,

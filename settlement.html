@@ -34,6 +34,11 @@
          through a real PDF + the iOS share sheet, and leaves the browser alone. -->
     <script src="native-export.js"></script>
     <script src="text-safe.js"></script>
+    <!-- UI WAVE 10: the shared dialog component, for the "?" on the Pay out card.
+         dialog_await_guard_test.js's CONVERTED list already names this page, so the
+         tag is expected here rather than new - and hand-rolling a sheet on the page
+         is what dialog_sweep_test.js forbids. -->
+    <script src="ui-dialogs.js"></script>
     <script src="score-marks.js"></script>
     <script src="money-engine.js"></script>
     <!-- The scorecard rows live once, in scorecard-rows.js (2026-09-16): the
@@ -208,6 +213,14 @@
            Numbers and rows are untouched; this is type and spacing only. */
         .settle-card { margin-top: 22px; }
         .settle-card:first-child { margin-top: 0; }
+        /* THE CONTEXT "?" (UI Wave 10). A literal "?", 44px, the same rule as the
+           other two surfaces. NOT in #title-row: receipt_send_button_test.js pins
+           that row byte for byte to the heading plus #receipt-actions. */
+        .tip-btn { box-sizing: border-box; min-width: 44px; min-height: 44px;
+            background: var(--bg-card); color: var(--brand-green);
+            border: 1px solid var(--brand-green); border-radius: 50%;
+            font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; padding: 0; }
+        .po-head .tip-btn { margin-left: 8px; }
         .settle-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid var(--brand-green); text-align: center; }
         
         .ledger-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-mid); font-weight: bold; font-size: 0.95rem; color: var(--text-main); }
@@ -388,7 +401,16 @@
                document. The popover is gone (2026-09-14, all eight pages are pills in
                the bar) but the wrapper stays hidden as a whole. */
             .top-nav-bar, .btn-primary, .event-title, .theme-toggle-btn,
-            .app-nav-wrap, .receipt-actions { display: none !important; }
+            .app-nav-wrap, .receipt-actions, .tip-btn { display: none !important; }
+            /* .tip-btn joined the line above on 2026-09-26 (UI Wave 10): the "?" is
+               chrome, not money. It is in THIS @media print block rather than a second
+               one of its own, because the print guards slice from the FIRST @media print
+               in the file - an earlier second block made every rule in here look
+               deleted. And the note sits BELOW the declaration, not above it: those same
+               guards read a 400-character window that starts at the first mention of
+               .top-nav-bar (which is inside the comment above) and must still reach this
+               line. Two fixed-length slices, one four-line comment, both broken - see
+               CLAUDE.md on endpoints that cannot drift. */
             .settle-card { border: 1px solid #ccc; background: #fff; }
             /* A match's story must not break across a page - the whole point is that a
                golfer can read one block and see how the money happened. */
@@ -1584,6 +1606,25 @@ html {
         if ((heldCents || 0) > 0) t += ' · ' + $(heldCents) + ' held';
         return t;
     }
+    // THE PAYOUT, EXPLAINED (UI Wave 10). Copy from the guide's own Settling Up card.
+    // THE FOURTH BULLET IS A CORRECTION, not a summary: the guide claimed each row had
+    // "a Pay out control for marking them settled". No such control exists anywhere in
+    // this app - a row is a disclosure that opens to show where the figure came from -
+    // and that sentence is fixed in instructions.html in this same wave.
+    function tipResults() {
+        if (typeof uiTip !== 'function') return;
+        uiTip({
+            title: '\uD83D\uDCB0 Pay out',
+            bullets: [
+                'One line per golfer: what they finished the round owed, or owing.',
+                'Tap a name to open it \u2014 every figure is itemised, so you can see which game it came from.',
+                'It totals the main format, the side games AND the side matches. Settle once from this page, not game by game.',
+                'Nothing here marks anybody paid. The app works out who owes who; it never holds money or moves it.',
+                'The Receipt on this tab is the same money with the full scorecard beside it \u2014 send that when somebody questions a number.'
+            ]
+        });
+    }
+
     function buildPayoutCardHtml(contributions, sortedTotals, r, data) {
         if (!contributions) return '';
         const keys = Object.keys(contributions);
@@ -1617,7 +1658,8 @@ html {
         const head = payoutHeadCell(paidCents, r && r.valid ? r.totalPoolCents : 0, r && r.valid ? (r.kpUnresolvedCents || 0) : 0);
 
         let html = `<div class="settle-card payout-card">`
-            + `<div class="settle-header po-head"><span>💰 Pay out</span><span class="po-total">${head}</span></div>`;
+            + `<div class="settle-header po-head"><span>💰 Pay out</span><span class="po-total">${head}</span>`
+            + `<button type="button" class="tip-btn" id="tip-results" aria-label="How the payout is worked out" onclick="tipResults()">?</button></div>`;
         if (rows.length === 0) html += `<div class="po-none">Nobody is owed anything.</div>`;
         rows.forEach(x => {
             html += `<details class="po-row print-open"><summary><span class="po-name">${escapeHtml(x.name)}</span><span class="po-amt">${money(x.total)}</span></summary>`;

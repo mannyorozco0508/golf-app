@@ -544,6 +544,53 @@
            intrinsic width and stops being a 34px target. */
         .theme-toggle-btn { min-height: 44px; }
         .resume-link { min-height: var(--ctl-h); max-width: var(--ctl-max); }
+        /* THE COACH ENTRY (UI Wave 10). No geometry of its own on purpose - it wears
+           .resume-link, which the button system already sizes at --ctl-h and caps at
+           --ctl-max, so there is nothing here for the one-height guard to find a
+           fourth exemption for.
+           FIRST RUN IS EMPHASIS, NOT A BLOCK. On a phone that has never set a round
+           up the link is drawn filled instead of underlined. It is one class on one
+           existing element: no second element, no extra height, and nothing for an
+           experienced host to dismiss. A modal would have been a block. */
+        /* THE COACH SCREEN. One width, one height, centred labels, no inline layout -
+           the Wave 5-7 system, applied by hand here because widget_system_test.js is
+           scoped to #lobby-screen and would not have caught a drift on this screen. */
+        #coach-screen > * + * { margin-top: var(--widget-gap); }
+        .coach-head { max-width: var(--widget-max); margin: 0 auto; text-align: center; }
+        .coach-kicker { font-size: 0.72rem; text-transform: uppercase; font-weight: bold;
+            letter-spacing: 0.06em; color: var(--text-muted); }
+        .coach-q { font-size: 1.15rem; font-weight: bold; color: var(--brand-green); margin-top: 6px; }
+        .coach-sub { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-top: 6px; }
+        #coach-options { max-width: var(--widget-max); margin: 0 auto; }
+        #coach-options > * + * { margin-top: var(--ctl-gap); }
+        .coach-opt { display: flex; flex-direction: column; justify-content: center;
+            width: 100%; box-sizing: border-box; min-height: var(--ctl-h); padding: 10px 14px;
+            background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid);
+            border-radius: 10px; cursor: pointer; text-align: left; font: inherit; }
+        .coach-opt.selected { border-color: var(--brand-green); background: var(--nassau-box-bg); }
+        .coach-opt-name { font-size: 0.95rem; font-weight: bold; color: var(--brand-green); }
+        .coach-opt-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; line-height: 1.35; }
+        .coach-nav { max-width: var(--widget-max); margin: 0 auto; display: flex; gap: var(--ctl-gap); }
+        .coach-nav-btn { flex: 1 1 0; box-sizing: border-box; min-height: var(--ctl-h);
+            background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid);
+            border-radius: 10px; font-size: 0.85rem; font-weight: bold; cursor: pointer; }
+        .coach-foot { max-width: var(--widget-max); margin: 0 auto; font-size: 0.75rem;
+            color: var(--text-muted); text-align: center; line-height: 1.4; }
+        /* THE CONTEXT "?" (UI Wave 10). A LITERAL "?", not an emoji: the icon system's
+           rule is one concept one icon, 📖 already owns "the guide", and a text
+           character allocates no glyph a later feature could collide with. 44px,
+           because Wave 8b raised every target in this app to that. Same rule on all
+           three surfaces so the affordance reads identically wherever it appears. */
+        .tip-btn { box-sizing: border-box; min-width: 44px; min-height: 44px;
+            background: var(--nav-bg); color: var(--brand-green);
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; padding: 0; }
+        /* On a wizard step title the "?" sits on the same line as the label, pushed to
+           the far end so it never comes between the glyph, the label and the step
+           number - rattle_icon_system_test.js pins that run byte for byte. */
+        .wizard-step-title .tip-btn { float: right; margin-top: -6px; }
+        .coach-link.coach-link-new { color: #ffffff; background: var(--brand-green);
+            border-radius: 8px; text-decoration: none; }
 
         /* THE THREE PAIRED ROWS ARE ONE PATTERN NOW.
            Before this, the fix that made the game-code row work was scoped to
@@ -871,6 +918,22 @@ html {
             <div class="hw-name">Game Day</div>
             <div class="hw-desc">Set up today in seconds</div>
         </button>
+    </div>
+
+    <!-- THE SETUP COACH ENTRY (UI Wave 10). BESIDE THE TILES, which is the host's
+         own path. NOT beside the code row: that row is behind the collapsed "Open
+         something else" disclosure and it is the JOINER's path - a golfer typing a
+         code the organizer sent them has nothing to set up.
+         MEASURED, because Wave 7 cut this screen to one viewport and guards hold it
+         there: 48x169 inside a 320x48 block at left 35, +62px, lobby 506 -> 568 of
+         844. It MIRRORS #resume-container / .resume-link rather than inventing a
+         control, so the one-left-edge, one-width and 48px rules are inherited from a
+         shape that already passes them instead of argued with.
+         A third tiles cell cost +157px and orphaned a grid cell; a link inside the
+         lead sentence was an 18px tap target, which is the thing Wave 8b existed to
+         fix. Both measured, both rejected. -->
+    <div id="coach-container">
+        <a class="resume-link coach-link" id="coach-link" onclick="startSetupCoach(this)">&#129517; Help me set this up</a>
     </div>
 
     <div id="event-type-framing" class="lobby-framing" style="display:none;"></div>
@@ -1773,7 +1836,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">💰 Games &amp; Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span></div>
+        <div class="wizard-step-title">💰 Games &amp; Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the money options work" onclick="tipMoney()">?</button></div>
         <div class="wizard-step-sub">Choose the games and bets you're playing. Everything here is optional.</div>
         <!-- Three sections, in the order a group actually decides: the main match
              first, then anything stacked on top, then field-wide pools. -->
@@ -2049,6 +2112,32 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
      called. The client hides the door. Setup writes are the owner's uid -
      see HANDOFF.md. The organizer link opens these screens; it does not
      authorize the save. -->
+<!-- THE SETUP COACH (UI Wave 10). A FIFTH SIBLING CONTAINER, not an addition to
+     the lobby: #lobby-screen, #admin-screen, this, #setup-refused-screen and
+     #round-ready-screen are all switched by display, so the coach costs the
+     one-viewport setup screen nothing beyond its 62px entry link.
+     AND IT IS PLACED AFTER #admin-screen ON PURPOSE. widget_system_test.js slices
+     the lobby from #lobby-screen to `<div class="container" id="admin-screen"`;
+     a container between those two would be swallowed by that slice and every
+     inline style in here judged as lobby layout. Here, that guard needs no change.
+     It runs on the SAME PAGE LOAD as the wizard - the entry mints a code through
+     createRoom the way the Game Day tile does and arrives with ?coach=1 - so it
+     sets the wizard's own DOM directly and hands over. No new state, no new
+     Firebase shape. -->
+<div class="container" id="coach-screen" style="display: none;">
+    <div class="coach-head">
+        <div class="coach-kicker" id="coach-kicker">Setting up</div>
+        <div class="coach-q" id="coach-q"></div>
+        <div class="coach-sub" id="coach-sub"></div>
+    </div>
+    <div id="coach-options"></div>
+    <div class="coach-nav">
+        <button type="button" class="coach-nav-btn" id="coach-back" onclick="coachBack()">&#8592; Back</button>
+        <button type="button" class="coach-nav-btn" id="coach-skip" onclick="coachSkip()">Skip this</button>
+    </div>
+    <div class="coach-foot" id="coach-foot"></div>
+</div>
+
 <div class="container" id="setup-refused-screen" style="display: none;">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🔒</div>
@@ -4368,6 +4457,334 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         window.location.href = tournamentUrl('tournament.html');
     }
 
+    // THE MONEY STEP, EXPLAINED (UI Wave 10). Copy drawn from the guide's side-games
+    // and side-matches sections, plus the one rule a host most needs and the guide
+    // states only in its offline section.
+    // THE THIRD BULLET IS THE IMPORTANT ONE and it is why this tip exists at all:
+    // multiGroupMoneySuppressed() turns the main format's stake off at two groups or
+    // more, and nothing on this screen said so.
+    function tipMoney() {
+        if (typeof uiTip !== 'function') return;
+        const groups = (typeof currentGroupCount === 'function') ? currentGroupCount() : 1;
+        const bullets = [
+            'One pot (Weekly Game): a single buy-in split between closest-to-the-pin, net finishing places and a skins bucket.',
+            'Skins, the Birdie game and the Dot game run alongside whatever the main format is \u2014 they are not instead of it.',
+            'Side matches are separate: any two or four golfers, even in different groups, settled on their own.'
+        ];
+        if (groups > 1) {
+            bullets.push('With ' + groups + ' groups the app pays the pot and the side games, '
+                + 'not a single wager on the main game \u2014 so that option is not offered.');
+        }
+        bullets.push('A press, a KP or a new side match is refused outright while you are offline. Scores are not.');
+        uiTip({ title: '\uD83D\uDCB0 Games & Money', bullets: bullets });
+    }
+
+    // ==== SETUP COACH (UI Wave 10) ====================================
+    //
+    // WHY IT EXISTS, counted: a host setting up Marty's round - 25 golfers, six
+    // groups, A/B flights, a pot with KP, Net Finish and skins - meets 163 controls
+    // across seven wizard steps. (36 of those are the custom-course par grid behind
+    // a checkbox, so the real load is nearer 60; the corrected number is the one
+    // worth quoting.) The app can already SAVE that round -
+    // pool_flights_golden.fixture.json holds 23 golfers, 12 A / 11 B, $20 in, KP $40
+    // on four holes, Net $200 at 60/40 and per-flight skins, with engine tests behind
+    // it. What was missing was a path.
+    //
+    // SO THIS INVENTS NOTHING. It sets the same state loadModeData() sets and hands
+    // over. The DOM is the wizard's state; there is no second store to keep in sync.
+    //
+    // AND IT FINISHES ON REVIEW. The host presses Save. saveSettings() creates the
+    // round at events/<code> and navigates to Round Ready - a coach that called it
+    // would be spending somebody else's money decisions for them.
+    let coachRequested = false;
+    let coachStep = 0;
+    const coachAnswers = {};
+
+    // THE STEPS, in the app's own vocabulary. Every option maps to state the wizard
+    // already has; nothing here is a new setting. `apply` runs at the end, in
+    // loadModeData's order, not as each answer is tapped - flights re-render the
+    // roster and the pot counts rows, so order matters (see coachApply).
+    const COACH_STEPS = [
+        {
+            key: 'size',
+            q: 'How many golfers?',
+            sub: 'This decides whether the round is one card or several, and it is the '
+               + 'one thing the setup screen cannot ask you directly.',
+            options: [
+                { value: 'four', name: 'Four of us', sub: 'One group, one card.' },
+                { value: 'eight', name: 'Five to eight', sub: 'Two groups. Each keeps its own card.' },
+                { value: 'big', name: 'More than eight', sub: 'Several groups, split four to a group. You can move the boundaries after.' }
+            ]
+        },
+        {
+            key: 'flights',
+            q: 'Split them into flights?',
+            sub: 'Two flights let the low handicaps and the high handicaps win separately. '
+               + 'Most big games do; a foursome does not.',
+            options: [
+                { value: 'no', name: 'No flights', sub: 'Everybody in one pool.' },
+                { value: 'yes', name: 'A and B flights', sub: 'Skins run per flight; everything else is the whole field.' }
+            ]
+        },
+        {
+            key: 'format',
+            q: 'What are you playing?',
+            sub: 'The main game. You can add side bets on top of any of these.',
+            options: [
+                { value: 'stroke', name: 'Stroke Play', sub: 'Low total wins. The one most rounds start from.' },
+                { value: 'stableford', name: 'Stableford', sub: 'Points per hole.' },
+                { value: 'bestball', name: 'Best Ball', sub: 'Best team score counts.' },
+                { value: 'scramble', name: 'Scramble', sub: 'Play one team ball.' }
+            ]
+        },
+        {
+            key: 'money',
+            q: 'Playing for anything?',
+            // The options for this step are built at render time, because the honest
+            // menu depends on how many groups there are. See coachMoneyOptions().
+            sub: '',
+            dynamic: 'money'
+        },
+        {
+            key: 'handicaps',
+            q: 'Handicaps?',
+            sub: 'How the strokes come out. Either way you type one number per golfer.',
+            options: [
+                { value: 'ghin-index', name: 'GHIN index', sub: 'Type each index; the app works out course handicaps from the tee.' },
+                { value: 'as-entered', name: 'Straight handicaps', sub: 'Type the number you already play off.' },
+                { value: 'scratch', name: 'No handicaps', sub: 'Gross scores only.' }
+            ]
+        },
+        {
+            key: 'course',
+            q: 'Ready for the course?',
+            sub: 'The last two things are the course and the names, and both have their own '
+               + 'screens. Finish here and the round opens on its Review page with '
+               + 'everything you just chose already set.',
+            options: [
+                { value: 'go', name: 'Take me there', sub: 'Opens the round on Review.' }
+            ]
+        }
+    ];
+
+    // THE MONEY MENU DEPENDS ON THE GROUP COUNT, and this is the one branch that
+    // would have made the coach lie. multiGroupMoneySuppressed() turns the MAIN
+    // FORMAT's stake off at two groups or more, so on Marty's round a coach that
+    // offered "play the main game for money" would collect an answer the app then
+    // discards. On a multi-group round the honest menu is the pot, skins and the
+    // side games; the main-format wager is only offered when it will survive.
+    function coachMoneyOptions() {
+        const answered = coachAnswers.size;
+        const groups = (answered === 'four') ? 1
+            : (answered === 'eight') ? 2
+            : (answered === 'big') ? 6
+            : (typeof currentGroupCount === 'function' ? currentGroupCount() : 1);
+        const multi = groups > 1
+            || (typeof multiGroupMoneySuppressed === 'function' && multiGroupMoneySuppressed());
+        const out = [{ value: 'none', name: 'Nothing', sub: 'Just keeping score.' }];
+        if (!multi) {
+            out.push({ value: 'match', name: 'A bet on the round',
+                sub: 'The main game for money, plus presses.' });
+        }
+        out.push({ value: 'skins', name: 'Skins', sub: 'Low score on a hole wins that hole.' });
+        out.push({ value: 'pot', name: 'One pot',
+            sub: multi
+                ? 'A buy-in split between closest-to-the-pin, net finishing places and skins.'
+                : 'A buy-in split between KP, net places and skins.' });
+        return out;
+    }
+
+    function coachStepDef(i) {
+        const def = COACH_STEPS[i];
+        if (!def) return null;
+        if (def.dynamic === 'money') {
+            const multi = (coachAnswers.size === 'eight' || coachAnswers.size === 'big');
+            return Object.assign({}, def, {
+                options: coachMoneyOptions(),
+                sub: multi
+                    ? 'With more than one group the app pays the side games and the pot, not a '
+                      + 'single bet on the main game - so those are what it offers.'
+                    : 'Any of these can be changed on the money screen afterwards.'
+            });
+        }
+        return def;
+    }
+
+    function showCoachScreen() {
+        ['lobby-screen', 'admin-screen', 'round-ready-screen', 'setup-refused-screen']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        const c = document.getElementById('coach-screen');
+        if (c) c.style.display = 'block';
+        coachStep = 0;
+        renderCoachStep();
+    }
+
+    function renderCoachStep() {
+        const def = coachStepDef(coachStep);
+        if (!def) return coachFinish();
+        const q = document.getElementById('coach-q');
+        const sub = document.getElementById('coach-sub');
+        const kick = document.getElementById('coach-kicker');
+        const mount = document.getElementById('coach-options');
+        const foot = document.getElementById('coach-foot');
+        const back = document.getElementById('coach-back');
+        if (kick) kick.textContent = 'Step ' + (coachStep + 1) + ' of ' + COACH_STEPS.length;
+        if (q) q.textContent = def.q;
+        if (sub) sub.textContent = def.sub || '';
+        if (back) back.textContent = coachStep === 0 ? '← Home' : '← Back';
+        if (foot) {
+            foot.textContent = 'Nothing is saved until you press Save on the Review page. '
+                + 'Skip anything you would rather set yourself.';
+        }
+        if (!mount) return;
+        mount.innerHTML = '';
+        (def.options || []).forEach(opt => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'coach-opt' + (coachAnswers[def.key] === opt.value ? ' selected' : '');
+            b.setAttribute('data-coach-value', opt.value);
+            b.onclick = function () { coachChoose(opt.value); };
+            const n = document.createElement('div');
+            n.className = 'coach-opt-name';
+            n.textContent = opt.name;
+            const sb = document.createElement('div');
+            sb.className = 'coach-opt-sub';
+            sb.textContent = opt.sub || '';
+            b.appendChild(n);
+            b.appendChild(sb);
+            mount.appendChild(b);
+        });
+    }
+
+    function coachChoose(value) {
+        const def = coachStepDef(coachStep);
+        if (!def) return;
+        coachAnswers[def.key] = value;
+        coachNext();
+    }
+
+    function coachNext() {
+        if (coachStep >= COACH_STEPS.length - 1) return coachFinish();
+        coachStep += 1;
+        renderCoachStep();
+    }
+
+    function coachBack() {
+        if (coachStep === 0) { window.location.href = 'admin.html'; return; }
+        coachStep -= 1;
+        renderCoachStep();
+    }
+
+    // SKIP LEAVES THE ANSWER UNSET, which is not the same as answering "no". An
+    // unset key is simply not applied, so the wizard keeps its own default.
+    function coachSkip() {
+        const def = coachStepDef(coachStep);
+        if (def) delete coachAnswers[def.key];
+        coachNext();
+    }
+
+    // APPLIED IN loadModeData's ORDER, and the ordering is load-bearing:
+    // flights BEFORE the roster (setFlightsEnabled re-renders the whole player list)
+    // and the pot AFTER it (mpRecalc counts the rows on screen). Getting this wrong
+    // prices the wrong field, which is a wrong number rather than a wrong screen.
+    function coachApply() {
+        const A = coachAnswers;
+
+        // Format first - it decides which steps exist at all. Written the way
+        // loadModeData writes it: the hidden select plus handleFormatChange, NOT
+        // selectFormatCard, which would advance the step under the coach.
+        if (A.format) {
+            const sel = document.getElementById('game-format-select');
+            if (sel) sel.value = A.format;
+            if (typeof handleFormatChange === 'function') handleFormatChange();
+            if (typeof syncFormatCards === 'function') syncFormatCards();
+        }
+
+        // Handicap basis. 'scratch' is not a basis the app stores - it is
+        // as-entered with no numbers typed - so it resolves to that rather than
+        // inventing a third value the save would not understand.
+        if (A.handicaps) {
+            const hb = document.getElementById('handicap-basis-select');
+            if (hb) hb.value = (A.handicaps === 'ghin-index') ? 'ghin-index' : 'as-entered';
+        }
+
+        // Flights, through the setter. The hidden #flights-enabled input is the
+        // state, but its visible switch only moves through setFlightsEnabled - and a
+        // switch showing the opposite of the stored answer is copy that lies.
+        if (A.flights && typeof setFlightsEnabled === 'function') {
+            setFlightsEnabled(A.flights === 'yes');
+        }
+
+        // GROUP STRUCTURE - the gap nothing else fills. There is no "number of
+        // groups" control in the app: the count is derived from
+        // computeGroupSizes(n, overrides).length, the per-group -/+ clamps to 1..6,
+        // and renderGroupDividers() returns early on a single group. So "six groups"
+        // is a thing a host can want and cannot currently ask for. Written here the
+        // way adjustGroupSize writes it, with the same two refreshers.
+        if (A.size === 'eight' || A.size === 'big') {
+            const wanted = (A.size === 'eight') ? 2 : 6;
+            groupSizeOverrides = {};
+            for (let i = 0; i < wanted; i++) groupSizeOverrides[i] = 4;
+            if (typeof renderGroupDividers === 'function') renderGroupDividers();
+            if (typeof refreshMultiGroupMoneyRule === 'function') refreshMultiGroupMoneyRule();
+        }
+
+        // Money. The coach turns games ON and leaves the app's own default amounts
+        // in place; the amounts are the one thing a host always wants to see before
+        // agreeing to, and step 6 shows them on Review.
+        if (A.money === 'skins') {
+            if (typeof toggleStackedGame === 'function') toggleStackedGame('skins', true);
+        } else if (A.money === 'pot') {
+            const mp = document.getElementById('mp-enabled');
+            if (mp && !mp.checked) { mp.checked = true; if (typeof mpToggle === 'function') mpToggle(); }
+        } else if (A.money === 'match') {
+            const hb = document.getElementById('enable-hole-bet');
+            if (hb && !hb.checked) { hb.checked = true; if (typeof toggleHoleBet === 'function') toggleHoleBet(); }
+        }
+
+        // AFTER the roster work, because the pot counts the rows on screen.
+        if (typeof mpRecalc === 'function') mpRecalc();
+    }
+
+    function coachFinish() {
+        try {
+            coachApply();
+        } finally {
+            try { localStorage.setItem('golfapp_coach_seen', '1'); } catch (e) {}
+            const c = document.getElementById('coach-screen');
+            if (c) c.style.display = 'none';
+            const a = document.getElementById('admin-screen');
+            if (a) a.style.display = 'block';
+            // ON REVIEW, BY NAME. Never a literal 7: the workflow is format-first and
+            // steps are skippable - Ryder Cup has no money step at all - so a number
+            // would walk the host into a step their own format does not have.
+            if (typeof goToWizardStep === 'function' && typeof wizardStepNumber === 'function') {
+                goToWizardStep(wizardStepNumber('review'));
+            }
+        }
+    }
+
+    // THE ENTRY. It mints the round through createRoom, the same path the Game Day
+    // tile uses, so there is one way to create a round rather than two.
+    function startSetupCoach(pressedEl) {
+        coachRequested = true;
+        selectedEventType = 'quick';
+        createRoom(pressedEl || document.getElementById('coach-link'));
+    }
+
+    // FIRST RUN IS EMPHASIS, NOT A BLOCK. A phone that has never set a round up gets
+    // the link drawn filled; everybody else gets it underlined like Resume. It never
+    // opens itself - an experienced host is not interrupted.
+    function markCoachFirstRun() {
+        const link = document.getElementById('coach-link');
+        if (!link) return;
+        let seen = '1', last = '1';
+        try { seen = localStorage.getItem('golfapp_coach_seen'); } catch (e) { seen = '1'; }
+        try { last = localStorage.getItem('lastRoomCode'); } catch (e) { last = '1'; }
+        if (!seen && !last) link.classList.add('coach-link-new');
+    }
+    // ==== END SETUP COACH ============================================
+
     function selectHomeWidget(type) {
         // COMPATIBILITY BRANCH. The Tournament home tile is gone - organizing an event
         // is a different product - but an installed PWA can still be holding a cached
@@ -4460,6 +4877,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         try {
             const newCode = await issueUniqueCode({ db, root: 'events' });
             let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}`;
+            // UI Wave 10: the Setup Coach mints its round through this same path -
+            // one way to create a round, not two - and marks the arrival so the
+            // page opens the coach instead of the wizard.
+            if (coachRequested) dest += '&coach=1';
             if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
             // CARRIED, NOT DROPPED: trip.html's copy select sends ?trip&copyFrom to
             // this lobby, and the minted URL used to lose the copy. See the note
@@ -8544,6 +8965,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     renderWizardProgress();
     // Game Day lands here. The first thing a golfer sees is the format gallery.
     goToWizardStep(wizardFirstStep());
+
+    // THE COACH ARRIVAL (UI Wave 10). ?coach=1 is set by createRoom when the entry
+    // on the lobby minted this round, so the coach opens on the same page load as
+    // the wizard and can set its DOM directly. It is the FLAG that opens it, never
+    // the absence of a round: a normal arrival must never meet the coach, because
+    // "optional, never blocks" is the whole condition it ships under.
+    // AFTER goToWizardStep above, so the wizard is in a valid state underneath -
+    // coachFinish() only has to reveal it and jump to Review.
+    if (urlParams.get('coach') === '1') {
+        showCoachScreen();
+    }
+    markCoachFirstRun();
 
     // Step 3's sub-header reflects which entry card the organizer chose — Club Event nudges
     // toward common club formats, Quick Round keeps it plain. Every format card is still

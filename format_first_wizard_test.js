@@ -263,7 +263,15 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
 
     test('the Review jump is semantic, not the number seven', () => {
         assert.equal(run(wizard('stroke'), "wizardStepNumber('review')"), 7);
-        assert.equal((ADMIN.match(/goToWizardStep\(wizardStepNumber\('review'\)\)/g) || []).length, 2);
+        // RE-PINNED 2026-09-26 (UI Wave 10, was 2): the Setup Coach finishes by handing
+        // the host to Review, so there is a third semantic jump - coachFinish(). The
+        // count is incidental to what this test is about; the teeth are the two
+        // assertions around it, and both still hold. A coach that jumped to a LITERAL
+        // 7 would be caught by the line below AND by setup_coach_test.js, which
+        // asserts the coach block contains no goToWizardStep(<digits>) at all -
+        // Ryder Cup's workflow has no money step, so a number walks a host into a
+        // step their own format does not have.
+        assert.equal((ADMIN.match(/goToWizardStep\(wizardStepNumber\('review'\)\)/g) || []).length, 3);
         assert.ok(!ADMIN.includes('goToWizardStep(7)'), 'no hardcoded Review jump remains');
     });
 });

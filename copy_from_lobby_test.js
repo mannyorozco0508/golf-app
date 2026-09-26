@@ -176,7 +176,12 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         // the scorecard's Group Links panel) to let a second device into the wizard.
         // 'season' since v218: a round started from a season carries ?season= so Save
         // can attach the new event code. It is read here and nowhere else on this page.
-        assert.deepEqual([...new Set(reads)].sort(), ['copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
+        // 'coach' JOINED 2026-09-26 (UI Wave 10): the Setup Coach mints its round through
+        // createRoom like the Game Day tile does and marks the arrival with ?coach=1, so
+        // the page opens the coach instead of the wizard. It is the lobby's own param in
+        // exactly the sense this list means - chosen here, read on arrival, never a
+        // golfer's to type.
+        assert.deepEqual([...new Set(reads)].sort(), ['coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

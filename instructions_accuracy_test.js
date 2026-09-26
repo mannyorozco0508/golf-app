@@ -240,6 +240,66 @@ describe('A. EVERY NAMED THING THE GUIDE QUOTES EXISTS IN A REAL PAGE', () => {
             + 'comment is being treated as a real control');
     });
 
+    // A NAME EXISTING SOMEWHERE IS NOT THE SAME AS THE CONTROL EXISTING (UI Wave 10).
+    //
+    // THIS IS THE HOLE I FELL INTO MYSELF. The check below asks whether each quoted
+    // string appears ANYWHERE in ANY page. In Wave 8 I wrote, in the guide, that
+    // "each golfer's row has a Pay out control for marking them settled". It passed -
+    // because "Pay out" does exist on settlement.html, as the CARD HEADING
+    // (`settle-header po-head`). There is no per-row control and nothing in this app
+    // marks anybody paid: a row is a <details> that opens to show where the figure
+    // came from. I had reported that shallowness in the same wave's recon and then
+    // relied on it.
+    //
+    // So the shape of the CLAIM is now checked too, not just the existence of the
+    // word. If the guide says a name belongs to a row, a per-golfer control or an
+    // action, that name may not be satisfied by a heading alone.
+    const ROW_CLAIM = /\b(each|every)\b[^.]{0,80}\brow\b[^.]{0,120}?<strong>([^<]{2,40})<\/strong>[^.]{0,60}\bcontrol\b/i;
+
+    test('a HEADING cannot satisfy a claim about a per-row control', () => {
+        const markup = guideMarkup();
+        const m = ROW_CLAIM.exec(markup);
+        if (m) {
+            const name = m[2].trim();
+            // The name is claimed as a per-row control, so it must appear somewhere
+            // that is NOT just a section or card heading.
+            const headingOnly = HAYSTACK.every((h) => {
+                const idx = h.src.indexOf(name);
+                if (idx === -1) return true;
+                const before = h.src.slice(Math.max(0, idx - 90), idx);
+                return /settle-header|<h[1-4]|wizard-step-title|modal-header|class="i-name"/.test(before);
+            });
+            assert.ok(!headingOnly,
+                'the guide says each row has a "' + name + '" control, and the only place '
+                + 'that string appears in the app is a HEADING. That is how "a Pay out '
+                + 'control for marking them settled" shipped in v234 - the words existed, '
+                + 'the control never did.');
+        }
+        // POSITIVE, so this cannot pass by the regex quietly ceasing to match: the
+        // sentence that replaced it is present, and it does not re-invent the control.
+        const prose = markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        assert.match(prose, /Nothing on it marks anybody paid/,
+            'the corrected Payout sentence is gone from the guide');
+        // And the name is still THERE - dropping "Pay out" altogether was the first
+        // correction I made and it was also wrong: the card really is headed that, so a
+        // guide that never says so is no more accurate than one that oversold it.
+        assert.match(prose, /card headed\s+Pay out/,
+            'the guide no longer says what the card is called');
+        assert.ok(!/control for marking them settled/i.test(prose),
+            'the invented "marking them settled" control is back in the guide');
+    });
+
+    test('and the app really has no mark-settled action, which is why that sentence went', () => {
+        // Held against the page rather than against my memory of it. If settlement.html
+        // ever GAINS such a control, this fails and the guide gets to describe it.
+        const settle = read('settlement.html');
+        const claims = [/markSettled/, /mark-paid/, /markPaid/, /mark as paid/i, /\bpaidAt\b/];
+        const found = claims.filter((re) => re.test(settle)).map(String);
+        assert.deepEqual(found, [],
+            'settlement.html now has a mark-settled path (' + found.join(', ') + ') - the '
+            + 'guide should say so, and this test should be replaced by one that checks it');
+    });
+
     test('no control the guide names is missing from the app', () => {
         const missing = quotedUiStrings().concat(namedInProseActuallyUsed())
             .filter((s) => existsSomewhere(s).length === 0);

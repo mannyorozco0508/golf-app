@@ -2374,7 +2374,72 @@
 // product cache is consumer-v77-no-card-attendance. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file;
 // this wave does not archive or upload.
-const CACHE_VERSION = 'golfapp-v236-no-card-attendance';
+// Moved to v237 because A HOST CAN BE WALKED THROUGH SETUP, EVERY SCREEN CAN EXPLAIN
+// ITSELF, AND THE MATCHES TAB IS FOR SIDE BETS. A device on v236 keeps a setup screen
+// with no guided path, three screens with nothing to ask, and a Ryder Cup builder in
+// front of every side bet. admin.html, index.html, settlement.html, sidematches.html,
+// instructions.html and ui-dialogs.js.
+//
+// THE SETUP COACH. Counted: a host setting up Marty's round - 25 golfers, six groups,
+// A/B flights, a pot with KP, Net Finish and skins - meets 163 controls across seven
+// wizard steps. (36 of those are the custom-course par grid behind a checkbox, so the
+// real load is nearer 60; the corrected figure is the one worth quoting.) The app
+// could already SAVE that round - pool_flights_golden.fixture.json holds 23 golfers,
+// 12 A / 11 B, $20 in, KP $40 on four holes, Net $200 at 60/40 and per-flight skins,
+// with engine tests behind it. What was missing was a path.
+//
+// SO THE COACH INVENTS NOTHING. It sets the state loadModeData() sets and hands over.
+// Entry is a 48x169 link inside a 320x48 block at left 35, beside the tiles - the
+// HOST's path, not the code row behind "Open something else", which is the joiner's.
+// +62px, lobby 506 -> 568 of 844, mirroring #resume-container so the one-left-edge,
+// one-width and 48px rules are inherited rather than argued with. A third tiles cell
+// cost +157px and orphaned a grid cell; a link in the lead sentence was an 18px tap
+// target. Both measured, both rejected.
+//
+// TWO THINGS IT HAD TO GET RIGHT. It never hardcodes a step number - the workflow is
+// format-first and Ryder Cup has no money step at all, so a literal 7 would walk a
+// host into a step their format does not have. And it does NOT offer main-format money
+// on a multi-group round, because multiGroupMoneySuppressed() turns that stake off at
+// two groups or more: asking and discarding the answer is the defect class CLAUDE.md
+// records twice. That second one is asserted BEHAVIOURALLY after a control proved the
+// source scan inert - naming a predicate is not obeying it.
+//
+// AND IT FILLS A REAL GAP, not just a friendlier wrapper: there is no "number of
+// groups" control in this app. The count is derived, the per-group -/+ clamps to 1..6,
+// and the divider UI does not render at all on a single group. "Six groups" was a
+// thing a host could want and could not ask for.
+//
+// THE "?" SHEETS. A seventh function in ui-dialogs.js - uiTip - because there was no
+// informational variant and uiConfirm draws two buttons and a promise a tip has no use
+// for. Bullets cost nothing: .ui-sheet-body was already white-space: pre-line. A
+// LITERAL "?" and not an emoji, at 44px: the icon system's rule is one concept one
+// icon, and a text character allocates no glyph a later feature could collide with.
+// On the Players sheet, the money step and the Pay out card. settlement.html loads
+// ui-dialogs.js for the first time - its CONVERTED entry already expected it.
+//
+// THE MATCHES TAB. The Ryder Cup builder is GATED, not deleted, and then FOLDED rather
+// than hidden - which is a correction to the first version of this gate. Emptying the
+// mount read correctly and broke a documented capability: ryder-cup.js says a Cup is a
+// LAYER, not a format, so a Stroke Play round can be Session 2 of one, and the only
+// route to that is this tab WITHOUT ?setup=ryder. Fourteen tests across five suites
+// said so. So on a plain arrival the same card sits behind one closed 44px row; with
+// ?setup=ryder, an existing Cup or a ryderCupRef it is straight in front of the
+// organizer. Nothing was deleted - renderRyderCupSetup exists in this file only, and
+// the wizard's Ryder Cup format card navigates here to use it.
+//
+// AND THE WAVE 8 SENTENCE IS FIXED. The guide claimed each golfer's row had a "Pay out
+// control for marking them settled". No such control exists: "Pay out" is the card
+// HEADING and a row is a disclosure. It passed v234's own guard because that guard
+// asks only whether a name exists somewhere - a shallowness I reported in that wave's
+// recon and then relied on. The guard now refuses a heading as evidence for a
+// per-row control claim, and a control proves it fires.
+//
+// No engine and no protected file changed. settlement-engine.js and action-model.js
+// were READ for the parked 9 Points work and not touched. The consumer product cache
+// is consumer-v78-coach. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and ALREADY SUBMITTED; this wave is web/Cap only, for a
+// later store build, and does not archive, upload or reopen 1.0.4.
+const CACHE_VERSION = 'golfapp-v237-coach';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
