@@ -2439,7 +2439,65 @@
 // is consumer-v78-coach. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and ALREADY SUBMITTED; this wave is web/Cap only, for a
 // later store build, and does not archive, upload or reopen 1.0.4.
-const CACHE_VERSION = 'golfapp-v237-coach';
+// Moved to v238 because 9 POINTS (Nines / 5-3-1) IS A WAGER YOU CAN ACTUALLY MAKE.
+// A device on v237 has no way to record it. sidematches.html, action-model.js,
+// settlement-engine.js and bet-strip.js.
+//
+// THE GAME: nine points on every hole between exactly THREE golfers, all nine always
+// allocated - 5-3-1 with no ties, 5-2-2 when two tie behind the low, 4-4-1 when two
+// tie for the low, 3-3-3 when all three tie. So the three totals always sum to
+// 9 x holes and even play is 54 each over 18. That invariant is what makes the money
+// zero-sum with no reconciliation.
+//
+// IT IS NOT A SIDE MATCH, AND THAT WAS THE RECON'S MAIN FINDING. Every side match is
+// teamAIds/teamBIds and every settlement path for one is zero-sum between TWO sides;
+// settlement-engine.js hands anything that is not format 'stroke' to
+// calculateMatchEngine, so a three-player entry in that node would have been settled
+// by a two-sided engine SILENTLY. Making it safe there would have needed guards in
+// bet-strip.js, hole-events.js and money-engine.js - three more protected files.
+//
+// SO IT IS AN additionalGameInstances ENTRY, the shape action-model.js already calls
+// "independent wagers with their own id, participants, stake and range". The decisive
+// property: getRoundGames gates on isAdditionalGameFormat, so an instance with
+// format 'nines' was SKIPPED by every consumer until the catalog knew the format -
+// the store shape could land before anything understood it, and the 100+ files that
+// read sideMatches are untouched by construction.
+//
+// THE MONEY IS AGAINST THE FIELD: net = rate x (points - mean). Pairwise would be
+// EXACTLY three times that for three players - rate x SUM_j (P_i - P_j) is
+// rate x 3 x (P_i - mean) - same winner, same ordering, three times the money. So it
+// is a rate choice, and $1 pairwise on an 8-point spread would be $24.
+//
+// AND IT NEVER ROUNDS, WHICH WAS MEASURED BEFORE THE BRANCH WAS WRITTEN. The ledger
+// rounds ONCE, at roundNetTotalsToWholeDollars, which keeps `exact` in cents beside a
+// whole-dollar `netByName` and reconciles against a target - verified by running both
+// settlement modes through computeCombinedNetTotals. Points sum to 9H so the mean is
+// an integer, so (points - mean) is an integer, and at the offered rates (0.25, 0.50,
+// 1.00) rate x integer is exactly representable: zero-sum came back EXACT over 20,000
+// random rounds per rate. Rounding inside the branch would change the math rather
+// than the presentation.
+//
+// THREE PLAYERS, ENFORCED TWICE. The picker names the count it refuses
+// ("you have picked 2"), and computeNinePointsNet settles nothing unless
+// fieldParticipants gives exactly three - provable with the picker out of the loop,
+// which is what CLAUDE.md asks of a backup guard.
+//
+// THE PICKER IS THE EXISTING ONE, not a third. Skins and Dots created from the Action
+// screen already use a participant picker with 44px targets that selects N golfers
+// without splitting them into sides; 9 Points is the third game in that family. The
+// two-sided TAP-SPLITTER is untouched - it builds every 1v1 and 2v2 on that screen.
+//
+// A GOLFER CAN SEE IT WHILE PLAYING. One branch in gameStatusLine, mirroring the
+// stableford branch: buildActionRows DISCARDS any row with an empty status, and
+// without it a 'nines' game fell through to buildBetStrip, found no two-sided shape,
+// and vanished until the Receipt. hole-events.js is deliberately NOT in this wave, so
+// there is no per-hole recap line yet; that is logged.
+//
+// No new storage concept, no new Firebase shape, and no golden moved. The consumer
+// product cache is consumer-v79-nine-points. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
+// wave is web/Cap only and does not archive, upload or reopen 1.0.4.
+const CACHE_VERSION = 'golfapp-v238-nine-points';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

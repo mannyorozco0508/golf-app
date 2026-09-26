@@ -452,6 +452,7 @@ html {
                 <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
                 <option value="skins">Skins (pick who's in)</option>
                 <option value="dots">Dots / Junk (everyone playing)</option>
+                <option value="nines">9 Points (three golfers, 5-3-1)</option>
             </select>
             <p id="sm-format-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
         </div>
@@ -1146,7 +1147,12 @@ html {
     // whole field, so both hide the Side 1 / Side 2 picker and the two-sided controls
     // (stake per side, press rule) that make no sense for them. Each wager type shows
     // only the settings it actually has - the app should feel like golf, not a form.
-    function isFieldAction(format) { return format === 'skins' || format === 'dots'; }
+    // 9 Points joined the participant-scoped family in UI Wave 11. It is NOT a side
+    // match: it is three independent totals settling against their own mean, and the
+    // side-match schema is two-sided all the way down. Written as an
+    // additionalGameInstances entry, exactly as Skins and Dots from this screen are,
+    // so settlement, Live Action and the Receipt pick it up with no new money code.
+    function isFieldAction(format) { return format === 'skins' || format === 'dots' || format === 'nines'; }
 
     function toggleSmAutoPressAmount() {
         const mode = document.getElementById('sm-autopress-mode');
@@ -1253,6 +1259,33 @@ html {
         const el = document.getElementById(id);
         if (el) el.value = String(val);
         renderFieldActionForm(document.getElementById('sm-format').value);
+    }
+
+    // WHO THE PICKER HAS, for 9 Points. The same fieldActionPick the Skins and Dots
+    // picker writes - one picker for every participant-scoped game, 44px targets and
+    // all. The two-sided TAP-SPLITTER (sidematchSides) is NOT involved and is NOT
+    // modified: it derives two sides from tap order and builds every 1v1 and 2v2 on
+    // this screen, and widening it would change all of them.
+    function npChosen(players) {
+        return Object.keys(fieldActionPick).filter(id => (players || []).some(p => String(p.id) === id));
+    }
+
+    // THE FRIENDLY HALF OF THE THREE-PLAYER RULE. It names the count, the way the
+    // side-match guard does, rather than returning silently - this is the surface where
+    // a silent return has already cost a round.
+    function npCommit(players) {
+        const chosen = npChosen(players);
+        if (chosen.length !== 3) {
+            uiRefuse(`\u26A0\uFE0F 9 Points is played by exactly three golfers \u2014 you have picked ${chosen.length}.`);
+            return false;
+        }
+        if (typeof canCreateWagerWith === 'function' && !canCreateWagerWith(chosen)) {
+            console.warn('Blocked: 9 Points outside this link\u2019s group.');
+            uiRefuse('\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so it can only start '
+                + 'a 9 Points game for Group ' + lockedGroup + '.');
+            return false;
+        }
+        return true;
     }
 
     function renderFieldActionForm(format) {
@@ -1849,6 +1882,13 @@ html {
             return;
         }
 
+        // EXACTLY THREE, AND SAID OUT LOUD. 9 Points allocates nine points between three
+        // golfers; there is no two-player or four-player table for it, and the foursome
+        // 5-3-1-0 variant with quarter-point ties is a different game that is logged and
+        // not built. The engine refuses a non-three wager as well (computeNinePointsNet),
+        // so this is the friendly half of a rule that is enforced twice.
+        if (format === 'nines' && !npCommit(players)) return;
+
         const entry = { format: format, enabled: true, startHole: startHole, createdAt: Date.now() };
 
         // OWNERSHIP METADATA.
@@ -1917,6 +1957,14 @@ html {
             if (isMultiGroupRound() || chosenD.length < players.length) {
                 entry.participantIds = chosenD;
             }
+        }
+
+        if (format === 'nines') {
+            // The picker's three, and the rate. The stake field IS the rate - dollars
+            // per point - which is what the catalog's stakeField names.
+            entry.participantIds = npChosen(players);
+            entry.ninePointsRate = stake;
+            entry.scoring = 'net';
         }
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;

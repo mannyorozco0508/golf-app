@@ -68,6 +68,34 @@ const ADDITIONAL_GAME_CATALOG = {
         stakeLabel: 'Per dot',
         defaults: { dotPointVal: 2 }
     },
+    // 9 POINTS (Nines / 5-3-1) — UI Wave 11. Nine points every hole between exactly
+    // THREE golfers: 5-3-1 with no ties, 5-2-2 when two tie behind the low, 4-4-1 when
+    // two tie for the low, 3-3-3 when all three tie. All nine are always allocated, so
+    // the three totals always sum to 9 x holes and even play is 54 each over 18.
+    //
+    // IT IS AN INSTANCE, NOT A FORMAT, AND NOT A SIDE MATCH. Every side match is
+    // teamAIds/teamBIds and every settlement path for one is zero-sum between two
+    // sides - settlement-engine.js hands anything that is not format 'stroke' to
+    // calculateMatchEngine, so a three-player entry in that node would be settled by a
+    // two-sided engine, silently. An instance already carries its own participants and
+    // reaches settlement, the Receipt, the Bets rows and Round Ready through one path.
+    //
+    // 9️⃣ is its own glyph, checked against every consumer page and against this file
+    // before it was chosen. The keycap reads as the game's name rather than as a
+    // category, which is the one-concept-one-icon rule doing its job.
+    //
+    // THE STAKE IS A RATE - dollars per point, settled against the field mean, so a
+    // golfer's net is rate x (their points - 54 on a full round). Pairwise settlement
+    // would be exactly three times this for three players: same winner, same order,
+    // three times the money.
+    nines: {
+        label: '9 Points',
+        icon: '9\ufe0f\u20e3',
+        blurb: 'Nine points a hole between three golfers — 5-3-1, ties split.',
+        stakeField: 'ninePointsRate',
+        stakeLabel: 'Per point',
+        defaults: { ninePointsRate: 0.5, scoring: 'net' }
+    },
     stableford: {
         label: 'Stableford',
         icon: '\uD83C\uDFAF',

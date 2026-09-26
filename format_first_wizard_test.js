@@ -518,7 +518,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': 'f8905d438fe945c40d0a02989e1c0033058f7224175f952660476e8a4fc58bed',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
+        'settlement-engine.js': 'b5e22550d5d958b1b7ee22e9bd1b206cf32f32d29b9bea108e97be0d9d795379',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
@@ -569,7 +569,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // yet (the same file pins zero production callers), so every existing
         // caller runs exactly what it ran. flights_absent_golden_test.js is
         // what guards the behaviour; this hash only proves nothing else moved.
-        'action-model.js': 'ded862809c049a156008d12e783cc3fdf4ec39a5a40babe13740e79f0ce275f2',
+        'action-model.js': 'e44bd672ec71460b8c4c9c80130cc4e4592830342d8f5d11926f066c471a1138',   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was ded86280): approved per-file, ONE new descriptor - the 'nines' entry in ADDITIONAL_GAME_CATALOG (label, its own 9-keycap glyph, blurb, stakeField ninePointsRate, defaults). No function changed and no arithmetic entered the file: the catalog key is what makes getRoundGames stop SKIPPING the instance, and every consumer downstream then receives it through the path skins and dots already use.
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the
@@ -619,7 +619,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // skinsState runs its own walk once per flight slice and merges (awards carry their flight, `flights` holds each flight's state); skinsStatus prefixes each flight's clause. One null slice is the walk that always ran.
         // flights_live_surfaces_test.js pins the behaviour; the flightless golden
         // (flights_absent_golden_test.js) pins that nothing else moved.
-        'bet-strip.js': '43880a617d7230f15553ffdf778dc15c1b67423b3d2d5ff04a943469694b145a',
+        'bet-strip.js': '000156db542c22d9ef8eb7193f0d6c791126276de51dd8b9c1be893fd637e9be',   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was 43880a61): approved per-file, ONE branch in gameStatusLine mirroring the stableford branch - the leader's short name and their points. Without it buildActionRows drops the row (it discards any row with an empty status) and a 'nines' game falls through to buildBetStrip, which reads a two-sided match shape, finds none, and returns not-eligible - so the wager would have appeared for the first time on the Receipt. No money is computed here: the points come from settlement-engine's own tie table.
         // Previous hash, for the record:
         //   bb759cb19c7eb66365fd6b746568de8e016813bbfce4fd34725794b9775d2def
         // RE-PINNED 2026-09-13 (flights wave, Wave 2 Step 5), per-file approval:

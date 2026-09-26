@@ -429,6 +429,41 @@ function gameStatusLine(game, holes, scores, players) {
         return { text: `${shortName(leader.player.name)} ${leader.value} dot${leader.value === 1 ? '' : 's'}`, tone: 'up' };
     }
 
+    // 9 POINTS (UI Wave 11). MIRRORS THE STABLEFORD BRANCH ABOVE, deliberately: a
+    // points game's live line is the leader and their total, and two wordings for the
+    // same idea is how they drift apart.
+    //
+    // WITHOUT THIS BRANCH THE WAGER SHIPS INVISIBLE, and that is why it is here rather
+    // than left for later. buildActionRows drops any row whose status is empty, and a
+    // 'nines' game with no branch falls through to buildBetStrip - which reads a
+    // two-sided match shape, finds none, and returns not-eligible. The golfer would
+    // have played a wager that appeared for the first time on the Receipt.
+    if (format === 'nines') {
+        // POINTS, NOT MONEY. computeNinePointsNet is the settler and converts to
+        // dollars; a live row wants the standing, so the points are counted here from
+        // the same table and the same allocation.
+        const totals = {};
+        (players || []).forEach(p => { totals[p.id] = 0; });
+        (holes || []).forEach(h => {
+            const nets = (players || []).map(p => {
+                const raw = scores['p' + p.id + '_h' + h.hole];
+                const gross = Number(raw);
+                if (!raw || !isFinite(gross) || gross <= 0) return null;
+                const strokes = (typeof getStrokes === 'function')
+                    ? getStrokes(h.hcpIndex, (typeof parseHcp === 'function') ? parseHcp(p.hcp) : Number(p.hcp) || 0)
+                    : 0;
+                return gross - strokes;
+            });
+            if (nets.some(n => n === null)) return;
+            const pts = (typeof ninePointsForHole === 'function') ? ninePointsForHole(nets) : null;
+            if (!pts) return;
+            (players || []).forEach((p, i) => { totals[p.id] += pts[i]; });
+        });
+        const leader = topBy(players, p => totals[p.id] || 0);
+        if (!leader || leader.value === 0) return { text: 'No points yet', tone: 'idle' };
+        return { text: `${shortName(leader.player.name)} ${leader.value} pts`, tone: 'up' };
+    }
+
     if (format === 'stableford') {
         const calc = calcStablefordEngine(cfg, holes, scores);
         const leader = topBy(players, p => calc.totals[p.id] || 0);

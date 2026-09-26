@@ -432,6 +432,93 @@
         return { t1Name, t2Name, t1Points, t2Points, holeLog };
     }
 
+    // ========================================================================
+    // 9 POINTS (Nines / 5-3-1) — UI Wave 11
+    //
+    // Nine points on every hole, between exactly THREE golfers, and all nine are
+    // always allocated:
+    //     no ties            low 5 · middle 3 · high 1
+    //     one low, two tie   5-2-2
+    //     two tie for low    4-4-1
+    //     all three tie      3-3-3
+    // So the three totals always sum to 9 x holes, and even play is 54 each over 18.
+    // That invariant is what makes the money zero-sum without any reconciliation.
+    //
+    // THE TABLE IS DATA, NOT FOUR BRANCHES. Written as ranked shares and handed out
+    // by rank, with tied ranks splitting their combined share evenly - which produces
+    // all four rows above from one rule instead of four, and cannot disagree with
+    // itself. 5-2-2 is (3+1)/2 = 2 each; 4-4-1 is (5+3)/2 = 4 each; 3-3-3 is
+    // (5+3+1)/3 = 3 each.
+    function ninePointsForHole(nets) {
+        if (!Array.isArray(nets) || nets.length !== 3) return null;
+        if (nets.some(n => typeof n !== 'number' || !isFinite(n))) return null;
+        const RANKED = [5, 3, 1];
+        const sorted = nets.slice().sort((a, b) => a - b);
+        return nets.map(n => {
+            const ranks = [];
+            sorted.forEach((v, i) => { if (v === n) ranks.push(i); });
+            const share = ranks.reduce((sum, i) => sum + RANKED[i], 0) / ranks.length;
+            return share;
+        });
+    }
+
+    // Settles ONE 9 Points wager and returns { playerId: net }.
+    //
+    // NET, FROM THE ROUND'S OWN ALLOCATION. No handicap math lives here: the strokes
+    // come from the same place every other engine gets them, so a 9 Points hole and a
+    // Skins hole can never disagree about what a golfer actually scored.
+    //
+    // AGAINST THE FIELD: net = rate x (points - mean). For three players, settling
+    // pairwise instead would be EXACTLY three times this - rate x SUM_j (P_i - P_j)
+    // is rate x 3 x (P_i - mean) - so it is the same winner and the same ordering at
+    // three times the money, which makes it a rate choice rather than a second game.
+    //
+    // AND IT NEVER ROUNDS. Measured before this was written: the ledger rounds ONCE,
+    // at roundNetTotalsToWholeDollars, which keeps `exact` in cents beside a
+    // whole-dollar `netByName` and reconciles against a target. Rounding here would
+    // change the math rather than the presentation. Points sum to 9H, so the mean is
+    // an integer, so (points - mean) is an integer - and at the offered rates (0.25,
+    // 0.50, 1.00) rate x integer is exactly representable in binary floating point.
+    //
+    // THREE PLAYERS, CHECKED HERE TOO. The picker refuses anything else, and so does
+    // this: a wager that is not between three golfers settles nothing rather than
+    // guessing which three were meant. That second check is provable with the picker
+    // out of the loop, which is what CLAUDE.md asks of a backup guard.
+    function computeNinePointsNet(data, courseData, savedScores) {
+        const out = {};
+        const players = (typeof fieldParticipants === 'function')
+            ? fieldParticipants(data)
+            : (data.players || []).filter(p => p.playingForMoney !== false);
+        if (players.length !== 3) return out;
+
+        const rate = Number(data.ninePointsRate) || 0;
+        const holes = courseData || [];
+        const totals = {};
+        players.forEach(p => { totals[p.id] = 0; });
+
+        holes.forEach(h => {
+            const nets = players.map(p => {
+                const raw = savedScores['p' + p.id + '_h' + h.hole];
+                const gross = Number(raw);
+                if (!raw || !isFinite(gross) || gross <= 0) return null;
+                // The round's own allocation, unchanged. getStrokes is handicap.js's.
+                const strokes = (typeof getStrokes === 'function')
+                    ? getStrokes(h.hcpIndex, (typeof parseHcp === 'function') ? parseHcp(p.hcp) : Number(p.hcp) || 0)
+                    : 0;
+                return gross - strokes;
+            });
+            if (nets.some(n => n === null)) return;      // a blank hole scores nobody
+            const pts = ninePointsForHole(nets);
+            if (!pts) return;
+            players.forEach((p, i) => { totals[p.id] += pts[i]; });
+        });
+
+        const sum = players.reduce((acc, p) => acc + totals[p.id], 0);
+        const mean = sum / players.length;
+        players.forEach(p => { out[p.id] = rate * (totals[p.id] - mean); });
+        return out;
+    }
+
     function computeHiLoSettlementNet(data, courseData, savedScores) {
         const allPlayers = (data.players || []).filter(p => p.playingForMoney !== false);
         const holeBet = data.holeBetStake || 0;
@@ -724,6 +811,9 @@
         }
         if (game.format === 'hilo') {
             return computeHiLoSettlementNet(cfg, holes, savedScores);
+        }
+        if (game.format === 'nines') {
+            return computeNinePointsNet(cfg, holes, savedScores);
         }
 
         // THE WAGER'S OWN FIELD, not the round's.

@@ -304,8 +304,8 @@ describe('THE SEAMS', () => {
         assert.match(fn, /Still in play/);
         ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPayoutCardHtml(', 'buildNetViewHtml(', 'Pay out', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
     });
-    test('settlement-engine.js moved for KP-never-refunds (sha f8905d43; was 9043e7fc for the KP wave, 42923121 at v148)', () => {
-        assert.equal(sha8('settlement-engine.js'), 'f8905d43');   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
+    test('settlement-engine.js moved for KP-never-refunds (sha b5e22550, was f8905d43; before that 9043e7fc for the KP wave, 42923121 at v148)', () => {
+        assert.equal(sha8('settlement-engine.js'), 'b5e22550');   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was f8905d43): approved per-file, ONE settlement branch - ninePointsForHole (the tie table as ranked shares) plus computeNinePointsNet, and one dispatch line beside skins and hilo in computeGameNetByPlayerId. No existing arithmetic moved: handicap strokes come from handicap.js getStrokes unchanged, and nothing rounds - the ledger still rounds exactly once at roundNetTotalsToWholeDollars. nine_points_test.js pins the four tie cases, the nine-a-hole invariant, zero-sum over 1,200 rounds, three-places-agree and never-touches-the-other-pots.   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)
     });
     test('HANDOFF no longer says the Receipt decides Final from computeMoneyPool alone', () => {
         const h = read('HANDOFF.md');
