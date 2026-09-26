@@ -1262,8 +1262,12 @@
         .golfer-out, .golfer-out .fc-name, .golfer-out .hv-player-name { opacity: 0.55; text-decoration: line-through; }
         .modal-content { background: var(--modal-bg); border-radius: 12px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; color: var(--text-main); }
         /* THE CONTEXT "?" (UI Wave 10). A LITERAL "?", not an emoji: the icon system's
-           standing rule is one concept one icon, 📖 already owns "the guide", and a
-           text character allocates no glyph that a later feature could collide with.
+           standing rule is one concept one icon, the guide already owns a glyph of its
+           own (🧭 since Wave 15b; 📖 before that, which is why this note used to name
+           it), and a text character allocates no glyph that a later feature could
+           collide with. That is also why ❓ was NOT chosen for the guide pill: it would
+           have put the same mark on this per-field affordance and on the whole-app
+           guide, which is the collision Wave 15b exists to remove.
            44px, because Wave 8b raised every target in this app to that and the
            nearest existing small pill (.ps-add) is 32. Same rule on all three
            surfaces so the affordance reads identically wherever it appears. */
@@ -1364,7 +1368,7 @@ html {
         <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
-        <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">📖</span><span class="tni-label">How it works</span></a>
+        <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
     </div>
     </div>
 
@@ -1519,9 +1523,9 @@ html {
          width, height and left edge as both of them.
          An <a>, not a button with an onclick: see .save-exit-box a.btn-primary. -->
     <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
-        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">📖 How it works</h3>
+        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🧭 How it works</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Every screen in the app, explained — including what your group link does and what it does not.</span>
-        <a class="btn-primary" style="margin-top: 0;" href="instructions.html">📖 How it works</a>
+        <a class="btn-primary" style="margin-top: 0;" href="instructions.html">🧭 How it works</a>
     </div>
 
     <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.

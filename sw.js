@@ -2704,7 +2704,40 @@
 // consumer-v82-onenav. The tournament product cache stays tournament-v54-rattle-golf. iOS
 // is at 1.0.4 build 2 and already submitted; this wave is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v241-onenav';
+// Moved to v242 TO GIVE THE GUIDE ITS OWN GLYPH. A device on v241 has 📖 twice in the
+// nav bar - once for Game and once for How it works, side by side in the same nine-pill
+// row - which reads as a mistake rather than as a system. The guide now owns 🧭 on every
+// route to it: the pill on all eight pages, index.html's bottom-of-card card from Wave
+// 8b (heading and link), and the guide's own <h1>. Game keeps 📖.
+//
+// WHY NOT ❓, WHICH IS THE OBVIOUS ONE. This app already uses exactly that mark for
+// exactly that purpose: the Wave 10 context tips are 44px round buttons whose label is a
+// LITERAL "?" text character, chosen so that no glyph was allocated and nothing could
+// collide with it later (tip_sheets_test.js asserts the plain "?" and records the
+// reason). A ❓ pill would have put one mark on a per-field affordance and on the
+// whole-app guide - the same collision this bump removes, moved one step sideways. 💡 is
+// that problem one step weaker, since those tip sheets ARE tips. ℹ️ was free and would
+// have worked; 🧭 was chosen over it because at 13px inside a green pill the blue ℹ️
+// square reads as a badge rather than a destination. All four candidates were verified
+// unused across every consumer page, raw and \uXXXX-escaped, before choosing.
+//
+// THE STATED EXCEPTION BECAME A REAL ALLOCATION. v241 carried a comment in
+// rattle_icon_system_test.js recording the duplicate and allowing it. Two assertions
+// replace it: the nine nav glyphs must be NINE DISTINCT glyphs, and every route to the
+// guide must carry the guide's glyph while none of them carries Game's. The second half
+// is what would have caught the original collision - each pill was correct in isolation,
+// and only the pair was wrong.
+//
+// Three comments in the repo said "📖 already owns the guide" (index.html, admin.html,
+// tip_sheets_test.js). All three are corrected rather than left to mislead: 📖 owns Game,
+// 🧭 owns the guide, and the "?" still allocates nothing.
+//
+// No engine and no protected file changed, and the bar's geometry is untouched - a glyph
+// swap inside the same span, 9 pills, two rows, 139px. The consumer product cache is
+// consumer-v83-guideglyph. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v242-guideglyph';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
