@@ -128,9 +128,39 @@
         .theme-toggle-btn { background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 16px; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; cursor: pointer; white-space: nowrap; display: block; margin: 0 auto 16px auto; }
         
         /* Top Navigation Bar */
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        /* ---- THE STRIP WRAPS; IT DOES NOT SLIDE (Wave 14) ----------------------
+           It used to be `overflow-x: auto` with `flex-wrap` unset, `scrollbar-width:
+           none` and a ::-webkit-scrollbar { display: none } beside it - a horizontal
+           scroller with the scrollbar suppressed. Measured at 390px: the bar was 326px
+           wide with a scrollWidth of 542, so 216px of pills were hidden with nothing on
+           screen to say so, and setting scrollLeft moved the pills 1:1. A thumb
+           brushing it while scrolling the page slid it and nothing snapped it back;
+           two screenshots seconds apart showed the strip in different positions.
+
+           THE SAME BUG WAS FIXED ON SEVEN PAGES ON 2026-09-14 and this page was missed.
+           index.html's comment describes it in the past tense and claims "all eight
+           pages are pills in the bar"; admin.html kept the scroller it was describing.
+           nav_bar_test.js could not catch it because its PAGES list omits admin.html,
+           which its own describe title states outright.
+
+           AFTER: 326px wide, scrollWidth 326, nothing hidden, nothing off screen.
+           It costs height instead - the pills wrap - and that is the trade index.html
+           already made. admin_nav_bar_test.js measures it.
+
+           STILL AN EXCEPTION IN ONE WAY: this bar carries eleven pills with long labels
+           (Scorecard/Leaderboard, plus Season and the guide route) where the other seven
+           carry eight short ones. Making it identical is a separate decision and is
+           logged, because two of those links have nowhere else to go. */
+        .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
+        /* min-height ADDED (Wave 14), and it was never here. index.html's pill rule has
+           carried it since the bar was rebuilt; admin.html's did not, so a pill sized to
+           its own text. Measured: every pill with an emoji came out 40px from the glyph's
+           line box, and the two WITHOUT one - "⋯ More" and "Season" - came out 34px. A
+           pre-existing tap target under the 44px line this app holds everywhere else,
+           found by the new guard rather than by the drift.
+           flex: 0 0 auto is LEFT ALONE: index.html's pills grow to fill their row, and
+           changing that is the shape question parked as Option B. */
+        .top-nav-item { flex: 0 0 auto; min-height: 40px; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
@@ -3364,6 +3394,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
+            // HOME CARRIES NOTHING (Wave 14). Every other pill stays inside the round;
+            // Home is the one that LEAVES it, and appending the round to it broke it.
+            //
+            // Measured with a real tap, one parameter apart on the same round:
+            //     ?game=X          index.html -> admin.html                 lands
+            //     ?game=X&group=1  index.html -> admin.html -> index.html   bounces
+            // admin.html's redirectGroupScorekeeper sees game AND group at parse and
+            // location.replace()s to the scorecard - correctly, because that is exactly
+            // the case it exists to catch: a group scorekeeper who reached setup. It
+            // cannot tell that apart from a deliberate Home tap, and it should not have
+            // to. Because it uses replace there is no history entry, so it read as
+            // "nothing happened" while the page reloaded and the browser restored the
+            // scroll position - down among the score boxes.
+            //
+            // So Home goes where its label says, and where "Save & Return to Home" on
+            // the scorecard has always gone: a bare admin.html, the lobby.
+            if (base === 'admin.html') { link.href = base; return; }
             let navHref = base + '?game=' + currentMode;
             const groupParam = urlParams.get('group');
             if (groupParam) navHref += '&group=' + groupParam;

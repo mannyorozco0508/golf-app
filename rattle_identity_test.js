@@ -250,7 +250,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v239-extras';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v240-nav';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -575,8 +575,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v239-extras';/);
-        assert.match(BUILD, /cacheName: 'consumer-v80-extras'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v240-nav';/);
+        assert.match(BUILD, /cacheName: 'consumer-v81-nav'/);
         assert.match(BUILD, /cacheName: 'tournament-v54-rattle-golf'/,
             'Tournament cache moved because the product name is Rattle Golf again');
     });

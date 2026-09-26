@@ -517,6 +517,23 @@ html {
         document.getElementById('main-content').style.display = 'block';
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
+            // HOME CARRIES NOTHING (Wave 14). Every other pill stays inside the round;
+            // Home is the one that LEAVES it, and appending the round to it broke it.
+            //
+            // Measured with a real tap, one parameter apart on the same round:
+            //     ?game=X          index.html -> admin.html                 lands
+            //     ?game=X&group=1  index.html -> admin.html -> index.html   bounces
+            // admin.html's redirectGroupScorekeeper sees game AND group at parse and
+            // location.replace()s to the scorecard - correctly, because that is exactly
+            // the case it exists to catch: a group scorekeeper who reached setup. It
+            // cannot tell that apart from a deliberate Home tap, and it should not have
+            // to. Because it uses replace there is no history entry, so it read as
+            // "nothing happened" while the page reloaded and the browser restored the
+            // scroll position - down among the score boxes.
+            //
+            // So Home goes where its label says, and where "Save & Return to Home" on
+            // the scorecard has always gone: a bare admin.html, the lobby.
+            if (base === 'admin.html') { link.href = base; return; }
             let navHref = base + '?game=' + currentMode;
             const groupParam = urlParams.get('group');
             if (groupParam) navHref += '&group=' + groupParam;

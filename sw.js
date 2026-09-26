@@ -2571,7 +2571,82 @@
 // The consumer product cache is consumer-v80-extras. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this wave is
 // web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v239-extras';
+// Moved to v240 for TWO NAV DEFECTS, one wave, two changes. A device on v239 has a tab
+// strip on the setup screen that slides under a thumb, and a 🏠 Home pill that cannot
+// leave a round on a group link - on any of seven pages.
+//
+// 1. THE STRIP WRAPS; IT DOES NOT SLIDE. admin.html's bar was `overflow-x: auto` with
+// flex-wrap unset, `scrollbar-width: none` and a ::-webkit-scrollbar { display: none }
+// beside it - a horizontal scroller with the scrollbar suppressed. Measured at 390x844:
+// 326px wide against a scrollWidth of 542, so 216px of pills were hidden with nothing on
+// screen to say so, eight of the eleven pills ended past the right edge, and setting
+// scrollLeft = 200 moved the first pill exactly 200px. Not sticky, not fixed, no
+// transform - ruled out by measurement, which is what made the overflow finding worth
+// acting on.
+//
+// THIS SAME BUG WAS FIXED ON SEVEN PAGES ON 2026-09-14 AND THIS PAGE WAS MISSED.
+// index.html's own comment describes it in the past tense - "the scrollbar was hidden,
+// so Scorecard showed, Leaderboard was clipped and Bets and Results were entirely off
+// screen with nothing hinting they existed" - and claims "all eight pages are pills in
+// the bar". admin.html kept the scroller that comment was describing. A sweep found every
+// other page with a bar had been migrated, admin.html alone had not.
+//
+// AND nav_bar_test.js COULD NOT HAVE CAUGHT IT. It asserts exactly the right things -
+// the bar must not scroll sideways, overflow-x must not be auto - on SIX pages, and its
+// PAGES list omits admin.html. The exclusion is written into a describe title: "the six
+// pages carry the same bar; admin.html and tournament.html are left alone". A correct
+// guard scoped around the one page with the defect. admin_nav_bar_test.js now covers it,
+// deliberately NARROW: it proves the strip cannot slide, nothing clips and every pill is
+// a thumb target, and it does NOT assert the eight-pill shape.
+//
+// A PRE-EXISTING TAP TARGET CAME OUT WITH IT. admin.html's .top-nav-item never carried
+// min-height, where index.html's has since the bar was rebuilt - so a pill sized to its
+// own text. Every pill with an emoji came to 40px from the glyph's line box; the two
+// WITHOUT one, "⋯ More" and "Season", came to 34px. Found by the new guard, not by the
+// drift.
+//
+// 2. 🏠 HOME LEAVES THE ROUND. It never was an in-page scroll: the pill is a plain
+// anchor with no target, no onclick and no preventDefault. It was a ROUND TRIP, measured
+// with a real tap on one round, one parameter apart:
+//     bare link   ?game=X          index.html -> admin.html                 LANDS
+//     group link  ?game=X&group=1  index.html -> admin.html -> index.html   BOUNCES
+// The nav rewriter appended ?game=&group= to EVERY .nav-link, so Home became
+// admin.html?game=X&group=1; admin.html's redirectGroupScorekeeper then saw both params
+// at parse, concluded a group scorekeeper had reached setup - exactly what it exists to
+// catch - and location.replace'd back to the scorecard. No history entry, so it read as
+// "nothing happened" while the page reloaded and the browser restored the scroll
+// position, which on a scorecard is down among the score boxes.
+//
+// THE REDIRECT IS NOT TOUCHED. It is a real safety rule and it cannot tell a deliberate
+// Home tap from the case it guards. Home simply stops carrying the round: it goes to a
+// bare admin.html, the lobby - where its label says, and where "Save & Return to Home"
+// on the scorecard has always gone. One line in each of eight rewriters, which are
+// byte-identical copies of the same five lines.
+//
+// IT WAS NEVER JUST THE SCORECARD. All seven in-round pages carry Home as a .nav-link
+// and all seven run that rewriter, so on a group link a golfer could not leave the round
+// from the nav bar on any of them. Over four golfers everyone gets a group link, so this
+// was the common case, not an edge.
+//
+// AND AN EXISTING GUARD ASSERTED THE CAUSE: nav_bar_test.js required every nav href to
+// end in ?game=...&group=..., Home included. Re-pointed to exempt Home with the reason
+// inline. The guard that matters now is home_pill_test.js, which TAPS Home on all seven
+// pages on a group link and asserts where the browser ENDS UP - an href that looks right
+// is not a tap that lands. Its fixture is a FOURSOME, because on a bare link to a
+// multi-group round the group picker covers the bar at z-index 999 and, once answered,
+// converts the bare link into a group link.
+//
+// PARKED, NOT FORGOTTEN: making admin.html's bar identical to the other seven (eight
+// short-labelled pills, no More menu). Two of its links have nowhere else to go - the
+// 📖 How it works route that guide_coverage_test.js depends on, and Season - so it is a
+// product decision rather than a CSS one. stats.html is migrated but also absent from
+// nav_bar_test.js's PAGES, so it is currently correct and unguarded.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v81-nav. The tournament product cache stays tournament-v54-rattle-golf. iOS
+// is at 1.0.4 build 2 and already submitted; this wave is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v240-nav';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

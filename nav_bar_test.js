@@ -95,10 +95,28 @@ PAGES.forEach(pg => {
             assert.ok(others.every(o => o.bg !== active[0].bg), 'the active fill differs from every other pill');
             assert.notEqual(active[0].color, others[0].color, 'and its ink is different');
         });
-        test('every link but Trip carries the game code and the group', () => {
+        test('every link but Trip and Home carries the game code and the group', () => {
+            // HOME EXEMPTED 2026-09-26 (Wave 14), and this assertion is why the defect
+            // survived: it REQUIRED the parameter that broke Home. With
+            // ?game=X&group=1 on it, a tap went index.html -> admin.html and
+            // admin.html's redirectGroupScorekeeper - seeing game AND group, which is
+            // precisely the case it guards - location.replace'd straight back to the
+            // scorecard. A golfer on a group link could not leave the round from the
+            // nav bar on any of the seven pages, and this line said that was correct.
+            //
+            // Home now carries nothing, like Trip: it is the pill that LEAVES the round,
+            // so it goes to the bare lobby - the same place "Save & Return to Home" on
+            // the scorecard has always gone. home_pill_test.js TAPS it on every page and
+            // asserts where the browser ends up, which is the assertion this one could
+            // never be: an href that looks right is not a tap that lands.
             const v = S[pg];
             v.items.forEach(i => {
                 if (i.href.startsWith('trip.html')) { assert.equal(i.navLink, false); assert.equal(i.href, 'trip.html'); return; }
+                if (i.href.split('?')[0] === 'admin.html') {
+                    assert.equal(i.href, 'admin.html',
+                        'Home must carry no round: ' + i.href);
+                    return;
+                }
                 assert.equal(i.navLink, true, i.label);
                 assert.match(i.href, /\?game=NAVBAR&group=1$/, i.label + ': ' + i.href);
             });
