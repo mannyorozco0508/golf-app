@@ -42,6 +42,12 @@ const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 
 const PAGE = process.argv[2] || 'index.html';
 const ARM = process.argv[3] || 'pool';
+// The two answers' treatments, read while the block is still the question.
+const ANSWERS = `JSON.stringify([].slice.call(document.querySelectorAll('.kp-answers .kp-btn')).map(function (b) {
+    var cs = getComputedStyle(b), r = b.getBoundingClientRect();
+    return { text: (b.innerText || '').trim(), bg: cs.backgroundColor, color: cs.color,
+             border: cs.borderTopWidth + ' ' + cs.borderTopColor, h: Math.round(r.height), w: Math.round(r.width) };
+}))`;
 
 const PAR3 = [3, 7, 12, 16];
 const CD = [];
@@ -99,11 +105,21 @@ const MEASURE = `
     // THE PICKER'S CONTROLS, when open: computed type size and box of each, so a
     // legibility change is a number before and after, not an adjective.
     picker: (() => {
-      if (!block || !block.querySelector('.kp-select')) return null;
+      // .kp-names since Wave 16: the select became the group's names as buttons, one tap
+      // each. Gating on the element that is gone would make this whole section read null
+      // and the check would report "no picker" on a page whose picker is open.
+      if (!block || !block.querySelector('.kp-names')) return null;
       const one = (sel) => { const el = block.querySelector(sel); if (!el) return null; const cs = getComputedStyle(el); const r = el.getBoundingClientRect();
         return { fontPx: parseFloat(cs.fontSize), h: Math.round(r.height), w: Math.round(r.width), top: Math.round(r.top + sy), pad: cs.paddingLeft + '/' + cs.paddingTop, border: cs.borderTopWidth + ' ' + cs.borderTopColor, radius: cs.borderTopLeftRadius, weight: cs.fontWeight, text: (el.innerText || el.value || el.placeholder || '').split(/\\s+/).join(' ').trim().slice(0, 40) }; };
       const n = ((heading && heading.querySelector('.hv-hole-num')) ? heading.querySelector('.hv-hole-num').innerText : '').replace('Hole', '').trim();
-      return { select: one('.kp-select'), ft: one('#kp-ft-' + n), inch: one('#kp-in-' + n), distLabel: one('.kp-dist-label'), save: one('.kp-btn'), cancel: one('.kp-cancel'), head: one('.kp-head'), current: one('.kp-current'), options: block.querySelector('.kp-select').options.length };
+      const names = [].slice.call(block.querySelectorAll('.kp-name'));
+      return { firstName: one('.kp-names .kp-name'), ft: one('#kp-ft-' + n), inch: one('#kp-in-' + n), distLabel: one('.kp-dist-label'), cancel: one('.kp-cancel'), head: one('.kp-head'), current: one('.kp-current'),
+        options: names.length,
+        // two to a row, measured rather than assumed from the grid declaration
+        nameRows: new Set(names.map((b) => Math.round(b.getBoundingClientRect().top))).size,
+        names: names.map((b) => { const r = b.getBoundingClientRect(); const cs = getComputedStyle(b);
+          return { text: (b.innerText || '').trim().slice(0, 24), fontPx: parseFloat(cs.fontSize), h: Math.round(r.height), w: Math.round(r.width),
+            overflows: b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1 }; }) };
     })(),
     // THE STACK under the nav row: every element child of the hole card from the
     // row down, and the first child of each mount, so "what moved down" is read
@@ -136,7 +152,10 @@ function bail(msg) {
         rounds: ROUNDS, settleMs: 3500,
         viewport: { width: 390, height: 844 },
         steps: [
-            ...(ARM === 'picker' ? [{ tap: '.kp-yes' }, { sleep: 300 }] : []),   // picker arm: open it with a real tap on "Yes — pick who" (v193)
+            // The two answers only exist BEFORE the tap, so their weights are read first.
+            // Reading them after would have measured an empty list and reported nothing,
+            // which is an assertion that cannot fail.
+            ...(ARM === 'picker' ? [{ expression: ANSWERS }, { tap: '.kp-yes' }, { sleep: 300 }] : []),   // picker arm: open it with a real tap on "Yes — pick who" (v193)
             { expression: MEASURE },                                  // arrival: hole 7, a KP hole (picker arm: open)
             { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 400 },   // Next -> hole 8, not a KP hole; landOnHole scrolls
             { expression: MEASURE },
@@ -147,8 +166,9 @@ function bail(msg) {
     if (!r.ok) bail(r.reason);
     // Each sleep step pushes its own line; the entries are read by position (the
     // picker arm's two opening lines first).
-    const vals = ARM === 'picker' ? r.value.slice(2) : r.value;
-    if (ARM === 'picker' && !/^tapped/.test(String(r.value[0]))) bail('Yes — pick who was not pressed: ' + r.value[0]);
+    const vals = ARM === 'picker' ? r.value.slice(3) : r.value;
+    const answersBefore = ARM === 'picker' ? JSON.parse(String(r.value[0])) : [];
+    if (ARM === 'picker' && !/^tapped/.test(String(r.value[1]))) bail('Yes — pick who was not pressed: ' + r.value[1]);
     const [arrive, tapNext, , h8, tapPrev, , h7] = vals;
     if (typeof tapNext !== 'string' || !/^tapped/.test(tapNext)) bail('Next was not pressed: ' + tapNext);
     if (typeof tapPrev !== 'string' || !/^tapped/.test(tapPrev)) bail('Prev was not pressed: ' + tapPrev);
@@ -178,8 +198,25 @@ function bail(msg) {
     if (h8.heading.viewportTop !== h7.heading.viewportTop)
         problems.push('the landing differs between hole 8 (' + h8.heading.viewportTop + ') and hole 7 (' + h7.heading.viewportTop + ')');
     if (ARM === 'picker') {
-        if (!arrive.picker || !arrive.picker.select) problems.push('picker arm: the tap did not open the select');
-        else if (arrive.picker.options !== 5) problems.push('picker arm: expected 5 options (prompt + four golfers), got ' + arrive.picker.options);
+        // Wave 16: the picker is the group's names as buttons, one tap each. FOUR of them,
+        // not five - the "Who is closest?" placeholder went with the select, and so did
+        // the Save step that followed it.
+        if (!arrive.picker || !arrive.picker.firstName) problems.push('picker arm: the tap did not open the name buttons');
+        else {
+            if (arrive.picker.options !== 4) problems.push('picker arm: expected 4 names (the group), got ' + arrive.picker.options);
+            if (arrive.picker.nameRows !== 2) problems.push('picker arm: expected the names two to a row, got ' + arrive.picker.nameRows + ' row(s)');
+            const small = (arrive.picker.names || []).filter((n) => n.fontPx < 17 || n.h < 44);
+            if (small.length) problems.push('picker arm: a name is under 17px type or 44px tall: ' + JSON.stringify(small));
+            const over = (arrive.picker.names || []).filter((n) => n.overflows);
+            if (over.length) problems.push('picker arm: a name overflows its button: ' + over.map((n) => n.text).join(', '));
+        }
+        // the two answers carry the SAME treatment (Wave 16); a difference here is the
+        // weight drifting apart again. Read before the tap - see the steps.
+        const a = answersBefore;
+        if (a.length !== 2) problems.push('picker arm: expected two answers before the tap, got ' + a.length);
+        else if (a[0].bg !== a[1].bg || a[0].color !== a[1].color || a[0].border !== a[1].border)
+            problems.push('picker arm: the two answers are not equal weight: ' + JSON.stringify(a));
+        else if (a.some((b) => b.h < 44)) problems.push('picker arm: an answer is under 44px: ' + JSON.stringify(a));
     }
     if (ARM === 'dots') {
         if (!arrive.dotsKpLine) problems.push('dots arm: no Dots KP line on the par 3');

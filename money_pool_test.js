@@ -718,7 +718,7 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         // RE-PINNED 2026-09-19: the block moved to #kp-entry-mount under the Prev/Next row.
         const html = sb.document.getElementById('kp-entry-mount').innerHTML;
         assert.match(html, /Hole 14 — Closest to the Pin/);   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
-        assert.match(html, /Did anyone in your group get inside it\?/); assert.match(html, /Yes — pick who/);
+        assert.match(html, /Did anyone get the KP in your group\?/); assert.match(html, /Yes — pick who/);   // Wave 16 wording
 
         vm.runInContext(`savePoolKp(14, '${String(P[4].id)}');`, sb);
         await new Promise(r => setImmediate(r));
@@ -741,7 +741,9 @@ describe('RENDERED SURFACES — the pool a golfer actually sees', () => {
         assert.equal(bootIndex(1, 7).document.getElementById('kp-entry-mount').innerHTML, '', 'nothing on a non-KP hole');
         const spec = bootIndex(null, 14).document.getElementById('kp-entry-mount').innerHTML;
         assert.match(spec, /Hole 14 — Closest to the Pin/, 'a spectator still SEES the marker');   // re-pinned 2026-09-22 (v193): the block is the question - kp_prompt_test.js
-        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-select/.test(spec),
+        // kp-names, not kp-select: Wave 16 replaced the select with one-tap name buttons,
+        // and a token that no longer exists anywhere would make this negative inert.
+        assert.ok(!/Did anyone|Yes — pick who|No — leave it|Change KP|kp-names/.test(spec),
             'but is offered no way to claim it');
     });
 

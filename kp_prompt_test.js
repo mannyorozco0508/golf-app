@@ -7,15 +7,34 @@
 // IS the question:
 //     ⛳ Hole 7 — Closest to the Pin
 //     Current KP: Marty (Group 3) — 8' 4"        or   No KP yet.
-//     Did anyone in your group get inside it?
+//     Did anyone get the KP in your group?
 //     [ No — leave it ]  [ Yes — pick who ]
 // It is EMPHASISED (kp-ask-now) the moment every golfer in this group has a
 // score on the hole - renderKpEntryMount runs on every snapshot, so the last
 // score lights it. On arriving at the hole unanswered it shows quietly. "No"
-// writes nothing and answers for this phone; "Yes" opens the picker and Save
+// writes nothing and answers for this phone; "Yes" opens the picker and the save
 // goes through saveKpLeader UNCHANGED (kpLeaders/hN + kpWinners/hN, one
 // update; a later group's save replaces both - last write wins, by design,
 // no transaction this wave). After an answer, "Change KP" reopens the picker.
+//
+// WAVE 16 CHANGED THREE THINGS AND NOTHING ELSE:
+//  1. THE WORDING. "Did anyone in your group get inside it?" became "Did anyone get
+//     the KP in your group?" - Manny's words. "inside it" asked a golfer to compare
+//     against a marker the sentence never named.
+//  2. ONE FEWER STEP. "Yes" used to reveal a <select> ("Who is closest?") that had to
+//     be opened, changed, and then Saved - three interactions after the tap. It now
+//     opens the group's names as BUTTONS, two to a row, and ONE TAP records it.
+//     pickKpLeader(hole, id) replaces submitKpEntry(hole); saveKpLeader is untouched,
+//     and the optional ft/in boxes still ride along - they sit above the names and are
+//     read at the tap. There is no "nothing picked" state left to refuse, which is why
+//     the old empty-pick assertion moved rather than stayed.
+//  3. EQUAL BUTTON WEIGHT. "Yes — pick who" was the filled brand-green button and
+//     "No — leave it" the outline one, on a hole where most answers are No. Measured
+//     against the block's own background, the filled button was 9.16:1 and the outline
+//     1.08:1 - the rarer answer was 8.5x more prominent than the common one. Both are
+//     outline now, in ONE rule naming both classes so they cannot drift apart, and the
+//     block's kp-ask-now border keeps the job of saying "answer me now". The filled
+//     treatment moves to the name buttons, where a tap really does write money.
 // A spectator sees the current KP and nothing to tap. pool-engine.js is not
 // touched: what is written is what it always read.
 //
@@ -76,7 +95,8 @@ describe('THE QUESTION on a KP hole', () => {
         const h = mount(boot(round(), 7, 1));
         assert.match(h, /<div class="kp-block kp-ask"><div class="kp-head">⛳ Hole 7 — Closest to the Pin<\/div>/);
         assert.match(h, /<div class="kp-current kp-none">No KP yet\.<\/div>/);
-        assert.match(h, /<div class="kp-question">Did anyone in your group get inside it\?<\/div>/);
+        assert.match(h, /<div class="kp-question">Did anyone get the KP in your group\?<\/div>/);
+        assert.doesNotMatch(h, /inside it/, 'Wave 16: the old wording is gone');
         assert.match(h, /<button class="kp-btn kp-no" onclick="answerKpNo\(7\)">No — leave it<\/button>/);
         assert.match(h, /<button class="kp-btn kp-yes" onclick="toggleKpEntry\(7\)">Yes — pick who<\/button>/);
         assert.doesNotMatch(h, /kp-ask-now/, 'CONTROL: the group has not finished the hole - not lit');
@@ -85,7 +105,7 @@ describe('THE QUESTION on a KP hole', () => {
     test('the current KP is named with the group and the distance: "Current KP: Gus (Group 2) — 8\' 4""', () => {
         const h = mount(boot(round({ leader: LEADER }), 7, 1));
         assert.match(h, /<div class="kp-current">Current KP: <strong>Gus<\/strong> \(Group 2\) — 8' 4"<\/div>/);
-        assert.match(h, /Did anyone in your group get inside it\?/, 'a later group is still asked');
+        assert.match(h, /Did anyone get the KP in your group\?/, 'a later group is still asked');
     });
     test('the group is read LIVE, not off the kpLeaders stamp: a golfer moved to another group (v199) reads his NEW group (CONTROL: the stamp still says the old one)', () => {
         // saveKpLeader stamps the group the recorder was in. The Players sheet can
@@ -110,7 +130,7 @@ describe('THE QUESTION on a KP hole', () => {
     test('LIT when every golfer in the group has a score on the hole - not before (CONTROL: three of four)', () => {
         const three = mount(boot(round({ holeSevenFor: [101, 102, 103] }), 7, 1));
         assert.doesNotMatch(three, /kp-ask-now/);
-        assert.match(three, /Did anyone in your group/);
+        assert.match(three, /Did anyone get the KP/);
         const four = mount(boot(round({ holeSevenFor: [101, 102, 103, 104] }), 7, 1));
         assert.match(four, /<div class="kp-block kp-ask kp-ask-now">/);
         // the other group's scores do not light THIS group's question
@@ -141,16 +161,25 @@ describe('THE ANSWERS', () => {
         run(sb, 'currentViewedHole = 12; renderKpEntryMount()');
         assert.match(mount(sb), /Hole 12 — Closest to the Pin[\s\S]*Did anyone/);
     });
-    test('"Yes — pick who": the picker with THIS group\'s golfers only; Save writes both keys through saveKpLeader; the block re-renders the new KP; answered', async () => {
+    test('"Yes — pick who": THIS group\'s names as buttons; ONE TAP writes both keys through saveKpLeader; the block re-renders the new KP; answered', async () => {
         const sb = boot(round({ leader: LEADER }), 7, 1);
         run(sb, 'toggleKpEntry(7)');
         const p = mount(sb);
-        assert.match(p, /<select id="kp-pick-7" class="kp-select">/);
-        ['Ann', 'Ben', 'Cal', 'Dee'].forEach(n => assert.match(p, new RegExp('<option value="\\d+">' + n + '</option>')));
-        ['Eli', 'Fay', 'Gus', 'Hal'].forEach(n => assert.doesNotMatch(p, new RegExp('<option value="\\d+">' + n + '</option>'), 'CONTROL: not the other group'));
-        assert.match(p, /Save KP/); assert.match(p, /onclick="cancelKpEntry\(7\)">Cancel/);
+        // WAVE 16: buttons, not a <select> that must be opened and then Saved.
+        assert.match(p, /<div class="kp-names">/);
+        ['Ann', 'Ben', 'Cal', 'Dee'].forEach(n => assert.match(p,
+            new RegExp('<button class="kp-btn kp-name" onclick="pickKpLeader\\(7, \'\\d+\'\\)">' + n + '</button>'),
+            n + ' is not a one-tap name button'));
+        ['Eli', 'Fay', 'Gus', 'Hal'].forEach(n => assert.doesNotMatch(p,
+            new RegExp('kp-name[^>]*>' + n + '<'), 'CONTROL: not the other group'));
+        assert.doesNotMatch(p, /<select|kp-select|kp-pick-7|Save KP/,
+            'the select-and-Save picker is gone, and with it the step this wave cut');
+        assert.match(p, /onclick="cancelKpEntry\(7\)">Cancel/);
         assert.doesNotMatch(p, /Did anyone/);
-        run(sb, "document.getElementById('kp-pick-7').value = '102'; document.getElementById('kp-ft-7').value = '6'; document.getElementById('kp-in-7').value = '2'; submitKpEntry(7)");
+        // the optional ft/in still ride along, above the names, read AT the tap
+        assert.match(p, /id="kp-ft-7"/); assert.match(p, /id="kp-in-7"/);
+        assert.ok(p.indexOf('kp-dist-row') < p.indexOf('kp-names'), 'distance sits above the names');
+        run(sb, "document.getElementById('kp-ft-7').value = '6'; document.getElementById('kp-in-7').value = '2'; pickKpLeader(7, '102')");
         await tick(); await tick();
         const w = writes(sb);
         assert.equal(w.length, 1); assert.equal(w[0].path, 'events/KPQ1');
@@ -166,7 +195,7 @@ describe('THE ANSWERS', () => {
     });
     test('a LATER group replaces the leader: Gus (Group 2) was KP, group 1 saves Ben - both keys move; last write wins', async () => {
         const sb = boot(round({ leader: LEADER }), 7, 1);
-        run(sb, "toggleKpEntry(7); document.getElementById('kp-pick-7').value = '102'; submitKpEntry(7)");
+        run(sb, "toggleKpEntry(7); pickKpLeader(7, '102')");
         await tick(); await tick();
         assert.equal(writes(sb)[0].value['kpWinners/h7'], '102', 'was 107');
         assert.equal(writes(sb)[0].value['kpLeaders/h7'].playerName, 'Ben');
@@ -175,28 +204,37 @@ describe('THE ANSWERS', () => {
         const sb = boot(round(), 7, 1);
         run(sb, 'toggleKpEntry(7); cancelKpEntry(7)');
         assert.deepEqual(writes(sb), []);
-        assert.match(mount(sb), /Change KP/); assert.doesNotMatch(mount(sb), /Did anyone|kp-select/);
+        assert.match(mount(sb), /Change KP/); assert.doesNotMatch(mount(sb), /Did anyone|kp-names/);
     });
     test('"Change KP" reopens the picker after a No; a save then replaces the answer', async () => {
         const sb = boot(round({ leader: LEADER }), 7, 1);
         run(sb, 'answerKpNo(7)');
         run(sb, 'toggleKpEntry(7)');
-        assert.match(mount(sb), /kp-pick-7/);
-        run(sb, "document.getElementById('kp-pick-7').value = '103'; submitKpEntry(7)");
+        assert.match(mount(sb), /kp-name/);
+        run(sb, "pickKpLeader(7, '103')");
         await tick(); await tick();
         assert.equal(writes(sb)[0].value['kpWinners/h7'], '103');
     });
-    test('an empty pick: the alert, nothing written, still not answered', () => {
+    test('there is no empty pick to refuse any more - but an id that is not this group\'s is still refused', () => {
+        // RE-POINTED IN WAVE 16. This used to set the select to '' and assert the
+        // "Pick the golfer who is closest." refusal. That state cannot happen now: every
+        // name is its own button carrying its own id, so there is nothing to leave blank
+        // and the placeholder option is gone. Deleting the test would have dropped the
+        // real claim underneath it - that the picker cannot write a golfer it should not -
+        // so it now asserts THAT, which the select could never be made to do by hand.
         const sb = boot(round(), 7, 1);
-        run(sb, "toggleKpEntry(7); document.getElementById('kp-pick-7').value = ''; submitKpEntry(7)");
-        assert.deepEqual(writes(sb), []);
-        assert.equal(run(sb, 'window.__alerts[0]'), 'Pick the golfer who is closest.');
-        assert.equal(run(sb, "sessionStorage.getItem('kpAsked:KPQ1:h7')"), null);
+        run(sb, "toggleKpEntry(7); pickKpLeader(7, '')");
+        assert.deepEqual(writes(sb), [], 'an empty id writes nothing');
+        assert.equal(run(sb, "sessionStorage.getItem('kpAsked:KPQ1:h7')"), null, 'and does not count as an answer');
+        // Gus is in group 2; this phone is locked to group 1.
+        run(sb, "pickKpLeader(7, '107')");
+        assert.deepEqual(writes(sb), [], 'another group\'s golfer writes nothing');
+        assert.equal(run(sb, 'window.__alerts.length') > 0, true, 'and it says so rather than failing silently');
     });
     test('a single-group round on the bare link (the organizer\'s foursome): the question, all four to pick from', () => {
         const d = round(); d.players = d.players.slice(0, 4); delete d.groupSizeOverrides;
         const h = mount(boot(d, 7));
-        assert.match(h, /Did anyone in your group get inside it\?/);
+        assert.match(h, /Did anyone get the KP in your group\?/);
     });
 });
 
@@ -219,12 +257,18 @@ describe('THE SEAMS', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CHROME, cold arrival, 390x844: the page renders the question itself on hole
-// 7 (a KP hole) for group 1's link; ONE REAL TAP on "Yes — pick who" opens the
-// picker; the golfer is chosen the way a golfer chooses (the select's value);
-// a real tap on Save KP writes the one update the page has always written; the
-// snapshot that comes back re-renders the block as "Current KP: Ben (Group 1)".
-// No page function is called.
+// CHROME, cold arrival, 390x844: the page renders the question itself on hole 7 (a KP
+// hole) for group 1's link; ONE REAL TAP on "Yes — pick who" opens the picker; ONE REAL
+// TAP on a name writes the one update the page has always written; the snapshot that
+// comes back re-renders the block as "Current KP: Ben (Group 1)". No page function is
+// called.
+//
+// THIS IS THE TEST THAT PROVES WAVE 16'S CLAIM, and it is why the step count is asserted
+// as a number. Before: tap Yes, open the select, choose, tap Save KP - three
+// interactions after Yes, one of them on a native picker a test cannot tap at all (the
+// old version of this block had to set the select's .value by script, which is exactly
+// the gap CLAUDE.md warns about: it proved the save worked when invoked, not that a
+// golfer could reach it). Now every step is a real tap, and there are two.
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 describe('CHROME: a real tap on Yes, a pick, a real tap on Save', () => {
     const data = round({ holeSevenFor: [101, 102, 103, 104] });
@@ -239,8 +283,10 @@ describe('CHROME: a real tap on Yes, a pick, a real tap on Save', () => {
             { expression: "'T0:' + " + TEXT },
             { tap: '.kp-yes', nth: 0 }, { sleep: 250 },
             { expression: "'T1:' + " + TEXT },
-            { expression: "(function () { var s = document.getElementById('kp-pick-7'); s.value = '102'; return 'PICK:' + s.value; })()" },
-            { tap: '.kp-block .kp-btn', nth: 0 }, { sleep: 400 },
+            { expression: "'NAMES:' + [].slice.call(document.querySelectorAll('.kp-name')).map(function (b) { return b.innerText.trim(); }).join('|')" },
+            // Ben is the second name; this is a REAL TAP on the button a golfer taps,
+            // not a scripted value on a control a test cannot open.
+            { tap: '.kp-name', nth: 1 }, { sleep: 400 },
             { expression: "'W:' + JSON.stringify(window.__coldWrites)" },
             { deliver: { path: 'events/KPQ1', value: Object.assign({}, d, { kpLeaders: { h7: { playerId: '102', playerName: 'Ben', group: 1, distanceInches: null, updatedAt: 2 } }, kpWinners: { h7: '102' } }) } }, { sleep: 250 },
             { expression: "'T2:' + " + TEXT },
@@ -251,11 +297,15 @@ describe('CHROME: a real tap on Yes, a pick, a real tap on Save', () => {
     test('ran, on hole 7, and the block was the question', () => {
         assert.ok(r && r.ok, r && r.reason);
         assert.equal(val('H'), '7');
-        assert.match(val('T0'), /^⛳ Hole 7 — Closest to the Pin No KP yet\. Did anyone in your group get inside it\? No — leave it Yes — pick who$/);
+        assert.match(val('T0'), /^⛳ Hole 7 — Closest to the Pin No KP yet\. Did anyone get the KP in your group\? No — leave it Yes — pick who$/);
     });
-    test('the tap on Yes opened the picker; the pick took; the tap on Save wrote kpLeaders/h7 + kpWinners/h7 in one update', () => {
-        assert.match(val('T1'), /Who is closest\?[\s\S]*Save KP/);
-        assert.equal(val('PICK'), '102');
+    test('the tap on Yes showed the four names; ONE tap on a name wrote kpLeaders/h7 + kpWinners/h7 in one update', () => {
+        // The picker is the names. No placeholder to open, no Save to find.
+        assert.equal(val('NAMES'), 'Ann|Ben|Cal|Dee');
+        assert.doesNotMatch(val('T1'), /Who is closest\?|Save KP/,
+            'the select-and-Save picker is back, and with it the step this wave cut');
+        assert.match(val('T1'), /Distance \(optional\)[\s\S]*Ann[\s\S]*Ben/,
+            'distance sits above the names, which is the only place it can be read before the tap');
         const w = JSON.parse(val('W')).filter(x => x.path === 'events/KPQ1');
         assert.equal(w.length, 1); assert.equal(w[0].op, 'update');
         assert.equal(w[0].value['kpWinners/h7'], '102'); assert.equal(w[0].value['kpLeaders/h7'].playerName, 'Ben'); assert.equal(w[0].value['kpLeaders/h7'].group, 1);

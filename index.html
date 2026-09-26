@@ -643,19 +643,38 @@
         .kp-question { font-size: 1rem; font-weight: bold; margin-top: 6px; }
         .kp-answers { display: flex; gap: 8px; }
         .kp-answers .kp-btn { flex: 1 1 0; min-height: 48px; margin-top: 8px; }
-        .kp-answers .kp-no { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid); }
+        /* EQUAL WEIGHT (Wave 16), and ONE rule naming BOTH classes so they cannot drift
+           apart. "Yes — pick who" used to be the filled brand-green button and "No —
+           leave it" the outline one, on a hole where most answers are No. Measured
+           against this block's own background: filled 9.16:1, outline 1.08:1 - the rarer
+           answer was 8.5x more prominent than the common one. Neither is a primary
+           action; the block is a QUESTION, and kp-ask-now's 2px brand-green border is
+           what says "answer now". The filled treatment moves to .kp-name below, where a
+           tap really does write money. Both answers stay 48px. */
+        .kp-answers .kp-no, .kp-answers .kp-yes { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid); }
         .kp-change { background: none; border: none; padding: 6px 0 0 0; color: var(--brand-green); font-size: 0.85rem; font-weight: bold; text-decoration: underline; cursor: pointer; min-height: 32px; }
         .kp-dist-none { font-size: 0.7rem; color: var(--text-muted); }
-        /* THE PICKER READS AT THE SCORE BOXES' SIZE (2026-09-19). The select had no
-           type size of its own - the UA's 13.33px, its grey border and square
-           corners - beside ft/in boxes at 15.2px with 8px corners, on the control
-           that names who gets the money, tapped on a green in sun. 17px is
-           .score-input's size, the boxes a golfer already reads here, and at or
-           over 16px iOS Safari does not zoom the page when it is focused. 48px is
-           the Prev/Next buttons' height. The ft/in boxes take the same size, height,
-           border, corners and background so the three read as one control. Save KP
-           (.kp-btn) is untouched: solid brand green, bold, the loudest thing here. */
-        .kp-select { width: 100%; min-height: 48px; margin-top: 6px; padding: 0 10px; font-size: 17px; color: var(--text-main); background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 8px; box-sizing: border-box; }
+        /* THE PICKER READS AT THE SCORE BOXES' SIZE (2026-09-19, and still the rule).
+           The control that names who gets the money is tapped on a green in sun by a
+           golfer who may not see well, and it used to carry the smallest type in the
+           block - the UA's 13.33px on a bare <select>, beside ft/in boxes at 15.2px.
+           17px is .score-input's size, the boxes a golfer already reads here, and at or
+           over 16px iOS Safari does not zoom the page when an INPUT is focused (a button
+           cannot zoom, so that half of the rule lives with ft/in). 48px is the Prev/Next
+           buttons' height. The ft/in boxes take the same size, height, border, corners
+           and background, so the picker reads as one control.
+           Wave 16 replaced the select with the name buttons below and they inherit all
+           of it; the step that used to follow the select is gone. */
+        /* ONE TAP RECORDS IT (Wave 16). This was a <select> ("Who is closest?") that had
+           to be opened, changed, and then Saved - three interactions after "Yes". It is
+           now the group's names, two to a row, and a tap IS the save. 17px is kept from
+           the select: kp_picker_legibility_test.js requires the control that names who
+           gets the money to read at .score-input's size, and .kp-btn's own 13.6px would
+           have put the smallest type in the block back on the money control. MEASURED at
+           390x844: 158x48 per name, no overflow at 3, 4 or 6 golfers, and a
+           22-character name wraps to two lines inside its own 48px button. */
+        .kp-names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+        .kp-names .kp-name { width: auto; min-height: 48px; margin-top: 0; padding: 0 8px; font-size: 17px; line-height: 1.15; white-space: normal; }
         .kp-dist-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
         .kp-dist-label { font-size: 0.85rem; color: var(--text-muted); flex: 1; }
         .kp-dist-input { width: 64px; height: 48px; text-align: center; font-size: 17px; color: var(--text-main); background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 8px; box-sizing: border-box; }
@@ -4376,17 +4395,21 @@ html {
         // (sessionStorage kpAsked:CODE:hN), the block IS the question -
         //     ⛳ Hole 7 — Closest to the Pin
         //     Current KP: Marty (Group 3) — 8' 4"        or   No KP yet.
-        //     Did anyone in your group get inside it?
-        //     [ No — leave it ]  [ Yes — pick who ]
+        //     Did anyone get the KP in your group?
+        //     [ No — leave it ]  [ Yes — pick who ]      (equal weight, Wave 16)
         // emphasised (kp-ask-now) the moment every golfer in this group has a
         // score on the hole - the block is re-rendered on every snapshot, so the
         // last score's arrival is what lights it. "No" writes nothing and answers
-        // for this phone; "Yes" opens the picker (this group's golfers, optional
-        // ft/in) and Save goes through saveKpLeader, unchanged - the same two keys,
-        // the same last-write-wins a later group relies on. After an answer a
-        // small "Change KP" stays, so a wrong "No" or the wrong golfer is one tap
-        // to fix. A spectator (bare link, multi-group) sees the current KP and
-        // nothing to tap, as before.
+        // for this phone; "Yes" opens the picker - this group's golfers as BUTTONS,
+        // two to a row, with the optional ft/in above them - and ONE TAP on a name
+        // goes through saveKpLeader, unchanged: the same two keys, the same
+        // last-write-wins a later group relies on. After an answer a small
+        // "Change KP" stays, so a wrong "No" or the wrong golfer is one tap to fix.
+        // A spectator (bare link, multi-group) sees the current KP and nothing to
+        // tap, as before.
+        //
+        // WAVE 16 CUT A STEP. "Yes" used to reveal a <select> that had to be opened,
+        // changed, and then Saved. The names are the control now.
         let head = '<div class="kp-block kp-ask' + (kpGroupHoleComplete(h) ? ' kp-ask-now' : '') + '">'
             + '<div class="kp-head">\u26F3 Hole ' + h + ' \u2014 Closest to the Pin</div>';
         // THE GROUP IS READ LIVE (v199 follow-up), not off the kpLeaders stamp.
@@ -4425,17 +4448,21 @@ html {
         let body = '';
         if (mine.length > 0) {
             if (kpEntryOpenHole === h) {
-                let opts = '<option value="">Who is closest?</option>';
-                mine.forEach(p => { opts += '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>'; });
-                body = '<select id="kp-pick-' + h + '" class="kp-select">' + opts + '</select>'
-                    + '<div class="kp-dist-row"><span class="kp-dist-label">Distance <em>(optional)</em></span>'
+                // THE DISTANCE SITS ABOVE THE NAMES, because a tap on a name is the save:
+                // anything below it would never be read. Still optional, still never
+                // decides the winner - the golfers on the green do that.
+                body = '<div class="kp-dist-row"><span class="kp-dist-label">Distance <em>(optional)</em></span>'
                     + '<input id="kp-ft-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="ft">'
                     + '<input id="kp-in-' + h + '" class="kp-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="in">'
                     + '</div>'
-                    + '<button class="kp-btn" onclick="submitKpEntry(' + h + ')">Save KP</button>'
+                    + '<div class="kp-names">';
+                mine.forEach(p => {
+                    body += '<button class="kp-btn kp-name" onclick="pickKpLeader(' + h + ', \'' + p.id + '\')">' + escapeHtml(p.name) + '</button>';
+                });
+                body += '</div>'
                     + '<button class="kp-cancel" onclick="cancelKpEntry(' + h + ')">Cancel</button>';
             } else if (!kpAsked(h)) {
-                body = '<div class="kp-question">Did anyone in your group get inside it?</div>'
+                body = '<div class="kp-question">Did anyone get the KP in your group?</div>'
                     + '<div class="kp-answers">'
                     + '<button class="kp-btn kp-no" onclick="answerKpNo(' + h + ')">No \u2014 leave it</button>'
                     + '<button class="kp-btn kp-yes" onclick="toggleKpEntry(' + h + ')">Yes \u2014 pick who</button>'
@@ -4575,13 +4602,22 @@ html {
         renderKpEntryMount();
     }
 
-    function submitKpEntry(hole) {
-        const sel = document.getElementById('kp-pick-' + hole);
+    // ONE TAP RECORDS THE KP (Wave 16), replacing submitKpEntry: the name IS the
+    // control, so there is no "nothing picked" state left to refuse and no Save step.
+    //
+    // IT STILL CHECKS THE ID. The markup only renders this group's names, so a bad id
+    // cannot be tapped - but a function that writes money should not trust its own
+    // caller, and canSetKpLeader is the same rule score-writing uses. Without this the
+    // only thing standing between another group's golfer and the money would be the
+    // markup that happened to render.
+    function pickKpLeader(hole, playerId) {
+        const pid = String(playerId || '');
+        if (!pid) return;
+        if (!canSetKpLeader(pid)) { uiRefuse('That golfer is not in your group.'); return; }
         const ft = document.getElementById('kp-ft-' + hole);
         const inch = document.getElementById('kp-in-' + hole);
-        if (!sel || !sel.value) { uiRefuse('Pick the golfer who is closest.'); return; }
         markKpAsked(hole);   // v193: a saved answer is an answer; saveKpLeader itself is unchanged
-        saveKpLeader(hole, sel.value, ft ? ft.value : '', inch ? inch.value : '');
+        saveKpLeader(hole, pid, ft ? ft.value : '', inch ? inch.value : '');
     }
 
     let kpEntryOpenHole = null;

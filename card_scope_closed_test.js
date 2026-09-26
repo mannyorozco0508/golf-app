@@ -155,7 +155,19 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // before re-pinning: 0 added, 0 changed, 3 removed across text and display on
         // all three links, every `filtered` list identical, capturedAt untouched. The
         // fixture's own "repinned" array carries the same record.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '0260d661');
+        // RE-PINNED (v243, UI Wave 16, was 0260d661): the KP question was reworded and its
+        // select became one-tap name buttons. DIFFED BEFORE RE-CAPTURING, which is the whole
+        // point of a golden: across the three links, 0 added, 1 CHANGED and 3 REMOVED.
+        // The change is kp-entry-mount's question line - "Did anyone in your group get inside
+        // it?" became "Did anyone get the KP in your group?" - and nothing else in the block
+        // moved. The removal is one key per link, "kp-pick-' + h + '", WHICH WAS NEVER A REAL
+        // ELEMENT: mini-dom registers an id when it scans id="..." out of static markup, and
+        // index.html literally contained id="kp-pick-' + h + '" inside a JavaScript string,
+        // so the capture recorded the neighbouring source "' + opts + '" as that element's
+        // text. Wave 16 deleted the select, so a harness artefact left the golden - not a
+        // surface. Every `filtered` list is identical and display is unchanged but for
+        // group-missing-note, which this suite deletes explicitly below.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'eac0ac10');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
