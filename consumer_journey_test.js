@@ -69,7 +69,13 @@ describe('THE HOME OFFERS THE THREE THINGS THE PRODUCT IS', () => {
         // 1300 -> 1550 (v218): the same navigation now also carries ?season=
         // when the lobby was opened from a season. Measured 1431 from the
         // signature to window.location.href.
-        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]{0,1550}window\.location\.href/,
+        // 1550 -> NO LIMIT (2026-09-26, UI Wave 10). createRoom gained the Setup
+        // Coach's `&coach=1` carry and outgrew the window a THIRD time. The bumps above
+        // are the same defect logged twice already in CLAUDE.md: a fixed-length source
+        // slice reports a missing safeguard in a function that has one, and the fix is
+        // an endpoint that cannot drift rather than a bigger number. A lazy match finds
+        // the FIRST navigation after the signature, which is what this always meant.
+        assert.match(ADMIN, /async function createRoom\(pressedEl\)[\s\S]*?window\.location\.href/,
             'createRoom no longer goes anywhere');
     });
 

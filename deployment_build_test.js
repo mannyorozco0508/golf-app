@@ -277,7 +277,7 @@ describe('PWA — two independent installable apps', () => {
         // Tournament is v54: the product name is Rattle Golf Tournaments again.
         assert.match(c, /^consumer-v\d+-/);
         assert.match(t, /^tournament-v\d+-/);
-        assert.match(c, /^consumer-v77-no-card-attendance$/);
+        assert.match(c, /^consumer-v78-coach$/);
         assert.match(t, /^tournament-v54-rattle-golf$/);
     });
 

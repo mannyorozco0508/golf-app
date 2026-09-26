@@ -1251,6 +1251,20 @@
         .ps-money { font-size: 0.85rem; color: var(--text-main); margin-top: 8px; }
         .golfer-out, .golfer-out .fc-name, .golfer-out .hv-player-name { opacity: 0.55; text-decoration: line-through; }
         .modal-content { background: var(--modal-bg); border-radius: 12px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; color: var(--text-main); }
+        /* THE CONTEXT "?" (UI Wave 10). A LITERAL "?", not an emoji: the icon system's
+           standing rule is one concept one icon, 📖 already owns "the guide", and a
+           text character allocates no glyph that a later feature could collide with.
+           44px, because Wave 8b raised every target in this app to that and the
+           nearest existing small pill (.ps-add) is 32. Same rule on all three
+           surfaces so the affordance reads identically wherever it appears. */
+        .tip-btn { box-sizing: border-box; min-width: 44px; min-height: 44px;
+            background: var(--nav-bg); color: var(--brand-green);
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; padding: 0; }
+        /* Hugs the title instead of being spaced away from it: the header is
+           justify-content: space-between, so without this the "?" would sit in the
+           middle of the row between the name and the close button. */
+        .modal-header .tip-btn { margin-left: 8px; margin-right: auto; }
         .modal-header { font-size: 1.2rem; font-weight: bold; color: var(--brand-green); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
         .dot-player-block { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-faint); text-align: left; }
@@ -1538,7 +1552,7 @@ html {
      re-read. Filled by renderPlayersSheet; empty until opened. -->
 <div class="modal-overlay" id="players-sheet" role="dialog" aria-labelledby="players-sheet-title">
     <div class="modal-content ps-content">
-        <div class="modal-header"><span id="players-sheet-title">👥 Players</span><button class="close-modal" onclick="closePlayersSheet()">&times;</button></div>
+        <div class="modal-header"><span id="players-sheet-title">👥 Players</span><button type="button" class="tip-btn" id="tip-players" aria-label="What the Players sheet does" onclick="tipPlayers()">?</button><button class="close-modal" onclick="closePlayersSheet()">&times;</button></div>
         <div id="players-sheet-body"></div>
         <div id="players-sheet-warn" class="ps-warn"></div>
         <div id="players-sheet-money" class="ps-money"></div>
@@ -5277,6 +5291,25 @@ html {
         Object.keys((data && data.scores) || {}).forEach(k => { const m = /^p(\d+)_h\d+$/.exec(k); if (m && parseInt(m[1], 10) > max) max = parseInt(m[1], 10); });
         return max + 1;
     }
+    // THE PLAYERS SHEET, EXPLAINED (UI Wave 10). Copy lifted from the in-app guide's
+    // own card so the two cannot drift into two different accounts of the same
+    // screen - and de-entitied, because uiTip escapes everything it is given.
+    // The last bullet is the one golfers actually get wrong: taking somebody out
+    // does not erase what they shot.
+    function tipPlayers() {
+        if (typeof uiTip !== 'function') return;
+        uiTip({
+            title: '\uD83D\uDC65 Players',
+            bullets: [
+                'One row per golfer: fix a name, fix a handicap, move somebody to another group.',
+                'Organizer only. A group scorekeeper link does not show this.',
+                'Out takes somebody out of the round mid-way. Their scores stay in the record \u2014 no surface shows them once the row is gone.',
+                'Adding that person back starts a fresh card under a new id, so the old scores do not come with them.',
+                'Nothing here is saved until you press Save.'
+            ]
+        });
+    }
+
     function openPlayersSheet() {
         if (!canReachSetup()) return;
         psSnapshot = rosterSignature(currentData.players);
