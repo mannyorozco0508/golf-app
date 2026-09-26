@@ -2333,7 +2333,48 @@
 // product cache is consumer-v76-golfer-route. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file; this wave
 // does not archive or upload.
-const CACHE_VERSION = 'golfapp-v235-golfer-route';
+// Moved to v236 because THE SCORECARD NO LONGER ASKS WHO IS PLAYING. A device on
+// v235 keeps a 342px-wide unfilled form above its score entry. index.html loses the
+// panel; admin.html and instructions.html lose one sentence each that described it.
+//
+// WHY, MEASURED COLD AT 390x844 on a round of eight with one golfer confirmed and
+// one declined:
+//     bare link    the panel 504 x 342 at y=824, SIXTEEN Confirm/Can't buttons
+//                  the hole view began at y=1334; the first score input at y=1414
+//     group link   the panel 319 x 342 at y=672, eight buttons
+//                  the hole view began at y=997; the first score input at y=1077
+// After: the first score input is reached 504px and 319px sooner, and the documents
+// are shorter by the same. It read as an unfilled form beside score entry and it
+// asked a question already answered - the person reading a scorecard is on the tee.
+//
+// THE FEATURE IS NOT GONE, AND THE DATA IS NOT ORPHANED. attendance.js is untouched
+// and still precached. The organizer's setup card (admin.html, when a round is
+// reopened) and Round Ready both still read AND write
+// events/<code>/attendance/<playerId>, and each Road Trip day card still prints the
+// headcount sentence. No engine, no payout path and no other page has ever read the
+// node - checked across all seventeen shared modules and all eight other consumer
+// pages. Existing records stay meaningful because the organizer's surfaces display
+// them. What changed is WHO WRITES: the organizer marks people, a golfer no longer
+// self-confirms.
+//
+// SO TWO SENTENCES HAD TO CHANGE, because copy that describes behaviour IS behaviour
+// (CLAUDE.md). The setup card said "Golfers confirm from the scorecard link. You can
+// mark someone here too" - the first half became false the moment the panel went.
+// The guide's own card said golfers confirm themselves from the scorecard link.
+//
+// THE PLAYERS SHEET IS KEPT, deliberately, and asserted so a later sweep for the
+// word cannot take it: its Out box writes players[i].out on the ROSTER and clears
+// playingForMoney. Two separate ideas that both happen to say "out".
+//
+// database.rules.json is UNCHANGED. Its attendance rows still guard the shape of
+// what admin.html writes; removing them would break the organizer's surfaces the
+// moment the rules were published. They stay in-repo and unpublished, as before.
+//
+// No engine and no protected file changed, and no dialog surface moved. The consumer
+// product cache is consumer-v77-no-card-attendance. The tournament product cache
+// stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 in the project file;
+// this wave does not archive or upload.
+const CACHE_VERSION = 'golfapp-v236-no-card-attendance';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -2408,9 +2449,10 @@ const SHELL_FILES = [
     // uiToast on paths a golfer reaches within seconds - so a cached shell without
     // it does not degrade the page, it breaks it, which is the correct failure.
     './ui-dialogs.js',
-    // attendance.js (v217): Confirm or mark out before tee time. index, admin and
-    // trip load it. A cached shell without it shows the roster and never the
-    // headcount.
+    // attendance.js (v217): who is in before tee time. admin.html and trip.html load
+    // it - NOT index.html any more (v236: the scorecard panel was removed and with it
+    // the script tag). A cached shell without this file shows the organizer the roster
+    // and never the headcount.
     './attendance.js',
     // match-engine.js (v218) is calculateMatchEngine - hole-by-hole match play, and
     // the money every Match, Nassau, Best Ball, Scramble and Ryder round settles

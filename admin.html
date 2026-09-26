@@ -2558,7 +2558,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         mount.style.display = 'block';
         mount.innerHTML = attendancePanelHtml(setupAttendancePlayers, setupAttendanceMap, {
             heading: "Who's playing",
-            note: 'Golfers confirm from the scorecard link. You can mark someone here too.'
+            // UI Wave 9: this said 'Golfers confirm from the scorecard link. You can
+            // mark someone here too.' The scorecard no longer asks, so the first half
+            // became false the moment the panel went - and a sentence that describes
+            // behaviour IS behaviour (CLAUDE.md). The organizer marks people here now.
+            note: 'Mark who is in before tee time. This is the only place it is asked.'
         });
     }
     function showSetupAttendance(code, players, attendance) {
