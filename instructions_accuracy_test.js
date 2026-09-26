@@ -209,7 +209,10 @@ describe('THE EXTRACTOR KNOWS A CONTROL NAME FROM EMPHASIS', () => {
 
     test('a comma run is split into the tabs it names', () => {
         const found = quotedUiStrings();
-        ['Card', 'Board', 'Bets', 'Results', 'Matches', 'Game'].forEach((s) =>
+        // WAVE 15: the pills read the long names on every page now, uniform, so the
+        // guide's prose names them that way too. A guide that says "Card" while the bar
+        // says "Scorecard" is the copy-versus-behaviour failure CLAUDE.md records twice.
+        ['Scorecard', 'Leaderboard', 'Bets', 'Results', 'Matches', 'Game'].forEach((s) =>
             assert.ok(found.includes(s), `"${s}" was not split out of the nav run`));
     });
 });

@@ -141,7 +141,17 @@
             padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
         }
         .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; }
-        .top-nav-item { flex: 1 1 auto; justify-content: center; padding: 8px 8px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item { flex: 1 1 auto; flex-direction: column; justify-content: center; padding: 8px 4px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 1px; white-space: nowrap; }
+        /* THE GLYPH IS ITS OWN LINE (Wave 15), and that is what pays for the ninth pill.
+           Measured at 390x844 on all eight pages: nine pills with the glyph BESIDE the
+           label is 758px of intrinsic width in the ~610px two rows hold, so three rows -
+           203px instead of 139px. Above the label it is 523px, so two rows. The pill does
+           NOT get taller: it is content-box with min-height 40px, so a single 13.8px line
+           already leaves 26px spare and the second line fits in it. 139px before, 139px
+           after, every pill 58px. nav_bar_test.js measures the stack by the two spans' y
+           positions, because a collapsed stack reads the same height as a real one. */
+        .tni-glyph { font-size: 13px; line-height: 1.1; }
+        .tni-label { line-height: 1.1; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
@@ -334,14 +344,15 @@ html {
     <!-- Top Navigation Bar -->
     <div class="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item nav-link">📝 Card</a>
-        <a href="leaderboard.html" class="top-nav-item active nav-link">🏆 Board</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
-        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-        <a href="game.html" class="top-nav-item nav-link">📖 Game</a>
-        <a href="trip.html" class="top-nav-item">🚐 Trip</a>
-        <a href="admin.html" class="top-nav-item nav-link">🏠 Home</a>
+        <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
+        <a href="leaderboard.html" class="top-nav-item active nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
+        <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
+        <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">📖</span><span class="tni-label">How it works</span></a>
     </div>
     </div>
 

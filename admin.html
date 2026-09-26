@@ -151,29 +151,39 @@
            (Scorecard/Leaderboard, plus Season and the guide route) where the other seven
            carry eight short ones. Making it identical is a separate decision and is
            logged, because two of those links have nowhere else to go. */
-        .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
-        /* min-height ADDED (Wave 14), and it was never here. index.html's pill rule has
-           carried it since the bar was rebuilt; admin.html's did not, so a pill sized to
-           its own text. Measured: every pill with an emoji came out 40px from the glyph's
-           line box, and the two WITHOUT one - "⋯ More" and "Season" - came out 34px. A
-           pre-existing tap target under the 44px line this app holds everywhere else,
-           found by the new guard rather than by the drift.
-           flex: 0 0 auto is LEFT ALONE: index.html's pills grow to fill their row, and
-           changing that is the shape question parked as Option B. */
-        .top-nav-item { flex: 0 0 auto; min-height: 40px; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        /* ---- THE SAME BAR AS THE OTHER SEVEN (Wave 15) -------------------------
+           This page kept its own nav for eleven days after the other seven were
+           rebuilt: a horizontal scroller with a hidden scrollbar (Wave 14 fixed the
+           sliding), eleven pills with long labels, and a "⋯ More" <details> that
+           shipped OPEN - so after Wave 14 it wrapped to five pills on two rows with a
+           six-item dropdown floating over the page. Worse than before, not better.
+
+           It is now index.html's bar, byte for byte: .app-nav-wrap, eight pills that
+           grow to fill their row, two rows of four at 390px. admin.html joins
+           nav_bar_test.js's PAGES, so this page is checked by the same assertions as
+           every other - which is what stops it drifting apart a third time.
+
+           MEASURED at 390x844: 2 rows [4,4], bar 139px, every pill 58px tall, nothing
+           clipped, nothing off screen, nothing that can slide. */
+        .app-nav-wrap {
+            display: block;
+            padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
+        }
+        .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+        .top-nav-item { flex: 1 1 auto; flex-direction: column; justify-content: center; padding: 8px 4px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 1px; white-space: nowrap; }
+        /* THE GLYPH IS ITS OWN LINE (Wave 15), and that is what pays for the ninth pill.
+           Measured at 390x844 on all eight pages: nine pills with the glyph BESIDE the
+           label is 758px of intrinsic width in the ~610px two rows hold, so three rows -
+           203px instead of 139px. Above the label it is 523px, so two rows. The pill does
+           NOT get taller: it is content-box with min-height 40px, so a single 13.8px line
+           already leaves 26px spare and the second line fits in it. 139px before, 139px
+           after, every pill 58px. nav_bar_test.js measures the stack by the two spans' y
+           positions, because a collapsed stack reads the same height as a real one. */
+        .tni-glyph { font-size: 13px; line-height: 1.1; }
+        .tni-label { line-height: 1.1; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
-        .nav-more { position: relative; flex: 0 0 auto; }
-        .nav-more summary { list-style: none; cursor: pointer; }
-        .nav-more summary::-webkit-details-marker { display: none; }
-        .nav-more-menu {
-            position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
-            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px;
-            padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 140px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-        }
-        .nav-more-menu .top-nav-item { width: 100%; box-sizing: border-box; }
 
         /* Lobby Styles */
         #lobby-screen { text-align: center; padding: 30px 15px; }
@@ -849,7 +859,11 @@
             color: var(--brand-green);
             line-height: 20px;
         }
-        /* The same marker-hiding .nav-more already uses - one pattern, one trick. */
+        /* The marker is hidden the way a <summary> always needs it hidden. This used to
+           point at the nav bar's ⋯ More menu as the other place on the page doing the
+           same trick; Wave 15 removed that menu, so this is the page's only disclosure.
+           Deliberately not naming the old class here: two guards assert this file no
+           longer mentions it, and a comment is enough to fail them. */
         .w-disclosure-summary::-webkit-details-marker { display: none; }
         /* THE COLLAPSE IS OURS, NOT THE BROWSER'S, AND THAT IS MEASURED RATHER THAN
            preferred. In the Chrome this repo drives (154) a CLOSED <details> does
@@ -1082,10 +1096,12 @@ html {
          natively, and a hand-written one there is redundant at best and
          conflicting at worst. The literal attribute would need a button+region
          pattern, which would be a SECOND disclosure pattern on this page.
-         AND NO `open` ATTRIBUTE. .nav-more ships with one; copying that would be
-         this same screen at its old height with an extra control on it. Closed on
-         arrival is the whole wave, and one_screen_test.js asserts both the absent
-         attribute and the measured closed state. -->
+         AND NO `open` ATTRIBUTE. The nav bar's ⋯ More menu shipped with one, which is
+         exactly how it went wrong: after Wave 14 taught the bar to wrap, an open
+         <details> inside it put five pills on two rows with a six-item dropdown
+         floating over the page. Wave 15 removed that menu; this disclosure stays
+         CLOSED on arrival, and one_screen_test.js asserts both the absent attribute
+         and the measured closed state. -->
     <details id="open-else" class="w-disclosure">
     <summary class="w-disclosure-summary">Open something else</summary>
     <div class="w-card" id="open-round-card">
@@ -1165,35 +1181,18 @@ html {
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <a class="back-btn" onclick="goBack()">← Back</a>
     <!-- Top Navigation Bar -->
+    <div class="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item nav-link">📝 Scorecard</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Leaderboard</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
-        <details class="nav-more" open>
-            <summary class="top-nav-item">⋯ More</summary>
-            <div class="nav-more-menu">
-                <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-                <a href="game.html" class="top-nav-item nav-link">📖 Game</a>
-                <a href="trip.html" class="top-nav-item">🚐 Trip</a>
-                <a href="season.html" class="top-nav-item">Season</a>
-                <a href="admin.html" class="top-nav-item active nav-link">🏠 Home</a>
-                <!-- THE GUIDE'S ONLY ROUTE (UI Wave 8), and until this line it had
-                     none. instructions.html has always been precached in sw.js and
-                     bundled into the app, and NO page has ever linked to it: a
-                     history search for an href to it over every .html file returns
-                     no commit that added one. It shipped unreachable in every
-                     build, including the ones a reviewer opened.
-                     HERE BECAUSE THIS MENU IS WHERE THIS PAGE FAMILY PUTS THE
-                     THINGS THAT ARE NOT TABS - Trip, Season, Home - so it needs no
-                     new component. NOT on the setup screen as its own block: that
-                     screen is one viewport by design and a guide link is exactly
-                     the kind of thing that grew it to 1172px.
-                     guide_coverage_test.js asserts a route exists, which is the
-                     assertion that was missing rather than the link. -->
-                <a href="instructions.html" class="top-nav-item">📖 How it works</a>
-            </div>
-        </details>
+        <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
+        <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
+        <a href="admin.html" class="top-nav-item active nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
+        <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">📖</span><span class="tni-label">How it works</span></a>
+    </div>
     </div>
 
     <div style="text-align: center; margin-top: 10px;">

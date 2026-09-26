@@ -101,25 +101,34 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
         // in admin.html's ⋯ More menu, and admin.html is the organizer's page. A
         // golfer who taps a group link lands on index.html and may never see Home.
         //
-        // NOT A NINTH NAV PILL. index.html's bar is eight pills that WRAP - measured
-        // at 390px, three rows already with the label lengths it carries - and it is
-        // measured on every page by nav_bar_test.js. A ninth pill spends fold space
-        // on every screen of the round to solve a problem that lives at the bottom.
+        // THE BOTTOM-OF-CARD ROUTE, which Wave 8b measured and built: the
+        // .save-exit-box stack that already holds Round Receipt and Save & Exit,
+        // below score entry, where it costs no fold space.
         //
-        // So: the bottom of the scorecard, in the .save-exit-box stack that already
-        // holds Round Receipt and Save & Exit, below score entry, where it costs no
-        // fold space at all.
+        // WAVE 15 ADDED A SECOND ROUTE, and withdrew the reason this test used to
+        // give for refusing one. It said a ninth pill makes the bar three rows. That
+        // was true of the bar as it then was - glyph BESIDE the label - and it stayed
+        // true when the labels went long: 758px of intrinsic pill in ~610px of two
+        // rows. Stacking the glyph ABOVE the label costs 235px of that and the ninth
+        // pill fits: measured two rows, 139px of wrapper, unchanged. So the guide is
+        // now a pill as well, and BOTH routes are asserted - the pill below, this
+        // card here. Neither is allowed to be the only one, because they answer
+        // different questions: the pill is reachable from every page, the card is
+        // where a golfer who has finished a hole is already looking.
         const idx = INDEX.replace(/<!--[\s\S]*?-->/g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
         assert.match(idx, /href="instructions\.html"/,
             'index.html does not link to the guide. The golfer door has no door: the '
             + 'only route is admin.html\'s More menu, which is the organizer\'s page.');
-        // In the bottom stack, not smuggled into the nav bar - and the guard says
-        // which, so "somewhere on the page" cannot satisfy it.
-        const at = idx.indexOf('href="instructions.html"');
+        // In the bottom stack, and the guard says WHICH - so "somewhere on the page"
+        // cannot satisfy it. Taking the LAST occurrence, not the first: the first is
+        // now the nav pill (Wave 15), and using indexOf here would read the pill's
+        // position and report that the card had moved.
+        const at = idx.lastIndexOf('href="instructions.html"');
         const navEnd = idx.indexOf('</div>', idx.indexOf('class="top-nav-bar"'));
         assert.ok(at > navEnd,
-            'the guide link is inside the nav bar. Wave 8b measured that a ninth pill '
-            + 'takes that bar to another row at 390px; the route belongs at the bottom.');
+            'the only guide link on index.html is the nav pill - the bottom-of-card '
+            + 'route Wave 8b built is gone, and with it the door for a golfer who is '
+            + 'looking at score entry rather than at the nav.');
         const box = idx.lastIndexOf('class="save-exit-box"', at);
         assert.ok(box > -1 && idx.slice(box, at).indexOf('</div>') === -1,
             'the guide link is not inside a .save-exit-box, so it does not read as one '
@@ -132,45 +141,47 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
         assert.match(idx, /Round Receipt/, 'the Receipt card is gone from the stack');
     });
 
-    test('every page that HAS a More menu carries the route', () => {
-        // MEASURED SCOPE, recorded here rather than left to a report. The brief said
-        // "on every page with that nav", and it turns out that is ONE page:
+    test('every consumer page carries the route, because it is a pill in the shared bar', () => {
+        // RE-POINTED IN WAVE 15, and the scope inverted. This used to assert
+        // "wherever a More menu exists, the route is in it", which measured out to ONE
+        // page: admin.html, the organizer's, with 11 pills and a three-item dropdown.
+        // That menu is gone. It shipped with `open`, so when Wave 14 taught the bar to
+        // wrap it became five pills on two rows with a six-item popover floating over
+        // the page.
         //
-        //   admin.html                                  11 pills, 3 nav-more-menu
-        //   index, leaderboard, skins, settlement,        8 pills, 0 nav-more-menu
-        //     sidematches, game, stats                    (a flat wrapping bar)
-        //   trip, season                                  no pill nav at all
-        //
-        // index.html's bar stopped being a scroller-plus-More on 2026-09-14 and is
-        // now eight pills that WRAP: two rows of four at 390px, ~303px and ~308px of
-        // the 334-342 available. A ninth pill makes it three rows, on the page a
-        // golfer lives on all day, and nav_bar_test.js measures that bar on every
-        // page. So a golfer who arrives by link still cannot reach the guide: the
-        // route is on the ORGANIZER's page. That is a geometry decision of its own
-        // and it is logged, not smuggled in here.
-        //
-        // What this asserts is the drift-proof half: wherever a More menu exists, the
-        // route is in it. It does NOT pin the count at one - a guard that went red
-        // the moment somebody put the guide on index.html would be pushing in the
-        // wrong direction, which is the fault CLAUDE.md records about the QR code.
+        // The route is now a pill in the bar every consumer page shares, which is
+        // eight pages instead of one. THE CLAIM THIS GUARD PROTECTS IS THE ROUTE, NOT
+        // THE MENU - the guide was unreachable from anywhere for the whole of this
+        // repo's history before Wave 8, and that is the only thing worth never
+        // regressing. So it asserts a real <a> on every page that has the bar, and it
+        // does not care what container holds it.
         const pages = fs.readdirSync(ROOT).filter(f => /\.html$/.test(f) && f !== 'instructions.html');
-        const withMenu = pages.filter(f => read(f).includes('class="nav-more-menu"'));
-        assert.ok(withMenu.length >= 1, 'no page has a More menu - this test guards nothing');
-        withMenu.forEach(f => assert.match(read(f), /href="instructions\.html"/,
-            f + ' has a More menu and no route to the guide in it'));
+        const withBar = pages.filter(f => read(f).includes('<div class="app-nav-wrap">'));
+        assert.equal(withBar.length, 8, 'the shared bar is on ' + withBar.length + ' pages, not 8: ' + withBar.join(', '));
+        withBar.forEach(f => assert.match(read(f), /<a href="instructions\.html" class="top-nav-item"/,
+            f + ' carries the shared bar and no guide pill in it'));
     });
 
-    test('the route is the More menu, which is where this page family puts non-tabs', () => {
-        // Not a new block on the setup screen: that screen is one viewport by
-        // design, and a guide link is exactly the kind of thing that grew it to
-        // 1172px. The ⋯ More menu already holds Trip, Season and Home.
-        const menuAt = ADMIN.indexOf('class="nav-more-menu"');
-        assert.ok(menuAt > -1, 'the More menu is gone');
-        const menu = ADMIN.slice(menuAt, ADMIN.indexOf('</div>', menuAt));
-        assert.match(menu, /href="instructions\.html"/,
-            'the guide is not in the More menu');
-        assert.match(menu, />[^<]*How it works[^<]*</,
-            'the menu item does not say what it opens');
+    test('the route on the setup screen is a pill in the bar, and it says what it opens', () => {
+        // RE-POINTED IN WAVE 15. This asserted that the route was inside
+        // class="nav-more-menu" on admin.html. That menu no longer exists anywhere,
+        // and the claim it was protecting was never the menu - it was that admin.html,
+        // the page an organizer starts from, has a route to the guide at all.
+        //
+        // Still NOT a new block on the setup screen: that screen is one viewport by
+        // design and a guide card is exactly the kind of thing that grew it to 1172px.
+        // The pill costs it nothing - the bar is 139px with nine pills exactly as it
+        // was with eight, because the glyph moved above the label instead of beside it.
+        const barAt = ADMIN.indexOf('<div class="app-nav-wrap">');
+        assert.ok(barAt > -1, 'admin.html has no shared nav bar');
+        const bar = ADMIN.slice(barAt, ADMIN.indexOf('</div>\n    </div>', barAt));
+        assert.match(bar, /href="instructions\.html"/,
+            'the guide is not in the bar');
+        assert.match(bar, /<span class="tni-label">How it works<\/span>/,
+            'the pill does not say what it opens');
+        // And the menu it replaced cannot come back: an `open` <details> in the bar is
+        // the defect Manny reported ("worse than before, not better").
+        assert.ok(!/nav-more/.test(ADMIN), 'the More menu is back in admin.html');
         // And it did NOT go on the Wave 7 setup screen as its own block.
         const lobby = ADMIN.slice(ADMIN.indexOf('<div class="container" id="lobby-screen">'),
                                   ADMIN.indexOf('<div class="container" id="admin-screen"'));
@@ -275,24 +286,33 @@ describe('4. PAGE AND CONTROL NAMES ARE THE APP\'S OWN', () => {
     test('the nav sentence uses index.html\'s labels, the ones a golfer sees in a round', () => {
         const navAt = INDEX.indexOf('class="top-nav-bar"');
         const nav = INDEX.slice(navAt, INDEX.indexOf('</div>', navAt + 400));
-        const labels = [...nav.matchAll(/class="top-nav-item[^"]*"[^>]*>([^<]+)</g)]
-            .map(m => m[1].replace(/[^\x20-\x7E]/g, '').trim())
-            .filter(Boolean);
+        // READ OUT OF THE LABEL SPAN (Wave 15): the pill is
+        // <span class="tni-glyph">glyph</span><span class="tni-label">label</span>, so the
+        // old `>([^<]+)<` capture read the glyph and stripped it to an empty string - six
+        // labels became zero and the `labels.length >= 6` positive assertion is what
+        // caught that rather than letting a forEach over nothing go green.
+        const labels = [...nav.matchAll(/class="tni-label">([^<]+)</g)]
+            .map(m => m[1].trim()).filter(Boolean);
         assert.ok(labels.length >= 6, 'only ' + labels.length + ' nav labels found');
         // ONE SENTENCE, not six words scattered through 1,400. On the old guide
         // every label happened to appear somewhere and this passed while the
         // sentence itself named the wrong page family.
-        const navSentence = (PROSE.match(/[^.]*\bCard\b[^.]*\bBoard\b[^.]*\./) || [''])[0];
+        const navSentence = (PROSE.match(/[^.]*\bScorecard\b[^.]*\bLeaderboard\b[^.]*\./) || [''])[0];
         assert.ok(navSentence.length > 40,
             'no single sentence lists the tabs: ' + JSON.stringify(navSentence));
         labels.forEach(l => assert.ok(navSentence.includes(l),
             'the tab sentence does not name "' + l + '": ' + navSentence));
-        // admin.html says Scorecard / Leaderboard for the same two tabs. That
-        // inconsistency is LOGGED FOR ITS OWN WAVE, not fixed here, and the guide
-        // follows index.html because that is the page a golfer lives on in a round.
-        assert.ok(/Scorecard/.test(ADMIN),
-            'admin.html stopped saying Scorecard - the logged inconsistency is gone, '
-            + 'so re-read this note');
+        // THE LOGGED INCONSISTENCY IS RESOLVED (Wave 15), so the note becomes its
+        // opposite. admin.html used to say Scorecard / Leaderboard while the other seven
+        // said Card / Board, and the guide followed index.html because that is the page a
+        // golfer lives on. Manny's call was to keep the LONG names and change the seven,
+        // so there is one set of labels now and the guide names them. What this asserts is
+        // that they really are one set: index.html's labels and admin.html's, compared.
+        const adminNav = ADMIN.slice(ADMIN.indexOf('class="top-nav-bar"'));
+        const adminLabels = [...adminNav.slice(0, adminNav.indexOf('</div>', 400)).matchAll(/class="tni-label">([^<]+)</g)].map(m => m[1].trim());
+        assert.deepEqual(adminLabels, labels,
+            'admin.html and index.html disagree about the labels again: '
+            + JSON.stringify(adminLabels) + ' vs ' + JSON.stringify(labels));
     });
 });
 

@@ -77,12 +77,15 @@ describe('CONSUMER IS GAME DAY AND ROAD TRIP', () => {
     });
 
     test('the compact nav still says "Trip", not the full product name', () => {
-        // Eight items in a 390px-wide bar. The full name lives on the homepage tile
-        // where there is room for it; the nav is deliberately abbreviated.
+        // NINE items in a 390px-wide bar (Wave 15). The full name lives on the homepage
+        // tile where there is room for it; the nav is deliberately abbreviated - and Trip
+        // is the one label Wave 15's lengthening left alone, because "Road Trip" is the
+        // page's name, not the tab's. The glyph is its own span since Wave 15: that is
+        // what stacks it above the label, which is what made room for the ninth pill.
         CONSUMER_PAGES.forEach(f => {
             const src = read(f);
             if (!src.includes('trip.html" class="top-nav-item')) return;
-            assert.ok(/\u{1F690} Trip/u.test(src), `${f}: nav label must be the van + "Trip"`);
+            assert.ok(/<span class="tni-glyph">\u{1F690}<\/span><span class="tni-label">Trip<\/span>/u.test(src), `${f}: nav label must be the van + "Trip"`);
             assert.ok(!/Road Trip<\/a>/.test(src), `${f}: the nav must not carry the full name`);
         });
     });
@@ -199,7 +202,8 @@ describe('NOTHING CONSUMER-FACING REGRESSED', () => {
             const src = read(f);
             assert.ok(!/\u2699\ufe0f? Home/u.test(src), `${f}: a gear must not mean Home`);
             if (/top-nav-item/.test(src)) {
-                assert.ok(/\u{1F3E0} Home/u.test(src), `${f}: Home is a house`);
+                // Paired spans since Wave 15 - see the note on the Trip label above.
+                assert.ok(/<span class="tni-glyph">\u{1F3E0}<\/span><span class="tni-label">Home<\/span>/u.test(src), `${f}: Home is a house`);
             }
         });
         assert.match(ADMIN, /\u2699\ufe0f Format Settings/u,

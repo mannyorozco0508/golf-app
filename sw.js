@@ -2646,7 +2646,65 @@
 // consumer-v81-nav. The tournament product cache stays tournament-v54-rattle-golf. iOS
 // is at 1.0.4 build 2 and already submitted; this wave is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v240-nav';
+// Moved to v241 FOR ONE NAV BAR ON ALL EIGHT PAGES, with the labels a golfer can read.
+// A device on v240 has admin.html's nav bar as five pills on two rows with a six-item ⋯
+// More dropdown floating over the page: Wave 14 taught that bar to wrap, and the menu
+// shipped with an `open` attribute, so wrapping made it worse rather than better -
+// Manny's words were "worse than before, not better".
+//
+// WHAT SHIPS: nine pills, the same nine on every one of the eight consumer pages, with
+// LONG uniform labels - Scorecard and Leaderboard, not Card and Board - and the glyph
+// STACKED ABOVE the label instead of beside it. No More menu anywhere. admin.html is no
+// longer a page with a nav of its own; it joins nav_bar_test.js's PAGES and answers to
+// the same assertions as the other seven.
+//
+// WHY THE GLYPH MOVED, MEASURED at 390x844 on all eight pages before anything was built.
+// The pills are flex: 1 1 auto, so wrapping is decided by INTRINSIC width, and two rows
+// of admin.html's 326px bar hold about 610px of pills once the 6px gaps are paid:
+//     short 8 pills, glyph beside label   570px   2 rows   139px   (what v240 ships)
+//     long  8 pills, glyph beside label   644px   3 rows   203px
+//     long  9 pills, glyph beside label   758px   3 rows   203px
+//     long  9 pills, glyph ABOVE label    523px   2 rows   139px   (what v241 ships)
+// So the long labels alone cost +64px on every page, and the ninth pill after them costs
+// nothing further because the third row already exists. Stacking is free in HEIGHT
+// because the pill is content-box with min-height 40px: one 13.8px line already leaves
+// 26px spare and the second line fits in it. Measured after building: 139px of wrapper
+// on all eight at 390 AND at 375, every pill 58px, nothing clipped, nothing off screen,
+// document scrollWidth 390/390, no element in the bar positioned anything but static.
+// Nothing else reached two rows at nine pills - not 11px type, not zero horizontal
+// padding, not a 3px gap, and dropping a pill was the weakest lever of all (Trip out and
+// the guide in is still three rows). 9px type reached it, with 2px of slack.
+//
+// THE TWO LINKS THAT HAD NOWHERE TO GO, which is why v240 parked this:
+//   📖 How it works is now the NINTH PILL, on all eight pages. It is the only guaranteed
+//     route to the guide, and before Wave 8 the guide was unreachable from anywhere in
+//     this repo's entire history. guide_coverage_test.js asserted "the route is the More
+//     menu"; re-pointed to assert the ROUTE, because the claim it protects is the route
+//     and never the container. index.html keeps Wave 8b's bottom-of-card link as well -
+//     two routes, both asserted, because they answer different questions.
+//   Season stays where a season is started: the Season card on the setup screen, inside
+//     the closed "Open something else" row. Verified by tapping rather than by reading -
+//     cold arrival, one tap, a real <a href="season.html"> rendered 97x48px, and 0px of
+//     cost on arrival because the row ships closed.
+//
+// AT 360px, LOGGED AND PRE-EXISTING: v240's bar is ALREADY three rows there -
+// leaderboard [4,3,1], admin [3,3,2], index [4,4]. Two rows has only ever held from 375
+// up. v241 measures two rows at 360 on seven of the eight and [4,4,1] on admin, so the
+// narrow phone improves on leaderboard and is unchanged in kind on admin. Not fixed here.
+//
+// FIVE OTHER SUITES PINNED THE OLD SHAPE and were re-pointed with the reason inline:
+// rattle_icon_system_test.js (its ADMIN_LABELS exception for admin.html's long labels is
+// DELETED - the long names are the rule now), game_tab_test.js, guide_controls_test.js,
+// rattle_consumer_separation_test.js and instructions_accuracy_test.js. whole_dollar_test
+// was INVERTED: index.html's getNavLinkHref('Board') became ('Leaderboard'), because the
+// short label only still matched as a substring of the long one and a lookup that passes
+// by substring accident is one label change from resolving to the wrong pill.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v82-onenav. The tournament product cache stays tournament-v54-rattle-golf. iOS
+// is at 1.0.4 build 2 and already submitted; this wave is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v241-onenav';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
