@@ -135,8 +135,10 @@ describe('THE GAME TAB - rendered on the pool_flights golden round, delivered th
         const block = src.slice(src.indexOf("document.querySelectorAll('.nav-link').forEach"), src.indexOf('db.ref('));
         assert.match(block, /navHref = base \+ '\?game=' \+ currentMode/);
         assert.match(block, /navHref \+= '&group=' \+ groupParam/);
-        assert.match(src, /<a href="game\.html" class="top-nav-item active nav-link">📖 Game<\/a>/);
-        assert.match(src, /<a href="trip\.html" class="top-nav-item">🚐 Trip<\/a>/, 'Trip deliberately bare, as on every page');
+        // WAVE 15: the pill is two spans, glyph above label - see nav_bar_test.js for the
+        // measurement (nine pills beside their labels is three rows; above them, two).
+        assert.match(src, /<a href="game\.html" class="top-nav-item active nav-link"><span class="tni-glyph">📖<\/span><span class="tni-label">Game<\/span><\/a>/);
+        assert.match(src, /<a href="trip\.html" class="top-nav-item"><span class="tni-glyph">🚐<\/span><span class="tni-label">Trip<\/span><\/a>/, 'Trip deliberately bare, as on every page');
     });
 });
 
@@ -145,7 +147,7 @@ const CONSUMER_BARS = ['index.html', 'leaderboard.html', 'settlement.html', 'ski
 describe('THE NAV SLOT: 📖 Game where 📊 Stats was, on every bar', () => {
     CONSUMER_BARS.forEach(f => test(f + ' carries 📖 Game and no Stats pill', () => {
         const src = decodeEscapes(read(f));
-        assert.match(src, /<a href="game\.html" class="top-nav-item[^"]*">📖 Game<\/a>/, f + ' has no Game pill');
+        assert.match(src, /<a href="game\.html" class="top-nav-item[^"]*"><span class="tni-glyph">📖<\/span><span class="tni-label">Game<\/span><\/a>/, f + ' has no Game pill');   // Wave 15: stacked spans
         assert.doesNotMatch(src, /href="stats\.html" class="top-nav-item/, f + ' still has a Stats pill');
         assert.doesNotMatch(src, /📊 Stats/, f + ' still says Stats');
     }));

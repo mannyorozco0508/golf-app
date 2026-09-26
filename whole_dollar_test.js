@@ -248,10 +248,16 @@ describe('ONE CLEAN FINISH — the modal', () => {
 
     test('Game (Stats\' old slot, v186) and Leaderboard survive as secondary links', () => {
         assert.ok(/getNavLinkHref\('Game'\)/.test(code));
-        // 'Board', not 'Leaderboard': the pill reads "🏆 Board", and searching for the
-        // long name resolved to '#' for the same reason View Settle did (fixed v186).
-        assert.ok(/getNavLinkHref\('Board'\)/.test(code));
-        assert.ok(!/getNavLinkHref\('Leaderboard'\)/.test(code), 'the dead search string is back');
+        // INVERTED IN WAVE 15, because the stated reason stopped being true. This asserted
+        // getNavLinkHref('Board') and BANNED 'Leaderboard', because the pill read "🏆 Board"
+        // and the long name resolved to '#' the way "View Settle" did. The pills carry the
+        // long labels now, so 'Leaderboard' is the correct search string and 'Board' is the
+        // accidental one - it only still works because the lookup is textContent.includes
+        // and 'Board' is a substring of 'Leaderboard'. A guard that passes by substring
+        // luck is the kind of green this file exists to refuse, so the search string moved
+        // to the label the bar actually shows.
+        assert.ok(/getNavLinkHref\('Leaderboard'\)/.test(code));
+        assert.ok(!/getNavLinkHref\('Board'\)/.test(code), 'searching for the short label again - it matches only as a substring');
         assert.ok(/fr-jump-small/.test(code), 'they should not compete with the Receipt');
     });
 

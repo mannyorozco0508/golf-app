@@ -25,11 +25,15 @@
 // tournament.html are left alone". A correct guard, scoped around the one page with the
 // defect. So this file exists to cover admin.html with something.
 //
-// DELIBERATELY NARROW: it asserts the strip cannot slide, nothing clips, and every pill
-// is a thumb target. It does NOT assert the eight-pill shape or the short labels -
-// making admin.html's bar identical to the other seven is a separate decision, with two
-// links that have nowhere else to go (the guide route guide_coverage_test.js depends on,
-// and Season). Logged, not smuggled in here.
+// DELIBERATELY NARROW, AND KEPT THAT WAY IN WAVE 15 - my call, on the record. That wave
+// made admin.html's bar identical to the other seven, so nav_bar_test.js now covers this
+// page's shape, order, rows, glyph stack and hrefs. These six assertions are NOT folded
+// into it, because they are the only ones in the repo that reproduce the original defect
+// BEHAVIOURALLY: they set bar.scrollLeft = 200 and measure that the first pill did not
+// move. nav_bar_test.js reads computed overflow-x and scrollWidth, which is the CAUSE;
+// this reads the drift itself. The two orphans that were logged here are resolved - the
+// guide is a pill in the bar, Season is on the setup screen - so this file stops being
+// the place they are recorded and is just the behavioural half.
 //
 // mini-dom cannot see any of this: getBoundingClientRect returns a hard-coded zero rect
 // there. And the bar lives inside #admin-screen, which is display:none until the wizard
@@ -141,8 +145,10 @@ describe('ADMIN.HTML\'S TAB STRIP (Chrome, 390x844)', () => {
     });
 
     test('every pill is a thumb target', () => {
-        const small = M.items.filter(i => i.h < 40).map(i => i.label + ' ' + i.h + 'px');
-        assert.deepEqual(small, [], 'under 40px: ' + small.join(', '));
+        // 44px from Wave 15, up from 40: the control minimum everything else in this
+        // project is held to. Measured 58px, so this is headroom, not a re-pin.
+        const small = M.items.filter(i => i.h < 44).map(i => i.label + ' ' + i.h + 'px');
+        assert.deepEqual(small, [], 'under 44px: ' + small.join(', '));
     });
 
     test('the page itself does not scroll sideways', () => {

@@ -198,31 +198,46 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
 // ---------------------------------------------------------------------------
 describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
 
-    // 2026-09-14: the labels are the short ones that let all eight pills fit two
-    // rows at 390px (nav_bar_test.js) - Card and Board, not Scorecard and
-    // Leaderboard. The glyphs are unchanged.
+    // 2026-09-26 (Wave 15): the labels are the LONG ones on every page, uniform -
+    // Scorecard and Leaderboard. They fit two rows at 390px because the glyph moved
+    // ABOVE the label rather than beside it (nav_bar_test.js measures both the rows
+    // and the stack). The glyphs themselves are unchanged.
+    //
+    // KNOWN DUPLICATE, STATED RATHER THAN SILENT: 📖 is Game's glyph and the guide's.
+    // It is the guide's everywhere already - index.html's bottom-of-card route has
+    // read "📖 How it works" since Wave 8b, and so did the More-menu item before it -
+    // so the pill matching it is continuity, not a new collision. It is the first
+    // time the two sit in one bar. Logged for Manny; a different glyph for the guide
+    // is his call, not a thing to change under a geometry wave.
     const NAV = [
-        ['index.html', '\u{1F4DD}', 'Card'],
-        ['leaderboard.html', '\u{1F3C6}', 'Board'],
+        ['index.html', '\u{1F4DD}', 'Scorecard'],
+        ['leaderboard.html', '\u{1F3C6}', 'Leaderboard'],
         ['skins.html', '\u{1F4B0}', 'Bets'],
         ['settlement.html', '\u{1F91D}', 'Results'],
         ['sidematches.html', '\u2694\ufe0f', 'Matches'],
         ['game.html', '\u{1F4D6}', 'Game'],   // v186: the Game tab took Stats' slot - a book, read once on the first tee
         ['trip.html', '\u{1F690}', 'Trip'],
         ['admin.html', '\u{1F3E0}', 'Home'],
+        ['instructions.html', '\u{1F4D6}', 'How it works'],   // Wave 15: the guide's only guaranteed route
     ];
 
-    // admin.html keeps its own older copy of the bar (long labels, a More menu);
-    // the wave that shortened the labels left it alone by instruction.
-    const ADMIN_LABELS = { 'Card': 'Scorecard', 'Board': 'Leaderboard' };
-    test('every page carries the same eight-item bar', () => {
+    // THE ADMIN_LABELS EXCEPTION IS GONE (Wave 15). It read
+    //     { 'Card': 'Scorecard', 'Board': 'Leaderboard' }
+    // and existed because admin.html kept an older copy of the bar that six waves in
+    // a row were told to leave alone. The long names are the rule on all eight pages
+    // now, so the exception is not re-pointed - it is deleted, and if admin.html ever
+    // drifts back to its own labels this test fails like every other page would.
+    test('every page carries the same nine-item bar, glyph above label', () => {
         CONSUMER.forEach(f => {
             const src = read(f);
             if (!src.includes('top-nav-item')) return;
             NAV.forEach(([, glyph, label]) => {
-                const want = (f === 'admin.html' && ADMIN_LABELS[label]) ? ADMIN_LABELS[label] : label;
-                assert.ok(src.includes(glyph + ' ' + want),
-                    `${f}: nav is missing "${glyph} ${want}"`);
+                // The PAIRED SPANS, not `glyph + ' ' + label`: the glyph is its own
+                // element now, which is what puts it on its own line. Asserting the old
+                // concatenation would go green on a bar that had merged them back into one
+                // text run - which measures three rows, the defect this wave fixed.
+                assert.ok(src.includes(`<span class="tni-glyph">${glyph}</span><span class="tni-label">${label}</span>`),
+                    `${f}: nav is missing the stacked pill "${glyph} / ${label}"`);
             });
         });
     });
@@ -348,9 +363,11 @@ describe('ROAD TRIP', () => {
         assert.match(ADMIN, /<div class="hw-icon">\u{1F690}<\/div>/u, 'homepage tile');
         assert.match(ADMIN, /<div class="hw-name">Road Trip<\/div>/, 'full name on the tile');
         // trip.html has no nav bar of its own; the compact label lives on the pages
-        // that link TO it, and it stays "Trip" because eight items must fit 390px.
+        // that link TO it, and it stays "Trip" because NINE items must fit 390px - the
+        // one label the Wave 15 lengthening left short, because "Road Trip" is the
+        // page's name and "Trip" is the tab's.
         CONSUMER.filter(f => read(f).includes('top-nav-item')).forEach(f =>
-            assert.match(read(f), /\u{1F690} Trip/u, `${f}: compact nav label`));
+            assert.match(read(f), /<span class="tni-glyph">\u{1F690}<\/span><span class="tni-label">Trip<\/span>/u, `${f}: compact nav label`));
         assert.match(TRIP, /<title>Road Trip<\/title>/, 'the page itself uses the full name');
     });
 

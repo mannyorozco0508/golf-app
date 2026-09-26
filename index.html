@@ -157,7 +157,17 @@
             padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light);
         }
         .top-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; }
-        .top-nav-item { flex: 1 1 auto; justify-content: center; padding: 8px 8px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .top-nav-item { flex: 1 1 auto; flex-direction: column; justify-content: center; padding: 8px 4px; min-height: 40px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 1px; white-space: nowrap; }
+        /* THE GLYPH IS ITS OWN LINE (Wave 15), and that is what pays for the ninth pill.
+           Measured at 390x844 on all eight pages: nine pills with the glyph BESIDE the
+           label is 758px of intrinsic width in the ~610px two rows hold, so three rows -
+           203px instead of 139px. Above the label it is 523px, so two rows. The pill does
+           NOT get taller: it is content-box with min-height 40px, so a single 13.8px line
+           already leaves 26px spare and the second line fits in it. 139px before, 139px
+           after, every pill 58px. nav_bar_test.js measures the stack by the two spans' y
+           positions, because a collapsed stack reads the same height as a real one. */
+        .tni-glyph { font-size: 13px; line-height: 1.1; }
+        .tni-label { line-height: 1.1; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
         .top-nav-item.matches-nav-link { color: var(--brand-navy); border-color: var(--brand-navy); }
         .top-nav-item.matches-nav-link.active { background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy); }
@@ -1346,14 +1356,15 @@ html {
     <!-- Top Navigation Bar -->
     <div class="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
-        <a href="index.html" class="top-nav-item active nav-link">📝 Card</a>
-        <a href="leaderboard.html" class="top-nav-item nav-link">🏆 Board</a>
-        <a href="skins.html" class="top-nav-item nav-link">💰 Bets</a>
-        <a href="settlement.html" class="top-nav-item nav-link">🤝 Results</a>
-        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link">⚔️ Matches</a>
-        <a href="game.html" class="top-nav-item nav-link">📖 Game</a>
-        <a href="trip.html" class="top-nav-item">🚐 Trip</a>
-        <a href="admin.html" class="top-nav-item nav-link">🏠 Home</a>
+        <a href="index.html" class="top-nav-item active nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
+        <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
+        <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
+        <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
+        <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">📖</span><span class="tni-label">How it works</span></a>
     </div>
     </div>
 
@@ -7366,15 +7377,21 @@ html {
         renderFinishRoundReview();
 
         // Game and Leaderboard only, as quiet text links (Game took Stats' slot, v186).
-        // The leaderboard link searches for 'Board': the pill has read "🏆 Board" since
-        // 2026-09-14, and searching for 'Leaderboard' resolved to '#' - the same dead
-        // link "View Settle" was, for the same reason (fixed v186). "View Settle" was removed: it
+        // The leaderboard link searches for 'Leaderboard', which is what the pill reads
+        // again as of Wave 15 (2026-09-26) - the labels are the long ones on all eight
+        // pages now. Between 2026-09-14 and then it read "🏆 Board" and this searched for
+        // 'Board'; searching for the long name resolved to '#' the same way the dead
+        // "View Settle" link did (fixed v186). 'Board' would in fact still work, because
+        // getNavLinkHref matches with textContent.includes and 'Board' is a substring of
+        // 'Leaderboard' - which is exactly why it moved: a lookup that works by substring
+        // accident is one label change away from resolving to the wrong pill.
+        // "View Settle" was removed: it
         // resolved to '#' because getNavLinkHref searched the nav for "Settle" and the
         // nav reads "Results" - a dead button since the nav was renamed. There is no
         // separate Settle page either; settlement.html IS Results IS the Receipt.
         document.getElementById('fr-jump-links').innerHTML = `
             <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Game')}">📖 Game</a>
-            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Board')}">🏆 Leaderboard</a>
+            <a class="fr-jump-link fr-jump-small" href="${getNavLinkHref('Leaderboard')}">🏆 Leaderboard</a>
         `;
 
         // Always opens on REVIEW. Money lives one deliberate tap away.

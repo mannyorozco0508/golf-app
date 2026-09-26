@@ -121,7 +121,15 @@ const CARD_MEASURE = `(function () {
             textGap: t
         };
     }
-    var guide = document.querySelector('a[href="instructions.html"]');
+    // THE BOTTOM-OF-CARD ROUTE SPECIFICALLY (re-pointed Wave 15). There are two routes
+    // to the guide on this page now - a nav pill and this card - and a plain
+    // querySelector returns the FIRST, which is the pill. Measuring the pill here would
+    // report that Wave 8b's card had moved into the nav bar, which is the opposite of
+    // what happened: the card is untouched and a second route was added.
+    var guide = [].slice.call(document.querySelectorAll('a[href="instructions.html"]'))
+        .filter(function (a) { return !!a.closest('.save-exit-box'); })[0]
+        || document.querySelector('a[href="instructions.html"]');
+    var guidePill = document.querySelector('.top-nav-bar a[href="instructions.html"]');
     var boxes = [].slice.call(document.querySelectorAll('.save-exit-box'));
     // The control in each bottom card, in document order, so "one height" is a
     // comparison against the cards that were already there.
@@ -136,6 +144,7 @@ const CARD_MEASURE = `(function () {
         guide: box(guide),
         guideInSaveExitBox: !!(guide && guide.closest('.save-exit-box')),
         guideInNav: !!(guide && guide.closest('.top-nav-bar')),
+        guidePill: box(guidePill),
         stack: stack,
         navPillCount: document.querySelectorAll('.top-nav-bar .top-nav-item').length,
         scoreEntryBottom: holeView
@@ -239,10 +248,20 @@ describe('THE SCORECARD CARRIES THE GOLFER\'S ROUTE TO THE GUIDE', () => {
         assert.ok(C.guide.onScreen, 'the guide link is in the DOM and renders nothing');
         assert.ok(C.guideInSaveExitBox,
             'the link is not in the .save-exit-box stack at the bottom of the card');
-        assert.ok(!C.guideInNav, 'the link went into the nav bar. Measured at 390px, a '
-            + 'ninth pill takes that wrapping bar to another row on every screen of '
-            + 'the round; the bottom of the card costs no fold space.');
-        assert.equal(C.navPillCount, 8, 'the nav bar gained or lost a pill: ' + C.navPillCount);
+        assert.ok(!C.guideInNav,
+            'the bottom-of-card route is gone and only the nav pill is left. Both are '
+            + 'wanted: the pill reaches the guide from every page, the card is where a '
+            + 'golfer who has just finished a hole is already looking.');
+        // NINE PILLS, AND THE NINTH IS THE GUIDE (Wave 15). This asserted 8 and refused a
+        // ninth, because a ninth pill measured as a third row - 203px instead of 139px on
+        // every page. It measured that way with the glyph BESIDE the label. Stacking the
+        // glyph above it took the nine pills from 758px of intrinsic width to 523px, and
+        // two rows hold ~610px, so the bar is 139px with nine pills exactly as it was with
+        // eight. nav_bar_test.js holds the rows; this holds the count and that the ninth
+        // is on screen rather than merely in the markup.
+        assert.equal(C.navPillCount, 9, 'the nav bar gained or lost a pill: ' + C.navPillCount);
+        assert.ok(C.guidePill && C.guidePill.onScreen,
+            'the guide pill is not rendering: ' + JSON.stringify(C.guidePill));
     });
 
     test('it sits BELOW score entry, so it costs no fold space', () => {
