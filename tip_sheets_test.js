@@ -16,10 +16,14 @@
 // CSS. That is measured against the rule, not assumed: the test below reads the
 // declaration out of the file.
 //
-// A LITERAL "?" AND NOT AN EMOJI, and that is a rule rather than a taste. 📖 owns
-// "the guide" on both routes to instructions.html, and
-// rattle_icon_system_test.js's standing rule is one concept, one icon. A text "?"
-// allocates no glyph, so it cannot collide with a later one.
+// A LITERAL "?" AND NOT AN EMOJI, and that is a rule rather than a taste.
+// rattle_icon_system_test.js's standing rule is one concept, one icon, and a text "?"
+// allocates no glyph at all, so it cannot collide with a later one.
+//
+// IT ALREADY EARNED THAT (Wave 15b). When the guide needed a glyph of its own, ❓ was
+// the obvious pick and was REFUSED for this reason: it would have put the same mark on
+// this per-field affordance and on the whole-app guide. The guide took 🧭. This note
+// used to say "📖 owns the guide", which was true until then.
 //
 // 44px, because Wave 8b spent a whole wave raising this app's tap targets and the
 // nearest reusable shape - .ps-add, inside the Players sheet already - is 32.

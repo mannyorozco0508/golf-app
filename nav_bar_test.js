@@ -10,7 +10,7 @@
 // THE SHAPE, as of Wave 15 (2026-09-26): NINE pills, the glyph STACKED ABOVE a
 // LONG label at 12px, padding 8px 4px, two rows, the bar wraps, More is gone:
 //     📝 Scorecard · 🏆 Leaderboard · 💰 Bets · 🤝 Results · ⚔️ Matches
-//     📖 Game · 🚐 Trip · 🏠 Home · 📖 How it works
+//     📖 Game · 🚐 Trip · 🏠 Home · 🧭 How it works
 //
 // WHY STACKED, MEASURED at 390x844 on all eight pages. The labels are the long
 // ones on every page now (Manny's call: uniform, and uniform means Scorecard and
@@ -77,7 +77,10 @@ const NAMES = PAGES.map(([f]) => f);
 // a pill that had lost the glyph element and kept the characters, or vice versa.
 const ORDER = [['index.html', '📝', 'Scorecard'], ['leaderboard.html', '🏆', 'Leaderboard'], ['skins.html', '💰', 'Bets'], ['settlement.html', '🤝', 'Results'],
                ['sidematches.html', '⚔️', 'Matches'], ['game.html', '📖', 'Game'], ['trip.html', '🚐', 'Trip'], ['admin.html', '🏠', 'Home'],
-               ['instructions.html', '📖', 'How it works']];
+               // 🧭, not 📖: for one wave the guide shared Game's glyph and the two sat
+               // side by side in this bar. rattle_icon_system_test.js now asserts the nine
+               // glyphs are nine distinct ones, so this triple is the other half of that.
+               ['instructions.html', '🧭', 'How it works']];
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 
 const CD = makeCourseData(18);

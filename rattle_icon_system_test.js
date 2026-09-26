@@ -203,12 +203,22 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
     // ABOVE the label rather than beside it (nav_bar_test.js measures both the rows
     // and the stack). The glyphs themselves are unchanged.
     //
-    // KNOWN DUPLICATE, STATED RATHER THAN SILENT: 📖 is Game's glyph and the guide's.
-    // It is the guide's everywhere already - index.html's bottom-of-card route has
-    // read "📖 How it works" since Wave 8b, and so did the More-menu item before it -
-    // so the pill matching it is continuity, not a new collision. It is the first
-    // time the two sit in one bar. Logged for Manny; a different glyph for the guide
-    // is his call, not a thing to change under a geometry wave.
+    // THE GUIDE OWNS 🧭 (Wave 15b). For one wave it shared 📖 with Game, and in the
+    // stacked bar the two sat side by side and read as a mistake. This note used to say
+    // so and leave it; it is now an ALLOCATION, enforced two tests down - the nine nav
+    // glyphs must be nine DISTINCT glyphs, and every route to the guide must carry the
+    // guide's own one.
+    //
+    // WHY 🧭 AND NOT ❓, which is the obvious help glyph: ❓ would collide with the thing
+    // this app already uses for exactly that purpose. The Wave 10 context tips are 44px
+    // round buttons whose label is a LITERAL "?" text character, chosen precisely so no
+    // glyph was allocated (tip_sheets_test.js asserts the plain "?" and says why). A ❓
+    // pill would put the same mark on a per-field affordance and on the whole-app guide.
+    // 💡 is the same problem one step weaker - those tip sheets ARE tips. ℹ️ was free and
+    // would have worked; 🧭 was chosen over it because at 13px in a green pill the blue
+    // ℹ️ square reads as a badge rather than as a destination, and because "find your way
+    // around" is what the guide is for. All four candidates were verified unused in every
+    // consumer page, raw and \uXXXX-escaped, before choosing.
     const NAV = [
         ['index.html', '\u{1F4DD}', 'Scorecard'],
         ['leaderboard.html', '\u{1F3C6}', 'Leaderboard'],
@@ -218,7 +228,7 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
         ['game.html', '\u{1F4D6}', 'Game'],   // v186: the Game tab took Stats' slot - a book, read once on the first tee
         ['trip.html', '\u{1F690}', 'Trip'],
         ['admin.html', '\u{1F3E0}', 'Home'],
-        ['instructions.html', '\u{1F4D6}', 'How it works'],   // Wave 15: the guide's only guaranteed route
+        ['instructions.html', '\u{1F9ED}', 'How it works'],   // Wave 15: the guide's only guaranteed route
     ];
 
     // THE ADMIN_LABELS EXCEPTION IS GONE (Wave 15). It read
@@ -239,6 +249,40 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
                 assert.ok(src.includes(`<span class="tni-glyph">${glyph}</span><span class="tni-label">${label}</span>`),
                     `${f}: nav is missing the stacked pill "${glyph} / ${label}"`);
             });
+        });
+    });
+
+    test('the nine nav glyphs are NINE DISTINCT glyphs — one concept, one icon', () => {
+        // THE REAL ALLOCATION (Wave 15b), replacing a comment that recorded a duplicate
+        // and allowed it. 📖 was Game's and the guide's at the same time, in the same bar.
+        // This is the assertion that makes the rule true rather than stated.
+        const glyphs = NAV.map(([, g]) => g);
+        assert.equal(new Set(glyphs).size, NAV.length,
+            'two nav pills share a glyph: ' + glyphs.filter((g, i) => glyphs.indexOf(g) !== i).join(' '));
+    });
+
+    test('every route to the guide carries the guide\'s glyph, and none of them carries Game\'s', () => {
+        // There are three kinds of route to instructions.html and they must agree, because
+        // they are the same destination: the nav pill on all eight pages, index.html's
+        // bottom-of-card card from Wave 8b, and the guide's own page heading.
+        const GUIDE = '\u{1F9ED}', GAME = '\u{1F4D6}';
+        CONSUMER.filter(f => read(f).includes('top-nav-item')).forEach(f => {
+            assert.ok(read(f).includes(`<span class="tni-glyph">${GUIDE}</span><span class="tni-label">How it works</span>`),
+                `${f}: the guide pill does not carry ${GUIDE}`);
+        });
+        const idx = read('index.html');
+        assert.equal((idx.match(new RegExp(GUIDE + ' How it works', 'gu')) || []).length, 2,
+            'index.html should carry the guide card heading AND its link, both with ' + GUIDE);
+        assert.match(read('instructions.html'), new RegExp('<h1>' + GUIDE + ' How HardPan Works</h1>', 'u'),
+            'the guide page heading does not carry the guide glyph');
+        // AND Game's glyph is not used for the guide anywhere. This is the half that would
+        // have caught the original collision: the pills were both correct in isolation.
+        [...CONSUMER, 'instructions.html'].forEach(f => {
+            const src = read(f);
+            assert.ok(!new RegExp(GAME + '\\s*How it works', 'u').test(src),
+                `${f}: still labels the guide with Game's glyph`);
+            assert.ok(!src.includes(`<span class="tni-glyph">${GAME}</span><span class="tni-label">How it works</span>`),
+                `${f}: the guide pill still carries Game's glyph`);
         });
     });
 
