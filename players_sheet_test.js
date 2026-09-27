@@ -242,8 +242,27 @@ describe('WHO SEES IT', () => {
         assert.match(body, /data-flight="B"/);
         assert.match(String(run(sb, "document.getElementById('players-sheet-money').textContent")), /^Pot \$460$/);
     });
-    test('a group link: no pill; openPlayersSheet does nothing (CONTROL)', async () => {
+    test("THE ORGANIZER on a group link: the pill STAYS (re-pointed in Wave 22)", async () => {
+        // This case asserted "no pill" until 2026-09-27, on the round this very fixture
+        // says is owned by this device. That is the defect Manny hit on round 4C6722: a
+        // multi-group round shows the group picker over the scorecard, and answering it
+        // locked a group, which took the organizer's own pills away. A group lock scopes
+        // the CARD to four golfers; it does not decide which device owns the round. What
+        // it still does is demand real evidence - see the no-evidence case below.
         const sb = page(data, '?game=ps1&group=2');
+        await tick();
+        assert.match(String(run(sb, "document.getElementById('group-filter-container').innerHTML")), /👥 Players</);
+        run(sb, 'openPlayersSheet()');
+        assert.equal(run(sb, "document.getElementById('players-sheet').style.display"), 'flex');
+        // and the sheet is the WHOLE field, not the locked group - the organizer edits the round
+        const body = String(run(sb, "document.getElementById('players-sheet-body').innerHTML"));
+        assert.equal((body.match(/class="ps-row"/g) || []).length, 23);
+    });
+    test('a group link with NO evidence: no pill; openPlayersSheet does nothing (CONTROL)', async () => {
+        // The scorekeeper this link is actually sent to: another device, no token on the
+        // URL. This is what the old case was protecting and it is untouched.
+        const other = J(data); other.ownerUid = 'somebody-else';
+        const sb = page(other, '?game=ps1&group=2');
         await tick();
         assert.doesNotMatch(String(run(sb, "document.getElementById('group-filter-container').innerHTML")), /👥 Players</);
         run(sb, 'openPlayersSheet()');

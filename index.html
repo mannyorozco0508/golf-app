@@ -6033,11 +6033,43 @@ html {
     // device. Gates the Edit round setup button and the Group Links panel (which
     // prints the organizer link). The isOrganizerView() gates that remain (the
     // inline wager panel, End & Wipe) are listed in HANDOFF.md, unchanged this wave.
+    // A GROUP LOCK IS NOT A DEMOTION (Wave 22). This used to return false for a group
+    // lock before asking anything else, and that is the defect Manny hit on round 4C6722:
+    // the organizer link opens on the SCORECARD, a 6-group round shows the group picker
+    // over the whole page, and answering it - the only thing on that screen - adds
+    // &group=1. hasGroupLock went true, this returned false, and both organizer doors
+    // vanished while the token was still held and still validating. He demoted himself by
+    // doing the only thing offered.
+    //
+    // The token means "this device is the organizer"; &group= means "this card is scoped
+    // to four golfers". Only the first governs the doors.
+    //
+    // BUT THE GROUP LOCK STILL BLOCKS THE FALLBACK, which is why v189 blocked group links
+    // outright and why this is not simply a deleted line. isRoundOrganizer also says yes
+    // on a round that records neither an owner nor a token - open to anybody, as it always
+    // was - and on a group link that would hand the organizer's doors to every scorekeeper
+    // of a legacy round. So a group lock demands EVIDENCE: organizerEvidence() returns the
+    // uid or the token that proves it, and nothing else counts.
+    // WHAT OPENS THE ORGANIZER'S DOORS (Wave 22). Two different facts used to be confused
+    // here. The organizer token means "this device is the organizer". A &group= means "this
+    // card is scoped to four golfers". Only the first governs the doors, so a group lock on
+    // its own no longer closes them - it used to bail out before the token was even read,
+    // which is why Manny lost Edit round setup, Group Links and Players on round 4C6722 the
+    // moment he answered the group picker on his own organizer link.
+    //
+    // A group lock does still tighten WHAT COUNTS as being the organizer: it demands real
+    // evidence - a uid that matches ownerUid, or a token that matches organizerToken - and
+    // will not accept isRoundOrganizer's open-round fallback. That fallback says yes to any
+    // round recording neither owner nor token, which is every round saved before v200; on a
+    // bare link that is the old behaviour and stays. On a group link it would hand the doors
+    // to whoever was passed the link for their foursome, which is the thing the group lock
+    // was guarding against in the first place. organizerEvidence() is that narrower test.
     function canReachSetup() {
-        if (hasGroupLock) return false;
         if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
         const uid = (window.authBootState && window.authBootState.uid) || null;
         const token = window.organizerGate.heldOrganizerToken(currentMode, organizerTokenParam);
+        if (hasGroupLock && typeof window.organizerGate.organizerEvidence === 'function'
+            && !window.organizerGate.organizerEvidence(currentData, uid, token)) return false;
         return window.organizerGate.isRoundOrganizer(currentData, uid, token);
     }
     function setupHref() { return 'admin.html?game=' + currentMode; }
@@ -6200,9 +6232,23 @@ html {
         // score their own foursome; offering "All Players" and every other group is
         // temptation and confusion, and the badge above already says which group they
         // are on. The organizer keeps the full selector.
+        //
+        // BUT THE ORGANIZER'S DOORS SURVIVE A GROUP LOCK (Wave 22). This used to empty the
+        // whole strip, which is the second half of the defect Manny hit on round 4C6722:
+        // the organizer link lands on the scorecard, a 6-group round shows the picker over
+        // the page, and answering it locks a group - so the strip was wiped and Edit round
+        // setup, Group Links and Players went with the switcher. canReachSetup() now keeps
+        // saying yes on a group lock when there is real evidence (see its note), and the
+        // doors are painted here without the switcher: an organizer who chose to score a
+        // group is still the organizer, and still has no use for a group selector.
         if (hasGroupLock) {
-            container.innerHTML = '';
+            container.innerHTML = canReachSetup()
+                ? `<a class="group-btn group-setup-btn" href="${setupHref()}">✏️ Edit round setup</a>`
+                  + `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">🔗 Group Links</button>`
+                  + `<button type="button" class="group-btn group-setup-btn" onclick="openPlayersSheet()">👥 Players</button>`
+                : '';
             renderGroupLinksPanel();
+            renderOrganizerClaim();
             return;
         }
 
