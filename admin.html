@@ -2634,7 +2634,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     ? ` <span style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(facing)}</span>`
                     : (p.hcp ? ` <span style="color:var(--text-muted); font-size:0.8rem;">(${escapeHtml(String(p.hcp))})</span>` : '');
                 return `${escapeHtml(p.name)}${hcpBit}`;
-            }).join('<br>')
+            // FLAT, WRAPPED TEXT (Wave 21), not one golfer per line. Measured at 390x844
+            // with 25 golfers: 587px of list became a handful of wrapped lines. The list
+            // STAYS because it is the only check that a pasted roster came through right
+            // before the links go out; what goes is the line-per-golfer shape.
+            // The separator is a middot with spaces around it, so the browser can break
+            // between golfers and never inside a name. No count line and no grouping -
+            // Manny's call on both, and the groups are named in the links section below.
+            }).join(' \u00B7 ')
             : `<span style="color:var(--text-muted);">No players added yet</span>`;
     }
 
