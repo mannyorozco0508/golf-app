@@ -1,0 +1,180 @@
+// ============================================================================
+// THE HOLE LANDS BELOW THE STATUS BAR, NOT BEHIND IT (Wave 19b)
+//
+// THE DEFECT, reported from the INSTALLED app and then measured. Manny tapped Next
+// without touching a score box - no typing, no keyboard - and could not see which
+// hole he was on. Next was scrolling correctly the whole time. It was scrolling the
+// hole heading to 12px from the PHYSICAL TOP OF THE SCREEN, which in a standalone
+// PWA on a notched iPhone is underneath the clock and the battery.
+//
+// HOW. index.html insets the root for the notch (the NATIVE SAFE AREA block):
+//     html { padding-top: env(safe-area-inset-top, 0px); ... }
+// and that protects content while the page sits at scroll 0. landOnHole() scrolls to
+// an ABSOLUTE document offset, and the root padding is part of the document - so once
+// the page scrolls, the padding has gone above the viewport and nothing is left
+// holding the landing target below the status bar. Measured, same round, same tap:
+//     root padding-top  0px -> scrollY  980 -> header 12px from the viewport top
+//     root padding-top 47px -> scrollY 1027 -> header 12px from the viewport top
+//     root padding-top 59px -> scrollY 1039 -> header 12px from the viewport top
+// The target tracks the inset faithfully, which is exactly the problem: 12px from the
+// viewport top is 35px UNDER a 47px status bar.
+//
+// ---------------------------------------------------------------------------
+// WHY THIRTEEN ARRANGEMENTS PASSED, AND WHY THAT IS THE POINT OF THIS FILE.
+//
+// The existing landing assertions read `header.getBoundingClientRect().top >= 0` and
+// called 12px a landing. AN ASSERTION THAT MEASURES THE VIEWPORT CANNOT SEE A STATUS
+// BAR: the viewport in a standalone PWA starts under the notch, so 12px from its top
+// is 12px from the top of the screen, and the assertion is satisfied by the defect.
+// Thirteen arrangements - bare and group links, four to eight golfers, scored and
+// unscored holes, from rest and from the page bottom, with and without a focused box,
+// at a keyboard-sized viewport - all reported "landed" and all were wrong on a phone.
+//
+// That is the SAME SHAPE as the fixture fault in Wave 17's row guard, which scored
+// holes 1-5 and landed on an unscored hole so no cell could ever vary. There, a
+// fixture that could not produce the variation could not see it. Here, a frame of
+// reference that has no status bar in it cannot see one. Both suites were green and
+// both were measuring the wrong thing, and it is worth a reader finding that stated
+// rather than rediscovering it.
+//
+// HOW THIS EMULATES THE NOTCH. env(safe-area-inset-top) cannot be forced from a
+// test, and there is no headless status bar. But the fix does not read env() - it
+// reads the COMPUTED root padding-top, which is what env() sets - so setting that
+// padding directly exercises the same code path with the same arithmetic. 47px and
+// 59px are what iPhone 14/15-class devices report in standalone. The 0px case pins
+// the WEB behaviour unchanged, which matters because on the web the inset is 0 and
+// nothing about this may move.
+// ============================================================================
+
+const { test, describe, before } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
+const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
+
+const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
+const CD = makeCourseData(18);
+const OFFSET = 12;                 // HOLE_LANDING_OFFSET
+const INSETS = [0, 47, 59];        // web, iPhone 14-class, iPhone 15 Pro Max-class
+
+// A round whose holes are all scored and mixed, which is the state the report came
+// from - and the one Wave 17's guard could not reach.
+function round() {
+    const names = ['Manny Orozco', 'Kopp Kelly', 'Dalen Drake', 'Vic Vance'];
+    const P = makePlayers(names, [0, 9, 18, 4], 101);
+    const scores = {};
+    P.forEach((p, i) => { for (let h = 1; h <= 12; h++) scores['p' + p.id + '_h' + h] = 3 + ((h + i) % 4); });
+    return { eventName: 'Landing', courseName: 'Test', players: P, gameFormat: 'stroke',
+        courseData: CD, scores, settlementMode: 'whole-dollar', skinsBuyIn: 5, skinsCarryOver: false };
+}
+
+const LOOK = `(function () {
+  var hdr = document.querySelector('.hole-view-header');
+  var boxes = [].slice.call(document.querySelectorAll('.hv-player-row .score-input'));
+  var inset = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
+  var r = hdr ? hdr.getBoundingClientRect() : null;
+  return JSON.stringify({
+    inset: inset,
+    hole: hdr ? (hdr.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 14) : null,
+    scrollY: Math.round(window.pageYOffset || 0),
+    headerTop: r ? Math.round(r.top) : null,
+    // the only question that matters: is the heading BELOW the inset, or behind it?
+    clearOfInset: r ? (Math.round(r.top) >= inset) : null,
+    gapBelowInset: r ? Math.round(r.top) - inset : null,
+    boxesInView: boxes.length > 0 && boxes.every(function (b) {
+      var q = b.getBoundingClientRect(); return q.top >= inset && q.bottom <= window.innerHeight; }),
+    boxCount: boxes.length
+  });
+})()`;
+
+// Emulating the notch: set the root padding the way env(safe-area-inset-top) does,
+// BEFORE the navigation, then tap for real.
+const S = {};
+before(async () => {
+    for (const inset of INSETS) {
+        const r = await arriveCold({ url: fileUrl('index.html', 'game=LND19'), settleMs: 3200,
+            db: { events: { LND19: round() }, global_courses: {}, trips: {}, tournaments: {} },
+            viewport: { width: 390, height: 844 }, steps: [
+                { expression: "document.documentElement.style.paddingTop = '" + inset + "px'; 'set'" },
+                { sleep: 250 },
+                { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 600 }, { expression: "'next:' + " + LOOK },
+                { tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 600 }, { expression: "'prev:' + " + LOOK },
+            ] });
+        S[inset] = { ok: r.ok, reason: r.reason };
+        if (r.ok) (r.value || []).filter(v => typeof v === 'string' && v.indexOf(':{') > -1)
+            .forEach(v => { S[inset][v.slice(0, v.indexOf(':{'))] = JSON.parse(v.slice(v.indexOf(':{') + 1)); });
+    }
+});
+
+INSETS.forEach(inset => {
+    describe('LANDING with a ' + inset + 'px safe-area inset', () => {
+        test('ran, and the page really has the inset applied', () => {
+            assert.ok(S[inset] && S[inset].ok, S[inset] && S[inset].reason);
+            assert.equal(S[inset].next.inset, inset, 'the emulated inset did not take');
+        });
+
+        ['next', 'prev'].forEach(nav => {
+            test(nav.toUpperCase() + ': the hole heading lands ' + OFFSET + 'px BELOW the inset, not below the viewport', () => {
+                const v = S[inset][nav];
+                assert.equal(v.headerTop, inset + OFFSET,
+                    'the heading is at ' + v.headerTop + 'px from the viewport top with a ' + inset
+                    + 'px status bar over it - it should be at ' + (inset + OFFSET));
+                assert.equal(v.clearOfInset, true,
+                    'the heading is BEHIND the status bar: top ' + v.headerTop + ' against an inset of ' + inset);
+                assert.equal(v.gapBelowInset, OFFSET);
+            });
+        });
+
+        test('and all four score boxes are still fully in view, below the inset', () => {
+            const v = S[inset].next;
+            assert.equal(v.boxCount, 4);
+            assert.equal(v.boxesInView, true, 'a box is behind the inset or off the bottom');
+        });
+    });
+});
+
+describe('THE WEB IS PINNED UNCHANGED', () => {
+    test('with no inset the heading is exactly ' + OFFSET + 'px from the top, as it always was', () => {
+        // On the web env(safe-area-inset-top) is 0 - the browser chrome owns that space -
+        // so this wave must not move the web landing by a single pixel. This is the case
+        // that says so, and it is why the fix reads the inset rather than adding a
+        // constant.
+        assert.equal(S[0].next.headerTop, OFFSET);
+        assert.equal(S[0].prev.headerTop, OFFSET);
+        assert.equal(S[0].next.inset, 0);
+    });
+});
+
+describe('THE SOURCE: ONE PLACE, AND IT READS THE LIVE INSET', () => {
+    const SRC = read('index.html');
+    const fn = SRC.slice(SRC.indexOf('function landOnHole()'), SRC.indexOf('\n    }', SRC.indexOf('function landOnHole()')));
+
+    test('landOnHole subtracts the inset as well as HOLE_LANDING_OFFSET', () => {
+        assert.ok(fn.length > 100, 'landOnHole could not be sliced');
+        assert.match(fn, /getComputedStyle\(document\.documentElement\)/,
+            'the inset is not read from the computed root padding');
+        assert.match(fn, /paddingTop/);
+        assert.match(fn, /HOLE_LANDING_OFFSET/);
+    });
+
+    test('it is done ONCE, inside landOnHole, not at the navigations', () => {
+        // Prev/Next (goToAdjacentHole) and the 1-18 jump (jumpToHole) both call
+        // landOnHole, so the inset belongs in the one function they share.
+        const jump = SRC.slice(SRC.indexOf('function jumpToHole'), SRC.indexOf('\n    }', SRC.indexOf('function jumpToHole')));
+        const adj = SRC.slice(SRC.indexOf('function goToAdjacentHole'), SRC.indexOf('\n    }', SRC.indexOf('function goToAdjacentHole')));
+        assert.match(jump, /landOnHole\(\)/); assert.match(adj, /landOnHole\(\)/);
+        [jump, adj].forEach(b => assert.ok(!/safe-area|paddingTop/.test(b),
+            'a navigation is doing the inset arithmetic itself'));
+        assert.equal((SRC.match(/getComputedStyle\(document\.documentElement\)\.paddingTop/g) || []).length, 1,
+            'the inset is read in more than one place');
+    });
+
+    test('env() is NOT read from script, because it cannot be', () => {
+        // The root padding IS the inset - the NATIVE SAFE AREA block sets it from env() -
+        // so reading the computed padding is reading the inset, and it is 0 on the web.
+        assert.ok(!/env\(safe-area-inset-top[^)]*\)\s*[^;]*\)\s*\|\|/.test(fn));
+        assert.match(SRC, /padding-top: env\(safe-area-inset-top, 0px\)/,
+            'the block that sets the root inset is gone, so nothing sets what this reads');
+    });
+});

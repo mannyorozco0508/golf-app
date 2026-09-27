@@ -260,7 +260,17 @@ describe('THE SEAM (source)', () => {
         const l = fn('landOnHole');
         assert.match(l, /const anchor = card\.querySelector\('\.hole-view-header'\) \|\| card\.querySelector\('\.score-input'\);/);
         assert.match(l, /window\.scrollTo\(0, Math\.max\(0, y\)\)/);
-        assert.match(l, /anchor\.getBoundingClientRect\(\)\.top \+ \(window\.pageYOffset \|\| 0\) - HOLE_LANDING_OFFSET/);
+        // WAVE 19b: the target is now the absolute offset MINUS the offset MINUS the live
+        // safe-area inset, and it spans two lines. The inset is why: in the installed app
+        // the root is inset for the notch, that inset scrolls away with the document, and
+        // without subtracting it the heading landed 12px from the PHYSICAL top of the
+        // screen - 35px behind a 47px status bar. What this assertion is about is unchanged
+        // and still asserted: one explicit absolute scrollTo, anchored on the heading,
+        // never smooth and never a nudge. hole_landing_inset_test.js measures the landing
+        // at 0, 47 and 59px of inset, because THIS assertion cannot see a status bar.
+        assert.match(l, /anchor\.getBoundingClientRect\(\)\.top \+ \(window\.pageYOffset \|\| 0\)\s*\n?\s*- HOLE_LANDING_OFFSET - inset;/);
+        assert.match(l, /parseFloat\(getComputedStyle\(document\.documentElement\)\.paddingTop\) \|\| 0/,
+            'the inset must be read from the computed root padding - env() is not readable from script');
         assert.ok(!/smooth|scrollBy|requestAnimationFrame/.test(l));
         const code = IDX.replace(/^\s*\/\/.*$/gm, '');
         assert.ok(!/function withNavAnchor|function scrollToHoleCard|withNavAnchor\(|scrollToHoleCard\(/.test(code), 'the anchor and the card-top scroll are gone (comments stripped)');
