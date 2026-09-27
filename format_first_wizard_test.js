@@ -465,7 +465,22 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // round is affected.
         // skins_carry_and_labels_test.js asserts the BEHAVIOUR of all of it rather
         // than trusting these hashes to notice.
-        'money-engine.js': '9653b6320c583b97479d94f500df0637ff637cde702abfaf719433046e8494a8',  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
+        // RE-PINNED 2026-09-26 (Wave 18, NO CARRY IS THE DEFAULT), approved per-file for
+        // the named sites only, one line each, no arithmetic.
+        // A TIED HOLE WITH NO RECORDED RULE USED TO CARRY. Nine reader sites each held
+        // their own `(setting || the carry literal)` - in five files, three of them
+        // engines - so a $10-a-hole bet with two quiet holes put $20 on the next one
+        // without anybody choosing that. Measured before the change: a round that
+        // recorded nothing was byte-for-byte a round that chose Carry.
+        // The default now lives ONCE, in action-model's holeTiesCarry(), and a NEW round
+        // records 'void' out loud (TIE_RULE_DEFAULT). READING STORED DATA IS UNCHANGED:
+        // holeTiesCarry is exactly equivalent to the nine defaults it replaced, which is
+        // what keeps a round already agreed with carry ON paying the same money - proved
+        // at $180 on a legacy 18-hole bet, live on four pages.
+        // tie_carry_default_test.js asserts the BEHAVIOUR of all five cases rather than
+        // trusting these hashes to notice, and its control flips the resolver and checks
+        // the legacy money MOVES ($20 -> $10) so the legacy half cannot be decoration.
+        'money-engine.js': '12bfa41c2c8e6b8abfd397fbffb9b8606428a9229a605b87ad30fc0f7b51dbf0',   // was 9653b632 (Wave 18: the two tie-rule sites)  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
         // RE-PINNED, with per-file approval, for one change each and no arithmetic.
         // A Nassau is three independent wagers and both files settled all three - and
         // every press off them - at the single collapsed `stake`, which is the OVERALL
@@ -518,7 +533,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // computation. flights_engine_test.js "4.0 LEDGER == SETTLEMENT, PER
         // FLIGHT" holds it; a control that re-allocates the ledger now moves the
         // nets too.
-        'settlement-engine.js': 'ce69ae731e17fd4559dd61f055dc45b5c0a2703881b5b3336183d25ff77331d7',   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
+        'settlement-engine.js': '25b4120eff3c0966585b5168863551695391b979aca00c72f1992bbd2c14c7de',   // was ce69ae73 (Wave 18: the two tie-rule sites; see the note on money-engine.js above)   // re-pinned v215: the Aloha bet's three approved edits (aloha-bet.js owns the rules and the arithmetic)   // re-pinned 2026-09-22: the KP refund wording (approved); was 9043e7fc...
         // Previous hash, for the record:
         //   c5d5ab056920555144e9504e3d73664e8bcad992a2f391ceab540fbd1530e2af
         // RE-PINNED 2026-09-13 (MAIN POOL SKINS PER FLIGHT), with Manny's
@@ -569,7 +584,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // yet (the same file pins zero production callers), so every existing
         // caller runs exactly what it ran. flights_absent_golden_test.js is
         // what guards the behaviour; this hash only proves nothing else moved.
-        'action-model.js': 'e1585501b9f0f1c34a2d9ee1bcab044bd58949a12a68cd1b0eaec4751be63b9e',   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was ded86280): approved per-file, ONE new descriptor - the 'nines' entry in ADDITIONAL_GAME_CATALOG (label, its own 9-keycap glyph, blurb, stakeField ninePointsRate, defaults). No function changed and no arithmetic entered the file: the catalog key is what makes getRoundGames stop SKIPPING the instance, and every consumer downstream then receives it through the path skins and dots already use.
+        'action-model.js': '399ba26f0025b8d18fb240968c0922e7de8d7a22b616ac936cd4afa76ffd771b',   // was e1585501 (Wave 18: TIE_RULE_DEFAULT + holeTiesCarry + tieRuleRecorded, beside the skins trio; no arithmetic)   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was ded86280): approved per-file, ONE new descriptor - the 'nines' entry in ADDITIONAL_GAME_CATALOG (label, its own 9-keycap glyph, blurb, stakeField ninePointsRate, defaults). No function changed and no arithmetic entered the file: the catalog key is what makes getRoundGames stop SKIPPING the instance, and every consumer downstream then receives it through the path skins and dots already use.
         // RE-PINNED, with per-file approval, for TWO changes and no arithmetic.
         //   1. duplicate-name problems carry `where: 'host' | 'local'`. Both branches
         //      already existed and already knew which roster was ambiguous; only the

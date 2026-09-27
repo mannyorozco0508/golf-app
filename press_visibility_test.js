@@ -280,7 +280,10 @@ describe('WHAT THIS FIX DID NOT TOUCH', () => {
     test('the Receipt still prints all four and nets $1,920 for the launch fixture', () => {
         const { loadJsFile } = require('./helpers/load-script.js');
         const E = loadJsFile('money-engine.js');
-        ['action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']
+        // action-model.js is NOT re-injected: since Wave 18 it is a declared prereq of
+        // money-engine.js (holeTiesCarry lives there), so loadJsFile has already run it
+        // into this sandbox; running the same script twice throws on its consts.
+        ['settlement-engine.js', 'bet-strip.js', 'hole-events.js']
             .forEach(f => vm.runInContext(read(f), E, { filename: f }));
         const round = { players: P2, courseData: CD, sideMatches: LAUNCH() };
         vm.runInContext(`window.__r = buildSideMatchReceipts(${JSON.stringify(round)},

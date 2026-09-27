@@ -358,7 +358,8 @@ describe('CROSS-GROUP PRESS — one $78, every view', () => {
         const E2 = (() => {
             const { loadJsFile } = require('./helpers/load-script.js');
             const sb2 = loadJsFile('money-engine.js');
-            ['action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']
+            // action-model.js not re-injected (Wave 18 prereq of money-engine.js).
+            ['settlement-engine.js', 'bet-strip.js', 'hole-events.js']
                 .forEach(f => vm.runInContext(read(f), sb2, { filename: f }));
             return sb2;
         })();

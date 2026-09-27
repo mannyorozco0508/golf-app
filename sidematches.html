@@ -557,14 +557,17 @@ html {
                 <div class="control-group">
                     <label>Tied Hole</label>
                     <div class="toggle-row">
-                        <span class="toggle-label-sm active" id="sm-tie-rule-label-carry" onclick="setSmTieRule('carry')">Carry</span>
+                        <!-- VOID IS WHERE A NEW WAGER STARTS (Wave 18). TIE_RULE_DEFAULT in
+                             action-model.js is the same 'void', and this markup has to agree
+                             with it: the hidden input is what the payload records. -->
+                        <span class="toggle-label-sm" id="sm-tie-rule-label-carry" onclick="setSmTieRule('carry')">Carry</span>
                         <label class="toggle-switch">
-                            <input type="checkbox" id="sm-tie-rule-switch" onchange="setSmTieRule(this.checked ? 'void' : 'carry')">
+                            <input type="checkbox" id="sm-tie-rule-switch" onchange="setSmTieRule(this.checked ? 'void' : 'carry')" checked>
                             <span class="toggle-slider"></span>
                         </label>
-                        <span class="toggle-label-sm" id="sm-tie-rule-label-void" onclick="setSmTieRule('void')">Void</span>
+                        <span class="toggle-label-sm active" id="sm-tie-rule-label-void" onclick="setSmTieRule('void')">Void</span>
                     </div>
-                    <input type="hidden" id="sm-tie-rule" value="carry">
+                    <input type="hidden" id="sm-tie-rule" value="void">
                 </div>
             </div>
             <div class="control-grid" style="margin-bottom:10px;">

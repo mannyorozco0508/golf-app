@@ -412,7 +412,10 @@ describe('CUSTOM NET PAYOUTS — money, ties and receipt', () => {
     const CD18 = makeCourseData(18);
     const E2 = (() => {
         const sb = loadJsFile('money-engine.js');
-        ['action-model.js', 'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']
+        // action-model.js is NOT re-injected: since Wave 18 it is a declared prereq of
+        // money-engine.js (holeTiesCarry lives there), so loadJsFile has already run it
+        // into this sandbox; running the same script twice throws on its consts.
+        ['settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js']
             .forEach(f => vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f }));
         return sb;
     })();

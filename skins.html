@@ -1124,7 +1124,7 @@ html {
             // it pays on the Receipt.
             const sides = { sideA: teamAPlayers, sideB: teamBPlayers };
             const isTeamMatch = teamAPlayers.length > 1 || teamBPlayers.length > 1;
-            const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' }, sides);
+            const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: holeTiesCarry(sm.tieRule) ? 'carry' : 'void', scoringType: sm.scoring || 'net' }, sides);
             const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
             const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
             const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];

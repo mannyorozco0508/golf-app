@@ -949,6 +949,15 @@ function duplicatePlayerNames(players) {
 // data.skinsCarryOver for the round's own skins, each instance's own flag, and
 // moneyPool.skins.carryOver for the Main Pool bucket - so they cannot collapse into
 // one setting. What they share is this: one place that decides what silence means.
+//
+// AND SILENCE MEANS THE OPPOSITE HERE FROM A TIED HOLE (Wave 18), on purpose, so
+// this is the reason rather than an inconsistency for somebody to find later:
+// holeTiesCarry() below treats an absent tie rule as CARRY, because a tie carrying
+// is money the group already agreed on a course - the stake stays on the table and
+// everyone standing there knows it. A skins pot that silently rolled is the
+// opposite: money nobody chose to risk, accumulating because a setting nobody saw
+// happened to default that way. Same mechanism, different answer, and the
+// difference is the money's provenance.
 function skinsCarriesOver(setting) {
     return setting === true;
 }
@@ -971,8 +980,60 @@ function skinsCarryRuleRecorded(setting) {
     return setting === true || setting === false;
 }
 
+// ---------------------------------------------------------------------------
+// TIED HOLES: WHAT AN ABSENT TIE RULE MEANS.
+//
+// Measured before this wave: a $10-a-hole stroke bet with holes 1 and 2 both tied
+// and NOBODY having chosen a rule carried $20 onto hole 3 - byte-for-byte the same
+// as a round that chose Carry. Nine reader sites each held their own `|| 'carry'`,
+// in five files, three of them engines. The engines are neutral -
+// calculateHoleBetEngine tests `config.tieRule === 'carry'` - so every one of those
+// defaults lived in a caller, which is the same shape the skins settings were in
+// before skinsCarriesOver above.
+//
+// NO CARRY IS WHAT A NEW ROUND GETS. Nobody's mental model of a $10 nassau side bet
+// is "the stake doubles unless we said otherwise"; a group that never discussed
+// ties expects each hole to stand alone.
+//
+// BUT SILENCE MEANS CARRY, WHICH IS THE OPPOSITE OF SKINS, and that is deliberate.
+// Both writers of a tie rule record it explicitly - sidematches.html for a wager,
+// saveSettings() for Wolf - so an ABSENT rule can only be a record written before
+// this wave, when the app itself defaulted to carry. A tie carrying is money the
+// group already agreed on a course: the stake sat on the table and everyone
+// standing there knew it. A skins pot that silently rolled is money nobody chose to
+// risk. So a legacy round keeps its carry and a new one starts at void, and the two
+// resolvers disagree about silence for a stated reason.
+//
+// tieRuleRecorded() is how a receipt can say WHICH rule it applied rather than
+// quietly picking one, exactly as skinsCarryRuleRecorded does.
+var TIE_RULE_DEFAULT = 'void';
+
+function holeTiesCarry(setting) {
+    // EXACTLY EQUIVALENT TO THE NINE `sm.tieRule || 'carry'` IT REPLACES, and that is
+    // the point: `(setting || 'carry') === 'carry'` is what every caller used to
+    // compute for itself. Reading stored data is unchanged by this wave - what changed
+    // is what a NEW round RECORDS (TIE_RULE_DEFAULT). Writing it out rather than
+    // collapsing it to one expression, because the three branches are three different
+    // facts and a future editor should have to disagree with the named one:
+    if (setting === 'carry') return true;         // agreed: carry
+    if (setting === 'void') return false;         // agreed: void
+    if (!setting) return true;                    // SILENCE: a pre-Wave-18 record, and
+                                                  // those carried. See the note above.
+    // A value the app has never written - 'push', 'CARRY', anything - voids, because
+    // that is what the engines do with it (`config.tieRule === 'carry'`) and a resolver
+    // is the easiest place to lose that by writing `setting !== 'void'`.
+    return false;
+}
+
+function tieRuleRecorded(setting) {
+    return setting === 'carry' || setting === 'void';
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports.skinsCarriesOver = skinsCarriesOver;
+    module.exports.TIE_RULE_DEFAULT = TIE_RULE_DEFAULT;
+    module.exports.holeTiesCarry = holeTiesCarry;
+    module.exports.tieRuleRecorded = tieRuleRecorded;
     module.exports.SKINS_CARRY_DEFAULT = SKINS_CARRY_DEFAULT;
     module.exports.skinsCarryRuleRecorded = skinsCarryRuleRecorded;
     module.exports.buildNassauWagerPayload = buildNassauWagerPayload;

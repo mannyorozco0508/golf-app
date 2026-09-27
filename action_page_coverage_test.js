@@ -218,7 +218,10 @@ describe('GROUP COUNTS — one, two and three groups', () => {
 describe('COVERAGE PARITY — Action / Live / Settlement / Receipt', () => {
     const ENG = (() => {
         const sb = loadJsFile('money-engine.js');
-        ['action-model.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f =>
+        // action-model.js is NOT re-injected: since Wave 18 it is a declared prereq of
+        // money-engine.js (holeTiesCarry lives there), so loadJsFile has already run it
+        // into this sandbox; running the same script twice throws on its consts.
+        ['settlement-engine.js', 'bet-strip.js'].forEach(f =>
             vm.runInContext(read(f), sb, { filename: f }));
         return sb;
     })();

@@ -25,7 +25,11 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 // Layered exactly as the browser loads them.
 function engines() {
     const sb = loadJsFile('money-engine.js');
-    ['action-model.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f => {
+    // action-model.js is NOT re-injected: since Wave 18 it is a declared prereq of
+    // money-engine.js (holeTiesCarry lives there), so loadJsFile has already run it into
+    // this sandbox, and running the same script twice throws on its const declarations -
+    // as a browser would too.
+    ['settlement-engine.js', 'bet-strip.js'].forEach(f => {
         vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), sb, { filename: f });
     });
     return sb;

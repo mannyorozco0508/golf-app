@@ -25,7 +25,11 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 function engines() {
     const sb = loadJsFile('money-engine.js');
-    ['action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js']
+    // action-model.js is NOT re-injected: since Wave 18 it is a declared prereq of
+    // money-engine.js (it owns holeTiesCarry), so loadJsFile has already run it into this
+    // sandbox. Running it twice throws 'ADDITIONAL_GAME_CATALOG has already been
+    // declared' - which is what a browser would do with the same script twice too.
+    ['settlement-engine.js', 'bet-strip.js', 'hole-events.js']
         .forEach(f => vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 }

@@ -8232,7 +8232,7 @@ html {
 
         const loneMult = parseFloat(data.wolfLoneMult) || 2;
         const blindMult = parseFloat(data.wolfBlindMult) || 4;
-        const tieRule = data.wolfTieRule || 'carry';
+        const tieRule = holeTiesCarry(data.wolfTieRule) ? 'carry' : 'void';
         const lastPlaceRule = data.wolfLastPlaceRule === 'on';
         const calls = data.wolfCalls || {};
 

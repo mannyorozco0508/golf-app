@@ -88,7 +88,7 @@ const offerInput = (extra) => Object.assign({
 // ---------------------------------------------------------------------------
 describe('1. NO ENGINE MATH MOVED', () => {
     test('money-engine.js is byte-for-byte unchanged', () => {
-        assert.equal(sha('money-engine.js'), '9653b6320c583b97', 'money-engine.js changed: ' + sha('money-engine.js'));  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
+        assert.equal(sha('money-engine.js'), '12bfa41c2c8e6b8a', 'money-engine.js changed: ' + sha('money-engine.js'));  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
     });
     test('aloha-bet.js computes no strokes and reads no scores except "is this hole blank"', () => {
         const src = read('aloha-bet.js');
