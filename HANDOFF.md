@@ -2766,17 +2766,77 @@ remembered on this device for this round (`rememberOrganizerToken`, localStorage
 nav rewrite drops the param on the first tab tap, so without the memory the
 organizer loses the setup the moment they change tabs). A legacy round with
 neither field (before 2026-08-24) is open as it always was; a round with a token
-and no `ownerUid` (2026-08-24 to 09-14) admits only the link. Never on a group
-link, whoever holds it. **The uid is per browser ORIGIN**: Safari, the home-screen
+and no `ownerUid` (2026-08-24 to 09-14) admits only the link.
+
+**A group link no longer closes the scorecard's doors by itself (Wave 22,
+2026-09-27).** The old rule was "never on a group link, whoever holds it", and it cost
+Manny his own controls on round 4C6722: he opened his organizer link on his own phone,
+answered the group picker a 25-golfer round shows over the card, and Edit round setup,
+Group Links and Players all went away while the matching token was still on the URL.
+A group lock now decides not WHO the organizer is but what counts as PROOF: on a group
+link `index.html` asks the new `organizerEvidence(data, uid, token)` — a matching
+`ownerUid` or a matching `organizerToken`, and **not** `isRoundOrganizer`'s legacy
+open-round arm, which on a group link would promote whoever was sent that link for
+their foursome. A bare link is unchanged. A locked card still gets no group switcher.
+`game.html`'s own gate is not `canReachSetup()` and still shows nothing on any group
+link; that divergence is pinned in `organizer_door_test.js` rather than fixed.
+
+**The uid is per browser ORIGIN**: Safari, the home-screen
 app and the App Store app on one phone are three different organizers — open the
 organizer link once in each to make them all the organizer.
 
-**WHAT THIS IS NOT. The client hides the doors; it does not lock them.**
-As of 2026-09-23 the database does, for setup keys on a round that has
-`ownerUid`: `auth.uid` must equal that uid. The organizer token is still
-`.read: true` with the rest of the round, so the rules cannot trust it. A
-second device saves setup by email-link sign-in, which adopts the uid that
-created the round. See "Owner-only consumer setup" below.
+**WHAT THIS IS NOT. The client hides the doors; it does not lock them — and as of
+2026-09-27 nothing else does either.** The previous version of this paragraph said
+"As of 2026-09-23 the database does". That was false, and it is the exact class of
+defect CLAUDE.md warns about: the rule was WRITTEN on 2026-09-23 and never
+published, so a confident sentence claimed an enforcement that does not exist.
+
+**MEASURED 2026-09-27 (Wave 22 item 3, logged and not built — nothing was
+published).** The last publish of `database.rules.json` was `dab91d8` (2026-09-18),
+whose repo bytes plus one trailing newline hash to
+`66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd` — the live sha
+read back three times with `firebase-tools` and recorded above. Four commits have
+changed the file since and **none of them is live**:
+
+| commit | date | what it added |
+|---|---|---|
+| `4f4ec0a` | 2026-09-23 | Lock consumer round setup to the owner's uid (#13) — **this is the one this section used to claim was enforced** |
+| `ae22953` | 2026-09-24 | v217 confirm-or-mark-out |
+| `6c2bd1b` | 2026-09-24 | v222 season ledger |
+| `1f189cf` | 2026-09-26 | Wave 13 |
+
+The current repo file plus a newline is `d4d56617…`, which matches `1f189cf` and not
+the live hash. **So today every consumer gate on a round is UI only.** Hiding "Edit
+round setup" is the whole of it; a client that skips the page and writes the node
+directly is refused by nothing.
+
+**WHAT PUBLISHING WOULD CHANGE, and what it would not.** This is the distinction a
+future reader needs, so it is written out rather than summarised. `events/$eventCode`
+`.read` is `true` and stays `true` — the round is readable by anyone with the code by
+design, which is also why the rules **cannot** trust the organizer token: it travels
+in a readable node, so anyone who can read the round can read the token. Only
+`auth.uid` can be trusted.
+
+- **SETUP would become owner-only.** The parent `.write` requires, for an existing
+  round that has `ownerUid`, `auth.uid === data.child('ownerUid').val()`. That covers
+  everything the wizard edits: the roster, the course, the wagers, group sizes, the
+  format. A second device gets there by email-link sign-in, which adopts the uid that
+  created the round.
+- **FIFTEEN CHILDREN WOULD STAY WRITABLE BY ANYONE HOLDING THE SIX-CHARACTER CODE**,
+  because each declares its own `.write: root.child('events/' + $eventCode).exists()`:
+  `scores`, `scoresVerified`, `kpLeaders`, `kpWinners`, `kpConfirmed`, `sideMatches`,
+  `matchPresses`, `strokePresses`, `dots`, `wolfCalls`, `ryderCup`, `ryderCupRef`,
+  `ryderFoursomes`, `additionalGameInstances`, `auditLog`. That is deliberate — a
+  scorekeeper on a group link is not signed in and must be able to post scores — but
+  it means publishing buys **the setup, not the money**. Everything that decides who
+  pays whom is in that list.
+- **A LEGACY ROUND (no `ownerUid`) WOULD STAY FULLY OPEN**, by the third arm of the
+  parent `.write`. Publishing changes nothing for any round created before 2026-08-24.
+
+So "only the organizer can change things" is not true today and would still not be
+true after a publish; what would become true is "only the organizer can change the
+round's SETUP, on rounds that have an owner". Anything said to a golfer has to match
+that, which is why no UI string may say protected, secure or locked.
 
 **Left on the OLD predicate this wave** — `index.html` `isOrganizerView()` is still
 `!hasGroupLock` ("no ?group= in the link"), which a "Just watching" spectator on
@@ -2798,6 +2858,10 @@ included), so a gate moved later has to move its comment too and update the
 table above. Also not on either predicate: the group switcher in
 `renderGroupFilters` (`hasGroupLock` decides, harmless for a spectator) and the
 score-override provenance `verifiedBy` (`hasOrganizerAuthority`, the token only).
+`renderGroupFilters` does now ask `canReachSetup()` on its locked branch, because that
+branch used to empty `#group-filter-container` — the container the doors are painted
+into — so a true `canReachSetup()` still rendered nothing. The switcher itself remains
+`hasGroupLock`'s decision alone.
 
 Not moved tonight because the wipe is the destructive control and should get its
 own decision rather than ride along, and the inline wager panel on a single group

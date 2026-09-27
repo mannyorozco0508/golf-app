@@ -3118,7 +3118,52 @@
 // consumer-v90-roster. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v249-roster';
+// Moved to v250 SO THE ORGANIZER KEEPS THEIR DOORS THROUGH THE GROUP PICKER.
+//
+// WHAT AN INSTALLED DEVICE ON v249 KEEPS SERVING: a scorecard where answering the group
+// picker takes the organizer's own controls away. Manny, round 4C6722, 25 golfers in 6
+// groups: he tapped "Share organizer link", opened it on his own phone, answered the
+// picker that a multi-group round shows over the card, and lost "Edit round setup", the
+// Group Links panel and the Players pill. The token was still on the URL and still
+// matched; two gates in index.html threw it away because a group was locked.
+//
+// THE TWO GATES, both in index.html. canReachSetup() bailed out on hasGroupLock before it
+// ever read the token. renderGroupFilters() then emptied #group-filter-container on the
+// same condition - which is the container the doors are painted into, so even a true
+// canReachSetup() rendered nothing. The first was the one briefed; the second was found
+// by measuring after the first was fixed, and the doors do not come back without both.
+//
+// WHAT THE GROUP LOCK STILL DOES, and this is the distinction worth keeping: it no longer
+// decides WHO the organizer is, it decides what counts as PROOF. On a group link the page
+// demands organizerEvidence() - a uid matching ownerUid, or a token matching
+// organizerToken. isRoundOrganizer's third arm (a round recording neither field is open,
+// as every round saved before v200 does) is NOT accepted there, because on a group link
+// that would hand the doors to whoever was sent that link for their foursome. On a bare
+// link the old behaviour is untouched. And a locked card still gets NO group switcher -
+// an organizer scoring one group has no use for "All Players".
+//
+// THE PICKER IS UNCHANGED, deliberately. Manny's instruction: one change. An organizer who
+// wants to score a group still can, and now keeps the doors while doing it.
+//
+// GUARDED BY the arrival-then-picker sequence nothing tested: organizer link, picker
+// answered, then all three doors asserted present in the rendered strip
+// (organizer_doors_after_picker_test.js, headless Chrome, cold). Three controls, each red
+// behaviourally: restore either gate and the doors vanish; let organizerEvidence accept
+// the open-round fallback and a legacy group link becomes an organizer.
+//
+// RE-POINTED: organizer_door_test.js, whose v189 header said "never on a group link,
+// whoever holds it" and asserted canReachSetup() === false on the owner's own group link.
+// That case now asserts the opposite, with the reason written into the file. game.html's
+// own gate is NOT canReachSetup and still shows nothing on any group link; that
+// divergence is pinned as a recorded fact rather than fixed.
+//
+// No engine and no protected file changed. database.rules.json is untouched and still
+// unpublished - these gates are UI only, and anyone holding the round code can still write
+// scores, KP, side matches, presses, dots and Ryder state. The consumer product cache is
+// consumer-v91-organizerdoors. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
+// web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v250-organizerdoors';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

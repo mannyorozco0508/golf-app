@@ -138,10 +138,23 @@ describe('2. THE THREE "?" CONTROLS EXIST, AND DO NOT DISTURB WHAT IS THERE', ()
         // `a.group-setup-btn { ... }` - so it counted a selector as a button and
         // failed on a correct page. The pills are what matter: exactly the two
         // organizer doors, and no third.
+        //
+        // FOUR, NOT TWO, SINCE WAVE 22: renderGroupFilters now has two branches that paint
+        // the doors - the open card, and a group-locked card where the device has organizer
+        // evidence. Each branch writes Edit round setup and Players, so the class appears
+        // twice per branch. The assertion's real job is unchanged: no THIRD kind of door,
+        // and the Players "?" (checked above) is not wearing the class. Both sites must sit
+        // inside renderGroupFilters, which is what stops a stray door elsewhere passing by
+        // arithmetic.
         const pills = src.match(/class="[^"]*\bgroup-setup-btn\b[^"]*"/g) || [];
-        assert.equal(pills.length, 2,
-            'expected exactly the two organizer doors, found ' + pills.length + ': '
-            + JSON.stringify(pills));
+        assert.equal(pills.length, 4,
+            'expected the two organizer doors in each of renderGroupFilters\' two branches, '
+            + 'found ' + pills.length + ': ' + JSON.stringify(pills));
+        const rgf = src.slice(src.indexOf('function renderGroupFilters'),
+                              src.indexOf('\n    function ', src.indexOf('function renderGroupFilters') + 30));
+        assert.ok(rgf.length > 400, 'renderGroupFilters could not be sliced');
+        assert.equal((rgf.match(/class="[^"]*\bgroup-setup-btn\b[^"]*"/g) || []).length, 4,
+            'a .group-setup-btn pill is being rendered outside renderGroupFilters');
     });
 
     test('the money "?" did not break the step-6 title the icon system pins', () => {

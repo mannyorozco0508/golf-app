@@ -141,10 +141,28 @@
         if (String(urlToken) !== String(data.organizerToken)) return false;
         try { localStorage.setItem(tokenKey(code), String(urlToken)); return true; } catch (e) { return false; }
     }
+    // EVIDENCE THAT THIS DEVICE IS THE ORGANIZER OF THIS ROUND (Wave 22): the uid that
+    // created it, or the organizer token it was given. Returns which one, or null.
+    //
+    // WHY IT IS ITS OWN FUNCTION. isRoundOrganizer below also answers yes on a round that
+    // records NEITHER of those - a legacy round, open to anybody, as it always was. That
+    // third answer is not evidence of anything, and one caller needs to tell the two
+    // apart: index.html's canReachSetup() keeps the organizer's doors open on a group link
+    // when there is real evidence, and must NOT hand them to every scorekeeper of a legacy
+    // round. Deliberately the only place the comparison is written, so the two predicates
+    // cannot drift.
+    function organizerEvidence(data, uid, token) {
+        if (!data || typeof data !== 'object') return null;
+        if (data.ownerUid && uid && String(uid) === String(data.ownerUid)) return 'uid';
+        if (data.organizerToken && token && String(token) === String(data.organizerToken)) return 'token';
+        return null;
+    }
+
     function isRoundOrganizer(data, uid, token) {
         if (!data || typeof data !== 'object') return false;
-        if (data.ownerUid && uid && String(uid) === String(data.ownerUid)) return true;
-        if (data.organizerToken && token && String(token) === String(data.organizerToken)) return true;
+        if (organizerEvidence(data, uid, token)) return true;
+        // A round that records no owner and no token is open, as it always was. This is the
+        // arm that is NOT evidence - see organizerEvidence above.
         if (!data.ownerUid && !data.organizerToken) return true;
         return false;
     }
@@ -367,6 +385,7 @@
         standingLine: standingLine,
         readStanding: readStanding,
         organizerShareUrl: organizerShareUrl,
+        organizerEvidence: organizerEvidence,
         shareOrganizerLink: shareOrganizerLink,
         organizerShareText: organizerShareText,
         tokenFromPaste: tokenFromPaste,

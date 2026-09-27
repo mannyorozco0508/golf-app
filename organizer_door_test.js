@@ -11,7 +11,26 @@
 //      first tab tap, so without the memory the organizer loses the setup);
 //   3. a legacy round with neither field is open, as it always was.
 // NOT "no ?group= in the link" (isOrganizerView), which a "Just watching"
-// spectator satisfies. And never on a group link, whoever holds it.
+// spectator satisfies.
+//
+// AND A GROUP LINK NO LONGER CLOSES THE SCORECARD'S DOORS BY ITSELF (Wave 22,
+// 2026-09-27). v189 wrote "never on a group link, whoever holds it", and the case
+// below asserted that on the owner's own device. Manny hit the cost of that rule on
+// round 4C6722: he tapped "Share organizer link" on his own phone, a 25-golfer round
+// shows the group picker over the scorecard, and answering it locked a group - which
+// took Edit round setup, Group Links and Players away from the organizer on his own
+// round. The rule is now narrower and says what it always meant: a group lock does not
+// decide who the organizer is, it decides what counts as PROOF. On a group link
+// index.html asks organizerEvidence() - a matching ownerUid or a matching token, and
+// nothing else. isRoundOrganizer's third arm (a legacy round with neither field is
+// open) is deliberately NOT accepted there, because on a group link it would hand the
+// doors to whoever was passed that link for their foursome. See
+// organizer_doors_after_picker_test.js for the arrival-then-picker sequence, and the
+// three cases under "AND A GROUP LOCK STILL BLOCKS EVERYTHING THAT IS NOT EVIDENCE".
+//
+// game.html is UNCHANGED and still shows nothing on any group link - see the case
+// below. That divergence is real and recorded rather than fixed: this wave was one
+// change to one gate.
 //
 // THE DOORS. index.html: "✏️ Edit round setup" in the group strip and the
 // 🔗 Group Links panel (it prints the organizer link) - both on canReachSetup().
@@ -119,11 +138,27 @@ describe('THE SCORECARD (index.html): the button and the Group Links panel', () 
         await tick();
         assert.match(strip(sb), SETUP, 'the page re-rendered itself on authReady');
     });
-    test('A GROUP LINK: no button, no Group Links, no panel - even on the organizer\'s own device (CONTROL: the button on a group link)', async () => {
+    test("A GROUP LINK ON THE ORGANIZER'S OWN DEVICE: the doors STAY (re-pointed in Wave 22 - see the header)", async () => {
+        // v189 asserted false here. It was the wrong half of the pair: the group lock is
+        // about which four golfers this card covers, not about which device owns the round.
+        // OWNER's ownerUid matches this realm's uid, so the evidence is real and the doors
+        // hold. What a group lock DOES still remove is the group switcher itself - there is
+        // no "All Players" button on a locked card, which is the assertion below.
         const sb = await scorecard(OWNER, '?game=door1&group=1');
+        assert.equal(run(sb, 'canReachSetup()'), true);
+        assert.match(strip(sb), /Edit round setup/);
+        assert.match(strip(sb), /toggleGroupLinksPanel/);
+        assert.match(strip(sb), /openPlayersSheet/);
+        assert.notEqual(panel(sb), '');
+        assert.doesNotMatch(strip(sb), /All Players/, 'a locked card still gets no group switcher');
+    });
+    test('A GROUP LINK WITH NO EVIDENCE: still no button, no Group Links, no panel (the scorekeeper Manny sends it to)', async () => {
+        // OTHER is owned by another uid and the URL carries no token, so nothing matches.
+        // This is the case v189 was actually protecting, and it is untouched.
+        const sb = await scorecard(OTHER, '?game=door1&group=1');
+        assert.equal(run(sb, 'canReachSetup()'), false);
         assert.doesNotMatch(strip(sb), /Edit round setup|toggleGroupLinksPanel/);
         assert.equal(panel(sb), '');
-        assert.equal(run(sb, 'canReachSetup()'), false);
     });
     test("ANOTHER GROUP'S LINK: the same nothing", async () => {
         const sb = await scorecard(OTHER, '?game=door1&group=2');
@@ -181,7 +216,10 @@ async function gameTab(data, search, opts) {
 const GAME_SETUP = /^<a class="game-setup-link" href="admin\.html\?game=DOOR1">✏️ Edit round setup<\/a><a class="game-setup-link" href="index\.html\?game=DOOR1&players=1">👥 Players<\/a>(<button type="button" class="game-setup-link" onclick="shareOrganizerLinkFromGame\(this\)">🔑 Share organizer link<\/button>)?$/;
 describe('THE GAME TAB (game.html): the button under the title', () => {
     test("the organizer's device: the button", async () => { assert.match(await gameTab(OWNER, '?game=door1'), GAME_SETUP); });
-    test('a group link: nothing, even for the owner (CONTROL)', async () => { assert.equal(await gameTab(OWNER, '?game=door1&group=1'), ''); });
+    // game.html keeps v189's flat rule - its own gate is not canReachSetup and this wave
+    // did not touch it. Pinned as it stands so the divergence from the scorecard is a
+    // recorded fact rather than a surprise to whoever reads the two suites together.
+    test('a group link: nothing, even for the owner (UNCHANGED by Wave 22 - the scorecard moved, this page did not)', async () => { assert.equal(await gameTab(OWNER, '?game=door1&group=1'), ''); });
     test('another device, bare link: nothing', async () => { assert.equal(await gameTab(OTHER, '?game=door1'), ''); });
     test('the organizer link, then the remembered token: the button both times', async () => {
         assert.match(await gameTab(OTHER, '?game=door1&organizer=tok-1'), GAME_SETUP);
