@@ -3085,7 +3085,40 @@
 // consumer-v89-footerrow. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v248-footerrow';
+// Moved to v249 SO ROUND READY'S PLAYER LIST IS ONE BLOCK OF TEXT.
+//
+// A device on v248 renders Round Ready's roster one golfer per line, joined with <br>.
+// Measured at 390x844 with Manny's 25-golfer round: 587px of list inside a 629px box, on
+// a screen whose whole job is to be read once before the links go out. (His estimate was
+// ~1500px; the measurement is 587 - the same direction as Wave 20, where ~900 measured
+// 518. Reported as measured either way.)
+//
+// NOW: flat wrapped text - "Randy T (0) - Ryan H (1) - Anthony (2) ..." with a middot
+// between golfers. 141px, so 446px comes back. The separator has spaces around it so the
+// browser breaks between golfers and never inside a name.
+//
+// THE LIST STAYS, and that is the point: it is the only check that a pasted roster came
+// through correctly before the links go out. What goes is the line-per-golfer shape.
+// NO COUNT LINE AND NO GROUPING, both Manny's call - the groups are already named in the
+// links section below it, and a count is one more thing to read on a screen for scanning
+// names.
+//
+// GUARDED ONLY ON HEIGHT AND COMPLETENESS, because Round Ready is seen once per round:
+// the list must come in under 220px and under half its old height, and EVERY ONE of the
+// 25 names must still be there. A condensed list that silently dropped a golfer would be
+// worse than a tall one, so the name check is the half that matters. The handicap is
+// asserted to still ride with the name, because a pasted roster gets both wrong together.
+//
+// A LIMIT, STATED IN THE SUITE: Round Ready is reachable only after a save -
+// showRoundReadyScreen has exactly one caller, inside saveSettings - so the suite shows
+// the screen and calls paintRoundReadyRoster the way the page does. It is a LAYOUT
+// measurement and NOT a reachability proof, and it says so.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v90-roster. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v249-roster';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
