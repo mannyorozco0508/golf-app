@@ -3028,7 +3028,64 @@
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it - but it is the first wave in a while whose defect only
 // exists in the native shell, so it is worth saying that the web was never wrong here.
-const CACHE_VERSION = 'golfapp-v247-landinset';
+// Moved to v248 SO THE SCORECARD FOOTER IS ONE ROW.
+//
+// A device on v247 carries three full-width cards at the bottom of every hole of every
+// round - Round Receipt, Save & Return to Home, How it works - each a heading, a
+// paragraph and a button that repeats the heading. Measured cold at 390x844: 342x166
+// each, 518px of footer, present whether or not there was a score to make a Receipt out
+// of. (The design brief estimated ~900px; the measurement is 518, reported as measured.)
+//
+// NOW: one row, all 52px.
+//     Save & exit   filled, 274px when it is alone, 144px beside the Receipt
+//     Receipt       outline, 122px, ONLY when the round has scores
+//     How it works  icon only, fixed 60px, aria-label "How it works"
+// and when the Receipt is absent one grey line carries what the three paragraphs said -
+// "Scores save as you go. The Round Receipt appears here once the round is scored." -
+// which goes when the Receipt appears.
+//     518px -> 92px with no scores (426px back; the note wraps to two lines at 390px)
+//     518px -> 52px with scores    (466px back)
+// and the document shrank by exactly those amounts, 2177->1751 and 2366->1900, which is
+// how we know nothing else moved.
+//
+// WHAT "THE ROUND HAS SCORES" MEANS, and it is the app's own answer rather than a new
+// one: computeRoundSettlement(...).started - some golfer has at least one hole scored.
+// ANY score in the round, not the group's and not a finished round, because that is what
+// makes the Receipt worth opening: with no scores that page renders a head, no money card
+// at all (renderCombinedSummary returns '' when every total is zero) and per-game cards
+// saying "Not Final" with nothing in them. With one score it has a LIVE RESULTS head with
+// the thru count, real per-game numbers and the card so far. Requiring FINISHED would make
+// the Receipt's whole live mode unreachable from the scorecard; requiring the GROUP's
+// scores would be wrong because the Receipt is the ROUND's money document and shows
+// cross-group matches. FAIL CLOSED: no engine, no claim, no button.
+//
+// SAVE & EXIT IS STATIC MARKUP AND STAYS THAT WAY. On a group link it is the only working
+// way out of a round - Wave 14 sent the nav's Home pill to the bare lobby, correctly, and
+// the Players pill is gated on canReachSetup() which is never true on a group link. If it
+// were written by a renderer, a golfer whose snapshot had not arrived would have no way
+// out at all. Only the Receipt and the note are toggled, and a guard asserts the renderer
+// does not touch Save & exit or the guide icon.
+//
+// PRINT IS UNTOUCHED BY CONTAINMENT, not by a new rule: the row sits inside #main-content
+// and @media print already sets #main-content { display: none !important }. The footer
+// never had a print rule of its own and still does not need one - asserted rather than
+// assumed.
+//
+// THE THREE CARDS EXISTED ONLY ON index.html. Checked before building: the other
+// in-round pages match "Save & Return" only inside a Wave 14 COMMENT and "How it works"
+// only as the nav pill, so there was nothing to land anywhere else.
+//
+// Two guards re-pointed, both Wave 8b's, both keeping their claim: guide_controls_test.js
+// measured the guide control against the card stack's WIDTH - in a row the widths are
+// deliberately different, so it measures HEIGHT now - and guide_coverage_test.js looked
+// for the link inside a .save-exit-box, now inside the footer row, with Save & exit and
+// the Receipt asserted present beside it as the positive half.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v89-footerrow. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v248-footerrow';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

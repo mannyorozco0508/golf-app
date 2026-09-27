@@ -101,9 +101,12 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
         // in admin.html's ⋯ More menu, and admin.html is the organizer's page. A
         // golfer who taps a group link lands on index.html and may never see Home.
         //
-        // THE BOTTOM-OF-CARD ROUTE, which Wave 8b measured and built: the
-        // .save-exit-box stack that already holds Round Receipt and Save & Exit,
-        // below score entry, where it costs no fold space.
+        // THE BOTTOM-OF-CARD ROUTE, which Wave 8b measured and built: below score
+        // entry, beside Save & exit and the Receipt, where it costs no fold space.
+        // WAVE 20 turned those three cards into ONE ROW - 518px of footer became 92px
+        // unscored and 52px scored - so the route is now the 60px icon in that row
+        // rather than a full-width button in a .save-exit-box. The claim is untouched:
+        // the golfer has a route at the bottom of the scorecard, and it is not the pill.
         //
         // WAVE 15 ADDED A SECOND ROUTE, and withdrew the reason this test used to
         // give for refusing one. It said a ninth pill makes the bar three rows. That
@@ -129,16 +132,18 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
             'the only guide link on index.html is the nav pill - the bottom-of-card '
             + 'route Wave 8b built is gone, and with it the door for a golfer who is '
             + 'looking at score entry rather than at the nav.');
-        const box = idx.lastIndexOf('class="save-exit-box"', at);
-        assert.ok(box > -1 && idx.slice(box, at).indexOf('</div>') === -1,
-            'the guide link is not inside a .save-exit-box, so it does not read as one '
-            + 'of the cards already at the bottom of the card');
-        // POSITIVE: the two cards it sits beside are still there. If the stack were
-        // renamed or removed, the assertion above would pass on a page with no
-        // bottom stack at all.
-        assert.ok((idx.match(/class="save-exit-box"/g) || []).length >= 3,
-            'the bottom stack lost a card - this guard is measuring a shape that is gone');
-        assert.match(idx, /Round Receipt/, 'the Receipt card is gone from the stack');
+        const row = idx.lastIndexOf('class="sc-footer-row"', at);
+        assert.ok(row > -1 && idx.slice(row, at).indexOf('</div>') === -1,
+            'the guide link is not inside the footer row, so it does not read as one of '
+            + 'the controls at the bottom of the card');
+        // POSITIVE: the controls it sits beside are still there. Without this, the
+        // assertion above would pass on a page with an empty row on it - and Save & exit
+        // in particular is the only working way out of a round on a group link, so its
+        // absence is a bigger defect than a missing guide icon.
+        assert.match(idx, /id="sc-foot-save"/, 'Save & exit is gone from the footer row');
+        assert.match(idx, /id="sc-foot-receipt"/, 'the Receipt control is gone from the row');
+        assert.match(idx, /Round Receipt appears here once the round is scored/,
+            'the line that stands in for the Receipt before there are scores is gone');
     });
 
     test('every consumer page carries the route, because it is a pill in the shared bar', () => {
