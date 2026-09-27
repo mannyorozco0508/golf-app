@@ -629,8 +629,24 @@
            at 48x48 and stays right-aligned, because the boxes forming one straight column
            is what lets a thumb run down the list without re-aiming. hole_view_row_test.js
            measures all of it at 4, 5 and 6 golfers. */
+        /* ALIGNED TO THE TOP, NOT THE CENTRE (Wave 19). align-items: center centred the
+           NAME against a cell whose height depends on what that golfer happens to have
+           under their box - the circled net mark is ~17px that only a golfer who strokes
+           on the hole and has a score gets - so on a scored hole the name dropped 9px in
+           one row and not the others while the box stayed put at +6. Measured at 390x844:
+           cells 75px and 93px, rows 88px and 106px, name +27.5 and +36.5, box +6 in every
+           row. flex-start pins the name to the top exactly as the box is pinned, so the
+           pair is level whatever the cell carries below it.
+           THE ROWS STAY UNEQUAL ON PURPOSE. Reserving the net mark's height on every row
+           would give back most of the 108px Wave 17 saved, and the alignment was the
+           complaint - hole_view_row_test.js asserts the inequality so nobody "fixes" it
+           by padding rows.
+           AND IT PRE-DATED WAVE 17 by the identical 18px (v243: cells 94/112, name +41 vs
+           +50). Wave 17 removed 19px of constant height per row, which took the same
+           anomaly from 15.7% of a 115px row to 20.5% of an 88px one - more visible, not
+           newly created. */
         .hv-player-row {
-            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
             padding: 6px 0; border-bottom: 1px solid var(--border-faint);
         }
         .hv-player-row:last-child { border-bottom: none; }
