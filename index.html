@@ -1128,7 +1128,35 @@
         .dots-btn { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 4px; transition: all 0.2s; }
         .dots-btn.has-dots { background-color: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
-        .save-exit-box { background: var(--nassau-box-bg); border: 2px solid var(--accent-teal); border-radius: 10px; padding: 14px; text-align: center; margin-top: 25px; margin-bottom: 10px; }
+        /* THE FOOTER IS ONE ROW (Wave 20). It was three full-width cards - Round
+           Receipt, Save & Return to Home, How it works - each a heading, a paragraph and
+           a button that repeated the heading: measured 342x166 each and 518px of footer on
+           every hole of every round, whether or not there was a score to make a Receipt
+           out of. Now: Save & exit filled and wide, Receipt outline beside it and only
+           when the round has scores, the guide as a 60px icon. All 52px.
+           PRINT NEEDS NO RULE HERE, and never had one: the row sits inside #main-content
+           and @media print hides that whole element. */
+        .sc-footer { margin-top: 25px; margin-bottom: 10px; }
+        .sc-footer-row { display: flex; align-items: stretch; gap: 8px; }
+        .sc-foot-btn {
+            min-height: 52px; box-sizing: border-box; border-radius: 10px;
+            font-family: inherit; font-size: 0.9rem; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            text-decoration: none; padding: 0 10px; white-space: nowrap;
+        }
+        /* FILLED, and it stays filled in both states: on a group link this is the only
+           working way out of a round. Wave 14 sent the nav's Home pill to the bare lobby,
+           and the 👥 Players pill is gated on canReachSetup(), which is never true on a
+           group link. */
+        .sc-foot-primary { flex: 1 1 auto; background: var(--brand-navy); color: #ffffff; border: none; }
+        .sc-foot-outline { flex: 1 1 auto; background: var(--bg-card); color: var(--brand-green); border: 1px solid var(--border-mid); }
+        /* ICON ONLY, so the accessible name is the only name it has - aria-label carries
+           it. 60px fixed, wider than the 44px minimum and narrow enough that the two real
+           buttons keep the row. */
+        .sc-foot-icon { flex: 0 0 60px; padding: 0; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid); font-size: 1.25rem; }
+        /* The one line that carries what the three paragraphs said, and only while the
+           Receipt is not there to say it better. */
+        .sc-foot-note { margin-top: 8px; font-size: 0.78rem; color: var(--text-muted); text-align: center; line-height: 1.3; }
         .end-box-card { background: var(--danger-box-bg); border: 2px dashed var(--accent-red); border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 10px; }
         .btn-danger { width: 100%; background-color: var(--accent-red); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
         .group-pick-btn { margin-top: 8px; text-align: left; font-size: 1rem; }
@@ -1147,7 +1175,6 @@
            Scoped to the bottom stack because index.html has no other anchor button;
            the wider a.btn-primary cleanup on stats.html and sidematches.html is
            logged and is not this wave. */
-        .save-exit-box a.btn-primary { display: block; box-sizing: border-box; text-decoration: none; line-height: 26px; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 
         .history-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); }
@@ -1546,35 +1573,49 @@ html {
     </div>
     </div>
 
-    <div class="save-exit-box" style="margin-top: 25px; margin-bottom: 10px;">
-        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🧾 Round Receipt</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">One document with the money, every match and press, and the full scorecard.</span>
-        <button class="btn-primary" style="margin-top: 0;" onclick="openReceipt()">🧾 Round Receipt</button>
-    </div>
+    <!-- THE FOOTER, ONE ROW (Wave 20).
+         It was three cards, 518px measured at 390px wide, on every hole of every round.
+         Each one was a heading, a paragraph, and a button repeating the heading.
 
-    <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
-        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🚪 Save & Return to Home</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Scores sync automatically. You can safely leave and resume this game anytime from the home page.</span>
-        <button class="btn-primary" style="margin-top: 0; background-color: var(--brand-navy);" onclick="window.location.href='admin.html'">⬅️ Save & Exit to Home</button>
-    </div>
+         SAVE & EXIT IS STATIC MARKUP AND STAYS THAT WAY. On a group link it is the only
+         working way out of a round: Wave 14 sent the nav's Home pill to the bare lobby
+         (correctly - it is the pill that LEAVES the round) and the Players pill is gated
+         on canReachSetup(), which is never true on a group link. If this button were
+         written by a renderer, a golfer whose snapshot had not arrived would have no way
+         out at all. Only the Receipt and the note below are toggled.
 
-    <!-- THE GOLFER'S ROUTE TO THE GUIDE (UI Wave 8b).
-         The guide's first door is written for somebody who arrived by a link, and
-         until this card that person could not open it. Wave 8's only route is in
-         admin.html's ⋯ More menu - the ORGANIZER's page - and a golfer who taps a
-         group link lands here and may never see Home.
-         NOT A NINTH NAV PILL. Measured at 390px, this page's nav is eight pills
-         that WRAP to three rows already; a ninth spends fold space on every screen
-         of the round to fix something that belongs at the bottom. Here it costs
-         nothing: it is below score entry, in the stack that already holds the
-         Receipt and Save & Exit, and it lays out 310x50 at left 40 - the same
-         width, height and left edge as both of them.
-         An <a>, not a button with an onclick: see .save-exit-box a.btn-primary. -->
-    <div class="save-exit-box" style="margin-top: 10px; margin-bottom: 10px;">
-        <h3 style="color: var(--brand-green); margin-top: 0; font-size: 1rem;">🧭 How it works</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 12px;">Every screen in the app, explained — including what your group link does and what it does not.</span>
-        <a class="btn-primary" style="margin-top: 0;" href="instructions.html">🧭 How it works</a>
+         THE RECEIPT APPEARS ONCE THE ROUND HAS SCORES - computeRoundSettlement(...)
+         .started, the app's own notion, meaning any golfer has any hole scored. With no
+         scores the Receipt page renders a head, no money card at all and per-game cards
+         that say "Not Final" with nothing in them; with one score it has a LIVE RESULTS
+         head, real per-game numbers and the card so far. Not FINISHED, which would make
+         the Receipt's whole live mode unreachable from here, and not the group's scores,
+         because the Receipt is the round's money document and shows cross-group matches.
+
+         THE GUIDE IS ICON ONLY, so aria-label is the only name it has. It is the golfer's
+         route to the guide that Wave 8b built - the nav pill is the other one - and
+         guide_controls_test.js measures that it is still here and still reachable. -->
+    <div class="sc-footer" id="scorecard-footer">
+        <div class="sc-footer-row">
+            <button type="button" class="sc-foot-btn sc-foot-primary" id="sc-foot-save" onclick="window.location.href='admin.html'">⬅️ Save &amp; exit</button>
+            <button type="button" class="sc-foot-btn sc-foot-outline" id="sc-foot-receipt" onclick="openReceipt()" style="display:none;">🧾 Receipt</button>
+            <a class="sc-foot-btn sc-foot-icon" id="sc-foot-guide" href="instructions.html" aria-label="How it works" title="How it works">🧭</a>
+        </div>
+        <div class="sc-foot-note" id="sc-foot-note">Scores save as you go. The Round Receipt appears here once the round is scored.</div>
     </div>
+    <!-- THE LANDING'S RUNWAY (Wave 20), and it is here because the footer WAS the runway.
+         landOnHole() scrolls the hole heading to the top of the viewport, and a page can
+         only scroll as far as its own height allows: to put the heading at the top there
+         must be a viewport's worth of page after it. The Full Card table is display:none
+         in Hole View, so what used to provide that was the 518px of footer cards. Measured
+         after they became a 52px row: a scored foursome lands 33px short, and an
+         eight-golfer round with no scores does not move at all - the heading stays 672px
+         down the page. Wave 19b had measured 796px of runway and concluded the landing
+         could never clamp; that was true of a page 466px taller.
+         So the runway is now explicit, sized to exactly what the landing needs and zero
+         when the page is long enough on its own. It is empty, it is below everything a
+         golfer reads, and it costs nothing but scroll length. -->
+    <div id="hole-landing-runway" aria-hidden="true"></div>
 
     <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.
          This was a full-width red button in static markup at the bottom of the
@@ -2501,6 +2542,12 @@ html {
         //
         // ONE PLACE. Prev/Next and the 1-18 jump both come through here, so neither of
         // them does this arithmetic itself.
+        // THE RUNWAY IS SIZED FIRST, SYNCHRONOUSLY (Wave 20). The page can only scroll as
+        // far as its own height allows, and the runway below the footer is what makes the
+        // heading reachable - so it has to be right BEFORE the target is computed, not on
+        // the next snapshot. Measured without this: an eight-golfer round asked for exactly
+        // its own maxScroll and got 0, because at scroll time the page was still short.
+        sizeHoleLandingRunway();
         try {
             if (anchor.getBoundingClientRect && typeof window.scrollTo === 'function') {
                 let inset = 0;
@@ -2823,8 +2870,55 @@ html {
     // The widgets under the hole card, in one list, so the closed path below and
     // the open path above cannot drift apart. Each closes itself on a link whose
     // group is not in this round (scopedPlayers() / scopeMissing()).
+    // THE FOOTER'S ONLY MOVING PARTS (Wave 20): the Receipt button and the one line of
+    // copy that stands in for it. Save & exit and the guide icon are static markup and are
+    // deliberately NOT touched here - see the note on the markup.
+    //
+    // "HAS SCORES" IS THE ENGINE'S OWN ANSWER. computeRoundSettlement(...).started is
+    // "some golfer has at least one hole scored" (playing.length > 0). FAIL CLOSED: with
+    // no engine there is no claim and no button, the same shape settlement.html uses for
+    // its own gate.
+    function renderFooterRow() {
+        const receipt = document.getElementById('sc-foot-receipt');
+        const note = document.getElementById('sc-foot-note');
+        if (!receipt || !note) return;
+        let started = false;
+        try {
+            if (typeof computeRoundSettlement === 'function') {
+                const holes = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+                started = !!computeRoundSettlement(currentData, holes, currentData.scores || {}).started;
+            }
+        } catch (e) { started = false; }
+        receipt.style.display = started ? '' : 'none';
+        note.style.display = started ? 'none' : '';
+        sizeHoleLandingRunway();
+    }
+
+    // EXACTLY THE RUNWAY THE LANDING NEEDS, AND NO MORE.
+    //
+    // To put the hole heading HOLE_LANDING_OFFSET from the top, the page must be able to
+    // scroll that far - which means there has to be a viewport's worth of document after
+    // the heading. Measured with the spacer at zero, then set to the shortfall, so a page
+    // that is long enough on its own gets nothing.
+    function sizeHoleLandingRunway() {
+        const pad = document.getElementById('hole-landing-runway');
+        if (!pad || typeof pad.getBoundingClientRect !== 'function') return;
+        try {
+            pad.style.height = '0px';
+            const card = document.getElementById('hole-view-card');
+            const anchor = card && card.querySelector
+                ? (card.querySelector('.hole-view-header') || card.querySelector('.score-input')) : null;
+            if (!anchor) return;
+            const headTop = anchor.getBoundingClientRect().top + (window.pageYOffset || 0);
+            const after = document.documentElement.scrollHeight - headTop;
+            const need = (window.innerHeight - HOLE_LANDING_OFFSET) - after;
+            pad.style.height = Math.max(0, Math.ceil(need)) + 'px';
+        } catch (e) { pad.style.height = '0px'; }
+    }
+
     function renderCardWidgets() {
         renderKpEntryMount();
+        renderFooterRow();
         // renderWhoAmI is gone (Wave 17): the question is one line inside My Round now,
         // built by whoAmILineHtml() and rendered by renderActionCenter, so there is no
         // widget of its own to keep in step here.

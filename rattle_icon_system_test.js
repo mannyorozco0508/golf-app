@@ -271,8 +271,14 @@ describe('GLOBAL NAVIGATION IS ONE SYSTEM', () => {
                 `${f}: the guide pill does not carry ${GUIDE}`);
         });
         const idx = read('index.html');
-        assert.equal((idx.match(new RegExp(GUIDE + ' How it works', 'gu')) || []).length, 2,
-            'index.html should carry the guide card heading AND its link, both with ' + GUIDE);
+        // WAVE 20: the bottom-of-card route is now an ICON in the footer row, not a card
+        // with a heading and a button - so the glyph no longer appears beside the words
+        // twice. It appears once as the icon, whose accessible name carries "How it works"
+        // because an icon has no other name. Asserted as the pair it now is.
+        assert.match(idx, new RegExp('id="sc-foot-guide"[^>]*aria-label="How it works"', 'u'),
+            'the footer guide icon has lost its accessible name');
+        assert.match(idx, new RegExp('aria-label="How it works"[^>]*>' + GUIDE + '<', 'u'),
+            'the footer guide icon does not carry ' + GUIDE);
         assert.match(read('instructions.html'), new RegExp('<h1>' + GUIDE + ' How HardPan Works</h1>', 'u'),
             'the guide page heading does not carry the guide glyph');
         // AND Game's glyph is not used for the guide anywhere. This is the half that would

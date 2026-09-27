@@ -121,28 +121,30 @@ const CARD_MEASURE = `(function () {
             textGap: t
         };
     }
-    // THE BOTTOM-OF-CARD ROUTE SPECIFICALLY (re-pointed Wave 15). There are two routes
-    // to the guide on this page now - a nav pill and this card - and a plain
+    // THE FOOTER ROUTE SPECIFICALLY (re-pointed Wave 20; Wave 15 before that). There are
+    // two routes to the guide on this page - a nav pill and the footer - and a plain
     // querySelector returns the FIRST, which is the pill. Measuring the pill here would
-    // report that Wave 8b's card had moved into the nav bar, which is the opposite of
-    // what happened: the card is untouched and a second route was added.
-    var guide = [].slice.call(document.querySelectorAll('a[href="instructions.html"]'))
-        .filter(function (a) { return !!a.closest('.save-exit-box'); })[0]
-        || document.querySelector('a[href="instructions.html"]');
+    // report the footer route missing when it is not.
+    // WAVE 20 turned the three bottom CARDS into one ROW, so the footer route is now the
+    // 60px icon in it rather than a full-width button in a .save-exit-box. The claim is
+    // unchanged and still measured: the golfer has a route to the guide at the bottom of
+    // the rendered scorecard, below score entry, the same height as the controls beside
+    // it, and it is not the nav pill.
+    var guide = document.getElementById('sc-foot-guide')
+        || document.querySelector('.sc-footer a[href="instructions.html"]');
     var guidePill = document.querySelector('.top-nav-bar a[href="instructions.html"]');
-    var boxes = [].slice.call(document.querySelectorAll('.save-exit-box'));
-    // The control in each bottom card, in document order, so "one height" is a
-    // comparison against the cards that were already there.
-    var stack = boxes.map(function (bx) {
-        var c = bx.querySelector('.btn-primary');
-        var r = box(c);
-        if (r) { r.card = String((bx.querySelector('h3') || {}).innerText || '').trim().slice(0, 30); }
-        return r;
-    }).filter(Boolean);
+    // The controls in the footer row, in document order, so "one height" is a comparison
+    // against the controls that are actually beside it.
+    var stack = [].slice.call(document.querySelectorAll('.sc-footer-row .sc-foot-btn'))
+        .map(function (c) {
+            var r = box(c);
+            if (r) { r.card = (c.getAttribute('aria-label') || c.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 30); }
+            return r;
+        }).filter(function (r) { return r && r.onScreen; });
     var holeView = document.getElementById('hole-view-container');
     return JSON.stringify({
         guide: box(guide),
-        guideInSaveExitBox: !!(guide && guide.closest('.save-exit-box')),
+        guideInFooterRow: !!(guide && guide.closest('.sc-footer-row')),
         guideInNav: !!(guide && guide.closest('.top-nav-bar')),
         guidePill: box(guidePill),
         stack: stack,
@@ -238,16 +240,19 @@ describe('THE SCORECARD CARRIES THE GOLFER\'S ROUTE TO THE GUIDE', () => {
         // tests below: asserting >= 3 here made a missing guide link fail the hook
         // and take all four tests down with one message, so none of them could be
         // shown failing on its own claim.
+        // Wave 20: the row, not the card stack. On a scored round it is three controls
+        // (Save & exit, Receipt, the guide icon); on an unscored one it is two, because the
+        // Receipt is deliberately absent - so two is the floor.
         assert.ok(C.stack.length >= 2,
-            'the bottom stack has ' + C.stack.length + ' cards, so there is nothing to compare');
+            'the footer row has ' + C.stack.length + ' controls, so there is nothing to compare');
     }, { timeout: 90000 });
 
     test('the guide link is ON the rendered scorecard', () => {
         assert.ok(C.guide, 'no a[href="instructions.html"] on index.html - the golfer '
             + 'door still has no door');
         assert.ok(C.guide.onScreen, 'the guide link is in the DOM and renders nothing');
-        assert.ok(C.guideInSaveExitBox,
-            'the link is not in the .save-exit-box stack at the bottom of the card');
+        assert.ok(C.guideInFooterRow,
+            'the link is not in the footer row at the bottom of the card');
         assert.ok(!C.guideInNav,
             'the bottom-of-card route is gone and only the nav pill is left. Both are '
             + 'wanted: the pill reaches the guide from every page, the card is where a '
@@ -271,24 +276,27 @@ describe('THE SCORECARD CARRIES THE GOLFER\'S ROUTE TO THE GUIDE', () => {
             + 'place this wave said it must not be.');
     });
 
-    test('it is one shape with the cards already in that stack', () => {
+    test('it is one HEIGHT with the controls beside it in the row', () => {
+        // WAVE 20 re-pointed this from width to HEIGHT, on purpose. In the card stack all
+        // three controls were the same 310x50 and equal width was the thing to check. In a
+        // ROW they are deliberately different widths - Save & exit and Receipt share the
+        // space, the guide is a fixed 60px icon - so width is no longer the claim. Height
+        // still is: an <a> gets no border-box and no block display from the UA stylesheet,
+        // which is how this control laid out 148x42 before Wave 8b wrote its rule, and a
+        // row makes that failure look like a design rather than a bug.
         const others = C.stack.filter(s => s.href !== 'instructions.html');
-        assert.ok(others.length >= 2, 'nothing to compare against: ' + JSON.stringify(C.stack));
-        const w = [...new Set(others.map(s => s.w))];
+        assert.ok(others.length >= 1, 'nothing to compare against: ' + JSON.stringify(C.stack));
         const h = [...new Set(others.map(s => s.h))];
-        const l = [...new Set(others.map(s => s.left))];
-        assert.equal(w.length, 1, 'the stack was already inconsistent in width: ' + w.join(', '));
-        assert.equal(h.length, 1, 'the stack was already inconsistent in height: ' + h.join(', '));
+        assert.equal(h.length, 1, 'the row was already inconsistent in height: ' + h.join(', '));
         const g = C.stack.find(s => s.href === 'instructions.html');
-        assert.ok(g, 'the guide control is not one of the stack\'s .btn-primary controls');
-        assert.equal(g.w, w[0], 'the guide control is ' + g.w + 'px wide, the others ' + w[0]);
+        assert.ok(g, 'the guide control is not one of the row\'s controls');
         assert.equal(g.h, h[0], 'the guide control is ' + g.h + 'px tall, the others ' + h[0]
             + '. An <a> gets no border-box from the UA stylesheet and no block display, '
             + 'which is how it laid out 148x42 before the rule was written.');
-        assert.equal(g.left, l[0], 'the guide control starts at ' + g.left + ', the others ' + l[0]);
         assert.ok(g.h >= MIN_TAP, 'the guide control is under ' + MIN_TAP + 'px: ' + g.h);
-        assert.ok(g.textGap && Math.abs(g.textGap.top - g.textGap.bottom) <= 1,
-            'the label is not centred in the guide control: ' + JSON.stringify(g.textGap));
+        // ICON ONLY since Wave 20, so there is no label to centre - the glyph is the whole
+        // control and aria-label carries the name. scorecard_footer_test.js holds that.
+        assert.ok(g.w >= MIN_TAP, 'the icon is narrower than a thumb: ' + g.w);
     });
 
     test('adding it did not make the scorecard scroll sideways', () => {

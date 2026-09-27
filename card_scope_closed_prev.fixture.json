@@ -38,7 +38,8 @@
                 "handicap-basis-note": "none",
                 "match-hcp-note": "block",
                 "nassau-payout-container": "none",
-                "wolfcall-payout-container": "none"
+                "wolfcall-payout-container": "none",
+                "sc-foot-note": "none"
             },
             "filtered": [
                 "Ivy",
@@ -87,7 +88,8 @@
                 "handicap-basis-note": "none",
                 "match-hcp-note": "block",
                 "nassau-payout-container": "none",
-                "wolfcall-payout-container": "none"
+                "wolfcall-payout-container": "none",
+                "sc-foot-note": "none"
             },
             "filtered": [
                 "Ann",
@@ -150,7 +152,8 @@
                 "handicap-basis-note": "none",
                 "match-hcp-note": "none",
                 "nassau-payout-container": "none",
-                "wolfcall-payout-container": "none"
+                "wolfcall-payout-container": "none",
+                "sc-foot-note": "none"
             },
             "filtered": [
                 "Ann",
@@ -222,6 +225,10 @@
         {
             "at": "(v244) UI Wave 17",
             "why": "THE \"WHICH ONE ARE YOU?\" QUESTION LEFT THE CARD and became one line inside My Round. Across all three links this capture changes exactly two things, diffed before writing: 1 REMOVED key - whoami-mount, whose text was \"| Which one are you?|Ivy|Jon|Kim|Lee|Skip - just show everything|\" - a 287px panel above score entry, measured cold at 390x844; and 1 CHANGED key - action-center-mount, which gains \"| Which one are you?|choose|\" directly after its header and is otherwise byte-identical. So the question did not disappear; it moved to the panel where four of the five behaviours it drives already appear. 0 added, 1 changed, 1 removed per link; every filtered list identical; display unchanged but for group-missing-note, which this suite deletes explicitly."
+        },
+        {
+            "at": "(v248) UI Wave 20",
+            "why": "THE SCORECARD FOOTER BECAME ONE ROW: three full-width cards (Round Receipt, Save and Return to Home, How it works) at 342x166 each and 518px of footer became a 52px row - Save and exit filled, Receipt outline and only when the round has scores, the guide as a 60px icon - plus one grey line standing in for the Receipt before there are scores. THE TEXT MAP IS BYTE-IDENTICAL: 0 added, 0 changed, 0 removed on all three links. The cards were static markup and never entered this capture, and neither does the row. The only change is ONE ADDED display key per link, sc-foot-note, because renderFooterRow sets the display on that line every snapshot - shown while the round has no scores, hidden once the Receipt is there. Diffed before writing."
         }
     ]
 }

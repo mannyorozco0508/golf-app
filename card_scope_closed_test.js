@@ -179,7 +179,19 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // choose|" straight after its header and is otherwise byte-identical. The question
         // moved; it did not go. Every filtered list is identical and display is unchanged
         // but for group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'bffd1bf0');
+        // RE-PINNED (v248, UI Wave 20, was bffd1bf0): the footer's three cards became one
+        // row. THE TEXT MAP IS BYTE-IDENTICAL - 0 added, 0 changed, 0 removed on all three
+        // links, because the cards were static markup and never entered this capture, and
+        // neither does the row. The only change is ONE ADDED display key per link,
+        // sc-foot-note: renderFooterRow() sets that line's display on every snapshot,
+        // shown while the round has no scores and hidden once the Receipt is there.
+        // RE-PINNED (v248, UI Wave 20, was bffd1bf0): the footer's three cards became one
+        // row. THE TEXT MAP IS BYTE-IDENTICAL - 0 added, 0 changed, 0 removed on all three
+        // links, because the cards were static markup and never entered this capture, and
+        // neither does the row. The only change is ONE ADDED display key per link,
+        // sc-foot-note: renderFooterRow sets that line's display on every snapshot,
+        // shown while the round has no scores and hidden once the Receipt is there.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'd34656c8');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
