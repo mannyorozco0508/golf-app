@@ -80,7 +80,7 @@ describe('1. NO ENGINE MATH MOVED', () => {
     // The files this wave does NOT change, pinned the way aloha_bet_test.js pins
     // money-engine.js. If one of these moves, the pin is the conversation.
     const PINNED = {
-        'money-engine.js': '9653b6320c583b97',
+        'money-engine.js': '12bfa41c2c8e6b8a',
         'handicap.js': '2d3b2f7fd916a4b8',
         'pool-engine.js': '372e76d7d5c41c38',
         // hole-events.js is DELIBERATELY not in this wave: the per-hole recap line

@@ -29,7 +29,11 @@ const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-mo
 
 const ENG = (() => {
     const sb = loadJsFile('money-engine.js');
-    ['action-model.js', 'settlement-engine.js', 'bet-strip.js'].forEach(f =>
+    // action-model.js is NOT re-injected here: since Wave 18 it is a declared prereq of
+    // money-engine.js (it owns holeTiesCarry), so loadJsFile has already run it into this
+    // sandbox. Running it twice throws 'ADDITIONAL_GAME_CATALOG has already been declared',
+    // which is what a browser would do with the same script twice as well.
+    ['settlement-engine.js', 'bet-strip.js'].forEach(f =>
         vm.runInContext(read(f), sb, { filename: f }));
     return sb;
 })();

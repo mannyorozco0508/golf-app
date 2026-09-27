@@ -267,7 +267,7 @@ describe('THE SEAM (source, comments stripped)', () => {
         // the half of this assertion that matters here: the 9 Points wave deliberately
         // did not touch the hole recap, and that is logged rather than half-built.
         assert.equal(h('hole-events.js'), '6fd7f7ed'); assert.equal(h('bet-strip.js'), '000156db');
-        assert.equal(h('money-engine.js'), '9653b632'); assert.equal(h('action-model.js'), 'e1585501');  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
+        assert.equal(h('money-engine.js'), '12bfa41c'); assert.equal(h('action-model.js'), '399ba26f');  // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.   // was 9653b632 (Wave 18: no carry is the default for tied holes - the sites approved per-file, one line each, no arithmetic. The default lives once in action-model's holeTiesCarry() and reads stored data exactly as the nine hand-written defaults did, so a legacy round pays the same money; tie_carry_default_test.js holds the behaviour and its control proves the legacy money moves if that stops being true.)
         assert.equal(h('pool-engine.js'), '372e76d7');   // 372e76d7: KP never refunds 2026-09-22 (approved per-file, the KP branch): a blank on a finished round and an Out winner are held (unresolved), nobody goes to the skins bucket (toSkinsCents), no KP refund; was a335f19c.
     });
 });

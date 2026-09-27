@@ -1062,7 +1062,7 @@
                     holeEnabled: (sm.holeStake || 0) > 0,
                     holeStake: sm.holeStake || 0,
                     segment: sm.segment || 'full',
-                    tieRule: sm.tieRule || 'carry',
+                    tieRule: holeTiesCarry(sm.tieRule) ? 'carry' : 'void',   // Wave 18: one resolver, same reading
                     scoringType: sm.scoring || 'net'
                 }, sides);
                 const holePresses = (sm.holePresses ? Object.values(sm.holePresses) : [])
@@ -1489,7 +1489,7 @@
                 // settled two golfers and silently dropped the other two - money that was
                 // not zero-sum. The whole side goes to the engine now.
                 const sides = { sideA: teamAPlayers, sideB: teamBPlayers };
-                const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: sm.tieRule || 'carry', scoringType: sm.scoring || 'net' }, sides);
+                const holeConfig = Object.assign({ holeEnabled: (sm.holeStake || 0) > 0, holeStake: sm.holeStake || 0, segment: sm.segment || 'full', tieRule: holeTiesCarry(sm.tieRule) ? 'carry' : 'void', scoringType: sm.scoring || 'net' }, sides);   // Wave 18: one resolver
                 const overallConfig = Object.assign({ overallEnabled: (sm.overallStake || 0) > 0, overallStake: sm.overallStake || 0, overallMode: sm.overallMode || 'stroke', scoringType: sm.scoring || 'net' }, sides);
                 const holePresses = sm.holePresses ? Object.values(sm.holePresses) : [];
                 const overallPresses = sm.overallPresses ? Object.values(sm.overallPresses) : [];

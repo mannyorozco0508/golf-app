@@ -23,7 +23,10 @@ function calcWolfEngine(data, courseData, savedScores) {
 
     const loneMult = parseFloat(data.wolfLoneMult) || 2;
     const blindMult = parseFloat(data.wolfBlindMult) || 4;
-    const tieRule = data.wolfTieRule || 'carry';
+    // Wave 18: the default moved into one resolver (action-model.js), which reads stored
+    // data exactly as the nine hand-written defaults it replaced did. Deliberately not
+    // quoting the old expression here: a guard asserts this file no longer contains it.
+    const tieRule = holeTiesCarry(data.wolfTieRule) ? 'carry' : 'void';
     const lastPlaceRule = data.wolfLastPlaceRule === 'on';
     const calls = data.wolfCalls || {};
 
@@ -1143,7 +1146,7 @@ function buildLiveStrokeBetStates(data, courseData, savedScores, visiblePlayerId
             try {
                 const cfg = {
                     holeEnabled: true, holeStake, segment: sm.segment || 'full',
-                    tieRule: sm.tieRule || 'carry', scoringType: scoring, p1, p2,
+                    tieRule: holeTiesCarry(sm.tieRule) ? 'carry' : 'void', scoringType: scoring, p1, p2,   // Wave 18: one resolver, same reading
                 };
                 const hb = calculateHoleBetEngine([p1, p2], range, savedScores, cfg,
                     sm.holePresses ? Object.values(sm.holePresses) : []);

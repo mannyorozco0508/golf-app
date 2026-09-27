@@ -2856,7 +2856,64 @@
 // consumer-v85-holeview. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v244-holeview';
+// Moved to v245 SO NO CARRY IS THE DEFAULT FOR A TIED HOLE, EVERYWHERE.
+//
+// A device on v244 puts $20 on the next hole after two quiet holes of a $10-a-hole bet
+// without anybody having chosen that. Measured before the change: a round that recorded
+// NOTHING was byte-for-byte a round that chose Carry.
+//
+// NINE READER SITES each held their own copy of that default, in five files:
+// settlement.html, stats.html (x2), skins.html, index.html, money-engine.js (x2, the
+// side-match ties and Wolf's) and settlement-engine.js (x2). The engines themselves are
+// neutral - calculateHoleBetEngine tests `config.tieRule === 'carry'` - so every default
+// lived in a CALLER, which is exactly the shape the skins settings were in before
+// skinsCarriesOver. It now lives once, in action-model.js:
+//     TIE_RULE_DEFAULT = 'void'     what a NEW round or wager is given
+//     holeTiesCarry(setting)        what silence means in STORED data
+//     tieRuleRecorded(setting)      whether the round said anything at all
+// and both hidden inputs (sidematches.html's sm-tie-rule, admin.html's wolf-tie-rule)
+// ship value="void" with Void as the active toggle label.
+//
+// A ROUND ALREADY AGREED WITH CARRY ON KEEPS IT, and this is the part worth reading:
+// holeTiesCarry is EXACTLY EQUIVALENT to the nine defaults it replaced. Reading stored
+// data did not change at all. The flip is entirely in what a new round RECORDS, which is
+// why a legacy round cannot be restated - measured at $180 on an 18-hole $10 bet with 17
+// tied holes, live on settlement, index, skins and stats. Both writers record the rule
+// explicitly (sidematches.html for a wager, saveSettings() for Wolf), so an absent rule
+// can only be a record written before this wave.
+//
+// SILENCE MEANS THE OPPOSITE HERE FROM SKINS, on purpose, and both resolvers now carry
+// the reason: a tie carrying is money the group already agreed on a course - the stake
+// sat on the table and everyone standing there knew it - while a skins pot that silently
+// rolled is money nobody chose to risk.
+//
+// AND THE WIZARD WOULD HAVE LIED WITHOUT ONE MORE FIX. admin.html set the Wolf toggle
+// only `if (data.wolfTieRule)`, which was harmless while the markup default matched an
+// absent setting. It does not any more: a legacy round has no rule and CARRIES, while
+// the markup now starts at Void, so the wizard would have shown Void on a round that
+// carries and the next save would have written 'void' and moved money nobody agreed to
+// move. It now sets the toggle from holeTiesCarry().
+//
+// FIVE CASES tested in tie_carry_default_test.js, in money, on both the live strip and
+// the Receipt: a new round (void), carry chosen, a legacy round with nothing recorded
+// (keeps carry, $20 not $10), a legacy round with void recorded, and a value the app has
+// never written ("push") which must behave like void rather than carry. The control that
+// matters flips the resolver so silence means void and checks the LEGACY MONEY MOVES -
+// $20 to $10 on the live strip and on the Receipt - so the legacy half cannot be
+// decoration.
+//
+// PER-FILE APPROVED, named sites only, one line each, no arithmetic: money-engine.js
+// (2), settlement-engine.js (2), action-model.js (the three resolvers, beside the skins
+// trio). Fourteen suites' frozen-hash pins re-pinned with the reason recorded.
+// helpers/load-script.js declares the new dependency in MODULE_PREREQS, because
+// money-engine and settlement-engine now call holeTiesCarry as a plain global exactly as
+// every page supplies it - the alternative was a typeof guard, which would have put a
+// tenth copy of the decision in the engines.
+//
+// The consumer product cache is consumer-v86-nocarry. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
+// web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v245-nocarry';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

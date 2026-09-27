@@ -426,7 +426,12 @@ describe('MIGRATION STATE — this scaffolding is meant to come down', () => {
         // v218: money-engine.js also needs match-engine.js, because
         // computeRoundMoneyByPlayer and buildLiveMatchState call calculateMatchEngine -
         // and buildLiveMatchState returns a SILENT null without it.
-        assert.deepEqual(MODULE_PREREQS['money-engine.js'], ['handicap.js', 'match-engine.js']);
+        // WAVE 18: action-model.js joins the list, because calcWolfEngine and
+        // buildLiveStrokeBetStates call holeTiesCarry() - the one place that decides what
+        // an absent tie rule means. handicap.js is still FIRST, which is what this test is
+        // about; the assertion keeps the whole ordered list rather than just membership so
+        // a reordering has to be deliberate.
+        assert.deepEqual(MODULE_PREREQS['money-engine.js'], ['handicap.js', 'match-engine.js', 'action-model.js']);
         assert.deepEqual(MODULE_PREREQS['match-engine.js'], ['handicap.js']);
         MIGRATED_PAGES.forEach(page => {
             const src = read(page);
