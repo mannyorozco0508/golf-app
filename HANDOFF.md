@@ -2798,15 +2798,32 @@ whose repo bytes plus one trailing newline hash to
 read back three times with `firebase-tools` and recorded above. Four commits have
 changed the file since and **none of them is live**:
 
-| commit | date | what it added |
-|---|---|---|
-| `4f4ec0a` | 2026-09-23 | Lock consumer round setup to the owner's uid (#13) — **this is the one this section used to claim was enforced** |
-| `ae22953` | 2026-09-24 | v217 confirm-or-mark-out |
-| `6c2bd1b` | 2026-09-24 | v222 season ledger |
-| `1f189cf` | 2026-09-26 | Wave 13 |
+| commit | date | repo bytes + `\n`, sha256 | what it added |
+|---|---|---|---|
+| `1f189cf` | 2026-09-26 | `d4d56617ae1774ec` | Wave 13 — **and the current file** |
+| `6c2bd1b` | 2026-09-24 | `358391e176b396e3` | v222 season ledger |
+| `ae22953` | 2026-09-24 | `5b0fac15f23d658a` | v217 confirm-or-mark-out |
+| `4f4ec0a` | 2026-09-23 | `233246783e03183c` | Lock consumer round setup to the owner's uid (#13) — **the one this section used to claim was enforced** |
+| `dab91d8` | 2026-09-18 | `66d26ee96a33e1d3` | **← THIS IS WHAT IS LIVE.** A code-holder writes scores and nothing else |
+
+**Check it rather than trust it.** The live hash is of the repo file plus one trailing
+newline, which is what the Firebase CLI writes, so the whole table reproduces locally
+with no console and no network:
+
+```
+LIVE=66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd
+git log --format='%h %ad' --date=short -- database.rules.json | while read h d; do
+  S=$( { git show $h:database.rules.json; printf '\n'; } | shasum -a 256 | cut -d' ' -f1)
+  [ "$S" = "$LIVE" ] && M='<== LIVE' || M=''
+  echo "$h $d ${S:0:16} $M"
+done
+```
 
 The current repo file plus a newline is `d4d56617…`, which matches `1f189cf` and not
-the live hash. **So today every consumer gate on a round is UI only.** Hiding "Edit
+the live hash. **If a future reader runs that loop and the `<== LIVE` marker has moved
+to a newer commit, the rules were published in between and this whole section needs
+re-reading.** If the marker disappears entirely, something was published that is not
+in git, and the live rules should be read back before anything else is trusted here. **So today every consumer gate on a round is UI only.** Hiding "Edit
 round setup" is the whole of it; a client that skips the page and writes the node
 directly is refused by nothing.
 
@@ -2868,6 +2885,44 @@ own decision rather than ride along, and the inline wager panel on a single grou
 is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
+
+- **OPEN 2026-09-27 — `game.html`'s organizer gate still refuses every group link,
+  the owner's own included.** Wave 22 moved the SCORECARD's rule: a group lock no
+  longer closes the doors by itself, it only narrows what counts as evidence (see
+  "Who is the organizer" above). `game.html` was not touched, because that wave was
+  one change to one gate. Its gate is not `canReachSetup()` — it has its own
+  predicate — so the two pages now disagree about the same device on the same link:
+  `index.html?game=X&group=1` shows the organizer their doors, `game.html?game=X&group=1`
+  shows them nothing.
+  - **It is PINNED, not fixed.** `organizer_door_test.js` has the case "a group link:
+    nothing, even for the owner (UNCHANGED by Wave 22 — the scorecard moved, this page
+    did not)". A pin records a fact; it does not make the fact right, and **it should
+    not stay pinned forever** (Manny, 2026-09-27).
+  - **The wave that fixes it** should move `game.html` onto the same
+    `organizerEvidence()` test and re-point that pinned case with the reason, the way
+    Wave 22 re-pointed three suites. Check `game.html`'s own predicate first: if it is
+    the older `isOrganizerView()`, the table above under "Left on the OLD predicate"
+    is the other half of the same job.
+
+- **OPEN 2026-09-27 — a transient `SIGSEGV` kills one file per full suite run, and it
+  is UNEXPLAINED.** Not resolved, not diagnosed, recorded so that a recurrence is a
+  pattern rather than a surprise.
+  - **What was seen.** Four `npm test` runs on 2026-09-27: two clean green (9396
+    tests, 9394 passed, 2 todo, ~157s), and two killed by a segfault in a **different
+    file each time** — `players_sheet_test.js` after 325 ms, `board_header_trim_test.js`
+    after 18462 ms. No assertion was involved. The runner counts a dead file as one
+    test, so the runs reported 13 and 22 **dropped** results rather than failures.
+  - **Both files are green standalone**, repeatedly: `players_sheet_test.js` 38/38 on
+    five consecutive runs, `board_header_trim_test.js` 23/23. So it is runner-level,
+    not a defect in either suite.
+  - **The one correlation available.** 47 test files now drive headless Chrome (Wave 22
+    added the 47th, `organizer_doors_after_picker_test.js`). Concurrent Chrome
+    instances under the node test runner are the plausible pressure, and that is a
+    hypothesis, not a finding — nothing has been measured to support it.
+  - **Why the history is empty.** `test-runs/` keeps only `last.tap` and
+    `last-green.json`, so there is no record of whether this predates Wave 22. It
+    cannot be claimed either way. If it recurs, the cheap first step is keeping the
+    TAP of a failing run before the next one overwrites it, and noting which file died.
 
 - **OPEN 2026-09-23 — `calculateMatchEngine` exists in THREE copies, with drifting
   return shapes.** Found during the v215 recon, logged rather than fixed: it needs
