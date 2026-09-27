@@ -2913,7 +2913,63 @@
 // The consumer product cache is consumer-v86-nocarry. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
 // web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v245-nocarry';
+// Moved to v246 SO EVERY GOLFER'S NAME LINES UP WITH THEIR OWN SCORE BOX.
+//
+// On a device at v245, on a hole that has scores, one golfer's name sits 9px lower than
+// the others relative to their own box, and a stroke dot appears to float in the gap
+// between two rows. Manny reported it at 390px and it measures exactly as reported.
+//
+// THE BOXES WERE NEVER WRONG - and that is why Wave 17's guard stayed green. Measured
+// cold at 390x844 on a scored hole: every box at +6 within its row and left 318 in every
+// row, which is precisely what that guard asserted. What moved was the NAME.
+//
+// THE CAUSE. The score cell is the Full Card's <td>, a centred column, and the elements
+// under the box are OPTIONAL and differ per golfer - the circled NET MARK is ~17px that
+// only a golfer who strokes on that hole and has a score gets. So cells come out 75px or
+// 93px, rows 88px or 106px, and with align-items: center the name centred against a cell
+// whose height depended on somebody else's handicap:
+//     Manny  cell 75  row  88  name +27.5  box +6      offset 21.5
+//     Kopp   cell 93  row 106  name +36.5  box +6      offset 30.5   <- his net mark
+// The floating dot is the same fact: stroke-dots sits at the BOTTOM of the cell, so on
+// the 18px-taller row it rendered 33px lower than its neighbours and read as belonging to
+// neither row. It was under Kopp's box; his cell is just longer.
+//
+// AND IT PRE-DATED WAVE 17 BY THE IDENTICAL 18 PIXELS. Measured against v243 rather than
+// reasoned about: cells 94/112, rows 115/133, name +41 vs +50 - the same 18px of cell and
+// 9px of name. Wave 17 removed 19px of constant height from every row (the cloned initials
+// label plus padding), so the same anomaly went from 15.7% of a 115px row to 20.5% of an
+// 88px one, on rows that now sit closer together. It became visible; it was not created.
+//
+// THE FIX IS ONE PROPERTY: align-items: flex-start on .hv-player-row, so the name pins to
+// the top exactly as the box is pinned and the pair is level whatever the cell carries
+// below it. Measured after: name +6 and box +6 in all four rows, offset 0.
+// THE ROWS STAY UNEQUAL ON PURPOSE (88 and 106). Reserving the net mark's height on every
+// row would give back most of the 108px Wave 17 saved, and the alignment was the
+// complaint - so the guard asserts the inequality too, in case somebody "fixes" it later
+// by padding rows.
+//
+// THE GUARD WAS THE REAL FIX. hole_view_row_test.js scored holes 1-5 and therefore landed
+// on hole 6, WHICH HAS NO SCORES - so no cell could carry a net mark, every cell came out
+// 60px and every row 73px, and it pinned 73px as though it were universal when it is only
+// true of an unscored hole. A GUARD WHOSE FIXTURE CANNOT PRODUCE THE VARIATION CANNOT SEE
+// IT. It now holds BOTH cases: the unscored hole (73px, uniform) and a scored MIXED hole -
+// a net mark on one golfer, a shape box on another, neither on a third - asserting that
+// every row's name-to-box offset is identical, with a positive assertion that the cells
+// really do differ so the offset test cannot pass vacuously.
+//
+// ITEM 2 OF THAT REPORT IS NOT IN THIS WAVE. "Next does not land" did not reproduce in
+// nine arrangements - from rest, twice more, from the page bottom, bare / skins /
+// side-match rounds, four and six golfers, with a box focused, and at a 450px viewport -
+// all landing with the header 12px from the top and every box in view. The clamping
+// hypothesis was wrong: there is 796px of content below the hole card in every case, and
+// the wanted and actual scroll are equal in all nine. It waits on one answer from Manny:
+// whether Next fails only after typing a score, with the keyboard up.
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v87-rowalign. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v246-rowalign';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
