@@ -2482,9 +2482,33 @@ html {
         if (!anchor) return;
         // THE SCROLL: an absolute target, so the landing is identical whatever the
         // golfer count, the banners above, or where the page was.
+        //
+        // AND BELOW THE STATUS BAR, NOT BEHIND IT (Wave 19b). In the INSTALLED app the
+        // root is inset for the notch - see the NATIVE SAFE AREA block - and that inset
+        // protects content only while the page sits at scroll 0. This target is an
+        // ABSOLUTE document offset and the inset is part of the document, so once the
+        // page scrolls the inset has gone above the viewport and nothing is left holding
+        // the heading clear of the clock. Measured on the same round and the same tap:
+        // with a 47px inset the target moved to 1027 and put the heading 12px from the
+        // PHYSICAL TOP OF THE SCREEN - 35px underneath the status bar - which is what
+        // Manny saw as "Next does not land on the hole". It landed; he could not see it.
+        //
+        // The inset is read from the COMPUTED ROOT PADDING rather than from env(),
+        // because env() is not readable from script and that padding IS the inset. It is
+        // 0 everywhere without a notch, so the web landing does not move by a pixel -
+        // hole_landing_inset_test.js pins the zero case for exactly that reason, and
+        // emulates 47 and 59 for the rest.
+        //
+        // ONE PLACE. Prev/Next and the 1-18 jump both come through here, so neither of
+        // them does this arithmetic itself.
         try {
             if (anchor.getBoundingClientRect && typeof window.scrollTo === 'function') {
-                const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0) - HOLE_LANDING_OFFSET;
+                let inset = 0;
+                if (typeof getComputedStyle === 'function' && document.documentElement) {
+                    inset = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
+                }
+                const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0)
+                    - HOLE_LANDING_OFFSET - inset;
                 window.scrollTo(0, Math.max(0, y));
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }

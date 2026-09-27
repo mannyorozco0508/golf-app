@@ -2969,7 +2969,66 @@
 // consumer-v87-rowalign. The tournament product cache stays tournament-v54-rattle-golf.
 // iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
 // archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v246-rowalign';
+// Moved to v247 SO THE HOLE LANDS BELOW THE STATUS BAR, NOT BEHIND IT.
+//
+// On a device at v246 running the INSTALLED app, tapping Next scrolls correctly and the
+// golfer still cannot see which hole they are on. Manny reported it with no typing and no
+// keyboard, on the same screenshot as the row misalignment: the heading lands 12px from
+// the PHYSICAL TOP OF THE SCREEN, which on a notched iPhone in standalone is 35px
+// underneath a 47px status bar. It landed. He could not see it.
+//
+// HOW. index.html insets the root for the notch (the NATIVE SAFE AREA block):
+//     html { padding-top: env(safe-area-inset-top, 0px); ... }
+// which protects content while the page sits at scroll 0. landOnHole() scrolls to an
+// ABSOLUTE document offset and the inset is part of the document, so once the page scrolls
+// the inset has gone above the viewport and nothing is left holding the heading clear of
+// the clock. Measured, same round, same tap, HOLE_LANDING_OFFSET = 12:
+//     root padding-top  0px -> scrollY  980 -> heading 12px from the viewport top
+//     root padding-top 47px -> scrollY 1027 -> heading 12px from the viewport top
+//     root padding-top 59px -> scrollY 1039 -> heading 12px from the viewport top
+// The target tracks the inset faithfully, which is exactly the problem.
+//
+// THE FIX: landOnHole subtracts the live inset as well as the 12px, read from the COMPUTED
+// ROOT PADDING because env() is not readable from script and that padding IS the inset.
+// ONE PLACE - Prev/Next (goToAdjacentHole) and the 1-18 jump (jumpToHole) both come
+// through landOnHole, so neither does the arithmetic itself. The inset is 0 everywhere
+// without a notch, so THE WEB LANDING DOES NOT MOVE BY A PIXEL, and the new guard pins
+// that zero case for exactly that reason.
+//
+// WHY THIRTEEN ARRANGEMENTS PASSED FIRST, which is the more useful half. The existing
+// landing assertions read the header's rect against the VIEWPORT and called 12px a
+// landing. AN ASSERTION THAT MEASURES THE VIEWPORT CANNOT SEE A STATUS BAR: in a
+// standalone PWA the viewport starts under the notch, so 12px from its top is 12px from
+// the top of the screen and the assertion is satisfied BY the defect. Bare and group
+// links, four to eight golfers, scored and unscored holes, from rest and from the page
+// bottom, with and without a focused box, at a keyboard-sized viewport - all thirteen
+// reported "landed" and all were wrong on a phone.
+// That is the SAME SHAPE as the fixture fault in Wave 17's row guard, which scored holes
+// 1-5 and landed on an unscored hole so no cell could ever vary. There a fixture that
+// could not produce the variation could not see it; here a frame of reference with no
+// status bar in it cannot see one. Both suites were green and both measured the wrong
+// thing, and hole_landing_inset_test.js says so in its own header so the next reader finds
+// it stated rather than rediscovering it.
+//
+// THE NEW GUARD emulates the notch by setting the root padding directly - env() cannot be
+// forced from a test and there is no headless status bar, but the fix reads the computed
+// padding, so the same code path runs with the same arithmetic. 0, 47 and 59px, on Next
+// AND Prev, asserting the heading lands at inset + 12 and every box is below the inset.
+// Control: drop the inset subtraction and the 47 and 59 cases go red on both navigations
+// while the 0px case and the web-unchanged test stay green.
+//
+// WHAT WAS RULED OUT BY MEASUREMENT, not by argument: the clamping hypothesis (796px of
+// content sits below the hole card in every arrangement, and the wanted scroll equals the
+// actual in all thirteen), the keyboard/focus race (Manny tapped Next without touching a
+// box, and a focused-box arrangement landed anyway), and Wave 19's own align-items change
+// (four fresh arrangements after it, wanted == got, heading at 12 every time).
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v88-landinset. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it - but it is the first wave in a while whose defect only
+// exists in the native shell, so it is worth saying that the web was never wrong here.
+const CACHE_VERSION = 'golfapp-v247-landinset';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
