@@ -10,7 +10,8 @@
 // ships: crypto.randomUUID, uuid, deviceId, device_id, installId, install_id,
 // clientId and userId are ZERO hits, and no storage key holds a count. The complete
 // set of localStorage keys is golfapp-theme, golfAppRoster, lastRoomCode,
-// lastTripCode, landingDismissed_<code> and golfapp_me_<code> -
+// lastTripCode, landingDismissed_<code>, golfapp_me_<code> and (Wave 17)
+// golfapp_me_skip_<code>, which records only that this device declined to say -
 // and the last of those is the player NUMBER the golfer taps as "me" on one round,
 // not a random value and never sent anywhere.
 //

@@ -77,7 +77,12 @@ describe('THE PRIMARY SCORE IS THE STORED GROSS', () => {
     });
 
     test('Hole View copies the cell rather than rebuilding the number', () => {
-        assert.match(HV, /cells\[i\] \? cells\[i\]\.innerHTML : ''/);
+        // WAVE 17: the Hole View copy is holeViewCellHtml(cells[i]), which takes the Full
+        // Card's cell and REMOVES one element - the table's column initials, which were
+        // the golfer's name a second time and 17px of every row. It builds nothing: the
+        // dots, the box and the marks are still the Full Card's own html, which is the
+        // claim this assertion exists for.
+        assert.match(HV, /holeViewCellHtml\(cells\[i\]\)/);
         assert.ok(!/class="score-input"/.test(code(HV)),
             'Hole View must not construct its own score input');
     });
@@ -330,7 +335,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v10', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v243-kpask';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v244-holeview';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

@@ -125,9 +125,12 @@ describe('2. INITIALS: Randy T. / Randy C. / Matt M. / Matt B. / Matt H. on ever
     });
     test('the who-am-I buttons and Finish Round\'s missing rows', () => {
         const d = round12(); d.players.forEach((p, i) => { for (let h = 1; h <= 3; h++) d.scores['p' + p.id + '_h' + h] = 4; }); delete d.scores['p101_h2']; delete d.scores['p104_h3'];
-        const sb = arrive(d, '?game=nm1&group=1', ['whoami-mount', 'fr-incomplete-warning']);
-        run(sb, "whoAmIDismissed = false; meId = null; renderWhoAmI()");
-        const w = html(sb, 'whoami-mount');
+        const sb = arrive(d, '?game=nm1&group=1', ['fr-incomplete-warning']);
+        // WAVE 17: the buttons are built by whoAmILineHtml() and revealed by a tap, instead
+        // of a 287px panel in #whoami-mount that opened by itself. What this test is about
+        // is the NAMES on those buttons - shortened to "Randy T." where two Randys play -
+        // so it reads the builder's own output and leaves the mount out of it.
+        const w = run(sb, "whoAmIDismissed = false; meId = null; whoAmIPickerOpen = true; whoAmILineHtml()");
         assert.match(w, /whoami-btn" onclick="setMe\('101'\)">Randy T\.<\/button>/);
         assert.match(w, /setMe\('104'\)">Matt M\.<\/button>/);
         run(sb, 'renderIncompleteWarning()');
@@ -135,7 +138,7 @@ describe('2. INITIALS: Randy T. / Randy C. / Matt M. / Matt B. / Matt H. on ever
         assert.match(f, /Hole 2 · Randy T\. <a/); assert.match(f, /Hole 3 · Matt M\. <a/);
     });
     test('a golfer named by id in the round ticker / Ryder pairings, and the Wolf name', () => {
-        const sb = arrive(round12(), '?game=nm1&group=1', ['whoami-mount']);
+        const sb = arrive(round12(), '?game=nm1&group=1', []);
         assert.equal(run(sb, "golferLabel(102)"), 'Randy C.');
         assert.equal(run(sb, "golferLabel(currentData.players[2])"), 'Marty');
         assert.equal(run(sb, "golferLabelFor('Matt H')"), 'Matt H.');

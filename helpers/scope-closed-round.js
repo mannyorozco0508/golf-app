@@ -36,7 +36,7 @@ function oneGroupRound() {
 // tag-stripped text of every element the page wrote, by id, plus the scoped
 // list the page settled on. The mounts the widgets write into are placed in the
 // tree first (mini-dom does not parse static markup).
-const MOUNTS = ['hole-view-card', 'card-body', 'action-center-mount', 'hole-recap-mount', 'whoami-mount', 'fc-ticker-mount', 'live-skins-mount', 'live-board-mount', 'group-missing-note'];
+const MOUNTS = ['hole-view-card', 'card-body', 'action-center-mount', 'hole-recap-mount', 'fc-ticker-mount', 'live-skins-mount', 'live-board-mount', 'group-missing-note'];
 function arrive(query, data) {
     const vm = require('vm');
     const { loadHtmlInlineScript } = require('./load-script.js');

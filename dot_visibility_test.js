@@ -158,7 +158,12 @@ describe('THE INDICATOR IS SHARED, NOT DUPLICATED', () => {
         // .hv-player-cell is a flex row, that appended span sat beside the whole centred
         // column while the cell's own pips sat under the box: one birdie, two pips, out
         // of line with each other. Both extra copies are gone.
-        assert.ok(/hv-player-cell">\$\{cells\[i\] \? cells\[i\]\.innerHTML : ''\}<\/div>/.test(IDX),
+        // WAVE 17: the Hole View copy is holeViewCellHtml(cells[i]), which takes the Full
+        // Card's cell and REMOVES one element - the table's column initials, which were
+        // the golfer's name a second time and 17px of every row. It builds nothing: the
+        // dots, the box and the marks are still the Full Card's own html, which is the
+        // claim this assertion exists for.
+        assert.ok(/hv-player-cell">\$\{holeViewCellHtml\(cells\[i\]\)\}<\/div>/.test(IDX),
             'nothing may be appended after the cloned cell');
         assert.ok(!/pipHtml/.test(IDX), 'the second pip render must not come back');
         assert.ok(!/hv-dot-line/.test(IDX), 'the written label line must not come back');

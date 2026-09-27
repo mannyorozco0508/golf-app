@@ -64,7 +64,10 @@ describe('?group=7 ON A SIX-GROUP ROUND: nobody', () => {
         ['card-body', 'table-head-row', 'hole-view-card'].forEach(id => assert.equal(a.text[id], undefined, id + ' is empty'));
     });
     test('no My Round, no ticker (either mount), no recap, no who-am-I, no live skins, no bet strip', () => {
-        ['action-center-mount', 'fc-ticker-mount', 'live-ticker-mount', 'hole-recap-mount', 'whoami-mount', 'live-skins-mount', 'bet-strip-mount'].forEach(id => assert.equal(a.text[id], undefined, id + ' is empty'));
+        // whoami-mount is gone (Wave 17) - naming a mount that no longer exists would make
+        // this "is empty" assertion trivially and permanently true, which is the inert-guard
+        // trap. The line that replaced it lives inside action-center-mount, already listed.
+        ['action-center-mount', 'fc-ticker-mount', 'live-ticker-mount', 'hole-recap-mount', 'live-skins-mount', 'bet-strip-mount'].forEach(id => assert.equal(a.text[id], undefined, id + ' is empty'));
     });
     test('no landing welcome, no dots context, no "Enter Hole 1 Scores" prompt', () => {
         assert.equal(a.display['round-landing-summary'], 'none');
@@ -167,7 +170,16 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // text. Wave 16 deleted the select, so a harness artefact left the golden - not a
         // surface. Every `filtered` list is identical and display is unchanged but for
         // group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'eac0ac10');
+        // RE-PINNED (v244, UI Wave 17, was eac0ac10): the "Which one are you?" question left
+        // the scorecard and became one line inside My Round. DIFFED BEFORE RE-CAPTURING:
+        // across the three links, 0 added, 1 CHANGED and 1 REMOVED.
+        // REMOVED is whoami-mount, whose text was "|👋 Which one are you?|Ivy|Jon|Kim|Lee|
+        // Skip — just show everything|" - a 287px panel above score entry, measured cold at
+        // 390x844. CHANGED is action-center-mount, which gains "|👋 Which one are you?|
+        // choose|" straight after its header and is otherwise byte-identical. The question
+        // moved; it did not go. Every filtered list is identical and display is unchanged
+        // but for group-missing-note, which this suite deletes explicitly below.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'bffd1bf0');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
