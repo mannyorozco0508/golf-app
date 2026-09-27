@@ -180,8 +180,15 @@ describe('5. WHAT THE REMOVAL MUST NOT HAVE TAKEN WITH IT', () => {
         assert.ok(h, 'the scorecard did not register its round listener');
         h.cb({ val: () => ({ eventName: 'Monday', gameFormat: 'stroke', players: P,
             courseData: CD, scores }), exists: () => true });
-        const who = String(sb.document.getElementById('whoami-mount').innerHTML || '');
-        assert.ok(who.length > 100, 'the scorecard painted nothing: ' + who.length);
-        assert.match(who, /Ann/, 'the golfers are not on the page');
+        // WAVE 17: this read #whoami-mount as the proof that the card painted. That mount
+        // is gone - the question is one line inside My Round now - so the proof moved to the
+        // scorecard's own body, which is what "the scorecard still works" actually means.
+        const body = String(sb.document.getElementById('card-body').innerHTML || '');
+        assert.ok(body.length > 100, 'the scorecard painted nothing: ' + body.length);
+        // The names are in the HEAD row; card-body carries the holes and the column
+        // initials. Both are asserted, because "it painted" and "the golfers are named"
+        // are two claims and the old single read of #whoami-mount covered neither well.
+        const head = String(sb.document.getElementById('table-head-row').innerHTML || '');
+        assert.match(head, /Ann/, 'the golfers are not on the page');
     });
 });

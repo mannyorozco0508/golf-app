@@ -361,8 +361,17 @@ describe('D1 — THE CELLS DO NOT MOVE (Section 6.6)', () => {
     // rebuild by identity. Read: stripping exactly those two attributes from the
     // rendered cells gives back the previous pins (5f39fef9fe15 / 8938cbdfb70a) -
     // nothing else in either cell moved. The arithmetic is unchanged.
-    const ERIC_TD_SHA = 'a013a3d5d3c616d318844b45175de7671d715e0f8317707f9913a507bccc566f';
-    const CHRIS_TD_SHA = '591ac6447849ec6cb903c295c33fe0e18763bee30932cb87ef461aae797b6eb5';
+    // RE-PINNED (v244, UI Wave 17): the Full Card's column-initials div gained
+    // class="fc-cell-initials". Hole View clones this cell and used to bring that div
+    // with it - the golfer's name a second time, 17px above the box, on a row that
+    // already names them - so the row builder now strips it BY THAT CLASS rather than by
+    // position. The class is the whole change to this cell.
+    // READ BEFORE RE-PINNING, the same way the v121 note above did it: removing exactly
+    // ` class="fc-cell-initials"` from each rendered cell gives back the previous pins
+    // (a013a3d5... / 591ac644...) byte for byte, one occurrence per cell. Nothing else in
+    // either cell moved, and the arithmetic is untouched.
+    const ERIC_TD_SHA = '2aa04a936544ad51fc739c4343a6306206dacfca627153cfbe80b27ee351ab8e';
+    const CHRIS_TD_SHA = 'd06eace409b6444ec7ab32971d814ed784680e1844b317c4d16dc33a4068d73d';
 
     test('Eric reads -2, with no net mark and no pips', () => {
         const call = symptom();

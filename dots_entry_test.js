@@ -123,8 +123,12 @@ describe('CONFIRMATION — the golfer must see the tap landed', () => {
     test('confirmation comes from the score cell, drawn exactly once', () => {
         const src = read('index.html');
         // The whole Hole View dots section: the lookup and the button.
+        // The endpoint was `html += '<div id="whoami-mount"></div>'`, which Wave 17
+        // deleted - a hand-picked neighbouring line is a guess about file order, exactly
+        // what CLAUDE.md says to avoid. It ends at the next function instead.
         const start = src.indexOf('const dotsGame = activeDotsGame();');
-        const fn = src.slice(start, src.indexOf("html += '<div id=\"whoami-mount\"></div>'", start));
+        const fn = src.slice(start, src.indexOf('\n        function ', start));
+        assert.ok(fn.length > 200, 'the Hole View dots section could not be sliced: ' + fn.length);
         assert.ok(/currentData\.dots\[`h\$\{holeNum\}`\]/.test(fn), 'reads this hole only');
 
         // Hole View used to confirm the tap THREE times over: a written label line under

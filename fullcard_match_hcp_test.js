@@ -210,7 +210,12 @@ describe('HOLE VIEW STILL READS CLEAN NAMES', () => {
     });
 
     test('Hole View copies the player cell VERBATIM, dots included', () => {
-        assert.match(renderHoleViewSrc, /cells\[i\] \? cells\[i\]\.innerHTML : ''/,
+        // WAVE 17: the Hole View copy is holeViewCellHtml(cells[i]), which takes the Full
+        // Card's cell and REMOVES one element - the table's column initials, which were
+        // the golfer's name a second time and 17px of every row. It builds nothing: the
+        // dots, the box and the marks are still the Full Card's own html, which is the
+        // claim this assertion exists for.
+        assert.match(renderHoleViewSrc, /holeViewCellHtml\(cells\[i\]\)/,
             'the same HTML - which is why the two views cannot disagree about dots');
     });
 });

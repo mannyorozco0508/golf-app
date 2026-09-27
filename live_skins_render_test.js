@@ -282,8 +282,12 @@ describe('SCORE CORRECTIONS — the card moves with the score', () => {
         // The engine cannot go stale; only a missing re-render can. This is the
         // assertion that protects against that.
         const src = read('index.html');
-        const at = src.indexOf('renderWhoAmI();');
-        const block = src.slice(at, at + 220);
+        // ANCHORED ON THE FUNCTION, not on a neighbouring call. This used to slice from
+        // `renderWhoAmI();` - which Wave 17 deleted - and a hand-picked neighbour is a guess
+        // about file order that the next wave can invalidate, exactly as CLAUDE.md records.
+        const at = src.indexOf('function renderCardWidgets()');
+        const block = src.slice(at, src.indexOf('\n    }', at));
+        assert.ok(at > -1 && block.length > 40, 'renderCardWidgets could not be sliced');
         assert.match(block, /renderLiveSkins\(\);/,
             'renderLiveSkins must run whenever the scorecard renders, or a correction leaves a stale card.');
     });

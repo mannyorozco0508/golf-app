@@ -2789,7 +2789,74 @@
 // consumer-v84-kpask. The tournament product cache stays tournament-v54-rattle-golf. iOS
 // is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not archive,
 // upload or reopen it.
-const CACHE_VERSION = 'golfapp-v243-kpask';
+// Moved to v244 FOR TWO THINGS FROM MANNY'S PHONE.
+//
+// 1. "👋 WHICH ONE ARE YOU?" IS NO LONGER A PANEL ON THE SCORECARD. Measured cold at
+// 390x844 it was 287px above score entry, on the screen Wave 7 spent a whole wave
+// cutting to one viewport, asking a question most golfers do not care about.
+//
+// IT WAS NOT DELETED, AND THE RECON IS WHY. The block is the ONLY writer of
+// golfapp_me_<code>: ?me= is the other way in and NO LINK THE APP HANDS OUT CARRIES IT
+// (every generated link is ?game=CODE, optionally &group=N). Five surfaces read that
+// answer, measured on two identical cold arrivals differing only in the stored value:
+//     the recap says "You 1 UP / You — birdie" instead of "Ben ..."
+//     the headline says "1 match · losing 1" instead of "3 live"
+//     the sections split into MY MATCHES / OTHER MATCHES
+//     the row label drops your own name: "vs Ann" instead of "Ann vs Ben"
+//     and your own match is listed first
+// One of those readers is nameFor/personalize in hole-events.js, a protected file.
+// Deleting the writer would have left five behaviours unreachable and dead code in a
+// protected file, so the question MOVED instead: one line inside My Round.
+//
+// (C) THE REFUSAL IS WRITTEN DOWN NOW, which was the actual defect. The answer
+// persisted and the refusal did not - whoAmIDismissed was a plain `let` - so "Skip —
+// just show everything" lasted until the next page load and the block came back, and
+// back, all round. golfapp_me_skip_<code> joins golfapp_me_<code>; the session flag
+// stays so a skip acts instantly, and both are wrapped for private mode.
+//
+// (B) WHY MY ROUND AND NOT THE 👥 PLAYERS SHEET, the other candidate: the Players pill
+// is gated on canReachSetup() and is NEVER on a group link, and a golfer on a group
+// link in a group of two or more is exactly who the question is for. My Round reaches
+// them, needs no modal, and is where four of the five behaviours already appear.
+// AND A GOLFER CAN NOW CHANGE THEIR MIND, which they could not before at all: a stored
+// answer was one-way, unchangeable from any screen, and a skipped one had nowhere to
+// go. The line reads "You: <name> · change", or "Showing everyone · choose", and opens
+// the same buttons on a tap. clearMe() forgets the answer and records the refusal.
+// HONEST LIMIT: renderActionCenter returns empty on a round with no bets and no money
+// pool, so there is no line on such a round - where the answer drives only the recap's
+// "You", the other four needing bets to exist.
+//
+// 2. THE HOLE VIEW ROW IS A LIST ROW, NOT A BAND. Each golfer's row was 100px, of which
+// the score box is 48. The other 52 came from two things that did not need to be there:
+// the FULL CARD's column initials, cloned in with the score cell - a 21.7x17 div reading
+// "AA" sitting 19px above the box, on a row that already carries the golfer's NAME - and
+// 10px of padding top and bottom. The name block is 32px and centred, so a 100px row
+// left 34px empty above it and 34px below.
+//     73px now.  4 golfers 400px of rows -> 292px (108px back)
+//                5 golfers 500px -> 365px (135px back)
+//                6 golfers 600px -> 438px (162px back)
+// The initials are stripped IN THE ROW BUILDER by the class the Full Card now gives
+// them, not with display:none and not by position. THE BOX IS UNTOUCHED at 48x48 and
+// stays right-aligned: the boxes forming one straight column is what lets a thumb run
+// the list without re-aiming, and the 294px gap stops reading as a void once the row is
+// 73px rather than 100px. The HANDICAP STAYS A BLOCK - measured, inline saves 0px
+// because the row is set by the cell - and THE STROKE DOTS STAY UNDER THE BOX, which is
+// the floor here and is pinned by eight assertions across five suites.
+//
+// ELEVEN GUARD FILES were re-pointed, six of them pinning the verbatim clone
+// `cells[i] ? cells[i].innerHTML : ''` - now holeViewCellHtml(cells[i]), which still
+// takes the Full Card's own html and only REMOVES from it. Two anchored their source
+// slice on a line this wave deleted (an endpoint CLAUDE.md warns against) and now
+// anchor on the function. One read #whoami-mount as its proof that the scorecard
+// painted at all. Two sha-pinned artefacts were diffed before re-pinning: the Full Card
+// cell shas (stripping exactly ` class="fc-cell-initials"` gives the old pins back byte
+// for byte) and card_scope_closed's golden (1 removed, 1 changed, 0 added per link).
+//
+// No engine and no protected file changed. The consumer product cache is
+// consumer-v85-holeview. The tournament product cache stays tournament-v54-rattle-golf.
+// iOS is at 1.0.4 build 2 and already submitted; this is web/Cap only and does not
+// archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v244-holeview';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

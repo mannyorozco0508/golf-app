@@ -389,7 +389,12 @@ describe('HOLE VIEW SHOWS THE GOLFER\u2019S OWN HANDICAP', () => {
     });
 
     test('no second dot renderer was built inside Hole View', () => {
-        assert.match(HV, /cells\[i\] \? cells\[i\]\.innerHTML : ''/,
+        // WAVE 17: the Hole View copy is holeViewCellHtml(cells[i]), which takes the Full
+        // Card's cell and REMOVES one element - the table's column initials, which were
+        // the golfer's name a second time and 17px of every row. It builds nothing: the
+        // dots, the box and the marks are still the Full Card's own html, which is the
+        // claim this assertion exists for.
+        assert.match(HV, /holeViewCellHtml\(cells\[i\]\)/,
             'score cells are still copied verbatim from the Full Card');
         assert.ok(!/stroke-dots/.test(HV), 'Hole View never constructs a dot element itself');
         assert.equal((SRC.match(/class="stroke-dots"/g) || []).length, 1,
@@ -555,7 +560,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v243-kpask';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v244-holeview';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });

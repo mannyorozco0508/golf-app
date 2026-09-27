@@ -165,7 +165,12 @@ describe('THE STRIP CANNOT RESIZE THE SCORE-ENTRY COLUMN', () => {
 // ---------------------------------------------------------------------------
 describe('THE DUPLICATE RENDER DOES NOT COME BACK', () => {
     test('Hole View appends nothing after the cloned cell', () => {
-        assert.ok(/hv-player-cell">\$\{cells\[i\] \? cells\[i\]\.innerHTML : ''\}<\/div>/.test(IDX),
+        // WAVE 17: the Hole View copy is holeViewCellHtml(cells[i]), which takes the Full
+        // Card's cell and REMOVES one element - the table's column initials, which were
+        // the golfer's name a second time and 17px of every row. It builds nothing: the
+        // dots, the box and the marks are still the Full Card's own html, which is the
+        // claim this assertion exists for.
+        assert.ok(/hv-player-cell">\$\{holeViewCellHtml\(cells\[i\]\)\}<\/div>/.test(IDX),
             'a second pip span appended here is what floated beside the box');
         assert.ok(!/pipHtml/.test(IDX), 'the appended pip span must stay gone');
         assert.ok(!/hv-dot-line/.test(IDX), 'the written label line must stay gone');

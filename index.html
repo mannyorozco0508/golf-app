@@ -437,27 +437,32 @@
             background: transparent; color: var(--text-muted);
             font-size: 0.74rem; font-weight: bold; cursor: pointer; font-family: inherit;
         }
-        @media print { .hole-recap, .whoami-panel { display: none !important; } }
+        @media print { .hole-recap, .whoami-line { display: none !important; } }
         @media (prefers-reduced-motion: no-preference) {
             .hole-recap { animation: recapIn 180ms ease-out; }
         }
         @keyframes recapIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* One tap, once per round per device. Not a profile, not an account. */
-        .whoami-panel {
-            margin: 10px 0; padding: 12px; border-radius: 10px;
-            border: 1px dashed var(--border-mid); background: var(--bg-card);
+        /* One tap, once per round per device. Not a profile, not an account.
+           THE LINE (Wave 17). This was .whoami-panel, a 287px block on the scorecard above
+           score entry; it is now one row inside My Round that opens the golfer buttons on a
+           tap. 44px minimum on every control, because this is still a thing a thumb hits. */
+        .whoami-line { margin: 0 0 10px 0; }
+        .whoami-line-btn {
+            width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 8px 10px; background: var(--bg-soft); color: var(--text-main);
+            border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.85rem; cursor: pointer;
         }
-        .whoami-title { font-size: 0.85rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
+        .whoami-line-cue { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.03em; }
+        .whoami-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
         .whoami-btn {
-            width: 100%; padding: 11px; min-height: 44px; margin-bottom: 6px;
-            border-radius: 10px; border: 1px solid var(--border-mid);
-            background: var(--nav-bg); color: var(--brand-green);
-            font-weight: bold; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+            min-height: 44px; padding: 8px 10px; background: var(--bg-card); color: var(--text-main);
+            border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer;
         }
+        .whoami-btn-on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .whoami-skip {
-            width: 100%; padding: 8px; border: none; background: transparent;
-            color: var(--text-muted); font-size: 0.76rem; cursor: pointer; font-family: inherit;
+            width: 100%; min-height: 44px; margin-top: 8px; background: none; border: none;
+            color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; cursor: pointer;
         }
         .add-action-btn {
             width: 100%; padding: 10px; min-height: 44px; border-radius: 0 0 10px 10px;
@@ -616,9 +621,17 @@
         }
         .hv-hole-num { font-size: 1.5rem; font-weight: bold; color: var(--brand-green); }
         .hv-hole-meta { font-size: 0.85rem; color: var(--text-muted); font-weight: bold; }
+        /* A LIST ROW, NOT A BAND (Wave 17). 10px of padding on a row whose tallest
+           element is a 48px box gave a 100px row per golfer - 400px of a 4-golfer card,
+           600px of a 6-golfer one - with 34px of empty above the name and 34px below.
+           6px, and the Full Card's column initials no longer cloned in above the box,
+           make it 73px: 108px back on a foursome, 162px on a six. The BOX IS UNTOUCHED
+           at 48x48 and stays right-aligned, because the boxes forming one straight column
+           is what lets a thumb run down the list without re-aiming. hole_view_row_test.js
+           measures all of it at 4, 5 and 6 golfers. */
         .hv-player-row {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            padding: 10px 0; border-bottom: 1px solid var(--border-faint);
+            padding: 6px 0; border-bottom: 1px solid var(--border-faint);
         }
         .hv-player-row:last-child { border-bottom: none; }
         .hv-player-name { font-weight: bold; font-size: 0.95rem; flex: 1; }
@@ -2628,6 +2641,31 @@ html {
         // recording a dot required leaving the hole you were playing. It belongs here,
         // next to the scores. Each golfer's dots are drawn by their own score cell, so a
         // tap is visibly confirmed without opening anything and without repeating itself.
+        // THE FULL CARD'S COLUMN INITIALS DO NOT TRAVEL (Wave 17).
+        //
+        // The score cell is cloned whole out of the Full Card, and it begins with that
+        // table's COLUMN HEADER - a div reading "AA", the golfer's initials, sitting 19px
+        // above the box. On the Full Card that is the only thing naming the column. In
+        // Hole View the row already carries the golfer's NAME on the left, so it was the
+        // same fact twice and 17px of every row to say it: measured 100px rows at 390x844,
+        // of which the box is 48.
+        //
+        // STRIPPED HERE, IN THE BUILDER, not hidden with CSS. display:none would leave the
+        // element in the row, in the print stylesheet and in anything that reads the row's
+        // text, and it would put the saving at the mercy of one selector. It is removed
+        // from the html this function emits, by the class the Full Card gives it - not by
+        // position, which the next change to that cell would quietly invalidate.
+        //
+        // NOT cloneNode: mini-dom has no cloneNode, and several suites render this
+        // function under it. Under mini-dom `cells` is empty anyway (innerHTML parses no
+        // children there), so this path only ever runs in a real browser - but a throw
+        // would still be a throw.
+        function holeViewCellHtml(cell) {
+            if (!cell) return '';
+            return String(cell.innerHTML || '')
+                .replace(/<div class="fc-cell-initials"[^>]*>[\s\S]*?<\/div>/, '');
+        }
+
         const dotsGame = activeDotsGame();
         const holeDotsNow = (dotsGame && currentData.dots && currentData.dots[`h${holeNum}`])
             ? currentData.dots[`h${holeNum}`] : {};
@@ -2665,7 +2703,7 @@ html {
             // PDF all render a dot the same way, and a carried greenie is worth what it
             // says everywhere. The pip span carries its net value as a title for anyone
             // who taps it.
-            html += `</div><div class="hv-player-cell">${cells[i] ? cells[i].innerHTML : ''}</div></div>`;
+            html += `</div><div class="hv-player-cell">${holeViewCellHtml(cells[i])}</div></div>`;
         }
 
         // ALTERNATE SHOT GETS ITS OWN BOX, and only in a Foursomes session.
@@ -2726,7 +2764,6 @@ html {
         // just happened, what's at stake, how the side matches stand. The press strip
         // stays a single scrollable chip row, so it holds a fixed height no matter how
         // many presses are running.
-        html += '<div id="whoami-mount"></div>';
         html += '<div id="hole-recap-mount"></div>';
         html += '<div id="live-skins-mount"></div>';
         html += '<div id="action-center-mount"></div>';
@@ -2748,7 +2785,9 @@ html {
     // group is not in this round (scopedPlayers() / scopeMissing()).
     function renderCardWidgets() {
         renderKpEntryMount();
-        renderWhoAmI();
+        // renderWhoAmI is gone (Wave 17): the question is one line inside My Round now,
+        // built by whoAmILineHtml() and rendered by renderActionCenter, so there is no
+        // widget of its own to keep in step here.
         renderHoleRecap();
         renderLiveSkins();
         renderLiveTicker();
@@ -4672,7 +4711,28 @@ html {
         if (!stored || !organizerTokenParam) return false;
         return String(organizerTokenParam) === String(stored);
     }
+    // THE REFUSAL IS WRITTEN DOWN, LIKE THE ANSWER (Wave 17, item C).
+    //
+    // This was the defect. The ANSWER persisted - golfapp_me_<code> - and the REFUSAL
+    // did not: whoAmIDismissed was a plain `let`, so "Skip — just show everything"
+    // lasted until the next page load and then the question came back, and came back
+    // again after every reload, all round. A golfer who declined was asked on every
+    // single navigation between holes that reloaded the page.
+    //
+    // Two halves on purpose. The session flag makes a skip act immediately without
+    // waiting on a storage round-trip, and the stored value makes it survive the
+    // reload. Private mode throws on both set and get, so both are wrapped and the
+    // failure mode is the old behaviour rather than a broken page.
+    const meSkipKey = () => `golfapp_me_skip_${currentMode}`;
     let whoAmIDismissed = false;
+    function storeWhoAmISkipped() {
+        whoAmIDismissed = true;
+        try { localStorage.setItem(meSkipKey(), '1'); } catch (e) { /* private mode: lasts the session */ }
+    }
+    function whoAmISkipped() {
+        if (whoAmIDismissed) return true;
+        try { return localStorage.getItem(meSkipKey()) === '1'; } catch (e) { return false; }
+    }
 
     function loadStoredMe() {
         try { return localStorage.getItem(meStorageKey()); } catch (e) { return null; }
@@ -4693,28 +4753,78 @@ html {
     function setMe(id) {
         meId = String(id);
         storeMe(id);
+        whoAmIPickerOpen = false;
         renderScorecard();
     }
     function skipWhoAmI() {
-        whoAmIDismissed = true;
-        renderWhoAmI();
+        storeWhoAmISkipped();
+        whoAmIPickerOpen = false;
         renderHoleRecap();
         renderActionCenter();
     }
 
-    function renderWhoAmI() {
-        const mount = document.getElementById('whoami-mount');
-        if (!mount) return;
-        const scoped = scopedPlayers();
-        // Asked once, only where it can actually help, and always skippable.
-        if (resolvedMeId() || whoAmIDismissed || scoped.length < 2) { mount.innerHTML = ''; return; }
+    // GOING BACK TO SHOWING EVERYONE. Before Wave 17 the answer was one-way: once
+    // stored, no screen in the app could change it, and a golfer who skipped had
+    // nowhere at all to change their mind. Both are reachable from the line now.
+    function clearMe() {
+        meId = null;
+        try { localStorage.removeItem(meStorageKey()); } catch (e) { /* private mode */ }
+        storeWhoAmISkipped();
+        whoAmIPickerOpen = false;
+        renderScorecard();
+    }
 
-        mount.innerHTML = '<div class="whoami-panel">' +
-            '<div class="whoami-title">\uD83D\uDC4B Which one are you?</div>' +
-            scoped.map(p => '<button type="button" class="whoami-btn" onclick="setMe(\'' + p.id + '\')">' +
-                escapeHtml(golferLabel(p)) + '</button>').join('') +
-            '<button type="button" class="whoami-skip" onclick="skipWhoAmI()">Skip \u2014 just show everything</button>' +
-            '</div>';
+    // ONE LINE INSIDE MY ROUND (Wave 17, item B), not a panel on the card.
+    //
+    // It was a 287px block above score entry - measured cold at 390x844 - on the screen
+    // Wave 7 spent a whole wave cutting to one viewport, asking a question most golfers
+    // do not care about. The five behaviours the answer drives all survive, because the
+    // answer and every reader of it are untouched; only the asking moved.
+    //
+    // WHY THE ACTION CENTER AND NOT THE 👥 PLAYERS SHEET, which was the other candidate:
+    // the Players pill is gated on canReachSetup() and is NEVER on a group link, and a
+    // golfer on a group link in a group of two or more is exactly who this question is
+    // for. The sheet cannot reach them. My Round can, needs no modal, and is where four
+    // of the five behaviours appear anyway - the headline, MY MATCHES / OTHER MATCHES,
+    // the row label and the ordering.
+    //
+    // HONEST LIMIT, recorded rather than discovered later: renderActionCenter returns
+    // empty when a round has no bets and no money pool, so on such a round there is no
+    // line either. On that round the answer drives only the recap's "You" - the other
+    // four behaviours need bets to exist at all.
+    //
+    // IT IS ONE LINE UNTIL ASKED. The golfer buttons appear on a tap, so the panel does
+    // not grow for a question nobody was asking.
+    let whoAmIPickerOpen = false;
+    function toggleWhoAmIPicker() {
+        whoAmIPickerOpen = !whoAmIPickerOpen;
+        renderActionCenter();
+    }
+
+    function whoAmILineHtml() {
+        const scoped = scopedPlayers();
+        // Nothing to disambiguate with one golfer in scope - the same gate as before.
+        if (scoped.length < 2) return '';
+        const me = resolvedMeId();
+        const mine = me ? (currentData.players || []).find(p => String(p.id) === String(me)) : null;
+        const label = mine
+            ? '\uD83D\uDC4B You: <strong>' + escapeHtml(golferLabel(mine)) + '</strong>'
+            : (whoAmISkipped()
+                ? '\uD83D\uDC4B Showing everyone'
+                : '\uD83D\uDC4B Which one are you?');
+        let out = '<div class="whoami-line">'
+            + '<button type="button" class="whoami-line-btn" onclick="toggleWhoAmIPicker()">'
+            + label + '<span class="whoami-line-cue">' + (whoAmIPickerOpen ? 'close' : (mine ? 'change' : 'choose')) + '</span>'
+            + '</button>';
+        if (whoAmIPickerOpen) {
+            out += '<div class="whoami-picks">'
+                + scoped.map(p => '<button type="button" class="whoami-btn' + (me && String(p.id) === String(me) ? ' whoami-btn-on' : '')
+                    + '" onclick="setMe(\'' + p.id + '\')">' + escapeHtml(golferLabel(p)) + '</button>').join('')
+                + '</div>'
+                + '<button type="button" class="whoami-skip" onclick="' + (mine ? 'clearMe()' : 'skipWhoAmI()')
+                + '">' + (mine ? 'Show everyone instead' : 'Skip \u2014 just show everything') + '</button>';
+        }
+        return out + '</div>';
     }
 
     // ---- End-of-hole recap -------------------------------------------------
@@ -5051,7 +5161,8 @@ html {
         // page. This is a LINK to it, never a second copy of the wager form.
         else if (canAddGroupAction()) body += '<a class="add-action-btn" href="' + addGroupActionHref() + '">' + addGroupActionLabel() + '</a>';
 
-        mount.innerHTML = '<div class="action-center">' + toggle + '<div class="action-body">' + body + '</div></div>';
+        mount.innerHTML = '<div class="action-center">' + toggle
+            + '<div class="action-body">' + whoAmILineHtml() + body + '</div></div>';
     }
 
     function renderBetStrip() {
@@ -8943,7 +9054,7 @@ html {
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                            <div style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
+                            <div class="fc-cell-initials" style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
                             <div class="score-input-wrapper${markClass}${gapBoxes.has(String(p.id) + '_' + h.hole) ? ' score-gap' : ''}">
                                 ${scoreInputHtml}
                                 ${shapeHtml}

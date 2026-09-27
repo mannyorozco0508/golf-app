@@ -407,6 +407,55 @@ describe('IDENTITY — personalization, never authorization', () => {
         assert.ok(/just show everything/.test(idx));
     });
 
+    // ---- WAVE 17 ------------------------------------------------------------
+    // THE REFUSAL IS PERSISTED NOW, WHICH WAS THE ACTUAL DEFECT. The answer was
+    // stored (golfapp_me_<code>) and the refusal was not: whoAmIDismissed was a
+    // plain `let`, so "Skip — just show everything" lasted until the next page
+    // load and then the block came back, and back, all round. The answer
+    // persisted; the refusal did not.
+    test('WAVE 17: the skip is STORED, per round, like the answer is', () => {
+        assert.match(idx, /golfapp_me_skip_\$\{currentMode\}/,
+            'the refusal must be stored per round, the way the answer is');
+        const fn = idx.slice(idx.indexOf('function skipWhoAmI'), idx.indexOf('\n    }', idx.indexOf('function skipWhoAmI')));
+        assert.match(fn, /storeWhoAmISkipped\(\)/, 'skipping must write the refusal down');
+        // and the gate must READ the stored value, not only the session flag - a gate
+        // that reads the flag alone is the defect with a storage key beside it.
+        const gate = idx.slice(idx.indexOf('function whoAmISkipped'), idx.indexOf('\n    }', idx.indexOf('function whoAmISkipped')));
+        assert.match(gate, /localStorage/, 'whoAmISkipped must consult storage');
+        assert.match(gate, /whoAmIDismissed/, 'and the session flag, so a skip acts at once');
+    });
+
+    // THE QUESTION LEFT THE CARD. It was a 287px panel above score entry - measured
+    // cold at 390x844 - on a screen Wave 7 spent a whole wave cutting to one
+    // viewport. It is now ONE LINE inside My Round, which is where four of the five
+    // behaviours it drives already appear (the headline, MY MATCHES / OTHER MATCHES,
+    // the row label, the ordering).
+    test('WAVE 17: no whoami panel on the scorecard, and no mount for one', () => {
+        assert.ok(!/id="whoami-mount"/.test(idx), 'the 287px panel still has its mount on the card');
+        assert.ok(!/function renderWhoAmI\b/.test(idx), 'the card renderer is still there');
+        assert.ok(!/class="whoami-panel"/.test(idx), 'the panel markup is still built');
+    });
+
+    test('WAVE 17: the line lives in the Action Center, and a golfer can CHANGE THEIR MIND', () => {
+        // The old answer was one-way: once stored, nothing on any screen could change it,
+        // and a golfer who skipped had nowhere to go at all. That is what this line fixes.
+        assert.match(idx, /function whoAmILineHtml/, 'no line builder');
+        const fn = idx.slice(idx.indexOf('function whoAmILineHtml'), idx.indexOf('\n    }', idx.indexOf('function whoAmILineHtml')));
+        assert.match(fn, /Which one are you\?/, 'the unanswered line must still ask');
+        assert.match(fn, /toggleWhoAmIPicker\(\)/, 'the line must open the picker');
+        assert.match(fn, /setMe\(/, 'and the picker must be able to set the answer');
+        assert.match(fn, /clearMe\(/, 'and to go back to showing everyone');
+        // it is rendered BY the Action Center, so it cannot be orphaned in a mount
+        const ac = idx.slice(idx.indexOf('function renderActionCenter'), idx.indexOf('function renderBetStrip'));
+        assert.match(ac, /whoAmILineHtml\(\)/, 'the Action Center does not render the line');
+    });
+
+    test('WAVE 17: clearMe forgets the answer AND records the refusal, so it does not re-ask', () => {
+        const fn = idx.slice(idx.indexOf('function clearMe'), idx.indexOf('\n    }', idx.indexOf('function clearMe')));
+        assert.match(fn, /removeItem/, 'the stored answer must actually be forgotten');
+        assert.match(fn, /storeWhoAmISkipped\(\)/, 'and the refusal recorded');
+    });
+
     test('no account, email or profile is ever requested', () => {
         const panel = idx.slice(idx.indexOf('function renderWhoAmI'), idx.indexOf('function renderWhoAmI') + 900);
         ['email', 'password', 'sign in', 'account'].forEach(w =>
@@ -414,8 +463,13 @@ describe('IDENTITY — personalization, never authorization', () => {
     });
 
     test('the picker only appears when it could help', () => {
-        const fn = idx.slice(idx.indexOf('function renderWhoAmI'), idx.indexOf('function renderWhoAmI') + 700);
-        assert.ok(/resolvedMeId\(\) \|\| whoAmIDismissed \|\| scoped\.length < 2/.test(fn));
+        // WAVE 17: the gate moved from renderWhoAmI (deleted with the card panel) to the
+        // line builder, and it reads the STORED refusal now rather than a session flag.
+        // The "fewer than two golfers" half is unchanged: with one golfer in scope there
+        // is nothing to disambiguate.
+        const fn = idx.slice(idx.indexOf('function whoAmILineHtml'), idx.indexOf('\n    }', idx.indexOf('function whoAmILineHtml')));
+        assert.match(fn, /scoped\.length < 2/, 'it must still stay away where it cannot help');
+        assert.match(fn, /whoAmISkipped\(\)/, 'and respect a refusal that was written down');
     });
 });
 
@@ -462,12 +516,16 @@ describe('SCORECARD RENDER', () => {
         const data = acceptanceRound(cd, p, sc);
         vm.runInContext(`currentData = ${JSON.stringify(data)};` +
             `window.__scFilteredPlayers = currentData.players; currentViewedHole = 7;` +
-            `actionCenterOpen = true; ${state} renderWhoAmI(); renderHoleRecap(); renderActionCenter();`, sb);
+            `actionCenterOpen = true; ${state} renderHoleRecap(); renderActionCenter();`, sb);
         const g = id => {
             const el = sb.document.getElementById(id);
             return el ? el.innerHTML : '';
         };
-        return { who: g('whoami-mount'), recap: g('hole-recap-mount'), action: g('action-center-mount') };
+        // WAVE 17: renderWhoAmI and #whoami-mount are gone. The question is one line the
+        // Action Center renders, so `who` reads out of the SAME html as the action panel -
+        // which is the point of the move, and means a line that stopped rendering shows up
+        // here as an empty string rather than as a mount nobody notices is missing.
+        return { who: g('action-center-mount'), recap: g('hole-recap-mount'), action: g('action-center-mount') };
     }
 
     test('the recap appears under a plain "Hole 7 complete" heading', () => {
@@ -488,10 +546,16 @@ describe('SCORECARD RENDER', () => {
         assert.match(render(`meId='${p[0].id}';`).recap, /You win/);
     });
 
-    test('the who-are-you picker shows when identity is unknown, and not after', () => {
+    test('the who-are-you line asks when identity is unknown, and names the golfer after', () => {
+        // WAVE 17: it no longer vanishes once answered - that was the whole problem. It
+        // becomes "You: <name>" with a way to change it, because before this wave a stored
+        // answer could not be changed from any screen in the app.
         assert.match(render('').who, /Which one are you/);
         const { p } = four();
-        assert.equal(render(`meId='${p[0].id}';`).who, '');
+        const answered = render(`meId='${p[0].id}';`).who;
+        assert.ok(!/Which one are you/.test(answered), 'it must stop asking once answered');
+        assert.match(answered, /You:/, 'and say who it thinks you are');
+        assert.match(answered, /change/, 'and offer to change it');
     });
 
     test('the collapsed bar reports how much of the action is yours', () => {
