@@ -427,7 +427,7 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
         // still NOT published, so live season writes may refuse until it is, which
         // is expected and is not a defect to chase.
-        assert.equal(sha('database.rules.json'), '3af7722b');   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
+        assert.equal(sha('database.rules.json'), '62ea83f1');   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
     });
 });
 

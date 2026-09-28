@@ -159,12 +159,16 @@ describe('THE SOURCE: ONE PLACE, AND IT READS THE LIVE INSET', () => {
     });
 
     test('it is done ONCE, inside landOnHole, not at the navigations', () => {
-        // Prev/Next (goToAdjacentHole) and the 1-18 jump (jumpToHole) both call
-        // landOnHole, so the inset belongs in the one function they share.
+        // Prev/Next (goToAdjacentHole) and the 1-18 jump (jumpToHole) reach landOnHole
+        // through goToHole since Wave 23 - one place instead of two, which is where the
+        // forced KP gate sits - so the inset belongs in the function they all share and
+        // the navigations must still not do the arithmetic themselves.
         const jump = SRC.slice(SRC.indexOf('function jumpToHole'), SRC.indexOf('\n    }', SRC.indexOf('function jumpToHole')));
         const adj = SRC.slice(SRC.indexOf('function goToAdjacentHole'), SRC.indexOf('\n    }', SRC.indexOf('function goToAdjacentHole')));
-        assert.match(jump, /landOnHole\(\)/); assert.match(adj, /landOnHole\(\)/);
-        [jump, adj].forEach(b => assert.ok(!/safe-area|paddingTop/.test(b),
+        const one = SRC.slice(SRC.indexOf('function goToHole'), SRC.indexOf('\n    }', SRC.indexOf('function goToHole')));
+        assert.match(one, /landOnHole\(\)/, 'goToHole no longer lands');
+        assert.match(jump, /goToHole\(/); assert.match(adj, /goToHole\(/);
+        [jump, adj, one].forEach(b => assert.ok(!/safe-area|paddingTop/.test(b),
             'a navigation is doing the inset arithmetic itself'));
         assert.equal((SRC.match(/getComputedStyle\(document\.documentElement\)\.paddingTop/g) || []).length, 1,
             'the inset is read in more than one place');

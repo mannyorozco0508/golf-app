@@ -373,8 +373,15 @@ describe('INCOMPLETE SCORES — no dead end, and no invented money', () => {
     test('there is a direct route back to each missing score', () => {
         assert.match(finish({ missing: true }).warn, /jumpToMissingHole\(12\)/);
         const idx = read('index.html');
-        const fn = idx.slice(idx.indexOf('function jumpToMissingHole'), idx.indexOf('function jumpToMissingHole') + 250);
+        // The 250-character window no longer reaches the assignment: Wave 23 put the
+        // forced KP gate at the top of this function, so the route is gated before it
+        // navigates. Sliced to the function instead of to a character count - a
+        // character count is a statement about how long the code above happens to be.
+        const at = idx.indexOf('function jumpToMissingHole');
+        const fn = idx.slice(at, idx.indexOf('\n    }', at));
         assert.ok(/currentViewedHole = hole/.test(fn), 'it must actually navigate to the hole');
+        assert.match(fn, /kpGateBefore\(/,
+            'a route back to a missing score may still not walk off an unanswered KP hole');
     });
 
     test('REGRESSION: the last hole always offers an end-of-round action', () => {

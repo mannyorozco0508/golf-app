@@ -682,6 +682,34 @@
            tap really does write money. Both answers stay 48px. */
         .kp-answers .kp-no, .kp-answers .kp-yes { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-mid); }
         .kp-change { background: none; border: none; padding: 6px 0 0 0; color: var(--brand-green); font-size: 0.85rem; font-weight: bold; text-decoration: underline; cursor: pointer; min-height: 32px; }
+        /* THE FORCED DECISION (Wave 23). DELIBERATELY NOT .modal-overlay:
+           pwa-boot.js's generic back probe closes any shown .modal-overlay or
+           .recap-overlay, and a modal Android back can dismiss is not a forced
+           decision. This one registers its own probe at priority 0 whose close()
+           does nothing, so the press is swallowed. There is no backdrop handler
+           either - the three buttons are the only ways out. */
+        #kp-force-overlay { display: none; position: fixed; inset: 0; z-index: 4000;
+            background: rgba(0,0,0,0.55); align-items: center; justify-content: center; padding: 16px; }
+        .kpf-card { background: var(--bg-card); border-radius: 14px; padding: 16px;
+            width: 100%; max-width: 420px; box-sizing: border-box; }
+        .kpf-head { font-size: 1.05rem; font-weight: bold; }
+        .kpf-ask { font-size: 1rem; margin: 8px 0 4px 0; }
+        .kpf-sub { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+        .kpf-dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .kpf-dist-label { font-size: 0.85rem; color: var(--text-muted); }
+        .kpf-dist-input { width: 64px; min-height: 44px; box-sizing: border-box; text-align: center;
+            font-size: 1rem; border: 1px solid var(--border-mid); border-radius: 8px; background: var(--bg-main); color: var(--text-main); }
+        .kpf-names { display: flex; flex-wrap: wrap; gap: 8px; }
+        /* 17px on the control that names who gets the money - the same floor
+           kp_picker_legibility_test.js holds the block's name buttons to. */
+        .kpf-names .kpf-name { flex: 1 1 45%; min-height: 48px; font-size: 17px; font-weight: bold;
+            background: var(--brand-green); color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+        .kpf-none { display: block; width: 100%; min-height: 48px; margin-top: 10px; font-size: 1rem;
+            background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-mid);
+            border-radius: 8px; cursor: pointer; }
+        .kpf-back { display: block; width: 100%; min-height: 44px; margin-top: 8px; background: none;
+            border: none; color: var(--brand-green); font-size: 0.9rem; font-weight: bold;
+            text-decoration: underline; cursor: pointer; }
         .kp-dist-none { font-size: 0.7rem; color: var(--text-muted); }
         /* THE PICKER READS AT THE SCORE BOXES' SIZE (2026-09-19, and still the rule).
            The control that names who gets the money is tapped on a green in sun by a
@@ -1702,6 +1730,9 @@ html {
     </div>
 </div>
 
+<!-- THE FORCED KP DECISION (Wave 23). Body built by renderKpForcedModal(). -->
+<div id="kp-force-overlay"><div class="kpf-card" id="kp-force-body"></div></div>
+
 <div class="modal-overlay" id="finish-round-modal-overlay">
     <div class="modal-content finish-round-modal-content">
         <div class="modal-header">
@@ -2441,13 +2472,12 @@ html {
     function jumpToHole(holeNum) {
         holePickerOpen = false;
         if (currentViewMode === 'hole') {
-            // The same landing as Prev/Next, so the three navigations agree. The
-            // smooth scroll to the card's top that used to be here is gone: it raced
-            // the focus's own scroll and landed somewhere else.
-            commitPendingScore();
-            currentViewedHole = holeNum;
-            renderHoleView();
-            landOnHole();
+            // The same landing as Prev/Next, so the three navigations agree - and now
+            // literally the same function, which is what makes "the gate is on every
+            // hole change" a true statement rather than three copies of it. The smooth
+            // scroll to the card's top that used to be here is gone: it raced the
+            // focus's own scroll and landed somewhere else.
+            goToHole(holeNum);
         } else {
             const row = document.getElementById(`hole-row-${holeNum}`);
             if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2455,6 +2485,12 @@ html {
     }
 
     function setViewMode(mode) {
+        // FULL CARD IS AN EXIT FROM THE HOLE (Manny's answer C). The KP block is built
+        // inside renderHoleView, so a group that switches to the Full Card leaves the
+        // question behind entirely - the third of the three skip routes. Gated on the
+        // way out. That the Full Card has no KP entry of its own is a separate backlog
+        // item and is deliberately not fixed here.
+        if (mode === 'full' && kpGateBefore(currentViewedHole, function () { setViewMode('full'); })) return;
         currentViewMode = mode;
         document.getElementById('view-mode-hole-btn').classList.toggle('active', mode === 'hole');
         document.getElementById('view-mode-full-btn').classList.toggle('active', mode === 'full');
@@ -2573,9 +2609,7 @@ html {
         idx = Math.max(0, Math.min(holeNumbers.length - 1, idx + delta));
         // Boundary behaviour unchanged: clamped, never wrapped.
         if (holeNumbers[idx] === currentViewedHole) return;
-        currentViewedHole = holeNumbers[idx];
-        renderHoleView();
-        landOnHole();
+        goToHole(holeNumbers[idx]);
     }
 
     // Reads the already-rendered row for the selected hole out of the full table (built earlier in the
@@ -4564,8 +4598,9 @@ html {
         // THE QUESTION (v193). 9/21: the block was a heading and a button under the
         // nav row, and the groups did not understand it. It is now the question a
         // marshal would ask on the green, in the words a golfer uses, and it asks
-        // on its own: on a KP hole, until this phone has answered for the hole
-        // (sessionStorage kpAsked:CODE:hN), the block IS the question -
+        // on its own: on a KP hole, until THIS GROUP has answered for the hole
+        // (kpAnsweredFor - the round's answer log, see below; sessionStorage only
+        // as a same-session fallback), the block IS the question -
         //     ⛳ Hole 7 — Closest to the Pin
         //     Current KP: Marty (Group 3) — 8' 4"        or   No KP yet.
         //     Did anyone get the KP in your group?
@@ -4634,28 +4669,93 @@ html {
                 });
                 body += '</div>'
                     + '<button class="kp-cancel" onclick="cancelKpEntry(' + h + ')">Cancel</button>';
-            } else if (!kpAsked(h)) {
+            } else if (kpAnsweredFor(h) === null) {
                 body = '<div class="kp-question">Did anyone get the KP in your group?</div>'
                     + '<div class="kp-answers">'
                     + '<button class="kp-btn kp-no" onclick="answerKpNo(' + h + ')">No \u2014 leave it</button>'
                     + '<button class="kp-btn kp-yes" onclick="toggleKpEntry(' + h + ')">Yes \u2014 pick who</button>'
                     + '</div>';
             } else {
-                body = '<button class="kp-change" onclick="toggleKpEntry(' + h + ')">Change KP</button>';
+                // CHANGE KP DELETES THIS GROUP'S ANSWER (rule D), rather than only
+                // reopening the picker. Without the delete a group that answered
+                // 'none' and then changed their mind would be left with a stored
+                // answer they could no longer see, and the gate would never ask
+                // again - so undoing a wrong 'No' has to remove the record itself.
+                body = '<button class="kp-change" onclick="changeKpAnswer(' + h + ')">Change KP</button>';
             }
         }
         return head + body + '</div>';
     }
 
-    // ---- THE QUESTION'S STATE (v193) ------------------------------------------
-    // Answered once per hole per phone. sessionStorage, keyed by round and hole,
-    // so a new round asks again and a reload in the same session does not nag.
-    function kpAskedKey(hole) { return 'kpAsked:' + currentMode + ':h' + hole; }
-    function kpAsked(hole) {
-        try { return sessionStorage.getItem(kpAskedKey(hole)) === '1'; } catch (e) { return false; }
+    // ---- THE QUESTION'S STATE (v193; durable and per group in Wave 23) --------
+    //
+    // WHAT CHANGED AND WHY. v193 recorded the answer in sessionStorage, once per hole
+    // PER PHONE. That is why groups walked off KP holes and the hole stayed blank: the
+    // answer died with the session, was never shared between two phones in one group,
+    // and nothing in the round remembered that anybody had been asked. The answer now
+    // lives on the round, per hole AND per group:
+    //
+    //     events/<CODE>/kpGroupAnswers/h<N>/g<G> = { answer: 'none' | '<playerId>', at }
+    //
+    // IT IS AN ANSWER LOG AND NOTHING ELSE. No engine reads it - pool-engine.js and
+    // settlement-engine.js are untouched by this wave - and it is emphatically NOT the
+    // organizer's whole-field call, which lives at its own node, is made on the Finish
+    // Round screen, and moves that hole's share into the skins pot. One foursome
+    // reporting nothing is a different statement from the field having no winner, and
+    // kp_forced_decision_test.js prices the difference at $20 on its own fixture.
+    //
+    // THREE STATES, AND ABSENCE IS ONE OF THEM (Manny's rule D): null means nobody in
+    // this group has answered, 'none' means they answered and reported nothing, and an
+    // id means they named someone. Only null opens the gate, which is what makes
+    // "Change KP" (it deletes the group's answer) able to put the question back.
+    //
+    // A LATER GROUP'S WINNER DOES NOT CLEAR ANOTHER GROUP'S ANSWER (rule A). The log is
+    // per group by construction, so Group 3 recording the KP leaves Group 1's 'none'
+    // exactly where it was - a true record of what Group 1 reported, which is all it
+    // ever claimed to be.
+    //
+    // SESSIONSTORAGE SURVIVES AS A SAME-SESSION FALLBACK ONLY, and it now stores the
+    // ANSWER rather than the fact of having been asked. That distinction matters: an
+    // "asked" flag set by closing the picker would have suppressed the gate without
+    // anybody answering, which is the skip this wave exists to close. Writing it is
+    // what keeps a group moving when the write cannot land (aeroplane mode on a course
+    // with no signal); the round node is the truth everywhere else.
+    function kpGroupAnswerKey() { return 'g' + (hasGroupLock && lockedGroup !== null ? lockedGroup : 'all'); }
+    function kpSessionAnswerKey(hole) { return 'kpAnswer:' + currentMode + ':h' + hole + ':' + kpGroupAnswerKey(); }
+    function kpAnsweredFor(hole) {
+        const byHole = (currentData && currentData.kpGroupAnswers) ? currentData.kpGroupAnswers['h' + hole] : null;
+        const mine = byHole ? byHole[kpGroupAnswerKey()] : null;
+        if (mine && mine.answer) return String(mine.answer);
+        try {
+            const v = sessionStorage.getItem(kpSessionAnswerKey(hole));
+            if (v) return String(v);
+        } catch (e) { /* private mode: the round node is the only source, which is correct */ }
+        return null;
     }
-    function markKpAsked(hole) {
-        try { sessionStorage.setItem(kpAskedKey(hole), '1'); } catch (e) { /* private mode: asks again on the next render, harmless */ }
+    // ONE WRITER for the log, so the block and the modal cannot record it differently.
+    // It is never bundled into saveKpLeader's update: that update is the money write and
+    // its atomicity is load-bearing (kpLeaders and kpWinners must land together or not
+    // at all), and an answer log riding inside it would make a failed log write look
+    // like a failed KP write.
+    function recordKpGroupAnswer(hole, answer) {
+        try { sessionStorage.setItem(kpSessionAnswerKey(hole), String(answer)); } catch (e) { /* as above */ }
+        if (!currentData.kpGroupAnswers) currentData.kpGroupAnswers = {};
+        if (!currentData.kpGroupAnswers['h' + hole]) currentData.kpGroupAnswers['h' + hole] = {};
+        currentData.kpGroupAnswers['h' + hole][kpGroupAnswerKey()] = { answer: String(answer), at: Date.now() };
+        const u = {};
+        u['kpGroupAnswers/h' + hole + '/' + kpGroupAnswerKey()] = { answer: String(answer), at: Date.now() };
+        return db.ref('events/' + currentMode).update(u)
+            .catch(() => { /* the session copy already answered; a log is not money */ });
+    }
+    // "Change KP" - the group takes their answer back, and the question returns.
+    function clearKpGroupAnswer(hole) {
+        try { sessionStorage.removeItem(kpSessionAnswerKey(hole)); } catch (e) { /* as above */ }
+        if (currentData.kpGroupAnswers && currentData.kpGroupAnswers['h' + hole]) {
+            delete currentData.kpGroupAnswers['h' + hole][kpGroupAnswerKey()];
+        }
+        const u = {};
+        u['kpGroupAnswers/h' + hole + '/' + kpGroupAnswerKey()] = null;
+        return db.ref('events/' + currentMode).update(u).catch(() => {});
     }
     // Every golfer this link may claim for (the group on a group link, the field
     // on a single-group round) has a score on the hole.
@@ -4666,14 +4766,180 @@ html {
         return players.every(p => scores['p' + p.id + '_h' + hole] > 0);
     }
     function answerKpNo(hole) {
-        markKpAsked(hole);
+        recordKpGroupAnswer(hole, 'none');
         kpEntryOpenHole = null;
         renderKpEntryMount();
     }
+    // CANCEL RECORDS NOTHING, which is a change from v193. It used to mark the hole
+    // asked, so closing the picker silently answered for the group - a skip with no
+    // answer behind it. Closing the picker now leaves the question standing, and the
+    // gate will still ask on the way out.
     function cancelKpEntry(hole) {
-        markKpAsked(hole);
         kpEntryOpenHole = null;
         renderKpEntryMount();
+    }
+    function changeKpAnswer(hole) {
+        clearKpGroupAnswer(hole);
+        kpEntryOpenHole = hole;
+        renderKpEntryMount();
+    }
+
+    // ---- THE FORCED DECISION (Wave 23) ---------------------------------------
+    //
+    // Marty's round: groups left KP holes without answering and the holes sat blank.
+    // The question was already on the card - see the block above - so what was missing
+    // was not the question but any consequence for walking past it. A KP hole this
+    // group has finished may now only be LEFT through an answer.
+    //
+    // ON LEAVING ONLY (Manny's answer B). Arriving on a complete, unanswered KP hole
+    // opens nothing: a group standing on the green has not finished with the hole yet,
+    // and a modal in their face on arrival would be answered at random to get rid of
+    // it. The decision is asked for at the moment they try to move on, which is also
+    // the moment they actually know it.
+    //
+    // WHAT MAKES A HOLE A KP HOLE: moneyPool.kp.holes, the CONFIGURED list, never
+    // "par 3". The wizard suggests the course's par 3s and the organizer may edit them,
+    // so par 3 is a default and not the definition. settlement-engine.js has an older
+    // par-3-derived KP game of its own (kpBuyIn), which nothing in the app ever writes
+    // a stake for; this gate has nothing to do with it.
+    function kpHoleInPlay(hole) {
+        const kp = currentData && currentData.moneyPool && currentData.moneyPool.kp;
+        if (!kp || !Array.isArray(kp.holes)) return false;
+        if (currentData.moneyPool.enabled === false) return false;
+        return kp.holes.map(Number).indexOf(Number(hole)) > -1;
+    }
+    // SPECTATORS ARE NEVER ASKED. The same rule the block and score-writing use: on a
+    // multi-group round the bare link is what spectators hold and it records nothing;
+    // a group link may. A single-group round has no meaningful scoping.
+    function kpCanWriteHere() {
+        const isMultiGroup = (currentData.players || []).length > 4;
+        return hasGroupLock || !isMultiGroup;
+    }
+    function kpDecisionNeeded(hole) {
+        if (hole === null || hole === undefined) return false;
+        if (!kpHoleInPlay(hole)) return false;
+        if (!kpCanWriteHere()) return false;
+        // UNSCORED HOLES ARE NEVER GATED. kpGroupHoleComplete is the existing
+        // per-group test - every golfer this link may claim for has a score on the
+        // hole - so a group that picked up, or has not played it, walks through.
+        if (!kpGroupHoleComplete(hole)) return false;
+        return kpAnsweredFor(hole) === null;
+    }
+    // THE ONE GATE. Every way out of a hole asks this and returns if it says yes;
+    // the answer resumes the navigation by re-running it, so the gate is re-evaluated
+    // rather than bypassed with a flag - a write that failed cannot let anyone through.
+    function kpGateBefore(fromHole, resume) {
+        if (!kpDecisionNeeded(fromHole)) return false;
+        openKpForcedModal(fromHole, resume);
+        return true;
+    }
+
+    let kpForcedResume = null;
+    let kpForcedHole = null;
+    function openKpForcedModal(hole, resume) {
+        kpForcedHole = Number(hole);
+        kpForcedResume = (typeof resume === 'function') ? resume : null;
+        renderKpForcedModal();
+        const ov = document.getElementById('kp-force-overlay');
+        if (ov) ov.style.display = 'flex';
+    }
+    function closeKpForcedModal() {
+        const ov = document.getElementById('kp-force-overlay');
+        if (ov) ov.style.display = 'none';
+        kpForcedHole = null;
+        kpForcedResume = null;
+        // Repaint the hole: the 1-18 picker may have been left open behind the modal
+        // by the tap that opened it.
+        if (currentViewMode === 'hole') renderHoleView();
+    }
+    function renderKpForcedModal() {
+        const body = document.getElementById('kp-force-body');
+        if (!body || kpForcedHole === null) return;
+        const h = kpForcedHole;
+        const mine = (currentData.players || []).filter(p => canSetKpLeader(p.id) && p.playingForMoney !== false);
+        // THE COPY. It asks about THIS GROUP and says so twice, because the answer is
+        // this group's alone: another foursome can still hold or take the marker, and
+        // "none" here settles nothing about the hole. The organizer's whole-field call
+        // is a different decision on a different screen and must not be confused with
+        // this one.
+        let html = '<div class="kpf-head">\u26F3 Hole ' + h + ' \u2014 Closest to the Pin</div>'
+            + '<div class="kpf-ask">Did anyone in your group win Closest to the Pin?</div>'
+            + '<div class="kpf-sub">Your group\'s answer for this hole. Another group can still record the KP.</div>';
+        if (mine.length > 0) {
+            html += '<div class="kpf-dist-row"><span class="kpf-dist-label">Distance <em>(optional)</em></span>'
+                + '<input id="kpf-ft" class="kpf-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="ft">'
+                + '<input id="kpf-in" class="kpf-dist-input" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="in">'
+                + '</div><div class="kpf-names">';
+            mine.forEach(p => {
+                html += '<button class="kpf-name" onclick="kpForcedPick(' + h + ', \'' + p.id + '\')">' + escapeHtml(p.name) + '</button>';
+            });
+            html += '</div>';
+        }
+        html += '<button class="kpf-none" onclick="kpForcedNone(' + h + ')">Nobody in our group</button>'
+            + '<button class="kpf-back" onclick="kpForcedBack()">Back to hole ' + h + '</button>';
+        body.innerHTML = html;
+    }
+    // A PICK IS THE SAME WRITE THE BLOCK'S PICKER MAKES - saveKpLeader, unchanged, one
+    // update carrying kpLeaders and kpWinners - plus the answer log. Nothing here
+    // reimplements the money write, and a refusal keeps the modal up.
+    function kpForcedPick(hole, playerId) {
+        const ft = document.getElementById('kpf-ft');
+        const inch = document.getElementById('kpf-in');
+        const pid = String(playerId || '');
+        if (!pid) return;
+        if (!canSetKpLeader(pid)) { uiRefuse('That golfer is not in your group.'); return; }
+        const p = saveKpLeader(hole, pid, ft ? ft.value : '', inch ? inch.value : '');
+        if (!p) return;                       // refused: offline, or out of group
+        recordKpGroupAnswer(hole, pid);
+        kpForcedProceed();
+    }
+    // "Nobody in our group" WRITES THE ANSWER LOG AND NOTHING ELSE. It is not the
+    // organizer's whole-field call, it names no winner, and it moves no money.
+    function kpForcedNone(hole) {
+        recordKpGroupAnswer(hole, 'none');
+        kpForcedProceed();
+    }
+    function kpForcedBack() {
+        closeKpForcedModal();                 // records nothing; the question stands
+    }
+    function kpForcedProceed() {
+        const resume = kpForcedResume;
+        closeKpForcedModal();
+        if (resume) resume();
+    }
+    // ANDROID BACK CANNOT DISMISS IT. pwa-boot.js walks the probes in priority order
+    // and STOPS at the first one that reports itself open, so a probe that reports open
+    // and closes nothing swallows the press. What it has to beat is the GENERIC probe
+    // at priority 2, which closes any shown .modal-overlay - which is also why this
+    // overlay does not carry that class. The three buttons are the only ways out, and
+    // there is no backdrop handler to tap through.
+    //
+    // PRIORITY 1, NOT 0. registerBackProbe stores `Number(probe.priority) || 9`
+    // (pwa-boot.js:335), and Number(0) is falsy - so a probe registered at 0 is filed
+    // at NINE, behind every generic probe, and hardware back closes the modal it was
+    // meant to hold. My first version did exactly that; the guard's probe-order
+    // assertion is what caught it.
+    if (window.GolfBack) window.GolfBack.register({
+        name: 'kp-forced', priority: 1,
+        isOpen: function () {
+            const ov = document.getElementById('kp-force-overlay');
+            return !!(ov && ov.style.display === 'flex');
+        },
+        close: function () { /* deliberately nothing: the decision is forced */ }
+    });
+
+    // ONE PLACE THAT CHANGES THE HOLE, so Prev, Next and the 1-18 picker cannot
+    // disagree about the gate. commitPendingScore runs BEFORE the gate is evaluated:
+    // the fourth golfer's score, typed and not yet left, is what makes the hole
+    // complete, and asking before saving it would let that tap through.
+    function goToHole(hole) {
+        if (Number(hole) === Number(currentViewedHole)) return true;
+        commitPendingScore();
+        if (kpGateBefore(currentViewedHole, function () { goToHole(hole); })) return false;
+        currentViewedHole = hole;
+        renderHoleView();
+        landOnHole();
+        return true;
     }
 
     // ---- KP LEADERS ---------------------------------------------------------
@@ -4753,7 +5019,10 @@ html {
         updates['kpLeaders/h' + hole] = leader;
         updates['kpWinners/h' + hole] = String(pid);
 
-        db.ref('events/' + currentMode).update(updates)
+        // RETURNED, not just fired. A caller that must know whether the KP was
+        // actually accepted - the forced modal, which may not close on a refusal -
+        // has no other way to tell: every refusal above returns undefined.
+        return db.ref('events/' + currentMode).update(updates)
             .then(() => {
                 kpEntryOpenHole = null;
                 renderKpEntryMount();
@@ -4789,8 +5058,15 @@ html {
         if (!canSetKpLeader(pid)) { uiRefuse('That golfer is not in your group.'); return; }
         const ft = document.getElementById('kp-ft-' + hole);
         const inch = document.getElementById('kp-in-' + hole);
-        markKpAsked(hole);   // v193: a saved answer is an answer; saveKpLeader itself is unchanged
-        saveKpLeader(hole, pid, ft ? ft.value : '', inch ? inch.value : '');
+        // A saved answer is an answer (v193), now recorded on the round rather than
+        // only on this phone. saveKpLeader itself is unchanged.
+        const p = saveKpLeader(hole, pid, ft ? ft.value : '', inch ? inch.value : '');
+        // ONLY AN ACCEPTED SAVE COUNTS. saveKpLeader returns nothing when it refuses -
+        // offline, or a golfer outside this group - and logging an answer there would
+        // tell the gate the group had decided when no KP was written.
+        if (!p) return null;
+        recordKpGroupAnswer(hole, pid);
+        return p;
     }
 
     let kpEntryOpenHole = null;
@@ -5555,6 +5831,8 @@ html {
     // same synchronous focus path the advance uses (pendingScoreFocus is read by
     // the rebuild's captureScoreFocus), so iOS keeps the keyboard.
     function jumpToGap(pid, hole) {
+        if (Number(hole) !== Number(currentViewedHole)
+            && kpGateBefore(currentViewedHole, function () { jumpToGap(pid, hole); })) return;
         currentViewedHole = Number(hole);
         if (currentViewMode !== 'hole' && typeof setViewMode === 'function') setViewMode('hole');
         pendingScoreFocus = { playerId: String(pid), hole: String(hole) };
@@ -7664,6 +7942,8 @@ html {
     }
 
     function jumpToMissingHole(hole) {
+        if (Number(hole) !== Number(currentViewedHole)
+            && kpGateBefore(currentViewedHole, function () { jumpToMissingHole(hole); })) return;
         closeFinishRoundModal();
         currentViewedHole = hole;
         renderScorecard();
@@ -7684,6 +7964,11 @@ html {
         // 'value' -> the rebuild happen here, before the review below reads the
         // round - so the score it is about to count as missing is already saved.
         commitPendingScore();
+        // ON THE LAST HOLE THIS BUTTON REPLACES Next (see renderHoleView's nav row), so
+        // when 18 is a KP hole it is the only way off it and has to be gated like one.
+        // The commit above must come first: the eighteenth score is what completes the
+        // hole the gate is about to ask about.
+        if (kpGateBefore(currentViewedHole, openFinishRoundModal)) return;
         // A REVIEW STARTS EMPTY. Staged corrections belong to one sitting; carrying
         // them into the next one would offer to save something the organizer typed
         // an hour ago and walked away from.

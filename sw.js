@@ -3163,7 +3163,71 @@
 // consumer-v91-organizerdoors. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
 // web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v250-organizerdoors';
+// Moved to v251 SO A GROUP CANNOT LEAVE A KP HOLE WITHOUT ANSWERING.
+//
+// WHAT AN INSTALLED DEVICE ON v250 KEEPS SERVING: a scorecard a group can walk off a
+// KP hole without answering, leaving the hole blank and the money unsettled. Marty's
+// round. The question itself was already there - v193 put it under Prev/Next, Wave 16
+// reworded it - so what was missing was any consequence for walking past it, and there
+// were THREE ways past, all measured in the recon:
+//   1. the answer lived in sessionStorage, once per hole PER PHONE, so it died with the
+//      session and was never shared between two phones in one group;
+//   2. on COLD ARRIVAL at a KP hole the block sits 1398px down an 844px viewport - 554px
+//      below the fold. After a Prev/Next landing it is at 433px and plainly visible,
+//      which is why it worked for a group walking the card and not for one reopening
+//      the app (tools/kp-entry-position-check.js, 390x844);
+//   3. the block is built inside renderHoleView, so the Full Card shows nothing at all.
+//
+// THE GATE. A KP hole this group has FINISHED may now only be LEFT through an answer.
+// One function, kpGateBefore(fromHole, resume), and five callers - goToHole (the new
+// single choke point that Prev, Next and the 1-18 picker all go through), jumpToGap,
+// jumpToMissingHole, openFinishRoundModal (on the last hole it REPLACES Next, so when
+// 18 is a KP hole it is the only way off it) and setViewMode('full'). The answer
+// resumes the blocked navigation by re-running it, so the gate is re-evaluated rather
+// than bypassed with a flag: a write that failed cannot let anyone through.
+//
+// ON LEAVING ONLY, and never on arrival. A group standing on the green has not finished
+// with the hole; a modal in their face on arrival gets answered at random to clear it.
+//
+// THE MONEY TRAP THIS AVOIDS, PRICED. kpNoWinner already exists and pool-engine.js
+// reads it: it is the ORGANIZER's whole-field call and it moves that hole's KP share
+// into the skins pot. "Nobody in our group" is one foursome's report and a completely
+// different statement, so it goes to its own node - kpGroupAnswers/h<N>/g<G>, an answer
+// log no engine reads. Measured on the guard's own fixture: writing kpNoWinner instead
+// would move $20 out of the KP pot and into the skins pot while another group was still
+// walking up. The guard replays the modal's real write log through computeMoneyPool and
+// fails with those dollars in the message if the button is ever re-pointed.
+//
+// THREE STATES, absence among them: null (nobody in this group has answered), 'none',
+// or a player id. Only null opens the gate, which is what lets "Change KP" - it now
+// DELETES the group's answer - put the question back. A later group's winner does not
+// clear another group's 'none': the log is per group by construction.
+//
+// TWO BEHAVIOURS CHANGED IN THE v193 BLOCK, deliberately. "No - leave it" now writes
+// (the log, and only the log - no winner, and never the organizer's node). And CANCEL
+// NO LONGER ANSWERS: closing the picker used to mark the hole asked, which silently
+// answered for the group. Both are re-pointed in kp_prompt_test.js with the reason.
+//
+// THE MODAL CANNOT BE DISMISSED. It is deliberately NOT a .modal-overlay, because
+// pwa-boot.js's generic probe closes any shown one on hardware back, and it registers
+// its own probe whose close() does nothing, so the press is swallowed. A player, "Nobody
+// in our group", or "Back to hole N" are the only ways out, and there is no backdrop
+// handler. NOTE FOR THE NEXT READER: that probe is at priority ONE, not zero -
+// registerBackProbe stores `Number(probe.priority) || 9`, so a probe registered at 0 is
+// filed at NINE, behind every generic probe. The first version did exactly that.
+//
+// database.rules.json gained ONE child, kpGroupAnswers, with the same write rule
+// kpLeaders and kpWinners carry - an undeclared node inherits the organizer-only parent
+// rule, which would make the modal fail for exactly the group scorekeepers it is for,
+// once the rules are published. THE RULES ARE STILL UNPUBLISHED (see HANDOFF.md's hash
+// table) so this changes nothing today; it is so a future publish does not break it.
+//
+// NO ENGINE CHANGED. pool-engine.js and settlement-engine.js are untouched and neither
+// may ever read the answer log; the guard asserts that by name. The consumer product
+// cache is consumer-v92-kpforced. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
+// web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v251-kpforced';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
