@@ -52,6 +52,32 @@
 // HARNESS LIMIT, STATED. mini-dom has no layout and would report every button
 // 0x0, so none of this could run there; the money describe is the only part that
 // does not need a browser, and it loads the engines directly.
+//
+// THE RED BASELINE, RECORDED SO IT CANNOT BE MISREMEMBERED. Run against pre-build
+// main (3e48f56, index.html sha 13616080...), all 25 tests: 6 PASS / 19 FAIL.
+// The six that passed without the feature, and why each one did - because "6 green"
+// is not coverage and should not be read as any:
+//   1  "every arrival ran"                       a HARNESS PRECONDITION. It asserts the
+//                                                cold arrivals completed without error,
+//                                                which says nothing about the gate.
+//   3  "ARRIVING ... does NOT open the modal"    VACUOUS without the feature: there is no
+//                                                modal, so "no modal" is free. It only
+//                                                becomes a real assertion once one exists.
+//   14 "AN INCOMPLETE KP HOLE is never gated"    PARTLY VACUOUS: nothing is gated without
+//                                                a gate. Its two fixture assertions
+//                                                (landed on 7, hole incomplete) are real
+//                                                and did pass - which is the point of
+//                                                having them, since this case was INERT
+//                                                before they were added.
+//   16 "the baseline"                            ENGINE-ONLY, and genuinely green: it
+//   17 "kpGroupAnswers is INVISIBLE to the money" describes pool-engine.js behaviour that
+//   19 "CONTROL 2: ... moves $20 ... skins pot"   this wave does not change. 17 is green
+//                                                for the right reason - a node the engine
+//                                                has never heard of cannot move money.
+// So: 1 precondition, 2 vacuous, 3 engine-only. An earlier report of this file said
+// "18 fail / 6 pass" - that was the 24-test version, before test 18 (REPLAYED) was
+// added to close control 2 - and misclassified the six as "4 vacuous + 3 engine-only",
+// which is seven things among six tests. The numbers above are measured.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');

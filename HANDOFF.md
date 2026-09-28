@@ -2886,6 +2886,49 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
 
+- **OPEN 2026-09-28 — `registerBackProbe` files a priority-0 probe at NINE.**
+  `pwa-boot.js:335` stores `priority: Number(probe.priority) || 9`. `Number(0)` is
+  falsy, so a probe registered at priority 0 — the natural way to write "this one
+  comes first" — is filed *last*, behind both generic probes (`modal` at 2,
+  `popover` at 3). Hardware back then closes the very layer that probe existed to
+  hold.
+  - **Found the hard way in Wave 23.** The forced-KP modal registered at 0, and
+    `kp_forced_decision_test.js`'s probe-order assertion caught it: Android back
+    dismissed a modal whose whole purpose was to be undismissable. The modal now
+    registers at **priority 1** and a comment at the registration says why.
+  - **THE FIX IS `?? 9`, NOT `|| 9`** — `Number(probe.priority) ?? 9` keeps the
+    default for `undefined` and stops coercing a legitimate 0. `Number()` of a
+    non-numeric string gives `NaN`, which `??` does *not* catch, so the fix wants
+    `Number.isFinite(n) ? n : 9` if that case matters; decide it in the wave.
+  - **ITS OWN WAVE, with a test that a priority-0 probe runs first** (Manny,
+    2026-09-28). `back_button_test.js` is where it goes: register two probes, one
+    at 0 and one at 2, both reporting open, and assert `GolfBack.press()` returns
+    the priority-0 one. That test fails today.
+  - **Check the existing registrations before changing the default.** Nothing in
+    the repo registers at 0 today (`index.html` uses 1 for both its probes,
+    `pwa-boot.js` 2 and 3, `admin.html` and `sidematches.html` their own), so the
+    fix cannot reorder anything that already works — but confirm that rather than
+    trust this line.
+
+- **OPEN 2026-09-28 — the Full Card view has no KP entry at all.**
+  `#kp-entry-mount` is built inside `renderHoleView` (`index.html`, right after the
+  nav row), which writes into `#hole-view-card`. In Full Card view that card is
+  `display:none`, so a group working on the Full Card never sees the KP question,
+  the current leader, or the picker.
+  - **This was one of the three skip routes measured in the Wave 23 recon**, and it
+    is the one that wave did NOT close. Wave 23 gated `setViewMode('full')` as an
+    *exit* — a group cannot switch to the Full Card to escape an unanswered KP
+    hole — which is not the same thing as giving the Full Card a KP entry. Manny's
+    answer C said so explicitly: gate the exit, backlog the entry.
+  - **What the fixing wave has to decide.** The Full Card shows all eighteen holes
+    at once, so "the hole the group is standing on" has no meaning there; a KP
+    entry on that screen needs a different anchor (per-row? a strip naming only the
+    round's KP holes?). That is a design question, not a port.
+  - **Do not simply move the mount.** The block reads `currentViewedHole` and the
+    per-group write rule; both still apply, and `tools/kp-entry-position-check.js`
+    measures where the block sits and what it pushed down — re-run it, and note
+    that it only exercises Hole View today.
+
 - **OPEN 2026-09-27 — `game.html`'s organizer gate still refuses every group link,
   the owner's own included.** Wave 22 moved the SCORECARD's rule: a group lock no
   longer closes the doors by itself, it only narrows what counts as evidence (see
