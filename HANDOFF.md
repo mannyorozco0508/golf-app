@@ -2919,6 +2919,34 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
 
+- **OPEN 2026-09-28 — nothing in the suite catches an ORPHANED CSS RULE.**
+  Wave 24 dropped the PROJECTED/FINAL word from the Net Finish head and left
+  `.lnf-state` behind in `index.html` — a rule with no element in the page carrying
+  that class. It was found by a verification step that happened to print the class
+  count, **not by any test**, and it could not have been: no guard asserts the
+  absence of an unused rule, and a rule with no element cannot fail one.
+  - **Why it matters more than tidiness.** Dead CSS reads as a live surface. The next
+    reader finds `.lnf-state` and a styled state word that no longer exists, and
+    either "restores" something nobody asked for or spends the time proving it is
+    dead. This repo has already paid for the mirror-image of that twice — copy that
+    described behaviour it no longer had (the trip money card, the "read-only"
+    spectator link), which is the subject of a whole CLAUDE.md section.
+  - **The shape of the check, for whoever takes it.** Collect every class selector
+    declared in a page's `<style>` blocks, collect every class the page can emit —
+    static `class="..."` attributes AND the ones built inside template strings, which
+    is the hard half — and report the declared-but-never-emitted set. The runtime half
+    is what makes it real: a source scan alone cannot see a class a template builds,
+    and `helpers/mini-dom.js` has no layout and parses no `innerHTML` children, so it
+    cannot answer this either. It wants the same rendered/source PAIR that
+    `tools/trip-awards-check.js` and `trip_awards_identity_test.js` form for escaped
+    glyphs — neither half is optional.
+  - **Expect a long allow-list, and budget for it.** State classes only added under a
+    condition no fixture reaches, print-only rules, and classes shared with another
+    page will all look orphaned. A check whose allow-list is longer than its findings
+    is worse than none, so the first wave should MEASURE how many candidates the eight
+    pages actually produce before deciding the check is worth having.
+  - **Not built (Manny, 2026-09-28): logged, not fixed.**
+
 - **OPEN 2026-09-28 — `registerBackProbe` files a priority-0 probe at NINE.**
   `pwa-boot.js:335` stores `priority: Number(probe.priority) || 9`. `Number(0)` is
   falsy, so a probe registered at priority 0 — the natural way to write "this one

@@ -46,6 +46,40 @@
 // mid-round), leaderboard.html, and the Finish Round correction diff at index.html,
 // which names golfers whose position a correction WOULD change and is Manny's decision
 // to leave as-is.
+//
+// THE RED BASELINE, MEASURED AND WRITTEN DOWN HERE so it cannot be misremembered or
+// quoted from a stale run. Against pre-build main (52772b7 - index.html sha
+// e3dbe834..., game.html unchanged) WITH net-finish-line.js present, all 26 tests:
+//
+//     11 PASS / 15 FAIL
+//
+// Why the builder is present for the baseline: with the file absent this suite cannot
+// LOAD at all - 0 pass, 0 fail, 26 cancelled. That is technically red and proves
+// nothing per assertion, so the baseline is taken with the builder in place and the
+// two pages untouched, which is the state where every assertion actually runs.
+//
+// THE ELEVEN THAT PASS WITHOUT THE FEATURE, and none of them is coverage:
+//   ONE FIXTURE PRECONDITION
+//     "the engine really does have a named 1st and a T2 here" - it exists so a fixture
+//     that computed no places cannot make every absence assertion below pass for the
+//     wrong reason.
+//   THREE THE FINISHED VIEW, green BY DESIGN
+//     "the finished card names the places and prices them", "the tie is still a shared
+//     place...", "and the card names the winners". This wave does not change the
+//     finished view, and these staying green through it is the claim, not a gap.
+//   FIVE THE BUILDER
+//     the four net-finish-line.js cases plus its never-recomputes control. Green
+//     because that file is the first thing the wave adds.
+//   TWO VACUOUS AT BASELINE
+//     "the four protected engines are untouched" and "settlement.html and
+//     leaderboard.html are not involved" - trivially true before anything is built,
+//     and real from the moment something is.
+//
+// 1 + 3 + 5 + 2 = 11. An earlier report of this wave said "11 pass / 14 fail", which
+// is 25: that figure was measured when this file had 25 tests, before the legacy-cents
+// Chrome case at the very bottom was added. Nothing was missing and nothing failed to
+// run; the count in the prose had gone stale against the file. Numbers in this header
+// are measured against the sha named above.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
