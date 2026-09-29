@@ -2795,12 +2795,13 @@ published, so a confident sentence claimed an enforcement that does not exist.
 published).** The last publish of `database.rules.json` was `dab91d8` (2026-09-18),
 whose repo bytes plus one trailing newline hash to
 `66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd` — the live sha
-read back three times with `firebase-tools` and recorded above. Four commits have
+read back three times with `firebase-tools` and recorded above. **Five** commits have
 changed the file since and **none of them is live**:
 
 | commit | date | repo bytes + `\n`, sha256 | what it added |
 |---|---|---|---|
-| `1f189cf` | 2026-09-26 | `d4d56617ae1774ec` | Wave 13 — **and the current file** |
+| `1fafd07` | 2026-09-28 | `966360897cf255ad` | Wave 23's `kpGroupAnswers` — **the current file**, and the one that MUST ship next (see below) |
+| `1f189cf` | 2026-09-26 | `d4d56617ae1774ec` | Wave 13 |
 | `6c2bd1b` | 2026-09-24 | `358391e176b396e3` | v222 season ledger |
 | `ae22953` | 2026-09-24 | `5b0fac15f23d658a` | v217 confirm-or-mark-out |
 | `4f4ec0a` | 2026-09-23 | `233246783e03183c` | Lock consumer round setup to the owner's uid (#13) — **the one this section used to claim was enforced** |
@@ -2819,8 +2820,8 @@ git log --format='%h %ad' --date=short -- database.rules.json | while read h d; 
 done
 ```
 
-The current repo file plus a newline is `d4d56617…`, which matches `1f189cf` and not
-the live hash. **If a future reader runs that loop and the `<== LIVE` marker has moved
+The current repo file plus a newline is `966360897cf255ad…`, which matches `1fafd07`
+and not the live hash. **If a future reader runs that loop and the `<== LIVE` marker has moved
 to a newer commit, the rules were published in between and this whole section needs
 re-reading.** If the marker disappears entirely, something was published that is not
 in git, and the live rules should be read back before anything else is trusted here. **So today every consumer gate on a round is UI only.** Hiding "Edit
