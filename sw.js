@@ -3295,7 +3295,55 @@
 // The consumer product cache is consumer-v93-netfinish. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted;
 // this is web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v252-netfinish';
+// Moved to v253 SO THE REFUSAL CARD SAYS THE WAY IN LASTS.
+//
+// WHAT AN INSTALLED DEVICE ON v252 KEEPS SERVING: a refusal card that offers a way in
+// without saying it is remembered. "This round's setup belongs to its organizer",
+// then "Are you the organizer? Paste your organizer link", a box, and Unlock setup -
+// all of which has worked since v200. What no sentence said is that the token it
+// stores is HELD for the round from then on, so the card read as a per-visit hoop:
+// paste a link to get in this time. A golfer who does not know it is remembered
+// either keeps the link to hand forever or assumes the app has not really let them in.
+//
+// ONE SENTENCE, IN THE GATE: CLAIM_REMEMBERED in organizer-gate.js, rendered by
+// admin.html's renderSetupClaim UNDER the Unlock button - "You only need to do this
+// once on this device - the link is remembered for this round." It sits under the
+// button because it answers "and then what?", which is a question you only have once
+// you have seen what the box wants. The words live beside CLAIM_PROMPT so the page
+// cannot drift from them, and admin.html is asserted NOT to carry its own copy.
+//
+// IT IS TRUE OF BOTH ROUTES IN. claimOrganizerToken (the paste box) and
+// rememberOrganizerToken (arriving on the organizer link) both write through the same
+// tokenKey() helper, so "once on this device" holds whichever way the organizer gets
+// there - asserted, because a sentence that is only true of one route would be a
+// confident lie on the other.
+//
+// AND IT PROMISES NOTHING ABOUT SECURITY. The gate HIDES doors. database.rules.json
+// is untouched and still unpublished, so anyone holding the six-character code can
+// still write this round; the guard refuses the words protected, secure and locked on
+// the card, in the source AND in the rendered screen.
+//
+// NOTHING ELSE MOVED. The brief that produced this wave also asked for the organizer
+// gate itself - isRoundOrganizer's three arms, the hidden setup, the Edit round setup
+// doors, the gated Group Links panel, the remembered token, the other ten
+// isOrganizerView uses left alone. Every one of those SHIPPED ALREADY, in v189 with
+// the paste box added in v200 and the group-lock narrowing in Wave 22, and none of it
+// was rebuilt: organizer-gate.js's gate functions are byte-identical but for the new
+// copy constant. The guard's baseline says so out loud - 10 of its 13 tests are green
+// against the previous main.
+//
+// GUARDED BY organizer_wayback_test.js: the refusal card reached the way the page
+// reaches it, the sentence read from the decoded source slice AND from a cold Chrome
+// arrival's innerText, the persistence proved behaviourally (a paste is remembered, a
+// wrong link is not, a second arrival with no link is let in), and a group link still
+// offered no box. Four controls, each red behaviourally: canReachSetup always true
+// (5 red), isRoundOrganizer always false (17 red), the legacy arm removed (4 red), and
+// the sentence dropped from the render (3 red).
+//
+// The consumer product cache is consumer-v94-wayback. The tournament product cache
+// stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted;
+// this is web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v253-wayback';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
