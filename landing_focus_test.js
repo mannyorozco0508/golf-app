@@ -58,6 +58,30 @@
 // coordinates with a raw Input.dispatchMouseEvent and NO scrollIntoView, the page does
 // not move at all. The last describe pins that, using raw dispatch for exactly that
 // reason.
+//
+// THE RED BASELINE, measured against the FINAL file per CLAUDE.md's count rule.
+// Against main 5eeb1f2 (index.html as it stood, sha 72cae6d7...), all tests:
+//
+//     8 PASS / 7 FAIL        (measured at 15 tests; the platform-fact test about a
+//                             disabled input was added afterwards and is green either
+//                             way, because a browser has always refused that focus)
+//
+// THE EIGHT THAT PASS WITHOUT THE FEATURE, and not one of them is coverage:
+//   ONE arrival check - the fixtures reached the card.
+//   THREE REFUSALS, VACUOUS before any focus exists: "a full hole focuses nothing",
+//     "a spectator is never focused" and "past the keyboard line" are all free when
+//     nothing is focused on any landing. They become real the moment focus does.
+//   THREE SCROLL CASES, green because ITEM C WAS NEVER A DEFECT - see the note above.
+//     They pin a property that already held, which is worth having and is not evidence
+//     that this wave did anything.
+//   ONE asserting the v128 note is still in the file - green because it was already
+//     there, and it is the thing this wave must not destroy.
+//   1 + 3 + 3 + 1 = 8.
+//
+// AND I ALMOST SHIPPED THIS HEADER WITHOUT THE BASELINE IN IT. I measured 8/7, wrote
+// it into the commit message, and left the file silent - the third time in this repo,
+// and the reason CLAUDE.md says the guard header is the copy that wins any
+// disagreement. The codeload verify caught it by grepping the tarball for the figure.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
