@@ -2855,6 +2855,38 @@ true after a publish; what would become true is "only the organizer can change t
 round's SETUP, on rounds that have an owner". Anything said to a golfer has to match
 that, which is why no UI string may say protected, secure or locked.
 
+### WHAT THE NEXT RULES PUBLISH MUST CARRY
+
+**`kpGroupAnswers` MUST SHIP IN THE NEXT PUBLISH OF `database.rules.json`** (added
+2026-09-28, Wave 23, `#eventCode` child, `.write` identical to `kpLeaders`,
+`kpWinners` and `kpConfirmed`: `root.child('events/' + $eventCode).exists()`).
+
+This is not a nice-to-have, and it is the one entry on this list whose absence
+BREAKS A SHIPPED FEATURE rather than merely leaving it unenforced:
+
+- The forced KP decision writes the group's answer to
+  `events/<CODE>/kpGroupAnswers/h<N>/g<G>`. The writer is a **group scorekeeper** on a
+  `?group=` link — not signed in, no `auth.uid`, by design, exactly like the golfer
+  posting scores.
+- Children with no rule of their own inherit the **parent** `.write`, which for an
+  owned round requires `auth.uid === data.child('ownerUid').val()`. So the moment the
+  current repo file is published **without** this child, every one of those writes is
+  refused, and a group that answers the modal has its answer silently dropped.
+- The modal would still let them through — the answer is also kept in
+  `sessionStorage` as a same-session fallback — so the failure is quiet: the question
+  returns for the next phone, and for the same phone in a new session. A gate that
+  re-asks forever is worse than the skip it replaced.
+- It is already in the repo file (sha `62ea83f1…`) and frozen by
+  `format_first_wizard_test.js` and `organizer_link_share_test.js`, so a publish of
+  the repo file as it stands carries it. **The risk is publishing an older copy**, or
+  hand-editing in the console from the last live version (`dab91d8`, which predates
+  it by four commits). Publish the repo file; diff it against the live read-back
+  before and after, the way the hash table above was built.
+
+Nothing else is pending for the rules. `kpNoWinner` and `kpCancelled` stay
+undeclared **deliberately** — they are the organizer's whole-field calls and the
+owner-only parent rule is exactly right for them.
+
 **Left on the OLD predicate this wave** — `index.html` `isOrganizerView()` is still
 `!hasGroupLock` ("no ?group= in the link"), which a "Just watching" spectator on
 the bare link satisfies. On 2026-09-21 the string appeared 12 times in
