@@ -117,7 +117,7 @@ html {
 
 <div class="container">
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-    <a class="back-btn" onclick="goBack()">← Back to Home</a>
+    <a class="back-btn" id="guide-back" onclick="goBack()">← Back to Home</a>
 
     <h1>🧭 How HardPan Works</h1>
     <p class="sub">Two ways in. If somebody sent you a link, start at <a href="#for-golfers">You were sent a link</a>. If you are the one setting the round up, start at <a href="#for-organizers">You&rsquo;re setting up the round</a>.</p>
@@ -343,13 +343,75 @@ html {
         }
     });
 
-    function goBack() {
-        if (document.referrer && document.referrer.includes(window.location.host)) {
-            history.back();
-        } else {
-            window.location.href = 'admin.html';
-        }
+    // BACK GOES WHERE YOU CAME FROM, AND SAYS SO (Wave 28).
+    //
+    // Manny tapped How it works from a round's scorecard (GFLBAM, group 3), read it,
+    // tapped "Back to Home" and was out of the round - on the web AND in the iOS app
+    // run from Xcode. Two reasons, and the second is why the first was invisible:
+    //   1. The guide pill was a bare instructions.html. The in-round nav rewriter only
+    //      touches .nav-link, and this pill has never carried that class, so the page
+    //      arrived knowing nothing about any round.
+    //   2. goBack() then asked document.referrer and called history.back(). Neither is
+    //      dependable: the Capacitor shell does not hand a referrer across a
+    //      capacitor:// navigation, and on a cold open - the app resumed straight onto
+    //      the guide - there is no history entry to go back to either. The fallback,
+    //      admin.html, is what Manny hit.
+    //
+    // SO THE WAY BACK IS EXPLICIT, IN THE URL. `from` names the page and the round
+    // params name the round and the group. Those survive a cold open, a reload and the
+    // native shell, which is exactly what referrer and history do not.
+    //
+    // A SPECTATOR RETURNS AS A SPECTATOR and a group link never loses its group,
+    // because this reflects the params back rather than deciding anything: no ?group=
+    // in, no ?group= out; a group link in, the same group out.
+    //
+    // ONLY PAGES THE ROUND NAV ACTUALLY HAS. `from` is checked against a fixed list
+    // rather than trusted, so a hand-edited ?from=https://... cannot turn this button
+    // into an open redirect. Anything unrecognised falls back to Home, which is also
+    // what an ordinary visit gets.
+    const GUIDE_BACK_TARGETS = {
+        'index.html': 'scorecard',
+        'leaderboard.html': 'Leaderboard',
+        'skins.html': 'Bets',
+        'settlement.html': 'Results',
+        'sidematches.html': 'Matches',
+        'game.html': 'Game'
+        // stats.html is DELIBERATELY ABSENT. game_tab_test.js asserts that nothing
+        // links to it any more - the page is kept only for the parity tests - and my
+        // first draft listed it here out of completeness, which made instructions.html
+        // a link to it and turned that suite red. Nothing can navigate there, so
+        // nothing can arrive at the guide from there; a from=stats.html would fall
+        // back to Home, which is correct.
+    };
+
+    function guideBackTarget() {
+        const q = new URLSearchParams(window.location.search);
+        const from = q.get('from') || '';
+        const game = q.get('game') || '';
+        const group = q.get('group') || '';
+        const label = GUIDE_BACK_TARGETS[from];
+        if (!label || !game) return { href: 'admin.html', text: '\u2190 Back to Home' };
+        let href = from + '?game=' + encodeURIComponent(game);
+        if (group) href += '&group=' + encodeURIComponent(group);
+        return { href: href, text: '\u2190 Back to ' + label };
     }
+
+    function renderGuideBack() {
+        const el = document.getElementById('guide-back');
+        if (!el) return;
+        const t = guideBackTarget();
+        el.textContent = t.text;
+        // An href as well as the handler, so the label and the destination cannot
+        // drift apart and a long-press shows where it goes.
+        el.setAttribute('href', t.href);
+    }
+
+    function goBack() {
+        // NO history.back() AND NO REFERRER - see the note above. One destination,
+        // computed from the URL, which behaves the same in the browser and in the app.
+        window.location.href = guideBackTarget().href;
+    }
+    renderGuideBack();
 </script>
 </body>
 </html>

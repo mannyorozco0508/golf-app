@@ -452,6 +452,41 @@ html {
             link.href = navHref;
         });
 
+        // THE GUIDE PILL CARRIES WHERE IT CAME FROM (Wave 28).
+        //
+        // Manny tapped "How it works" from a round's scorecard (GFLBAM, group 3), read
+        // it, tapped "Back to Home" and was out of the round - on the web AND in the
+        // iOS app. instructions.html has no .nav-link class, so the rewriter above
+        // never touched it: the pill was a bare instructions.html and the page had no
+        // idea a round existed. Its goBack() then fell back on document.referrer and
+        // history.back(), which is unreliable in the Capacitor shell and useless on a
+        // cold open - so it went to admin.html.
+        //
+        // EXPLICIT PARAMS, NOT HISTORY. `from` names the page to return to and the
+        // round params say which round and which group, so the way back survives a
+        // cold open, a reload and the native shell, none of which keep a referrer.
+        //
+        // NOT ON admin.html, deliberately: Home is where "Back to Home" already goes,
+        // and a from=admin.html round trip carrying a group would hit the same
+        // redirectGroupScorekeeper bounce the note above describes.
+        (function () {
+            const here = (location.pathname.split('/').pop() || 'index.html');
+            if (here === 'admin.html') return;
+            // EVERY ROUTE TO THE GUIDE, not just the nav pill. index.html has TWO -
+            // the pill and the footer row's 🧭 (#sc-foot-guide, Wave 20) - and a
+            // golfer who used the second one would have been dumped on Home exactly
+            // as before. Selecting by href rather than by class covers both, and any
+            // third route added later gets it for free.
+            if (!currentMode) return;
+            const guides = Array.from(document.querySelectorAll('a[href]'))
+                .filter(a => (a.getAttribute('href') || '').split('?')[0] === 'instructions.html');
+            if (guides.length === 0) return;
+            let href = 'instructions.html?from=' + encodeURIComponent(here) + '&game=' + currentMode;
+            const g = urlParams.get('group');
+            if (g) href += '&group=' + g;
+            guides.forEach(a => { a.href = href; });
+        })();
+
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `💰 Bets (${currentData.eventName || "Live Round"})`;

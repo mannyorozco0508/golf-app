@@ -131,8 +131,8 @@ const CARD_MEASURE = `(function () {
     // the rendered scorecard, below score entry, the same height as the controls beside
     // it, and it is not the nav pill.
     var guide = document.getElementById('sc-foot-guide')
-        || document.querySelector('.sc-footer a[href="instructions.html"]');
-    var guidePill = document.querySelector('.top-nav-bar a[href="instructions.html"]');
+        || document.querySelector('.sc-footer a[href^="instructions.html"]');
+    var guidePill = document.querySelector('.top-nav-bar a[href^="instructions.html"]');
     // The controls in the footer row, in document order, so "one height" is a comparison
     // against the controls that are actually beside it.
     var stack = [].slice.call(document.querySelectorAll('.sc-footer-row .sc-foot-btn'))
@@ -248,7 +248,11 @@ describe('THE SCORECARD CARRIES THE GOLFER\'S ROUTE TO THE GUIDE', () => {
     }, { timeout: 90000 });
 
     test('the guide link is ON the rendered scorecard', () => {
-        assert.ok(C.guide, 'no a[href="instructions.html"] on index.html - the golfer '
+        // ^= NOT =, SINCE WAVE 28. Both guide routes now carry ?from=&game=&group= so
+        // the guide can get back to the round, and an exact href match found neither -
+        // which read as "the guide pill is not rendering" on a page where both were
+        // there. The claim is unchanged: there IS a route to the guide on the card.
+        assert.ok(C.guide, 'no a[href^="instructions.html"] on index.html - the golfer '
             + 'door still has no door');
         assert.ok(C.guide.onScreen, 'the guide link is in the DOM and renders nothing');
         assert.ok(C.guideInFooterRow,
@@ -284,11 +288,13 @@ describe('THE SCORECARD CARRIES THE GOLFER\'S ROUTE TO THE GUIDE', () => {
         // still is: an <a> gets no border-box and no block display from the UA stylesheet,
         // which is how this control laid out 148x42 before Wave 8b wrote its rule, and a
         // row makes that failure look like a design rather than a bug.
-        const others = C.stack.filter(s => s.href !== 'instructions.html');
+        // PREFIX, since Wave 28: the guide routes carry ?from=&game=&group= now.
+        const isGuide = s => String(s.href || '').split('?')[0] === 'instructions.html';
+        const others = C.stack.filter(s => !isGuide(s));
         assert.ok(others.length >= 1, 'nothing to compare against: ' + JSON.stringify(C.stack));
         const h = [...new Set(others.map(s => s.h))];
         assert.equal(h.length, 1, 'the row was already inconsistent in height: ' + h.join(', '));
-        const g = C.stack.find(s => s.href === 'instructions.html');
+        const g = C.stack.find(isGuide);
         assert.ok(g, 'the guide control is not one of the row\'s controls');
         assert.equal(g.h, h[0], 'the guide control is ' + g.h + 'px tall, the others ' + h[0]
             + '. An <a> gets no border-box from the UA stylesheet and no block display, '

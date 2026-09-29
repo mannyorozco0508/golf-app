@@ -195,7 +195,13 @@ describe('THE GUIDE ICON IS PRESENT IN BOTH STATES', () => {
             assert.ok(v.guide && v.guide.onScreen, 'the guide icon is missing');
             assert.equal(v.guide.w, ICON_W, 'the icon is ' + v.guide.w + 'px wide, not ' + ICON_W);
             assert.equal(v.guide.h, CTL_H);
-            assert.equal(v.guideHref, 'instructions.html');
+            // RE-POINTED (Wave 28): the footer's guide route now carries
+            // ?from=&game=&group= so the guide can get back to the round - it was one
+            // of the TWO routes that dumped a golfer on Home. The base is what this
+            // suite cares about; guide_back_test.js holds where it returns to.
+            assert.equal(String(v.guideHref).split('?')[0], 'instructions.html');
+            assert.match(v.guideHref, /\?from=index\.html&game=/,
+                'the footer guide route lost the way back: ' + v.guideHref);
             assert.equal(v.guideLabel, 'How it works',
                 'icon-only, so the accessible name is the only name it has');
             // ICON ONLY: no words. The glyph is the whole label.
