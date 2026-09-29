@@ -55,13 +55,34 @@ const DB = { events: {
 const PRE = 'window.__STUBDB = ' + JSON.stringify(DB) + ';' + REFIRE + `
 (function(){ window.__ui = []; ['mousedown','click'].forEach(function(k){ document.addEventListener(k, function(e){ var b = e.target && e.target.closest && e.target.closest('button'); if (b) window.__ui.push(k + '[' + b.innerText.trim().slice(0, 8) + ']'); }, true); }); })();`;
 
+// A SNAPSHOT MAY PRESERVE A FOCUS; IT MAY NEVER CREATE ONE (re-pointed Wave 27).
+// These cases used to assert active === 'BODY' after a remote snapshot, which was the
+// v128 world where nothing was ever focused on a landing. The landing now focuses the
+// first empty writable box, and restoreScoreFocus() deliberately puts that focus BACK
+// by identity after a rebuild - its whole job is that a snapshot must not wipe what
+// the golfer typed or where they were. So 'BODY' is no longer the rule.
+// The rule that MATTERS is intact and is what is asserted instead: a snapshot cannot
+// invent a focus, because restoreScoreFocus starts `if (!memo) return;` and the memo
+// only exists when a box was focused before the rebuild. If the golfer closed the
+// keyboard, a snapshot still does not reopen it - which is the sentence the original
+// comment gave for this rule, and it is unchanged.
+const focusOk = (s, why) => {
+    if (s.active === 'BODY') return;
+    assert.ok(/^p\d+\/h\d+$/.test(String(s.active)),
+        why + ': focus is neither a score box nor nothing - ' + s.active);
+    assert.equal(s.activeValue, '', why + ': a box with a score in it holds focus');
+    assert.ok(s.activeBottom !== null && s.activeBottom <= (844 - 336),
+        why + ': the focused box is under the keyboard allowance - ' + s.activeBottom);
+};
+
 // Where the page is, by identity - never by index.
 const STATE = `(function(){ var a = document.activeElement; var card = document.getElementById('hole-view-card'); var boxes = card ? card.querySelectorAll('.score-input') : []; var first = boxes[0]; var fr = first && first.getBoundingClientRect(); var hd = card && card.querySelector('.hole-view-header'); var hr = hd && hd.getBoundingClientRect();
   var id = (a && a.classList && a.classList.contains('score-input')) ? 'p' + a.getAttribute('data-player-id') + '/h' + a.getAttribute('data-hole') : (a === document.body ? 'BODY' : a.tagName);
   var selected = (a && a.classList && a.classList.contains('score-input')) ? (a.selectionStart === 0 && a.selectionEnd === a.value.length) : null;
   var nav = document.querySelector('.hole-view-nav-row'); var btns = nav ? Array.from(nav.querySelectorAll('button')).map(function (b) { return b.innerText.trim(); }) : [];
   return JSON.stringify({ hole: (document.querySelector('.hv-hole-num') || {}).innerText, scrollY: Math.round(window.scrollY), firstBoxTop: fr ? Math.round(fr.top * 10) / 10 : null, headingTop: hr ? Math.round(hr.top * 10) / 10 : null, headingBottom: hr ? Math.round(hr.bottom * 10) / 10 : null, headingText: hd ? hd.innerText.replace(/\\s+/g, ' ') : null, boxes: boxes.length, enabled: Array.from(boxes).filter(function (b) { return !b.disabled; }).length,
-    active: id, selected: selected, activeValue: a && a.value !== undefined ? a.value : null, nav: btns, finishOpen: getComputedStyle(document.getElementById('finish-round-modal-overlay')).display, ui: window.__ui.splice(0), ev: (window.__ev || []).splice(0) }); })()`;
+    active: id, selected: selected, activeValue: a && a.value !== undefined ? a.value : null,
+    activeBottom: (a && a.classList && a.classList.contains('score-input')) ? Math.round(a.getBoundingClientRect().bottom) : null, nav: btns, finishOpen: getComputedStyle(document.getElementById('finish-round-modal-overlay')).display, ui: window.__ui.splice(0), ev: (window.__ev || []).splice(0) }); })()`;
 const rect = (sel, n) => `(function(){ var el = document.querySelectorAll(${JSON.stringify(sel)})[${n || 0}]; if (!el) return 'null'; var r = el.getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`;
 const tap = (p) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 } } },
                     { cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 } } }];
@@ -140,7 +161,27 @@ const landed = (st, hole) => {
     assert.ok(st.headingTop >= 0 && st.headingBottom <= 844, 'the heading is fully on screen');
     assert.match(st.headingText, new RegExp('^Hole ' + hole + ' Par \\d'), 'and it names the hole: ' + st.headingText);
     assert.ok(st.firstBoxTop > st.headingBottom, 'the score boxes sit under the heading');
-    assert.equal(st.active, 'BODY', 'nothing is focused on a hole change');
+    // RE-POINTED IN WAVE 27, and the v128 reason above is kept because it is still
+    // true of what it describes. This asserted `active === 'BODY'` - nothing focused
+    // on a hole change - which was v128's remedy: it anchored the first BOX at the
+    // top and focused unconditionally, so the heading was already off screen and on a
+    // deep card iOS scrolled the target out from under the keyboard and took the
+    // heading with it.
+    //
+    // The landing now focuses the first EMPTY WRITABLE box, but only when it will sit
+    // CLEAR OF THE KEYBOARD - so the CONDITION is what gets asserted, not the absence.
+    // This fixture's holes have empty boxes near the top of a four-golfer card, so the
+    // focus is expected here; what must still hold is the thing v128 was protecting,
+    // and it is checked right above: the heading is at the offset and fully on screen.
+    // landing_focus_test.js holds the four refusals and the keyboard-line arithmetic.
+    if (/^p\d+\/h\d+$/.test(String(st.active))) {
+        assert.equal(st.activeValue, '', 'the landing focused a box that already had a score: '
+            + st.active + ' = ' + JSON.stringify(st.activeValue));
+        assert.ok(st.activeBottom !== null && st.activeBottom <= (844 - 336),
+            'the landing focused a box under the keyboard allowance: bottom ' + st.activeBottom);
+    } else {
+        assert.equal(st.active, 'BODY', 'focus went somewhere that is neither a score box nor nothing');
+    }
 };
 
 describe('THE LANDING: Next, Next again, Prev - one place, whatever the starting offset', () => {
@@ -164,15 +205,15 @@ describe('THE LANDING: Next, Next again, Prev - one place, whatever the starting
         const s = P(S.nav, 12); landed(s, 2);
         assert.equal(s.headingTop, P(S.nav, 4).headingTop);
     });
-    test('a remote snapshot after the landing focuses nothing - hole 2 still has empty boxes', () => {
+    test('a remote snapshot after the landing does not CREATE a focus (re-pointed, Wave 27)', () => {
         const s = P(S.nav, 14);
         assert.ok(s.ev.includes('value->render'), 'the snapshot rebuilt the card: ' + s.ev.join(' > '));
-        assert.equal(s.active, 'BODY'); assert.ok(s.enabled >= 2);
+        focusOk(s, 'after a remote snapshot'); assert.ok(s.enabled >= 2);
     });
-    test('and again after the golfer touched nothing else: still BODY', () => {
+    test('and again after the golfer touched nothing else: still nothing new', () => {
         const s = P(S.nav, 17);
         assert.ok(s.ev.includes('value->render'), s.ev.join(' > '));
-        assert.equal(s.active, 'BODY');
+        focusOk(s, 'after a second snapshot');
     });
 });
 
@@ -216,16 +257,27 @@ describe('FIX 1: a score still focused when Next is tapped', () => {
     });
 });
 
-describe('NO AUTO-FOCUS, whatever the boxes hold', () => {
+describe('THE FOCUS FOLLOWS THE BOXES: the first empty one, or nothing at all', () => {
     test('ran', () => assert.ok(S.part && S.part.ok && S.full && S.full.ok, (S.part && S.part.reason) || (S.full && S.full.reason)));
-    test('golfer 1 has hole 2 and three boxes are empty: Next lands, nothing is focused', () => {
-        const s = P(S.part, 3); landed(s, 2); assert.equal(s.enabled, 4); assert.equal(s.active, 'BODY');
+    test('golfer 1 has hole 2 and three boxes are empty: Next lands, and the FIRST EMPTY box takes focus', () => {
+        // Re-pointed with the describe above: golfer 1's box already holds a score, so
+        // the landing must skip it and take golfer 2's. That is the condition this
+        // suite now holds; landing_focus_test.js holds the refusals.
+        const s = P(S.part, 3); landed(s, 2); assert.equal(s.enabled, 4);
+        focusOk(s, 'partly scored hole');
+        assert.match(String(s.active), /^p\d+\/h2$/, 'nothing on the landed hole took focus');
+        assert.equal(s.activeValue, '', 'it focused a box that already had a score');
     });
-    test('every box on hole 2 holds a score: the landing is the same, activeElement stays BODY', () => {
+    test('every box on hole 2 holds a score: the landing is the same, and NOTHING is focused', () => {
         const s = P(S.full, 3); landed(s, 2); assert.equal(s.enabled, 4);
+        assert.equal(s.active, 'BODY', 'a full hole took focus anyway');
         assert.equal(s.headingTop, P(S.part, 3).headingTop);
     });
-    test('a remote snapshot afterwards does not focus anything either', () => {
+    test('a remote snapshot afterwards does not focus anything either - there was nothing to restore', () => {
+        // The clean half of the pair: on a FULL hole the landing focused nothing, so
+        // there is no memo, so restoreScoreFocus returns early and the snapshot cannot
+        // invent one. This is the case that proves a snapshot never reopens a keyboard
+        // the golfer closed.
         const s = P(S.full, 5);
         assert.ok(s.ev.includes('value->render')); assert.equal(s.active, 'BODY');
     });
@@ -259,8 +311,30 @@ describe('THE SEAM (source)', () => {
         assert.match(fn('goToAdjacentHole'), /goToHole\(/);
         assert.match(fn('jumpToHole'), /goToHole\(/);
         assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 1, 'exactly one call site');
+        // RE-POINTED IN WAVE 27. This banned every focus() on the navigation path, to
+        // hold v128's decision. The focus is back, so the ban becomes a CONDITION: the
+        // ONLY focus allowed on that path is focusFirstEmptyScoreBox(), called from
+        // landOnHole, and it must test all three of empty, writable and clear of the
+        // keyboard. A bare focus() anywhere else on the path still fails.
         const navPath = [fn('landOnHole'), fn('goToHole'), fn('goToAdjacentHole'), fn('jumpToHole'), fn('toggleHolePicker')].join('\n').replace(/^\s*\/\/.*$/gm, '');
-        assert.ok(!/\.focus\(|\.select\(|pendingScoreFocus/.test(navPath), 'no keyboard-opening focus anywhere on the navigation path');
+        assert.ok(!/pendingScoreFocus/.test(navPath),
+            'the navigation path is using the auto-advance focus memo, which is for typing');
+        const focusCalls = (navPath.match(/\.focus\(|\.select\(/g) || []);
+        assert.equal(focusCalls.length, 0,
+            'something on the navigation path focuses directly instead of going through '
+            + 'focusFirstEmptyScoreBox: ' + focusCalls.join(', '));
+        assert.match(fn('landOnHole'), /focusFirstEmptyScoreBox\(\)/,
+            'landOnHole no longer focuses the first empty box');
+        const f = fn('focusFirstEmptyScoreBox');
+        assert.ok(f.length > 150, 'focusFirstEmptyScoreBox could not be sliced');
+        assert.match(f, /:not\(\[disabled\]\)/, 'it does not skip a locked box');
+        assert.match(f, /value/, 'it does not require an EMPTY box');
+        assert.match(f, /innerHeight/, 'it does not test the keyboard allowance');
+        assert.match(f, /KEYBOARD_ALLOWANCE/, 'the allowance is not the named constant');
+        // The claim the snapshot re-points rest on: with no memo there is no focus to
+        // restore, so a rebuild cannot invent one.
+        assert.match(fn('restoreScoreFocus'), /if \(!memo\) return;/,
+            'restoreScoreFocus would now focus something after a rebuild with nothing focused before');
     });
     test('the scroll is an explicit scrollTo to the HOLE HEADING (the first box only if there is no heading), never smooth, never a nudge; the nav-row anchor is gone', () => {
         const l = fn('landOnHole');
