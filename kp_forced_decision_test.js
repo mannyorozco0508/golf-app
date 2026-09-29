@@ -45,6 +45,17 @@
 // tools/lib/cold-arrival.js records every ref().set/update a REAL TAP made, so the
 // assertions below read what the page actually wrote. That is behaviour, not prose.
 //
+// WAVE 27b ADDED THREE CASES, and they have their own baseline - the header figure
+// above is Wave 23's and describes a file that had 25 tests. Measured against this
+// branch before the Back fix (index.html at 7f87a76), all 28:
+//
+//     25 PASS / 3 FAIL
+//
+// The three reds are exactly the new "BACK TO HOLE N RE-LANDS THE HOLE" cases at 0,
+// 47 and 59px of inset; every one of Wave 23's 25 stayed green, which is the evidence
+// that re-landing on Back changed nothing else about the gate. Control: drop the
+// re-land and the same three go red again.
+//
 // WHY CHROME. Every trigger is a tap: Next, the 1-18 picker, Full Card, Finish
 // Round. Cold through tools/lib/cold-arrival.js - the page runs its own init,
 // listener and render, and no test here calls a navigation function by name.
