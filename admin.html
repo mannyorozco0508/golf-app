@@ -446,6 +446,7 @@
         .claim-label { display: block; font-size: 0.88rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px; }
         .claim-input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-mid); border-radius: 8px; font-size: 16px; background: var(--bg-page); color: var(--text-main); }
         .claim-btn { margin-top: 8px; }
+        .claim-remembered { font-size: 0.82rem; color: var(--text-muted); margin-top: 8px; line-height: 1.45; }
         .claim-note { margin-top: 8px; font-size: 0.82rem; color: var(--accent-red); min-height: 1em; }
         .btn-outline { width: 100%; background-color: var(--bg-card); color: var(--brand-green); border: 2px solid var(--brand-green); padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
 
@@ -7647,6 +7648,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             + '<label class="claim-label" for="claim-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
             + '<input id="claim-input" class="claim-input" type="text" inputmode="url" autocomplete="off" placeholder="Paste the link or token">'
             + '<button type="button" class="btn-outline claim-btn" onclick="submitSetupClaim()">Unlock setup</button>'
+            // THE WAY BACK IN, STATED. Under the button rather than above the input:
+            // it answers "and then what?", which is a question you only have once you
+            // have seen what the box wants. The words come from organizer-gate.js so
+            // this page cannot drift from them, exactly as CLAIM_PROMPT does.
+            + '<div class="claim-remembered">' + window.organizerGate.CLAIM_REMEMBERED + '</div>'
             + '<div id="claim-note" class="claim-note" role="status"></div>'
             + '</div>';
     }

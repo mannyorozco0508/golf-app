@@ -368,6 +368,22 @@
     }
     var CLAIM_PROMPT = 'Are you the organizer? Paste your organizer link.';
     var CLAIM_WRONG = 'That link isn\u2019t for this round.';
+    // THE WAY BACK IN, SAID OUT LOUD. The claim box has been a real way in since
+    // v200, and the token it stores is held for the round from then on - but no
+    // sentence said so, so the card read as a per-visit hoop: paste a link to get in
+    // this time. A golfer who does not know it is remembered either keeps the link to
+    // hand forever or assumes the app has not really let them in.
+    //
+    // IT IS TRUE OF BOTH ROUTES. claimOrganizerToken (this box) and
+    // rememberOrganizerToken (arriving on the organizer link) write the same
+    // localStorage key, so "once on this device" holds whichever way the organizer
+    // gets here.
+    //
+    // AND IT PROMISES NOTHING ABOUT SECURITY. The gate hides doors; the rules are
+    // untouched and anyone with the round code can still write it. No word here may
+    // say protected, secure or locked - the same standing rule the tournament gate
+    // carries - which is also why it says "remembered" and not "unlocked for good".
+    var CLAIM_REMEMBERED = 'You only need to do this once on this device \u2014 the link is remembered for this round.';
 
     window.organizerGate = {
         TRIAL_MS: TRIAL_MS,
@@ -391,6 +407,7 @@
         tokenFromPaste: tokenFromPaste,
         claimOrganizerToken: claimOrganizerToken,
         CLAIM_PROMPT: CLAIM_PROMPT,
-        CLAIM_WRONG: CLAIM_WRONG
+        CLAIM_WRONG: CLAIM_WRONG,
+        CLAIM_REMEMBERED: CLAIM_REMEMBERED
     };
 })();
