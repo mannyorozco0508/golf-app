@@ -128,6 +128,11 @@ const CONSUMER_SHELL = [
     // the first draft of this note did, and the build caught it.
     'match-engine.js',
     'money-engine.js', 'pool-engine.js', 'settlement-engine.js',
+    // net-finish-line.js: the Net Finish split - 1st $50, 2nd $30, 3rd $20 - shared
+    // by index.html and game.html. Both call it unguarded inside the money card, so
+    // a bundle without it renders no card at all rather than a wrong figure.
+    // (No apostrophes above: see the note at the head of this block.)
+    'net-finish-line.js',
     // live-skins.js: which config each live skins surface builds its ledger
     // from. index.html, leaderboard.html and settlement.html load it.
     'live-skins.js',
