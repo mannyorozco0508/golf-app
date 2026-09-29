@@ -2749,7 +2749,16 @@ candidates are the codes THIS DEVICE remembered at its own saves
 device, or before v191, is never offered. The old round's scores are not
 moved; ids differ between rounds.
 
-## The organizer doors — Wave v189, 2026-09-21
+## The organizer doors — Wave v189, 2026-09-21 (built; extended v200 and Waves 22, 25)
+
+**BUILT, and not a plan.** Worth stating at the top because a brief once asked for
+this feature to be built from scratch: the doors, the refusal card, the gate and the
+remembered token all shipped in **v189** (2026-09-21), the paste-to-claim way back in
+arrived in **v200**, **Wave 22** narrowed what counts as evidence on a group link, and
+**Wave 25** (2026-09-28) added the one sentence that was genuinely missing — see "the
+way back in" below. Anything proposing to build the gate itself is proposing a rewrite.
+Held by `organizer_door_test.js` (30 tests), `organizer_link_share_test.js` (34),
+`organizer_doors_after_picker_test.js` (8) and `organizer_wayback_test.js` (13).
 
 **What it is.** Two doors into the round setup for the organizer — "✏️ Edit round
 setup" on the scorecard's group strip (`index.html` `renderGroupFilters`) and under
@@ -2784,6 +2793,19 @@ link; that divergence is pinned in `organizer_door_test.js` rather than fixed.
 **The uid is per browser ORIGIN**: Safari, the home-screen
 app and the App Store app on one phone are three different organizers — open the
 organizer link once in each to make them all the organizer.
+
+**THE WAY BACK IN, AND THAT IT LASTS (v200; the sentence in Wave 25).** The refusal
+card is not a dead end. It carries a paste box — `renderSetupClaim` in `admin.html`,
+prompt and words from `organizer-gate.js` — which takes the pasted organizer link (or
+the bare token), checks it against THIS round's `organizerToken`, and stores it on the
+device. No Firebase write and nothing read. Wave 25 added the fact the card never
+stated: `CLAIM_REMEMBERED`, rendered under the Unlock button — *"You only need to do
+this once on this device — the link is remembered for this round."* It is true of both
+routes in, because `claimOrganizerToken` and `rememberOrganizerToken` write through the
+same `tokenKey()` helper. **Never on a group link:** a scorekeeper is not a locked-out
+organizer, and offering it there invites a golfer to hunt for a secret that is not
+theirs. The card may not say protected, secure or locked, in the markup or on the
+rendered screen — the guard refuses all three words.
 
 **WHAT THIS IS NOT. The client hides the doors; it does not lock them — and as of
 2026-09-27 nothing else does either.** The previous version of this paragraph said
@@ -2918,6 +2940,40 @@ own decision rather than ride along, and the inline wager panel on a single grou
 is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
+
+- **OPEN 2026-09-28 — THE REAL LOCK WAVE: publishing the rules, and the audit that
+  has to come first.** Every consumer gate today is UI only (see "What the next rules
+  publish must carry" above). Making enforcement real is its own wave, and it has a
+  **prerequisite that must be done before a single rule is published**:
+  - **STEP 0 — THE ownerUid AUDIT. Read-only, and it gates the rest.** List the recent
+    rounds under `events/` and report, per round: code, date, player count, `ownerUid`,
+    and whether that uid is a browser Manny still has. Two uids are known to be his:
+    the iPhone `k8fYkL1hsPb6ZDL3wgQi8hywPi42`, and `TFM8Iu07r5QtUzCvrMK6RleS7583`,
+    which is **unidentified** — find out what it is before trusting it.
+    **WHY IT COMES FIRST:** the parent `.write` keys setup to `auth.uid === ownerUid`.
+    The uid is **per browser ORIGIN** (Safari, the home-screen app and the App Store
+    app on one phone are three different organizers), so publishing locks every round
+    whose `ownerUid` belongs to a browser nobody can reach any more — and the organizer
+    is locked out of their own setup with no way back except the token. Publish first
+    and find out afterwards and the fix is a data migration on live rounds.
+  - **IT COULD NOT BE DONE ON 2026-09-28, and this is the blocker to solve.** Listing
+    `events/` needs a read of the PARENT node, and neither the repo ruleset nor the
+    live one grants it: `events/$eventCode` is `.read: true`, `events` has no `.read`
+    at all. Confirmed rather than inferred — an unauthenticated
+    `GET /events.json?shallow=true` returns `{"error":"Permission denied"}`, which is
+    the rules working correctly. The authenticated route needs the Firebase CLI, and
+    `firebase-tools@13` crashes on this machine's Node 24 (`Cannot find module
+    './internal/streams/stream'`). **An older major is worth trying and was NOT
+    verified here** — do not take `@12` on trust. So the audit wants either the CLI
+    run by Manny (`database:get /events --shallow --project golfapp-9fb21`, on a
+    version that starts), or the codes pasted from the Firebase console — after which
+    each round reads individually under the existing `.read: true`.
+  - **WHAT THE WAVE ITSELF THEN OWES.** A publish is not the whole job: the rules make
+    SETUP owner-only and leave fifteen children writable by any code-holder (the list
+    is above), so the wave has to say what it is and is not claiming, and no UI string
+    may start saying protected, secure or locked. `kpGroupAnswers` must ride along or
+    the forced KP decision breaks quietly — also above.
+  - **Logged, not built.** No rules have been published.
 
 - **OPEN 2026-09-28 — nothing in the suite catches an ORPHANED CSS RULE.**
   Wave 24 dropped the PROJECTED/FINAL word from the Net Finish head and left
