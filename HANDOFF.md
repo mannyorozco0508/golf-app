@@ -2939,6 +2939,42 @@ Not moved tonight because the wipe is the destructive control and should get its
 own decision rather than ride along, and the inline wager panel on a single group
 is the case where "one group IS the field" was the deliberate design.
 
+## Closed, and worth keeping closed
+
+- **FIXED IN v194, GUARDED 2026-09-28 — the wizard's Weekly Game step showed no pot
+  when an existing round was reopened.** Reported again as **item 4 of the 2026-09-27
+  handoff**, by which time it was already fixed: the step opened on *"Add players in
+  Step 5 to see the pot."* on a round that had eight players, and toggling Weekly Game
+  off and on cleared it.
+  - **The fix is one call, `admin.html:7935-7941`**, inside the existing-round
+    loader's roster branch (`if (storedPlayersTemp.length > 0)`): `mpRecalc()` runs
+    AFTER `handleFormatChange(true)` rebuilds the rows. The pot counts
+    `querySelectorAll('.player-row')` — `mpRecalc` → `mpDraftData` →
+    `collectWizardPlayers` → `captureCurrentPlayerInputs` — so anything that reads it
+    before the rows exist multiplies a correct buy-in by zero golfers. **The toggle
+    "fixed" nothing:** every pool control carries `oninput="mpRecalc()"`, so touching
+    one simply asked the question again once the rows were there. That is also the
+    tell for a recurrence — if touching any pool input clears it, it is ordering, not
+    arithmetic.
+  - **It was DISPLAY ONLY, on two independent grounds**, so no round was ever saved
+    wrong: `captureMoneyPool()` writes only `buyIn` and the bucket amounts — no total
+    and no participant count, the pot being derived at read time — and the save gate
+    re-validates on the payload's own player list (`validateMoneyPool(payload,
+    finalCourseData)`). What it cost was the organizer's confidence at the moment they
+    set the buy-in.
+  - **NOW GUARDED by `wizard_pot_on_edit_test.js`** (7 tests), which is the point of
+    this entry: for four waves the fix was held by a comment and nothing else, and
+    deleting that one call left the whole suite green. The guard arrives cold at
+    `admin.html?game=CODE` as the owner, reaches the step by a real tap on the step
+    dot, and **touches no pool input** — touching one is what used to hide the
+    defect. Control: delete the `mpRecalc()` call and 4 of 7 go red with the screen
+    reading *"Add players in Step 5 to see the pot."*
+  - **Nine sibling surfaces read the roster the same way** and are NOT individually
+    guarded: `renderWizardReview` (`admin.html:3036`, the one this guard also checks),
+    `renderSkinsExtras`, `skinsChosenIds`, `addSkinsInstance`, `renderSkinsInstances`,
+    `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
+    `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
+
 ## Known open items
 
 - **OPEN 2026-09-28 — THE REAL LOCK WAVE: publishing the rules, and the audit that
