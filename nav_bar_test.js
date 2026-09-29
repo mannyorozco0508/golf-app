@@ -201,7 +201,36 @@ NAMES.forEach(pg => {
             const want = pg === 'admin.html' ? /\?game=NAVBAR$/ : /\?game=NAVBAR&group=1$/;
             v.items.forEach(i => {
                 if (i.href.startsWith('trip.html')) { assert.equal(i.navLink, false); assert.equal(i.href, 'trip.html'); return; }
-                if (i.href.startsWith('instructions.html')) { assert.equal(i.navLink, false); assert.equal(i.href, 'instructions.html'); return; }
+                // RE-POINTED (Wave 28). The guide pill asserted a BARE
+                // instructions.html, which was the defect: a golfer who tapped How it
+                // works from a round arrived on a page that knew no round existed, and
+                // its "Back to Home" put them on the Home screen. The pill now carries
+                // from= plus the round, so Back can return to where they came from -
+                // and it still carries NO .nav-link class, because it is written by its
+                // own block rather than by the rewriter (Home's exemption is why the
+                // rewriter cannot simply be widened). guide_back_test.js holds the
+                // journey end to end.
+                if (i.href.startsWith('instructions.html')) {
+                    assert.equal(i.navLink, false, 'the guide pill joined the rewriter');
+                    // ON admin.html IT STAYS BARE, deliberately: Home is where "Back to
+                    // Home" already goes, and a from=admin.html round trip carrying a
+                    // group would hit the redirectGroupScorekeeper bounce this file
+                    // documents for Home above. So the lobby's guide pill carries
+                    // nothing, exactly as Home's does.
+                    if (pg === 'admin.html') {
+                        assert.equal(i.href, 'instructions.html',
+                            'the lobby gave the guide a round to carry: ' + i.href);
+                        return;
+                    }
+                    assert.match(i.href, new RegExp('^instructions\\.html\\?from=' + pg.replace('.', '\\.')),
+                        'the guide pill does not carry where it came from: ' + i.href);
+                    // `want` is anchored on a literal "?game=", and the guide pill's
+                    // query starts with from= - so the round is asserted on its own
+                    // tail rather than with the other pills' pattern.
+                    const tail = pg === 'admin.html' ? /&game=NAVBAR$/ : /&game=NAVBAR&group=1$/;
+                    assert.match(i.href, tail, 'the guide pill lost the round: ' + i.href);
+                    return;
+                }
                 if (i.href.split('?')[0] === 'admin.html') {
                     assert.equal(i.href, 'admin.html',
                         'Home must carry no round: ' + i.href);

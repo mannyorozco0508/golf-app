@@ -90,7 +90,7 @@ const PRODUCTS = {
         // to the next free key rather than reusing one an installed device holds.
         // Moved to v64. The Board's team view reads calculateMatchEngine, one
         // call per pair. A device on v63 still invents that margin itself.
-        cacheName: 'consumer-v95-reviewpool',
+        cacheName: 'consumer-v97-backtoround',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

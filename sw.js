@@ -3397,7 +3397,67 @@
 // consumer product cache is consumer-v95-reviewpool. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
 // web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v254-reviewpool';
+// Moved to v256 SO BACK FROM THE GUIDE RETURNS TO THE ROUND.
+//
+// v255 IS DELIBERATELY SKIPPED. Wave 27 (the landing focus) holds it on an unmerged
+// branch; this wave was cut from main independently, so it takes the next key after it
+// rather than colliding with it whichever lands first.
+//
+// WHAT AN INSTALLED DEVICE ON v254 KEEPS SERVING: a guide you cannot get back from.
+// Manny tapped "How it works" from a round's scorecard - GFLBAM, group 3 - read it,
+// tapped "Back to Home" and was out of the round. On the web AND in the iOS app run
+// from Xcode.
+//
+// TWO CAUSES, and the second is why the first went unnoticed:
+//   1. THE LINKS CARRIED NOTHING. The in-round nav rewriter only touches .nav-link, and
+//      the guide pill has never had that class, so its href stayed a bare
+//      instructions.html and the page arrived knowing no round existed. True from all
+//      seven in-round pages, not just the scorecard - and true of the SECOND route as
+//      well: the footer row's 🧭 (#sc-foot-guide, Wave 20), which a golfer who used it
+//      would have been dumped by in exactly the same way. Both are fixed; the selector
+//      is by href rather than by class so a third route gets it for free.
+//   2. goBack() ASKED document.referrer AND CALLED history.back(). Neither is
+//      dependable: the Capacitor shell does not hand a referrer across a capacitor://
+//      navigation, and on a cold open - the app resumed straight onto the guide - there
+//      is no history entry either. The fallback was admin.html, which is what he hit.
+//
+// THE WAY BACK IS NOW EXPLICIT, IN THE URL: from= names the page, game= and group= name
+// the round and the group. Those survive a cold open, a reload and the native shell,
+// which is exactly what referrer and history do not. Measured end to end with a real
+// tap that crosses pages, on his own round and group: the link reads
+// instructions.html?from=index.html&game=GFLBAM&group=3, the guide's button reads
+// "Back to scorecard", and tapping it lands on index.html?game=GFLBAM&group=3. From
+// Matches it says "Back to Matches" and returns there. A bare link returns with NO
+// group invented. An ordinary visit with no from= still says "Back to Home".
+//
+// from= IS CHECKED AGAINST A FIXED LIST, not trusted, so a hand-edited
+// ?from=https://... falls back to Home instead of becoming an open redirect - a back
+// button built from a URL parameter is exactly the shape that becomes one by accident.
+//
+// EIGHT REWRITERS, ONE EDIT. That five-line rewriter is duplicated byte-for-byte across
+// index, leaderboard, skins, settlement, sidematches, game, stats and admin - verified
+// identical by hash BEFORE editing, all eight patched, and the identity is now pinned so
+// a ninth copy or a drifting one is visible. NOT on admin.html: Home is where "Back to
+// Home" already goes, and a from=admin.html round trip carrying a group would hit the
+// same redirectGroupScorekeeper bounce Wave 14 documented when Home carried the round.
+//
+// GUARDED BY guide_back_test.js, 9 tests, real taps that cross pages. Baseline 2 PASS /
+// 7 FAIL against v254. Controls: drop from= from the links (4 red - the round carried
+// but the way back not) and trust from= without the allow-list (the forged case red).
+//
+// RE-POINTED, reason inline: nav_bar_test.js asserted the guide pill was a BARE
+// instructions.html on all eight bars - which WAS the defect - and now asserts it
+// carries from= plus the round, with admin.html still bare. guide_controls_test.js
+// matched a[href="instructions.html"] exactly and found neither route once they carried
+// params, reading as "the guide pill is not rendering" on a page where both were there.
+//
+// AN OBSERVATION, NOT FIXED: on a bare admin.html the guide pill is laid out 0x0, so the
+// lobby does not offer the in-round bar at all.
+//
+// No engine touched. The consumer product cache is consumer-v97-backtoround. The
+// tournament product cache stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and
+// already submitted; this is web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v256-backtoround';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
