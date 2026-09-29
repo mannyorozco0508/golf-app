@@ -2405,13 +2405,13 @@ html {
         // the round is scored, then what money is running. The stored key is untouched.
         const scoringEl = document.getElementById('landing-scoring');
         if (scoringEl) {
-            // A Nassau round is scored hole-by-hole as match play, whatever the
-            // stored gameFormat says. Telling the golfer "Stroke Play" described
-            // the storage, not the game they are actually playing.
-            const primaryNassau = Object.values(currentData.sideMatches || {}).find(sm => sm && sm.format === 'nassau');
-            scoringEl.textContent = (gameFormat === 'stroke' && primaryNassau)
-                ? `Match Play · ${primaryNassau.scoring === 'gross' ? 'Gross' : 'Net'}`
-                : ((typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play');
+            // ONE BUILDER, TWO SURFACES (Wave 27b). This card and the header subtitle
+            // used to answer the same question separately and disagree: the card said
+            // "Match Play · Net" and the header "STROKE (NET)" on the same round. Both
+            // now ask roundScoringBasis(); each formats it its own way, and only the
+            // formatting differs.
+            const b = roundScoringBasis();
+            scoringEl.textContent = b.fromWager ? (b.label + ' \u00B7 ' + b.scoring) : b.label;
         }
 
         // v194: a Weekly Game round is not "no bets" - the pot is the bet.
@@ -4591,6 +4591,41 @@ html {
         } catch (e) { return false; }
     }
 
+    // WHAT THIS ROUND IS ACTUALLY PLAYING - ONE ANSWER, TWO SURFACES (Wave 27b).
+    //
+    // The Playing With card and the header subtitle both describe the round's format
+    // and scoring, and they contradicted each other: on a STROKE round carrying a
+    // Nassau side match the card read "Match Play · Net" - deliberately, because that
+    // is the game being played hole by hole - while the header read "STROKE (NET)"
+    // straight off the stored key. Worse, the header's "(NET)" was a DEFAULT rather
+    // than a reading: scoringType only consults a wager when gameFormat is 'nassau',
+    // so a GROSS Nassau side match still printed NET up there while the card correctly
+    // said Gross.
+    //
+    // THIS IS DISPLAY ONLY. It does not touch scoringType or window.__scScoringType -
+    // the main format's gross/net setting, which round_scoring_parity_test.js holds
+    // every surface to and which is a DIFFERENT question from "what is the group
+    // playing". Nothing here is read by any engine; the money reads the stored
+    // gameFormat and the wagers, exactly as before.
+    //
+    // fromWager says whether the answer came from a side match rather than the stored
+    // format, because the card shows the scoring only in that case and the header
+    // always shows it - the one place their formatting legitimately differs.
+    function roundScoringBasis() {
+        const gf = (currentData && currentData.gameFormat) || 'stroke';
+        const primaryNassau = Object.values((currentData && currentData.sideMatches) || {})
+            .find(sm => sm && sm.format === 'nassau');
+        if (gf === 'stroke' && primaryNassau) {
+            return { label: 'Match Play', fromWager: true,
+                     scoring: primaryNassau.scoring === 'gross' ? 'Gross' : 'Net' };
+        }
+        const label = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gf]) || 'Stroke Play';
+        // The stored setting for the main format, derived the way every other surface
+        // derives it - see the cascade beside the subtitle.
+        const st = (typeof window !== 'undefined' && window.__scScoringType) || 'net';
+        return { label: label, fromWager: false, scoring: st === 'gross' ? 'Gross' : 'Net' };
+    }
+
     // ---- LIVE NET FINISH ---------------------------------------------------
     //
     // NO TIE MATH HERE. computeMoneyPool() has already decided which finishing
@@ -5008,8 +5043,23 @@ html {
         recordKpGroupAnswer(hole, 'none');
         kpForcedProceed();
     }
+    // BACK RE-LANDS THE HOLE (Wave 27b). Closing the popup used to leave the page
+    // wherever the golfer had scrolled to before they tapped Next - typically down
+    // among the score boxes, because that is where you are when you finish a hole -
+    // so "Back to hole N" put them at the top of nothing in particular. Manny reported
+    // it from his iPhone.
+    //
+    // THE SAME LANDING Next and Prev use, and literally the same function: close (which
+    // re-renders the card), then landOnHole(), which is the render-then-land pair
+    // goToHole performs. No hole change and no write - the question is still unanswered
+    // and the gate will ask again on the way out, which is the whole point of Back.
+    //
+    // The Wave 27 focus rule rides along for free: landOnHole ends with
+    // focusFirstEmptyScoreBox(), so the first empty writable box takes the keypad if it
+    // is clear of it, and nothing is focused if it is not.
     function kpForcedBack() {
         closeKpForcedModal();                 // records nothing; the question stands
+        if (currentViewMode === 'hole') landOnHole();
     }
     function kpForcedProceed() {
         const resume = kpForcedResume;
@@ -9213,7 +9263,14 @@ html {
         window.__scScoringType = scoringType;
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        // THE SAME ANSWER THE PLAYING WITH CARD GIVES - see roundScoringBasis(). This
+        // read `${gameFormat} (${scoringType})` straight off the stored keys, which is
+        // why a stroke round with a Nassau side match said STROKE (NET) here and
+        // "Match Play · Net" three lines down the same screen. scoringType itself is
+        // untouched and still exported for the parity guard; only this label moved.
+        const subtitleBasis = roundScoringBasis();
+        document.getElementById("format-subtitle").textContent =
+            `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
 
         renderGroupFilters(players.length);
 

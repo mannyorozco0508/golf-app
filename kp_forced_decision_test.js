@@ -316,6 +316,77 @@ describe('THE GATE: A COMPLETE KP HOLE CANNOT BE LEFT UNANSWERED', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// "BACK TO HOLE N" LANDS THE HOLE, IT DOES NOT JUST CLOSE (Wave 27b)
+//
+// Manny, on his iPhone: Back closed the popup and left him at the TOP of the hole
+// rather than on it. The cause is not the popup - it is that closing it re-rendered
+// the card and stopped there, so the page stayed wherever the golfer had scrolled to
+// before they tapped Next. That is typically DOWN among the score boxes, because that
+// is where you are when you finish a hole, which is why this does not reproduce unless
+// the fixture scrolls away first. These arrivals do exactly that.
+//
+// THE FIX IS THE SAME LANDING Next and Prev use - close, then landOnHole() - so the
+// heading sits at inset+12 and the boxes below it, and the Wave 27 focus rule rides
+// along because landOnHole ends with focusFirstEmptyScoreBox().
+// ---------------------------------------------------------------------------
+describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
+    const OFFSET = 12;
+    const B = {};
+    before(async () => {
+        const SEE = `(function () {
+          var card = document.getElementById('hole-view-card');
+          var head = card ? card.querySelector('.hole-view-header') : null;
+          var ov = document.getElementById('kp-force-overlay');
+          return JSON.stringify({
+            hole: (typeof currentViewedHole !== 'undefined') ? currentViewedHole : 'n/a',
+            inset: parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0,
+            headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
+            scrollY: Math.round(window.pageYOffset || 0),
+            modal: !!(ov && getComputedStyle(ov).display !== 'none'),
+            writes: (window.__coldWrites || []).length
+          });
+        })()`;
+        for (const inset of [0, 47, 59]) {
+            const r = await arriveCold({ url: fileUrl('index.html', 'game=KPF&group=1'),
+                db: { events: { KPF: J(LANDS_ON_8) }, global_courses: {}, trips: {}, tournaments: {} },
+                settleMs: 3200, viewport: { width: 390, height: 844 },
+                steps: [
+                    { expression: "document.documentElement.style.paddingTop = '" + inset + "px'; 'set'" }, { sleep: 250 },
+                    { tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 700 },      // Prev onto the complete KP hole 7
+                    // SCROLL AWAY, the way a golfer does while entering the last score.
+                    // Without this the page is already landed and Back looks correct
+                    // whether or not it re-lands - the case would be inert.
+                    { expression: "window.scrollTo(0, (window.pageYOffset||0) + 260); 'scrolled'" }, { sleep: 250 },
+                    { expression: "'AWAY:' + " + SEE },
+                    { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 700 },      // Next -> the gate opens
+                    { tap: '#kp-force-overlay .kpf-back' }, { sleep: 700 },
+                    { expression: "'BACK:' + " + SEE },
+                ] });
+            B[inset] = r.ok ? (() => { const o = {};
+                (r.value || []).forEach(v => { if (typeof v === 'string' && v.indexOf(':{') > -1)
+                    o[v.slice(0, v.indexOf(':{'))] = JSON.parse(v.slice(v.indexOf(':{') + 1)); });
+                return o; })() : { error: r.reason };
+        }
+    });
+
+    [0, 47, 59].forEach(inset => {
+        test('inset ' + inset + 'px: Back lands the hole at inset+' + OFFSET + ', same hole, nothing written', () => {
+            const v = B[inset];
+            assert.ok(v && !v.error, 'inset ' + inset + ': ' + (v && v.error));
+            // The fixture must really be scrolled off the landing, or this proves nothing.
+            assert.equal(v.AWAY.inset, inset, 'the emulated inset did not take');
+            assert.notEqual(v.AWAY.headingTop, inset + OFFSET,
+                'the fixture never left the landing, so Back cannot be shown to restore it');
+            assert.equal(v.BACK.modal, false, 'Back did not close the popup');
+            assert.equal(v.BACK.hole, 7, 'Back changed the hole: ' + v.BACK.hole);
+            assert.equal(v.BACK.headingTop, inset + OFFSET,
+                'Back left the page at ' + v.BACK.headingTop + ', not the landing');
+            assert.equal(v.BACK.writes, 0, 'Back wrote something');
+        });
+    });
+});
+
 describe('THE OTHER WAYS OUT OF A HOLE ARE GATED TOO', () => {
     test('FULL CARD is an exit and is gated (answer C) - the view did not switch', () => {
         const v = S.toFullCard;

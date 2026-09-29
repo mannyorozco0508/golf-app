@@ -13,7 +13,7 @@
         "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Ivy India|-6|2|Kim Kilo|-5|3|Jon Juliet|-2|4|Lee Lima|-1|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · Ivy v Jon · thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · Kim v Vic · thru 6|OVERALL MATCH|Vic 2 UP|$30|",
         "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
         "course-title": "Closed Links",
-        "format-subtitle": "Scope • STROKE (NET)",
+        "format-subtitle": "Scope • STROKE PLAY (NET)",
         "landing-group-names": "Ivy, Jon, Kim, Lee |Got it ✕|",
         "landing-scoring": "Stroke Play",
         "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|⚔️ 2 Side Bets|",
@@ -61,7 +61,7 @@
         "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
         "group-lock-badge": "👁️ Spectator View (Read-Only)",
         "course-title": "Closed Links",
-        "format-subtitle": "Scope • STROKE (NET)",
+        "format-subtitle": "Scope • STROKE PLAY (NET)",
         "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|👥 Players|",
         "group-pick-body": "|Group 1 · Ann, Ben, Cal, Dee|Group 2 · Eli, Fay, Gus, Hal|Group 3 · Ivy, Jon, Kim, Lee|Group 4 · Max, Ned, Oli, Pat|Group 5 · Quy, Rae, Sam, Tia|Group 6 · Uma, Vic, Wes, Xan|",
         "landing-group-names": "Ann, Ben, Cal, Dee, Eli, Fay, Gus, Hal, Ivy, Jon, Kim, Lee, Max, Ned, Oli, Pat, Quy, Rae, Sam, Tia, Uma, Vic, Wes, Xan |Got it ✕|",
@@ -129,7 +129,7 @@
         "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|1|Cal Charlie|-5|2|Ben Bravo|-3|3|Dee Delta|-1|4|Ann Alpha|E|🥩 SKINS WON|Thru Hole 6|Cal Charlie|2 skins|Holes 1, 4|Tied holes are not shown · Official through Hole 6|",
         "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|Cal Charlie — 2|Latest: Hole 4 — Cal Charlie|Hole 7 — Waiting on Group 1|hide hole-by-hole|Hole 1 — Cal Charlie — Net 2 — Skin|Hole 4 — Cal Charlie — Net 3 — Skin|Hole 7 — Waiting on Group 1|Hole 8 — Waiting on Group 1|Hole 9 — Waiting on Group 1|Hole 10 — Waiting on Group 1|Hole 11 — Waiting on Group 1|Hole 12 — Waiting on Group 1|Hole 13 — Waiting on Group 1|Hole 14 — Waiting on Group 1|Hole 15 — Waiting on Group 1|Hole 16 — Waiting on Group 1|Hole 17 — Waiting on Group 1|Hole 18 — Waiting on Group 1|",
         "course-title": "Closed Links",
-        "format-subtitle": "Scope • STROKE (NET)",
+        "format-subtitle": "Scope • STROKE PLAY (NET)",
         "landing-group-names": "Ann, Ben, Cal, Dee |Got it ✕|",
         "landing-scoring": "Stroke Play",
         "landing-active-games": "|🏆 Weekly Game · $20 each|⛳ Stroke Play|",
@@ -233,6 +233,10 @@
     {
       "date": "2026-09-28",
       "why": "UI Wave 24 - Net Finish names nobody until the round is finished. DIFFED BEFORE RE-CAPTURING: across the three links, 0 added, 2 CHANGED and 0 removed. Both changes are the same key, action-center-mount, on the two links whose round is unfinished (group-3 and bare); one-group-1 is byte-identical because its round is finished and the finished view did not move. The change is exactly two things going and two arriving: the summary line loses \"leads net\" and the block loses \"PROJECTED\" and its named rows, replaced by the pot, the split \"1st $60 - 2nd $40\" and the line \"Winners show once every card is in.\" No filtered list changed, and display is unchanged but for group-missing-note, which this suite deletes explicitly."
+    },
+    {
+      "date": "2026-09-29",
+      "why": "Wave 27b - the header subtitle and the Playing With card now give ONE answer, from roundScoringBasis(). DIFFED BEFORE RE-CAPTURING: across the three links, 0 added, 3 CHANGED and 0 removed. All three are the same key, format-subtitle, and the same change: \"Scope - STROKE (NET)\" became \"Scope - STROKE PLAY (NET)\". The header now uses the cards label vocabulary (MAIN_GAME_LABELS) instead of the raw stored key, so a plain stroke round reads STROKE PLAY. Nothing else moved on any link, no filtered list changed, and display is unchanged but for group-missing-note which this suite deletes explicitly."
     }
   ]
 }

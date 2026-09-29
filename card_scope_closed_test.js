@@ -203,7 +203,7 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // What arrived: the split "1st $60 · 2nd $40" and "Winners show once every card
         // is in." Every filtered list is identical and display is unchanged but for
         // group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '63b596c5');
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'facec252');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

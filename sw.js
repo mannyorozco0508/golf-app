@@ -3469,7 +3469,49 @@
 // landing unmoved. The consumer product cache is consumer-v96-landingfocus. The
 // tournament product cache stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2
 // and already submitted; this is web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v255-landingfocus';
+// Moved to v257 FOR TWO MORE FROM MANNY'S PHONE, on top of v255's landing focus.
+//
+// v256 BELONGS TO WAVE 28 (Back from the guide returns to the round), which was cut
+// from main independently and is unmerged. This branch takes v257 so the two cannot
+// collide whichever lands first.
+//
+// 1. "BACK TO HOLE N" NOW LANDS THE HOLE. Closing the popup re-rendered the card and
+//    stopped there, so the page stayed wherever the golfer had scrolled to before they
+//    tapped Next - typically DOWN among the score boxes, because that is where you are
+//    when you finish a hole. Manny got the top of the hole instead of the hole. The fix
+//    is the same landing Next and Prev use, and literally the same function: close, then
+//    landOnHole(). No hole change and no write - the question is still unanswered and
+//    the gate asks again on the way out, which is the point of Back. v255's focus rule
+//    rides along free, because landOnHole ends with focusFirstEmptyScoreBox().
+//    IT ONLY REPRODUCES IF THE FIXTURE SCROLLS AWAY FIRST, which is why the three new
+//    cases scroll 260px down before tapping Next; without that the page is already
+//    landed and Back looks correct whether or not it re-lands.
+//
+// 2. THE HEADER AND THE PLAYING WITH CARD NOW GIVE ONE ANSWER. The header read
+//    "Single Round - STROKE (NET)" while the card three lines below read "Match Play -
+//    Net", on the same round. They answered the same question from different sources:
+//    the header off the stored keys, the card deliberately relabelling a stroke round
+//    with a Nassau side match as the match play it actually is. Worse, the header's
+//    "(NET)" was a DEFAULT rather than a reading - scoringType only consults a wager
+//    when gameFormat is 'nassau' - so a GROSS Nassau side match printed NET up there
+//    while the card correctly said Gross. Both now ask roundScoringBasis(); each
+//    formats it its own way and only the formatting differs.
+//
+// DISPLAY ONLY, AND ASSERTED. scoringType and window.__scScoringType are UNTOUCHED -
+// that is the MAIN format's gross/net setting, which round_scoring_parity_test.js holds
+// every surface to and which is a different question from "what is this group playing".
+// No engine reads either label; the money reads the stored gameFormat and the wagers
+// exactly as before, and the guard asserts all four engines are clean of both.
+//
+// GUARDED BY three new cases in kp_forced_decision_test.js (0/47/59px insets: Back
+// closes, stays on the hole, lands the heading at inset+12 and writes nothing) and
+// round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
+// 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
+//
+// The consumer product cache is consumer-v98-kpbackland. The tournament product cache
+// stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
+// is web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v257-kpbackland';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
