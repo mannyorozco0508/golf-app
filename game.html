@@ -44,6 +44,12 @@
     <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
+    <!-- net-finish-line.js: the Net Finish split, shared with the scorecard since
+         Wave 24. placesText() used to live in this page and re-derive the split from
+         the setup config; the shared builder reads the engine's allocated
+         placeCents, which is the same figure on a whole-dollar round and the
+         CORRECT one on a legacy cents round. -->
+    <script src="net-finish-line.js"></script>
     <script src="grouping.js"></script>
     <style>
         :root {
@@ -299,20 +305,6 @@ html {
         return { label, how, stake };
     }
 
-    function placesText(net, wholeDollar) {
-        if (!net) return '';
-        const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)]);
-        let amounts;
-        if (net.payoutMode === 'custom' && Array.isArray(net.amounts)) amounts = net.amounts.map(Number);
-        else {
-            const places = Array.isArray(net.places) ? net.places : [];
-            const total = Number(net.amount) || 0;
-            amounts = (wholeDollar && typeof allocateWholeDollars === 'function')
-                ? allocateWholeDollars(total, places)
-                : places.map(p => Math.round(total * p) / 100);
-        }
-        return amounts.map((a, i) => ordinal(i + 1) + ' ' + money(a)).join(', ');
-    }
 
     // WHERE THE HANDICAPS COME FROM, said ONCE (v212). Marty's group follows
     // GHIN, so every golfer's Course Handicap is converted from their Index off
@@ -346,7 +338,6 @@ html {
             html += '<div class="game-sub game-muted">⚠️ ' + escapeHtml(r.errors[0] || 'The pot does not add up.') + '</div></div>';
             return html;
         }
-        const wholeDollar = typeof isWholeDollarRound === 'function' && isWholeDollarRound(data);
         // KP - the holes and what each is worth, from the engine's own per-hole split.
         if (r.kpCancelled && r.kpCancelled.cancelled) {
             html += '<div class="game-sub">📍 KP: cancelled for this round — its ' + $(r.kpCancelled.originalCents) + ' went into the skins pot.</div>';
@@ -359,7 +350,7 @@ html {
         }
         // Net Finish - the paid places.
         if (r.net) {
-            html += '<div class="game-sub">🥇 <strong>Net Finish</strong> — ' + $(r.net.amountCents) + ' to the best net scores: ' + escapeHtml(placesText(mp.net, wholeDollar)) + '</div>';
+            html += '<div class="game-sub">🥇 <strong>Net Finish</strong> — ' + $(r.net.amountCents) + ' to the best net scores: ' + escapeHtml(netFinishSplitText(r.net, ', ')) + '</div>';
         }
         // Skins - gross or net, carry or not, per flight or the whole field.
         if (r.skins) {

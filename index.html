@@ -64,6 +64,10 @@
          Carries no money - a Cup match awards points, never dollars. -->
     <script src="ryder-cup.js"></script>
     <script src="pool-engine.js"></script>
+    <!-- net-finish-line.js: the paid places of the Net Finish pot and what each is
+         worth, naming nobody. One builder, shared with game.html, reading the
+         engine's already-allocated net.placeCents. No dependencies of its own. -->
+    <script src="net-finish-line.js"></script>
     <script src="bet-strip.js"></script>
     <script src="hole-events.js"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
@@ -657,6 +661,7 @@
         .hv-player-cell .status-pill { font-size: 0.9rem; padding: 8px 10px; }
         /* Live whole-field skins. Compact by default: this sits BELOW score entry
            and navigation, and must never grow tall enough to push them off screen. */
+        .lnf-waiting { font-size: 0.78rem; color: var(--text-muted); padding: 2px 0 0 0; }
         /* Live Net Finish / KP rows. Compact by design: this sits below score entry
            and navigation and must not grow tall enough to push them off screen. */
         /* KP block. Compact by design - it sits inside the Action Center and must not
@@ -738,7 +743,6 @@
         .kp-btn { width: 100%; min-height: 44px; margin-top: 6px; border: none; border-radius: 8px; background: var(--brand-green); color: #fff; font-weight: bold; font-size: 0.85rem; }
         .kp-cancel { width: 100%; min-height: 40px; margin-top: 4px; background: none; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; }
         .lnf-head { font-size: 0.66rem; font-weight: bold; letter-spacing: 0.03em; color: var(--brand-green); margin-top: 8px; }
-        .lnf-state { color: var(--text-muted); font-weight: 600; }
         .lnf-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.74rem; padding: 2px 0; }
         .lnf-amt { font-weight: 600; white-space: nowrap; }
         .lnf-pending { color: var(--text-muted); font-style: italic; }
@@ -4461,7 +4465,10 @@ html {
         if (!r.valid) return html + '<div class="section-summary" style="color:var(--accent-red);">\u26A0\uFE0F ' + r.errors[0] + '</div>';
         const bits = [];
         if (r.kp) bits.push('\uD83D\uDCCD KP ' + r.kp.lines.filter(l => l.winnerId).length + '/' + r.kp.lines.length + ' claimed');
-        if (r.net && r.net.standings.length) bits.push('\uD83E\uDD47 ' + golferLabel(r.net.standings[0].id) + ' leads net');
+        // NAMES NOBODY EITHER (Wave 24). This line named the net leader on hole one -
+        // the same defect as the block below it, one row up, and it would have survived
+        // a fix that only changed the block.
+        if (r.net && r.net.standings.length && netFinishNamesAllowed()) bits.push('\uD83E\uDD47 ' + golferLabel(r.net.standings[0].id) + ' leads net');
         if (r.skins) bits.push('\uD83E\uDD69 ' + r.skins.lines.reduce((a, l) => a + l.units, 0) + ' skins won');
         html += '<div class="section-summary">' + bits.join(' \u00B7 ') + '</div>';
         html += buildLiveNetFinish(r);
@@ -4494,6 +4501,34 @@ html {
         mount.innerHTML = buildPoolKpEntry(r);
     }
 
+    // IS THE ROUND OVER? ONE RESOLVER, AND IT IS THE ENGINE'S (Wave 24).
+    //
+    // computeRoundSettlement(...).finished - verified || scored, where scored means
+    // every golfer who TEED OFF has every hole and verified is the organizer's
+    // "Scores Look Right" in Finish Round. It is the same predicate the Receipt has
+    // always asked, which is the point: before this the card computed its OWN answer
+    // (every pool PARTICIPANT complete, with no verified arm at all), so a round with
+    // a picked-up ball that the organizer had verified read unfinished here and FINAL
+    // on the Receipt. Two answers to one question, and the golfer saw both.
+    //
+    // .finished, NOT .settled. An unresolved KP holds KP money and keeps .settled
+    // false; the net standings are not provisional because of it, and withholding the
+    // net winners over a KP nobody recorded would hide them on a round that is over.
+    // The Receipt keeps .settled for the whole document - a different question.
+    //
+    // WHOLE FIELD. computeRoundFinish reads data.players with no group filter, so
+    // group 1 finishing cannot reveal names while group 6 is on hole 12.
+    //
+    // FAILS CLOSED. No engine, no claim: names stay hidden rather than appearing on a
+    // page that cannot ask.
+    function netFinishNamesAllowed() {
+        if (typeof computeRoundSettlement !== 'function') return false;
+        try {
+            return !!computeRoundSettlement(currentData, currentData.courseData || [],
+                                            currentData.scores || {}).finished;
+        } catch (e) { return false; }
+    }
+
     // ---- LIVE NET FINISH ---------------------------------------------------
     //
     // NO TIE MATH HERE. computeMoneyPool() has already decided which finishing
@@ -4507,27 +4542,39 @@ html {
     // consumed 2nd place as well. Anyone reimplementing that from scratch in a page
     // would get it subtly wrong, and it would disagree with the receipt.
     //
-    // WORDING IS DELIBERATE. This says PROJECTED, never FINAL, whenever a single
-    // participant still has a hole outstanding - which is almost always true while
-    // anyone is still on the course, and is exactly when a golfer is most likely to
-    // read it and act on it.
+    // NOBODY IS NAMED UNTIL THE ROUND IS FINISHED (Wave 24).
+    //
+    // Manny read "1st: Paul - net 21 / T2: Lance / Matt B - net 22" off this card with
+    // a few holes played. The money was right; the screen was naming winners of a
+    // round nobody had finished, and a golfer who acts on that settles up early on a
+    // result that has not happened. Until netFinishNamesAllowed() says otherwise the
+    // card shows THE POT AND THE SPLIT ONLY, which is exactly what the Game tab has
+    // always shown, built by the same shared function.
+    //
+    // THE SPLIT IS AVAILABLE FROM HOLE ONE. r.net.placeCents is allocated from the
+    // setup the moment the pool is valid - it does not wait for scores - so there is
+    // no state in which the card has nothing useful to say.
+    //
+    // NO STATE WORD IN THE HEAD. It used to read PROJECTED or FINAL. With the names
+    // withheld the shape already carries it - no names means not finished, names mean
+    // finished - and a head saying PROJECTED above a line with no names says the same
+    // thing twice. One muted line says when the names arrive instead.
     function buildLiveNetFinish(r) {
-        if (!r.net || !r.net.lines || r.net.lines.length === 0) return '';
+        if (!r.net) return '';
         const $ = centsToMoney;
+        let html = '<div class="lnf-head">\uD83C\uDFC5 NET FINISH \u00B7 ' + $(r.net.amountCents) + '</div>';
 
-        // Complete means every pool participant has posted every hole. Anything less
-        // and the standings can still move.
-        const holes = (currentData.courseData || []).length;
-        const scores = currentData.scores || {};
-        const complete = holes > 0 && r.participants.every(p =>
-            (currentData.courseData || []).every(h => {
-                const v = scores['p' + p.id + '_h' + h.hole];
-                return v && v > 0;
-            }));
+        if (!netFinishNamesAllowed()) {
+            // ONE POT, ONE SPLIT, on a flighted round as much as any other: only skins
+            // and birdies carry a flight scope, and the net pot is field-wide.
+            const split = (typeof netFinishSplitText === 'function') ? netFinishSplitText(r.net) : '';
+            if (!split) return html;
+            return html
+                + '<div class="lnf-row"><span>' + split + '</span></div>'
+                + '<div class="lnf-waiting">Winners show once every card is in.</div>';
+        }
 
-        let html = '<div class="lnf-head">\uD83C\uDFC5 NET FINISH \u00B7 ' + $(r.net.amountCents)
-            + ' \u00B7 <span class="lnf-state">' + (complete ? 'FINAL' : 'PROJECTED') + '</span></div>';
-
+        if (!r.net.lines || r.net.lines.length === 0) return html;
         r.net.lines.forEach(l => {
             const tied = l.ids.length > 1;
             const place = (tied ? 'T' : '') + l.place;

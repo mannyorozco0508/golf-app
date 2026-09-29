@@ -98,15 +98,38 @@ describe('LIVE NET FINISH', () => {
         assert.match(t, /\$30/);
     });
 
-    test('says PROJECTED while anyone still has a hole to play', () => {
+    // RE-POINTED IN WAVE 24, and both of these tested something that is now gone.
+    //
+    // The card used to name the paid places from hole one and label the whole block
+    // PROJECTED. Manny read "1st: Paul - net 21 / T2: Lance / Matt B - net 22" off a
+    // round with a few holes played: the money was right, the screen was naming
+    // winners of a round nobody had finished. The names are withheld until the round
+    // is finished, and THE STATE WORD IS GONE with them - no names means not
+    // finished, names mean finished, and a head saying PROJECTED above a line with no
+    // names says the same thing twice.
+    //
+    // The second test is the more important re-point. It encoded the card's OWN
+    // completeness rule - every pool PARTICIPANT has posted every hole - which had no
+    // `verified` arm, so a round with a picked-up ball that the organizer had
+    // confirmed read unfinished here and FINAL on the Receipt. Both surfaces now ask
+    // computeRoundSettlement(...).finished. net_finish_no_names_test.js holds the arm
+    // this fixture cannot reach.
+    test('while anyone still has a hole to play: the pot and the split, and nobody named', () => {
         const t = strip(boot({ thru: { 1:15, 2:14, 3:13 } }).banner());
-        assert.match(t, /PROJECTED/);
-        assert.ok(!/FINAL/.test(t), 'nothing is final while a group is still out there');
+        assert.match(t, /NET FINISH . \$70/, 'the pot must still be on the card: ' + t);
+        assert.match(t, /1st \$40 . 2nd \$30/, 'the split is missing: ' + t);
+        assert.match(t, /Winners show once every card is in\./);
+        assert.ok(!/PROJECTED|FINAL/.test(t), 'the state word came back: ' + t);
+        ['Avery', 'Blake', 'Casey', 'Devon'].forEach(n => assert.ok(t.indexOf(n) === -1,
+            'the card names ' + n + ' with a group still out: ' + t));
     });
 
-    test('says FINAL only when every participant has posted every hole', () => {
+    test('names the places only once the round is finished, and then the split line goes', () => {
         const t = strip(boot({ nets: [70,72,75,78,80,82,84,86,88,90,92,94] }).banner());
-        assert.match(t, /FINAL/);
+        assert.match(t, /1 . Avery . net 70/, 'the finished card stopped naming the winner');
+        assert.match(t, /\$40/);
+        assert.ok(!/Winners show once/.test(t), 'the waiting line survived into the finished view');
+        assert.ok(!/PROJECTED|FINAL/.test(t), 'the state word came back');
     });
 
     test('a TIE shows the shared place and the per-golfer amount', () => {
@@ -172,7 +195,10 @@ describe('DIFFERENT GROUP PACES', () => {
     test('15 / 14 / 13 keeps every live surface working and honest', () => {
         const b = boot({ thru: { 1:15, 2:14, 3:13 }, kpWinners: { h3:'101', h7:'105' } });
         const t = strip(b.banner());
-        assert.match(t, /PROJECTED/, 'standings can still move');
+        // RE-POINTED (Wave 24): standings can still move, and the card now says that by
+        // naming nobody rather than by labelling named rows PROJECTED.
+        assert.match(t, /Winners show once every card is in\./, 'standings can still move');
+        assert.ok(!/1 . Avery/.test(t), 'a golfer is named while two groups are still out: ' + t);
         assert.match(t, /KP · \$100/, 'KP stays visible while groups are out');
         assert.match(t, /Hole 3 · Avery/);
         assert.match(t, /Hole 12 · Pending/);

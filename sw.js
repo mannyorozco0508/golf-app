@@ -3227,7 +3227,75 @@
 // cache is consumer-v92-kpforced. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
 // web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v251-kpforced';
+// Moved to v252 SO NET FINISH NAMES NOBODY UNTIL THE ROUND IS FINISHED.
+//
+// WHAT AN INSTALLED DEVICE ON v251 KEEPS SERVING: a Weekly Game card that names the
+// paid places from hole one. Manny read "1st: Paul - net 21 / T2: Lance / Matt B -
+// net 22" with a few holes played. Reproduced from the engine before anything was
+// built - eight golfers, $100 over 50/30/20, five holes in, and computeMoneyPool
+// returns net.lines [[1,["Avery"],5000],[2,["Blake","Casey"],5000]]. The money was
+// never wrong. The screen was naming winners of a round nobody had finished, and a
+// group that settles on that pays out on a result that has not happened.
+//
+// OPTION 2, Manny's decision. Until the round is finished the card shows THE POT AND
+// THE SPLIT ONLY - "NET FINISH · $100" then "1st $50 · 2nd $30 · 3rd $20" - with one
+// muted line, "Winners show once every card is in." Names, net scores and per-golfer
+// amounts appear unchanged the moment it is finished. DISPLAY ONLY: no payout
+// arithmetic moved, and no engine changed.
+//
+// TWO SURFACES, NOT ONE. The block was the obvious one; the summary line one row above
+// it also named the leader ("X leads net") and would have survived a fix that only
+// changed the block. Both now ask the same resolver.
+//
+// THE SPLIT IS CONSUMED, NEVER RECOMPUTED. New shared file net-finish-line.js reads
+// r.net.placeCents - pool-engine's "ALLOCATED value of each paid position, exposed
+// additively" - and formats it. It is populated from the moment a pool is valid,
+// measured at [5000,3000,2000] with ZERO scores posted, which is why the card always
+// has something true to say. A net with no placeCents returns NOTHING rather than
+// falling back to the setup percentages: that fallback is the path settlement.html
+// records as returning 3999/3001 where the engine allocated 4000/3000.
+//
+// ONE BUILDER. game.html had its own placesText() doing the same job from the setup
+// config; it is deleted and that page now calls the shared function. Its rendered
+// sentence is byte-identical on a whole-dollar round and CORRECT on a legacy cents
+// round, where the two used to differ by a cent. The separator stays each page's own
+// - ", " in the Game tab's sentence, " · " in the scorecard's compact head - because
+// the money is what must not drift, not the punctuation.
+//
+// ONE RESOLVER FOR "FINISHED". computeRoundSettlement(...).finished - verified ||
+// scored - the same predicate the Receipt has always asked. buildLiveNetFinish used
+// to compute its OWN answer (every pool PARTICIPANT complete, with no verified arm),
+// so a round with a picked-up ball the organizer had confirmed read unfinished on the
+// card and FINAL on the Receipt. That local rule is deleted, not left beside it.
+// .finished and not .settled: an unresolved KP holds KP money but does not make the
+// net standings provisional.
+//
+// NO STATE WORD. The head used to read PROJECTED or FINAL. With the names withheld the
+// shape carries it - no names means not finished - and PROJECTED above a nameless line
+// says the same thing twice.
+//
+// WHOLE FIELD, NOT PER GROUP. computeRoundFinish reads data.players with no group
+// filter, so group 1 finishing cannot reveal names while group 6 is on hole 12.
+// ONE POT, ONE SPLIT: only skins and birdies carry a flight scope, so the net line is
+// never drawn per flight - tested on a round that IS flighted, where the skins bucket
+// splits A $30 / B $30 while the net line stays a single $100 pot.
+//
+// GUARDED BY net_finish_no_names_test.js: five round states (no scores; five holes
+// with a live tie; every card in; seventeen holes plus organizer verification;
+// multi-group with group 1 done and group 2 thru 12), the partial states sweeping for
+// ALL EIGHT golfers rather than one, plus two cold Chrome arrivals - one whole-dollar,
+// one legacy cents proving the split prints $3.33/$3.33/$3.34 exactly.
+//
+// UNCHANGED, deliberately: settlement.html (its receipt already short-circuits the
+// whole document on an unfinished round, so it never named anybody mid-round), its
+// LIVE RESULTS standings card (positions and to-par, no money - that is the
+// leaderboard), leaderboard.html, and the Finish Round correction diff, which names
+// golfers whose position a correction WOULD change and is Manny's call to keep.
+//
+// The consumer product cache is consumer-v93-netfinish. The tournament product cache
+// stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted;
+// this is web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v252-netfinish';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3323,6 +3391,12 @@ const SHELL_FILES = [
     './bet-strip.js',
     './hole-events.js',
     './pool-engine.js',
+    // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -
+    // shared by index.html and game.html. Both call it UNGUARDED inside the money
+    // card, so a cached shell missing this file does not print a wrong figure, it
+    // fails to render the card - which is the correct failure, and the reason it is
+    // precached rather than left to runtime caching.
+    './net-finish-line.js',
     // live-skins.js decides which config each live skins surface builds its
     // ledger from (the wager itself, or the pool bucket). index.html,
     // leaderboard.html and settlement.html all load it.

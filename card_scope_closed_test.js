@@ -191,7 +191,19 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // neither does the row. The only change is ONE ADDED display key per link,
         // sc-foot-note: renderFooterRow sets that line's display on every snapshot,
         // shown while the round has no scores and hidden once the Receipt is there.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'd34656c8');
+        // RE-PINNED (v252, UI Wave 24, was d34656c8): Net Finish names nobody until the
+        // round is finished. DIFFED BEFORE RE-CAPTURING, which is the whole point of a
+        // golden: across the three links, 0 added, 2 CHANGED and 0 REMOVED. Both changes
+        // are the SAME key, action-center-mount, and only on the two links whose round is
+        // unfinished - group-3 and bare. one-group-1 is byte-identical, because its round
+        // is finished and the finished view did not move, which is the strongest evidence
+        // in this file that the wave was display-only.
+        // What went: "🥇 Ivy leads net" from the summary line, and "· PROJECTED" plus the
+        // named rows "T1 · Ivy India / Quy Quebec · net ..." from the block.
+        // What arrived: the split "1st $60 · 2nd $40" and "Winners show once every card
+        // is in." Every filtered list is identical and display is unchanged but for
+        // group-missing-note, which this suite deletes explicitly below.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '63b596c5');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
