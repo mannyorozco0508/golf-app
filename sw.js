@@ -3343,7 +3343,61 @@
 // The consumer product cache is consumer-v94-wayback. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted;
 // this is web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v253-wayback';
+// Moved to v254 SO THE REVIEW STEP NAMES THE WEEKLY GAME.
+//
+// WHAT AN INSTALLED DEVICE ON v253 KEEPS SERVING: a wizard Review step - the last
+// screen before Save, where every other row links to the step that owns it - that says
+// NOTHING about the money pool. Measured on a round carrying a $320 pot with $100 of
+// KP, $100 of net prizes and a $120 skins bucket, the whole GAMES & MONEY section read
+//     "Skins $20 Gross - 8 players   Extras None"
+// The round's LARGEST money item was absent while a $20 skins instance was listed.
+// renderWizardReview never referenced moneyPool, captureMoneyPool, mp-buyin,
+// mp-enabled or totalPool at all, no comment claimed an exclusion, and nothing
+// asserted its absence - an omission, not a decision.
+//
+// THE ROW, first in the money section because it is the number every other figure is
+// a slice of:
+//     🏆 Weekly Game   $40 in · $320 pot · KP $100 · Net $100 · Skins $120
+// and when the pot cannot save, the shape the side-match line already established:
+//     🏆 Weekly Game   ⚠️ $320 pot — Choose at least one KP hole. — fix before saving
+//
+// THE FULL SPLIT, NOT JUST THE POT (Manny's call, and his reasoning). The failure this
+// row exists to catch is a pot that is not what the organizer thinks it is - and the
+// TOTAL is the one figure that does not move when that happens. KP money with no holes
+// chosen leaves $320 on screen and refuses to save; a net prize dropped to nothing
+// leaves $320 on screen and pays different people. A pot-only line would hide both.
+//
+// BOUND TO WHAT THE SAVE WRITES. wizardWeeklyGameLine() calls captureMoneyPool() and
+// validateMoneyPool() - the same two functions the save gate calls - exactly as
+// wizardSideMatchLine is bound to collectSetupNassauWager(). Every figure is CONSUMED
+// (v.totalPool, v.remainder, moneyPoolNetTotal) and none recomputed, because a second
+// arithmetic path is how a review starts disagreeing with the money. The refusal
+// WORDING is not reinvented either: it is mpFriendlyError()'s, the same sentence the
+// save shows. A remainder skins bucket is the validator's figure; a FIXED one is the
+// organizer's own number and is read from the pool, because the validator does not own
+// that value.
+//
+// THE CONTROL WORTH KNOWING ABOUT. Point the line at its own arithmetic - buyIn times
+// a head count, and net.amount instead of moneyPoolNetTotal - and a CUSTOM $40/$30
+// prize makes the row read
+//     "$40 in · $320 pot · KP $100 · Skins $150"
+// with the Net line GONE ENTIRELY: a custom payout has no `amount` field, so a $70
+// prize vanishes from the review and the skins bucket appears to hold it. (I proposed
+// a legacy-cents round for this control in the recon and was wrong - validateMoneyPool
+// works in whole dollars, so cents never diverge there. The custom net is the real
+// divergence.)
+//
+// GUARDED BY review_weekly_game_test.js, 11 tests, cold Chrome, the Review step reached
+// by a real tap: the full split on a preset round, the custom net at $70 with skins
+// following to $150, a FIXED bucket showing its own $120, KP-with-no-holes warning and
+// naming the reason, and NO ROW at all on a round without a pool. Baseline 4 PASS /
+// 7 FAIL against v253.
+//
+// pool-engine.js is NOT touched - it already returned everything the row needed. The
+// consumer product cache is consumer-v95-reviewpool. The tournament product cache stays
+// tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
+// web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v254-reviewpool';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

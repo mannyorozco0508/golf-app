@@ -2958,6 +2958,59 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
              + ' / $' + (w.overallStake || 0) + ' \u2014 ' + who;
     }
 
+    // WHAT THE WEEKLY GAME WILL ACTUALLY BE, or that it will not save.
+    //
+    // The review listed the main format, the stacked games, the skins instances, the
+    // extras and the side match - and said NOTHING about the money pool. On a round
+    // carrying a $320 pot with $100 of KP, $100 of net prizes and a $120 skins bucket,
+    // the section read "Skins $20 Gross - 8 players - Extras None". The round's
+    // largest money item was absent from the last screen before Save, while a $20
+    // skins instance was listed. That is the same omission the side-match line above
+    // was written for, and the same argument applies: a fully configured pot and a
+    // broken one reviewed identically.
+    //
+    // THE FULL SPLIT, not just the pot. The failure this row exists to catch is a pot
+    // that is not what the organizer thinks it is, and the total is the one figure
+    // that does NOT move when it happens - KP money with no holes chosen, or a net
+    // prize dropped to nothing, both leave $320 on screen and change who gets paid.
+    //
+    // BOUND TO THE SAVE. captureMoneyPool() and validateMoneyPool() are the same two
+    // functions the save gate calls, so this cannot promise a pot that will not be
+    // written or stay silent about one that will. Every figure is CONSUMED -
+    // v.totalPool, v.remainder, moneyPoolNetTotal() - and none is recomputed here: a
+    // second arithmetic path is how a review starts disagreeing with the money.
+    //
+    // THE WORDING OF A REFUSAL IS NOT REINVENTED EITHER. An invalid pot is refused at
+    // save with mpFriendlyError()'s plain-English phrasing; this row shows the same
+    // sentence, so the warning a golfer reads here is the one they will read there.
+    function wizardPoolLine() {
+        if (typeof captureMoneyPool !== 'function' || typeof validateMoneyPool !== 'function') return '';
+        const pool = captureMoneyPool();
+        if (!pool) return '';                       // no pool, no row - as before
+        const draft = { players: collectWizardPlayers(), moneyPool: pool };
+        // The REAL course data when the round has it, so "KP hole 19 is not on this
+        // course" is caught on the review rather than at the save. Absent, an empty
+        // list skips only that check - the same allowance mpRecalc makes.
+        const v = validateMoneyPool(draft, loadedCourseData || []);
+        const $ = x => '$' + (Number(x) || 0).toFixed(0);
+        if (!v.valid) {
+            const why = (typeof mpFriendlyError === 'function' && v.errors && v.errors.length)
+                ? mpFriendlyError(v.errors[0], v) : (v.errors || ['Something is wrong with the pot.'])[0];
+            return '\u26A0\uFE0F ' + $(v.totalPool) + ' pot \u2014 ' + why + ' \u2014 fix before saving';
+        }
+        const bits = [$(pool.buyIn) + ' in', $(v.totalPool) + ' pot'];
+        if (pool.kp && (Number(pool.kp.amount) || 0) > 0) bits.push('KP ' + $(pool.kp.amount));
+        const net = (typeof moneyPoolNetTotal === 'function') ? moneyPoolNetTotal(pool.net) : 0;
+        if (net > 0) bits.push('Net ' + $(net));
+        // A remainder bucket is the validator's figure; a fixed one is the organizer's
+        // own number. Asking the validator for a fixed bucket would be asking the
+        // wrong question - it does not own that value.
+        const skins = (pool.skins && pool.skins.mode === 'remainder') ? v.remainder
+            : ((pool.skins && pool.skins.mode === 'fixed') ? (Number(pool.skins.amount) || 0) : 0);
+        if (skins > 0) bits.push('Skins ' + $(skins));
+        return bits.join(' \u00B7 ');
+    }
+
     function renderWizardReview() {
         renderOrganizerStanding();
         const container = document.getElementById('wizard-review-summary');
@@ -3021,6 +3074,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + ' \u2014 stored as the round format', 3, SEC_SCORING]);
         }
         if (stakeText) rows.push(['The Bet', stakeText, 4, SEC_ACTION]);
+        // FIRST in GAMES & MONEY, because it is the biggest number on the screen and
+        // the one every other figure is a slice of.
+        const poolLine = wizardPoolLine();
+        if (poolLine) rows.push(['\uD83C\uDFC6 Weekly Game', poolLine, 6, SEC_ACTION]);
         if (currentFormat === 'skins') {
             const buyIn = document.getElementById('skins-buyin') ? (document.getElementById('skins-buyin').value || '0') : '0';
             const carryOn = document.getElementById('skins-carryover') ? document.getElementById('skins-carryover').value !== 'false' : SKINS_CARRY_DEFAULT;
