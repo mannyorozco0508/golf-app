@@ -3,7 +3,7 @@
 //
 // 9/21: the KP block was a heading and a "Set KP Leader" button under the nav
 // row, and the groups did not understand it. Now, on a KP hole, until this
-// phone has answered for the hole (sessionStorage kpAsked:CODE:hN), the block
+// GROUP has answered for the hole, the block
 // IS the question:
 //     ⛳ Hole 7 — Closest to the Pin
 //     Current KP: Marty (Group 3) — 8' 4"        or   No KP yet.
@@ -15,7 +15,25 @@
 // writes nothing and answers for this phone; "Yes" opens the picker and the save
 // goes through saveKpLeader UNCHANGED (kpLeaders/hN + kpWinners/hN, one
 // update; a later group's save replaces both - last write wins, by design,
-// no transaction this wave). After an answer, "Change KP" reopens the picker.
+// no transaction this wave). After an answer, "Change KP" takes it back.
+//
+// WAVE 23 MADE THE ANSWER DURABLE AND PER GROUP, and these pins moved with it.
+// v193 recorded "this phone was asked" in sessionStorage. That is why groups walked
+// off KP holes: the answer died with the session, was never shared between two phones
+// in one group, and nothing in the round remembered it. The answer now lives at
+// kpGroupAnswers/h<N>/g<G> on the round - an ANSWER LOG that no engine reads - and
+// kpAnsweredFor(hole) is the ONE resolver both this block and the forced modal ask.
+// Three consequences are pinned below, each at the case that changed:
+//   1. "No - leave it" now WRITES (the log, and only the log). The old "No writes
+//      nothing" control has become the stronger claim: it writes no WINNER and does
+//      not touch the organizer's whole-field node, which would move money.
+//   2. A pick makes TWO writes - saveKpLeader's single money update, unchanged, plus
+//      the log. The assertions select the money write by key rather than by index,
+//      because an index is a statement about ordering that nothing needs to be true.
+//   3. CANCEL NO LONGER ANSWERS. Closing the picker used to mark the hole asked, which
+//      silently answered for the group; the question now stands, and the gate will ask
+//      again on the way out. That was a skip route, not a feature.
+// The forced modal that leaving a KP hole now opens is kp_forced_decision_test.js.
 //
 // WAVE 16 CHANGED THREE THINGS AND NOTHING ELSE:
 //  1. THE WORDING. "Did anyone in your group get inside it?" became "Did anyone get
@@ -149,12 +167,24 @@ describe('THE ANSWERS', () => {
     test('"No — leave it": nothing written, the question gone, "Change KP" stays; asked once per hole (a re-render does not ask again)', () => {
         const sb = boot(round({ leader: LEADER }), 7, 1);
         run(sb, 'answerKpNo(7)');
-        assert.deepEqual(writes(sb), [], 'CONTROL: No writes nothing');
+        // RE-POINTED IN WAVE 23. This asserted that No wrote NOTHING. It now writes the
+        // answer log - that is the whole point, because a No that wrote nothing was a No
+        // the round forgot. The control underneath it is stronger than the old one: No
+        // writes no WINNER and does not touch the organizer's whole-field node, which is
+        // the write that would move this hole's share into the skins pot.
+        const nw = writes(sb);
+        assert.equal(nw.length, 1, 'expected exactly the answer log: ' + JSON.stringify(nw));
+        assert.deepEqual(Object.keys(nw[0].value), ['kpGroupAnswers/h7/g1']);
+        assert.equal(nw[0].value['kpGroupAnswers/h7/g1'].answer, 'none');
+        assert.ok(!JSON.stringify(nw).includes('kpWinners'), 'CONTROL: No names no winner');
+        assert.ok(!JSON.stringify(nw).includes('kpNoWinner'),
+            'CONTROL: No is not the organizer\'s whole-field call and must not move money');
         const h = mount(sb);
         assert.doesNotMatch(h, /Did anyone|kp-no|kp-yes/);
         assert.match(h, /Current KP: <strong>Gus<\/strong>/);
-        assert.match(h, /<button class="kp-change" onclick="toggleKpEntry\(7\)">Change KP<\/button>/);
-        assert.equal(run(sb, "sessionStorage.getItem('kpAsked:KPQ1:h7')"), '1');
+        assert.match(h, /<button class="kp-change" onclick="changeKpAnswer\(7\)">Change KP<\/button>/);
+        assert.equal(run(sb, "sessionStorage.getItem('kpAnswer:KPQ1:h7:g1')"), 'none',
+            'the same-session fallback did not record the answer');
         run(sb, 'renderKpEntryMount()');
         assert.doesNotMatch(mount(sb), /Did anyone/, 'asked once');
         // hole 12 is still unanswered on this phone
@@ -181,11 +211,21 @@ describe('THE ANSWERS', () => {
         assert.ok(p.indexOf('kp-dist-row') < p.indexOf('kp-names'), 'distance sits above the names');
         run(sb, "document.getElementById('kp-ft-7').value = '6'; document.getElementById('kp-in-7').value = '2'; pickKpLeader(7, '102')");
         await tick(); await tick();
+        // TWO WRITES NOW (Wave 23): saveKpLeader's money update, byte-for-byte the same
+        // single update it always made, PLUS the answer log. The money write is selected
+        // BY KEY, not by index - which write goes first is not a claim worth pinning.
         const w = writes(sb);
-        assert.equal(w.length, 1); assert.equal(w[0].path, 'events/KPQ1');
-        assert.equal(w[0].value['kpWinners/h7'], '102');
-        assert.equal(w[0].value['kpLeaders/h7'].playerId, '102'); assert.equal(w[0].value['kpLeaders/h7'].playerName, 'Ben'); assert.equal(w[0].value['kpLeaders/h7'].group, 1); assert.equal(w[0].value['kpLeaders/h7'].distanceInches, 74);
-        assert.deepEqual(Object.keys(w[0].value).sort(), ['kpLeaders/h7', 'kpWinners/h7'], 'the same two keys as before, nothing else');
+        const money = w.filter(x => x.value && x.value['kpWinners/h7'] !== undefined);
+        assert.equal(money.length, 1, 'kpWinners must be written by exactly one update: ' + JSON.stringify(w));
+        assert.equal(money[0].path, 'events/KPQ1');
+        assert.equal(money[0].value['kpWinners/h7'], '102');
+        assert.equal(money[0].value['kpLeaders/h7'].playerId, '102'); assert.equal(money[0].value['kpLeaders/h7'].playerName, 'Ben'); assert.equal(money[0].value['kpLeaders/h7'].group, 1); assert.equal(money[0].value['kpLeaders/h7'].distanceInches, 74);
+        assert.deepEqual(Object.keys(money[0].value).sort(), ['kpLeaders/h7', 'kpWinners/h7'],
+            'the money update gained a key - its atomicity is why the two are together');
+        const log = w.filter(x => x.value && x.value['kpGroupAnswers/h7/g1'] !== undefined);
+        assert.equal(log.length, 1, 'the pick did not record the group\'s answer');
+        assert.equal(log[0].value['kpGroupAnswers/h7/g1'].answer, '102');
+        assert.ok(!JSON.stringify(w).includes('kpNoWinner'), 'a pick touched the organizer\'s node');
         // the page's own snapshot carries the leader back
         run(sb, "currentData.kpLeaders = { h7: { playerId: '102', playerName: 'Ben', group: 1, distanceInches: 74, updatedAt: 2 } }; currentData.kpWinners = { h7: '102' }; renderKpEntryMount()");
         const h = mount(sb);
@@ -200,20 +240,35 @@ describe('THE ANSWERS', () => {
         assert.equal(writes(sb)[0].value['kpWinners/h7'], '102', 'was 107');
         assert.equal(writes(sb)[0].value['kpLeaders/h7'].playerName, 'Ben');
     });
-    test('Cancel: nothing written, answered on this phone, Change KP stays', () => {
+    test('Cancel: nothing written, and the QUESTION STANDS - closing the picker is not an answer (re-pointed, Wave 23)', () => {
+        // This asserted that Cancel left "Change KP" behind, i.e. that closing the
+        // picker counted as having answered. It did that by marking the hole asked on
+        // this phone, so a golfer who opened the picker and thought better of it had
+        // silently answered for their group - a skip with nothing behind it. Cancel now
+        // records nothing and the question comes back, which is also what makes the
+        // forced gate on the way out coherent: there is no half-answered state left.
         const sb = boot(round(), 7, 1);
         run(sb, 'toggleKpEntry(7); cancelKpEntry(7)');
-        assert.deepEqual(writes(sb), []);
-        assert.match(mount(sb), /Change KP/); assert.doesNotMatch(mount(sb), /Did anyone|kp-names/);
+        assert.deepEqual(writes(sb), [], 'Cancel wrote something');
+        assert.match(mount(sb), /Did anyone get the KP in your group\?/, 'the question did not come back');
+        assert.doesNotMatch(mount(sb), /kp-names|Change KP/);
+        assert.equal(run(sb, "sessionStorage.getItem('kpAnswer:KPQ1:h7:g1')"), null,
+            'Cancel recorded an answer');
     });
     test('"Change KP" reopens the picker after a No; a save then replaces the answer', async () => {
         const sb = boot(round({ leader: LEADER }), 7, 1);
         run(sb, 'answerKpNo(7)');
-        run(sb, 'toggleKpEntry(7)');
+        // CHANGE KP DELETES THE GROUP'S ANSWER (Wave 23, Manny's rule D), rather than
+        // only reopening the picker - otherwise a group that answered and changed their
+        // mind keeps a stored answer they can no longer see, and nothing asks again.
+        run(sb, 'changeKpAnswer(7)');
+        assert.equal(run(sb, 'kpAnsweredFor(7)'), null, 'the answer was not taken back');
         assert.match(mount(sb), /kp-name/);
         run(sb, "pickKpLeader(7, '103')");
         await tick(); await tick();
-        assert.equal(writes(sb)[0].value['kpWinners/h7'], '103');
+        const mw = writes(sb).filter(x => x.value && x.value['kpWinners/h7'] !== undefined);
+        assert.equal(mw.length, 1);
+        assert.equal(mw[0].value['kpWinners/h7'], '103');
     });
     test('there is no empty pick to refuse any more - but an id that is not this group\'s is still refused', () => {
         // RE-POINTED IN WAVE 16. This used to set the select to '' and assert the
@@ -247,7 +302,13 @@ describe('THE SEAMS', () => {
         assert.doesNotMatch(fn, /kpAsked|sessionStorage|transaction/);
     });
     test('the question is answered in sessionStorage per round and hole; the mount is rendered on every snapshot (the last score lights it)', () => {
-        assert.match(src, /function kpAskedKey\(hole\) \{ return 'kpAsked:' \+ currentMode \+ ':h' \+ hole; \}/);
+        // RE-POINTED: the answer lives on the round now, per hole AND per group, with
+        // sessionStorage kept only as a same-session fallback. Both keys are pinned so
+        // neither can quietly lose the group segment - which is what would let one
+        // foursome's answer silence another's question.
+        assert.match(src, /function kpGroupAnswerKey\(\) \{ return 'g' \+ \(hasGroupLock/);
+        assert.match(src, /function kpSessionAnswerKey\(hole\) \{ return 'kpAnswer:' \+ currentMode \+ ':h' \+ hole \+ ':' \+ kpGroupAnswerKey\(\); \}/);
+        assert.match(src, /u\['kpGroupAnswers\/h' \+ hole \+ '\/' \+ kpGroupAnswerKey\(\)\]/);
         assert.match(src, /function renderCardWidgets\(\) \{\s*renderKpEntryMount\(\);/);
     });
     test('pool-engine.js: the pay rule (recording pays) is the one this block writes for; its sha moved 2026-09-22 for KP-never-refunds (approved), not for this block', () => {
@@ -290,7 +351,7 @@ describe('CHROME: a real tap on Yes, a pick, a real tap on Save', () => {
             { expression: "'W:' + JSON.stringify(window.__coldWrites)" },
             { deliver: { path: 'events/KPQ1', value: Object.assign({}, d, { kpLeaders: { h7: { playerId: '102', playerName: 'Ben', group: 1, distanceInches: null, updatedAt: 2 } }, kpWinners: { h7: '102' } }) } }, { sleep: 250 },
             { expression: "'T2:' + " + TEXT },
-            { expression: "'S:' + sessionStorage.getItem('kpAsked:KPQ1:h7')" }
+            { expression: "'S:' + sessionStorage.getItem('kpAnswer:KPQ1:h7:g1')" }
         ] });
     });
     const val = tag => { const hit = (r.value || []).find(v => typeof v === 'string' && v.startsWith(tag + ':')); assert.ok(hit !== undefined, 'no ' + tag + ' in ' + JSON.stringify(r.value).slice(0, 400)); return hit.slice(tag.length + 1); };
@@ -306,12 +367,18 @@ describe('CHROME: a real tap on Yes, a pick, a real tap on Save', () => {
             'the select-and-Save picker is back, and with it the step this wave cut');
         assert.match(val('T1'), /Distance \(optional\)[\s\S]*Ann[\s\S]*Ben/,
             'distance sits above the names, which is the only place it can be read before the tap');
+        // BY KEY, not by index: the tap now also records the group's answer, and the
+        // money update is the one carrying kpWinners.
         const w = JSON.parse(val('W')).filter(x => x.path === 'events/KPQ1');
-        assert.equal(w.length, 1); assert.equal(w[0].op, 'update');
-        assert.equal(w[0].value['kpWinners/h7'], '102'); assert.equal(w[0].value['kpLeaders/h7'].playerName, 'Ben'); assert.equal(w[0].value['kpLeaders/h7'].group, 1);
+        const money = w.filter(x => x.value && x.value['kpWinners/h7'] !== undefined);
+        assert.equal(money.length, 1, 'one update must carry the money: ' + JSON.stringify(w));
+        assert.equal(money[0].op, 'update');
+        assert.equal(money[0].value['kpWinners/h7'], '102'); assert.equal(money[0].value['kpLeaders/h7'].playerName, 'Ben'); assert.equal(money[0].value['kpLeaders/h7'].group, 1);
+        assert.equal(w.filter(x => x.value && x.value['kpGroupAnswers/h7/g1'] !== undefined).length, 1,
+            'the real tap did not record the group\'s answer');
     });
     test('the snapshot re-rendered the block: Current KP: Ben (Group 1), Change KP, no question; answered on this phone', () => {
         assert.match(val('T2'), /^⛳ Hole 7 — Closest to the Pin Current KP: Ben \(Group 1\) — Distance not recorded Change KP$/);
-        assert.equal(val('S'), '1');
+        assert.equal(val('S'), '102', 'the answer recorded is the golfer who was tapped');
     });
 });

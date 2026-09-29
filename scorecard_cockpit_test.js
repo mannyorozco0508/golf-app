@@ -182,10 +182,16 @@ describe('HOLE NAVIGATION', () => {
         // first score box HOLE_LANDING_OFFSET px from the top and focuses the first
         // empty one. hole_view_landing_test.js measures it in Chrome; this only pins
         // the call shape.
-        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
-            IDX.indexOf('function goToAdjacentHole') + 900);
+        // RE-POINTED AGAIN (Wave 23): the render-then-land pair moved into goToHole,
+        // the one function Prev/Next and the 1-18 jump now share, because the forced KP
+        // gate has to sit on every hole change and could not be in three places.
+        const fn = IDX.slice(IDX.indexOf('function goToHole'),
+            IDX.indexOf('function goToHole') + 900);
         assert.match(fn, /renderHoleView\(\);\s*landOnHole\(\);/, 'render, then land');
         assert.ok(!/scrollToHoleCard\(\)|withNavAnchor\(/.test(fn), 'neither earlier scroll rule');
+        const adj = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
+            IDX.indexOf('function goToAdjacentHole') + 900);
+        assert.match(adj, /goToHole\(/, 'Prev/Next must navigate through the one place');
     });
 
     test('the landing targets the hole heading (v129; v128 anchored the first box), not the card and not the page top', () => {

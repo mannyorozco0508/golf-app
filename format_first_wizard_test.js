@@ -761,7 +761,7 @@ describe('FROZEN — THIS WAS SETUP ORCHESTRATION, NOT ARITHMETIC', () => {
         // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
         // still NOT published, so live season writes may refuse until it is, which
         // is expected and is not a defect to chase.
-        'database.rules.json': '3af7722bf55606604324f982c4f2f26ae102e2d71aab6ad6485e2e687a94eca9',   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
+        'database.rules.json': '62ea83f1310047ef83699088cfb2026c16c9b4324ba69dad9f8755c3543e98e1',   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
         // RE-PINNED 2026-09-23, with Manny's explicit request for Handicap Index
         // conversion. The seven stroke functions (parseHcp, getStrokes,
         // allocateMatchStrokes, matchHandicapBaseline, matchRelativeHandicaps,

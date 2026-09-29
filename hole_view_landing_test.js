@@ -247,13 +247,19 @@ describe('THE LAST HOLE: the arrival unchanged; the Finish button now guarded (W
 
 describe('THE SEAM (source)', () => {
     const fn = (name) => { const at = IDX.indexOf('function ' + name + '('); return IDX.slice(at, IDX.indexOf('\n    function ', at + 30)); };
-    test('landOnHole is called from the three navigation handlers, never from renderHoleView, and NOTHING on the nav path focuses', () => {
+    test('landOnHole is called from the ONE navigation function every handler shares, never from renderHoleView, and NOTHING on the nav path focuses', () => {
+        // RE-POINTED IN WAVE 23, and the count went DOWN from two to one. Prev/Next and
+        // the 1-18 jump each carried their own "render, then land"; both now go through
+        // goToHole. That consolidation is what makes the forced KP gate a single check
+        // on every hole change instead of a copy per navigation - and a copy per
+        // navigation is how a gate ends up missing from one of them.
         const rhv = fn('renderHoleView');
         assert.ok(!/\.focus\(|landOnHole|pendingScoreFocus/.test(rhv), 'renderHoleView must not focus');
-        assert.match(fn('goToAdjacentHole'), /renderHoleView\(\);\s*landOnHole\(\);/);
-        assert.match(fn('jumpToHole'), /renderHoleView\(\);\s*landOnHole\(\);/);
-        assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 2, 'exactly two call sites');
-        const navPath = [fn('landOnHole'), fn('goToAdjacentHole'), fn('jumpToHole'), fn('toggleHolePicker')].join('\n').replace(/^\s*\/\/.*$/gm, '');
+        assert.match(fn('goToHole'), /renderHoleView\(\);\s*landOnHole\(\);/);
+        assert.match(fn('goToAdjacentHole'), /goToHole\(/);
+        assert.match(fn('jumpToHole'), /goToHole\(/);
+        assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 1, 'exactly one call site');
+        const navPath = [fn('landOnHole'), fn('goToHole'), fn('goToAdjacentHole'), fn('jumpToHole'), fn('toggleHolePicker')].join('\n').replace(/^\s*\/\/.*$/gm, '');
         assert.ok(!/\.focus\(|\.select\(|pendingScoreFocus/.test(navPath), 'no keyboard-opening focus anywhere on the navigation path');
     });
     test('the scroll is an explicit scrollTo to the HOLE HEADING (the first box only if there is no heading), never smooth, never a nudge; the nav-row anchor is gone', () => {
@@ -283,9 +289,18 @@ describe('THE SEAM (source)', () => {
         assert.equal((IDX.match(/onmousedown="event\.preventDefault\(\)" onclick="goToAdjacentHole\(/g) || []).length, 2, 'Prev and Next');
         assert.match(IDX, /onmousedown="event\.preventDefault\(\)" onclick="toggleHolePicker\(\)"/);
         assert.match(IDX, /onmousedown="event\.preventDefault\(\)" onclick="jumpToHole\(/);
-        ['goToAdjacentHole', 'jumpToHole', 'toggleHolePicker'].forEach(n => assert.match(fn(n), /commitPendingScore\(\);/, n));
+        // RE-POINTED IN WAVE 23. jumpToHole commits through goToHole now, not itself.
+        // That order is load-bearing for more than the keyboard: the fourth golfer's
+        // score, typed and not yet left, is what makes the hole COMPLETE, and the forced
+        // KP gate is evaluated after the commit - so a gate that ran first would let
+        // that tap walk off an unanswered hole.
+        ['goToAdjacentHole', 'toggleHolePicker', 'goToHole'].forEach(n => assert.match(fn(n), /commitPendingScore\(\);/, n));
+        assert.match(fn('jumpToHole'), /goToHole\(/, 'jumpToHole must reach the shared commit');
+        const g = fn('goToHole');
+        assert.ok(g.indexOf('commitPendingScore();') < g.indexOf('kpGateBefore('),
+            'the gate is evaluated BEFORE the last score is committed');
         assert.match(fn('commitPendingScore'), /a\.blur\(\);/);
         // saveScore and the listener untouched by this wave: the commit is a blur, nothing more.
-        assert.ok(!/saveScore\(/.test(fn('commitPendingScore') + fn('landOnHole') + fn('goToAdjacentHole')));
+        assert.ok(!/saveScore\(/.test(fn('commitPendingScore') + fn('landOnHole') + fn('goToAdjacentHole') + fn('goToHole')));
     });
 });

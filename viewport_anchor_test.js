@@ -276,11 +276,20 @@ describe('PART B — BOUNDARIES AND FAIL-OPEN', () => {
 });
 
 describe('PART B — ONLY NAVIGATION LANDS', () => {
-    test('landOnHole is called from exactly two places: Prev/Next and the jump', () => {
-        assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 2);
+    test('landOnHole is called from exactly ONE place now: goToHole, which Prev/Next and the jump both use', () => {
+        // RE-POINTED IN WAVE 23, and the number went DOWN. This asserted two call sites
+        // because Prev/Next and the 1-18 jump each had their own copy of
+        // "render, then land". Both now go through goToHole, which is where the forced
+        // KP gate had to sit so that every hole change asks it - three copies of a
+        // navigation would have meant three copies of the gate, and eventually two.
+        assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 1,
+            'landOnHole has more than one caller again - so does the KP gate');
+        const gth = IDX.indexOf('function goToHole');
+        assert.ok(gth > -1, 'goToHole is gone');
+        assert.match(IDX.slice(gth, gth + 900), /renderHoleView\(\);\s*landOnHole\(\);/, 'goToHole');
         ['function goToAdjacentHole', 'function jumpToHole'].forEach(name => {
             const at = IDX.indexOf(name);
-            assert.match(IDX.slice(at, at + 900), /renderHoleView\(\);\s*landOnHole\(\);/, name);
+            assert.match(IDX.slice(at, at + 900), /goToHole\(/, name + ' no longer navigates through goToHole');
         });
     });
 

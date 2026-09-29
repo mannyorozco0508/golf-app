@@ -23,6 +23,9 @@
         "kpConfirmed": {
           ".write": "root.child('events/' + $eventCode).exists()"
         },
+        "kpGroupAnswers": {
+          ".write": "root.child('events/' + $eventCode).exists()"
+        },
         "sideMatches": {
           ".write": "root.child('events/' + $eventCode).exists()",
           "$matchId": {
