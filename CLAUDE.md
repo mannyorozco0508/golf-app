@@ -119,6 +119,52 @@ twice because the view switch it relied on never rebuilt anything.
 A control that mutates something genuinely harmless *should* be inert. Say so, rather
 than inventing an assertion to make it look caught.
 
+## A test count comes from the FINAL run of the FINAL file
+
+Guards grow while they are being built. A test gets added to close a control, a
+fixture turns out inert and gains two assertions, a case is split in two — and the
+run that produced the numbers already in the draft report happened before any of
+that. The numbers then describe a file that no longer exists.
+
+**This has happened twice, both times caught by Manny reading the arithmetic and not
+by anything in the repo:**
+
+- **Wave 23.** Reported "25 tests" beside "18 fail / 6 pass". 18 + 6 = 24: the run
+  was the 24-test version, before the test that closed control 2 was added. The same
+  sentence also classified the six passing as "4 vacuous + 3 engine-only" — seven
+  things among six tests.
+- **Wave 24.** Reported "26 tests" beside a baseline of "11 pass / 14 fail". 11 + 14
+  = 25: the baseline was measured before the legacy-cents case was added at the
+  bottom of the file. Re-measured across all 26 it is 11 / 15, and the 26th is a
+  perfectly good red.
+
+Neither was a missing or non-running test. Both were a stale count in prose, which is
+worse than it sounds: a reader checks the arithmetic, finds it wrong, and now has to
+doubt every other number in the report — including the ones that were measured.
+
+**The rule.**
+
+1. **Re-run the baseline against the FINISHED guard**, after the last assertion is
+   written, and take the numbers from that run. A baseline is not a historical record
+   of what you happened to run first; it is a statement about the file as it stands.
+2. **Quote the same figures in all three places** — the guard's own header, the commit
+   message, and the report. If they disagree, the header is right and the prose is
+   stale, because the header sits next to the tests it counts.
+3. **Add the arithmetic up before writing it down.** pass + fail must equal the test
+   count, and any breakdown of the passing tests must sum to the number that passed.
+4. **Name the baseline's sha.** "Against pre-build main (52772b7, index.html sha
+   e3dbe834…)" is checkable; "against HEAD" stops being true the moment HEAD moves.
+
+**And record the baseline in the guard, not only in the report.** Wave 24's fix turned
+out to be an *addition*, not a correction: the numbers had only ever been in a commit
+message and a paste. A baseline nobody can find while reading the test file is a
+baseline that will be misquoted again.
+
+**A count that cannot be honest is still worth stating.** A guard that cannot load
+because the file it needs does not exist yet reports 0 pass / 0 fail / N cancelled.
+That is red, and it proves nothing per assertion — so say that, and take the useful
+baseline from the state where every assertion actually runs.
+
 ## Defence in depth has to be provable with the other rules switched off
 
 A second guard that never fires on real data is indistinguishable from a second
