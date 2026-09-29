@@ -2440,13 +2440,13 @@ html {
         // the round is scored, then what money is running. The stored key is untouched.
         const scoringEl = document.getElementById('landing-scoring');
         if (scoringEl) {
-            // A Nassau round is scored hole-by-hole as match play, whatever the
-            // stored gameFormat says. Telling the golfer "Stroke Play" described
-            // the storage, not the game they are actually playing.
-            const primaryNassau = Object.values(currentData.sideMatches || {}).find(sm => sm && sm.format === 'nassau');
-            scoringEl.textContent = (gameFormat === 'stroke' && primaryNassau)
-                ? `Match Play · ${primaryNassau.scoring === 'gross' ? 'Gross' : 'Net'}`
-                : ((typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gameFormat]) || 'Stroke Play');
+            // ONE BUILDER, TWO SURFACES (Wave 27b). This card and the header subtitle
+            // used to answer the same question separately and disagree: the card said
+            // "Match Play · Net" and the header "STROKE (NET)" on the same round. Both
+            // now ask roundScoringBasis(); each formats it its own way, and only the
+            // formatting differs.
+            const b = roundScoringBasis();
+            scoringEl.textContent = b.fromWager ? (b.label + ' \u00B7 ' + b.scoring) : b.label;
         }
 
         // v194: a Weekly Game round is not "no bets" - the pot is the bet.
@@ -2569,6 +2569,63 @@ html {
     // happens. With no heading (a hole with no data) the first box is the anchor.
     const HOLE_LANDING_OFFSET = 12;
 
+    // AND WHY THE FOCUS IS BACK, CONDITIONALLY (Wave 27). The note above is kept
+    // exactly as it was, because it is still true of what it describes: v128 anchored
+    // the first BOX at the top and focused unconditionally, so the heading was already
+    // off-screen before focus did anything, and on a deep card iOS scrolled the target
+    // out from under the keyboard and took the heading with it.
+    //
+    // Two things are different now. The landing anchors the HEADING, and the focus only
+    // happens when the box will still be CLEAR OF THE KEYBOARD - so iOS has no reason
+    // to scroll, and the heading stays where landOnHole put it. Measured at 390x844,
+    // rows 73px apart: boxes 0-5 end at or above 482 and are clear of a 336px keypad
+    // starting at 508; box 6 starts at 507 and box 7 at 580, and both are under it. So
+    // a group-locked four-golfer card gets the keypad every time, and a card deep
+    // enough to bury the target focuses nothing rather than losing the heading.
+    //
+    // 336px is an iPhone portrait soft keyboard, the class of device this is for. It is
+    // an ALLOWANCE, not a measurement: the keyboard is not open yet when this runs, and
+    // window.visualViewport cannot tell us how tall it will be. Erring large means the
+    // refusal happens one row early rather than one row late, and one row early costs
+    // a tap while one row late costs the heading.
+    const KEYBOARD_ALLOWANCE = 336;
+
+    // FOUR REFUSALS, and each is the page's own rule rather than a copy of it:
+    //   no card / no boxes      fail open - navigation still happens
+    //   every box filled        nothing to type
+    //   the box is DISABLED     renderScorecard sets that from isLocked (a superseded
+    //                           round, or a multi-group round without a matching
+    //                           ?group=), so a spectator and another foursome are both
+    //                           excluded without this function deciding who is who.
+    //                           BELT AND BRACES, AND MEASURED AS SUCH: removing this
+    //                           filter does NOT let a spectator be focused, because a
+    //                           browser refuses focus() on a disabled input - the
+    //                           control for it is behaviourally inert and the guard
+    //                           says so instead of pretending otherwise. It is kept
+    //                           for two reasons: it states the intent where the rule
+    //                           lives, and it picks the first WRITABLE empty box
+    //                           rather than stalling on a locked one, which is what
+    //                           a card mixing locked and writable rows would need.
+    //   under the keypad        see above
+    // SYNCHRONOUS BY CONSTRUCTION: this is the last thing landOnHole does, and
+    // landOnHole runs inside the click handler, which is the only window iOS gives a
+    // focus() to open the keyboard. Nothing here awaits anything.
+    function focusFirstEmptyScoreBox() {
+        try {
+            const card = document.getElementById('hole-view-card');
+            if (!card || typeof card.querySelectorAll !== 'function') return null;
+            const boxes = Array.from(card.querySelectorAll('.score-input:not([disabled])'));
+            const box = boxes.filter(b => !String(b.value || '').trim())[0];
+            if (!box || typeof box.getBoundingClientRect !== 'function') return null;
+            const r = box.getBoundingClientRect();
+            if (!(r.height > 0)) return null;                       // not laid out
+            const limit = (window.innerHeight || 0) - KEYBOARD_ALLOWANCE;
+            if (!(r.bottom <= limit)) return null;                  // would be under the keypad
+            box.focus();
+            return box;
+        } catch (e) { return null; }                                 // fail open, always
+    }
+
     // THE TAP THAT WENT NOWHERE (fix 1). A score typed and not yet left - a lone
     // "1", or a corrected number - is still focused when the golfer taps Next. The
     // browser's mousedown moved focus to the button: the box blurred, change fired,
@@ -2634,7 +2691,12 @@ html {
                 window.scrollTo(0, Math.max(0, y));
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }
-        // NO FOCUS HERE, deliberately - see the note above.
+        // THE FOCUS IS LAST, AFTER THE SCROLL. Focusing first would let the browser
+        // scroll the box into view on its own terms and then have landOnHole fight it -
+        // which is the race the 2026-09-14 note describes. Scroll, then focus, and the
+        // focus is a no-op for the scroll position because the box is already clear of
+        // the keypad by the time it is chosen.
+        focusFirstEmptyScoreBox();
     }
 
     function goToAdjacentHole(delta) {
@@ -4564,6 +4626,41 @@ html {
         } catch (e) { return false; }
     }
 
+    // WHAT THIS ROUND IS ACTUALLY PLAYING - ONE ANSWER, TWO SURFACES (Wave 27b).
+    //
+    // The Playing With card and the header subtitle both describe the round's format
+    // and scoring, and they contradicted each other: on a STROKE round carrying a
+    // Nassau side match the card read "Match Play · Net" - deliberately, because that
+    // is the game being played hole by hole - while the header read "STROKE (NET)"
+    // straight off the stored key. Worse, the header's "(NET)" was a DEFAULT rather
+    // than a reading: scoringType only consults a wager when gameFormat is 'nassau',
+    // so a GROSS Nassau side match still printed NET up there while the card correctly
+    // said Gross.
+    //
+    // THIS IS DISPLAY ONLY. It does not touch scoringType or window.__scScoringType -
+    // the main format's gross/net setting, which round_scoring_parity_test.js holds
+    // every surface to and which is a DIFFERENT question from "what is the group
+    // playing". Nothing here is read by any engine; the money reads the stored
+    // gameFormat and the wagers, exactly as before.
+    //
+    // fromWager says whether the answer came from a side match rather than the stored
+    // format, because the card shows the scoring only in that case and the header
+    // always shows it - the one place their formatting legitimately differs.
+    function roundScoringBasis() {
+        const gf = (currentData && currentData.gameFormat) || 'stroke';
+        const primaryNassau = Object.values((currentData && currentData.sideMatches) || {})
+            .find(sm => sm && sm.format === 'nassau');
+        if (gf === 'stroke' && primaryNassau) {
+            return { label: 'Match Play', fromWager: true,
+                     scoring: primaryNassau.scoring === 'gross' ? 'Gross' : 'Net' };
+        }
+        const label = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gf]) || 'Stroke Play';
+        // The stored setting for the main format, derived the way every other surface
+        // derives it - see the cascade beside the subtitle.
+        const st = (typeof window !== 'undefined' && window.__scScoringType) || 'net';
+        return { label: label, fromWager: false, scoring: st === 'gross' ? 'Gross' : 'Net' };
+    }
+
     // ---- LIVE NET FINISH ---------------------------------------------------
     //
     // NO TIE MATH HERE. computeMoneyPool() has already decided which finishing
@@ -4981,8 +5078,23 @@ html {
         recordKpGroupAnswer(hole, 'none');
         kpForcedProceed();
     }
+    // BACK RE-LANDS THE HOLE (Wave 27b). Closing the popup used to leave the page
+    // wherever the golfer had scrolled to before they tapped Next - typically down
+    // among the score boxes, because that is where you are when you finish a hole -
+    // so "Back to hole N" put them at the top of nothing in particular. Manny reported
+    // it from his iPhone.
+    //
+    // THE SAME LANDING Next and Prev use, and literally the same function: close (which
+    // re-renders the card), then landOnHole(), which is the render-then-land pair
+    // goToHole performs. No hole change and no write - the question is still unanswered
+    // and the gate will ask again on the way out, which is the whole point of Back.
+    //
+    // The Wave 27 focus rule rides along for free: landOnHole ends with
+    // focusFirstEmptyScoreBox(), so the first empty writable box takes the keypad if it
+    // is clear of it, and nothing is focused if it is not.
     function kpForcedBack() {
         closeKpForcedModal();                 // records nothing; the question stands
+        if (currentViewMode === 'hole') landOnHole();
     }
     function kpForcedProceed() {
         const resume = kpForcedResume;
@@ -9186,7 +9298,14 @@ html {
         window.__scScoringType = scoringType;
 
         document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
-        document.getElementById("format-subtitle").textContent = `${currentData.eventName || "Live Round"} • ${gameFormat.toUpperCase()} (${scoringType.toUpperCase()})`;
+        // THE SAME ANSWER THE PLAYING WITH CARD GIVES - see roundScoringBasis(). This
+        // read `${gameFormat} (${scoringType})` straight off the stored keys, which is
+        // why a stroke round with a Nassau side match said STROKE (NET) here and
+        // "Match Play · Net" three lines down the same screen. scoringType itself is
+        // untouched and still exported for the parity guard; only this label moved.
+        const subtitleBasis = roundScoringBasis();
+        document.getElementById("format-subtitle").textContent =
+            `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
 
         renderGroupFilters(players.length);
 

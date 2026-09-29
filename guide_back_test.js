@@ -46,7 +46,7 @@
 // is no #guide-back element at all, so the forged-from= case fails on the missing
 // button rather than passing vacuously.
 //
-// AND I FIRST WROTE "3 PASS / 8 FAIL" INTO THIS HEADER FROM A GUESS, before measuring:
+// AND I FIRST WROTE 3/8 INTO THIS HEADER FROM A GUESS, before measuring:
 // wrong on both numbers and not even a sum of 9. The first attempt to measure it was
 // worse - a shell loop that did not word-split, so nothing was swapped and the run
 // reported 9/9 against my own built files. Both are the count rule's subject, and the

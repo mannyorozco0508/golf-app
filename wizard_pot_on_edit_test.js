@@ -46,8 +46,8 @@
 // THE BASELINE, measured per CLAUDE.md's count rule - and for a guard written AFTER
 // its fix, the honest baseline is two numbers, not one:
 //
-//   against main 2ecca35, the code as it stands (fixed):   7 PASS / 0 FAIL
-//   with the v194 mpRecalc() call deleted (the defect):    3 PASS / 4 FAIL
+//   all 7 tests, against main 2ecca35, the code as it stands (fixed):  7 PASS / 0 FAIL
+//   all 7 tests, with the v194 mpRecalc() call deleted (the defect):    3 PASS / 4 FAIL
 //
 // All-green against a fixed tree is not evidence of anything on its own, which is why
 // the second figure is the one that matters here. With the defect restored the screen

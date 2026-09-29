@@ -3397,6 +3397,79 @@
 // consumer product cache is consumer-v95-reviewpool. The tournament product cache stays
 // tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this is
 // web/Cap only and does not archive, upload or reopen it.
+// Moved to v255 SO LANDING ON A HOLE OPENS THE KEYPAD - WHEN IT SAFELY CAN.
+//
+// WHAT AN INSTALLED DEVICE ON v254 KEEPS SERVING: a scorecard where Next lands on a
+// hole and the golfer then has to tap a score box before they can type. Every hole,
+// every group, all round.
+//
+// THE FOCUS IS BACK, AND IT IS CONDITIONAL - which is the whole of why it is safe now.
+// index.html has carried a note since 2026-09-14, after a real round on v128: that
+// version anchored the first BOX at the top and focused unconditionally, so the heading
+// was already off screen, and on a deep card iOS scrolled the target out from under the
+// keyboard and took the heading with it. Note what v128 proves - THE KEYBOARD DID OPEN.
+// The failure was never a dead focus; it was the heading leaving the screen. Two things
+// differ now: the landing anchors the HEADING, and the focus only happens when the box
+// will still be CLEAR OF THE KEYBOARD, so iOS has no reason to scroll at all.
+//
+// MEASURED at 390x844, heading at inset+12, rows 73px apart, a 336px iPhone portrait
+// keypad starting at y=508: boxes 0-5 end at or above 482 and are clear; box 6 starts
+// at 507 and box 7 at 580, both under it. So a group-locked four-golfer card - Manny's
+// case - gets the keypad every time, and a card deep enough to bury the target focuses
+// NOTHING rather than losing the heading. 336 is an allowance, not a measurement: the
+// keyboard is not open yet when the choice is made, so erring large refuses one row
+// early instead of one row late, and one row early costs a tap while one row late costs
+// the heading.
+//
+// FOUR REFUSALS: no card or no boxes (fail open, navigation still happens); every box
+// filled; the box DISABLED; the box under the keypad. Prev, the 1-18 picker and a
+// resumed KP answer all land through the same goToHole and get the same rule.
+//
+// THE DISABLED FILTER IS BELT AND BRACES, AND THE GUARD SAYS SO. Removing it does NOT
+// let a spectator be focused, because a browser refuses focus() on a disabled input -
+// measured, the control is behaviourally inert, and the suite pins the platform fact
+// rather than inventing an assertion to make the filter look load-bearing.
+//
+// WHAT WAS NOT CHANGED, on Manny's decision: the KP modal's resume path. It was
+// reported as landing at the top of the par 3 instead of on the next hole. ELEVEN
+// MEASURED RUNS could not reproduce it - three insets (0/47/59), both modal answers,
+// and a forced Firebase echo re-firing the listener - every one landing on the next
+// hole at scrollY 949 with the heading at inset+12, identical to a plain Next. The
+// resume already calls the same goToHole and landOnHole that Next does. Next step is
+// Manny's screen recording, not more Chrome.
+//
+// AND THE "39px SCROLL SHIFT ON MODAL OPEN" WAS MY INSTRUMENT, NOT THE PRODUCT.
+// tools/lib/cold-arrival.js calls el.scrollIntoView({block:'center'}) before every tap,
+// so the harness scrolled the Next button to the middle of the screen and the modal
+// path had no landing afterwards to correct it. The tell was that the shift tracked the
+// inset exactly - 39, 86, 98 at 0, 47, 59 - while document height did not move. Pressed
+// at the button's own coordinates with a raw Input.dispatchMouseEvent and NO
+// scrollIntoView, the page does not move at all. The guard pins that with raw dispatch
+// at all three insets, so the property Manny asked for is held even though it was
+// already true.
+//
+// GUARDED BY landing_focus_test.js (16 tests, real taps): the first empty box focused
+// and the heading still at inset+12 at 0/47/59; the first EMPTY one on a partly scored
+// hole; nothing on a full hole; nothing for a spectator; nothing past the keypad line;
+// Prev and the picker the same; a KP answer the same. Baseline 8 PASS / 7 FAIL,
+// measured at 15 tests (the 16th was added afterwards - see that file), against
+// v254. Four controls, each red behaviourally except the inert one, labelled:
+// focus a filled box (4 red), drop the disabled filter (source only - INERT, and why),
+// drop the allowance test (1 red), make the modal scroll the page (3 red).
+//
+// RE-POINTED: hole_view_landing_test.js, which banned every focus() on the navigation
+// path to hold v128's decision. The ban is now a CONDITION - the only focus allowed is
+// focusFirstEmptyScoreBox, from landOnHole, testing empty AND writable AND clear of the
+// keypad - and the v128 note itself is asserted to still be in the file, so the reason
+// survives the wave that reverses it. Its remote-snapshot cases moved from "activeElement
+// is BODY" to "a snapshot may PRESERVE a focus but may never CREATE one", which is the
+// rule that was always meant: restoreScoreFocus starts `if (!memo) return;`, so a
+// keyboard the golfer closed still stays closed.
+//
+// NO ENGINE TOUCHED. tools/kp-entry-position-check.js still PASS with the hole-7
+// landing unmoved. The consumer product cache is consumer-v96-landingfocus. The
+// tournament product cache stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2
+// and already submitted; this is web/Cap only and does not archive, upload or reopen it.
 // Moved to v256 SO BACK FROM THE GUIDE RETURNS TO THE ROUND.
 //
 // v255 IS DELIBERATELY SKIPPED. Wave 27 (the landing focus) holds it on an unmerged
@@ -3457,7 +3530,49 @@
 // No engine touched. The consumer product cache is consumer-v97-backtoround. The
 // tournament product cache stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and
 // already submitted; this is web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v256-backtoround';
+// Moved to v257 FOR TWO MORE FROM MANNY'S PHONE, on top of v255's landing focus.
+//
+// v256 BELONGS TO WAVE 28 (Back from the guide returns to the round), which was cut
+// from main independently and is unmerged. This branch takes v257 so the two cannot
+// collide whichever lands first.
+//
+// 1. "BACK TO HOLE N" NOW LANDS THE HOLE. Closing the popup re-rendered the card and
+//    stopped there, so the page stayed wherever the golfer had scrolled to before they
+//    tapped Next - typically DOWN among the score boxes, because that is where you are
+//    when you finish a hole. Manny got the top of the hole instead of the hole. The fix
+//    is the same landing Next and Prev use, and literally the same function: close, then
+//    landOnHole(). No hole change and no write - the question is still unanswered and
+//    the gate asks again on the way out, which is the point of Back. v255's focus rule
+//    rides along free, because landOnHole ends with focusFirstEmptyScoreBox().
+//    IT ONLY REPRODUCES IF THE FIXTURE SCROLLS AWAY FIRST, which is why the three new
+//    cases scroll 260px down before tapping Next; without that the page is already
+//    landed and Back looks correct whether or not it re-lands.
+//
+// 2. THE HEADER AND THE PLAYING WITH CARD NOW GIVE ONE ANSWER. The header read
+//    "Single Round - STROKE (NET)" while the card three lines below read "Match Play -
+//    Net", on the same round. They answered the same question from different sources:
+//    the header off the stored keys, the card deliberately relabelling a stroke round
+//    with a Nassau side match as the match play it actually is. Worse, the header's
+//    "(NET)" was a DEFAULT rather than a reading - scoringType only consults a wager
+//    when gameFormat is 'nassau' - so a GROSS Nassau side match printed NET up there
+//    while the card correctly said Gross. Both now ask roundScoringBasis(); each
+//    formats it its own way and only the formatting differs.
+//
+// DISPLAY ONLY, AND ASSERTED. scoringType and window.__scScoringType are UNTOUCHED -
+// that is the MAIN format's gross/net setting, which round_scoring_parity_test.js holds
+// every surface to and which is a different question from "what is this group playing".
+// No engine reads either label; the money reads the stored gameFormat and the wagers
+// exactly as before, and the guard asserts all four engines are clean of both.
+//
+// GUARDED BY three new cases in kp_forced_decision_test.js (0/47/59px insets: Back
+// closes, stays on the hole, lands the heading at inset+12 and writes nothing) and
+// round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
+// 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
+//
+// The consumer product cache is consumer-v98-kpbackland. The tournament product cache
+// stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
+// is web/Cap only and does not archive, upload or reopen it.
+const CACHE_VERSION = 'golfapp-v257-kpbackland';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

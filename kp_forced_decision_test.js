@@ -45,6 +45,17 @@
 // tools/lib/cold-arrival.js records every ref().set/update a REAL TAP made, so the
 // assertions below read what the page actually wrote. That is behaviour, not prose.
 //
+// WAVE 27b ADDED THREE CASES, and they have their own baseline - the header figure
+// above is Wave 23's and describes a file that had 25 tests. Measured against this
+// branch before the Back fix (index.html at 7f87a76), all 28:
+//
+//     25 PASS / 3 FAIL
+//
+// The three reds are exactly the new "BACK TO HOLE N RE-LANDS THE HOLE" cases at 0,
+// 47 and 59px of inset; every one of Wave 23's 25 stayed green, which is the evidence
+// that re-landing on Back changed nothing else about the gate. Control: drop the
+// re-land and the same three go red again.
+//
 // WHY CHROME. Every trigger is a tap: Next, the 1-18 picker, Full Card, Finish
 // Round. Cold through tools/lib/cold-arrival.js - the page runs its own init,
 // listener and render, and no test here calls a navigation function by name.
@@ -55,6 +66,9 @@
 //
 // THE RED BASELINE, RECORDED SO IT CANNOT BE MISREMEMBERED. Run against pre-build
 // main (3e48f56, index.html sha 13616080...), all 25 tests: 6 PASS / 19 FAIL.
+// BASELINE COUNT DELTA: +3  Wave 27b added the three Back-to-hole cases after this
+//   figure was measured; the file registers 28 now. The Wave 27b baseline above is
+//   the one taken at 28.
 // The six that passed without the feature, and why each one did - because "6 green"
 // is not coverage and should not be read as any:
 //   1  "every arrival ran"                       a HARNESS PRECONDITION. It asserts the
@@ -313,6 +327,77 @@ describe('THE GATE: A COMPLETE KP HOLE CANNOT BE LEFT UNANSWERED', () => {
         assert.ok(order.indexOf('kp-forced') > -1, 'the KP probe is not registered: ' + order);
         assert.ok(order.indexOf('kp-forced') < order.indexOf('modal'),
             'the generic modal probe is reached first, so hardware back closes this: ' + order);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// "BACK TO HOLE N" LANDS THE HOLE, IT DOES NOT JUST CLOSE (Wave 27b)
+//
+// Manny, on his iPhone: Back closed the popup and left him at the TOP of the hole
+// rather than on it. The cause is not the popup - it is that closing it re-rendered
+// the card and stopped there, so the page stayed wherever the golfer had scrolled to
+// before they tapped Next. That is typically DOWN among the score boxes, because that
+// is where you are when you finish a hole, which is why this does not reproduce unless
+// the fixture scrolls away first. These arrivals do exactly that.
+//
+// THE FIX IS THE SAME LANDING Next and Prev use - close, then landOnHole() - so the
+// heading sits at inset+12 and the boxes below it, and the Wave 27 focus rule rides
+// along because landOnHole ends with focusFirstEmptyScoreBox().
+// ---------------------------------------------------------------------------
+describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
+    const OFFSET = 12;
+    const B = {};
+    before(async () => {
+        const SEE = `(function () {
+          var card = document.getElementById('hole-view-card');
+          var head = card ? card.querySelector('.hole-view-header') : null;
+          var ov = document.getElementById('kp-force-overlay');
+          return JSON.stringify({
+            hole: (typeof currentViewedHole !== 'undefined') ? currentViewedHole : 'n/a',
+            inset: parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0,
+            headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
+            scrollY: Math.round(window.pageYOffset || 0),
+            modal: !!(ov && getComputedStyle(ov).display !== 'none'),
+            writes: (window.__coldWrites || []).length
+          });
+        })()`;
+        for (const inset of [0, 47, 59]) {
+            const r = await arriveCold({ url: fileUrl('index.html', 'game=KPF&group=1'),
+                db: { events: { KPF: J(LANDS_ON_8) }, global_courses: {}, trips: {}, tournaments: {} },
+                settleMs: 3200, viewport: { width: 390, height: 844 },
+                steps: [
+                    { expression: "document.documentElement.style.paddingTop = '" + inset + "px'; 'set'" }, { sleep: 250 },
+                    { tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 700 },      // Prev onto the complete KP hole 7
+                    // SCROLL AWAY, the way a golfer does while entering the last score.
+                    // Without this the page is already landed and Back looks correct
+                    // whether or not it re-lands - the case would be inert.
+                    { expression: "window.scrollTo(0, (window.pageYOffset||0) + 260); 'scrolled'" }, { sleep: 250 },
+                    { expression: "'AWAY:' + " + SEE },
+                    { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 700 },      // Next -> the gate opens
+                    { tap: '#kp-force-overlay .kpf-back' }, { sleep: 700 },
+                    { expression: "'BACK:' + " + SEE },
+                ] });
+            B[inset] = r.ok ? (() => { const o = {};
+                (r.value || []).forEach(v => { if (typeof v === 'string' && v.indexOf(':{') > -1)
+                    o[v.slice(0, v.indexOf(':{'))] = JSON.parse(v.slice(v.indexOf(':{') + 1)); });
+                return o; })() : { error: r.reason };
+        }
+    });
+
+    [0, 47, 59].forEach(inset => {
+        test('inset ' + inset + 'px: Back lands the hole at inset+' + OFFSET + ', same hole, nothing written', () => {
+            const v = B[inset];
+            assert.ok(v && !v.error, 'inset ' + inset + ': ' + (v && v.error));
+            // The fixture must really be scrolled off the landing, or this proves nothing.
+            assert.equal(v.AWAY.inset, inset, 'the emulated inset did not take');
+            assert.notEqual(v.AWAY.headingTop, inset + OFFSET,
+                'the fixture never left the landing, so Back cannot be shown to restore it');
+            assert.equal(v.BACK.modal, false, 'Back did not close the popup');
+            assert.equal(v.BACK.hole, 7, 'Back changed the hole: ' + v.BACK.hole);
+            assert.equal(v.BACK.headingTop, inset + OFFSET,
+                'Back left the page at ' + v.BACK.headingTop + ', not the landing');
+            assert.equal(v.BACK.writes, 0, 'Back wrote something');
+        });
     });
 });
 
