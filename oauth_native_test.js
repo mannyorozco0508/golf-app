@@ -73,25 +73,31 @@
 // native_plugin_allowlist_test.js is the counterpart for that, and the dylib
 // numbers above are how it was done for this plugin.
 //
-// THE BASELINE, all 26 tests, measured against 254b3c8 in a clean worktree with
+// THE BASELINE, all 35 tests, measured against 254b3c8 in a clean worktree with
 // node_modules symlinked in - the commit where oauth-signin.js and its popup path
 // exist and NO native wiring does (the plugin is not a dependency there, no
-// allowlist entry, no traits, no URL-scheme tool):
+// allowlist entry, no traits, no URL-scheme tool, and the failure path still
+// swallows its error code):
 //
-//     14 PASS / 12 FAIL
+//     17 PASS / 18 FAIL
 //
-// The 12 reds are: the plugin is not a dependency (1), the iOS/Android allowlists
-// (1), the Google trait in Package.swift (1) and in the config (1), skipNativeAuth
-// in both places (1), the ios/.gitignore note (1), the URL-scheme tool existing (1)
-// and its four behaviours (4), and the Sign in with Apple entitlement (1).
+// The 18 reds: the plugin is not a dependency (1), the iOS/Android allowlists (1),
+// the Google trait in Package.swift (1) and in the config (1), skipNativeAuth in
+// both places (1), the ios/.gitignore note (1), the URL-scheme tool existing (1)
+// and its four behaviours (4), the Sign in with Apple entitlement (1), and the six
+// in the last block - the unmapped code on screen, the two native-only messages,
+// adoptCredential, the adopt using the error's credential, the rethrow-and-log, and
+// the log carrying no token.
 //
-// The 14 greens are honest but earn less: the six behavioural nativeCredential
+// The 17 greens are honest but earn less: the six behavioural nativeCredential
 // tests pass because that function was already written at 254b3c8 against the
 // README, the three definitions.d.ts tests pass because the symlinked node_modules
-// is today's plugin either way, and four are things 254b3c8 genuinely already had
-// right - the Android gradle has no firebase project, the scene forwards
-// openURLContexts, nothing ignored the plist, and Info.plist carried no stale
-// scheme. Those last four would each go red on the change they name.
+// is today's plugin either way, three of the diagnosis tests were already true (see
+// that block), and five are things 254b3c8 genuinely already had right - the
+// Android gradle has no firebase project, the scene forwards openURLContexts,
+// nothing ignored the plist, Info.plist carried no stale scheme, and the pbxproj
+// and entitlements agreed. Those last five would each go red on the change they
+// name.
 //
 // ONE TEST IS EXPECTED RED UNTIL MANNY FINISHES THE XCODE STEP:
 // "Sign in with Apple is on the App target". Adding the capability in Xcode writes
@@ -471,5 +477,192 @@ describe('THE CALLBACK AND THE CAPABILITY', () => {
             assert.equal(found.length, 0,
                 'an entitlements file is committed but nothing references it - Xcode ignores it and Apple sign-in fails at runtime: ' + found.join(', '));
         }
+    });
+});
+
+// ===========================================================================
+// WHY THIS BLOCK EXISTS, and it is not a hypothetical.
+//
+// 2026-09-30, Manny's iPhone, Xcode Cmd+R: the Apple sheet appeared, Face ID
+// completed, the app came back and the status line said "Could not finish
+// sign-in. Nothing changed - try again, or use email instead." - the generic
+// message, with no code in it. The founder pass was still on screen, so the uid
+// was intact and nothing had been half-written. But which failure it was could
+// not be recovered from the device: the shell has no visible console, the error
+// was caught, and the code - the one fact that identifies it - was discarded.
+//
+// Two things changed, and both are tested below rather than described.
+//
+//   1. messageFor ENDS AN UNRECOGNISED ERROR WITH ITS CODE. Every failure the
+//      path expects is mapped to a plain sentence with no code in it, so a code
+//      appearing on screen means the mapping is missing a case.
+//
+//   2. THE ADOPT FALLBACK USES THE CREDENTIAL ON THE ERROR. Firebase attaches a
+//      credential to credential-already-in-use and
+//      account-exists-with-different-credential. The popup path never re-presents
+//      a credential, because the SDK mints a fresh one each time; the native path
+//      built one itself and handed the SAME object to signInWithCredential after
+//      the link had already consumed it. That is the one structural difference
+//      between the two paths on this branch, and this is the suspect for the
+//      failure above - Apple and Google were both signed in on the web preview
+//      earlier that day, so the credential genuinely WAS already in use and the
+//      adopt branch is exactly the branch that ran.
+//
+// STILL NOT PROVEN HERE: which code the device actually produced. Nothing in this
+// repo can produce a real Apple idToken, so the fix above is the one structural
+// defect found by reading, and the code on screen after the next Cmd+R is what
+// settles it. Guessing which of the two mattered would be inventing a measurement.
+//
+// MEASURED for this block on its own, against d5e86f7 - oauth-signin.js exactly as
+// it shipped to the phone that failed: 3/9 green, six red. (The file's own baseline,
+// in the checked form, is the 35-test figure at the top.) The three already-green
+// are the ones asserting behaviour that was right before this fix: a mapped code
+// shows a plain sentence with no code appended, an error carrying no code at all
+// still gets the bare sentence, and the adopt path with NO credential on the error
+// already worked - it fell through to the credential we presented, which is the
+// case the old code handled by accident rather than on purpose.
+// ===========================================================================
+describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL', () => {
+
+    // A firebase stand-in with a callable auth(), which is what signIn needs.
+    function fakeSeam(opts) {
+        const o = opts || {};
+        const calls = [];
+        const sandbox = loadJsFile(SEAM);
+        const anon = { uid: 'anon-1', isAnonymous: true, email: null };
+        const adopted = { uid: 'web-uid-9', isAnonymous: false, email: 'a@b.com' };
+        const user = {
+            uid: anon.uid, isAnonymous: true, email: null,
+            linkWithCredential: (cred) => {
+                calls.push({ fn: 'linkWithCredential', cred: cred });
+                if (o.linkError) return Promise.reject(o.linkError);
+                return Promise.resolve({ user: { uid: anon.uid, isAnonymous: false, email: 'a@b.com' } });
+            },
+            linkWithPopup: () => { calls.push({ fn: 'linkWithPopup' }); return Promise.resolve({ user: anon }); }
+        };
+        const auth = {
+            currentUser: o.noUser ? null : user,
+            signInWithCredential: (cred) => {
+                calls.push({ fn: 'signInWithCredential', cred: cred });
+                if (o.signInError) return Promise.reject(o.signInError);
+                return Promise.resolve({ user: adopted });
+            },
+            signInWithPopup: () => { calls.push({ fn: 'signInWithPopup' }); return Promise.resolve({ user: adopted }); }
+        };
+        const authFn = () => auth;
+        authFn.GoogleAuthProvider = function () { this.addScope = () => {}; };
+        authFn.GoogleAuthProvider.credential = (idToken, accessToken) => ({ built: 'google', idToken, accessToken });
+        authFn.OAuthProvider = function (id) {
+            this.providerId = id;
+            this.addScope = () => {};
+            this.credential = (arg) => ({ built: 'apple', arg });
+        };
+        sandbox.firebase = { auth: authFn };
+        sandbox.window.Capacitor = o.plugin ? { Plugins: { FirebaseAuthentication: o.plugin } } : undefined;
+        const logged = [];
+        sandbox.console = { error: (m) => logged.push(String(m)), log: () => {}, warn: () => {} };
+        return { o: sandbox.oauthSignin, calls, logged };
+    }
+    const applePlugin = {
+        signInWithApple: () => Promise.resolve({ credential: { idToken: 'aid', nonce: 'raw', providerId: 'apple.com' } }),
+        signInWithGoogle: () => Promise.resolve({ credential: { idToken: 'gid', accessToken: 'gacc', providerId: 'google.com' } })
+    };
+    const err = (code, extra) => Object.assign(new Error(code), { code: code }, extra || {});
+
+    test('an unmapped code is ON SCREEN, appended to the generic sentence', () => {
+        const { o } = fakeSeam({});
+        const msg = o.messageFor(err('auth/invented-for-this-test'));
+        assert.ok(msg.indexOf(o.notes.generic) === 0, 'the sentence must still lead: ' + msg);
+        assert.ok(/\(auth\/invented-for-this-test\)$/.test(msg),
+            'an error the mapping does not know must end with its code, or a device failure is unrecoverable: ' + msg);
+    });
+
+    test('a MAPPED code shows a plain sentence with no code in it', () => {
+        const { o } = fakeSeam({});
+        const cancelled = o.messageFor(err('auth/popup-closed-by-user'));
+        assert.equal(cancelled, o.notes.cancelled, 'a known failure must not leak a code');
+        assert.ok(!/\(auth\//.test(cancelled));
+        assert.ok(!/\(auth\//.test(o.messageFor(err('auth/operation-not-allowed'))));
+    });
+
+    test('an error with no code at all still gets the bare sentence', () => {
+        const { o } = fakeSeam({});
+        assert.equal(o.messageFor(new Error('nothing useful')), o.notes.generic);
+        assert.equal(o.messageFor(null), o.notes.generic);
+    });
+
+    test('the native-only failures say what they are: a rejected token, and no signal', () => {
+        const { o } = fakeSeam({});
+        const bad = o.messageFor(err('auth/invalid-credential'));
+        assert.equal(o.messageFor(err('auth/missing-or-invalid-nonce')), bad,
+            'a nonce mismatch and a rejected token are the same story to the golfer');
+        assert.ok(/token was rejected/.test(bad), bad);
+        assert.ok(!/\(auth\//.test(bad), 'it is mapped, so no code is appended');
+        assert.ok(/No connection/.test(o.messageFor(err('auth/network-request-failed'))));
+    });
+
+    test('adoptCredential prefers the credential Firebase put on the error', () => {
+        const { o } = fakeSeam({});
+        const fresh = { built: 'from-firebase' };
+        const presented = { built: 'ours' };
+        assert.equal(o.adoptCredential(err('auth/credential-already-in-use', { credential: fresh }), presented), fresh);
+        assert.equal(o.adoptCredential(err('auth/credential-already-in-use'), presented), presented,
+            'a provider that attaches nothing must still adopt, with what we presented');
+    });
+
+    test('NATIVE ADOPT: the second sign-in gets the error credential, not the consumed one', async () => {
+        const fresh = { built: 'fresh-from-firebase' };
+        const { o, calls } = fakeSeam({
+            plugin: applePlugin,
+            linkError: err('auth/credential-already-in-use', { credential: fresh })
+        });
+        const out = await o.signIn('apple');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential', 'signInWithCredential'],
+            'link first, then adopt');
+        assert.equal(calls[0].cred.built, 'apple', 'the link is presented the credential we built from the plugin');
+        assert.equal(calls[1].cred, fresh,
+            'the adopt must use the credential on the error - re-presenting a consumed Apple credential is the suspected device failure');
+        assert.equal(out.note, o.notes.adopted, 'and the golfer is told the trial was not copied');
+        assert.equal(out.preserved, false);
+    });
+
+    test('NATIVE ADOPT without a credential on the error still adopts', async () => {
+        const { o, calls } = fakeSeam({
+            plugin: applePlugin,
+            linkError: err('auth/credential-already-in-use')
+        });
+        const out = await o.signIn('apple');
+        assert.equal(calls.length, 2);
+        assert.equal(calls[1].cred.built, 'apple', 'falls back to what we presented');
+        assert.equal(out.note, o.notes.adopted);
+    });
+
+    test('a failure that is NOT an adopt signal is rethrown with its code, and logged once', async () => {
+        const { o, calls, logged } = fakeSeam({
+            plugin: applePlugin,
+            linkError: err('auth/invalid-credential')
+        });
+        let caught = null;
+        try { await o.signIn('apple'); } catch (e) { caught = e; }
+        assert.ok(caught, 'it must reject rather than resolve on a failure');
+        assert.equal(caught.code, 'auth/invalid-credential', 'the code must survive for messageFor');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential'], 'no silent second attempt');
+        assert.equal(logged.length, 1, 'exactly one log line, so the Xcode console shows it once: ' + JSON.stringify(logged));
+        assert.ok(/auth\/invalid-credential/.test(logged[0]), logged[0]);
+        assert.ok(/apple/.test(logged[0]), 'and which button it was: ' + logged[0]);
+    });
+
+    test('the log carries no token, ever', async () => {
+        const { o, logged } = fakeSeam({
+            plugin: {
+                signInWithApple: () => Promise.resolve({ credential: { idToken: 'SECRET-ID-TOKEN', nonce: 'SECRET-NONCE' } }),
+                signInWithGoogle: () => Promise.resolve({})
+            },
+            linkError: err('auth/invalid-credential')
+        });
+        try { await o.signIn('apple'); } catch (e) { /* expected */ }
+        assert.equal(logged.length, 1);
+        assert.ok(!/SECRET-ID-TOKEN/.test(logged[0]), 'an id token must never reach a log: ' + logged[0]);
+        assert.ok(!/SECRET-NONCE/.test(logged[0]), logged[0]);
     });
 });

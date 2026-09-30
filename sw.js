@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v106-nativesignin. The tournament product cache
+// The consumer product cache is consumer-v107-signincode. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3757,7 +3757,19 @@
 // app would otherwise keep serving v264's oauth-signin.js, whose header says the
 // providers are off and the plist is not in the repo. No behaviour changed in the
 // bundle; the tap that changed is the one in the iOS shell, which is not cached here.
-const CACHE_VERSION = 'golfapp-v265-nativesignin';
+//
+// Moved to v266 SO A FAILED SIGN-IN SAYS WHICH FAILURE IT WAS. Native Continue with
+// Apple failed on a real iPhone with "Could not finish sign-in" and nothing else -
+// the shell has no visible console, the error was caught, and the code was thrown
+// away, so the one fact that identified it was gone. Now: an error the mapping does
+// not recognise ends with its own code on screen, a rejected token and a dead
+// connection have their own sentences, every failure is console.error'd once (which
+// Capacitor forwards to the Xcode log) with no token in it, and the adopt path -
+// the second device, where the Apple or Google account is already on another uid -
+// signs in with the credential FIREBASE puts on the error rather than re-presenting
+// the one the failed link already consumed. An installed device would otherwise keep
+// showing a sentence that cannot be diagnosed.
+const CACHE_VERSION = 'golfapp-v266-signincode';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

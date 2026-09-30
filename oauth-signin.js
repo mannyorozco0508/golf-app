@@ -65,6 +65,12 @@
     var NOTE_POPUP_BLOCKED = 'The browser blocked the sign-in window. Allow pop-ups for this site, or use email instead.';
     var NOTE_NOT_READY = 'Sign-in is not ready yet. Wait a moment and try again.';
     var NOTE_GENERIC = 'Could not finish sign-in. Nothing changed - try again, or use email instead.';
+    // THE NATIVE-ONLY FAILURES. None of these can happen in a browser popup, because
+    // the popup hands Firebase a credential Firebase itself minted. On iOS the
+    // credential is built here out of what the Apple or Google SDK returned, so it
+    // can be wrong in ways a popup cannot, and each one needs a different answer.
+    var NOTE_BAD_CREDENTIAL = 'Apple or Google signed you in, but this app could not finish it - the sign-in token was rejected. Nothing changed. Use email instead for now and tell Manny it said the token was rejected.';
+    var NOTE_NO_CONNECTION = 'No connection while signing in. Nothing changed - try again when you have signal.';
 
     var PROVIDERS = { apple: 'apple.com', google: 'google.com' };
 
@@ -113,6 +119,12 @@
     function isAdoptSignal(err) {
         return !!(err && err.code && ADOPT_CODES[err.code]);
     }
+    // Firebase puts the credential on the adopt errors. Prefer it; fall back to the
+    // one we presented. Kept as its own function so a test can state which wins.
+    function adoptCredential(err, presented) {
+        var onErr = err && err.credential;
+        return onErr || presented;
+    }
 
     function snapshot(user) {
         if (!user || !user.uid) return null;
@@ -133,6 +145,11 @@
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
             || code === 'auth/user-cancelled') return NOTE_CANCELLED;
         if (code === 'sdk-absent' || code === 'no-provider') return NOTE_NOT_READY;
+        // An idToken Firebase will not accept, or a nonce that does not match the
+        // one inside it. This is the native path's own failure mode.
+        if (code === 'auth/invalid-credential' || code === 'auth/missing-or-invalid-nonce'
+            || code === 'auth/invalid-credential-or-provider-id') return NOTE_BAD_CREDENTIAL;
+        if (code === 'auth/network-request-failed') return NOTE_NO_CONNECTION;
         // The same lesson the preview sign-in fix recorded: an unauthorized ORIGIN is
         // its own failure and must not be reported as a network problem.
         if (code === 'auth/unauthorized-domain') {
@@ -141,6 +158,20 @@
             return 'Sign-in is not allowed from ' + (host || 'this address')
                 + '. Add it in Firebase Console → Authentication → Settings → Authorized domains, or use the live app.';
         }
+        // AN UNMAPPED CODE IS SHOWN, AND THAT IS NOT A DEBUG LEFTOVER.
+        //
+        // Wave 33's native Apple sign-in failed on Manny's iPhone with exactly this
+        // sentence and nothing else, and there was no way to find out why: the shell
+        // has no visible console, the error was caught here, and the one fact that
+        // would have identified it - the code - was the one thing thrown away. A
+        // message that says "could not finish" and hides WHICH failure it was costs
+        // a whole round trip to a physical device every time.
+        //
+        // So an error this function does not recognise ends with its own code. Every
+        // failure the code path expects is named above and shows a plain sentence
+        // with no code in it; seeing one on screen means the mapping is missing a
+        // case, which is information, not noise.
+        if (code) return NOTE_GENERIC + ' (' + String(code) + ')';
         return NOTE_GENERIC;
     }
 
@@ -168,10 +199,32 @@
         } catch (e) { return null; }
     }
 
+    // EVERY FAILURE IS ALSO LOGGED, because in the iOS shell console.error is the
+    // only thing that reaches a place Manny can read it: Capacitor forwards web-view
+    // console output to the native log, so an Xcode Cmd+R run shows the code even
+    // when the screen shows a sentence. Never logs a token - the code, the message
+    // and which button, nothing else.
+    function logFailure(which, err) {
+        try {
+            if (typeof console === 'undefined' || !console.error) return;
+            console.error('oauth-signin ' + String(which) + ' failed: '
+                + String((err && err.code) || 'no-code') + ' ' + String((err && err.message) || ''));
+        } catch (e) { /* a console that throws is not worth a failed sign-in */ }
+    }
+
     // ONE ENTRY POINT. Returns { uid, note, preserved } or rejects with a coded
     // error; never leaves a half-signed-in state behind, because link failures fall
     // through to a full sign-in and nothing else is written on the way.
     function signIn(which) {
+        // The one wrapper: whatever fails, the code is logged once, then rethrown
+        // unchanged so the caller still decides what the screen says.
+        return signInAttempt(which).then(null, function (err) {
+            logFailure(which, err);
+            throw err;
+        });
+    }
+
+    function signInAttempt(which) {
         var auth = authInstance();
         if (!auth) return Promise.reject(Object.assign(new Error('sdk-absent'), { code: 'sdk-absent' }));
         var provider = providerFor(which);
@@ -195,7 +248,16 @@
                     return Promise.resolve(auth.currentUser.linkWithCredential(credential))
                         .then(finish, function (err) {
                             if (!isAdoptSignal(err)) throw err;
-                            return Promise.resolve(auth.signInWithCredential(credential)).then(finish);
+                            // THE CREDENTIAL ON THE ERROR, WHEN THERE IS ONE. Firebase
+                            // attaches it to credential-already-in-use and
+                            // account-exists-with-different-credential precisely so the
+                            // second step does not have to re-present the first one,
+                            // and for Apple that matters: the popup path never re-uses
+                            // a credential because the SDK hands back a fresh one, and
+                            // the native path was the only place doing it. Falls back
+                            // to the credential we built, which is what the web tests
+                            // exercise and what a provider that attaches nothing gets.
+                            return Promise.resolve(auth.signInWithCredential(adoptCredential(err, credential))).then(finish);
                         });
                 }
                 return Promise.resolve(auth.signInWithCredential(credential)).then(finish);
@@ -220,6 +282,7 @@
         messageFor: messageFor,
         providerFor: providerFor,
         nativeCredential: nativeCredential,
+        adoptCredential: adoptCredential,
         signIn: signIn,
         notes: { preserved: NOTE_PRESERVED, adopted: NOTE_ADOPTED, fresh: NOTE_FRESH,
                  cancelled: NOTE_CANCELLED, notEnabled: NOTE_NOT_ENABLED,
