@@ -1158,6 +1158,18 @@
                 (calc.activeMatches || []).forEach(m => {
                     receipt.segments.push({
                         label: m.pressNum > 0 ? `Press ${m.pressNum}` : (m.label || 'Original'),
+                        // WHICH BET THIS SEGMENT BELONGS TO (Wave 30). DISPLAY ONLY -
+                        // nothing here or downstream computes with it.
+                        //
+                        // A Nassau is three wagers, and match-engine.js numbers presses
+                        // PER BASE - so a press off the Total and a press off the Back 9
+                        // are both "Press 1", and a card listing all three bases showed
+                        // two rows with one name. It cannot be re-derived from the hole
+                        // range either: the Total's press (H11-18) and a Back 9 press
+                        // (H11-18) are identical in startHole and endHole. The engine
+                        // knows; the receipt simply never carried it.
+                        baseId: m.baseId,
+                        pressNum: m.pressNum,
                         // A Nassau's F9/B9 windows are fixed at 1-9 and 10-18 by the engine -
                         // they are scoring BOUNDS, not the holes played. On a side match that
                         // starts mid-round the two differ: a Nassau struck on the 9th tee has

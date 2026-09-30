@@ -93,11 +93,20 @@ describe('calculateMatchEngine — one copy, and every copy agrees', () => {
         // a half-applied guard, not a safety net. Escaping moved to the callers,
         // where it can cover the team names too; the engine returns plain text.
         const { name } = canonicalEngine();
-        const line = read(name).split('\n').find(l => /m\.finalResult\s*=/.test(l));
-        assert.ok(line, 'no finalResult assignment found in ' + name);
-        assert.ok(!/escapeHtml/.test(line),
-            'the canonical engine must not escape; the sinks do. Found: ' + line.trim());
-        assert.match(line, /\$\{winnerName\}/);
+        // READ THE WHOLE ASSIGNMENT, not its first line. Wave 30 made it a ternary -
+        // "N up" when the bet went the distance, "N&2" when it closed early - so the
+        // line the old single-line search found was `m.finalResult = hLeft === 0` and
+        // carried neither escapeHtml nor the winner name. The claim is about the
+        // EXPRESSION, so the slice is the expression.
+        const src = read(name);
+        const at = src.search(/m\.finalResult\s*=/);
+        assert.ok(at > -1, 'no finalResult assignment found in ' + name);
+        const expr = src.slice(at, src.indexOf(';', at) + 1);
+        assert.ok(!/escapeHtml/.test(expr),
+            'the canonical engine must not escape; the sinks do. Found: ' + expr.trim());
+        assert.match(expr, /\$\{winnerName\}/);
+        assert.match(expr, /\$\{Math\.abs\(m\.status\)\} up/, 'the distance form');
+        assert.match(expr, /\$\{Math\.abs\(m\.status\)\}&\$\{hLeft\}/, 'and the early-close form');
     });
 
     test('pressesByHole is gone, and nothing anywhere looks for it', () => {

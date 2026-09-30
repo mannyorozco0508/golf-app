@@ -224,7 +224,7 @@ const GOLDEN = {
     '04 stroke multiple presses': 'c71d849e84be166c3d9c753ce1419b409af93d1d7d96e6dad560f92edec0317e',
     '05 stroke start-hole 6': '7c65722f5e82de0761c248b712e3e9778a7e7f74e0aec68782479c8889d9297d',
     '06 side match play 2v2': '8395dcbfdaeebc582356f085956848c15a2b90c35bdcb2f8b294d0e809ec5950',   // RE-PINNED (UI Wave 29, v258): the side-match card gained a dollar line per bet and a match line. Diffed against fec1050 before re-recording: this fixture grew exactly two blocks - 'Overall Match - Ann/Abe 10&8 | Ann/Abe +$20' and the match line - and nothing else moved. 13 of the 15 fixtures are byte-identical, which is how this re-pin is known to be the wave and not a side effect.
-    '07 modern nassau 2v2': '35dfb0b2c52e8ca5f85ebd5220fde70a2c6409ff499d1d777b3c8fbfca941345',   // RE-PINNED (UI Wave 29, v258): same addition, over 19 bets - and it is worth reading, because the money makes the Wave 30 labelling problem visible: this Nassau prints 'Press 1' TWICE, 'Press 2' twice and so on, because match-engine.js numbers presses per BASE and this card lists all three bases together. The dollars are right; the names are not distinguishable. Logged, not fixed here.
+    '07 modern nassau 2v2': '49072542efd21b7b6d45fb7490960c8c3ad21fe5717a95b420c9b3e478c55881',   // RE-PINNED (UI Wave 29, v258): same addition, over 19 bets - and it is worth reading, because the money makes the Wave 30 labelling problem visible: this Nassau prints 'Press 1' TWICE, 'Press 2' twice and so on, because match-engine.js numbers presses per BASE and this card lists all three bases together. The dollars are right; the names are not distinguishable. Logged, not fixed here.   // RE-PINNED AGAIN (UI Wave 30, v259): each Nassau press is now named by the bet it came off - "Front 9 press (H5)", "Back 9 press (H18)" - and sits UNDER that bet instead of in the order it was struck, and a bet that went the distance reads "1 up" not "1&0". Verified before re-recording: 19 money rows before and after, the same 19 amounts and the same per-row money multiset - a REORDER and a relabel, not a re-price. It is the only one of the 15 fixtures that moved, which is the evidence this wave touched Nassau press naming and nothing else.
     '08 stroke 2v2': 'c3ea512473304a84861a18f07308c4cf71e2b9568733d9e2d361469e61d31b06',   // INTENTIONAL — the money defect, spelled out below
     '09 legacy nassau round': 'd959b691f9baa08e3d5b8e0f43db08d576da08b0bbb4406dccc8ed01416398aa',
     '10 money pool round': '55cea65b2617d4eb7091e1ce1dc0d2628f6aae8dd93731578bc416765fb0cbb6',
@@ -436,7 +436,7 @@ describe('GOLDEN FINAL SCORECARD — every historical shape still renders identi
         // change touched the side-match card and nothing else on this page. A test name
         // claiming "byte-identical" over a golden that moved would be the lie this file
         // exists to prevent.
-        const rePinned = name === '06 side match play 2v2' || name === '07 modern nassau 2v2';
+        const rePinned = name === '06 side match play 2v2' || name === '07 modern nassau 2v2';   // 07 again in Wave 30
         test(`${name}${changed ? ' — INTENTIONALLY CHANGED IN BATCH 3'
             : (rePinned ? ' — RE-PINNED IN UI WAVE 29' : ' — byte-identical to pre-Batch-3')}`, () => {
             const html = renderStats(FIXTURES[name]);

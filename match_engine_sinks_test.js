@@ -157,8 +157,12 @@ describe('v218: the match engine returns plain text and the SINKS escape it', ()
             // because the fix is the same one line at the same kind of sink.
             const src = read('settlement.html');
             [/\$\{escapeHtml\(r\.nameA\)\} vs \$\{escapeHtml\(r\.nameB\)\}/,
-             /receipt-seg-result">\$\{escapeHtml\(seg\.result\)\}/,
-             /receipt-seg-money">\$\{escapeHtml\(seg\.winner\)\}/,
+             // RE-PINNED (Wave 30): the Receipt draws its rows from side-match-lines.js,
+             // which owns the press label and the order. The name-bearing fields are
+             // row.result and row.moneyText, and both are escaped at the sink - which is
+             // the only thing this guard is about.
+             /receipt-seg-result">\$\{escapeHtml\(row\.result\)\}/,
+             /receipt-seg-money">\$\{escapeHtml\(row\.moneyText\)\}/,
              // RE-PINNED (UI Wave 29): the MATCH NET line used to interpolate
              // ${escapeHtml(r.netTo)} directly. It now prints ONE escaped string -
              // sideMatchNetLine() from side-match-lines.js - because r.netTo and
@@ -174,7 +178,7 @@ describe('v218: the match engine returns plain text and the SINKS escape it', ()
             // (a winner, a side) and every one of them goes through the escaper.
             const calls = src.match(/side(?:MatchNetLine|MatchBetLines)\(/g) || [];
             assert.ok(calls.length >= 2, 'the Receipt must read the shared builder');
-            ['escapeHtml(netText)', 'escapeHtml(line.moneyText)'].forEach(sink =>
+            ['escapeHtml(netText)', 'escapeHtml(row.moneyText)', 'escapeHtml(row.result)'].forEach(sink =>
                 assert.ok(src.includes(sink), 'unescaped builder output at the sink: ' + sink));
         });
 
