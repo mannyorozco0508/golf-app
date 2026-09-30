@@ -46,6 +46,20 @@ const strip = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/
     // would have to be re-recorded, throwing away the very thing they prove.
     .replace(/&#39;/g, "'").replace(/&quot;/g, '\"').replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+// UI WAVE 29 (v258): THE SIDE MATCH CARD EXPLAINS ITS MONEY NOW, and this file's
+// captures are of the text before it. THE AMOUNTS DID NOT MOVE - Ann +$10 and Wes
+// +$44 are byte-identical either side - so the three folds below remove only what
+// was ADDED, and the tests that use them assert the additions are really on the page
+// first (a fold that cannot see its own subject would make deleting the feature look
+// like a pass):
+//   1. the explanation after a MATCH NET amount
+//   2. "All square" for what used to print as "Push - nobody pays"
+//   3. the per-bet "$0 - halved" line, which a halved bet never used to carry at all
+const wave29 = t => t
+    .replace(/(MATCH NET · [^|]*?) — [^|]*?(?=\||$)/g, '$1')
+    .replace(/MATCH NET · All square/g, 'MATCH NET · Push — nobody pays')
+    .split('|$0 · halved').join('');
 const CD = makeCourseData(18); const J = v => JSON.parse(JSON.stringify(v));
 
 // The captured round: 23 golfers (the wizard's), groups 4/4/4/4/4/3, a settled
@@ -180,8 +194,23 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
             assert.match(PREV[k].summary, /Who Pays Who/);
         });
     });
-    test('the bare link\'s Side Matches card is the pre-change text too', () => {
-        assert.equal(strip(sideMatchesOnly(arrive(BARE)('settle-content'))), PREV.bare.sideMatches);
+    test('the bare link\'s Side Matches card is the pre-change text, through the Wave 29 folds', () => {
+        const today = strip(sideMatchesOnly(arrive(BARE)('settle-content')));
+        // POSITIVE CONTROLS FIRST, so the folds cannot hide the absence of what they
+        // fold. Deleting the Wave 29 feature makes these three fail rather than making
+        // the comparison below pass.
+        assert.match(today, /MATCH NET · Ann \+\$10 — Ann won 1 bet \(\$10\)/,
+            'a decided match must explain its total');
+        assert.match(today, /\$0 · halved/, 'a halved bet must say so and say $0');
+        assert.match(today, /All square — every bet halved, nobody pays/,
+            'and a Nassau halved three ways must say why the net is nothing');
+        assert.equal(wave29(today), PREV.bare.sideMatches,
+            'with the additions folded away, the card is the pre-change text to the byte');
+        // AND THE MONEY ITSELF, compared directly rather than trusted to the fold:
+        // every dollar figure in the card, in order, unchanged.
+        const amounts = t => (t.match(/\$[\d,]+(?:\.\d\d)?/g) || []).join(' ');
+        assert.equal(amounts(wave29(today)), amounts(PREV.bare.sideMatches),
+            'not one amount moved');
     });
 });
 

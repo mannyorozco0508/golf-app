@@ -51,7 +51,20 @@ const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-mo
 // strip0: the capture's stripper. TODAY: the one normalised line (see header).
 const strip0 = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-const norm = t => t.split('|' + TODAY + '|').join('|<today>|');
+// A SECOND NORMALISED LINE (UI WAVE 29, v258). The Receipt's MATCH NET line gained
+// an explanation after the amount - "MATCH NET - Carp +$50 - Carp won 1 bet ($50)" -
+// because a bare total is what sent Manny looking for a bug in a side match that
+// correctly netted $0. The AMOUNT is unchanged and is still compared by value; only
+// the explanation that follows it is folded away, so this capture keeps proving that
+// nothing else about a finished receipt moved.
+//
+// RE-RECORDING THE CAPTURE WAS THE WRONG FIX: its whole value is that it was taken
+// at 8a02234 and never re-taken. A documented transform keeps that. And the fold
+// cannot hide its own absence - the test below asserts today's render DOES carry the
+// explanation, so if the feature disappeared this file would go red rather than
+// quietly comparing equal.
+const WAVE29_NET = /(MATCH NET · [^|]*?) — [^|]*?(?=\||$)/g;
+const norm = t => t.split('|' + TODAY + '|').join('|<today>|').replace(WAVE29_NET, '$1');
 // strip: for the rows below - whitespace beside a bar dropped so text can be matched across tags.
 const strip = h => strip0(h).replace(/ ?\| ?/g, '|').replace(/\|+/g, '|');
 
@@ -147,6 +160,15 @@ describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', 
     test('Caledonia (finished, KPs confirmed): every mount is the capture through the documented transforms', () => {
         v196(receipt(rounds[0].data), prev.caledonia);
         void sendMoved;   // subsumed: the proof reads the raw capture
+    });
+    test('the Wave 29 fold is folding something real: the explanation IS on the page', () => {
+        // The positive control for the normalisation above. Without this, deleting the
+        // whole feature would make the capture match again and this file go green.
+        const settle = strip0(receipt(rounds[0].data).raw('settle-content'));
+        assert.match(settle, /MATCH NET · Carp \+\$50 — Carp won 1 bet \(\$50\)/,
+            'the MATCH NET line must still explain itself');
+        assert.equal(norm('|MATCH NET · Carp +$50 — Carp won 1 bet ($50)|'), '|MATCH NET · Carp +$50|',
+            'and the fold must remove exactly the explanation, nothing else');
     });
     test('True Blue (finished): likewise', () => {
         v196(receipt(rounds[1].data), prev.trueBlue);

@@ -45,6 +45,7 @@
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
+    <script src="side-match-lines.js"></script>
     <!-- THE BETS TAB WATCHES A GROUP'S OWN ACTION. Three more shared files since the
          Bets/Matches split, none of them edited for it:
            grouping.js      - playerGroupMap / canLinkSeeWager: which group a golfer is
@@ -1232,10 +1233,50 @@ html {
                 });
                 body += `</div>`;
             });
-            if (sm.stake > 0) {
-                body += `<div class="bets-row"><span>Ledger:</span><span>${escapeHtml(calc.t1Name)}: ${fmtSideM(calc.t1TotalMoney)} | ${escapeHtml(calc.t2Name)}: ${fmtSideM(-calc.t1TotalMoney)}</span></div>`;
+            // THE MONEY, PER BET (v258). Manny entered a match after the round and the
+            // card told him the result of all four bets and none of the money: base
+            // Manny 3&2, Press 1 Marty 1&0, Press 2 Manny 3&2, Press 3 Marty 1&0,
+            // "Ledger: $0 | $0". The $0 was right - two bets each, $40 apiece - and
+            // nothing on screen said so, which is how a correct card reads as broken.
+            //
+            // Every figure comes from settlement-engine.js buildSideMatchReceipts,
+            // which has priced each segment since v141; side-match-lines.js turns them
+            // into sentences. Nothing here computes money, and the pills above are
+            // untouched - they are match STATE, this is what it is worth.
+            const smlRc = (typeof buildSideMatchReceipts === 'function')
+                ? (buildSideMatchReceipts(currentData, courseData, savedScores) || [])
+                    .find(x => x.matchId === matchId)
+                : null;
+            // FINISHED MEANS EVERY HOLE IN RANGE IS POSTED, not `closed`. A segment
+            // closes when the lead exceeds the holes left, so at the 18th |0| > 0 is
+            // false and an all-square match that went the distance is never closed -
+            // this card used to call that finished bet LIVE.
+            const smlFinished = (typeof computeRoundFinish === 'function')
+                && !!computeRoundFinish(currentData, courseData, savedScores).finished;
+            const smlDone = (typeof sideMatchRangeComplete === 'function')
+                && sideMatchRangeComplete(sm, players, courseData, savedScores,
+                    { roundFinished: smlFinished });
+            if (smlRc && typeof sideMatchBetLines === 'function') {
+                sideMatchBetLines(smlRc, { complete: smlDone }).forEach(l => {
+                    if (!l.moneyText) return;
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(l.label)} \u00B7 ${escapeHtml(l.result)}</span><span style="font-weight:bold;">${escapeHtml(l.moneyText)}</span></div>`;
+                });
             }
-            isFinal = calc.activeMatches.length > 0 && calc.activeMatches.every(m => m.closed);
+            if (sm.stake > 0) {
+                // THE LEDGER ROW STAYS (the v135 split names it, and
+                // bets_matches_split_test.js pins it here) - but it now carries DECIDED
+                // money. It read calc.t1TotalMoney, which books an open segment's stake
+                // as though it were won, so a bet thru 6 of 18 printed "+$30" beside a
+                // result that had decided nothing. Winner-gated, through the same
+                // segments the Receipt pays from.
+                const smlNet = (smlRc && typeof sideMatchDecidedNet === 'function')
+                    ? sideMatchDecidedNet(smlRc) : 0;
+                body += `<div class="bets-row"><span>Ledger:</span><span>${escapeHtml(calc.t1Name)}: ${fmtSideM(smlNet)} | ${escapeHtml(calc.t2Name)}: ${fmtSideM(-smlNet)}</span></div>`;
+                if (smlRc && typeof sideMatchNetLine === 'function') {
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(sideMatchNetLine(smlRc, { complete: smlDone }))}</span></div>`;
+                }
+            }
+            isFinal = smlDone;
             const label = (sm.format === 'nassau' && typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '';
             const price = label || (`$${sm.stake || 0}/match` + (sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''));
             formatLine = `${sm.format === 'nassau' ? 'Nassau' : 'Match Play'} • ${(sm.scoring || 'net').toUpperCase()} • ${price}`;

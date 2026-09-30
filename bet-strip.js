@@ -737,6 +737,19 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
         return (meId && String(p.id) === String(meId)) ? 'You' : shortName(p.name);
     };
 
+    // THE RECEIPTS, ONCE FOR THE ROUND (v258). Read below for DECIDED money on a
+    // match play or Nassau side bet. Built here rather than inside the loop because
+    // buildSideMatchReceipts prices every match on each call, and this function runs
+    // on every render. A missing engine leaves the map empty and the rows behave
+    // exactly as they did before this wave.
+    let smlReceipts = {};
+    if (typeof buildSideMatchReceipts === 'function') {
+        try {
+            (buildSideMatchReceipts(data, courseData, savedScores) || [])
+                .forEach(r => { smlReceipts[r.matchId] = r; });
+        } catch (e) { smlReceipts = {}; }
+    }
+
     Object.keys(sideMatches).forEach(id => {
         const sm = sideMatches[id];
         const a = (sm.teamAIds || []).map(String);
@@ -816,8 +829,30 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                         const speak = strip.mode === 'stroke' ? strokeSentence : matchSentence;
                         sentence = speak(status, meName);
                         strip.chips.forEach(c => {
-                            if (c.closed) decided += 0; else atStake += c.stake || 0;
+                            if (!c.closed) atStake += c.stake || 0;
                         });
+                        // DECIDED MONEY, WHICH THIS LINE USED TO SET TO ZERO (v258).
+                        //
+                        // It read `if (c.closed) decided += 0;` - so a Match Play or
+                        // Nassau side bet was worth nothing on the scorecard however it
+                        // finished. Measured before the fix: given every hole, Manny won
+                        // the base and every press and the row still reported netMoney 0,
+                        // netText "". Two things followed. The My Round card printed no
+                        // money at all for these formats (index.html moneyText is empty
+                        // when netText is), and `finished` - which requires
+                        // netMoney !== 0 - could never be true, so a finished match never
+                        // auto-expanded. Stroke Play was never affected; it tallies
+                        // seg.p1Money a few lines up.
+                        //
+                        // NO NEW ARITHMETIC. side-match-lines.js sums the segments
+                        // buildSideMatchReceipts already priced, gated on seg.winner so
+                        // an open segment contributes nothing - the same gate the Receipt
+                        // has used since v141. The figure is therefore equal to the
+                        // Receipt by construction, which side_match_money_lines_test.js
+                        // asserts across five fixtures.
+                        if (smlReceipts[id] && typeof sideMatchDecidedNet === 'function') {
+                            decided += sideMatchDecidedNet(smlReceipts[id]) * (iAmInB ? -1 : 1);
+                        }
                         presses = strip.chips.filter(c => c.isPress).map((c, i) => ({
                             label: `Press #${i + 1}`,
                             startedText: c.detail && c.detail.startHole ? `Started Hole ${c.detail.startHole}` : '',

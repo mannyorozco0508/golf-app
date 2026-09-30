@@ -58,7 +58,10 @@ const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 
 // The dependency list stats.html actually carries, asserted against its markup
 // below rather than trusted.
-const STATS_DEPS = ['action-model.js', 'settlement-engine.js'];
+// side-match-lines.js joined in UI Wave 29: stats.html loads it beside
+// settlement-engine.js, and the side-match card reads its sentences. Leaving it
+// out here would render a page the bundle does not ship.
+const STATS_DEPS = ['action-model.js', 'settlement-engine.js', 'side-match-lines.js'];
 
 // ---------------------------------------------------------------------------
 // FIXTURES
@@ -220,8 +223,8 @@ const GOLDEN = {
     '03 stroke custom press stake': 'fda4d500635529f9cb722b7a088cf530e2768ccf27935dc0130db8885047a176',
     '04 stroke multiple presses': 'c71d849e84be166c3d9c753ce1419b409af93d1d7d96e6dad560f92edec0317e',
     '05 stroke start-hole 6': '7c65722f5e82de0761c248b712e3e9778a7e7f74e0aec68782479c8889d9297d',
-    '06 side match play 2v2': 'b70534e5f4471d57324930f21b241c17d496617382687fa9b5751b4f827319c3',
-    '07 modern nassau 2v2': '48ebf705c94b8030e2efa8f75c16ae580aacfa5151e71e3777d2688540ed7b27',
+    '06 side match play 2v2': '8395dcbfdaeebc582356f085956848c15a2b90c35bdcb2f8b294d0e809ec5950',   // RE-PINNED (UI Wave 29, v258): the side-match card gained a dollar line per bet and a match line. Diffed against fec1050 before re-recording: this fixture grew exactly two blocks - 'Overall Match - Ann/Abe 10&8 | Ann/Abe +$20' and the match line - and nothing else moved. 13 of the 15 fixtures are byte-identical, which is how this re-pin is known to be the wave and not a side effect.
+    '07 modern nassau 2v2': '35dfb0b2c52e8ca5f85ebd5220fde70a2c6409ff499d1d777b3c8fbfca941345',   // RE-PINNED (UI Wave 29, v258): same addition, over 19 bets - and it is worth reading, because the money makes the Wave 30 labelling problem visible: this Nassau prints 'Press 1' TWICE, 'Press 2' twice and so on, because match-engine.js numbers presses per BASE and this card lists all three bases together. The dollars are right; the names are not distinguishable. Logged, not fixed here.
     '08 stroke 2v2': 'c3ea512473304a84861a18f07308c4cf71e2b9568733d9e2d361469e61d31b06',   // INTENTIONAL — the money defect, spelled out below
     '09 legacy nassau round': 'd959b691f9baa08e3d5b8e0f43db08d576da08b0bbb4406dccc8ed01416398aa',
     '10 money pool round': '55cea65b2617d4eb7091e1ce1dc0d2628f6aae8dd93731578bc416765fb0cbb6',
@@ -427,7 +430,15 @@ describe('GOLDEN FINAL SCORECARD — every historical shape still renders identi
         // the side NAME moved - proof the naming change is independent of the money
         // change and that a tied side is still reported as a side.
         const changed = name === '08 stroke 2v2' || name === '15 stroke 2v2 all square';
-        test(`${name}${changed ? ' — INTENTIONALLY CHANGED IN BATCH 3' : ' — byte-identical to pre-Batch-3'}`, () => {
+        // AND TWO WERE RE-RECORDED IN UI WAVE 29 (v258): the two SIDE MATCH fixtures,
+        // which gained a dollar line per bet and a match line. The other thirteen are
+        // still byte-identical to pre-Batch-3, and that is what proves the Wave 29
+        // change touched the side-match card and nothing else on this page. A test name
+        // claiming "byte-identical" over a golden that moved would be the lie this file
+        // exists to prevent.
+        const rePinned = name === '06 side match play 2v2' || name === '07 modern nassau 2v2';
+        test(`${name}${changed ? ' — INTENTIONALLY CHANGED IN BATCH 3'
+            : (rePinned ? ' — RE-PINNED IN UI WAVE 29' : ' — byte-identical to pre-Batch-3')}`, () => {
             const html = renderStats(FIXTURES[name]);
             assert.ok(html.length > 200, name + ': the card should have rendered');
             assert.equal(sha(html), GOLDEN[name],

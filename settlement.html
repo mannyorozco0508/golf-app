@@ -54,6 +54,7 @@
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
 <script src="settlement-engine.js"></script>
+<script src="side-match-lines.js"></script>
 <script src="live-skins.js"></script>
 <script src="pool-engine.js"></script>
 <!-- Grouping (v141): playerGroupMap / canLinkSeeWager, so the SIDE MATCHES cards
@@ -1010,20 +1011,60 @@ html {
         html += `<div class="receipt-title">${escapeHtml(r.nameA)} vs ${escapeHtml(r.nameB)}</div>`;
         html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
 
-        r.segments.forEach(seg => {
+        // ONE BUILDER FOR THE MONEY SENTENCES (v258). The per-segment figure below
+        // has been right since v141 and its gate - a winner AND money - is the gate
+        // side-match-lines.js now applies for every surface. The lines come from
+        // there so the Receipt, the Bets tab and Final Results cannot drift apart
+        // on one wager.
+        const sm = (data.sideMatches || {})[matchId]
+            || (matchId === '__main' && typeof legacyMainAsSideMatch === 'function'
+                ? legacyMainAsSideMatch(data) : null);
+        // EVERY HOLE IN RANGE, POSTED - not the engine closed flag, which is false
+        // on a halved match that went all eighteen.
+        //
+        // WITHOUT THE HELPER, TRUE. A shell cached before v258 has no
+        // side-match-lines.js, and `false` would have silently dropped the
+        // "($N each)" line from a 2v2 receipt - a page rendering LESS than it did
+        // before the wave. The absent-file behaviour is the PREVIOUS behaviour, and
+        // receipt_final_test.js measured exactly that regression before this line
+        // said so.
+        // The round's own finish rule rides along: a verified round, or one where every
+        // started card is complete, is over for this bet too - blank holes and all.
+        const rFinished = (typeof computeRoundFinish === 'function')
+            && !!computeRoundFinish(data, courseData, savedScores).finished;
+        const rDone = (typeof sideMatchRangeComplete === 'function')
+            ? !!(sm && sideMatchRangeComplete(sm, data.players || [], courseData, savedScores,
+                { roundFinished: rFinished }))
+            : true;
+        const rLines = (typeof sideMatchBetLines === 'function')
+            ? sideMatchBetLines(r, { complete: rDone }) : [];
+
+        r.segments.forEach((seg, i) => {
+            const line = rLines[i];
             html += `<div class="receipt-seg">`;
             html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
             html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
             html += `<div class="receipt-seg-result">${escapeHtml(seg.result)}</div>`;
-            if (seg.winner && seg.money > 0) {
+            if (line && line.moneyText) {
+                html += `<div class="receipt-seg-money">${escapeHtml(line.moneyText)}</div>`;
+            } else if (!line && seg.winner && seg.money > 0) {
                 html += `<div class="receipt-seg-money">${escapeHtml(seg.winner)} +$${fmtWhole(seg.money)}</div>`;
             }
             html += `</div>`;
         });
 
-        html += `<div class="receipt-net">MATCH NET \u00B7 ` +
-            (r.netTo ? `${escapeHtml(r.netTo)} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays') +
-            (r.isTeam && r.netTo ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
+        // THE MATCH LINE, AND WHY IT CHANGED. It read r.netTo / r.netAmount, which
+        // come from receipt.net - and receipt.net includes OPEN segments. Measured on
+        // this wave's fixtures: a Match Play bet through 6 holes of 18, Reese one up,
+        // printed "MATCH NET \u00B7 Reese +$30" with twelve holes unplayed. The
+        // per-segment gate two blocks up was correct all along; this line was not.
+        // It now states decided money only, and on a push it says WHY the total is
+        // nothing instead of leaving a group to wonder.
+        const netText = (typeof sideMatchNetLine === 'function')
+            ? sideMatchNetLine(r, { complete: rDone })
+            : (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays');
+        html += `<div class="receipt-net">MATCH NET \u00B7 ${escapeHtml(netText)}` +
+            (r.isTeam && r.netTo && rDone ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
             `</div>`;
         html += `</div>`;
         return html;
