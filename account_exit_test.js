@@ -49,10 +49,10 @@
 //   - mini-dom has no layout, so "shown" here means style.display, never that
 //     anybody could see or tap it. The two-step arming is state, not geometry.
 //
-// THE BASELINE, all 43 tests, measured against main 7608a56 in a clean worktree -
+// THE BASELINE, all 47 tests, measured against main 7608a56 in a clean worktree -
 // Wave 33 merged, no account-exit.js, no card, no sign-out anywhere in the app:
 //
-//     3 PASS / 40 FAIL
+//     3 PASS / 44 FAIL
 //
 // The nine tests in the INCIDENT block at the bottom were also measured on their own
 // against bb3cd18 - the code as it stood when Manny's real account was deleted:
@@ -61,7 +61,7 @@
 // The three that pass are the whole rules block, and they are honest about earning
 // nothing from this wave: they measure a ruleset this wave does not touch. They are
 // here because the DESIGN depends on those eight verdicts, and a rules publish that
-// changed one of them would make this wave's delete silently incomplete. The 40
+// changed one of them would make this wave's delete silently incomplete. The 44
 // reds are every line of the feature.
 //
 // (My own first draft of this paragraph said 8 PASS, from counting the targaryen
@@ -857,5 +857,82 @@ describe('THE INCIDENT: A SIGNED-IN PANEL MUST NOT OFFER TO SIGN IN AGAIN', () =
             'the hedge that reads like reassurance must not be used for an unknown');
         assert.match(unknown, /You are about to delete a@b\.com \(Apple\)/);
         assert.notEqual(X.deleteFinalWarning(null, { unknown: true }), X.deleteFinalWarning(null, { pass: false }));
+    });
+});
+
+// ===========================================================================
+// THE THIRD WAY IN, CLOSED. The two provider buttons came off a signed-in panel
+// the day the incident happened; the email link is the same hazard and was left
+// open that round. It signs in, and Firebase links a verified credential to
+// whichever account already holds that email - the exact mechanism that put Manny
+// back on his real organizer. So: signed in, there is NO way to add a provider from
+// this panel at all. Moving an organizer to another device means signing OUT here
+// and signing in over there, which is what the lead now says.
+//
+// MEASURED at 4ff86bf - the incident fix, with the email link still offered - these
+// four on their own: 1/4 green. The green one is the CONTROL, and it is supposed to
+// be: an anonymous organizer had all three ways in before this change and still does.
+// I wrote 0/4 first, which would have meant the control was testing the change
+// instead of guarding it.
+// ===========================================================================
+describe('SIGNED IN, THE EMAIL LINK IS NOT ON OFFER EITHER', () => {
+
+    function panel(signedIn) {
+        const sb = loadHtmlInlineScript('admin.html', ['account-exit.js', 'my-groups.js']);
+        if (signedIn) {
+            sb.__auth.setUser({
+                uid: 'u9', isAnonymous: false, email: 'manny@example.com',
+                providerData: [{ providerId: 'apple.com' }], delete: () => Promise.resolve()
+            });
+        }
+        sb.refreshAccountState();
+        return sb;
+    }
+    const display = (sb, id) => {
+        const e = sb.document.getElementById(id);
+        return e ? e.style.display : null;
+    };
+
+    test('the toggle is gone, and so is the card', () => {
+        const sb = panel(true);
+        assert.equal(display(sb, 'oauth-email-toggle'), 'none',
+            'Use email instead signs in too, and a signed-in sign-in is what deleted a real account');
+        assert.equal(display(sb, 'email-link-card'), 'none');
+    });
+
+    test('and tapping it anyway does nothing', () => {
+        // Hiding a button is not a permission: the handler refuses on its own, so a
+        // stale onclick, a console call or a cached shell cannot open it.
+        const sb = panel(true);
+        sb.toggleEmailFallback();
+        assert.equal(display(sb, 'email-link-card'), 'none', 'the card must stay shut');
+        sb.toggleEmailFallback();
+        assert.equal(display(sb, 'email-link-card'), 'none', 'twice, in case it toggles');
+    });
+
+    test('a card left OPEN by an anonymous golfer shuts when they sign in', () => {
+        // The real sequence: open the email option, finish a sign-in inside the
+        // panel, and the panel repaints with the card still on screen.
+        const sb = panel(false);
+        sb.toggleEmailFallback();
+        assert.notEqual(display(sb, 'email-link-card'), 'none', 'anonymous: it opens');
+        sb.__auth.setUser({
+            uid: 'u9', isAnonymous: false, email: 'manny@example.com',
+            providerData: [{ providerId: 'apple.com' }], delete: () => Promise.resolve()
+        });
+        sb.refreshAccountState();
+        assert.equal(display(sb, 'email-link-card'), 'none', 'signing in shuts it');
+        assert.equal(display(sb, 'oauth-email-toggle'), 'none');
+    });
+
+    test('CONTROL: an anonymous organizer still has all three ways in', () => {
+        // A fix that closed the door for everybody would leave no way to sign in at
+        // all, which is worse than the hazard it removes.
+        const sb = panel(false);
+        assert.notEqual(display(sb, 'oauth-apple'), 'none');
+        assert.notEqual(display(sb, 'oauth-google'), 'none');
+        assert.notEqual(display(sb, 'oauth-email-toggle'), 'none');
+        sb.toggleEmailFallback();
+        assert.notEqual(display(sb, 'email-link-card'), 'none', 'and the email form still opens');
     });
 });

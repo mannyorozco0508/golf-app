@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v111-namedaccount. The tournament product cache
+// The consumer product cache is consumer-v112-signedinclosed. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3809,7 +3809,14 @@
 // instead, both delete warnings NAME the account, and a founder pass has to be TYPED
 // away after a read taken at the moment of the delete. An installed device would
 // otherwise keep serving the screen that offered the tap.
-const CACHE_VERSION = 'golfapp-v270-namedaccount';
+// Moved to v271 SO A SIGNED-IN PANEL HAS NO WAY IN AT ALL. The two provider buttons
+// came off at v270; "Use email instead" is the same hazard and was still there. It
+// signs in, and Firebase links a verified credential to whichever account already
+// holds that email - the exact mechanism that put a real organizer back on screen and
+// then deleted it. Signed in, the toggle is gone, the card is shut, and the handler
+// refuses on its own so a stale onclick or a cached shell cannot open it. Moving an
+// organizer to another device is: sign OUT here, sign in over there.
+const CACHE_VERSION = 'golfapp-v271-signedinclosed';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

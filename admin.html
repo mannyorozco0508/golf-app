@@ -7089,6 +7089,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function toggleEmailFallback() {
         var card = document.getElementById('email-link-card');
         if (!card) return;
+        // SIGNED IN MEANS NO PROVIDER MAY BE ADDED FROM THIS PANEL, and the email
+        // link is the same hazard as the two provider buttons were. It signs in, and
+        // Firebase links a verified credential to whichever account already holds
+        // that email - which is how a real organizer got signed back into and then
+        // deleted on 2026-09-30. The two buttons came off the screen that day; this
+        // is the third way in, closed the same way. Moving an organizer to another
+        // device means signing OUT here and signing in over there.
+        if (typeof accountIsLinked === 'function' && accountIsLinked()) {
+            emailFallbackShown = false;
+            if (card.style.display !== 'none') card.style.display = 'none';
+            return;
+        }
         emailFallbackShown = !emailFallbackShown;
         var show = emailFallbackShown;
         var want = show ? '' : 'none';
@@ -7367,6 +7379,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const want = linked ? 'none' : '';
             if (b && b.style.display !== want) b.style.display = want;
         });
+        // THE EMAIL LINK IS THE THIRD WAY IN, and it closes with the other two.
+        const toggle = document.getElementById('oauth-email-toggle');
+        const tWant = linked ? 'none' : '';
+        if (toggle && toggle.style.display !== tWant) toggle.style.display = tWant;
+        if (linked) {
+            // Signed in with the card already open - the state a golfer is in the
+            // moment a sign-in completes inside the panel - shuts it.
+            emailFallbackShown = false;
+            const card = document.getElementById('email-link-card');
+            if (card && card.style.display !== 'none') card.style.display = 'none';
+            setTextOnce(toggle, 'Use email instead');
+        }
         const who = document.getElementById('oauth-who');
         const line = linked ? window.accountExit.describeAccount(u) : '';
         setTextOnce(who, line);
@@ -7391,7 +7415,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             setTextOnce(document.getElementById('email-link-lead'),
                 'Signed in. Use this again only to move this organizer onto another browser or phone.');
             setTextOnce(document.getElementById('oauth-lead'),
-                'Signed in. To put this same organizer on another phone or browser, use the email link below - do not sign in again here.');
+                'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email.');
         }
     }
 
