@@ -1,5 +1,15 @@
 // ============================================================================
-// RULES STAGE 1, TESTED BEFORE IT IS PUBLISHED
+// RULES STAGE 1 — TESTED BEFORE IT WAS PUBLISHED, AND NOW LIVE
+//
+// PUBLISHED 2026-09-29 ~7:01 PM, by console paste of database.rules.stage1.json.
+// Post-publish: a score from a ?group= link SAVED, and a forced-KP answer on GFLBAM
+// SAVED. The rollback is dab91d8, one paste, and it is on the Desktop.
+//
+// THIS FILE STILL EARNS ITS PLACE AFTER THE PUBLISH. It is now the only executable
+// description of what is live: database.rules.json is NOT the live ruleset and still
+// carries the Stage 2 owner-only parent. Every scenario below runs against the live
+// file and against the ruleset it replaced, so "Stage 1 took nothing away" stays a
+// measurement rather than a memory.
 //
 // WHAT STAGE 1 IS. Everything in the repo rules file that is ADDITIVE, with the
 // events/$eventCode parent left EXACTLY as it is live (dab91d8):
@@ -43,7 +53,7 @@
 // runs through it, against BOTH files, so a difference between the candidate and
 // live is a measurement rather than a claim.
 //
-// THE RED BASELINE, all 9 tests: against database.rules.json alone this file has
+// THE RED BASELINE, all 11 tests: against database.rules.json alone this file has
 // no candidate to test, so it is stated the other way round - each scenario below
 // is run against the LIVE file too, and the four that differ are asserted to
 // differ. That comparison IS the baseline: if the candidate stopped adding
@@ -61,8 +71,13 @@ const REPO = __dirname;
 const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
 const CANDIDATE = path.join(REPO, 'database.rules.stage1.json');
 const REPO_RULES = path.join(REPO, 'database.rules.json');
-const LIVE = path.join(os.tmpdir(), 'rules-live-dab91d8-' + process.pid + '.json');
-fs.writeFileSync(LIVE, execFileSync('git', ['show', 'dab91d8:database.rules.json'], { cwd: REPO, encoding: 'utf8' }));
+// PREV, NOT LIVE. dab91d8 was the live ruleset until 2026-09-29, when Stage 1 was
+// published from database.rules.stage1.json through the console. It is now the
+// ROLLBACK, and the comparison below is "what Stage 1 changed relative to what it
+// replaced" - which is the same measurement, correctly named. Calling this variable
+// LIVE after the publish would have made the whole file assert a false label.
+const PREV = path.join(os.tmpdir(), 'rules-prev-dab91d8-' + process.pid + '.json');
+fs.writeFileSync(PREV, execFileSync('git', ['show', 'dab91d8:database.rules.json'], { cwd: REPO, encoding: 'utf8' }));
 
 const OWNER = 'u-owner', OTHER = 'u-other', CO = 'u-co';
 const OWNER_EMAIL = 'owner@example.com';
@@ -99,66 +114,66 @@ const ROOT = {
 // dab91d8 - stated, so the difference is measured and not assumed.
 const TABLE = [
     // --- participation stays open. This is the whole risk surface of Stage 1.
-    { id: 'P1', what: 'a group scorekeeper posts a score', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P1', what: 'a group scorekeeper posts a score', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'the single most common write in the app, from a ?group= link with no sign-in',
       path: 'events/ZZTEST/scores/p101_h2', data: 4 },
-    { id: 'P2', what: 'a group answers the forced KP', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P2', what: 'a group answers the forced KP', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'kpGroupAnswers already works in production - GFLBAM holds three stored answers',
       path: 'events/ZZTEST/kpGroupAnswers/h4/g1', data: { answer: 'none', at: 1 } },
-    { id: 'P3', what: 'a side match is added mid-round', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P3', what: 'a side match is added mid-round', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'money the group agreed to, entered by whoever has the phone',
       path: 'events/ZZTEST/sideMatches/m1', data: { format: 'match', stake: 20, teamAIds: ['101'], teamBIds: ['102'] } },
-    { id: 'P4', what: 'the organizer verifies the scores', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P4', what: 'the organizer verifies the scores', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'Finish Round is reachable from a group link', path: 'events/ZZTEST/scoresVerified', data: { verified: true, verifiedAt: 1, verifiedBy: 'organizer' } },
-    { id: 'P5', what: 'a KP winner is recorded', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P5', what: 'a KP winner is recorded', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'the KP entry card is on the scorecard', path: 'events/ZZTEST/kpWinners/h3', data: '101' },
-    { id: 'P6', what: 'a press is written', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P6', what: 'a press is written', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'a press costs real money and is entered at the tee', path: 'events/ZZTEST/matchPresses/p1', data: { baseId: '18', startHole: 5 } },
-    { id: 'P7', what: 'a dot is awarded', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'P7', what: 'a dot is awarded', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'junk is entered by the group', path: 'events/ZZTEST/dots/h4', data: { '101': 1 } },
 
     // --- STAGE 1 DOES NOT LOCK THE PARENT, and that is the point of Stage 1.
-    { id: 'E1', what: 'a code-holder edits the round NAME', who: 'nobody', verdict: 'allow', live: 'allow',
+    { id: 'E1', what: 'a code-holder edits the round NAME', who: 'nobody', verdict: 'allow', prev: 'allow',
       why: 'Stage 1 leaves the parent exactly as live - no lockout is possible, and no '
          + 'new protection is claimed here either. Stage 2 is where this becomes the owner.',
       path: 'events/ZZTEST/eventName', data: 'Renamed' },
 
     // --- MY GROUPS. The four rows that are NEW, and differ from live.
-    { id: 'G1', what: 'the OWNER writes their own group', who: 'owner', verdict: 'allow', live: 'refuse',
+    { id: 'G1', what: 'the OWNER writes their own group', who: 'owner', verdict: 'allow', prev: 'refuse',
       why: 'without this My Groups cannot save at all - it is why Stage 1 exists',
       path: 'organizers/' + OWNER + '/groups/g2',
       data: { name: 'Bandon trip', ownerUid: OWNER, createdAt: 1, updatedAt: 1, members: { paul: { name: 'Paul', hcp: '3.5' } } } },
-    { id: 'G2', what: 'a STRANGER reads somebody else group', who: 'other', verdict: 'refuse', live: 'refuse',
+    { id: 'G2', what: 'a STRANGER reads somebody else group', who: 'other', verdict: 'refuse', prev: 'refuse',
       why: 'privacy: an account sees only its own groups and the ones shared with it',
       op: 'read', path: 'organizers/' + OWNER + '/groups/g1' },
-    { id: 'G3', what: 'a CO-ORGANIZER reads the group they were named on', who: 'co', verdict: 'allow', live: 'refuse',
+    { id: 'G3', what: 'a CO-ORGANIZER reads the group they were named on', who: 'co', verdict: 'allow', prev: 'refuse',
       why: 'a co-organizer must be able to start a round from it - matched on auth.token.email',
       op: 'read', path: 'organizers/' + OWNER + '/groups/g1' },
-    { id: 'G4', what: 'a CO-ORGANIZER saves a handicap back', who: 'co', verdict: 'allow', live: 'refuse',
+    { id: 'G4', what: 'a CO-ORGANIZER saves a handicap back', who: 'co', verdict: 'allow', prev: 'refuse',
       why: 'their edits save back - that is what making one means',
       path: 'organizers/' + OWNER + '/groups/g1/members/marty/hcp', data: '8' },
-    { id: 'G5', what: 'a STRANGER writes into somebody else group', who: 'other', verdict: 'refuse', live: 'refuse',
+    { id: 'G5', what: 'a STRANGER writes into somebody else group', who: 'other', verdict: 'refuse', prev: 'refuse',
       why: 'the same wall from the other side', path: 'organizers/' + OWNER + '/groups/g1/members/marty/hcp', data: '99' },
-    { id: 'G6', what: 'a CO-ORGANIZER adds another co-organizer', who: 'co', verdict: 'refuse', live: 'refuse',
+    { id: 'G6', what: 'a CO-ORGANIZER adds another co-organizer', who: 'co', verdict: 'refuse', prev: 'refuse',
       why: 'only the owner decides who else gets in', path: 'organizers/' + OWNER + '/groups/g1/coOrganizers/x@y,com', data: true },
-    { id: 'G7', what: 'nobody signed in reads a group', who: 'nobody', verdict: 'refuse', live: 'refuse',
+    { id: 'G7', what: 'nobody signed in reads a group', who: 'nobody', verdict: 'refuse', prev: 'refuse',
       why: 'a roster of forty real names is not public', op: 'read', path: 'organizers/' + OWNER + '/groups/g1' },
-    { id: 'G8', what: 'a group with no name or no members', who: 'owner', verdict: 'refuse', live: 'refuse',
+    { id: 'G8', what: 'a group with no name or no members', who: 'owner', verdict: 'refuse', prev: 'refuse',
       why: 'the validate, so a half-written group cannot land', path: 'organizers/' + OWNER + '/groups/g3', data: { ownerUid: OWNER } },
-    { id: 'G9', what: 'a handicap stored as a NUMBER', who: 'owner', verdict: 'refuse', live: 'refuse',
+    { id: 'G9', what: 'a handicap stored as a NUMBER', who: 'owner', verdict: 'refuse', prev: 'refuse',
       why: 'handicaps are used AS ENTERED: "3.5" and "+2" are strings, and a number here '
          + 'would quietly change what the app hands back',
       path: 'organizers/' + OWNER + '/groups/g1/members/marty/hcp', data: 9 },
 
     // --- THE DISCOVERY POINTER.
-    { id: 'S1', what: 'the OWNER points the group at a co-organizer email', who: 'owner', verdict: 'allow', live: 'refuse',
+    { id: 'S1', what: 'the OWNER points the group at a co-organizer email', who: 'owner', verdict: 'allow', prev: 'refuse',
       why: 'the only way the other account can FIND the group',
       path: 'sharedGroups/' + CO_KEY + '/' + OWNER + '/g1', data: true },
-    { id: 'S2', what: 'the CO-ORGANIZER reads their own pointer list', who: 'co', verdict: 'allow', live: 'refuse',
+    { id: 'S2', what: 'the CO-ORGANIZER reads their own pointer list', who: 'co', verdict: 'allow', prev: 'refuse',
       why: 'it is how the panel lists groups shared with them', op: 'read', path: 'sharedGroups/' + CO_KEY },
-    { id: 'S3', what: 'a STRANGER reads somebody else pointer list', who: 'other', verdict: 'refuse', live: 'refuse',
+    { id: 'S3', what: 'a STRANGER reads somebody else pointer list', who: 'other', verdict: 'refuse', prev: 'refuse',
       why: 'that list is who shares with whom, and is nobody else business', op: 'read', path: 'sharedGroups/' + CO_KEY },
-    { id: 'S4', what: 'a STRANGER points at a group they do not own', who: 'other', verdict: 'refuse', live: 'refuse',
+    { id: 'S4', what: 'a STRANGER points at a group they do not own', who: 'other', verdict: 'refuse', prev: 'refuse',
       why: 'nobody can invite themselves into someone else group',
       path: 'sharedGroups/' + CO_KEY + '/' + OWNER + '/g1', data: true }
 ];
@@ -174,7 +189,7 @@ function buildData(which) {
     const tests = {};
     TABLE.forEach(row => {
         const entry = tests[row.path] || {};
-        const want = which === 'live' ? row.live : row.verdict;
+        const want = which === 'prev' ? row.prev : row.verdict;
         const bucket = (row.op === 'read')
             ? (want === 'allow' ? 'canRead' : 'cannotRead')
             : (want === 'allow' ? 'canWrite' : 'cannotWrite');
@@ -217,15 +232,15 @@ describe('rules Stage 1 — additive, and proved so before it is published', () 
         assert.match(out, /0 failures in \d+ tests/, out.slice(-2000));
     });
 
-    test('the events parent is BYTE-IDENTICAL to live, so nothing can be taken away', () => {
+    test('the events parent is BYTE-IDENTICAL to dab91d8, so nothing was taken away', () => {
         const cand = JSON.parse(fs.readFileSync(CANDIDATE, 'utf8')).rules.events.$eventCode;
-        const live = JSON.parse(fs.readFileSync(LIVE, 'utf8')).rules.events.$eventCode;
+        const live = JSON.parse(fs.readFileSync(PREV, 'utf8')).rules.events.$eventCode;
         assert.equal(cand['.write'], live['.write'], 'the one rule that could lock anybody out');
         assert.equal(cand['.read'], live['.read']);
         assert.equal(cand['.validate'], live['.validate']);
     });
 
-    test('and it is the LIVE form, not the repo form - Stage 2 is a separate decision', () => {
+    test('and it is the dab91d8 form, not the repo form - Stage 2 is a separate decision', () => {
         const cand = JSON.parse(fs.readFileSync(CANDIDATE, 'utf8')).rules.events.$eventCode['.write'];
         const repo = JSON.parse(fs.readFileSync(REPO_RULES, 'utf8')).rules.events.$eventCode['.write'];
         assert.notEqual(cand, repo, 'the repo file tightens the parent; Stage 1 does not');
@@ -234,33 +249,33 @@ describe('rules Stage 1 — additive, and proved so before it is published', () 
             'Stage 1 must carry no owner-only arm on the parent');
     });
 
-    test('the same table against the LIVE file: only the new paths differ', () => {
-        const { code, out } = run(LIVE, 'live');
+    test('the same table against the ruleset it REPLACED: only the new paths differ', () => {
+        const { code, out } = run(PREV, 'prev');
         assert.equal(code, 0, 'the live expectations did not hold:\n' + out.slice(-3000));
         // WHAT THIS PROVES. Every row's live verdict is asserted too, so the four
         // groups of differences are measured: everything that is allowed today is
         // still allowed, and the only things that change are the new keys.
-        const differ = TABLE.filter(r => r.verdict !== r.live).map(r => r.id);
+        const differ = TABLE.filter(r => r.verdict !== r.prev).map(r => r.id);
         assert.deepEqual(differ, ['G1', 'G3', 'G4', 'S1', 'S2'],
             'Stage 1 changes exactly five outcomes, all of them on organizers/ or sharedGroups');
         differ.forEach(id => {
             const row = TABLE.find(r => r.id === id);
             assert.match(row.path, /^(organizers|sharedGroups)\//, id + ' must be a new path');
-            assert.equal(row.live, 'refuse', id + ' is refused today because the rule does not exist');
+            assert.equal(row.prev, 'refuse', id + ' is refused today because the rule does not exist');
             assert.equal(row.verdict, 'allow', id + ' is what Stage 1 adds');
         });
         // Nothing a scorekeeper does changes at all.
         TABLE.filter(r => r.id[0] === 'P' || r.id[0] === 'E').forEach(r =>
-            assert.equal(r.verdict, r.live, r.id + ' must behave identically before and after'));
+            assert.equal(r.verdict, r.prev, r.id + ' must behave identically before and after'));
     });
 
-    test('kpGroupAnswers is ALLOWED under the live file, which is why nothing is broken today', () => {
+    test('kpGroupAnswers was ALLOWED under dab91d8 too, which is why nothing was ever broken', () => {
         // The HANDOFF note said publishing without this child BREAKS the forced-KP
         // gate. It is true only if the parent tightens at the same time: the live
         // parent lets any code-holder write an existing round, so the child inherits
         // permission. GFLBAM holds three stored answers as the field evidence.
         const row = TABLE.find(r => r.id === 'P2');
-        assert.equal(row.live, 'allow');
+        assert.equal(row.prev, 'allow');
         assert.equal(row.verdict, 'allow');
         assert.match(fs.readFileSync(path.join(REPO, 'HANDOFF.md'), 'utf8'),
             /kpGroupAnswers WORKS TODAY\s+via the open parent/,
@@ -269,7 +284,7 @@ describe('rules Stage 1 — additive, and proved so before it is published', () 
 
     test('Stage 1 adds exactly the four things it is supposed to, and nothing else', () => {
         const cand = JSON.parse(fs.readFileSync(CANDIDATE, 'utf8')).rules;
-        const live = JSON.parse(fs.readFileSync(LIVE, 'utf8')).rules;
+        const live = JSON.parse(fs.readFileSync(PREV, 'utf8')).rules;
         const CHILDREN = ['scores', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'kpGroupAnswers',
             'sideMatches', 'matchPresses', 'strokePresses', 'dots', 'wolfCalls', 'ryderCup',
             'ryderCupRef', 'ryderFoursomes', 'additionalGameInstances', 'auditLog', 'scoresVerified'];
@@ -350,7 +365,7 @@ describe('rules Stage 1 — additive, and proved so before it is published', () 
         // engine does not support \s in a character class; production's does.
         const rx = /\[\^@\\\\s\]/;
         assert.match(fs.readFileSync(CANDIDATE, 'utf8'), rx, 'the candidate carries it');
-        assert.match(fs.readFileSync(LIVE, 'utf8'), rx, 'and so does the live file');
+        assert.match(fs.readFileSync(PREV, 'utf8'), rx, 'and so does the live file');
         // Editing it to suit the emulator would be changing production rules to fit a
         // harness. targaryen accepts it, which is why every check above runs there.
         assert.ok(fs.existsSync(TARGARYEN), 'targaryen is the harness this repo uses for rules');

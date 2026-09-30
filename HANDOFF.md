@@ -2808,17 +2808,64 @@ theirs. The card may not say protected, secure or locked, in the markup or on th
 rendered screen — the guard refuses all three words.
 
 **WHAT THIS IS NOT. The client hides the doors; it does not lock them — and as of
-2026-09-27 nothing else does either.** The previous version of this paragraph said
-"As of 2026-09-23 the database does". That was false, and it is the exact class of
-defect CLAUDE.md warns about: the rule was WRITTEN on 2026-09-23 and never
-published, so a confident sentence claimed an enforcement that does not exist.
+2026-09-29, AFTER the Stage 1 publish, that is still true of a round.** The previous
+version of this paragraph said "As of 2026-09-23 the database does". That was false,
+and it is the exact class of defect CLAUDE.md warns about: the rule was WRITTEN on
+2026-09-23 and never published, so a confident sentence claimed an enforcement that
+does not exist. **Stage 1 did not change it either** — Stage 1 deliberately left the
+`events/$eventCode` parent byte-identical to `dab91d8`, so setup is still writable by
+anyone holding the code. What Stage 1 locked is the NEW ground: `organizers/$uid/groups`
+and `sharedGroups`. Read the next section before assuming anything about a round.
 
-**MEASURED 2026-09-27 (Wave 22 item 3, logged and not built — nothing was
-published).** The last publish of `database.rules.json` was `dab91d8` (2026-09-18),
-whose repo bytes plus one trailing newline hash to
-`66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd` — the live sha
-read back three times with `firebase-tools` and recorded above. **Five** commits have
-changed the file since and **none of them is live**:
+### STAGE 1 IS LIVE (published 2026-09-29, ~7:01 PM, console paste)
+
+**WHAT IS LIVE IS `database.rules.stage1.json`, NOT `database.rules.json`.** That is
+the one thing to take from this section. Manny pasted the Stage 1 file into the
+Firebase console Rules tab; `database.rules.json` in the repo was never published and
+still carries the owner-only parent, which is Stage 2 and is **not built**.
+
+    live ruleset      database.rules.stage1.json   sha256 7fe9d73ef95f725da41cb3ca00459b46308e7d67068500a4c89c33769348fff8
+    rollback          dab91d8:database.rules.json  sha256 66d26ee96a33e1d3…
+                      (also on the Desktop as ROLLBACK-dab91d8-database.rules.json,
+                       byte for byte — a one-paste undo)
+
+**POST-PUBLISH CHECKS, run on the real app straight after:**
+
+| check | result |
+|---|---|
+| post a score from a `?group=` link | **SAVED** |
+| answer the forced KP (GFLBAM) | **SAVED** |
+
+Those two are the whole risk surface of Stage 1 — everything else it added is new
+ground nothing depended on. The other two checks on the list (add a side match, save
+a My Group) are the ones Stage 1 was FOR; My Groups could not save at all before it.
+
+**WHY THERE IS NO "live hash = repo file + newline" TRICK ANY MORE.** The loop below
+reproduced the live sha from git because every previous publish went through
+`firebase-tools`, which writes the repo file plus one trailing newline. Stage 1 went
+in as a CONSOLE PASTE, and the console reformats what it stores, so the live bytes are
+not guaranteed to equal any file in git. Two candidate hashes for the same content are
+recorded here so a future reader can tell which they are looking at rather than guess:
+
+    database.rules.stage1.json exactly            7fe9d73ef95f725da41cb3ca00459b46308e7d67068500a4c89c33769348fff8
+    the same file plus one trailing newline       123c6f57cf2863dc7bbdbb76cd5770a60319d3740a2b533ef172dec136c55aa2
+
+**If a read-back matches neither, read the live rules and diff them against
+`database.rules.stage1.json` before trusting anything in this section.**
+
+**STAGE 2 IS NOT BUILT.** The `ownerLock` grandfather design is approved in principle
+and nothing has been written: no rule, no app change, no flag on any round. Until it
+is, a code-holder can still rewrite a round's setup, exactly as before.
+
+### THE HISTORY, AND WHY THE TABLE BELOW STOPS AT dab91d8
+
+**MEASURED 2026-09-27 (Wave 22 item 3), superseded by the Stage 1 publish above.**
+Before 2026-09-29 the last publish of `database.rules.json` was `dab91d8`
+(2026-09-18), whose repo bytes plus one trailing newline hash to
+`66d26ee96a33e1d3a6e2f28c162053992cdec804928535d81339ec9f984f19bd` — the sha read back
+three times with `firebase-tools` and recorded above. It is now the ROLLBACK, not the
+live ruleset. **Five** commits had changed the repo file since, and **none of them has
+ever been live**:
 
 | commit | date | repo bytes + `\n`, sha256 | what it added |
 |---|---|---|---|
@@ -2827,7 +2874,7 @@ changed the file since and **none of them is live**:
 | `6c2bd1b` | 2026-09-24 | `358391e176b396e3` | v222 season ledger |
 | `ae22953` | 2026-09-24 | `5b0fac15f23d658a` | v217 confirm-or-mark-out |
 | `4f4ec0a` | 2026-09-23 | `233246783e03183c` | Lock consumer round setup to the owner's uid (#13) — **the one this section used to claim was enforced** |
-| `dab91d8` | 2026-09-18 | `66d26ee96a33e1d3` | **← THIS IS WHAT IS LIVE.** A code-holder writes scores and nothing else |
+| `dab91d8` | 2026-09-18 | `66d26ee96a33e1d3` | **← THE ROLLBACK** (was live until 2026-09-29). A code-holder writes scores and nothing else |
 
 **Check it rather than trust it.** The live hash is of the repo file plus one trailing
 newline, which is what the Firebase CLI writes, so the whole table reproduces locally
@@ -2843,14 +2890,17 @@ done
 ```
 
 The current repo file plus a newline is `966360897cf255ad…`, which matches `1fafd07`
-and not the live hash. **If a future reader runs that loop and the `<== LIVE` marker has moved
-to a newer commit, the rules were published in between and this whole section needs
-re-reading.** If the marker disappears entirely, something was published that is not
-in git, and the live rules should be read back before anything else is trusted here. **So today every consumer gate on a round is UI only.** Hiding "Edit
-round setup" is the whole of it; a client that skips the page and writes the node
-directly is refused by nothing.
+and is NOT what is live. **That loop now finds no `<== LIVE` marker at all, and that is
+correct rather than alarming:** what is live is `database.rules.stage1.json`, which is
+not a version of `database.rules.json`. The loop still answers a useful question —
+which committed version of the repo file was ever published — and the answer is
+`dab91d8` and nothing since. **So today every consumer gate on a round is STILL UI only, Stage 1
+published and all.** Hiding "Edit round setup" is the whole of it; a client that skips
+the page and writes the node directly is refused by nothing. The section below
+describes what STAGE 2 would change.
 
-**WHAT PUBLISHING WOULD CHANGE, and what it would not.** This is the distinction a
+**WHAT STAGE 2 WOULD CHANGE, and what it would not** (this is the owner-only parent
+that `database.rules.json` already carries and that Stage 1 deliberately left out). This is the distinction a
 future reader needs, so it is written out rather than summarised. `events/$eventCode`
 `.read` is `true` and stays `true` — the round is readable by anyone with the code by
 design, which is also why the rules **cannot** trust the organizer token: it travels
