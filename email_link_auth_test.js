@@ -237,7 +237,15 @@ describe('SENDING THE LINK', () => {
         await assert.rejects(() => sb.emailLinkAuth.sendLink('marty@example.com'), (err) => err.code === 'auth/operation-not-allowed');
         assert.equal(sb.localStorage.getItem('golfapp_email_for_sign_in'), null);
         assert.match(sb.emailLinkAuth.messageFor({ code: 'auth/operation-not-allowed' }), /Firebase console/);
-        assert.match(sb.emailLinkAuth.messageFor({ code: 'auth/unauthorized-domain' }), /Firebase console/);
+        // SPLIT 2026-09-29. These two were one assertion, and they are two different
+        // failures: operation-not-allowed means the PROVIDER is off, and
+        // unauthorized-domain means THIS ORIGIN is not allowlisted. Measured on a
+        // branch preview, the second sends no email and used to be reported as a
+        // network problem. It now gets its own note, which names the hostname.
+        assert.match(sb.emailLinkAuth.messageFor({ code: 'auth/unauthorized-domain' }),
+            /No email was sent/);
+        assert.match(sb.emailLinkAuth.messageFor({ code: 'auth/unauthorized-continue-uri' }),
+            /Authorized domains/, 'the code a preview actually returns');
         await assert.rejects(() => sb.emailLinkAuth.sendLink('not-an-email'), (err) => err.code === 'auth/invalid-email');
     });
 });
@@ -364,7 +372,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v259-pressnames';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v260-signinwhy';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);

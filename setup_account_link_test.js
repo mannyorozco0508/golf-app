@@ -69,7 +69,27 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         // If it moves, Option A stopped being a presentation change and the
         // held-note flush, the uid preservation and the link/adopt split all need
         // re-proving rather than re-pinning.
-        assert.equal(sha('email-link-auth.js'), 'ed3eed24c3a4410ad1a5915eb5e61cebb9f8782aa0d5f0c8023bafc678f6c044',
+        // RE-PINNED 2026-09-29 (was ed3eed24): ONE message-map change - four
+        // continue-uri error codes now return a note that says no email was sent and
+        // names this hostname, instead of falling through to "Could not finish
+        // sign-in. Check the signal". Measured cause: sendOobCode with a branch-preview
+        // continueUrl is refused UNAUTHORIZED_DOMAIN before any email leaves.
+        //
+        // AND THE THREE THINGS THIS PIN DEMANDS BE RE-PROVED WERE RE-PROVED, not
+        // re-pinned - each is a passing test in email_link_auth_test.js, named here so
+        // the claim is checkable:
+        //   the uid-preserving link path   "linkWithCredential keeps the uid and does
+        //                                   not call signInWithEmailLink", plus "a link
+        //                                   that comes back as a different uid is a
+        //                                   failure, not a preserved organizer"
+        //   the second-device adopt path   "email already on an account: sign in as
+        //                                   that account, and say the trial was not
+        //                                   copied"
+        //   the held-note flush (v214)     "paste and Finish inside the panel repaints
+        //                                   the link, with no reopen and no reload"
+        // Nothing in the send path, the link path or the adopt path was touched; the
+        // diff is the message map and one helper that reads window.location.hostname.
+        assert.equal(sha('email-link-auth.js'), '0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

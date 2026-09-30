@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v100-pressnames. The tournament product cache
+// The consumer product cache is consumer-v101-signinwhy. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3629,7 +3629,28 @@
 // helpers/match-engine-golden.json change and not one of its 70 numbers does.
 //
 // GUARDED BY press_parent_labels_test.js.
-const CACHE_VERSION = 'golfapp-v259-pressnames';
+// Moved to v260 SO A PREVIEW SAYS WHY IT CANNOT EMAIL A SIGN-IN LINK.
+//
+// On a branch preview, "Email me a sign-in link" sent nothing and the screen said
+// "Could not finish sign-in. Check the signal and try the link again." Measured
+// against the project: sendOobCode with a preview continueUrl is refused with
+// UNAUTHORIZED_DOMAIN before any email leaves, and the same request with the live
+// host is accepted. So the cause is the ORIGIN - a branch host is not on the
+// project authorized domains - and continueUrl() sends this origin ON PURPOSE, so a
+// preview cannot email a production link.
+//
+// THE CODE DEFECT: the SDK reports it as auth/unauthorized-continue-uri, a DIFFERENT
+// code from auth/unauthorized-domain, and only the second was in the message map. So
+// it fell through to the generic note, which blamed the network for a refusal that
+// never reached it and implied a link was on its way. All four continue-uri codes
+// now land on a note that says nothing was sent, names THIS hostname, and gives both
+// ways out - the live app, or the console entry.
+//
+// AN INSTALLED DEVICE WITHOUT THIS BUMP keeps the misleading note. Sign-in on the
+// live app is unaffected either way; this only changes what a failure says.
+//
+// GUARDED BY preview_signin_domain_test.js.
+const CACHE_VERSION = 'golfapp-v260-signinwhy';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

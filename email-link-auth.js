@@ -72,6 +72,29 @@
     var NOTE_LINK_UNAVAILABLE = 'This app cannot attach the link to the current account. Sign-in was not switched to a new account.';
     var NOTE_UID_CHANGED = 'The link did not stay on this account. Nothing was switched. Send a new link from this app and finish it here.';
     var NOTE_GENERIC = 'Could not finish sign-in. Check the signal and try the link again.';
+    // THE PREVIEW-DEPLOY MESSAGE, and why it is its own note (2026-09-29).
+    //
+    // MEASURED against the project: sending a link with a continueUrl on a branch
+    // preview is refused before any email leaves -
+    //     POST accounts:sendOobCode  continueUrl=https://ui-wave31-my-groups.golf-app-5a5.pages.dev/admin.html
+    //       -> UNAUTHORIZED_DOMAIN : Domain not allowlisted by project
+    //     the same request with https://golf-app-5a5.pages.dev/admin.html  -> accepted
+    // so the cause is the ORIGIN, not the email, the signal or the account.
+    //
+    // The SDK reports that as `auth/unauthorized-continue-uri`, which is a DIFFERENT
+    // code from `auth/unauthorized-domain` and was not in the map below - so it fell
+    // through to NOTE_GENERIC and the screen said "Could not finish sign-in. Check the
+    // signal", after no email had been sent and with nothing wrong with the signal.
+    // Two wrong things in one line: it blamed the network, and it implied a link was
+    // on its way. The note now names the real cause and both ways out.
+    function noteUnauthorizedOrigin() {
+        var host = '';
+        try { host = String((window.location && window.location.hostname) || ''); } catch (e) { host = ''; }
+        return 'No email was sent: ' + (host ? host : 'this address')
+            + ' is not on this project\u2019s authorized sign-in domains, so Firebase refused the '
+            + 'request. Sign in on the live app instead, or add this exact hostname in Firebase '
+            + 'Console \u2192 Authentication \u2192 Settings \u2192 Authorized domains.';
+    }
 
     function normalizeEmail(email) {
         return String(email == null ? '' : email).trim().toLowerCase();
@@ -179,7 +202,13 @@
 
     function messageFor(err) {
         var code = err && err.code;
-        if (code === 'auth/operation-not-allowed' || code === 'auth/unauthorized-domain') return NOTE_CONSOLE;
+        if (code === 'auth/operation-not-allowed') return NOTE_CONSOLE;
+        // BOTH forms, because the SDK uses one for the page origin and the other for
+        // the continueUrl, and a preview deploy hits the second one.
+        if (code === 'auth/unauthorized-domain' || code === 'auth/unauthorized-continue-uri'
+            || code === 'auth/invalid-continue-uri' || code === 'auth/missing-continue-uri') {
+            return noteUnauthorizedOrigin();
+        }
         if (code === 'sdk-absent') return NOTE_NOT_READY;
         if (code === 'auth/invalid-email') return NOTE_BAD_EMAIL;
         if (code === 'auth/invalid-action-code' || code === 'auth/expired-action-code') return NOTE_BAD_LINK;
