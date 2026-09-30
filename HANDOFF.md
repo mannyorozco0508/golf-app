@@ -3037,6 +3037,33 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Known open items
 
+- **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
+  THERE.** Manny reported it on GFLBAM hole 4, group 3: tapping "Change KP" put
+  LIVE LEADERBOARD, Skins Won and Live Matches & Presses at the top of the screen
+  with Hole 4 below - and all three of those mounts sit BELOW the KP box inside
+  `#hole-view-card` (`index.html:2991-2993`), so the page ended up FURTHER DOWN than
+  the box. "Jumped up" is the content moving up the screen, not the scroll going to 0.
+  - **MEASURED, AND IT IS NOT THE PRODUCT.** Six arms say the page does not move: a
+    synthetic round; the real GFLBAM round with the second snapshot the write causes,
+    delivered the way Firebase delivers it; three viewport-height arms emulating
+    Chrome-on-iPhone toolbars (844/730/844); and **the installed iOS app on Manny's
+    own phone, through a forced-on probe build** - it STAYS PUT there. The clamp
+    theory is dead on arithmetic: the KP block grows 92 -> 268, so `maxScroll` RISES
+    176px on that press and a toolbar is 60-90px.
+  - **SO IT IS CHROME-ON-iPHONE ONLY**, which is WebKit under Chrome's own chrome,
+    with toolbars that collapse and expand on scroll. `kp_change_stays_put_test.js`
+    pins the property for every engine the suite can drive.
+  - **NOT BEING CHASED (Manny's call, 2026-09-30).** The diagnostic lives on branch
+    `ui-kpprobe-scroll` (`8322436`, UNMERGED): `?kpprobe=1` prints four numbered
+    samples around the press - before, rendered, next frame, +800ms - with scrollY,
+    innerHeight, visualViewport, document height, maxScroll and the box's top. To pick
+    it up again: that branch, that link, on Chrome on an iPhone.
+  - **AND THE HARNESS TRAP THAT COST AN HOUR, TWICE.** `cold-arrival.js:397` centres
+    an element before every `{ tap }`. With a `{ tap }` this very press "moves" the
+    page 119px - a perfect reproduction of the report, manufactured by the tool. Wave
+    27 produced a phantom 39px shift the same way. Measure a scroll with a raw
+    `Input.dispatchMouseEvent` or measure nothing.
+
 - **OPEN 2026-09-28 — THE REAL LOCK WAVE: publishing the rules, and the audit that
   has to come first.** Every consumer gate today is UI only (see "What the next rules
   publish must carry" above). Making enforcement real is its own wave, and it has a
