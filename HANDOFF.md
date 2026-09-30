@@ -2884,8 +2884,18 @@ that, which is why no UI string may say protected, secure or locked.
 2026-09-28, Wave 23, `#eventCode` child, `.write` identical to `kpLeaders`,
 `kpWinners` and `kpConfirmed`: `root.child('events/' + $eventCode).exists()`).
 
-This is not a nice-to-have, and it is the one entry on this list whose absence
-BREAKS A SHIPPED FEATURE rather than merely leaving it unenforced:
+**CORRECTED 2026-09-29, measured against production.** kpGroupAnswers WORKS TODAY
+via the open parent: the live `events/$eventCode` `.write` lets any code-holder write
+an existing round, so the child inherits permission and the forced-KP gate has been
+recording all along. GFLBAM holds three stored answers (h4, h7, h11, group 3) as the
+field evidence, and `rules_stage1_test.js` asserts the same verdict against the live
+file. The child rule BREAKS NOTHING by its absence and becomes ESSENTIAL only if the
+parent tightens without it - which is Stage 2. The paragraph below was written on the
+assumption that the repo file would be published whole; it is right about the
+consequence and wrong about the timing.
+
+If the parent is ever tightened, this is the one entry whose absence would break a
+shipped feature rather than merely leave it unenforced:
 
 - The forced KP decision writes the group's answer to
   `events/<CODE>/kpGroupAnswers/h<N>/g<G>`. The writer is a **group scorekeeper** on a
