@@ -49,15 +49,15 @@
 //   - mini-dom has no layout, so "shown" here means style.display, never that
 //     anybody could see or tap it. The two-step arming is state, not geometry.
 //
-// THE BASELINE, all 33 tests, measured against main 7608a56 in a clean worktree -
+// THE BASELINE, all 34 tests, measured against main 7608a56 in a clean worktree -
 // Wave 33 merged, no account-exit.js, no card, no sign-out anywhere in the app:
 //
-//     3 PASS / 30 FAIL
+//     3 PASS / 31 FAIL
 //
 // The three that pass are the whole rules block, and they are honest about earning
 // nothing from this wave: they measure a ruleset this wave does not touch. They are
 // here because the DESIGN depends on those eight verdicts, and a rules publish that
-// changed one of them would make this wave's delete silently incomplete. The 30
+// changed one of them would make this wave's delete silently incomplete. The 31
 // reds are every line of the feature.
 //
 // (My own first draft of this paragraph said 8 PASS, from counting the targaryen
@@ -432,7 +432,35 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
             'the screen has to say so: ' + p.text('account-exit-status'));
     });
 
-    test('BEFORE THE RULES PUBLISH: the record is refused, the groups write runs, the account still goes', async () => {
+    test('AFTER THE PUBLISH: organizers/<uid> goes in ONE write, and the groups write is not even attempted', async () => {
+        // THE RULES WENT LIVE 2026-09-30, ~4:40 AM Phoenix. The page-path proof is
+        // the ORDER test above - two writes, the record among them and no groups
+        // write at all. This one calls deleteAccount directly, because the fact being
+        // asserted is in its RESULT rather than on the screen: recordRemoved is the
+        // single flag that says which of the two worlds a delete happened in, and
+        // done['.../groups'] === 'skipped' is the proof the fallback did not run.
+        const sb = loadHtmlInlineScript('admin.html', ['account-exit.js', 'my-groups.js']);
+        sb.__dbReads = { 'organizers/u9/groups': { g1: { name: 'Thursday game', coOrganizers: { 'a,b@c,com': true } } } };
+        const user = { uid: 'u9', isAnonymous: false, email: 'a@b.com',
+                       providerData: [{ providerId: 'apple.com' }],
+                       delete: () => Promise.resolve() };
+        const out = await sb.window.accountExit.deleteAccount({
+            auth: { currentUser: user }, db: sb.db, reload: () => {}
+        });
+        assert.equal(out.recordRemoved, true, 'the whole record must be what went');
+        assert.equal(out.done['organizers/u9'], 'removed');
+        assert.equal(out.done['organizers/u9/groups'], 'skipped',
+            'the groups fallback must not run once the record is gone - it is one write, not two');
+        assert.deepEqual(sb.__dbWrites.map(w => w.path), [
+            'sharedGroups/a,b@c,com/u9/g1',
+            'organizers/u9'
+        ], 'exactly two writes: the pointer, and the record');
+        // AND THE KEEPS ARE NOW MOOT, which the result says rather than the header:
+        // firstSeenAt and pass went with the record.
+        assert.equal(out.keeps.length, 2, 'the plan still NAMES them, for the rollback world');
+    });
+
+    test('BEFORE THE PUBLISH (or after a rollback): the record is refused, the groups write runs, the account still goes', async () => {
         // This is the world the app is in RIGHT NOW: Stage 1 has no .write at
         // organizers/<uid>, so the first attempt is permission-denied. It must not
         // be the STOP, and the fallback must actually run - otherwise the feature

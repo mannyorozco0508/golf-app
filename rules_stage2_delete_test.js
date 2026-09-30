@@ -8,7 +8,12 @@
 // behind. Manny approved one addition to fix that, and this file is the proof of
 // what it does and - more importantly - what it does not.
 //
-// THE WHOLE DELTA, one key, on top of the published file:
+// PUBLISHED 2026-09-30, ~4:40 AM Phoenix, from PUBLISH-THIS-database.rules.stage2delete
+// .json with no edits. Post-publish on the phone: a score save PASSED and My Groups
+// still listed "Thursday game". So this file's subject is now the LIVE ruleset, and
+// database.rules.stage1.json is the rollback.
+//
+// THE WHOLE DELTA, one key, on top of the ruleset it replaced:
 //
 //   "organizers": { "$uid": { ".write":
 //       "newData.val() === null && auth != null && auth.uid === $uid" } }
@@ -92,8 +97,14 @@ const { execFileSync } = require('child_process');
 
 const REPO = __dirname;
 const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
-const LIVE = path.join(REPO, 'database.rules.stage1.json');          // published 2026-09-29
-const NEXT = path.join(REPO, 'database.rules.stage2delete.json');     // to be published
+// PUBLISHED 2026-09-30, ~4:40 AM Phoenix, by console paste of
+// PUBLISH-THIS-database.rules.stage2delete.json with no edits. So the names moved,
+// exactly as they did in rules_stage1_test.js after its own publish: what this file
+// calls LIVE is the stage2delete file, and stage1 is now PREV - the rollback. Calling
+// stage1 "live" after the publish would have made every comparison below mislabelled
+// while still passing.
+const LIVE = path.join(REPO, 'database.rules.stage2delete.json');    // published 2026-09-30
+const PREV = path.join(REPO, 'database.rules.stage1.json');          // the rollback
 const ROLLBACK = path.join(REPO, 'database.rules.rollback-stage1.json');
 
 const OWNER = 'u-owner';
@@ -124,40 +135,40 @@ const USERS = {
 // EVERY ROW SAYS WHAT IT IS FOR, and `live` is what the SAME row does under the
 // published file - so the difference the publish makes is measured, not asserted.
 const T = [
-    { id: 'A1', what: 'the owner empties their whole record', who: 'owner', next: 'allow', live: 'refuse',
+    { id: 'A1', what: 'the owner empties their whole record', who: 'owner', live: 'allow', prev: 'refuse',
       path: 'organizers/' + OWNER, data: null,
       why: 'this is the point of the delta: delete account now removes firstSeenAt and pass with it' },
-    { id: 'A2', what: 'somebody else tries to empty it', who: 'other', next: 'refuse', live: 'refuse',
+    { id: 'A2', what: 'somebody else tries to empty it', who: 'other', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER, data: null,
       why: 'the auth.uid half - without it any signed-in golfer could wipe any organizer' },
-    { id: 'A3', what: 'an unauthenticated visitor tries to empty it', who: 'nobody', next: 'refuse', live: 'refuse',
+    { id: 'A3', what: 'an unauthenticated visitor tries to empty it', who: 'nobody', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER, data: null,
       why: 'a null auth must not slip through auth.uid === $uid' },
-    { id: 'A4', what: 'the owner OVERWRITES the record with something', who: 'owner', next: 'refuse', live: 'refuse',
+    { id: 'A4', what: 'the owner OVERWRITES the record with something', who: 'owner', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER, data: { firstSeenAt: 1, pass: { kind: 'founder', expiresAt: 9 } },
       why: 'the newData null half - a delete rule that also permits a rewrite is a pass-granting rule' },
-    { id: 'A5', what: 'the owner writes themselves a pass', who: 'owner', next: 'refuse', live: 'refuse',
+    { id: 'A5', what: 'the owner writes themselves a pass', who: 'owner', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER + '/pass', data: { kind: 'founder', expiresAt: 4102444800000 },
       why: 'THE ONE THAT MATTERS: a parent grant cannot be revoked deeper, so this is what the null half exists to stop' },
-    { id: 'A6', what: 'the owner deletes only their pass', who: 'owner', next: 'refuse', live: 'refuse',
+    { id: 'A6', what: 'the owner deletes only their pass', who: 'owner', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER + '/pass', data: null,
       why: 'the record still has two keys afterwards, so it is not a delete and pass stays unremovable' },
-    { id: 'A7', what: 'the owner deletes only firstSeenAt', who: 'owner', next: 'refuse', live: 'refuse',
+    { id: 'A7', what: 'the owner deletes only firstSeenAt', who: 'owner', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER + '/firstSeenAt', data: null,
       why: 'same reason - the trial clock cannot be reset by shaving one key off the record' },
-    { id: 'A8', what: 'the owner writes a bigger firstSeenAt', who: 'owner', next: 'refuse', live: 'refuse',
+    { id: 'A8', what: 'the owner writes a bigger firstSeenAt', who: 'owner', live: 'refuse', prev: 'refuse',
       path: 'organizers/' + OWNER + '/firstSeenAt', data: 99,
       why: 'the create-only rule still stands: a running trial cannot be restarted' },
-    { id: 'A9', what: 'the owner removes their groups', who: 'owner', next: 'allow', live: 'allow',
+    { id: 'A9', what: 'the owner removes their groups', who: 'owner', live: 'allow', prev: 'allow',
       path: 'organizers/' + OWNER + '/groups', data: null,
       why: 'unchanged, and still the fallback the app uses until the publish lands' },
-    { id: 'A10', what: 'the owner removes one co-organizer pointer', who: 'owner', next: 'allow', live: 'allow',
+    { id: 'A10', what: 'the owner removes one co-organizer pointer', who: 'owner', live: 'allow', prev: 'allow',
       path: 'sharedGroups/' + CO_KEY + '/' + OWNER + '/g1', data: null,
       why: 'unchanged: the pointers are removed leaf by leaf either way' },
-    { id: 'A11', what: 'a scorekeeper posts a score', who: 'nobody', next: 'allow', live: 'allow',
+    { id: 'A11', what: 'a scorekeeper posts a score', who: 'nobody', live: 'allow', prev: 'allow',
       path: 'events/ZZTEST/scores/p101_h2', data: 4,
       why: 'the most common write in the app, and this delta must not go near it' },
-    { id: 'A12', what: 'a record whose ONLY key is pass loses it', who: 'passonly', next: 'allow', live: 'refuse',
+    { id: 'A12', what: 'a record whose ONLY key is pass loses it', who: 'passonly', live: 'allow', prev: 'refuse',
       path: 'organizers/u-passonly/pass', data: null,
       why: 'the intended edge case in the header: emptying that record IS deleting that account' }
 ];
@@ -165,7 +176,7 @@ const T = [
 function dataFile(which) {
     const tests = {};
     T.forEach(row => {
-        const want = which === 'live' ? row.live : row.next;
+        const want = which === 'prev' ? row.prev : row.live;
         const entry = tests[row.path] || {};
         const bucket = want === 'allow' ? 'canWrite' : 'cannotWrite';
         entry[bucket] = (entry[bucket] || []).concat([{ auth: row.who, data: row.data }]);
@@ -182,7 +193,7 @@ function run(rulesPath, which) {
 // A mutated ruleset, written to a temp path. NO REPO FILE IS TOUCHED, so there is
 // nothing to restore - the controls run on a copy.
 function mutated(fn) {
-    const d = JSON.parse(fs.readFileSync(NEXT, 'utf8'));
+    const d = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
     fn(d);
     const f = path.join(os.tmpdir(), 'rules-stage2-ctl-' + process.pid + '-' + Math.random().toString(36).slice(2) + '.json');
     fs.writeFileSync(f, JSON.stringify(d, null, 1));
@@ -192,17 +203,17 @@ function mutated(fn) {
 describe('THE DELETE RULE, AND THE TWO HALVES THAT MAKE IT SAFE', () => {
 
     test('the table has both verdicts, a null-auth row, and a reason each', () => {
-        assert.ok(T.filter(r => r.next === 'allow').length >= 4, 'a table of refusals is satisfied by a ruleset that refuses everything');
-        assert.ok(T.filter(r => r.next === 'refuse').length >= 6);
-        assert.ok(T.some(r => r.who === 'nobody' && r.next === 'refuse'));
+        assert.ok(T.filter(r => r.live === 'allow').length >= 4, 'a table of refusals is satisfied by a ruleset that refuses everything');
+        assert.ok(T.filter(r => r.live === 'refuse').length >= 6);
+        assert.ok(T.some(r => r.who === 'nobody' && r.live === 'refuse'));
         T.forEach(r => assert.ok(r.why && r.why.length > 25, r.id + ' must say why'));
         assert.ok(fs.existsSync(TARGARYEN), 'targaryen is the harness this repo uses for rules');
     });
 
-    test('the candidate file exists and is the published file plus ONE key', () => {
-        assert.ok(fs.existsSync(NEXT), 'database.rules.stage2delete.json is what Manny publishes');
-        const live = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
-        const next = JSON.parse(fs.readFileSync(NEXT, 'utf8'));
+    test('the live file is the previous one plus ONE key', () => {
+        assert.ok(fs.existsSync(LIVE), 'database.rules.stage2delete.json is what is LIVE since 2026-09-30');
+        const live = JSON.parse(fs.readFileSync(PREV, 'utf8'));
+        const next = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
         const added = [];
         (function walk(a, b, p) {
             Object.keys(b).forEach(k => {
@@ -213,39 +224,39 @@ describe('THE DELETE RULE, AND THE TWO HALVES THAT MAKE IT SAFE', () => {
             Object.keys(a).forEach(k => { if (!(k in b)) added.push('REMOVED ' + p + '/' + k); });
         })(live, next, '');
         assert.deepEqual(added, ['/rules/organizers/$uid/.write'],
-            'the publish must add exactly one key and change nothing else: ' + JSON.stringify(added));
+            'the publish added exactly one key and changed nothing else: ' + JSON.stringify(added));
         assert.equal(next.rules.organizers.$uid['.write'],
             'newData.val() === null && auth != null && auth.uid === $uid');
     });
 
-    test('the events parent is still BYTE-IDENTICAL to the published file', () => {
+    test('the events parent is still BYTE-IDENTICAL to what it replaced', () => {
         // Rounds are what the whole app does. A rules publish that touched this
         // parent would be a different wave with a different approval.
+        const prev = JSON.parse(fs.readFileSync(PREV, 'utf8'));
         const live = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
-        const next = JSON.parse(fs.readFileSync(NEXT, 'utf8'));
-        assert.equal(JSON.stringify(next.rules.events), JSON.stringify(live.rules.events));
+        assert.equal(JSON.stringify(live.rules.events), JSON.stringify(prev.rules.events));
     });
 
-    test('EVERY expectation holds against the candidate', () => {
-        const { code, out } = run(NEXT, 'next');
-        assert.equal(code, 0, 'targaryen disagreed with the candidate:\n' + out.slice(-3000));
+    test('EVERY expectation holds against the LIVE file', () => {
+        const { code, out } = run(LIVE, 'live');
+        assert.equal(code, 0, 'targaryen disagreed with the live file:\n' + out.slice(-3000));
         assert.match(out, /0 failures in \d+ tests/, out.slice(-2000));
     });
 
-    test('and the SAME rows behave as stated under the PUBLISHED file', () => {
-        // Which is what makes the `live` column a measurement rather than a memory.
-        const { code, out } = run(LIVE, 'live');
-        assert.equal(code, 0, 'the live column is wrong somewhere:\n' + out.slice(-3000));
+    test('and the SAME rows behave as stated under the ROLLBACK file', () => {
+        // Which is what makes the `prev` column a measurement rather than a memory.
+        const { code, out } = run(PREV, 'prev');
+        assert.equal(code, 0, 'the prev column is wrong somewhere:\n' + out.slice(-3000));
         assert.match(out, /0 failures in \d+ tests/, out.slice(-2000));
     });
 
     test('exactly TWO rule outcomes change, and both are deletes', () => {
-        const changed = T.filter(r => r.next !== r.live);
+        const changed = T.filter(r => r.live !== r.prev);
         assert.deepEqual(changed.map(r => r.id), ['A1', 'A12']);
         changed.forEach(r => {
             assert.equal(r.data, null, r.id + ' must be a delete');
-            assert.equal(r.next, 'allow');
-            assert.equal(r.live, 'refuse');
+            assert.equal(r.live, 'allow');
+            assert.equal(r.prev, 'refuse');
         });
         // Two ROWS. The third change the publish brings is in the app rather than in
         // the ruleset - organizers/<uid> becomes removable, so account-exit.js's
@@ -258,7 +269,7 @@ describe('THE DELETE RULE, AND THE TWO HALVES THAT MAKE IT SAFE', () => {
         const f = mutated(d => {
             d.rules.organizers.$uid['.write'] = 'auth != null && auth.uid === $uid';
         });
-        const { code, out } = run(f, 'next');
+        const { code, out } = run(f, 'live');
         assert.notEqual(code, 0, 'a rule that lets the owner write anything under their record must FAIL this table');
         assert.match(out, /organizers\/u-owner\/pass|organizers\/u-owner/, out.slice(-1500));
     });
@@ -267,28 +278,30 @@ describe('THE DELETE RULE, AND THE TWO HALVES THAT MAKE IT SAFE', () => {
         const f = mutated(d => {
             d.rules.organizers.$uid['.write'] = 'newData.val() === null';
         });
-        const { code, out } = run(f, 'next');
+        const { code, out } = run(f, 'live');
         assert.notEqual(code, 0, 'without auth.uid === $uid, A2 and A3 must fail');
         assert.match(out, /organizers\/u-owner/, out.slice(-1500));
     });
 
-    test('NEGATIVE CONTROL: the published file itself fails the candidate table', () => {
-        // Proof the table is not vacuous: the ruleset that is live right now cannot
-        // satisfy it, because A1 and A12 are the whole point of the publish.
-        const { code } = run(LIVE, 'next');
-        assert.notEqual(code, 0, 'if the live file passed the candidate table, the publish would change nothing');
+    test('NEGATIVE CONTROL: the ROLLBACK file fails the live table', () => {
+        // Proof the table is not vacuous: the ruleset this replaced cannot satisfy
+        // it, because A1 and A12 are the whole point of the publish. It is also what
+        // a rollback would cost - roll back and the app is back to leaving
+        // firstSeenAt and any pass behind on a deleted account.
+        const { code } = run(PREV, 'live');
+        assert.notEqual(code, 0, 'if stage1 passed the live table, the publish would have changed nothing');
     });
 });
 
 describe('THE ROLLBACK, AND WHAT THE PUBLISH MUST NOT TAKE AWAY', () => {
 
-    test('the rollback copy is BYTE-IDENTICAL to the published file', () => {
+    test('the rollback copy is BYTE-IDENTICAL to the ruleset it rolls back to', () => {
         assert.ok(fs.existsSync(ROLLBACK), 'a publish with no rollback in hand is not a publish');
-        assert.equal(fs.readFileSync(ROLLBACK, 'utf8'), fs.readFileSync(LIVE, 'utf8'),
-            'the rollback must be exactly what is live, not a reconstruction of it');
+        assert.equal(fs.readFileSync(ROLLBACK, 'utf8'), fs.readFileSync(PREV, 'utf8'),
+            'the rollback must be exactly Stage 1, not a reconstruction of it');
     });
 
-    test('EVERYTHING STAGE 1 ALLOWED IS STILL ALLOWED - its own 21 rows, re-run', () => {
+    test('EVERYTHING STAGE 1 ALLOWED IS STILL ALLOWED - its own 21 rows, re-run against LIVE', () => {
         // Not a hand-picked subset: rules_stage1_test.js is run again with its
         // candidate pointed at the new file, so the table that DEFINED Stage 1 is
         // the table that says the publish took nothing away.
@@ -303,7 +316,7 @@ describe('THE ROLLBACK, AND WHAT THE PUBLISH MUST NOT TAKE AWAY', () => {
                 // writes nothing a regex can read - the first version of this test
                 // matched against an empty string and failed for that reason alone.
                 env: (function () {
-                    const e = Object.assign({}, process.env, { RULES_CANDIDATE: NEXT });
+                    const e = Object.assign({}, process.env, { RULES_CANDIDATE: LIVE });
                     delete e.NODE_TEST_CONTEXT;
                     delete e.NODE_OPTIONS;
                     return e;
@@ -317,10 +330,11 @@ describe('THE ROLLBACK, AND WHAT THE PUBLISH MUST NOT TAKE AWAY', () => {
         assert.match(out, /# pass 11/, 'all 11 Stage 1 tests must run: ' + out.slice(-800));
     });
 
-    test('the app does not need the publish to have happened', () => {
+    test('the app did not need the publish to have happened, and still does not', () => {
         // account-exit.js tries the whole record FIRST and falls back to groups when
-        // the rules refuse it, so the same build works before and after. A wave that
-        // needed the publish to land first would be a wave nobody could test.
+        // the rules refuse it, so the same build works before and after - and it is
+        // also what makes the rollback safe: roll the rules back and the fallback
+        // simply starts running again, with no release.
         const src = fs.readFileSync(path.join(REPO, 'account-exit.js'), 'utf8');
         assert.match(src, /WHOLE RECORD FIRST/, 'the file must say which strategy it uses');
         assert.match(src, /organizers\/' \+ id\b/, 'and it must try the record path');

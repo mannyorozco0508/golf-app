@@ -83,6 +83,15 @@ const REPO_RULES = path.join(REPO, 'database.rules.json');
 // ROLLBACK, and the comparison below is "what Stage 1 changed relative to what it
 // replaced" - which is the same measurement, correctly named. Calling this variable
 // LIVE after the publish would have made the whole file assert a false label.
+//
+// AND NEITHER IS database.rules.stage1.json ANY MORE. On 2026-09-30, ~4:40 AM
+// Phoenix, database.rules.stage2delete.json was published - Stage 1 plus one key,
+// a .write at organizers/$uid that permits ONLY a full delete by the owner. So this
+// file's default candidate is now the one-step ROLLBACK rather than what is running,
+// and rules_stage2_delete_test.js owns the live file. Nothing here needed changing:
+// the 21 rows below are exactly the expectations the live ruleset must still meet,
+// and that suite re-runs this whole file with RULES_CANDIDATE pointed at it to prove
+// the publish took nothing away.
 const PREV = path.join(os.tmpdir(), 'rules-prev-dab91d8-' + process.pid + '.json');
 fs.writeFileSync(PREV, execFileSync('git', ['show', 'dab91d8:database.rules.json'], { cwd: REPO, encoding: 'utf8' }));
 
