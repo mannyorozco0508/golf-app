@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v107-signincode. The tournament product cache
+// The consumer product cache is consumer-v112-signedinclosed. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3769,7 +3769,54 @@
 // signs in with the credential FIREBASE puts on the error rather than re-presenting
 // the one the failed link already consumed. An installed device would otherwise keep
 // showing a sentence that cannot be diagnosed.
-const CACHE_VERSION = 'golfapp-v266-signincode';
+// Moved to v267 SO AN ACCOUNT CAN BE SIGNED OUT OF AND DELETED. App Review 5.1.1(v)
+// asks an app that creates accounts to let somebody delete one from inside it, and
+// Wave 33 made Apple and Google the front door while the app had neither a sign-out
+// nor a delete anywhere in it. account-exit.js joins the shell. An installed device
+// would otherwise keep serving a panel with no way out of the account it just made.
+//
+// WHAT A DELETE CAN REACH IS MEASURED, NOT ASSUMED. Under the live Stage 1 rules the
+// owner may remove organizers/<uid>/groups and each sharedGroups pointer, and the
+// client deletes the Auth user - which is the account. organizers/<uid> itself,
+// firstSeenAt and pass are all refused by rule, so two keys survive a delete and the
+// second warning says a founder pass does not come back. Rounds are never touched:
+// other golfers may still be scoring one.
+// Moved to v268 BECAUSE THE DELETE NOW TRIES THE WHOLE RECORD FIRST. Manny approved
+// one rules addition - organizers/$uid may be EMPTIED by its owner and nothing else
+// (database.rules.stage2delete.json, not published yet) - so delete account attempts
+// organizers/<uid> before falling back to the groups write. That is the feature
+// detection: the same build is correct before and after the publish, and nothing
+// needs re-releasing when it lands. A device holding the earlier v267 from the branch
+// preview would keep the groups-only version.
+// Moved to v269 FOR A TRASH ICON ON EVERY GROUP ROW. My Groups had no way to remove
+// a saved group at all - the only way out of a group typed in by mistake was to stop
+// using it. The owner now gets one confirm and the group goes with its co-organizer
+// invites. There is NO leave button for a co-organizer, and that is the live rules
+// rather than a choice: every grant under organizers/$uid is the owner, so a
+// co-organizer cannot delete the group, their own invite, or even their own
+// sharedGroups pointer - measured in my_groups_delete_test.js. A shared row says who
+// can remove it instead. An installed device would otherwise keep a list with no way
+// to prune it.
+// Moved to v270 AFTER A REAL ACCOUNT WAS DELETED IN PLACE OF A THROWAWAY.
+// 2026-09-30: signed in as his real organizer, Manny tapped Continue with Google with
+// what he believed was a throwaway. A signed-in tap takes the sign-in branch, and
+// Firebase auto-links a verified Google credential to whichever account already holds
+// that email - so he was signed back into the SAME uid, the note said "same organizer
+// account", and the delete then deleted it. The founder-pass warning did not shout
+// because the record it reads is fetched once at page load for the uid the page
+// BOOTED with, and he had signed out first.
+// So: a signed-in panel no longer offers either provider button and says who you are
+// instead, both delete warnings NAME the account, and a founder pass has to be TYPED
+// away after a read taken at the moment of the delete. An installed device would
+// otherwise keep serving the screen that offered the tap.
+// Moved to v271 SO A SIGNED-IN PANEL HAS NO WAY IN AT ALL. The two provider buttons
+// came off at v270; "Use email instead" is the same hazard and was still there. It
+// signs in, and Firebase links a verified credential to whichever account already
+// holds that email - the exact mechanism that put a real organizer back on screen and
+// then deleted it. Signed in, the toggle is gone, the card is shut, and the handler
+// refuses on its own so a stale onclick or a cached shell cannot open it. Moving an
+// organizer to another device is: sign OUT here, sign in over there.
+const CACHE_VERSION = 'golfapp-v271-signedinclosed';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3886,6 +3933,15 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './oauth-signin.js',
+    // account-exit.js: sign out, and delete account - App Review 5.1.1(v), which
+    // asks an app that creates accounts to let somebody delete one from inside it.
+    // Precached because the panel it lives in has to work on a device that has not
+    // been online since the last release, and because a golfer who wants out should
+    // not be told to find signal first.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './account-exit.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -

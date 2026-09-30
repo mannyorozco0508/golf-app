@@ -1110,6 +1110,13 @@ group's names, the counted class back, the caution dropped). `sw.js`
 
 ## The founder pass, and a line that says where the trial stands (2026-09-20, v184)
 
+> **SUPERSEDED 2026-09-30.** The uid this section names, `k8fY…`, was DELETED during
+> the Wave 34 throwaway test, and its pass with it - see the incident at the top of
+> "Where things stand". The pass now lives on `h8AxnefqnuZNKv6XwvFFIKRMHSS2`, written
+> from the console with `grantedBy: "manny-console"`. Everything below is still the
+> right description of what a pass IS and how the rule treats it; only the uid and
+> the writing tool are historical.
+
 **THE PASS - a production write, done by hand on 2026-09-20 11:34 UTC.**
 `organizers/k8fYkL1hsPb6ZDL3wgQi8hywPi42/pass` = `{ expiresAt: 4102444800000
 (2099-12-31), kind: "founder", grantedAt: 1789904076089, grantedBy: "manny-cli", note }`.
@@ -3051,6 +3058,43 @@ is the case where "one group IS the field" was the deliberate design.
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
 ## Where things stand, 2026-09-30
+
+**INCIDENT, 2026-09-30: MANNY'S REAL ORGANIZER WAS DELETED DURING THE WAVE 34 TEST.**
+
+- **Gone:** the Auth user and `organizers/<uid>` for
+  `k8fYkL1hsPb6ZDL3wgQi8hywPi42`, founder pass included. **Rounds were untouched**,
+  which is what the delete was designed to do - `events/*` is never written.
+- **The new real account is `h8AxnefqnuZNKv6XwvFFIKRMHSS2`** (Apple), and the founder
+  pass has been RESTORED there from the console, `grantedBy: "manny-console"`. Manny
+  confirmed the founder line shows. The old uid is dead, and uids are never reused.
+- **THE PATH, AND NOT ONE STEP WAS A WRONG TAP.** He was signed in as the real
+  account and tapped Continue with Google with what he believed was a throwaway.
+  `planOauth` sees a NON-anonymous user, so it takes the sign-in branch - and
+  Firebase, with one-account-per-email, **auto-links a verified Google credential to
+  whichever account already holds that email**. So he was signed into the SAME uid,
+  and the note said, correctly, "This is the same organizer account". Delete account
+  then deleted exactly that account. **The screen offered that button while signed
+  in**, under a lead that said tapping it again only moves the organizer to another
+  device.
+- **WHY THE FOUNDER-PASS WARNING DID NOT SHOUT** - the part that is a defect in this
+  repo rather than in his tapping. The loud sentence needs a pass in `standing`, and
+  `standing` came from `organizer-gate.js readStanding`: ONE read, at page load,
+  through `window.authReady`, which is a **one-shot promise carrying the uid the page
+  BOOTED with**. He had signed out first, so the boot uid was anonymous, its record
+  was null, and the warning fell back to the hedged "If this account has a founder
+  pass..." - which reads like reassurance.
+- **FIXED ON `ui-wave34-account-exit`, unmerged, three changes and nine tests that
+  all fail against `bb3cd18` (the code that deleted it):** (1) signed in, Continue
+  with Apple and Continue with Google come OFF the screen and the panel says "Signed
+  in as EMAIL (PROVIDERS)"; moving a device is the email link, which says so.
+  (2) Both delete warnings NAME the account. (3) The pass is read at the moment of
+  the delete, off `auth.currentUser`, and a founder pass has to be TYPED away - the
+  word is DELETE - while an unreadable record gets its own sentence instead of the
+  reassuring one.
+- **STILL OPEN, and worth knowing before the next test:** the EMAIL LINK on a
+  signed-in account is the same class of hazard and was left alone this round - its
+  own lead says it is for moving an organizer to another device. And nothing in the
+  app can restore a founder pass: that was a console write, and it is the only way.
 
 **ONE-TAP SIGN-IN IS LIVE ON MAIN, AND IT WORKED ON A REAL iPHONE.** Wave 33,
 merged at `e50c91f` (`golfapp-v266-signincode`, consumer `v107`). Apple and Google

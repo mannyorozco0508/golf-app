@@ -69,13 +69,29 @@ const { execFileSync } = require('child_process');
 
 const REPO = __dirname;
 const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
-const CANDIDATE = path.join(REPO, 'database.rules.stage1.json');
+// THE CANDIDATE IS OVERRIDABLE, and that is what proves a later publish takes
+// nothing away. rules_stage2_delete_test.js runs this whole file again with
+// RULES_CANDIDATE pointed at database.rules.stage2delete.json: 21 rows, the same
+// expectations, so "everything Stage 1 allowed is still allowed" is measured by the
+// table that defined Stage 1 rather than by a hand-copied subset of it.
+const CANDIDATE = process.env.RULES_CANDIDATE
+    ? path.resolve(process.env.RULES_CANDIDATE)
+    : path.join(REPO, 'database.rules.stage1.json');
 const REPO_RULES = path.join(REPO, 'database.rules.json');
 // PREV, NOT LIVE. dab91d8 was the live ruleset until 2026-09-29, when Stage 1 was
 // published from database.rules.stage1.json through the console. It is now the
 // ROLLBACK, and the comparison below is "what Stage 1 changed relative to what it
 // replaced" - which is the same measurement, correctly named. Calling this variable
 // LIVE after the publish would have made the whole file assert a false label.
+//
+// AND NEITHER IS database.rules.stage1.json ANY MORE. On 2026-09-30, ~4:40 AM
+// Phoenix, database.rules.stage2delete.json was published - Stage 1 plus one key,
+// a .write at organizers/$uid that permits ONLY a full delete by the owner. So this
+// file's default candidate is now the one-step ROLLBACK rather than what is running,
+// and rules_stage2_delete_test.js owns the live file. Nothing here needed changing:
+// the 21 rows below are exactly the expectations the live ruleset must still meet,
+// and that suite re-runs this whole file with RULES_CANDIDATE pointed at it to prove
+// the publish took nothing away.
 const PREV = path.join(os.tmpdir(), 'rules-prev-dab91d8-' + process.pid + '.json');
 fs.writeFileSync(PREV, execFileSync('git', ['show', 'dab91d8:database.rules.json'], { cwd: REPO, encoding: 'utf8' }));
 

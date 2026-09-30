@@ -402,8 +402,17 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // browser that will not keep the setting (uiFail) and confirms each way it is
         // thrown (two uiToasts). A switch that changed state silently would be worse
         // than no switch.
-        assert.equal(refuse + fail + toast, 60,
-            'the alerts should still be 60 messages, got '
+        // 63 SINCE THE GROUP TRASH ICON (v269): deleting one saved group speaks three
+        // more times, one of each kind. It REFUSES when the caller is not the owner -
+        // a co-organizer cannot delete a group, their own invite, or their own
+        // sharedGroups pointer under the live rules, so that refusal is a state a
+        // real co-organizer can reach by calling the handler. It REPORTS a server
+        // refusal on the removal, and it must: a group left in place because a
+        // pointer removal failed has to say so rather than look deleted. And it
+        // CONFIRMS the delete, because a row vanishing is the kind of thing somebody
+        // needs told rather than inferred.
+        assert.equal(refuse + fail + toast, 63,
+            'the alerts should still be 63 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
@@ -417,7 +426,8 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // 11 since the extension: two more receipts of a completed write - a
         // co-organizer added, a co-organizer removed. Both are things that happened.
         // 12 with the switch's two confirmations, which are receipts of a state change.
-        assert.ok(toast <= 12, 'too much of this page floats away: ' + toast);
+        // 13 with "<group> deleted" (v269), which is a receipt of a completed write.
+        assert.ok(toast <= 13, 'too much of this page floats away: ' + toast);
     });
 });
 

@@ -315,6 +315,42 @@ function myGroupIsOwner(group, uid) {
     return !!(group && uid && group.ownerUid && String(group.ownerUid) === String(uid));
 }
 
+// ---- DELETING ONE GROUP FROM THE LIST -------------------------------------
+//
+// WHO MAY, MEASURED AGAINST THE LIVE RULESET rather than read off it. Against
+// database.rules.stage2delete.json (published 2026-09-30), through targaryen:
+//
+//   owner deletes organizers/<owner>/groups/<gid>                 allowed
+//   owner deletes sharedGroups/<coKey>/<owner>/<gid>              allowed
+//   CO-ORGANIZER deletes the group                                REFUSED
+//   CO-ORGANIZER deletes their own coOrganizers/<key> entry        REFUSED
+//   CO-ORGANIZER deletes their own sharedGroups pointer            REFUSED
+//
+// So the OWNER can delete a group and take its invites with it, and a co-organizer
+// cannot remove themselves from anything: every grant on this subtree is the owner's.
+// "Leave group" therefore needs a rules change and is NOT built - the list says so
+// on a shared row instead of offering a button that would always be refused.
+function myGroupDeleteConfirm(name) {
+    return 'Delete ' + String(name || 'this group')
+        + '? The golfers in it are only removed from this saved list. Rounds are not affected.';
+}
+// The paths, in the order they are removed. The POINTERS FIRST, because their paths
+// are only knowable while the group is still there - the same reason the account
+// delete orders them that way.
+function myGroupDeletePlan(ownerUid, groupId, group) {
+    const owner = String(ownerUid || '');
+    const gid = String(groupId || '');
+    const co = (group && group.coOrganizers && typeof group.coOrganizers === 'object')
+        ? group.coOrganizers : {};
+    const removals = [];
+    Object.keys(co).forEach((emailKey) => {
+        if (co[emailKey] !== true) return;
+        removals.push('sharedGroups/' + emailKey + '/' + owner + '/' + gid);
+    });
+    removals.push(myGroupsPath(owner) + '/' + gid);
+    return { removals: removals, pointerCount: removals.length - 1 };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         MY_GROUPS_MAX, MY_GROUPS_MAX_MEMBERS, myGroupsPath, myGroupMember, myGroupKey,
@@ -324,6 +360,7 @@ if (typeof module !== 'undefined' && module.exports) {
         myGroupMemberRows, myGroupSections, myGroupSearchFilter,
         describeSizes, splitSuggestions, myGroupRoundUpdates,
         coOrganizerKey, coOrganizerEmail, sharedGroupsPath,
-        myGroupCanManage, myGroupIsOwner
+        myGroupCanManage, myGroupIsOwner,
+        myGroupDeleteConfirm, myGroupDeletePlan
     };
 }
