@@ -387,13 +387,37 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         const code = codeOf(ADMIN);
         const n = (k) => (code.match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
         const refuse = n('uiRefuse'), fail = n('uiFail'), toast = n('uiToast');
-        assert.equal(refuse + fail + toast, 38,
-            'the 38 alerts should still be 38 messages, got '
+        // 48 SINCE MY GROUPS (v260): the saved-roster panel speaks ten more times -
+        // it refuses without a sign-in, without a name and without a tick; it reports
+        // a server refusal on a save and on a write-back (the rule for
+        // organizers/<uid>/groups has not been published yet, so that refusal is a
+        // state a real organizer will meet); and it confirms what it saved.
+        // 58 SINCE THE MY GROUPS EXTENSION (v261): the panel now refuses without a
+        // sign-in, without a name, without a tick, on a bad email, on inviting
+        // yourself, and when only the owner may act; it reports a server refusal on
+        // five separate writes (the rules for organizers/<uid>/groups and
+        // sharedGroups are not published yet, so those refusals are states a real
+        // organizer will meet); and it confirms what it saved.
+        // 60 SINCE MY GROUPS SHIPPED DARK (v261): the secret-panel switch reports a
+        // browser that will not keep the setting (uiFail) and confirms each way it is
+        // thrown (two uiToasts). A switch that changed state silently would be worse
+        // than no switch.
+        assert.equal(refuse + fail + toast, 60,
+            'the alerts should still be 60 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
         assert.ok(toast < refuse, 'more things float than refuse: ' + toast + ' vs ' + refuse);
-        assert.ok(toast <= 8, 'too much of this page floats away: ' + toast);
+        // 9 SINCE MY GROUPS (v260): three of the new messages are RECEIPTS of a
+        // completed write - golfers added from a saved group, a group saved, a group
+        // updated - which is the one thing on this page that mostly succeeds. The
+        // fourth candidate went the other way: "nothing new to save" is a refusal,
+        // because nothing was written, and it must not float away like something
+        // that was.
+        // 11 since the extension: two more receipts of a completed write - a
+        // co-organizer added, a co-organizer removed. Both are things that happened.
+        // 12 with the switch's two confirmations, which are receipts of a state change.
+        assert.ok(toast <= 12, 'too much of this page floats away: ' + toast);
     });
 });
 
@@ -444,8 +468,12 @@ describe('5. THE PAGE\'S OWN OVERLAY IS LEFT ALONE, DELIBERATELY', () => {
         // depends on this z-index being above the page's own 1000 dropdown, so
         // lowering it to 999 to match index.html would put the panel underneath
         // that dropdown as well as the paste modal.
+        // THREE SINCE MY GROUPS (v260): #my-groups-modal joined. The conclusion is
+        // unchanged and the argument is stronger again - the saved-group picker also
+        // has to sit above the page's own 1000 dropdown.
         const users = (ADMIN.match(/class="modal-overlay"/g) || []).length;
-        assert.equal(users, 2, 'admin.html has ' + users + ' overlays now - re-read the note above');
+        assert.equal(users, 3, 'admin.html has ' + users + ' overlays now - re-read the note above');
+        assert.ok(/<div class="modal-overlay" id="my-groups-modal">/.test(ADMIN));
         assert.ok(/<div class="modal-overlay" id="paste-players-modal">/.test(ADMIN),
             'the paste-players modal no longer uses .modal-overlay');
         assert.ok(/<div class="modal-overlay" id="account-modal">/.test(ADMIN),

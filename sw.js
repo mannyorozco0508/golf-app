@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v101-signinwhy. The tournament product cache
+// The consumer product cache is consumer-v102-mygroups. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3650,7 +3650,33 @@
 // live app is unaffected either way; this only changes what a failure says.
 //
 // GUARDED BY preview_signin_domain_test.js.
-const CACHE_VERSION = 'golfapp-v260-signinwhy';
+// Moved to v261 FOR MY GROUPS - THE WEEKLY FOURSOME, SAVED ONCE - BEHIND THE
+// SECRET PANEL.
+//
+// SHIPPED HIDDEN (2026-09-30, Manny's call). The panel is off for everyone and shows
+// only when a device has been switched on from the secret master panel - the ⛳ logo,
+// five taps. Preview deploys cannot sign in (a branch host is not an authorized
+// domain), and My Groups needs a real sign-in, so the only way to test it is on the
+// live app with the feature dark for everybody else.
+//
+// (originally written as v260; main had taken that number for the sign-in note)
+//
+// An organizer typed the same names, handicaps and A/B flights every week. They are
+// saved on the ACCOUNT now - organizers/<uid>/groups - so the same groups are there
+// in Safari, the home-screen app and the App Store app. An anonymous uid is
+// per-browser, so the feature is gated on a linked email sign-in and says why.
+//
+// NEW FILE IN THE SHELL: my-groups.js. admin.html calls it unguarded.
+//
+// AND THE PASTE IMPORTER READS A TRAILING NOTE. Measured: "B Jimmy 11 (captain)"
+// parsed to the NAME "Jimmy 11 (captain)" with NO handicap, because the note sat
+// between the number and the end of the line. The note now comes off first and is
+// REPORTED in the review rather than dropped.
+//
+// THE WRITE RULE FOR organizers/<uid>/groups IS NOT PUBLISHED YET. Until it is,
+// every save is refused by the server, nothing is written, and the organizer is told.
+// my_groups_test.js carries the exact rules block the next publish must add.
+const CACHE_VERSION = 'golfapp-v261-mygroups';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3754,6 +3780,13 @@ const SHELL_FILES = [
     // list by matching quoted strings out of this source, and one apostrophe in a
     // comment swallows every entry after it - which is what the first draft did.
     './side-match-lines.js',
+    // my-groups.js: the saved weekly group. admin.html calls it unguarded from the
+    // Players step, so a cached shell without it breaks the wizard rather than
+    // degrading it. Precached for that reason.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './my-groups.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -

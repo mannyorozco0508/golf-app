@@ -19,6 +19,7 @@
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
+    <script src="my-groups.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -1004,6 +1005,12 @@ html {
             <button class="btn-primary" style="background-color: var(--brand-green);" onclick="enableWholeDollarSettlement()">💵 Settle this round in whole dollars</button>
         </div>
 
+        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-mid);">
+            <div style="font-size:0.78rem; font-weight:bold; margin-bottom:4px;">My Groups (unreleased)</div>
+            <div id="my-groups-flag-state" style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">…</div>
+            <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="toggleMyGroupsFeature()">👥 Turn My Groups on for this device</button>
+        </div>
+
         <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
         <button class="btn-primary" style="background-color: var(--bg-card); color: var(--brand-navy);" onclick="shareMainApp()">📤 Share App Link</button>
@@ -1839,6 +1846,18 @@ html {
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
+    <button class="btn-outline" id="my-groups-btn" style="display:none;" onclick="openMyGroupsModal()">👥 My Groups</button>
+
+    <div class="modal-overlay" id="my-groups-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>👥 My Groups</span>
+                <button class="close-modal" onclick="closeMyGroupsModal()" aria-label="Close">&times;</button>
+            </div>
+            <p id="my-groups-note" style="font-size:0.8rem; color:var(--text-muted); margin:0 0 10px 0;"></p>
+            <div id="my-groups-body"></div>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="paste-players-modal">
         <div class="modal-content">
@@ -3145,6 +3164,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 btn.textContent = '☀️ Light Mode';
             });
         }
+        // A device already switched on keeps the button across reloads. The switch
+        // lives in localStorage, so this is the only thing that has to run on load.
+        if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
     });
     // ------------------
 
@@ -3246,6 +3268,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         tapCount++;
         if (tapCount >= 5) {
             document.getElementById('secret-master-panel').style.display = 'block';
+            if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
             tapCount = 0;
         }
     }
@@ -6912,6 +6935,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         let validPlayers = [];
         let flaggedLines = [];
         let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
+        let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
         let groups = [];
         let inGroup = false;     // true while inside a run of non-empty lines
         lines.forEach((rawLine, idx) => {
@@ -6923,7 +6947,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // the iPhone's double-space-for-a-period puts one on every line). Only
             // trailing, only periods; "Jr." at the end loses its dot too - accepted.
             // Stored names are never rewritten; this is the paste only.
-            const { flight, rest, notAFlight } = splitLeadingFlight(line);
+            // A TRAILING NOTE IN BRACKETS COMES OFF FIRST (v260). Measured before
+            // this: "B Jimmy 11 (captain)" parsed to the NAME "Jimmy 11 (captain)"
+            // with NO handicap, because the note sat between the number and the end
+            // of the line. The note is reported rather than dropped silently, so the
+            // review says what it ignored.
+            const noted = (typeof stripTrailingNote === 'function')
+                ? stripTrailingNote(line) : { text: line, note: '' };
+            if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
+            const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
             // A not-a-flight line is kept AS TYPED: its comma is part of what was
             // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
             // trailing number is read off it.
@@ -6948,7 +6980,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const flights = anyFlight
             ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
             : null;
-        return { validPlayers, flaggedLines, flaggedFlights, groups, flights };
+        return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights };
     }
 
     function openPastePlayersModal() {
@@ -7059,7 +7091,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, flaggedFlights, groups, flights } = parsePlayerPasteText(text);
+        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text);
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -7092,6 +7124,477 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         summaryEl.innerHTML = html;
         commitBtn.disabled = validPlayers.length === 0;
+    }
+
+    // ===== MY GROUPS (v260, extended v261) ================================
+    //
+    // The weekly game, saved on the ACCOUNT. my-groups.js holds the store shape,
+    // the sectioning, the split suggestions and the co-organizer rules; this file
+    // is the panel over it and the wizard wiring.
+    //
+    // UNIVERSAL BY DESIGN. Nothing here knows about any particular game: a roster
+    // is a list of names with handicaps and optional A/B flights, a group is a
+    // named roster, and an account has as many as it likes ("Thursday game",
+    // "Bandon trip"). A first-time user with no groups gets a create-your-first
+    // panel that works with no explanation.
+    //
+    // NOTHING HERE PARSES A HANDICAP OR TOUCHES A ROUND'S MONEY. The roster goes
+    // in and out through captureCurrentPlayerInputs() and appendPlayerFrom() -
+    // the same two functions the paste importer uses - and the chosen group sizes
+    // go through the wizard's own groupSizeOverrides into grouping.js
+    // computeGroupSizes(). No grouping is reimplemented.
+    //
+    // CREATING A ROUND NEVER DEPENDS ON AN ACCOUNT WRITE. Every write here is its
+    // own tap, reports its own failure, and saveRound calls none of them.
+    let myGroupsState = { groups: {}, shared: {}, pickedId: null, pickedOwner: null,
+                          query: '', open: {}, sizes: null, usedId: null, usedOwner: null };
+
+    // ===== MY GROUPS IS UNRELEASED, AND OFF =================================
+    //
+    // SHIPPED DARK (2026-09-30). The reason it ships at all rather than waiting on a
+    // preview: a branch host is not one of the project's authorized sign-in domains,
+    // so "Email me a sign-in link" cannot work on a preview - measured, see
+    // preview_signin_domain_test.js - and My Groups is gated on a real sign-in. The
+    // only place it can be tested is the live app, so it goes there switched off.
+    //
+    // PER DEVICE, IN localStorage, AND NOT IN FIREBASE. A flag in app_settings would
+    // be global - it would turn the feature on for every golfer at once, which is the
+    // opposite of what "hidden" means. The secret master panel (the ⛳ logo, five
+    // taps) is the switch, the same door the whole-dollar settlement switch uses.
+    //
+    // IT CANNOT LEAK. The button ships display:none and nothing else references the
+    // panel, so a device that has never been switched on has no way in - no URL, no
+    // gesture, no stale markup. my_groups_hidden_test.js holds that.
+    const MY_GROUPS_FLAG = 'golfapp_mygroups_on';
+    function myGroupsEnabled() {
+        try { return localStorage.getItem(MY_GROUPS_FLAG) === '1'; } catch (e) { return false; }
+    }
+    function syncMyGroupsVisibility() {
+        const btn = document.getElementById('my-groups-btn');
+        if (btn) btn.style.display = myGroupsEnabled() ? '' : 'none';
+        const note = document.getElementById('my-groups-flag-state');
+        if (note) {
+            note.textContent = myGroupsEnabled()
+                ? 'ON for this device. Sign in with your email, then Players → 👥 My Groups.'
+                : 'OFF. Nobody sees the button, including you, until you turn it on here.';
+        }
+    }
+    function toggleMyGroupsFeature() {
+        const on = !myGroupsEnabled();
+        try { localStorage.setItem(MY_GROUPS_FLAG, on ? '1' : '0'); }
+        catch (e) { return uiFail('This browser will not keep the setting, so the switch cannot hold.'); }
+        syncMyGroupsVisibility();
+        uiToast(on ? 'My Groups is on for this device' : 'My Groups is off again');
+    }
+
+    function myGroupsUser() {
+        try {
+            const u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+            return (u && u.isAnonymous === false && u.email) ? { uid: String(u.uid), email: String(u.email) } : null;
+        } catch (e) { return null; }
+    }
+    function myGroupsUid() { const u = myGroupsUser(); return u ? u.uid : null; }
+
+    // Own groups live under this account; a group shared WITH this account lives
+    // under its owner and is found through the sharedGroups pointer, which only
+    // this account's email can read. An account never sees anything else.
+    function myGroupAt(id, ownerUid) {
+        return ownerUid ? ((myGroupsState.shared[ownerUid] || {})[id]) : myGroupsState.groups[id];
+    }
+    function myGroupRefPath(id, ownerUid) {
+        const u = myGroupsUser();
+        return myGroupsPath(ownerUid || (u && u.uid)) + '/' + id;
+    }
+
+    function closeMyGroupsModal() {
+        document.getElementById('my-groups-modal').classList.remove('open');
+    }
+
+    async function openMyGroupsModal() {
+        const body = document.getElementById('my-groups-body');
+        const note = document.getElementById('my-groups-note');
+        document.getElementById('my-groups-modal').classList.add('open');
+        myGroupsState.pickedId = null; myGroupsState.pickedOwner = null;
+        myGroupsState.query = ''; myGroupsState.sizes = null;
+        // A LINKED ACCOUNT IS THE WHOLE POINT. An anonymous uid is per-browser, so a
+        // group saved in Safari would not exist in the installed app - and saying
+        // that is better than saving something that quietly is not there.
+        const u = myGroupsUser();
+        if (!u) {
+            note.textContent = 'Sign in with your email first, and your groups follow you into Safari, the home-screen app and the App Store app.';
+            body.innerHTML = '<button class="btn-primary" onclick="closeMyGroupsModal(); openAccountPanel();">Sign in</button>';
+            return;
+        }
+        note.textContent = 'Saved on your account. Only you and anyone you make a co-organizer can see these.';
+        body.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Loading…</p>';
+        try {
+            const mine = await db.ref(myGroupsPath(u.uid)).once('value');
+            myGroupsState.groups = mine.val() || {};
+            myGroupsState.shared = {};
+            // GROUPS SHARED WITH ME. The pointer is the only way to find them - a
+            // co-organizer cannot list another account's subtree, and should not be
+            // able to.
+            const ptr = await db.ref(sharedGroupsPath(u.email)).once('value');
+            const owners = ptr.val() || {};
+            for (const ownerUid of Object.keys(owners)) {
+                for (const gid of Object.keys(owners[ownerUid] || {})) {
+                    try {
+                        const g = await db.ref(myGroupsPath(ownerUid) + '/' + gid).once('value');
+                        if (g.val()) {
+                            myGroupsState.shared[ownerUid] = myGroupsState.shared[ownerUid] || {};
+                            myGroupsState.shared[ownerUid][gid] = g.val();
+                        }
+                    } catch (e) { /* a pointer whose group was deleted or un-shared: skip it */ }
+                }
+            }
+        } catch (e) {
+            body.innerHTML = '';
+            uiFail('Could not read your groups: ' + (e && e.message ? e.message : 'permission denied'));
+            return;
+        }
+        renderMyGroupsBody();
+    }
+
+    function myGroupsAllEntries() {
+        const out = Object.keys(myGroupsState.groups).map(id => ({ id: id, ownerUid: null, g: myGroupsState.groups[id] }));
+        Object.keys(myGroupsState.shared).forEach(ownerUid =>
+            Object.keys(myGroupsState.shared[ownerUid]).forEach(id =>
+                out.push({ id: id, ownerUid: ownerUid, g: myGroupsState.shared[ownerUid][id] })));
+        return out.sort((a, b) => (b.g.updatedAt || 0) - (a.g.updatedAt || 0));
+    }
+
+    function renderMyGroupsBody() {
+        const body = document.getElementById('my-groups-body');
+        body.innerHTML = myGroupsState.pickedId ? myGroupPickerHtml() : myGroupListHtml();
+        if (myGroupsState.pickedId) {
+            const q = document.getElementById('mg-search');
+            if (q) q.value = myGroupsState.query;
+            refreshMyGroupCount();
+        }
+    }
+
+    function myGroupListHtml() {
+        const entries = myGroupsAllEntries();
+        const u = myGroupsUser();
+        let html = '';
+        if (entries.length === 0) {
+            // THE FIRST-TIME PANEL. It has to work with no help at all, so it says
+            // what a group is and offers the two ways in - paste a list, or type.
+            html += '<p style="font-weight:bold; margin:0 0 6px 0;">Create your first group</p>'
+                 + '<p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 12px 0;">'
+                 + 'A group is your list of golfers — names, handicaps, and A/B flights if you use them. '
+                 + 'Save it once and every round after that starts by ticking who is playing.</p>'
+                 + '<div style="display:flex; flex-direction:column; gap:8px;">'
+                 + '<button class="btn-primary" onclick="closeMyGroupsModal(); openPastePlayersModal();">📋 Paste a list of players</button>'
+                 + '<button class="btn-outline" onclick="closeMyGroupsModal();">➕ Type them in on this page</button>'
+                 + '<p style="font-size:0.78rem; color:var(--text-muted); margin:4px 0 0 0;">Either way, come back here and tap Save to keep the list.</p>'
+                 + '</div>';
+        } else {
+            entries.forEach(e => {
+                const n = Object.keys((e.g && e.g.members) || {}).length;
+                const shared = !!e.ownerUid;
+                html += '<div style="display:flex; align-items:center; gap:8px; padding:8px 2px; border-bottom:1px solid var(--border-faint);">'
+                     + '<span style="flex:1; font-weight:bold;">' + escapeHtml((e.g && e.g.name) || 'My Group')
+                     + (shared ? ' <span style="font-weight:normal; font-size:0.72rem; color:var(--brand-green);">shared with you</span>' : '')
+                     + '</span>'
+                     + '<span style="color:var(--text-muted); font-size:0.82rem;">' + n + '</span>'
+                     + '<button class="btn-outline-sm" onclick="pickMyGroup(\'' + escapeHtml(e.id) + '\',' + (shared ? '\'' + escapeHtml(e.ownerUid) + '\'' : 'null') + ')">Start from this</button>'
+                     + '</div>';
+            });
+        }
+        html += '<div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">'
+             + '<button class="btn-outline" onclick="saveRosterAsMyGroup()">💾 Save this round’s roster as a group</button>'
+             + (myGroupsState.usedId && myGroupAt(myGroupsState.usedId, myGroupsState.usedOwner)
+                ? '<button class="btn-outline" onclick="syncMyGroupFromRoster()">↻ Save changes back to '
+                  + escapeHtml((myGroupAt(myGroupsState.usedId, myGroupsState.usedOwner).name) || 'My Group') + '</button>'
+                : '')
+             + '</div>';
+        if (u && myGroupsAllEntries().some(e => !e.ownerUid)) {
+            html += '<p style="font-size:0.74rem; color:var(--text-muted); margin:12px 0 0 0;">Signed in as ' + escapeHtml(u.email) + '</p>';
+        }
+        return html;
+    }
+
+    function myGroupPickerHtml() {
+        const g = myGroupAt(myGroupsState.pickedId, myGroupsState.pickedOwner);
+        if (!g) return myGroupListHtml();
+        const u = myGroupsUser();
+        const sect = myGroupSections(g, Date.now());
+        const checkedNow = myGroupsState.checked || sect.checked;
+        myGroupsState.checked = checkedNow;
+        const isOwner = myGroupIsOwner(g, u && u.uid);
+        let html = '<p style="font-weight:bold; margin:0 0 8px 0;">' + escapeHtml(g.name || 'My Group') + '</p>'
+            + '<input id="mg-search" type="search" placeholder="Search the roster" autocomplete="off" '
+            + 'oninput="myGroupsState.query = this.value; renderMyGroupSections();" '
+            + 'style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--border-mid); font-size:1rem; margin-bottom:10px; background:var(--bg-page); color:var(--text-main);">'
+            + '<div id="mg-sections"></div>'
+            + '<div id="mg-count" style="margin-top:12px; font-size:0.86rem;"></div>'
+            + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'
+            + '<button class="btn-primary" onclick="applyMyGroupPicks()">Add ticked golfers</button>'
+            + '<button class="btn-outline" onclick="myGroupsState.pickedId = null; myGroupsState.checked = null; renderMyGroupsBody();">Back</button>'
+            + '</div>';
+        if (isOwner) {
+            const co = Object.keys(g.coOrganizers || {});
+            html += '<div style="margin-top:16px; border-top:1px solid var(--border-faint); padding-top:12px;">'
+                 + '<p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 6px 0;">Co-organizers can start rounds from this group, and their handicap edits save back.</p>'
+                 + co.map(k => '<div style="display:flex; align-items:center; gap:8px; font-size:0.84rem; padding:3px 0;">'
+                        + '<span style="flex:1;">' + escapeHtml(coOrganizerEmail(k)) + '</span>'
+                        + '<button class="btn-outline-sm" onclick="removeCoOrganizer(\'' + escapeHtml(k) + '\')">Remove</button></div>').join('')
+                 + '<button class="btn-outline-sm" onclick="inviteCoOrganizer()" style="margin-top:6px;">➕ Add a co-organizer</button>'
+                 + '</div>';
+        }
+        return html;
+    }
+
+    // The sections, re-rendered on every keystroke of the search box. Ticks live in
+    // myGroupsState.checked so filtering never loses one.
+    function renderMyGroupSections() {
+        const g = myGroupAt(myGroupsState.pickedId, myGroupsState.pickedOwner);
+        const host = document.getElementById('mg-sections');
+        if (!g || !host) return;
+        const sect = myGroupSections(g, Date.now());
+        const checked = {};
+        (myGroupsState.checked || []).forEach(k => { checked[k] = true; });
+        const q = myGroupsState.query;
+        let html = '';
+        sect.sections.forEach(sc => {
+            const rows = myGroupSearchFilter(sc.rows, q);
+            if (rows.length === 0) return;
+            // A search always opens what it found; otherwise Inactive stays shut.
+            const open = q ? true : (myGroupsState.open[sc.id] !== undefined ? myGroupsState.open[sc.id] : !sc.collapsed);
+            html += '<div style="margin-top:10px;">'
+                 + '<button type="button" onclick="myGroupsState.open[\'' + sc.id + '\'] = ' + (open ? 'false' : 'true') + '; renderMyGroupSections();" '
+                 + 'style="all:unset; cursor:pointer; display:flex; width:100%; align-items:center; gap:6px; font-size:0.78rem; font-weight:bold; color:var(--text-muted); text-transform:uppercase;">'
+                 + '<span>' + (open ? '▾' : '›') + '</span><span>' + escapeHtml(sc.label) + '</span>'
+                 + '<span style="font-weight:normal;">' + rows.length + '</span></button>';
+            if (open) {
+                rows.forEach(r => {
+                    html += '<label style="display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:0.9rem;">'
+                         + '<input type="checkbox" class="mg-pick" value="' + escapeHtml(r.key) + '"'
+                         + (checked[r.key] ? ' checked' : '') + ' onchange="onMyGroupTick(this)">'
+                         + '<span style="flex:1;">' + escapeHtml(r.name) + '</span>'
+                         + '<span style="color:var(--text-muted); font-size:0.8rem;">'
+                         + (r.flight ? escapeHtml(r.flight) + ' · ' : '')
+                         + (r.hcp === '' ? 'no index' : escapeHtml(r.hcp))
+                         + (r.playCount ? ' · ' + r.playCount + ' rounds' : '')
+                         + '</span></label>';
+                });
+            }
+            html += '</div>';
+        });
+        if (html === '') html = '<p style="font-size:0.85rem; color:var(--text-muted); margin-top:10px;">Nobody matches “' + escapeHtml(q) + '”.</p>';
+        host.innerHTML = html;
+        refreshMyGroupCount();
+    }
+
+    function onMyGroupTick(box) {
+        const set = {};
+        (myGroupsState.checked || []).forEach(k => { set[k] = true; });
+        if (box.checked) set[box.value] = true; else delete set[box.value];
+        myGroupsState.checked = Object.keys(set);
+        myGroupsState.sizes = null;
+        refreshMyGroupCount();
+    }
+
+    // THE LIVE COUNT AND THE SPLIT. Twenty-six playing is six foursomes and a
+    // twosome, or five foursomes and two threesomes - both real answers, so the
+    // organizer picks one and it becomes the wizard's own groupSizeOverrides.
+    function refreshMyGroupCount() {
+        const el = document.getElementById('mg-count');
+        if (!el) return;
+        const n = (myGroupsState.checked || []).length;
+        if (n === 0) { el.innerHTML = '<span style="color:var(--text-muted);">Nobody ticked yet.</span>'; return; }
+        const opts = splitSuggestions(n);
+        let html = '<strong>' + n + ' playing</strong>';
+        if (opts.length) {
+            html += ' <span style="color:var(--text-muted);">— how do you want them grouped?</span>'
+                 + '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">'
+                 + opts.map((o, i) => '<button type="button" class="btn-outline-sm" onclick="pickMyGroupSplit(' + i + ')" '
+                        + 'style="' + (myGroupsState.sizes && myGroupsState.sizes.label === o.label ? 'border-color:var(--brand-green); color:var(--brand-green); font-weight:bold;' : '') + '">'
+                        + escapeHtml(o.label) + '</button>').join('')
+                 + '</div>';
+        }
+        el.innerHTML = html;
+    }
+
+    function pickMyGroupSplit(i) {
+        const opts = splitSuggestions((myGroupsState.checked || []).length);
+        myGroupsState.sizes = opts[i] || null;
+        refreshMyGroupCount();
+    }
+
+    function pickMyGroup(id, ownerUid) {
+        myGroupsState.pickedId = id;
+        myGroupsState.pickedOwner = ownerUid || null;
+        myGroupsState.checked = null;
+        myGroupsState.open = {};
+        myGroupsState.query = '';
+        myGroupsState.sizes = null;
+        renderMyGroupsBody();
+        renderMyGroupSections();
+    }
+
+    // PREFILL. The ticked members are appended through the SAME pipeline the paste
+    // importer uses, so flights turn on the same way and the blank arrival row is
+    // dropped the same way. The chosen split becomes groupSizeOverrides, which is
+    // what grouping.js computeGroupSizes() already reads.
+    async function applyMyGroupPicks() {
+        const g = myGroupAt(myGroupsState.pickedId, myGroupsState.pickedOwner);
+        if (!g) return;
+        const picked = (myGroupsState.checked || []);
+        const rows = myGroupRoster(g, picked);
+        if (rows.length === 0) return uiRefuse('Tick at least one golfer.');
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const existing = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
+        if (rows.some(r => r.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        rows.forEach(r => existing.push({
+            name: r.name, hcp: r.hcp, team: '',
+            squad: existing.length % 2 === 0 ? 'red' : 'blue',
+            playingForMoney: true, flight: r.flight
+        }));
+        document.getElementById('player-list').innerHTML = '';
+        renderPlayerListHeaderAndWarning(existing.length);
+        existing.forEach(p => appendPlayerFrom(p, false, existing.length));
+        updateCount();
+        if (myGroupsState.sizes && myGroupsState.sizes.sizes) {
+            groupSizeOverrides = {};
+            myGroupsState.sizes.sizes.forEach((sz, i) => { groupSizeOverrides[i] = sz; });
+        }
+        myGroupsState.usedId = myGroupsState.pickedId;
+        myGroupsState.usedOwner = myGroupsState.pickedOwner;
+        closeMyGroupsModal();
+        uiToast(rows.length + ' golfer' + (rows.length === 1 ? '' : 's') + ' added from ' + ((g.name) || 'My Group')
+            + (myGroupsState.sizes ? ' · ' + myGroupsState.sizes.label : ''));
+        // WHO PLAYED, recorded so the next round starts with the right people ticked
+        // and the regulars sort to the top. Its own write, its own failure: the round
+        // is already prefilled whatever the server says.
+        try {
+            await db.ref(myGroupRefPath(myGroupsState.pickedId, myGroupsState.pickedOwner))
+                .update(myGroupRoundUpdates(g, picked, Date.now()));
+        } catch (e) { uiFail('Group prefilled, but the play counts did not save: ' + (e && e.message ? e.message : 'permission denied')); }
+    }
+
+    async function saveRosterAsMyGroup() {
+        const u = myGroupsUser();
+        if (!u) return uiRefuse('Sign in with your email to save a group to your account.');
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const rows = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p) && String(p.name || '').trim() !== '');
+        if (rows.length === 0) return uiRefuse('Add some golfers first.');
+        const name = await uiPrompt({ title: 'Name this group', body: 'Something you will recognise next week — "Thursday game", "Bandon trip".', value: 'Thursday game' });
+        if (name === null) return;
+        const existingId = Object.keys(myGroupsState.groups)
+            .find(id => (myGroupsState.groups[id].name || '').trim().toLowerCase() === String(name).trim().toLowerCase());
+        const id = existingId || db.ref(myGroupsPath(u.uid)).push().key;
+        const payload = buildMyGroupPayload(name, rows, Date.now());
+        payload.ownerUid = u.uid;
+        // An update, not a set, so an existing group keeps its play counts, its
+        // lastRound and its co-organizers when the roster is re-saved.
+        const existing = myGroupsState.groups[id];
+        if (existing) {
+            Object.keys(payload.members).forEach(k => {
+                if (existing.members && existing.members[k]) {
+                    payload.members[k].playCount = existing.members[k].playCount || 0;
+                    payload.members[k].lastPlayedAt = existing.members[k].lastPlayedAt || 0;
+                }
+            });
+            if (existing.coOrganizers) payload.coOrganizers = existing.coOrganizers;
+            if (existing.lastRound) payload.lastRound = existing.lastRound;
+            if (existing.createdAt) payload.createdAt = existing.createdAt;
+        } else payload.createdAt = Date.now();
+        try {
+            await db.ref(myGroupsPath(u.uid) + '/' + id).set(payload);
+        } catch (e) {
+            // The write rule for organizers/<uid>/groups ships in the next rules
+            // publish. Until then the server refuses, nothing is written, and the
+            // organizer is told rather than left believing it saved.
+            return uiFail('Could not save the group: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        myGroupsState.groups[id] = payload;
+        myGroupsState.usedId = id; myGroupsState.usedOwner = null;
+        renderMyGroupsBody();
+        uiToast('Saved ' + payload.name + ' — ' + Object.keys(payload.members).length + ' golfers');
+    }
+
+    // AFTER THE ROSTER IS EDITED: what the round changed, offered back to the group.
+    // A co-organizer's edits save back too - that is the point of making one.
+    async function syncMyGroupFromRoster() {
+        const u = myGroupsUser();
+        const id = myGroupsState.usedId, owner = myGroupsState.usedOwner;
+        const g = id && myGroupAt(id, owner);
+        if (!u || !g) return;
+        if (!myGroupCanManage(g, u.uid, u.email)) return uiRefuse('Only the owner or a co-organizer can change this group.');
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const rows = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
+        const changes = myGroupHandicapChanges(g, rows);
+        const added = myGroupNewcomers(g, rows);
+        // A REFUSAL, NOT A RECEIPT: nothing was written, so it must not float away
+        // like something that was.
+        if (changes.length === 0 && added.length === 0) return uiRefuse('Nothing new to save — the group already matches this roster.');
+        const lines = changes.map(c => c.name + ' ' + (c.from || 'no index') + ' → ' + (c.to || 'no index'))
+            .concat(added.map(a => a.name + ' (new)'));
+        const ok = await uiConfirm({
+            title: 'Update ' + (g.name || 'My Group') + '?',
+            body: lines.join('\n'),
+            confirmText: 'Save to my group', danger: false
+        });
+        if (!ok) return;
+        const updates = {};
+        changes.forEach(c => { updates[c.key + '/hcp'] = c.to; });
+        added.forEach(a => { updates[a.key] = { name: a.name, hcp: a.hcp, flight: a.flight, playCount: 0, lastPlayedAt: 0 }; });
+        try {
+            await db.ref(myGroupRefPath(id, owner) + '/members').update(updates);
+            await db.ref(myGroupRefPath(id, owner) + '/updatedAt').set(Date.now());
+        } catch (e) {
+            return uiFail('Could not update the group: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        changes.forEach(c => { if (g.members[c.key]) g.members[c.key].hcp = c.to; });
+        added.forEach(a => { g.members[a.key] = { name: a.name, hcp: a.hcp, flight: a.flight, playCount: 0, lastPlayedAt: 0 }; });
+        uiToast('My Group updated');
+    }
+
+    // A CO-ORGANIZER IS AN EMAIL, not a uid. There is no way to look a uid up from
+    // an email in a client, so the group stores the email and the rules compare it
+    // against auth.token.email. The pointer under sharedGroups is what lets the
+    // other account FIND the group; without it they could not, and should not.
+    async function inviteCoOrganizer() {
+        const u = myGroupsUser();
+        const id = myGroupsState.pickedId;
+        const g = id && myGroupAt(id, myGroupsState.pickedOwner);
+        if (!u || !g) return;
+        if (!myGroupIsOwner(g, u.uid)) return uiRefuse('Only the owner can add a co-organizer.');
+        const email = await uiPrompt({ title: 'Co-organizer email', body: 'They need to sign in with this email on their own phone.', value: '' });
+        if (email === null) return;
+        const clean = String(email).trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return uiRefuse('That does not look like an email address.');
+        if (clean === u.email.toLowerCase()) return uiRefuse('You are the owner already.');
+        const key = coOrganizerKey(clean);
+        try {
+            await db.ref(myGroupRefPath(id, null) + '/coOrganizers/' + key).set(true);
+            await db.ref(sharedGroupsPath(clean) + '/' + u.uid + '/' + id).set(true);
+        } catch (e) {
+            return uiFail('Could not add them: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        g.coOrganizers = g.coOrganizers || {};
+        g.coOrganizers[key] = true;
+        renderMyGroupsBody();
+        uiToast(clean + ' can now start rounds from ' + (g.name || 'this group'));
+    }
+
+    async function removeCoOrganizer(key) {
+        const u = myGroupsUser();
+        const id = myGroupsState.pickedId;
+        const g = id && myGroupAt(id, myGroupsState.pickedOwner);
+        if (!u || !g) return;
+        if (!myGroupIsOwner(g, u.uid)) return uiRefuse('Only the owner can remove a co-organizer.');
+        try {
+            await db.ref(myGroupRefPath(id, null) + '/coOrganizers/' + key).remove();
+            await db.ref(sharedGroupsPath(coOrganizerEmail(key)) + '/' + u.uid + '/' + id).remove();
+        } catch (e) {
+            return uiFail('Could not remove them: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        if (g.coOrganizers) delete g.coOrganizers[key];
+        renderMyGroupsBody();
+        uiToast('Removed');
     }
 
     // Appends parsed players to whatever's already in the list — reuses the exact same
