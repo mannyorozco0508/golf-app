@@ -3102,12 +3102,36 @@ instead", unchanged.
   failed link consumed, and every failure is `console.error`'d once - code and
   message, never a token - which Capacitor forwards to the Xcode log.
 
-**RULES STAGE 1 IS LIVE.** Published 2026-09-29 ~7:01 PM by console paste of
-`database.rules.stage1.json`. Post-publish: a score from a `?group=` link SAVED and a
-forced-KP answer on GFLBAM SAVED. The rollback is `dab91d8`, one paste, and the file
-is on the Desktop. **What is live is `database.rules.stage1.json`, NOT
-`database.rules.json`** - the repo file was never published and still carries the
-Stage 2 owner-only parent. Read "STAGE 1 IS LIVE" above before assuming anything.
+**THE LIVE RULESET IS `database.rules.stage2delete.json`.** Published 2026-09-30
+~4:40 AM Phoenix by console paste of the Desktop copy
+(`PUBLISH-THIS-database.rules.stage2delete.json`), with no edits. **The rollback is
+`database.rules.stage1.json`** - one paste, and `database.rules.rollback-stage1.json`
+in the repo is a byte-identical copy of it for exactly that. `dab91d8` is the
+two-step rollback behind that.
+
+- **What it added is ONE key**, and nothing else changed (diffed structurally, not
+  eyeballed): `organizers/$uid` gains
+  `".write": "newData.val() === null && auth != null && auth.uid === $uid"`. It
+  permits a write that EMPTIES the record and nothing else - so Delete account can
+  now remove `organizers/<uid>` whole, taking `firstSeenAt` and any `pass` with it,
+  while `pass` stays unwritable because setting one leaves a non-null record. A
+  `.write` at a node governs everything under it, which is exactly why the
+  `newData.val() === null` half is load-bearing.
+- **Post-publish checks, on Manny's phone:** a score save PASSED, and My Groups still
+  listed "Thursday game". PASSED.
+- **Confirmed from the app side, 2026-09-30, against the real database over REST:**
+  an unauthenticated `DELETE organizers/<uid>` returns **401**, an unauthenticated
+  `PUT organizers/<uid>/pass` returns **401**, and an unauthenticated read of a
+  record returns **401** - with a positive control that the endpoint and key work
+  (`GET events/GFLBAM/eventName` -> 200 `"Single Round"`). The deny side of the new
+  rule is live. The ALLOW side needs a signed-in owner, which is Manny's throwaway
+  test; no real record was deleted to check it.
+- **`database.rules.json` in the repo is STILL not what is running** - it carries the
+  Stage 2 owner-only round parent and has never been published. Read this section
+  before assuming anything about which file is live.
+- `rules_stage2_delete_test.js` (12 tests, three negative controls) owns the live
+  file; `rules_stage1_test.js` now describes the rollback and is re-run in full
+  against the live file to prove the publish took nothing away.
 
 **MY GROUPS IS SHIPPED AND DARK.** On main since `4aba38a`
 (`golfapp-v261-mygroups`), and invisible: the button ships `display:none` and appears
@@ -3125,7 +3149,8 @@ the dark state; `my_groups_test.js` holds the feature.
 
 | what | state |
 |---|---|
-| **Stage 2 rules** - the owner-only round parent, with the `ownerLock` grandfather | approved IN PRINCIPLE, **not built**: no rule, no app change, no flag on any round |
+| **Stage 2 rules** - the owner-only round parent, with the `ownerLock` grandfather | approved IN PRINCIPLE, **not built**: no rule, no app change, no flag on any round. NOTE the name collision: `database.rules.stage2delete.json`, published 2026-09-30, is the DELETE rule and has nothing to do with this row |
+| **Wave 34** - sign out and delete account (App Review 5.1.1(v)) | built on `ui-wave34-account-exit`, unmerged, waiting on Manny's THROWAWAY-account test. The rules half is already live |
 | **the `ownerUid` audit** - Step 0, and it gates Stage 2 | blocked: listing `events/` needs a read of the parent node, which no ruleset grants. See the item below |
 | **authorized sign-in domains** - a preview cannot email a link | one console entry per branch host; Firebase takes no wildcards. A fixed custom subdomain CNAME'd to the Pages project, authorized once, is the durable answer and needs DNS |
 | **My Groups for real users** - take the flag off | Manny switched it on in the Xcode build on 2026-09-30 and saved "Thursday game", so the feature is proven on a device; taking the flag off is still a decision, not a leftover |
