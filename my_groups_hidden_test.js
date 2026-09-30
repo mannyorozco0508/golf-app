@@ -125,8 +125,10 @@ describe('My Groups is off until the secret panel turns it on', () => {
         assert.ok(!/urlParams|location\.search/.test(fn), 'a URL parameter would be a public door');
         // Exactly two callers: the load hook and the secret panel opening. Anything
         // else is a new way in and has to be justified rather than assumed.
-        assert.equal((src.match(/syncMyGroupsVisibility\(\);/g) || []).length, 3,
-            'the load hook, refreshAccountState, and the toggle itself');
+        assert.equal((src.match(/syncMyGroupsVisibility\(\);/g) || []).length, 4,
+            'the load hook, refreshAccountState, the toggle itself, and - since v264 - a '
+            + 'successful one-tap sign-in, which is the moment the card first becomes '
+            + 'eligible to show at all');
     });
 
     test('the switch is an ACCOUNT setting, reachable in the App Store app', () => {

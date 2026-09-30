@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v104-mygroupsacct. The tournament product cache
+// The consumer product cache is consumer-v105-onetap. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3721,7 +3721,35 @@
 // ordinary signed-in setting.
 //
 // AN INSTALLED DEVICE WITHOUT THIS BUMP has no way to turn My Groups on at all.
-const CACHE_VERSION = 'golfapp-v263-mygroupsacct';
+// Moved to v264 FOR ONE-TAP SIGN-IN: APPLE AND GOOGLE.
+//
+// The email link failed on a real phone, repeatedly, and the failure is structural
+// rather than a bug: the link arrives in Gmail, Gmail opens it in the DEFAULT
+// browser, and that is a different browser from the one the round was started in - a
+// different anonymous uid and a different IndexedDB. So it asked for the email again
+// and the pasted link could not finish. No copy change fixes a flow whose second
+// step leaves the app.
+//
+// Apple and Google never leave the browser: a popup from the golfer own tap,
+// postMessage back, done. The email link stays as a one-tap fallback behind
+// "Use email instead", unchanged.
+//
+// THE UID GUARANTEE IS THE SAME ONE THE EMAIL LINK MAKES: an anonymous organizer is
+// LINKED, so the uid, the rounds, the free trial and a founder pass stay where they
+// are; a credential already on another account is the second device and the note
+// says the trial was not copied. oauth_signin_test.js asserts the two decision
+// tables agree rather than trusting them to.
+//
+// MEASURED: neither provider is enabled in the console yet - createAuthUri returns
+// OPERATION_NOT_ALLOWED for google.com and apple.com - so the buttons say "not
+// switched on for this app yet" rather than failing blank. The authorized-domains
+// list already carries the production host, read back from the project.
+//
+// THE NATIVE HALF IS A SEAM, NOT AN IMPLEMENTATION. In the shell a popup has no
+// window; iOS needs the native plugin, GoogleService-Info.plist (not in this repo),
+// the Sign in with Apple capability and an Xcode build. nativeCredential() is the
+// one function to fill in and every build today takes the popup path.
+const CACHE_VERSION = 'golfapp-v264-onetap';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3832,6 +3860,12 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './my-groups.js',
+    // oauth-signin.js: Apple and Google one-tap sign-in. Reached through a typeof
+    // guard, so a cached shell without it falls back to the email link.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './oauth-signin.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -

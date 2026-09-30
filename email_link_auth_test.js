@@ -372,7 +372,7 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.ok(!/'email-link-auth\.js'/.test(shared));
         assert.ok(!/'email-link-auth\.js'/.test(tournament));
         assert.match(read('sw.js'), /'\.\/email-link-auth\.js'/);
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v263-mygroupsacct';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v264-onetap';/);
 
         const src = read('email-link-auth.js');
         assert.match(src, /linkWithCredential/);
@@ -467,6 +467,14 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
                 { expression: `(function () { var c = document.getElementById('email-link-card'); return JSON.stringify({ text: c ? c.innerText : '', onScreen: !!(c && c.getClientRects().length > 0), inPanel: !!(c && document.getElementById('account-modal') && document.getElementById('account-modal').contains(c)) }); })()` },
                 { tap: '#account-link' },
                 { sleep: 300 },
+                // THE EMAIL CARD IS THE FALLBACK NOW (v264): the panel leads with
+                // Continue with Apple / Continue with Google, and the email form is
+                // behind "Use email instead". That is one more real tap a golfer makes,
+                // so the journey makes it too - and the state BEFORE the tap is asserted
+                // below, because "hidden until asked for" is the new claim.
+                { expression: `(function () { var c = document.getElementById('email-link-card'); var o = document.getElementById('oauth-card'); return JSON.stringify({ emailOnScreen: !!(c && c.getClientRects().length > 0), oauthText: o ? o.innerText : '' }); })()` },
+                { tap: '#oauth-email-toggle' },
+                { sleep: 250 },
                 { expression: `(function () { var c = document.getElementById('email-link-card'); return JSON.stringify({ text: c ? c.innerText : '', onScreen: !!(c && c.getClientRects().length > 0) }); })()` },
                 { tap: '#email-link-input' },
                 { sleep: 150 },
@@ -479,15 +487,23 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
         });
         assert.equal(r.ok, true, r.reason);
         const objs = (r.value || []).filter((x) => typeof x === 'string' && x.charAt(0) === '{').map((x) => JSON.parse(x));
-        assert.equal(objs.length, 3, JSON.stringify(r.value));
-        const [arrival, opened, sent] = objs;
+        assert.equal(objs.length, 4, JSON.stringify(r.value));
+        const [arrival, panel, opened, sent] = objs;
+        // 1b. v264: the panel leads with one tap, and the email form is NOT on screen
+        // until it is asked for. Both halves asserted, so a wave that deleted either
+        // the buttons or the fallback goes red.
+        assert.equal(panel.emailOnScreen, false,
+            'the email form is on screen before "Use email instead" was tapped');
+        assert.match(panel.oauthText, /Continue with Apple/);
+        assert.match(panel.oauthText, /Continue with Google/);
+        assert.match(panel.oauthText, /Use email instead/);
         // 1. NOT ON THE HOME SCREEN, and not deleted either.
         assert.equal(arrival.onScreen, false,
             'the tall organizer card is on Home again - Option A moved it on purpose');
         assert.equal(arrival.inPanel, true,
             'the card is not inside #account-modal, so the flow may have been deleted');
         // 2. THE LINK OPENS IT, and the words are the same words.
-        assert.equal(opened.onScreen, true, 'tapping Account did not open the panel');
+        assert.equal(opened.onScreen, true, '"Use email instead" did not reveal the email form');
         assert.match(opened.text, /Keep this organizer/);
         assert.match(opened.text, /free trial and a founder pass/);
         assert.doesNotMatch(opened.text, MONEY);
@@ -571,6 +587,10 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
                 { expression: `(function () { window.__noReload = 'kept'; var a = document.getElementById('account-link'); return JSON.stringify({ stage: 'before', account: a ? a.innerText.trim() : '', marker: window.__noReload }); })()` },
                 { tap: '#account-link' },
                 { sleep: 200 },
+                // v264: the email form is behind "Use email instead", so the journey
+                // reveals it first, exactly as a golfer would.
+                { tap: '#oauth-email-toggle' },
+                { sleep: 250 },
                 { tap: '#email-link-paste' },
                 { sleep: 150 },
                 { cdp: { method: 'Input.insertText', params: { text: LINK } } },

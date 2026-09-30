@@ -124,6 +124,13 @@ const CONSUMER_SHELL = [
     // gives the wizard a My Groups button that throws. It ships.
     // NO APOSTROPHES IN THIS BLOCK.
     'my-groups.js',
+    // oauth-signin.js (v264): Apple and Google one-tap sign-in, and the uid
+    // guarantee that links a provider to the anonymous organizer so rounds, the
+    // free trial and a founder pass stay put. admin.html calls it through a typeof
+    // guard, so a bundle without it falls back to the email link rather than
+    // breaking - but the email link is the flow that failed on a real phone, so it
+    // ships. NO APOSTROPHES IN THIS BLOCK.
+    'oauth-signin.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in

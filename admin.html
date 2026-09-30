@@ -54,6 +54,7 @@
          trial and a founder pass stay. Consumer only; tournament.html keeps
          its own email-and-password form and does not load this. -->
     <script src="email-link-auth.js"></script>
+    <script src="oauth-signin.js"></script>
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="action-model.js"></script>
@@ -1058,7 +1059,24 @@ html {
              the same three places. It renders NOTHING until the trial read answers,
              which is why it cost 0px on arrival and 30px on a phone with a pass. -->
         <div id="lobby-standing" class="organizer-standing" role="status"></div>
-    <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title">
+    <!-- ONE-TAP SIGN-IN, FIRST. The email link is the fallback now, not the front
+         door: it arrives in a mail app, which opens it in the DEFAULT browser, and
+         that is a different browser - a different anonymous uid and a different
+         IndexedDB - from the one the round was started in. Apple and Google never
+         leave this browser. See oauth-signin.js for the uid guarantee, which is the
+         same one the email link makes.
+         NO STORE WORDS IN THIS BLOCK, not even in a comment - it sits inside
+         #lobby-screen and that whole slice is scanned for the words a paywall
+         would use. -->
+    <section id="oauth-card" class="email-link-card" aria-labelledby="oauth-title">
+        <h2 id="oauth-title">Keep this organizer</h2>
+        <p id="oauth-lead">One tap. Your rounds, the free trial and a founder pass stay on this same account.</p>
+        <button type="button" id="oauth-apple" class="btn-primary" onclick="oauthTap('apple')">&#63743;&nbsp; Continue with Apple</button>
+        <button type="button" id="oauth-google" class="btn-outline" onclick="oauthTap('google')">Continue with Google</button>
+        <p id="oauth-status" role="status"></p>
+        <button type="button" id="oauth-email-toggle" class="btn-outline" onclick="toggleEmailFallback()">Use email instead</button>
+    </section>
+    <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title" style="display:none;">
         <h2 id="email-link-title">Keep this organizer</h2>
         <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a sign-in link and finish it in this same app. It stays the same account, so the free trial and a founder pass stay with the rounds already set up on it.</p>
         <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
@@ -7014,13 +7032,61 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Open and close only. The flow inside is email-link-auth.js's, untouched:
     // the form still posts to emailLinkAuth.submitSend and Finish still calls
     // emailLinkAuth.submitPaste, by the same ids they have always used.
+    // ONE TAP, AND EVERY WRITE IN HERE IS CONDITIONAL. This card is inside
+    // #account-modal, which watchAccountStatus observes with subtree +
+    // characterData + childList and answers by calling refreshAccountState. An
+    // unconditional textContent write re-fires the observer, which calls back, which
+    // writes again - a mutation loop that hung the page for 33.7s in headless Chrome
+    // the last time it was written, and the time before that. setTextOnce or nothing.
+    function oauthReady() {
+        return !!(window.oauthSignin && typeof window.oauthSignin.signIn === 'function');
+    }
+    function oauthTap(which) {
+        if (!oauthReady()) return setTextOnce(document.getElementById('oauth-status'),
+            'Sign-in is not ready yet. Wait a moment and try again.');
+        var a = document.getElementById('oauth-apple'), g = document.getElementById('oauth-google');
+        if (a) a.disabled = true; if (g) g.disabled = true;
+        setTextOnce(document.getElementById('oauth-status'), 'Opening\u2026');
+        window.oauthSignin.signIn(which).then(function (r) {
+            if (a) a.disabled = false; if (g) g.disabled = false;
+            setTextOnce(document.getElementById('oauth-status'), r.note || '');
+            refreshAccountState();
+            if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+        }, function (err) {
+            if (a) a.disabled = false; if (g) g.disabled = false;
+            setTextOnce(document.getElementById('oauth-status'), window.oauthSignin.messageFor(err));
+        });
+    }
+    // The email card is the FALLBACK, shown only when asked for. It is unchanged
+    // otherwise - same form, same handlers, same guarantees.
+    // THE STATE IS A VARIABLE, NOT A READ OF style.display. mini-dom does not parse
+    // a static style attribute, so the card reads undefined there and a toggle keyed
+    // on the string would behave differently in the harness from the browser - which
+    // is the harness proving the thing you are assuming. One boolean, both places.
+    var emailFallbackShown = false;
+    function toggleEmailFallback() {
+        var card = document.getElementById('email-link-card');
+        if (!card) return;
+        emailFallbackShown = !emailFallbackShown;
+        var show = emailFallbackShown;
+        var want = show ? '' : 'none';
+        if (card.style.display !== want) card.style.display = want;
+        setTextOnce(document.getElementById('oauth-email-toggle'),
+            show ? 'Hide the email option' : 'Use email instead');
+        if (show) {
+            var box = document.getElementById('email-link-input');
+            if (box && typeof box.focus === 'function') { try { box.focus(); } catch (e) {} }
+        }
+    }
+
     function openAccountPanel() {
         const el = document.getElementById('account-modal');
         if (!el) return;
         refreshAccountState();
         el.classList.add('open');
-        const box = document.getElementById('email-link-input');
-        if (box && typeof box.focus === 'function' && !accountIsLinked()) { try { box.focus(); } catch (e) {} }
+        // NOTHING IS FOCUSED ON ARRIVAL ANY MORE. The email box is behind "Use email
+        // instead", so focusing it would open the keyboard over the two buttons a
+        // golfer is meant to tap. toggleEmailFallback focuses it when it is asked for.
     }
     function closeAccountPanel() {
         const el = document.getElementById('account-modal');
@@ -7107,6 +7173,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (linked) {
             setTextOnce(document.getElementById('email-link-lead'),
                 'Signed in. Use this again only to move this organizer onto another browser or phone.');
+            setTextOnce(document.getElementById('oauth-lead'),
+                'Signed in. Tap either one again only to move this organizer onto another browser or phone.');
         }
     }
 
