@@ -207,10 +207,17 @@ describe('one-tap sign-in keeps the organizer', () => {
             'the native SDK must not create its own session, or there is no anonymous '
             + 'user left to link and the uid guarantee is gone');
         assert.match(src, /linkWithCredential/, 'and the credential is LINKED, not signed in');
-        // Said where it can be checked: the three things that make the native half
-        // impossible from here.
-        assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'ios/App/App/GoogleService-Info.plist')),
-            'GoogleService-Info.plist is not in this repo - Manny downloads it');
+        // THIS LINE USED TO ASSERT THE OPPOSITE, and the flip is the point rather
+        // than a loosened test. While the native half was unbuilt, "the plist is
+        // not in this repo" was one of the three facts that made it unreachable
+        // from here. The plist is now committed - nothing in it is a secret, it
+        // ships inside every binary, and ios/.gitignore carries the reasoning - so
+        // asserting its ABSENCE would now fail on a correct tree. What is still
+        // true, and is what this file actually owns, is the line above: with no
+        // plugin on the window there is no native path, so every test here takes
+        // the popup path. The wiring is oauth_native_test.js's.
+        assert.ok(fs.existsSync(path.join(REPO_ROOT, 'ios/App/App/GoogleService-Info.plist')),
+            'GoogleService-Info.plist is committed - without it the iOS build has no Firebase options and Continue with Google is dead on the device');
         assert.ok(fs.existsSync(path.join(REPO_ROOT, 'ios/App/CapApp-SPM/Package.swift')),
             'the iOS project is SPM, not CocoaPods');
         assert.match(read('capacitor.config.ts'), /THE iOS TARGET LINKS EXACTLY THESE/,
