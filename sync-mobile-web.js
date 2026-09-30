@@ -118,6 +118,12 @@ const CONSUMER_SHELL = [
     // match play side bet as worth nothing - which is the defect this wave fixed.
     // It ships. NO APOSTROPHES IN THIS BLOCK.
     'side-match-lines.js',
+    // my-groups.js (v260): the weekly foursome saved on the ACCOUNT - the store shape,
+    // the tick list, the handicap write-back and the paste note stripper. admin.html
+    // loads it and calls it UNGUARDED from the Players step, so a bundle without it
+    // gives the wizard a My Groups button that throws. It ships.
+    // NO APOSTROPHES IN THIS BLOCK.
+    'my-groups.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in

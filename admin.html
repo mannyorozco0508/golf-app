@@ -19,6 +19,7 @@
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
+    <script src="my-groups.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -1839,6 +1840,18 @@ html {
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
+    <button class="btn-outline" onclick="openMyGroupsModal()">👥 My Groups</button>
+
+    <div class="modal-overlay" id="my-groups-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>👥 My Groups</span>
+                <button class="close-modal" onclick="closeMyGroupsModal()" aria-label="Close">&times;</button>
+            </div>
+            <p id="my-groups-note" style="font-size:0.8rem; color:var(--text-muted); margin:0 0 10px 0;"></p>
+            <div id="my-groups-body"></div>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="paste-players-modal">
         <div class="modal-content">
@@ -6912,6 +6925,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         let validPlayers = [];
         let flaggedLines = [];
         let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
+        let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
         let groups = [];
         let inGroup = false;     // true while inside a run of non-empty lines
         lines.forEach((rawLine, idx) => {
@@ -6923,7 +6937,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // the iPhone's double-space-for-a-period puts one on every line). Only
             // trailing, only periods; "Jr." at the end loses its dot too - accepted.
             // Stored names are never rewritten; this is the paste only.
-            const { flight, rest, notAFlight } = splitLeadingFlight(line);
+            // A TRAILING NOTE IN BRACKETS COMES OFF FIRST (v260). Measured before
+            // this: "B Jimmy 11 (captain)" parsed to the NAME "Jimmy 11 (captain)"
+            // with NO handicap, because the note sat between the number and the end
+            // of the line. The note is reported rather than dropped silently, so the
+            // review says what it ignored.
+            const noted = (typeof stripTrailingNote === 'function')
+                ? stripTrailingNote(line) : { text: line, note: '' };
+            if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
+            const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
             // A not-a-flight line is kept AS TYPED: its comma is part of what was
             // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
             // trailing number is read off it.
@@ -6948,7 +6970,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const flights = anyFlight
             ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
             : null;
-        return { validPlayers, flaggedLines, flaggedFlights, groups, flights };
+        return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights };
     }
 
     function openPastePlayersModal() {
@@ -7059,7 +7081,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, flaggedFlights, groups, flights } = parsePlayerPasteText(text);
+        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text);
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -7092,6 +7114,202 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         summaryEl.innerHTML = html;
         commitBtn.disabled = validPlayers.length === 0;
+    }
+
+    // ===== MY GROUPS (v260) ==============================================
+    //
+    // The weekly foursome, saved once on the ACCOUNT. See my-groups.js for the
+    // store shape, why it is the account and not the device, and why a handicap
+    // is kept as the string the organizer typed.
+    //
+    // NOTHING HERE PARSES A HANDICAP OR TOUCHES A ROUND. It reads the wizard's
+    // rows through captureCurrentPlayerInputs() and writes them back through
+    // appendPlayerFrom() - the same two functions the paste importer uses - so a
+    // prefilled roster is indistinguishable from a typed one.
+    let myGroupsState = { groups: {}, pickedId: null, loaded: false };
+
+    function myGroupsUid() {
+        try {
+            const u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+            return (u && u.isAnonymous === false && u.email) ? String(u.uid) : null;
+        } catch (e) { return null; }
+    }
+
+    function closeMyGroupsModal() {
+        document.getElementById('my-groups-modal').classList.remove('open');
+    }
+
+    async function openMyGroupsModal() {
+        const body = document.getElementById('my-groups-body');
+        const note = document.getElementById('my-groups-note');
+        document.getElementById('my-groups-modal').classList.add('open');
+        myGroupsState.pickedId = null;
+        // A LINKED ACCOUNT IS THE WHOLE POINT. An anonymous uid is per-browser, so a
+        // group saved in Safari would not exist in the installed app - and saying
+        // that is better than saving something that quietly is not there.
+        const uid = myGroupsUid();
+        if (!uid) {
+            note.textContent = 'Sign in with your email first, and your groups follow you into Safari, the home-screen app and the App Store app.';
+            body.innerHTML = '<button class="btn-primary" onclick="closeMyGroupsModal(); openAccountPanel();">Sign in</button>';
+            return;
+        }
+        note.textContent = 'Saved on your account, so the same groups are here on every device you sign in to.';
+        body.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Loading\u2026</p>';
+        try {
+            const snap = await db.ref(myGroupsPath(uid)).once('value');
+            myGroupsState.groups = snap.val() || {};
+            myGroupsState.loaded = true;
+        } catch (e) {
+            myGroupsState.groups = {};
+            body.innerHTML = '';
+            uiFail('Could not read your groups: ' + (e && e.message ? e.message : 'permission denied'));
+            return;
+        }
+        renderMyGroupsBody();
+    }
+
+    function renderMyGroupsBody() {
+        const body = document.getElementById('my-groups-body');
+        const ids = Object.keys(myGroupsState.groups)
+            .sort((a, b) => (myGroupsState.groups[b].updatedAt || 0) - (myGroupsState.groups[a].updatedAt || 0));
+        let html = '';
+        if (myGroupsState.pickedId && myGroupsState.groups[myGroupsState.pickedId]) {
+            const g = myGroupsState.groups[myGroupsState.pickedId];
+            const rows = myGroupRoster(g);
+            html += '<p style="font-weight:bold; margin:0 0 8px 0;">' + escapeHtml(g.name || 'My Group')
+                 + ' \u2014 tick who is playing</p>';
+            rows.forEach(r => {
+                const k = myGroupKey(r.name);
+                html += '<label style="display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:0.9rem;">'
+                     + '<input type="checkbox" class="mg-pick" value="' + escapeHtml(k) + '" checked>'
+                     + '<span style="flex:1;">' + escapeHtml(r.name) + '</span>'
+                     + '<span style="color:var(--text-muted);">' + (r.flight ? escapeHtml(r.flight) + ' \u00B7 ' : '')
+                     + (String(r.hcp || '').trim() === '' ? 'no index' : escapeHtml(String(r.hcp))) + '</span></label>';
+            });
+            html += '<div style="display:flex; gap:8px; margin-top:12px;">'
+                 + '<button class="btn-primary" onclick="applyMyGroupPicks()">Add ticked golfers</button>'
+                 + '<button class="btn-outline" onclick="myGroupsState.pickedId = null; renderMyGroupsBody();">Back</button>'
+                 + '</div>';
+            body.innerHTML = html;
+            return;
+        }
+        if (ids.length === 0) {
+            html += '<p style="color:var(--text-muted); font-size:0.85rem;">No saved groups yet. Type or paste this week\u2019s roster, then save it here and it is one tap next time.</p>';
+        } else {
+            ids.forEach(id => {
+                const g = myGroupsState.groups[id];
+                const n = Object.keys((g && g.members) || {}).length;
+                html += '<div style="display:flex; align-items:center; gap:8px; padding:8px 2px; border-bottom:1px solid var(--border-faint);">'
+                     + '<span style="flex:1; font-weight:bold;">' + escapeHtml((g && g.name) || 'My Group') + '</span>'
+                     + '<span style="color:var(--text-muted); font-size:0.82rem;">' + n + ' golfer' + (n === 1 ? '' : 's') + '</span>'
+                     + '<button class="btn-outline-sm" onclick="pickMyGroup(\'' + escapeHtml(id) + '\')">Start from this</button>'
+                     + '</div>';
+            });
+        }
+        html += '<div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">'
+             + '<button class="btn-outline" onclick="saveRosterAsMyGroup()">\uD83D\uDCBE Save this round\u2019s roster as a group</button>'
+             // OFFERED ONLY WHEN A GROUP IS IN PLAY. It reports what the round changed -
+             // an edited handicap, a golfer who is not in the group yet - and asks before
+             // writing anything. Never on a save path: creating a round must not depend on
+             // an account write going through.
+             + (myGroupsState.usedId && myGroupsState.groups[myGroupsState.usedId]
+                ? '<button class="btn-outline" onclick="syncMyGroupFromRoster()">\u21BB Save changes back to '
+                  + escapeHtml(myGroupsState.groups[myGroupsState.usedId].name || 'My Group') + '</button>'
+                : '')
+             + '</div>';
+        body.innerHTML = html;
+    }
+
+    function pickMyGroup(id) { myGroupsState.pickedId = id; renderMyGroupsBody(); }
+
+    // PREFILL. The ticked members are appended through the SAME pipeline the paste
+    // importer uses, so flights turn on the same way and the blank arrival row is
+    // dropped the same way.
+    function applyMyGroupPicks() {
+        const g = myGroupsState.groups[myGroupsState.pickedId];
+        if (!g) return;
+        const picked = Array.from(document.querySelectorAll('.mg-pick'))
+            .filter(b => b.checked).map(b => b.value);
+        const rows = myGroupRoster(g, picked);
+        if (rows.length === 0) return uiRefuse('Tick at least one golfer.');
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const existing = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
+        if (rows.some(r => r.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        rows.forEach(r => existing.push({
+            name: r.name, hcp: r.hcp, team: '',
+            squad: existing.length % 2 === 0 ? 'red' : 'blue',
+            playingForMoney: true, flight: r.flight
+        }));
+        document.getElementById('player-list').innerHTML = '';
+        renderPlayerListHeaderAndWarning(existing.length);
+        existing.forEach(p => appendPlayerFrom(p, false, existing.length));
+        updateCount();
+        myGroupsState.usedId = myGroupsState.pickedId;
+        closeMyGroupsModal();
+        uiToast(rows.length + ' golfer' + (rows.length === 1 ? '' : 's') + ' added from ' + ((g.name) || 'My Group'));
+    }
+
+    async function saveRosterAsMyGroup() {
+        const uid = myGroupsUid();
+        if (!uid) return uiRefuse('Sign in with your email to save a group to your account.');
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const rows = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p) && String(p.name || '').trim() !== '');
+        if (rows.length === 0) return uiRefuse('Add some golfers first.');
+        const name = await uiPrompt({ title: 'Name this group', body: 'Something you will recognise next week.', value: 'Weekly Game' });
+        if (name === null) return;
+        const existingId = Object.keys(myGroupsState.groups)
+            .find(id => (myGroupsState.groups[id].name || '').trim().toLowerCase() === String(name).trim().toLowerCase());
+        const id = existingId || db.ref(myGroupsPath(uid)).push().key;
+        const payload = buildMyGroupPayload(name, rows, Date.now());
+        try {
+            await db.ref(myGroupsPath(uid) + '/' + id).set(payload);
+        } catch (e) {
+            // The write rule for organizers/<uid>/groups ships in the next rules
+            // publish. Until then the server refuses, nothing is written, and the
+            // organizer is told rather than left believing it saved.
+            return uiFail('Could not save the group: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        myGroupsState.groups[id] = payload;
+        myGroupsState.usedId = id;
+        renderMyGroupsBody();
+        uiToast('Saved ' + payload.name + ' \u2014 ' + Object.keys(payload.members).length + ' golfers');
+    }
+
+    // AFTER THE ROSTER IS EDITED: what the round changed, offered back to the group.
+    // Called from the Players step, never from a save path - creating a round must
+    // not depend on an account write succeeding.
+    async function syncMyGroupFromRoster() {
+        const uid = myGroupsUid();
+        const id = myGroupsState.usedId;
+        const g = id && myGroupsState.groups[id];
+        if (!uid || !g) return;
+        const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        const rows = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
+        const changes = myGroupHandicapChanges(g, rows);
+        const added = myGroupNewcomers(g, rows);
+        // A REFUSAL, NOT A RECEIPT: nothing was written, so it must not float away
+        // like something that was.
+        if (changes.length === 0 && added.length === 0) return uiRefuse('Nothing new to save \u2014 the group already matches this roster.');
+        const lines = changes.map(c => c.name + ' ' + (c.from || 'no index') + ' \u2192 ' + (c.to || 'no index'))
+            .concat(added.map(a => a.name + ' (new)'));
+        const ok = await uiConfirm({
+            title: 'Update ' + (g.name || 'My Group') + '?',
+            body: lines.join('\n'),
+            confirmText: 'Save to my group', danger: false
+        });
+        if (!ok) return;
+        const updates = {};
+        changes.forEach(c => { updates[c.key + '/hcp'] = c.to; });
+        added.forEach(a => { updates[a.key] = { name: a.name, hcp: a.hcp, flight: a.flight }; });
+        updates['../updatedAt'] = Date.now();
+        try {
+            await db.ref(myGroupsPath(uid) + '/' + id + '/members').update(updates);
+        } catch (e) {
+            return uiFail('Could not update the group: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        changes.forEach(c => { if (g.members[c.key]) g.members[c.key].hcp = c.to; });
+        added.forEach(a => { g.members[a.key] = { name: a.name, hcp: a.hcp, flight: a.flight }; });
+        uiToast('My Group updated');
     }
 
     // Appends parsed players to whatever's already in the list — reuses the exact same

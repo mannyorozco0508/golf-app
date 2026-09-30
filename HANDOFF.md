@@ -2906,6 +2906,21 @@ BREAKS A SHIPPED FEATURE rather than merely leaving it unenforced:
   it by four commits). Publish the repo file; diff it against the live read-back
   before and after, the way the hash table above was built.
 
+**`organizers/$uid/groups` MUST SHIP TOO** (added 2026-09-29, UI Wave 31, My
+Groups). The READ rule for `organizers/$uid` already exists; the WRITE rule for
+its `groups` child does not, so every save of a weekly roster is refused by the
+server until this publishes.
+
+- The exact block to add is written out in `my_groups_test.js`'s header, beside
+  the reason for each `.validate`.
+- Unlike `kpGroupAnswers`, this failure is LOUD: `saveRosterAsMyGroup` and
+  `syncMyGroupFromRoster` both report the refusal through `uiFail`, nothing is
+  written, and creating a round never depends on either. So shipping the feature
+  ahead of the rule degrades to "My Groups cannot save yet", not to a silent loss.
+- A test in `my_groups_test.js` asserts the rule is still ABSENT, so this note
+  cannot go stale quietly: the day `groups` gains its rule, that test goes red and
+  points back at this section.
+
 Nothing else is pending for the rules. `kpNoWinner` and `kpCancelled` stay
 undeclared **deliberately** — they are the organizer's whole-field calls and the
 owner-only parent rule is exactly right for them.
