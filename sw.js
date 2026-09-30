@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v103-rosterprice. The tournament product cache
+// The consumer product cache is consumer-v104-mygroupsacct. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3702,7 +3702,26 @@
 // computeMoneyPool, run once on the round and once on the draft.
 //
 // GUARDED BY edit_players_money_test.js.
-const CACHE_VERSION = 'golfapp-v262-rosterprice';
+// Moved to v263 SO MY GROUPS CAN BE SWITCHED ON IN THE APP STORE APP.
+//
+// Manny tapped the HARDPAN lockup five times on his iPhone and nothing happened -
+// the app behaving exactly as designed. handleSecretTap() opens with
+// `if (isNativeApp()) return;`, a deliberate native no-op under App Review
+// Guideline 2.1, because the secret panel offers a mass write to the shared course
+// database and a beta-distribution share. So the My Groups switch was in a place the
+// installed app can never reach, which is the one place it was needed.
+//
+// It is an ordinary Account setting now - "My Groups (beta)" - shown only to a
+// SIGNED-IN organizer, which is not decoration: the roster is stored on the account,
+// so an anonymous browser has nothing to save it to. The Account panel repaints it,
+// so finishing a sign-in with the panel open reveals it without a reload.
+//
+// THE SECRET PANEL'S NATIVE NO-OP IS UNTOUCHED and native_review_surface_test.js
+// still holds both its arms. Nothing was made reachable in the shell except an
+// ordinary signed-in setting.
+//
+// AN INSTALLED DEVICE WITHOUT THIS BUMP has no way to turn My Groups on at all.
+const CACHE_VERSION = 'golfapp-v263-mygroupsacct';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

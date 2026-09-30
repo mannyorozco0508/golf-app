@@ -8,10 +8,21 @@
 // two REST results. The only place the feature can be tested is the live app, so it
 // goes there switched OFF for everybody.
 //
-// THE SWITCH IS THE SECRET MASTER PANEL - the ⛳ logo, five taps - the same door the
-// whole-dollar settlement switch already uses, and it writes a PER-DEVICE flag in
-// localStorage. A flag in app_settings would be global: it would turn the feature on
-// for every golfer at once, which is the opposite of hidden.
+// THE SWITCH IS AN ACCOUNT SETTING, "My Groups (beta)", and it MOVED THERE on
+// 2026-09-30 because the secret master panel could never reach the App Store app:
+// handleSecretTap() is a deliberate native no-op under App Review Guideline 2.1, so
+// five taps on the logo do nothing in the shell - which is exactly where the switch
+// was needed. Manny tapped five times on his iPhone and nothing happened, which is
+// the app behaving as designed and the switch being in the wrong place.
+//
+// It is shown only to a SIGNED-IN organizer, and that is not decoration: My Groups
+// stores the roster on the ACCOUNT, so an anonymous browser has nothing to save it
+// to and the switch would promise something that cannot work.
+//
+// It still writes a PER-DEVICE flag in localStorage. A flag in app_settings would be
+// global: it would turn the feature on for every golfer at once, which is the
+// opposite of hidden. The secret panel's native no-op is UNTOUCHED, and
+// native_review_surface_test.js still holds both of its arms.
 //
 // WHAT "CANNOT LEAK" MEANS HERE, and each half is asserted below: the button ships
 // display:none in the markup, and nothing but the flag turns it on - no URL
@@ -25,14 +36,18 @@
 // flag is release management, and the rules are the security. Saying that plainly is
 // the point of this paragraph, because "hidden" reads like "protected" and is not.
 //
-// THE RED BASELINE, all 8 tests, measured against main 4676a29 - where admin.html
-// has no My Groups button at all, because Wave 31 had not merged:
+// THE RED BASELINE, all 10 tests, measured against main 433345d - where the switch
+// was behind the secret panel and therefore unreachable in the App Store app:
 //
-//     0 PASS / 8 FAIL
+//     7 PASS / 3 FAIL
 //
-// Every one is red for the same honest reason: there is nothing to hide yet. The
-// file earns its keep from here on as the thing that stops the button appearing for
-// everybody the day somebody deletes a style attribute.
+// THE SEVEN THAT PASS are the dark-ship properties this file was written for in the
+// first place and which the move does not change: the button ships display:none, a
+// fresh device sees nothing, the switch goes on and off, it survives a reload, only
+// the flag turns it on, and hiding is not security. The THREE reds are exactly the
+// move - the switch being an Account setting, being shown only to a signed-in
+// organizer, and the Account panel repainting it - which is what a baseline should
+// look like when a wave relocates a control rather than inventing one.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -111,15 +126,42 @@ describe('My Groups is off until the secret panel turns it on', () => {
         // Exactly two callers: the load hook and the secret panel opening. Anything
         // else is a new way in and has to be justified rather than assumed.
         assert.equal((src.match(/syncMyGroupsVisibility\(\);/g) || []).length, 3,
-            'the load hook, the secret panel, and the toggle itself');
+            'the load hook, refreshAccountState, and the toggle itself');
     });
 
-    test('the switch is INSIDE the secret master panel, which needs five taps', () => {
+    test('the switch is an ACCOUNT setting, reachable in the App Store app', () => {
+        const acct = src.slice(src.indexOf('<div class="modal-overlay" id="account-modal">'),
+            src.indexOf('<!-- Dot Game Modal -->'));
+        assert.match(acct, /id="my-groups-beta"/, 'the card is in the Account panel');
+        assert.match(acct, /My Groups \(beta\)/, 'labelled as a beta setting');
+        assert.match(acct, /onclick="toggleMyGroupsFeature\(\)"/, 'and the switch is there');
+        // AND NOT IN THE SECRET PANEL ANY MORE - which is the whole point of the move.
         const panel = src.slice(src.indexOf('<div id="secret-master-panel">'), src.indexOf('<div class="smp-close-row">'));
-        assert.match(panel, /onclick="toggleMyGroupsFeature\(\)"/, 'the switch is in the panel');
-        assert.match(panel, /id="my-groups-flag-state"/, 'and it says which way it is set');
-        assert.match(src, /tapCount \+\+?=|tapCount\+\+/, 'the panel counts taps');
-        assert.match(src, /if \(tapCount >= 5\)/, 'five of them');
+        assert.ok(!/toggleMyGroupsFeature/.test(panel), 'it must not be behind the native no-op');
+        // The panel's own native no-op is untouched.
+        assert.match(src, /if \(isNativeApp\(\)\) return;/, 'handleSecretTap stays a native no-op');
+        assert.match(src, /if \(tapCount >= 5\)/, 'and the panel still takes five taps for what is left in it');
+    });
+
+    test('and it is shown ONLY to a signed-in organizer', () => {
+        // Not decoration: the roster is stored on the ACCOUNT, so an anonymous browser
+        // has nothing to save it to.
+        const sb = page();
+        sb.syncMyGroupsVisibility();
+        assert.equal(sb.document.getElementById('my-groups-beta').style.display, 'none',
+            'anonymous sees no switch');
+        sb.__auth.setUser({ uid: 'u1', isAnonymous: false, email: 'a@b.com' });
+        sb.syncMyGroupsVisibility();
+        assert.notEqual(sb.document.getElementById('my-groups-beta').style.display, 'none',
+            'a signed-in organizer does');
+        assert.match(src, /<section id="my-groups-beta"[^>]*style="display:none;"/,
+            'and it ships hidden in the markup, not only in script');
+    });
+
+    test('the Account panel repaints it, so a sign-in inside the panel shows it', () => {
+        const fn = src.slice(src.indexOf('function refreshAccountState'), src.indexOf('function previewPastedPlayers'));
+        assert.match(fn, /syncMyGroupsVisibility\(\)/,
+            'without this, finishing sign-in in the open panel would leave the switch hidden');
     });
 
     test('HIDING IS NOT SECURITY, and the file says so where it can be checked', () => {

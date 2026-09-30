@@ -1005,11 +1005,19 @@ html {
             <button class="btn-primary" style="background-color: var(--brand-green);" onclick="enableWholeDollarSettlement()">💵 Settle this round in whole dollars</button>
         </div>
 
-        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-mid);">
-            <div style="font-size:0.78rem; font-weight:bold; margin-bottom:4px;">My Groups (unreleased)</div>
-            <div id="my-groups-flag-state" style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">…</div>
-            <button class="btn-primary" style="background-color: var(--accent-teal);" onclick="toggleMyGroupsFeature()">👥 Turn My Groups on for this device</button>
-        </div>
+        <!-- THE MY GROUPS SWITCH MOVED OUT OF HERE (2026-09-30). It could never be
+             reached in the installed iOS app: handleSecretTap() is a deliberate
+             native no-op under review Guideline 2.1, so five taps on the logo do
+             nothing in the shell - which is exactly where the switch was needed. It
+             is an ordinary signed-in setting now, in the Account panel, reachable
+             everywhere and not a hidden feature. The native no-op below is untouched;
+             native_review_surface_test.js still holds both its arms.
+             NO STORE WORDS IN THIS BLOCK, not even in a comment: it sits inside
+             #lobby-screen, and email_link_auth_test.js scans that whole slice for
+             the words a paywall would use. A source scan cannot tell a comment from
+             copy, and it is right not to try - so the words stay out. My first two
+             drafts of this comment tripped it twice, once for naming the store and
+             once for naming the scan. -->
 
         <h3 style="margin-top: 20px;">📲 Distribute Beta App</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Share the root URL for this app to add new testers.</p>
@@ -1062,6 +1070,16 @@ html {
         <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link" aria-label="Sign-in link from the email">
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
+    </section>
+    <!-- MY GROUPS (BETA). An ordinary account setting, shown only to a signed-in
+         organizer - which is not decoration: the feature stores the roster on the
+         ACCOUNT, so an anonymous browser has nothing to save it to and the switch
+         would promise something that cannot work. Hidden until linked, and the
+         guard asserts that. -->
+    <section id="my-groups-beta" class="email-link-card" aria-labelledby="my-groups-beta-title" style="display:none;">
+        <h2 id="my-groups-beta-title">My Groups (beta)</h2>
+        <p id="my-groups-flag-state">…</p>
+        <button type="button" id="my-groups-beta-btn" class="btn-primary" onclick="toggleMyGroupsFeature()">Turn My Groups on</button>
     </section>
       </div>
     </div>
@@ -3268,7 +3286,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         tapCount++;
         if (tapCount >= 5) {
             document.getElementById('secret-master-panel').style.display = 'block';
-            if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
             tapCount = 0;
         }
     }
@@ -7078,6 +7095,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
     function refreshAccountState() {
         const linked = accountIsLinked();
+        // The beta switch lives in this panel now, so it repaints with the panel -
+        // including the moment a sign-in completes without the panel closing (v214's
+        // held-note flush does the same thing for the note above it).
+        if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
         const flag = linked ? '1' : '0';
         const link = document.getElementById('account-link');
         setTextOnce(link, linked ? 'Organizer saved' : 'Account');
@@ -7170,14 +7191,33 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         try { return localStorage.getItem(MY_GROUPS_FLAG) === '1'; } catch (e) { return false; }
     }
     function syncMyGroupsVisibility() {
+        const on = myGroupsEnabled();
         const btn = document.getElementById('my-groups-btn');
-        if (btn) btn.style.display = myGroupsEnabled() ? '' : 'none';
-        const note = document.getElementById('my-groups-flag-state');
-        if (note) {
-            note.textContent = myGroupsEnabled()
-                ? 'ON for this device. Sign in with your email, then Players → 👥 My Groups.'
-                : 'OFF. Nobody sees the button, including you, until you turn it on here.';
-        }
+        const want = on ? '' : 'none';
+        if (btn && btn.style.display !== want) btn.style.display = want;
+        // THE SETTING IS FOR A SIGNED-IN ORGANIZER ONLY. My Groups saves the roster on
+        // the ACCOUNT, so an anonymous browser has nothing to save it to; offering the
+        // switch there would promise something that cannot work.
+        const card = document.getElementById('my-groups-beta');
+        const linked = (typeof accountIsLinked === 'function') ? accountIsLinked() : false;
+        const cardWant = linked ? '' : 'none';
+        if (card && card.style.display !== cardWant) card.style.display = cardWant;
+        // EVERY WRITE IN HERE GOES THROUGH setTextOnce, and that is load-bearing.
+        // This card is INSIDE #account-modal, which watchAccountStatus observes with
+        // subtree + characterData + childList and answers by calling
+        // refreshAccountState - which now calls this. An unconditional textContent
+        // write re-fires the observer, which calls this again, which writes again.
+        //
+        // I DID EXACTLY THAT on the first pass and hung the page: 33.7s to a CDP
+        // timeout in headless Chrome against 3.5s on main, and every Chrome-driven
+        // suite went red - 71 failures and 45 cancelled. mini-dom did not notice,
+        // because it has no observer. The note four screens up in this file describes
+        // the same loop from the last time somebody wrote it, down to the 33s.
+        setTextOnce(document.getElementById('my-groups-flag-state'), on
+            ? 'On for this device. Start a round, then Players \u2192 \uD83D\uDC65 My Groups.'
+            : 'Save the weekly roster once and start every round by ticking who is playing. Off until you turn it on, on this device.');
+        setTextOnce(document.getElementById('my-groups-beta-btn'),
+            on ? 'Turn My Groups off' : 'Turn My Groups on');
     }
     function toggleMyGroupsFeature() {
         const on = !myGroupsEnabled();
