@@ -3052,6 +3052,56 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Where things stand, 2026-09-30
 
+**ONE-TAP SIGN-IN IS LIVE ON MAIN, AND IT WORKED ON A REAL iPHONE.** Wave 33,
+merged at `e50c91f` (`golfapp-v266-signincode`, consumer `v107`). Apple and Google
+are the front door in the Account panel; the email link is behind "Use email
+instead", unchanged.
+
+- **THE DEVICE RESULT, 2026-09-30, Xcode Cmd+R on Manny's iPhone.** Continue with
+  Apple LINKED to the real account `k8fYkL1h...`: the screen said "same organizer
+  account" and **the founder pass was kept**, which is the whole point of
+  `skipNativeAuth` - the native SDK never takes the session, so the anonymous
+  organizer is still there to link. My Groups (beta) was switched on from the
+  Account panel and "Thursday game" saved and listed.
+- **A THROWAWAY AUTH USER WAS DELETED BY MANNY:**
+  `9nLXZOEp2JVJL1R6xp4MpfZj46p2`. It carried Apple AND Google and no `organizers`
+  data - it was the uid the web preview created earlier that day, which is why the
+  first native Apple tap hit the adopt branch. Deleting it is why the second tap
+  could link cleanly instead. If a future Apple or Google tap ever reports "Signed
+  in as that account" unexpectedly, this is the shape of the cause: the identity is
+  already on another uid.
+- **PRODUCTION, MEASURED AFTER THE MERGE.** `golf-app-5a5.pages.dev/sw.js` serves
+  `golfapp-v266-signincode`; the served `index.html` sha matches the repo;
+  `admin.html` serves both buttons and `oauth-signin.js` returns 200. Both providers
+  are ON, read back rather than assumed - `accounts:createAuthUri` returns a real
+  `authUri` at `accounts.google.com` and `appleid.apple.com` where it returned
+  OPERATION_NOT_ALLOWED on 2026-09-29. Authorized domains now read: `localhost`,
+  `golfapp-9fb21.firebaseapp.com`, `golfapp-9fb21.web.app`, `golf-app-5a5.pages.dev`,
+  `tournaments.rattlegolf.com`, `rattlegolf.com`, `hardpangolf.com`,
+  `ui-wave33-oauth-signin.golf-app-5a5.pages.dev`. **What that does NOT prove is a
+  completed tap in a production browser** - nothing here drove one; Manny signed in
+  with both on the preview host, and the native tap is the device result above.
+- **THE NATIVE WIRING, so the next person does not rediscover it.**
+  `@capacitor-firebase/authentication@8.5.2`, iOS-allowlisted in
+  `capacitor.config.ts`, SPM with the **Google trait only** so the Facebook SDK is
+  not linked (measured on the built dylib: `GIDSignIn` 34 against `FBSDK` 0, with
+  Filesystem 24 / Share 6 as positive controls). Android gained its own allowlist
+  naming the three it already had, because the Capacitor default would have linked
+  this plugin into a gradle build with no `google-services.json`.
+  `GoogleService-Info.plist` is **committed on purpose** - `ios/.gitignore` carries
+  the reasoning - and `tools/ios-google-urlscheme.js` copies its REVERSED_CLIENT_ID
+  into `Info.plist`. `oauth_native_test.js` (35 tests) holds all of it.
+- **TWO DEVICE-ONLY FAILURES WERE HIT AND FIXED ON THE WAY, both worth knowing.**
+  (1) The first Cmd+R failed to BUILD: the Mac had no development profile carrying
+  the Sign in with Apple entitlement, so signing failed on a device while the
+  simulator build passed. `xcodebuild -allowProvisioningUpdates` issued
+  `7125b0ed-…` (created 2026-09-30, applesignin present) and it built.
+  (2) The first native Apple tap failed with the generic sentence and no code.
+  `messageFor` now ends an unrecognised error with its own code, the adopt path uses
+  the credential Firebase attaches to the error rather than re-presenting the one a
+  failed link consumed, and every failure is `console.error`'d once - code and
+  message, never a token - which Capacitor forwards to the Xcode log.
+
 **RULES STAGE 1 IS LIVE.** Published 2026-09-29 ~7:01 PM by console paste of
 `database.rules.stage1.json`. Post-publish: a score from a `?group=` link SAVED and a
 forced-KP answer on GFLBAM SAVED. The rollback is `dab91d8`, one paste, and the file
@@ -3078,7 +3128,9 @@ the dark state; `my_groups_test.js` holds the feature.
 | **Stage 2 rules** - the owner-only round parent, with the `ownerLock` grandfather | approved IN PRINCIPLE, **not built**: no rule, no app change, no flag on any round |
 | **the `ownerUid` audit** - Step 0, and it gates Stage 2 | blocked: listing `events/` needs a read of the parent node, which no ruleset grants. See the item below |
 | **authorized sign-in domains** - a preview cannot email a link | one console entry per branch host; Firebase takes no wildcards. A fixed custom subdomain CNAME'd to the Pages project, authorized once, is the durable answer and needs DNS |
-| **My Groups for real users** - take the flag off | waiting on Manny's own testing on the live app |
+| **My Groups for real users** - take the flag off | Manny switched it on in the Xcode build on 2026-09-30 and saved "Thursday game", so the feature is proven on a device; taking the flag off is still a decision, not a leftover |
+| **the next App Store build** - it needs Sign in with Apple on the STORE profile | the distribution profile from 2026-09-03 has ZERO `applesignin` entries. Automatic signing regenerates it on the archive, but that is the thing to watch. Nothing archived or uploaded |
+| **`ui-wave33-oauth-signin` in authorized domains** | the branch is merged, so that entry can come out of the Firebase console whenever - harmless, one row of clutter |
 | **`kpGroupAnswers` in a future publish** | already live via the open parent; becomes essential only if the parent tightens |
 | **PR #19** - a pot-only trip no longer invents who owes who | open, unmerged, untouched all session |
 | **branch `ui-kpprobe-scroll`** - the KP scroll probe | unmerged on purpose; the diagnostic for the item below |
