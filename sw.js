@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v99-betmoney. The tournament product cache
+// The consumer product cache is consumer-v100-pressnames. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3607,7 +3607,29 @@
 // NOT IN THIS WAVE: the "1&0" wording (hLeft 0 is "1 up", not a match separator)
 // and labelling a Nassau press by its parent bet - two presses can both be
 // "Press 1" today. Both recorded for Wave 30, neither approved.
-const CACHE_VERSION = 'golfapp-v258-betmoney';
+// Moved to v259 SO A MATCH THAT WENT THE DISTANCE READS "1 UP".
+//
+// match-engine.js printed `${winner} ${status}&${hLeft}` for every closed segment.
+// "3&2" is three up with two to play - correct and standard. With no holes left the
+// same template printed "1&0" and "2&0", which no golfer says. One engine line, so
+// it reached every surface at once: the Bets card, the Receipt, the share-sheet PDF,
+// Final Results, the scorecard match pill and the MAIN game FINAL line.
+//
+// AND A NASSAU PRESS NOW NAMES ITS BET. match-engine.js numbers presses per BASE, so
+// the Total press and the Back 9 press were both "Press 1" on a card listing all
+// three bases - and the hole range cannot tell them apart, because the Total press
+// (H11-18) and a Back 9 press (H11-18) are identical. settlement-engine.js carries
+// baseId now (DISPLAY ONLY, nothing computes with it) and side-match-lines.js reads
+// "Front 9 press (H5)", "Back 9 press (H18)", "Total press (H11)", each ordered under
+// its own bet instead of in the order it was struck. A one-bet Match Play keeps its
+// numbers, because its presses chain: Press 1 (H5), Press 2 (H11), Press 3 (H15).
+//
+// AN INSTALLED DEVICE WITHOUT THIS BUMP keeps "1&0" on every surface and two rows
+// called "Press 1" on every Nassau. NO MONEY MOVES: three frozen strings in
+// helpers/match-engine-golden.json change and not one of its 70 numbers does.
+//
+// GUARDED BY press_parent_labels_test.js.
+const CACHE_VERSION = 'golfapp-v259-pressnames';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

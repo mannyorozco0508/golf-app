@@ -180,8 +180,10 @@ describe('side match money per bet', () => {
         const r = receiptFor(F.matchRound(), 'mm');
         assert.deepEqual(here(r.segments).map(s => s.label),
             ['Overall Match', 'Press 1', 'Press 2', 'Press 3']);
+        // Wave 30: a bet that goes the distance is "1 up", not "1&0" - hLeft is 0 and
+        // the & form means "with N to play".
         assert.deepEqual(here(r.segments).map(s => s.result),
-            ['Manny 3&2', 'Marty 1&0', 'Manny 3&2', 'Marty 1&0']);
+            ['Manny 3&2', 'Marty 1 up', 'Manny 3&2', 'Marty 1 up']);
         assert.deepEqual(here(r.segments).map(s => s.money), [20, 20, 20, 20]);
         assert.deepEqual(here(r.segments).map(s => s.toSideA), [true, false, true, false]);
         assert.equal(r.net, 0);
@@ -194,9 +196,12 @@ describe('side match money per bet', () => {
         assert.equal(r.netTo, 'Reese');
         assert.equal(r.netAmount, 100);
         assert.ok(r.segments.every(s => s.winner === 'Reese'), 'Reese took every bet');
+        // The engine still numbers presses per base - both are "Press 1" - and Wave 30
+        // is what makes them tellable apart: the receipt now carries baseId.
         const pressLabels = r.segments.filter(s => /press/i.test(s.label)).map(s => s.label);
-        assert.deepEqual(here(pressLabels), ['Press 1', 'Press 1'],
-            'the labelling problem is real and is Wave 30: two different bets, one name');
+        assert.deepEqual(here(pressLabels), ['Press 1', 'Press 1']);
+        assert.deepEqual(here(r.segments).filter(s => s.pressNum > 0).map(s => s.baseId), ['18', 'B9'],
+            'the H11 press is the TOTAL bet, the H18 press is the BACK 9 - display only');
         assert.deepEqual(here(r.segments).filter(s => /press/i.test(s.label)).map(s => s.startHole), [11, 18]);
     });
 
@@ -236,11 +241,14 @@ describe('side match money per bet', () => {
         const b = needBuilder();
         const lines = b.sideMatchBetLines(receiptFor(F.matchRound(), 'mm'), { complete: true });
         assert.equal(lines.length, 4, 'four bets, four lines');
-        assert.deepEqual(here(lines).map(l => l.label), ['Overall Match', 'Press 1', 'Press 2', 'Press 3']);
+        // Wave 30: a one-bet match keeps its press NUMBERS, because they chain - the
+        // base pressed at H5, that press at H11, that one at H15 - and gains the hole.
+        assert.deepEqual(here(lines).map(l => l.label),
+            ['Overall Match', 'Press 1 (H5)', 'Press 2 (H11)', 'Press 3 (H15)']);
         assert.deepEqual(here(lines).map(l => l.moneyText),
             ['Manny +$20', 'Marty +$20', 'Manny +$20', 'Marty +$20']);
         assert.ok(lines.every(l => l.decided === true));
-        assert.equal(lines[1].result, 'Marty 1&0', 'the engine result rides along untouched');
+        assert.equal(lines[1].result, 'Marty 1 up', 'the engine result rides along untouched');
     });
 
     test('an all-square finished bet says halved, and $0', () => {
