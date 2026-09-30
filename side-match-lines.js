@@ -94,6 +94,50 @@ function sideMatchRangeComplete(sm, players, courseData, savedScores, opts) {
     }));
 }
 
+// WHICH BET A PRESS BELONGS TO, AND IN WHAT ORDER (Wave 30).
+//
+// A Nassau is three wagers, and match-engine.js numbers presses PER BASE - so the
+// Total's press and the Back 9's press are both "Press 1". On a card that lists all
+// three bases that is two rows with one name, and it cannot be told apart from the
+// hole range: the Total's press (H11-18) and a Back 9 press (H11-18) are identical.
+// settlement-engine.js now carries baseId on the segment, which is the only thing
+// that can answer it.
+//
+// A ONE-BET MATCH KEEPS ITS NUMBERS. Match Play has a single base and its presses
+// CHAIN - base pressed at H5, that press pressed at H11, that one at H15 - so
+// "Press 1 (H5) / Press 2 (H11) / Press 3 (H15)" is the true description and
+// "Overall press" three times would be worse than what it replaced.
+const SML_BASE_ORDER = { F9: 0, B9: 1, '18': 2 };
+const SML_BASE_LABEL = { F9: 'Front 9', B9: 'Back 9', '18': 'Total' };
+
+function sideMatchSegmentLabel(seg, multiBase) {
+    const base = seg && seg.baseId;
+    if (!seg || !(seg.pressNum > 0)) return seg ? seg.label : '';
+    if (!multiBase || !SML_BASE_LABEL[base]) {
+        return 'Press ' + seg.pressNum + ' (H' + seg.startHole + ')';
+    }
+    return SML_BASE_LABEL[base] + ' press (H' + seg.startHole + ')';
+}
+
+// Base first, then its own presses by start hole; Front 9, Back 9, Total in that
+// order. The receipt's own order is engine order - F9, B9, Total, then every press
+// in the order it was struck - which put a Back 9 press below the Total it has
+// nothing to do with. A segment with no baseId (a stroke bet, an Aloha line) keeps
+// its position exactly.
+function sideMatchOrderedSegments(receipt) {
+    const segs = (receipt && receipt.segments) || [];
+    if (!segs.some(s => s && SML_BASE_ORDER[s.baseId] !== undefined)) return segs.slice();
+    return segs.map((s, i) => ({ s: s, i: i })).sort((a, b) => {
+        const oa = SML_BASE_ORDER[a.s.baseId], ob = SML_BASE_ORDER[b.s.baseId];
+        if (oa === undefined || ob === undefined) return a.i - b.i;
+        if (oa !== ob) return oa - ob;
+        const pa = a.s.pressNum || 0, pb = b.s.pressNum || 0;
+        if ((pa === 0) !== (pb === 0)) return pa === 0 ? -1 : 1;
+        if (a.s.startHole !== b.s.startHole) return a.s.startHole - b.s.startHole;
+        return a.i - b.i;
+    }).map(x => x.s);
+}
+
 // ONE LINE PER BET. `complete` says whether the bet's holes are all in.
 //
 //   decided and won   "Marty +$20"
@@ -102,12 +146,18 @@ function sideMatchRangeComplete(sm, players, courseData, savedScores, opts) {
 function sideMatchBetLines(receipt, opts) {
     if (!receipt || !receipt.segments) return [];
     const complete = !!(opts && opts.complete);
-    return receipt.segments.map(seg => {
+    const bases = {};
+    receipt.segments.forEach(s => { if (s && !(s.pressNum > 0) && s.baseId) bases[s.baseId] = 1; });
+    const multiBase = Object.keys(bases).length > 1;
+    return sideMatchOrderedSegments(receipt).map(seg => {
         const money = Math.abs(Number(seg.money) || 0);
         const won = !!seg.winner && money > 0;
         const halved = !seg.winner && money === 0 && complete;
         return {
-            label: seg.label,
+            label: sideMatchSegmentLabel(seg, multiBase),
+            rawLabel: seg.label,
+            baseId: seg.baseId,
+            pressNum: seg.pressNum,
             startHole: seg.startHole,
             endHole: seg.endHole,
             holesText: 'H' + seg.startHole + (seg.endHole > seg.startHole ? '–' + seg.endHole : ''),

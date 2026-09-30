@@ -250,14 +250,19 @@ describe('RESULTS PAGE renders the receipt', () => {
 
     test('it shows the original, each press, and the match net', () => {
         const fn = st.slice(st.indexOf('function buildReceiptBlock'), st.indexOf('function buildSideMatchesHtml'));
-        assert.ok(/seg\.label/.test(fn));
+        assert.ok(/row\.label|seg\.label/.test(fn));
         // BEHAVIOUR CHANGE: "Holes 10-18" became "Started Hole 10". The end hole is
         // always the end of the match, so it carried no information; the start hole is
         // the fact that distinguishes one press from another. The segment label is now
         // also translated for golfers (Original -> Original Bet, Press 1 -> Press #1).
-        assert.ok(/Started Hole \$\{seg\.startHole\}/.test(fn));
-        assert.ok(!/Holes \$\{seg\.startHole\}/.test(fn), 'the old range shorthand must be gone');
-        assert.ok(/receiptSegLabel\(seg\.label\)/.test(fn), 'segment labels must go through the golfer-facing translator');
+        // UI WAVE 30: the rows come from side-match-lines.js, which owns the press
+        // label and the order - so the field names are row.*, not seg.*. The claims
+        // are unchanged: a start hole, no range shorthand, and every label through the
+        // golfer-facing translator.
+        assert.ok(/Started Hole \$\{row\.startHole\}/.test(fn));
+        assert.ok(!/Holes \$\{(?:seg|row)\.startHole\}/.test(fn), 'the old range shorthand must be gone');
+        assert.ok(/receiptSegLabel\(row\.label\)/.test(fn), 'segment labels must go through the golfer-facing translator');
+        assert.ok(/sideMatchBetLines\(/.test(fn), 'and the rows are the shared builder rows');
         assert.ok(/MATCH NET/.test(fn));
     });
 

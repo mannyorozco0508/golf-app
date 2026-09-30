@@ -212,7 +212,15 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                     if (Math.abs(m.status) > hLeft) {
                         m.closed = true;
                         let winnerName = m.status > 0 ? t1Name : t2Name;
-                        m.finalResult = `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
+                        // "3&2" IS "three up with two to play" - correct, and standard.
+                        // With NO holes left the same template printed "1&0" and "2&0",
+                        // which no golfer says: a match that goes the distance is won
+                        // "1 up". Wording only; nothing about status, closure or money
+                        // moves, and match_engine_parity_test.js holds the 13-fixture
+                        // money corpus across this change.
+                        m.finalResult = hLeft === 0
+                            ? `${winnerName} ${Math.abs(m.status)} up`
+                            : `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                     }
 
                     if (hNum < m.endHole) {

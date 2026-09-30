@@ -64,6 +64,15 @@ const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'n
 // explanation, so if the feature disappeared this file would go red rather than
 // quietly comparing equal.
 const WAVE29_NET = /(MATCH NET · [^|]*?) — [^|]*?(?=\||$)/g;
+// AND WAVE 30 (v259): a bet that went the distance reads "N up", not "N&0". The
+// capture holds "Carp 2&0"; the amount beside it, and every other figure, is
+// unchanged. Folded on BOTH sides so the capture keeps proving what it was taken to
+// prove, and a test below asserts the new wording really is on the page.
+// Applied to the CAPTURE, not to the page: "&0" only ever came from a bet that went
+// the distance, so mapping it forward cannot touch anything else - whereas folding
+// "N up" backwards would also rewrite an OPEN segment, which has read "N up" since
+// long before this wave.
+const wave30 = t => String(t).replace(/(\d+)&0\b/g, '$1 up');
 const norm = t => t.split('|' + TODAY + '|').join('|<today>|').replace(WAVE29_NET, '$1');
 // strip: for the rows below - whitespace beside a bar dropped so text can be matched across tags.
 const strip = h => strip0(h).replace(/ ?\| ?/g, '|').replace(/\|+/g, '|');
@@ -142,7 +151,8 @@ const sendMoved = m => Object.assign({}, m, { summary: noFinalResults(sendMove(m
 // Results list as NET +/− in #results-net. helpers/results-payout-v196.js.
 const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
 const v196 = (r, prev) => assertV196Mounts(assert, id => ({ text: norm(strip0(r.raw(id))), html: r.raw(id) }),
-    { pool: prev.pool, summary: prev.summary, 'settle-content': prev.settle, 'receipt-scorecard': prev.scorecard }, { norm, equal: ['settle-content', 'receipt-scorecard'] });
+    { pool: wave30(prev.pool), summary: wave30(prev.summary), 'settle-content': wave30(prev.settle),
+      'receipt-scorecard': wave30(prev.scorecard) }, { norm, equal: ['settle-content', 'receipt-scorecard'] });
 
 describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', () => {
     const prev = JSON.parse(read('receipt_final_prev.fixture.json'));
@@ -160,6 +170,12 @@ describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', 
     test('Caledonia (finished, KPs confirmed): every mount is the capture through the documented transforms', () => {
         v196(receipt(rounds[0].data), prev.caledonia);
         void sendMoved;   // subsumed: the proof reads the raw capture
+    });
+    test('the Wave 30 fold is folding something real: the capture said 2&0, the page says 2 up', () => {
+        assert.match(JSON.stringify(prev), /Carp 2&0/, 'the capture is the pre-Wave-30 wording');
+        const settle = strip0(receipt(rounds[0].data).raw('settle-content'));
+        assert.match(settle, /Carp 2 up/, 'and the page says it the way a golfer does');
+        assert.ok(!/&0/.test(settle), 'with no "&0" left anywhere on the receipt');
     });
     test('the Wave 29 fold is folding something real: the explanation IS on the page', () => {
         // The positive control for the normalisation above. Without this, deleting the
@@ -327,7 +343,7 @@ describe('THE SEAMS', () => {
         ['computeCombinedNetTotals(', 'simplifyDebts(', 'buildPayoutCardHtml(', 'buildNetViewHtml(', 'Pay out', 'Who Pays Who'].forEach(t => assert.ok(!fn.includes(t), 'live branch must not carry ' + t));
     });
     test('settlement-engine.js moved for KP-never-refunds (sha b5e22550, was f8905d43; before that 9043e7fc for the KP wave, 42923121 at v148)', () => {
-        assert.equal(sha8('settlement-engine.js'), '25b4120e');   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was f8905d43): approved per-file, ONE settlement branch - ninePointsForHole (the tie table as ranked shares) plus computeNinePointsNet, and one dispatch line beside skins and hilo in computeGameNetByPlayerId. No existing arithmetic moved: handicap strokes come from handicap.js getStrokes unchanged, and nothing rounds - the ledger still rounds exactly once at roundNetTotalsToWholeDollars. nine_points_test.js pins the four tie cases, the nine-a-hole invariant, zero-sum over 1,200 rounds, three-places-agree and never-touches-the-other-pots.   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)   // was ce69ae73 (Wave 18: no carry is the default for tied holes - the sites approved per-file, one line each, no arithmetic. The default lives once in action-model's holeTiesCarry() and reads stored data exactly as the nine hand-written defaults did, so a legacy round pays the same money; tie_carry_default_test.js holds the behaviour and its control proves the legacy money moves if that stops being true.)
+        assert.equal(sha8('settlement-engine.js'), 'd9ee5e5a');   // RE-PINNED 2026-09-26 (UI Wave 11, 9 POINTS; was f8905d43): approved per-file, ONE settlement branch - ninePointsForHole (the tie table as ranked shares) plus computeNinePointsNet, and one dispatch line beside skins and hilo in computeGameNetByPlayerId. No existing arithmetic moved: handicap strokes come from handicap.js getStrokes unchanged, and nothing rounds - the ledger still rounds exactly once at roundNetTotalsToWholeDollars. nine_points_test.js pins the four tie cases, the nine-a-hole invariant, zero-sum over 1,200 rounds, three-places-agree and never-touches-the-other-pots.   // f8905d43: v215 THE ALOHA BET 2026-09-23 (approved per-file, three edits only: the aloha line in legacyMainAsSideMatch, the Receipt segment in buildSideMatchReceipts, the ledger line in computeCombinedNetTotals; every decision and every number comes from aloha-bet.js through a typeof guard, so no golf math entered this file)   // was ce69ae73 (Wave 18: no carry is the default for tied holes - the sites approved per-file, one line each, no arithmetic. The default lives once in action-model's holeTiesCarry() and reads stored data exactly as the nine hand-written defaults did, so a legacy round pays the same money; tie_carry_default_test.js holds the behaviour and its control proves the legacy money moves if that stops being true.)   // RE-PINNED 2026-09-29 (UI Wave 30, PRESS NAMES; was 25b4120e): approved per-file, ONE DISPLAY FIELD - baseId (and pressNum beside it) on each match/nassau receipt segment, so a Nassau press can be named by the bet it came off. A Nassau is three wagers and match-engine.js numbers presses per base, so the Total press and the Back 9 press were both "Press 1" - and the hole range cannot separate them, because both are H11-18. No arithmetic entered the file and nothing computes with the field; press_parent_labels_test.js pins every amount, every side and every match net on six fixtures across the change.
     });
     test('HANDOFF no longer says the Receipt decides Final from computeMoneyPool alone', () => {
         const h = read('HANDOFF.md');

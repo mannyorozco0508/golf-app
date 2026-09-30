@@ -354,10 +354,14 @@ describe('FROZEN — the surfaces that OWN press detail are untouched', () => {
     test('the Receipt still tells the complete press history', () => {
         const st = read('settlement.html');
         const fn = st.slice(st.indexOf('function buildReceiptBlock'), st.indexOf('function buildSideMatchesHtml'));
-        assert.ok(/receiptSegLabel\(seg\.label\)/.test(fn));
-        assert.ok(/Started Hole \$\{seg\.startHole\}/.test(fn));
-        assert.ok(/seg\.result/.test(fn));
+        // UI WAVE 30: the rows are side-match-lines.js rows, so the field names are
+        // row.* - and the press history is MORE complete than before, not less: each
+        // press now names the bet it came off and sits under it.
+        assert.ok(/receiptSegLabel\(row\.label\)/.test(fn));
+        assert.ok(/Started Hole \$\{row\.startHole\}/.test(fn));
+        assert.ok(/row\.result/.test(fn));
         assert.ok(/MATCH NET/.test(fn));
+        assert.ok(/rRows\.forEach/.test(fn), 'every segment still gets a row');
     });
 
     test('press CREATION and start-hole logic were not touched', () => {
@@ -509,6 +513,13 @@ describe('SIDE MATCH RECEIPT LANGUAGE — readable without a decoder ring', () =
         assert.equal(label('Press 1'), 'Press #1');
         assert.equal(label('Press 2'), 'Press #2');
         assert.equal(label('Press 12'), 'Press #12');
+        // UI WAVE 30: side-match-lines.js names a press by the BET it came off on a
+        // Nassau, and by its number plus start hole on a one-bet match where presses
+        // chain. Both are already the golfer-facing form; the bare "Press 2" above is
+        // the legacy shape a receipt rendered before that builder existed.
+        assert.equal(label('Press 2 (H11)'), 'Press #2 (H11)');
+        ['Front 9 press (H5)', 'Back 9 press (H18)', 'Total press (H11)'].forEach(l =>
+            assert.equal(label(l), l, 'a parent-bet press name is already plain golf'));
     });
 
     test('Nassau leg names pass straight through — they are already plain golf', () => {

@@ -891,7 +891,15 @@ html {
         // 'Original' (Stroke Play) and 'Overall Match' (Match Play) are the same thing
         // to a golfer: the bet that was there before anybody pressed.
         if (/^(original|overall match)$/i.test(label || '')) return 'Original Bet';
-        const m = /^press\s+(\d+)/i.exec(label || '');
+        // Wave 30: side-match-lines.js now names a press by the BET it came off
+        // ("Back 9 press (H18)") or, on a one-bet match where presses chain, by its
+        // number and start hole ("Press 2 (H11)"). Both are already the golfer-facing
+        // form and pass straight through; the bare "Press 2" below is the legacy shape
+        // a receipt rendered before that builder existed.
+        const withHole = /^press\s+(\d+)\s+\((H\d+)\)$/i.exec(label || '');
+        if (withHole) return `Press #${withHole[1]} (${withHole[2]})`;
+        if (/press \(H\d+\)$/i.test(label || '')) return label;
+        const m = /^press\s+(\d+)$/i.exec(label || '');
         return m ? `Press #${m[1]}` : (label || '');
     }
 
@@ -1039,16 +1047,23 @@ html {
         const rLines = (typeof sideMatchBetLines === 'function')
             ? sideMatchBetLines(r, { complete: rDone }) : [];
 
-        r.segments.forEach((seg, i) => {
-            const line = rLines[i];
+        // THE ROWS COME FROM THE BUILDER WHEN IT IS THERE (Wave 30), because it owns
+        // both the press LABEL and the ORDER now: a Nassau reads Front 9 and its
+        // press, Back 9 and its press, Total and its press, instead of engine order
+        // with a Back 9 press sitting under the Total it has nothing to do with.
+        // Absent the builder this falls back to the receipt's own segments, which is
+        // byte-for-byte what a pre-v259 shell rendered.
+        const rRows = rLines.length ? rLines : r.segments.map(seg => ({
+            label: seg.label, stake: seg.stake, startHole: seg.startHole, result: seg.result,
+            moneyText: (seg.winner && seg.money > 0) ? `${seg.winner} +$${fmtWhole(seg.money)}` : ''
+        }));
+        rRows.forEach(row => {
             html += `<div class="receipt-seg">`;
-            html += `<div class="receipt-seg-head"><span>${receiptSegLabel(seg.label)}</span><span>$${fmtWhole(seg.stake)}</span></div>`;
-            html += `<div class="receipt-seg-meta">Started Hole ${seg.startHole}</div>`;
-            html += `<div class="receipt-seg-result">${escapeHtml(seg.result)}</div>`;
-            if (line && line.moneyText) {
-                html += `<div class="receipt-seg-money">${escapeHtml(line.moneyText)}</div>`;
-            } else if (!line && seg.winner && seg.money > 0) {
-                html += `<div class="receipt-seg-money">${escapeHtml(seg.winner)} +$${fmtWhole(seg.money)}</div>`;
+            html += `<div class="receipt-seg-head"><span>${receiptSegLabel(row.label)}</span><span>$${fmtWhole(row.stake)}</span></div>`;
+            html += `<div class="receipt-seg-meta">Started Hole ${row.startHole}</div>`;
+            html += `<div class="receipt-seg-result">${escapeHtml(row.result)}</div>`;
+            if (row.moneyText) {
+                html += `<div class="receipt-seg-money">${escapeHtml(row.moneyText)}</div>`;
             }
             html += `</div>`;
         });
