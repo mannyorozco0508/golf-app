@@ -35,13 +35,15 @@
 //   link says the credential is already in use -> that is the SECOND DEVICE: sign
 //   in as that account, and the note says the trial was not copied
 //
-// WHAT IS A SEAM AND NOT AN IMPLEMENTATION. In the Capacitor shell a popup has no
-// window to open, so iOS needs @capacitor-firebase/authentication with the native
-// SDKs. That cannot be built or tested from here, and the file says so where it can
-// be checked: GoogleService-Info.plist is NOT in this repo, the iOS project is SPM
-// rather than CocoaPods, and capacitor.config.ts links iOS plugins by an explicit
-// allowlist. nativeCredential() is the one function to fill in, it is reached
-// through a typeof guard, and every build today takes the popup path.
+// WHAT THIS FILE OWNS, NOW THAT THE NATIVE HALF EXISTS. In the Capacitor shell a
+// popup has no window to open, so iOS goes through @capacitor-firebase/
+// authentication and the native SDKs. That wiring - the iOS allowlist, the Google-
+// only SPM trait, skipNativeAuth, the Google URL scheme out of the committed
+// GoogleService-Info.plist, and what nativeCredential() builds from the plugin's
+// reply - is oauth_native_test.js. This file stays on the DECISION TABLE: link vs
+// sign in, and the note each outcome shows. nativeCredential() is still reached
+// through a typeof guard and still returns null in a browser, so every test here
+// takes the popup path, which is also what every web build does.
 //
 // THE RED BASELINE, all 12 tests, measured against main 8a4a980 where
 // oauth-signin.js does not exist:

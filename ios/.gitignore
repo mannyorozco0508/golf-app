@@ -11,3 +11,24 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# GoogleService-Info.plist IS DELIBERATELY NOT IGNORED. THE REPO BEING PUBLIC IS
+# THE REASON IT IS COMMITTED, NOT A REASON TO HIDE IT.
+#
+# Nothing in it is a secret. Firebase documents these values as public, every
+# copy of the App Store binary carries the file inside it, and this repo already
+# publishes the SAME project's apiKey, projectId and databaseURL in index.html.
+# Adding the iOS API_KEY, CLIENT_ID and REVERSED_CLIENT_ID leaks nothing that an
+# unzipped IPA does not hand over anyway. What protects the project is the RTDB
+# rules published on 2026-09-29 and the auth providers' own allowlists - never
+# the obscurity of a config file.
+#
+# What ignoring it WOULD cost is the thing that actually hurts: the file is a
+# Resources build input, so a tree without it either fails the build outright or,
+# if the reference is dropped, produces a binary where FirebaseApp.configure() is
+# skipped (FirebaseAuthentication.swift:30 logs and returns) and Continue with
+# Google is dead - discovered by a user after review, not by anyone building.
+#
+# oauth_native_test.js asserts no ignore rule ever starts matching it, and that
+# whenever it IS present, ios/App/App/Info.plist carries its REVERSED_CLIENT_ID
+# as a URL scheme (node tools/ios-google-urlscheme.js writes that).

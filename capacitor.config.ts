@@ -25,7 +25,68 @@ const config: CapacitorConfig = {
     // and links all three, because that side was chosen and committed in
     // android/app/capacitor.build.gradle. native_plugin_allowlist_test.js
     // holds this list, Package.swift and the gradle against each other.
-    includePlugins: ['@capacitor/filesystem', '@capacitor/share']
+    // @capacitor-firebase/authentication joins for ONE-TAP SIGN-IN (Wave 33). In
+    // the shell a popup has no window to open, so Continue with Apple and Continue
+    // with Google need the native Apple and Google SDKs. It is named here
+    // deliberately, like the other two.
+    includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication']
+  },
+  // ANDROID IS NOW AN ALLOWLIST TOO, AND THE REASON IS THIS WAVE'S PLUGIN.
+  //
+  // Android was deliberately left on the Capacitor default - link every plugin in
+  // package.json - because all three of the plugins that existed were wanted there.
+  // @capacitor-firebase/authentication is the first one that is NOT: its Android half
+  // needs google-services.json and the com.google.gms.google-services gradle plugin,
+  // neither of which this repo has, so the next `npx cap sync android` would have
+  // written capacitor-firebase-authentication into capacitor.build.gradle and broken
+  // the Android build for a feature Android does not ship yet.
+  //
+  // Naming the three that were already there changes NOTHING about what Android
+  // links: after adding this, `npx cap sync android` left capacitor.build.gradle and
+  // capacitor.settings.gradle byte-identical - measured 2026-09-30, and that is the
+  // point of the list. When Android does get one-tap sign-in, it gets google-services
+  // .json, the gradle plugin, and a fourth entry here, together, on purpose.
+  android: {
+    includePlugins: ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share']
+  },
+  // SPM TRAITS: GOOGLE YES, FACEBOOK NO (Wave 33).
+  //
+  // @capacitor-firebase/authentication ships GoogleSignIn AND the Facebook SDK
+  // behind DEFAULT package traits, so a plain sync links Facebook into the binary -
+  // an unused third-party SDK, which is exactly what the review reply says this app
+  // does not have. Listing traits REPLACES the defaults, so naming Google alone
+  // excludes Facebook. The plugin README documents this; it needs Capacitor CLI
+  // 8.3.0+ (this project is on 8.5.1) and Xcode 16.3+ for Swift 6.1, which is what
+  // bumping swiftToolsVersion asks for.
+  //
+  // Verify after a sync: ios/App/CapApp-SPM/Package.swift should carry
+  // traits: ["Google"] on the plugin, and nothing facebook-ios-sdk should appear in
+  // Package.resolved after Xcode resolves. native_plugin_allowlist_test.js holds it.
+  experimental: {
+    ios: {
+      spm: {
+        swiftToolsVersion: '6.1',
+        packageTraits: {
+          '@capacitor-firebase/authentication': ['Google']
+        }
+      }
+    }
+  },
+  plugins: {
+    FirebaseAuthentication: {
+      // ONLY the two providers offered. Naming them is not decoration: the plugin
+      // ships Facebook support behind a default SPM trait, and an unused third-party
+      // SDK in the binary is exactly what the review reply says this app does not
+      // have. See ios/App/CapApp-SPM/Package.swift after a sync - if Facebook is in
+      // there, it has to come out before an archive.
+      providers: ['apple.com', 'google.com'],
+      // THE JS LAYER OWNS THE SESSION, and this is the whole uid guarantee: with
+      // native persistence off, the native SDK does not create its own signed-in
+      // user, so the anonymous organizer is still there to be LINKED and the rounds,
+      // the free trial and a founder pass stay on the same uid. oauth-signin.js also
+      // passes skipNativeAuth per call; this is the same decision at config level.
+      skipNativeAuth: true
+    }
   }
 };
 

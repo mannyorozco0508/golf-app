@@ -26,26 +26,33 @@
 // planOauth() below is the same decision table as planCompletion() in
 // email-link-auth.js, and oauth_signin_test.js asserts the pair agree.
 //
-// NOTHING HERE WORKS UNTIL THE PROVIDERS ARE ENABLED IN THE FIREBASE CONSOLE, and
-// that is MEASURED rather than assumed: as of 2026-09-30,
+// BOTH PROVIDERS ARE NOW ON, and the earlier measurement is kept because it is why
+// the not-enabled message exists at all. Before the console was touched on
+// 2026-09-30:
 //     POST accounts:createAuthUri providerId=google.com -> OPERATION_NOT_ALLOWED
 //     POST accounts:createAuthUri providerId=apple.com  -> OPERATION_NOT_ALLOWED
 //     "The identity provider configuration is not found."
-// So this ships behind the same per-device switch My Groups uses, the buttons say
-// what is wrong rather than failing blank, and the setup checklist is in the report.
+// Google and Apple were then enabled (Apple Services ID com.rattlegolf.app.web) and
+// both signed in on the preview as the organizer. So messageFor's "not switched on
+// for this app yet" is now the fallback for a console that changes under us rather
+// than the normal case.
 // The authorized-domains list already carries golf-app-5a5.pages.dev,
 // hardpangolf.com, rattlegolf.com and tournaments.rattlegolf.com - read back from
 // the project, not guessed - so the popup handler is reachable from production.
 //
-// THE NATIVE SEAM, and why it is a seam and not an implementation. In the
-// Capacitor shell a popup has no window to open, so the iOS app needs
-// @capacitor-firebase/authentication with the native Apple and Google SDKs. That
-// cannot be built or tested from here: it needs GoogleService-Info.plist (not in
-// this repo), the Sign in with Apple capability on the App ID, and an Xcode build.
-// The iOS project is also SPM, not CocoaPods, and capacitor.config.ts links iOS
-// plugins by an explicit ALLOWLIST. So nativeCredential() is the one function to
-// fill in, it is called through a typeof guard, and on the web - and in today's
-// shell - the popup path runs exactly as it does in a browser.
+// THE NATIVE SEAM IS WIRED, and nativeCredential() below is the whole of it on this
+// side. In the Capacitor shell a popup has no window to open, so the iOS app goes
+// through @capacitor-firebase/authentication and the native Apple and Google SDKs:
+// the plugin is allowlisted for iOS in capacitor.config.ts (SPM, not CocoaPods, with
+// the Google trait only so the Facebook SDK is not linked), skipNativeAuth keeps the
+// native SDK from taking the session so an anonymous organizer is still LINKED, and
+// GoogleService-Info.plist is committed - nothing in it is a secret and ios/
+// .gitignore carries the reasoning. oauth_native_test.js holds that wiring.
+//
+// The call is still reached through a typeof guard and still returns null on the
+// web, so a browser takes the popup path exactly as before. What nothing here can
+// prove is a tap on a device: the Apple side also needs the Sign in with Apple
+// capability on the App target, which is an Xcode step.
 // ============================================================================
 (function () {
     'use strict';

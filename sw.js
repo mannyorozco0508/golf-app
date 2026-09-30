@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v105-onetap. The tournament product cache
+// The consumer product cache is consumer-v106-nativesignin. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3740,16 +3740,24 @@
 // says the trial was not copied. oauth_signin_test.js asserts the two decision
 // tables agree rather than trusting them to.
 //
-// MEASURED: neither provider is enabled in the console yet - createAuthUri returns
-// OPERATION_NOT_ALLOWED for google.com and apple.com - so the buttons say "not
-// switched on for this app yet" rather than failing blank. The authorized-domains
-// list already carries the production host, read back from the project.
+// MEASURED, and v264's note is now out of date: at v264 neither provider was
+// enabled - createAuthUri returned OPERATION_NOT_ALLOWED for google.com and
+// apple.com - so the buttons said "not switched on for this app yet". Both were
+// enabled in the console on 2026-09-30 and both signed in on the preview, so that
+// message is now the fallback it was meant to be rather than the normal case.
 //
-// THE NATIVE HALF IS A SEAM, NOT AN IMPLEMENTATION. In the shell a popup has no
-// window; iOS needs the native plugin, GoogleService-Info.plist (not in this repo),
-// the Sign in with Apple capability and an Xcode build. nativeCredential() is the
-// one function to fill in and every build today takes the popup path.
-const CACHE_VERSION = 'golfapp-v264-onetap';
+// THE NATIVE HALF IS WIRED AT v265, and the web bundle is byte-identical apart
+// from comments: the wiring is in ios/, not in here. @capacitor-firebase/
+// authentication is allowlisted for iOS with the Google SPM trait only,
+// skipNativeAuth keeps the JS layer owning the session so an anonymous organizer is
+// still LINKED, and GoogleService-Info.plist is COMMITTED - nothing in it is a
+// secret, it ships inside every binary, and ios/.gitignore carries the reasoning.
+//
+// Moved to v265 SO THE NOTE ABOVE IS NOT A LIE ON AN INSTALLED DEVICE. An installed
+// app would otherwise keep serving v264's oauth-signin.js, whose header says the
+// providers are off and the plist is not in the repo. No behaviour changed in the
+// bundle; the tap that changed is the one in the iOS shell, which is not cached here.
+const CACHE_VERSION = 'golfapp-v265-nativesignin';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
