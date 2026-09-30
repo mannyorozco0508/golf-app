@@ -3,6 +3,29 @@
 Read `HANDOFF.md` first — it describes the project, the stack, and how Manny works.
 This file holds rules learned the hard way, from defects that actually shipped.
 
+## Two lanes: STRICT and FAST
+
+Manny's rule, 2026-09-29. Which lane a wave is in is decided by WHAT IT TOUCHES, not
+by how big it feels.
+
+**STRICT** — money math, any protected file (`HANDOFF.md`'s list),
+`database.rules.json`, payouts. Recon first when the brief asks for it. Negative
+controls. Branch plus a preview URL, and **no merge until Manny says so.**
+
+**FAST** — everything else: UI, copy, labels, navigation, layout. Build directly; no
+recon round unless a real blocker turns up. Still write a guard test for the
+behaviour and still take a baseline per the count rule above — **negative controls
+are not required.** Full suite ONCE. If it is green: merge to main, bump the cache,
+then codeload and production verify. Manny tests it live, and a bad change gets
+reverted.
+
+**Reports are ten lines, either lane.** What changed, the merge hash, and anything
+Manny has to decide or test himself. No fault diaries, and no restating shas beyond
+the merge hash.
+
+The lane changes the process, never the honesty: a measured figure is still measured,
+a guess is still labelled, and a baseline still has to add up.
+
 ## Test the entry point a user arrives through, not the function
 
 **A test that calls the function under test directly proves the function works. It

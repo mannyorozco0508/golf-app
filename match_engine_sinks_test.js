@@ -159,10 +159,23 @@ describe('v218: the match engine returns plain text and the SINKS escape it', ()
             [/\$\{escapeHtml\(r\.nameA\)\} vs \$\{escapeHtml\(r\.nameB\)\}/,
              /receipt-seg-result">\$\{escapeHtml\(seg\.result\)\}/,
              /receipt-seg-money">\$\{escapeHtml\(seg\.winner\)\}/,
-             /\$\{escapeHtml\(r\.netTo\)\} \+\$/].forEach(re =>
+             // RE-PINNED (UI Wave 29): the MATCH NET line used to interpolate
+             // ${escapeHtml(r.netTo)} directly. It now prints ONE escaped string -
+             // sideMatchNetLine() from side-match-lines.js - because r.netTo and
+             // r.netAmount come from receipt.net, which books OPEN segments: a match
+             // through 6 holes of 18 printed "MATCH NET - Reese +$30". The names are
+             // still escaped at the sink, which is what this guard exists to prove;
+             // what changed is that there is one sink instead of two interpolations.
+             /receipt-net">MATCH NET \\u00B7 \$\{escapeHtml\(netText\)\}/].forEach(re =>
                 assert.match(src, re, 'an unescaped receipt sink came back: ' + re));
             assert.match(src, /<script src="text-safe\.js">/,
                 'settlement.html must load the escaper it calls');
+            // Every side-match-lines.js string that reaches this page carries names
+            // (a winner, a side) and every one of them goes through the escaper.
+            const calls = src.match(/side(?:MatchNetLine|MatchBetLines)\(/g) || [];
+            assert.ok(calls.length >= 2, 'the Receipt must read the shared builder');
+            ['escapeHtml(netText)', 'escapeHtml(line.moneyText)'].forEach(sink =>
+                assert.ok(src.includes(sink), 'unescaped builder output at the sink: ' + sink));
         });
 
         test("leaderboard.html escapes its head-to-head banner and rows", () => {

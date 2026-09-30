@@ -51,7 +51,28 @@ const sha8 = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(R
 const DEPS = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'pool-engine.js'];
 const strip0 = h => h.replace(/<[^>]+>/g, '|').replace(/\|+/g, '|').replace(/\s+/g, ' ').trim();
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-const norm = t => t.split('|' + TODAY + '|').join('|<today>|');
+// TWO DOCUMENTED WAVE 29 (v258) SUBSTITUTIONS, so this capture keeps proving what it
+// was taken to prove. The Receipt's MATCH NET line changed, and the LIVE case changed
+// for a reason worth reading:
+//
+//   FINISHED: the amount is unchanged and still compared by value; an explanation now
+//     follows it ("MATCH NET - Ann / Cal +$25 - Ann / Cal won 1 bet ($25)"), because a
+//     bare total is what sent a golfer looking for a bug in a side match that
+//     correctly netted $0. Folded away below.
+//   LIVE: it used to print "MATCH NET - Ann / Cal +$25" with nine holes unplayed,
+//     because r.netTo/r.netAmount come from receipt.net, which books OPEN segments.
+//     It now says "Still playing - nothing decided yet". That is the fix, not drift,
+//     so it is a NAMED substitution against the capture and the old text is asserted
+//     to occur exactly once - the same discipline as OLD_TOKEN above.
+// $2 keeps the whitespace that sat between the amount and the per-golfer span, so
+// the fold removes the explanation and nothing around it.
+const WAVE29_NET = /(MATCH NET · [^|\u2014]*?)\s*\u2014\s*[^|]*?(\s*)(?=\||$)/g;
+// The live line, as the capture holds it, and what it is today. BOTH halves changed
+// and both are the fix: mid-round the Receipt named an amount AND split it per
+// golfer ("($12.50 each)") on a bet with nine holes unplayed.
+const WAVE29_LIVE_WAS = 'MATCH NET · Ann / Cal +$25 |($12.50 each)|';
+const WAVE29_LIVE_NOW = 'MATCH NET · Still playing|';
+const norm = t => t.split('|' + TODAY + '|').join('|<today>|').replace(WAVE29_NET, '$1$2');
 
 const CD = makeCourseData(18);
 const P4 = makePlayers(['Ann A', 'Ben B', 'Cal C', 'Dee D'], [0, 0, 0, 0], 101);
@@ -100,7 +121,21 @@ describe('THE BASELINE, and today differs from it by exactly the move and the la
         void OLD_TOKEN_GONE;
     });
     test('live: every mount identical to the capture, actions included (empty) - the button stays away mid-round', () => {
-        assert.deepEqual(mounts(arrive(round(9))), prev.live);
+        assert.equal(prev.live.settle.split(WAVE29_LIVE_WAS).length - 1, 1,
+            'the pre-Wave-29 live MATCH NET line must occur exactly once in the capture');
+        const expected = Object.assign({}, prev.live, {
+            settle: prev.live.settle.split(WAVE29_LIVE_WAS).join(WAVE29_LIVE_NOW)
+        });
+        assert.deepEqual(mounts(arrive(round(9))), expected);
+    });
+    test('and the LIVE change is the point: no decided amount on a round in play', () => {
+        // The positive control for the substitution above. A mid-round receipt used to
+        // name a winner and a figure; nine holes were unplayed.
+        const live = mounts(arrive(round(9))).settle;
+        assert.match(live, /MATCH NET · Still playing/);
+        assert.ok(!/MATCH NET · Ann \/ Cal \+\$25/.test(live),
+            'a bet with nine holes to play has decided nothing');
+        assert.ok(!/each\)/.test(live), 'and it does not split an amount nobody has won');
     });
 });
 

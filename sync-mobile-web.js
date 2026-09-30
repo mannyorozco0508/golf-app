@@ -110,6 +110,14 @@ const CONSUMER_SHELL = [
     // The ball-on-firm lockup and the tab icon. Consumer only.
     'hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
+    // side-match-lines.js (v258): the ONE builder for a side match card - a dollar
+    // line per bet and the match line under it - read by skins.html, stats.html,
+    // settlement.html and, through bet-strip.js, the scorecard. Four surfaces drew
+    // the same bet and none of them printed the money. bet-strip.js calls it through
+    // a typeof guard, so a bundle without it would quietly report every finished
+    // match play side bet as worth nothing - which is the defect this wave fixed.
+    // It ships. NO APOSTROPHES IN THIS BLOCK.
+    'side-match-lines.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in

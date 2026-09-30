@@ -48,6 +48,7 @@
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
+    <script src="side-match-lines.js"></script>
     <!-- Grouping (v140): playerGroupMap / canLinkSeeWager, so the Side Matches
          section shows a group link only the matches its golfers are in - the
          same rule, the same function, as the Matches, Bets and Board tabs. -->
@@ -751,9 +752,42 @@ html {
                 if (!calc) return;
                 const formatLabel = sm.format === 'nassau' ? 'Nassau' : 'Match Play';
 
+                // THE MONEY, PER BET (v258), above the two side totals. This card used
+                // to print two figures and no reason for them: a Nassau lost across
+                // five bets and a match lost on one read identically. Every line comes
+                // from settlement-engine.js buildSideMatchReceipts through
+                // side-match-lines.js - the same sentences the Bets tab and the Receipt
+                // print, so three surfaces cannot disagree about one wager.
+                const smlRc = (typeof buildSideMatchReceipts === 'function')
+                    ? (buildSideMatchReceipts(data, courseData, savedScores) || [])
+                        .find(x => x.matchId === matchId)
+                    : null;
+                // Finished is every hole in the bet's range, posted. NOT `closed`:
+                // an all-square match that went the distance never closes.
+                const smlFinished = (typeof computeRoundFinish === 'function')
+                    && !!computeRoundFinish(data, courseData, savedScores).finished;
+                const smlDone = (typeof sideMatchRangeComplete === 'function')
+                    && sideMatchRangeComplete(sm, players, courseData, savedScores,
+                        { roundFinished: smlFinished });
+                // DECIDED money for the two totals as well. They read
+                // calc.t1TotalMoney, which books a leading OPEN segment's stake as
+                // though it were won - so a bet through 6 of 18 printed a figure
+                // nobody had won yet, on the card a group keeps.
+                const smlNet = (smlRc && typeof sideMatchDecidedNet === 'function')
+                    ? sideMatchDecidedNet(smlRc) : 0;
+
                 rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted); padding-top:8px; border-top:1px dashed var(--border-faint);"><span>${escapeHtml(calc.t1Name)} vs ${escapeHtml(calc.t2Name)} — ${formatLabel}</span><span></span></div>`;
-                rows += `<div class="ledger-row"><span>${escapeHtml(calc.t1Name)}</span><span>${fmtSideM(calc.t1TotalMoney)}</span></div>`;
-                rows += `<div class="ledger-row"><span>${escapeHtml(calc.t2Name)}</span><span>${fmtSideM(-calc.t1TotalMoney)}</span></div>`;
+                if (smlRc && typeof sideMatchBetLines === 'function') {
+                    sideMatchBetLines(smlRc, { complete: smlDone }).forEach(l => {
+                        if (!l.moneyText) return;
+                        rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted);"><span>${escapeHtml(l.label)} · ${escapeHtml(l.result)}</span><span>${escapeHtml(l.moneyText)}</span></div>`;
+                    });
+                }
+                rows += `<div class="ledger-row"><span>${escapeHtml(calc.t1Name)}</span><span>${fmtSideM(smlNet)}</span></div>`;
+                rows += `<div class="ledger-row"><span>${escapeHtml(calc.t2Name)}</span><span>${fmtSideM(-smlNet)}</span></div>`;
+                if (smlRc && typeof sideMatchNetLine === 'function') {
+                    rows += `<div class="ledger-row" style="font-size:0.72rem; color:var(--text-muted);"><span>${escapeHtml(sideMatchNetLine(smlRc, { complete: smlDone }))}</span><span></span></div>`;
+                }
             }
         });
 

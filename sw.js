@@ -3569,10 +3569,45 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v98-kpbackland. The tournament product cache
+// The consumer product cache is consumer-v99-betmoney. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
-const CACHE_VERSION = 'golfapp-v257-kpbackland';
+// Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
+//
+// Manny entered a Match Play side bet AFTER the round - Marty vs Manny, NET,
+// $20/match, press 2 down - and the card gave him the result of all four bets and
+// none of the money: base Manny 3&2, Press 1 (h5) Marty 1&0, Press 2 (h11) Manny
+// 3&2, Press 3 (h15) Marty 1&0, then "Ledger: $0 | $0". The $0 was CORRECT - two
+// bets each, $40 apiece, net nothing - and nothing on screen said so. A post-round
+// bet is a core use, so a card that cannot explain its own total is the wrong half
+// of the job.
+//
+// AN INSTALLED DEVICE WITHOUT THIS BUMP keeps four surfaces that draw a side match
+// and print no per-bet money: the Bets card (skins.html), Final Results
+// (stats.html), the Receipt (settlement.html, and the share-sheet PDF it prints)
+// and the scorecard's My Round card. It also keeps three measured wrongs:
+//   - bet-strip.js read `decided += 0` for match play and Nassau, so a bet Manny
+//     won outright reported netMoney 0 and netText "" - no money on the scorecard
+//     at all, and `finished` (which needs netMoney !== 0) never true;
+//   - the Receipt's MATCH NET read receipt.net, which books OPEN segments, so a
+//     match through 6 of 18 printed "MATCH NET - Reese +$30" with twelve holes
+//     unplayed;
+//   - the Bets card called a bet FINAL only when every segment was `closed`, and a
+//     halved segment never closes (at the 18th |0| > 0 is false), so an all-square
+//     match that went the distance read LIVE forever.
+//
+// NEW FILE IN THE SHELL: side-match-lines.js, the one builder all four surfaces
+// read. No money is computed in it - every figure comes from
+// settlement-engine.js buildSideMatchReceipts, which has priced each segment since
+// v141. Finishedness is EVERY HOLE IN RANGE POSTED, never `closed`.
+//
+// GUARDED BY side_match_money_lines_test.js, over Manny's two real bets: the match
+// that nets $0 and the Nassau Reese swept for $100.
+//
+// NOT IN THIS WAVE: the "1&0" wording (hLeft 0 is "1 up", not a match separator)
+// and labelling a Nassau press by its parent bet - two presses can both be
+// "Press 1" today. Both recorded for Wave 30, neither approved.
+const CACHE_VERSION = 'golfapp-v258-betmoney';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3666,6 +3701,16 @@ const SHELL_FILES = [
     './ryder-cup.js',
     './action-model.js',
     './bet-strip.js',
+    // side-match-lines.js: the sentences a side match card prints - one dollar line
+    // per bet, one match line. bet-strip.js reaches it through a typeof guard, so a
+    // cached shell missing it does not break a page: it silently reports a finished
+    // match play side bet as worth $0 on the scorecard, which is exactly the defect
+    // v258 fixed. Precached so an installed device cannot regress to it.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads the precache
+    // list by matching quoted strings out of this source, and one apostrophe in a
+    // comment swallows every entry after it - which is what the first draft did.
+    './side-match-lines.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -
