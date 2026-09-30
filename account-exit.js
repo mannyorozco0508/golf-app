@@ -14,6 +14,16 @@
 //   organizers/<uid>                 REFUSED   no .write at that level, by design
 //   organizers/<uid>/firstSeenAt     REFUSED   create-only: "!data.exists() && ..."
 //   organizers/<uid>/pass            REFUSED   .write is literally false
+//
+// AND ONE RULE WAS APPROVED TO CHANGE THAT, so the first row is about to become
+// allowed. database.rules.stage2delete.json adds exactly one key -
+//   organizers/$uid ".write": "newData.val() === null && auth != null && auth.uid === $uid"
+// - which permits a write that EMPTIES the record and nothing else: setting a pass
+// leaves a non-null record, so pass stays unwritable even though the parent now
+// grants. rules_stage2_delete_test.js holds twelve rows and three controls on that.
+// It is not published yet, which is why the code below attempts the whole record
+// FIRST and falls back to the groups write when the rules refuse it. The same build
+// is correct before and after the publish; nothing needs re-releasing.
 //   organizers/<uid>/groups          allowed   owner writes the whole subtree
 //   organizers/<uid>/groups/$id      allowed   owner, and only the owner
 //   sharedGroups/<key>/<uid>/$id     allowed   owner of that uid, per leaf
@@ -76,13 +86,24 @@
         keep: 'Keep my account',
         // The founder-pass sentence is separate because it is the one thing here
         // somebody would be furious to learn afterwards.
-        founderWarn: 'THIS ACCOUNT HAS A FOUNDER PASS. Deleting the account does not release it and does not move it - it stays attached to an account that no longer exists, and nothing brings it back. If you want the pass, do not delete this account.',
+        // TRUE BEFORE AND AFTER THE RULES PUBLISH, which is why it does not say where
+        // the pass ends up. Today the rules refuse to remove it and it is stranded on
+        // an account that no longer exists; once the delete rule is published it goes
+        // with the record. Either way it is gone for the person reading this, and a
+        // sentence that named the mechanism would be wrong within the week.
+        founderWarn: 'THIS ACCOUNT HAS A FOUNDER PASS. Deleting the account gives up that pass for good: nothing brings it back, and signing in again with the same Apple ID, Google account or email makes a NEW organizer that does not have it. If you want the pass, do not delete this account.',
         founderMaybe: 'If this account has a founder pass or a running free trial, it stays attached to this account and a new one does not get it.'
     };
 
     // WHAT THE LIVE RULES REFUSE TO LET GO OF, with the rule that refuses it. Held
     // here rather than in a comment so the plan can HAND it to the screen and the
     // guard can assert the pair.
+    // WHAT SURVIVES A DELETE WHILE THE DELETE RULE IS UNPUBLISHED, with the rule that
+    // refuses each one. Held here rather than in a comment so the plan can HAND it to
+    // the screen and the guard can assert the pair. Once
+    // database.rules.stage2delete.json is published the whole-record removal takes
+    // both of these with it and nothing is kept - the result object's recordRemoved
+    // is what says which of the two worlds a given delete happened in.
     var KEEPS = [
         { key: 'firstSeenAt', why: 'the rule allows it to be created and never written again' },
         { key: 'pass', why: 'the rule sets .write to false, so nobody may remove a pass' }
@@ -129,13 +150,35 @@
                 });
             });
         });
+        // THE WHOLE RECORD FIRST, AND THE GROUPS AS A FALLBACK. Stage 1 refuses a
+        // write at organizers/<uid>, so until the delete rule is published this
+        // attempt is permission-denied and the groups write is what actually runs.
+        // Once it IS published, the first attempt succeeds and takes firstSeenAt and
+        // the pass with it, and the fallback never runs.
+        //
+        // WHY BOTH, RATHER THAN SHIPPING AFTER THE PUBLISH. This is the feature
+        // detection: the same build is correct before and after, so the wave can be
+        // tested on a device today and the publish can happen whenever Manny wants
+        // without a second release. `soft: true` is what tells removeAll that a
+        // refusal here is expected rather than the STOP condition.
+        removals.push({
+            path: 'organizers/' + id,
+            what: 'the account record itself, including firstSeenAt and any pass',
+            soft: true
+        });
         // ONE WRITE FOR EVERY GROUP. The rules grant the owner the whole subtree,
         // so this is one removal rather than one per group - fewer writes to fail
         // half way through.
         if (groupIds.length) {
             removals.push({
                 path: 'organizers/' + id + '/groups',
-                what: groupIds.length === 1 ? 'the saved group' : 'all ' + groupIds.length + ' saved groups'
+                what: groupIds.length === 1 ? 'the saved group' : 'all ' + groupIds.length + ' saved groups',
+                // AND IT IS SOFT TOO, because once the record above is gone there is
+                // nothing left to remove and the rules may refuse a write under a
+                // node that no longer exists. Neither path failing is a reason to
+                // keep an account alive; the pointers are the ones that must land.
+                afterRecord: true,
+                soft: true
             });
         }
         return {
@@ -206,15 +249,28 @@
         } catch (e) { return Promise.reject(coded('removal-failed', 'could not read the saved groups')); }
     }
 
+    // Returns { failed, done }. A SOFT removal that is refused is recorded in `done`
+    // as not-done and never in `failed`: the whole-record attempt is expected to be
+    // refused until the rules are published, and treating that as the STOP would mean
+    // nobody could delete an account at all today.
     function removeAll(db, removals) {
         var failed = [];
+        var done = {};
+        var recordGone = false;
         return removals.reduce(function (chain, r) {
             return chain.then(function () {
-                return Promise.resolve(db.ref(r.path).remove()).then(null, function (err) {
-                    failed.push({ path: r.path, code: (err && err.code) || 'remove-failed' });
+                // Once the whole record is gone, the groups write under it is moot.
+                if (r.afterRecord && recordGone) { done[r.path] = 'skipped'; return; }
+                return Promise.resolve(db.ref(r.path).remove()).then(function () {
+                    done[r.path] = 'removed';
+                    if (r.path.indexOf('/groups') === -1 && /^organizers\/[^/]+$/.test(r.path)) recordGone = true;
+                }, function (err) {
+                    var code = (err && err.code) || 'remove-failed';
+                    done[r.path] = 'refused:' + code;
+                    if (!r.soft) failed.push({ path: r.path, code: code });
                 });
             });
-        }, Promise.resolve()).then(function () { return failed; });
+        }, Promise.resolve()).then(function () { return { failed: failed, done: done }; });
     }
 
     function dropUser(auth, deps) {
@@ -244,16 +300,20 @@
         var uid = plan.uid;
         return readGroups(db, uid).then(function (groupsVal) {
             var p = deletePlan(uid, groupsVal);
-            return removeAll(db, p.removals).then(function (failed) {
-                // THE STOP. Data first, and if the data did not go, the account
-                // stays - see the header.
-                if (failed.length) throw coded('removal-failed',
-                    'could not remove ' + failed.length + ' of ' + p.removals.length);
+            return removeAll(db, p.removals).then(function (out) {
+                // THE STOP. Data first, and if a HARD removal did not go, the
+                // account stays - see the header. A soft one is allowed to fail.
+                if (out.failed.length) throw coded('removal-failed',
+                    'could not remove ' + out.failed.length + ' of ' + p.removals.length);
                 return dropUser(auth, deps).then(function (reauthed) {
                     if (deps && typeof deps.reload === 'function') deps.reload();
                     return {
                         uid: uid, deleted: true, reauthed: !!reauthed,
                         removed: p.removals.map(function (r) { return r.path; }),
+                        done: out.done,
+                        // TRUE only when the whole record actually went, which is the
+                        // one fact that says whether the rules publish has landed.
+                        recordRemoved: out.done['organizers/' + uid] === 'removed',
                         keeps: p.keeps
                     };
                 });

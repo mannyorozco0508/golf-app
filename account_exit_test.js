@@ -49,15 +49,15 @@
 //   - mini-dom has no layout, so "shown" here means style.display, never that
 //     anybody could see or tap it. The two-step arming is state, not geometry.
 //
-// THE BASELINE, all 32 tests, measured against main 7608a56 in a clean worktree -
+// THE BASELINE, all 33 tests, measured against main 7608a56 in a clean worktree -
 // Wave 33 merged, no account-exit.js, no card, no sign-out anywhere in the app:
 //
-//     3 PASS / 29 FAIL
+//     3 PASS / 30 FAIL
 //
 // The three that pass are the whole rules block, and they are honest about earning
 // nothing from this wave: they measure a ruleset this wave does not touch. They are
 // here because the DESIGN depends on those eight verdicts, and a rules publish that
-// changed one of them would make this wave's delete silently incomplete. The 29
+// changed one of them would make this wave's delete silently incomplete. The 30
 // reds are every line of the feature.
 //
 // (My own first draft of this paragraph said 8 PASS, from counting the targaryen
@@ -192,18 +192,27 @@ describe('THE DELETE PLAN IS A LIST, AND IT NAMES WHAT IT CANNOT TAKE', () => {
         assert.deepEqual(paths, [
             'sharedGroups/a,b@c,com/u9/g1',
             'sharedGroups/d,e@f,com/u9/g1',
+            'organizers/u9',
             'organizers/u9/groups'
         ], 'a coOrganizers entry that is not true is not a pointer: ' + JSON.stringify(paths));
         assert.equal(p.pointerCount, 2);
         assert.equal(p.groupCount, 3);
-        assert.equal(paths[paths.length - 1], 'organizers/u9/groups',
-            'the groups write must be LAST of the removals - the pointer paths are only knowable while the groups are still there');
+        // THE POINTERS COME FIRST because their paths are only knowable while the
+        // groups are still there. Then the whole record - which Stage 1 refuses and
+        // the approved delta allows - and the groups write as the fallback for the
+        // world where the publish has not happened yet.
+        const soft = plain(p.removals).filter(r => r.soft).map(r => r.path);
+        assert.deepEqual(soft, ['organizers/u9', 'organizers/u9/groups'],
+            'both organizers writes are SOFT: one of them is expected to be refused in either world');
+        assert.ok(plain(p.removals).slice(0, 2).every(r => !r.soft),
+            'the pointer removals are HARD - if they fail, the account must not be deleted');
     });
 
     test('no groups means no group write at all', () => {
         [null, undefined, {}, 'nonsense', 7].forEach(v => {
             const p = need().deletePlan('u9', v);
-            assert.deepEqual(plain(p.removals), [], 'nothing to remove for ' + JSON.stringify(v));
+            assert.deepEqual(plain(p.removals).map(r => r.path), ['organizers/u9'],
+                'the record attempt always stands; only the groups write is conditional: ' + JSON.stringify(v));
             assert.equal(p.groupCount, 0);
         });
     });
@@ -382,12 +391,14 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         p.tap('delete'); p.tap('delete');
         p.go();
         await tick();
+        // The stub refuses nothing, so this is the AFTER-PUBLISH world: the whole
+        // record goes in one write and the groups write is skipped as moot.
         assert.deepEqual(p.writes(), [
             'remove sharedGroups/a,b@c,com/u9/g1',
-            'remove organizers/u9/groups'
+            'remove organizers/u9'
         ], 'the data goes first, while the token is still valid');
         assert.deepEqual(p.deleted, ['delete@2'],
-            'the Auth user must be deleted AFTER both writes - delete it first and every write after it is permission-denied forever');
+            'the Auth user must be deleted AFTER the writes - delete it first and every write after it is permission-denied forever');
         assert.equal(p.reloads(), 1, 'then the page reloads, so no stale uid is left in authReady');
     });
 
@@ -403,8 +414,11 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
     });
 
     test('A REFUSED REMOVAL STOPS THE DELETE: the account survives', async () => {
+        // A POINTER, which is a HARD removal. The two organizers writes are soft -
+        // one of them is expected to be refused in either world - so refusing those
+        // must NOT stop the delete, and the test below that one proves it.
         const p = page({
-            refuse: (path, op) => (op === 'remove' && /^organizers/.test(path))
+            refuse: (path, op) => (op === 'remove' && /^sharedGroups/.test(path))
                 ? Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' }) : null
         });
         p.sb.refreshAccountState();
@@ -418,6 +432,30 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
             'the screen has to say so: ' + p.text('account-exit-status'));
     });
 
+    test('BEFORE THE RULES PUBLISH: the record is refused, the groups write runs, the account still goes', async () => {
+        // This is the world the app is in RIGHT NOW: Stage 1 has no .write at
+        // organizers/<uid>, so the first attempt is permission-denied. It must not
+        // be the STOP, and the fallback must actually run - otherwise the feature
+        // could not be tested until the publish landed.
+        const p = page({
+            refuse: (path, op) => (op === 'remove' && path === 'organizers/u9')
+                ? Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' }) : null
+        });
+        p.sb.refreshAccountState();
+        p.tap('delete'); p.tap('delete');
+        p.go();
+        await tick();
+        assert.deepEqual(p.writes(), [
+            'remove sharedGroups/a,b@c,com/u9/g1',
+            'remove organizers/u9',
+            'remove organizers/u9/groups'
+        ], 'the refused record attempt is followed by the groups fallback');
+        assert.deepEqual(p.deleted, ['delete@3'], 'and the account is deleted anyway');
+        assert.equal(p.reloads(), 1);
+        assert.match(p.text('account-exit-status'), /^$|Deleting/,
+            'no failure message: a refused soft removal is not an error');
+    });
+
     test('A REFUSED READ of the groups stops it too, and removes nothing', async () => {
         const p = page({ reads: { 'organizers/u9/groups': null } });
         // The stub answers null for an unknown path, which is indistinguishable from
@@ -427,8 +465,9 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         p.tap('delete'); p.tap('delete');
         p.go();
         await tick();
-        assert.deepEqual(p.writes(), [], 'no groups, no writes');
-        assert.deepEqual(p.deleted, ['delete@0'], 'and an account with no groups still deletes');
+        assert.deepEqual(p.writes(), ['remove organizers/u9'],
+            'no groups means no pointer and no groups write - only the record attempt');
+        assert.deepEqual(p.deleted, ['delete@1'], 'and an account with no groups still deletes');
     });
 
     test('requires-recent-login RE-RUNS THE SIGN-IN, then deletes', async () => {

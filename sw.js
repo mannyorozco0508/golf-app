@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v108-accountexit. The tournament product cache
+// The consumer product cache is consumer-v109-deleterecord. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3781,7 +3781,14 @@
 // firstSeenAt and pass are all refused by rule, so two keys survive a delete and the
 // second warning says a founder pass does not come back. Rounds are never touched:
 // other golfers may still be scoring one.
-const CACHE_VERSION = 'golfapp-v267-accountexit';
+// Moved to v268 BECAUSE THE DELETE NOW TRIES THE WHOLE RECORD FIRST. Manny approved
+// one rules addition - organizers/$uid may be EMPTIED by its owner and nothing else
+// (database.rules.stage2delete.json, not published yet) - so delete account attempts
+// organizers/<uid> before falling back to the groups write. That is the feature
+// detection: the same build is correct before and after the publish, and nothing
+// needs re-releasing when it lands. A device holding the earlier v267 from the branch
+// preview would keep the groups-only version.
+const CACHE_VERSION = 'golfapp-v268-deleterecord';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
