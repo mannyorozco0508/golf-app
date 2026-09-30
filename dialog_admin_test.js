@@ -392,8 +392,14 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // a server refusal on a save and on a write-back (the rule for
         // organizers/<uid>/groups has not been published yet, so that refusal is a
         // state a real organizer will meet); and it confirms what it saved.
-        assert.equal(refuse + fail + toast, 48,
-            'the alerts should still be 48 messages, got '
+        // 58 SINCE THE MY GROUPS EXTENSION (v261): the panel now refuses without a
+        // sign-in, without a name, without a tick, on a bad email, on inviting
+        // yourself, and when only the owner may act; it reports a server refusal on
+        // five separate writes (the rules for organizers/<uid>/groups and
+        // sharedGroups are not published yet, so those refusals are states a real
+        // organizer will meet); and it confirms what it saved.
+        assert.equal(refuse + fail + toast, 58,
+            'the alerts should still be 58 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
@@ -404,7 +410,9 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // fourth candidate went the other way: "nothing new to save" is a refusal,
         // because nothing was written, and it must not float away like something
         // that was.
-        assert.ok(toast <= 9, 'too much of this page floats away: ' + toast);
+        // 11 since the extension: two more receipts of a completed write - a
+        // co-organizer added, a co-organizer removed. Both are things that happened.
+        assert.ok(toast <= 11, 'too much of this page floats away: ' + toast);
     });
 });
 
