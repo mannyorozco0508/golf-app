@@ -3050,6 +3050,44 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-09-30
+
+**RULES STAGE 1 IS LIVE.** Published 2026-09-29 ~7:01 PM by console paste of
+`database.rules.stage1.json`. Post-publish: a score from a `?group=` link SAVED and a
+forced-KP answer on GFLBAM SAVED. The rollback is `dab91d8`, one paste, and the file
+is on the Desktop. **What is live is `database.rules.stage1.json`, NOT
+`database.rules.json`** - the repo file was never published and still carries the
+Stage 2 owner-only parent. Read "STAGE 1 IS LIVE" above before assuming anything.
+
+**MY GROUPS IS SHIPPED AND DARK.** On main since `4aba38a`
+(`golfapp-v261-mygroups`), and invisible: the button ships `display:none` and appears
+only on a device switched on from the secret master panel - the golf-ball logo, five
+taps - which writes a per-device `localStorage` flag. It ships rather than waiting on
+a preview because a branch host is not an authorized sign-in domain, so a preview
+CANNOT sign in, and My Groups needs a real account. `my_groups_hidden_test.js` holds
+the dark state; `my_groups_test.js` holds the feature.
+
+- **Hiding is not security, and the two must not be confused.** The panel refuses
+  without a linked account, and `organizers/$uid/groups` is owner-or-co-organizer in
+  the live ruleset. The flag is release management; the rules are the enforcement.
+
+### THE QUEUE, most load-bearing first
+
+| what | state |
+|---|---|
+| **Stage 2 rules** - the owner-only round parent, with the `ownerLock` grandfather | approved IN PRINCIPLE, **not built**: no rule, no app change, no flag on any round |
+| **the `ownerUid` audit** - Step 0, and it gates Stage 2 | blocked: listing `events/` needs a read of the parent node, which no ruleset grants. See the item below |
+| **authorized sign-in domains** - a preview cannot email a link | one console entry per branch host; Firebase takes no wildcards. A fixed custom subdomain CNAME'd to the Pages project, authorized once, is the durable answer and needs DNS |
+| **My Groups for real users** - take the flag off | waiting on Manny's own testing on the live app |
+| **`kpGroupAnswers` in a future publish** | already live via the open parent; becomes essential only if the parent tightens |
+| **PR #19** - a pot-only trip no longer invents who owes who | open, unmerged, untouched all session |
+| **branch `ui-kpprobe-scroll`** - the KP scroll probe | unmerged on purpose; the diagnostic for the item below |
+| **Chrome-on-iPhone "Change KP" jump** | logged below, not being chased |
+| **`pwa-boot.js:335`** files `priority: 0` at NINE | logged, not fixed |
+| **`game.html`'s gate is not `canReachSetup`** and shows nothing on any group link, owner included | logged, not fixed |
+| **Full Card has no KP entry** | logged, not fixed |
+| **`stats.html` defines its own `nassauStakeConfig`** (`:800`), a byte-copy of money-engine's | found in the Wave 29 recon; a duplicated builder, not a divergence - yet |
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
