@@ -49,15 +49,19 @@
 //   - mini-dom has no layout, so "shown" here means style.display, never that
 //     anybody could see or tap it. The two-step arming is state, not geometry.
 //
-// THE BASELINE, all 34 tests, measured against main 7608a56 in a clean worktree -
+// THE BASELINE, all 43 tests, measured against main 7608a56 in a clean worktree -
 // Wave 33 merged, no account-exit.js, no card, no sign-out anywhere in the app:
 //
-//     3 PASS / 31 FAIL
+//     3 PASS / 40 FAIL
+//
+// The nine tests in the INCIDENT block at the bottom were also measured on their own
+// against bb3cd18 - the code as it stood when Manny's real account was deleted:
+// 0/9 green. Every one of them describes something that code did or failed to do.
 //
 // The three that pass are the whole rules block, and they are honest about earning
 // nothing from this wave: they measure a ruleset this wave does not touch. They are
 // here because the DESIGN depends on those eight verdicts, and a rules publish that
-// changed one of them would make this wave's delete silently incomplete. The 31
+// changed one of them would make this wave's delete silently incomplete. The 40
 // reds are every line of the feature.
 //
 // (My own first draft of this paragraph said 8 PASS, from counting the targaryen
@@ -311,6 +315,15 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         if (o.refuse) sb.__dbRefuse = o.refuse;
         let reloads = 0;
         sb.location.reload = () => { reloads += 1; };
+        // THE LAST GATE IS A DIALOG NOW (2026-09-30 incident), so every page-path
+        // delete below answers it. WHAT it was asked is asserted in the incident
+        // block at the bottom; here it just says yes, so the rest still measures the
+        // order, the stop and the re-auth.
+        const asked = { confirm: [], prompt: [] };
+        sb.uiConfirm = (o) => { asked.confirm.push(o); return Promise.resolve(!o.__no); };
+        sb.uiPrompt = (o) => { asked.prompt.push(o); return Promise.resolve(o.__typed === undefined ? 'DELETE' : o.__typed); };
+        sb.uiToast = () => {};
+        sb.uiRefuse = () => {};
         const user = {
             uid: 'u9', isAnonymous: false, email: 'a@b.com',
             providerData: [{ providerId: o.provider || 'apple.com' }],
@@ -333,13 +346,13 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         };
         sb.oauthSignin = sb.window.oauthSignin;
         return {
-            sb, deleted, reauths,
+            sb, deleted, reauths, asked,
             reloads: () => reloads,
             writes: () => sb.__dbWrites.map(w => w.op + ' ' + w.path),
             text: id => { const e = sb.document.getElementById(id); return e ? e.textContent : null; },
             shown: id => { const e = sb.document.getElementById(id); return e ? e.style.display !== 'none' : null; },
             tap: what => sb.exitTap(what),
-            go: () => sb.exitGo()
+            go: () => sb.exitGo()   // async since the incident fix - await it
         };
     }
     const tick = () => new Promise(r => setTimeout(r, 15));
@@ -389,7 +402,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         const p = page();
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         // The stub refuses nothing, so this is the AFTER-PUBLISH world: the whole
         // record goes in one write and the groups write is skipped as moot.
@@ -406,7 +419,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         const p = page();
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         p.sb.__dbWrites.forEach(w => assert.ok(!/^events/.test(w.path),
             'other golfers may still be scoring that round: ' + w.path));
@@ -423,7 +436,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         });
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.deleted, [],
             'deleting the user after a failed removal would strand data nobody can ever reach');
@@ -471,7 +484,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         });
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.writes(), [
             'remove sharedGroups/a,b@c,com/u9/g1',
@@ -491,7 +504,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         // no groups means no removals, and the delete proceeds.
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.writes(), ['remove organizers/u9'],
             'no groups means no pointer and no groups write - only the record attempt');
@@ -502,7 +515,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         const p = page({ deleteError: Object.assign(new Error('recent'), { code: 'auth/requires-recent-login' }) });
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.reauths, ['apple'], 'the provider on the account is the one it re-runs');
         assert.deepEqual(p.deleted, ['delete@2', 'delete@2'], 'and it tries again after the re-auth');
@@ -516,7 +529,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         });
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.reauths, ['google']);
     });
@@ -528,7 +541,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         });
         p.sb.refreshAccountState();
         p.tap('delete'); p.tap('delete');
-        p.go();
+        await p.go();
         await tick();
         assert.deepEqual(p.reauths, [], 'there is no popup to re-run for an email link');
         assert.deepEqual(p.deleted, ['delete@2'], 'one attempt, which Firebase refused');
@@ -672,5 +685,177 @@ describe('IT IS LOADED, PRECACHED, AND REPAINTED WITH THE PANEL', () => {
         assert.ok(!/exitStep = document\./.test(fn));
         assert.ok(!/style\.display ===/.test(fn.slice(0, fn.indexOf('function syncAccountExit'))),
             'the STATE must never be read back out of the DOM');
+    });
+});
+
+// ===========================================================================
+// THE INCIDENT, REPRODUCED. 2026-09-30.
+//
+// Manny set out to test Delete account with a throwaway and deleted his REAL
+// organizer, k8fYkL1hsPb6ZDL3wgQi8hywPi42, founder pass and all. Rounds were
+// untouched, as designed. The new real account is h8AxnefqnuZNKv6XwvFFIKRMHSS2
+// (Apple) and the founder pass was restored there from the console.
+//
+// THE PATH, AND NOT ONE STEP OF IT WAS A WRONG TAP:
+//
+//   1. Signed in as the real account, he tapped Continue with Google with what he
+//      believed was a throwaway. planOauth sees a NON-anonymous user and takes the
+//      sign-in branch; Firebase, with one-account-per-email, AUTO-LINKS a verified
+//      Google credential to the existing account holding that email. So he was
+//      signed into the SAME uid and the note said, correctly, "This is the same
+//      organizer account". The screen OFFERED that button while signed in, with a
+//      lead that said tapping it again only moves the organizer to another device.
+//   2. Delete account then deleted exactly that account.
+//
+// AND THE FOUNDER-PASS WARNING DID NOT SHOUT, which is the bug in this repo rather
+// than in his tapping. The loud sentence needs a pass in `standing`, and `standing`
+// came from organizer-gate.js readStanding - ONE read, at page load, through
+// window.authReady, a one-shot promise carrying the uid the page BOOTED with. He had
+// signed out first, so the boot uid was anonymous, its record was null, and
+// deleteWarning produced the HEDGED line: "If this account has a founder pass...".
+// The first three tests below fail on the old code for exactly that reason.
+//
+// THE THREE FIXES, each with its own test:
+//   1. Signed in, the two provider buttons come OFF the screen and the panel says
+//      who you are. There is no way to sign into something else from a signed-in
+//      panel - moving a device is the email link, which says what it is for.
+//   2. Both delete warnings NAME the account, email and providers.
+//   3. The pass is read at the moment of the delete, off auth.currentUser, and a
+//      founder pass has to be TYPED away. An unreadable record gets its own
+//      sentence rather than the reassuring one.
+//
+// MEASURED at bb3cd18 - the code as it stood when the account was deleted - these
+// nine on their own: 0/9 green. (Shorthand on purpose: the file's baseline, in the
+// checked form, is the 43-test figure at the top, and a second full-form figure in
+// one header reads as a second baseline to a reader and to the arithmetic guard.)
+// ===========================================================================
+describe('THE INCIDENT: A SIGNED-IN PANEL MUST NOT OFFER TO SIGN IN AGAIN', () => {
+
+    function signedIn(opts) {
+        const o = opts || {};
+        const sb = loadHtmlInlineScript('admin.html', ['account-exit.js', 'my-groups.js']);
+        sb.__dbReads = o.reads || {};
+        const asked = { confirm: [], prompt: [] };
+        sb.uiConfirm = (x) => { asked.confirm.push(x); return Promise.resolve(o.confirm !== false); };
+        sb.uiPrompt = (x) => { asked.prompt.push(x); return Promise.resolve(o.typed === undefined ? 'DELETE' : o.typed); };
+        sb.uiToast = () => {};
+        sb.uiRefuse = () => {};
+        sb.uiFail = () => {};
+        let reloads = 0;
+        sb.location.reload = () => { reloads += 1; };
+        sb.__auth.setUser({
+            uid: o.uid || 'real-uid', isAnonymous: false,
+            email: o.email === undefined ? 'manny@example.com' : o.email,
+            providerData: (o.providers || ['apple.com']).map(id => ({ providerId: id })),
+            delete: () => Promise.resolve()
+        });
+        sb.refreshAccountState();
+        return {
+            sb, asked, reloads: () => reloads,
+            text: id => { const e = sb.document.getElementById(id); return e ? e.textContent : null; },
+            display: id => { const e = sb.document.getElementById(id); return e ? e.style.display : null; }
+        };
+    }
+    const tick = () => new Promise(r => setTimeout(r, 15));
+
+    test('1. Continue with Apple and Continue with Google are GONE when signed in', () => {
+        const p = signedIn();
+        assert.equal(p.display('oauth-apple'), 'none',
+            'a signed-in tap takes the sign-in branch, and Firebase auto-links a verified Google credential to whichever account holds that email - which is how a real organizer got signed back into and then deleted');
+        assert.equal(p.display('oauth-google'), 'none');
+    });
+
+    test('1b. and the panel SAYS who you are, email and providers', () => {
+        const p = signedIn({ email: 'manny@example.com', providers: ['apple.com', 'google.com'] });
+        assert.equal(p.text('oauth-who'), 'Signed in as manny@example.com (Apple and Google)');
+        assert.notEqual(p.display('oauth-who'), 'none');
+        assert.ok(!/Tap either one again/.test(p.text('oauth-lead')),
+            'the lead must not invite the tap that caused this');
+    });
+
+    test('1c. an ANONYMOUS organizer still gets both buttons, and no identity line', () => {
+        // The control: if the fix hid them for everybody there would be no way in.
+        const sb = loadHtmlInlineScript('admin.html', ['account-exit.js', 'my-groups.js']);
+        sb.refreshAccountState();
+        assert.notEqual(sb.document.getElementById('oauth-apple').style.display, 'none');
+        assert.notEqual(sb.document.getElementById('oauth-google').style.display, 'none');
+        assert.equal(sb.document.getElementById('oauth-who').style.display, 'none');
+    });
+
+    test('2. BOTH delete warnings name the account', () => {
+        const p = signedIn({ email: 'manny@example.com', providers: ['apple.com'] });
+        p.sb.exitTap('delete');
+        assert.match(p.text('account-exit-warn'), /This is manny@example\.com \(Apple\)/,
+            'the first warning must say WHICH account: ' + p.text('account-exit-warn'));
+        assert.match(p.text('account-exit-warn'), /does NOT delete rounds/i);
+    });
+
+    test('3. A FOUNDER PASS ON THE ACCOUNT MEANS TYPING, not tapping', async () => {
+        const p = signedIn({
+            uid: 'real-uid',
+            reads: { 'organizers/real-uid': { firstSeenAt: 1, pass: { kind: 'founder', expiresAt: 4102444800000 } } }
+        });
+        p.sb.exitTap('delete'); p.sb.exitTap('delete');
+        await p.sb.exitGo();
+        await tick();
+        assert.equal(p.asked.prompt.length, 1, 'it must ask for the word to be typed');
+        assert.match(p.asked.prompt[0].title, /Type DELETE/);
+        assert.match(p.asked.prompt[0].title, /manny@example\.com/, 'and name the account in the prompt');
+        assert.match(p.asked.prompt[0].body, /FOUNDER PASS/);
+        assert.match(p.asked.prompt[0].body, /gives that pass up for good/);
+        // The pass was read HERE, off auth.currentUser - not from the record
+        // organizer-gate.js fetched at boot for whatever uid the page started with.
+        assert.ok(p.sb.__dbWrites.length > 0, 'and with DELETE typed it goes through');
+    });
+
+    test('3b. THE WRONG WORD DELETES NOTHING', async () => {
+        const p = signedIn({
+            uid: 'real-uid',
+            typed: 'delete my account',
+            reads: { 'organizers/real-uid': { firstSeenAt: 1, pass: { kind: 'founder', expiresAt: 4102444800000 } } }
+        });
+        p.sb.exitTap('delete'); p.sb.exitTap('delete');
+        await p.sb.exitGo();
+        await tick();
+        assert.deepEqual(p.sb.__dbWrites, [], 'not one write');
+        assert.equal(p.reloads(), 0);
+        assert.match(p.text('account-exit-status'), /did not match DELETE/);
+    });
+
+    test('3c. CANCELLING THE TYPE BOX deletes nothing', async () => {
+        const p = signedIn({
+            uid: 'real-uid', typed: null,
+            reads: { 'organizers/real-uid': { firstSeenAt: 1, pass: { kind: 'founder', expiresAt: 4102444800000 } } }
+        });
+        p.sb.exitTap('delete'); p.sb.exitTap('delete');
+        await p.sb.exitGo();
+        await tick();
+        assert.deepEqual(p.sb.__dbWrites, [], 'not one write');
+        assert.match(p.text('account-exit-status'), /Nothing was deleted/);
+    });
+
+    test('3d. NO PASS: no type box, but the account is still named in the confirm', async () => {
+        const p = signedIn({ uid: 'plain-uid', reads: { 'organizers/plain-uid': { firstSeenAt: 1 } } });
+        p.sb.exitTap('delete'); p.sb.exitTap('delete');
+        await p.sb.exitGo();
+        await tick();
+        assert.equal(p.asked.prompt.length, 0, 'no pass, no typing - the friction is for the pass');
+        assert.equal(p.asked.confirm.length, 1, 'but a named confirm either way');
+        assert.match(p.asked.confirm[0].title, /Delete manny@example\.com\?/);
+        assert.ok(p.sb.__dbWrites.length > 0);
+    });
+
+    test('3e. AN UNREADABLE RECORD GETS ITS OWN SENTENCE, not the reassuring one', async () => {
+        // The state the incident actually happened in: nothing could say whether
+        // there was a pass. "If this account has a founder pass" reads like "there
+        // probably is not one", and that is the sentence that let it through.
+        const p = signedIn({ uid: 'real-uid' });   // no read seeded -> the stub answers null
+        const X = p.sb.window.accountExit;
+        const unknown = X.deleteFinalWarning({ uid: 'real-uid', isAnonymous: false, email: 'a@b.com', providerData: [{ providerId: 'apple.com' }] }, { unknown: true });
+        assert.match(unknown, /could not check/i, unknown);
+        assert.ok(!/If this account has a founder pass/.test(unknown),
+            'the hedge that reads like reassurance must not be used for an unknown');
+        assert.match(unknown, /You are about to delete a@b\.com \(Apple\)/);
+        assert.notEqual(X.deleteFinalWarning(null, { unknown: true }), X.deleteFinalWarning(null, { pass: false }));
     });
 });

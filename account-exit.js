@@ -92,7 +92,11 @@
         // with the record. Either way it is gone for the person reading this, and a
         // sentence that named the mechanism would be wrong within the week.
         founderWarn: 'THIS ACCOUNT HAS A FOUNDER PASS. Deleting the account gives up that pass for good: nothing brings it back, and signing in again with the same Apple ID, Google account or email makes a NEW organizer that does not have it. If you want the pass, do not delete this account.',
-        founderMaybe: 'If this account has a founder pass or a running free trial, it stays attached to this account and a new one does not get it.'
+        founderMaybe: 'If this account has a founder pass or a running free trial, it stays attached to this account and a new one does not get it.',
+        // SEPARATE FROM founderMaybe ON PURPOSE. "We could not check" and "there is
+        // probably nothing" read the same to a golfer and are not the same fact, and
+        // the incident happened in exactly the state this sentence describes.
+        founderUnknown: 'This device could not check whether this account holds a founder pass or a running free trial. If it does, deleting the account gives it up for good. Check on a connection first if that matters to you.'
     };
 
     // WHAT THE LIVE RULES REFUSE TO LET GO OF, with the rule that refuses it. Held
@@ -109,10 +113,67 @@
         { key: 'pass', why: 'the rule sets .write to false, so nobody may remove a pass' }
     ];
 
+    // ---- THE INCIDENT THIS SECTION EXISTS BECAUSE OF -----------------------
+    //
+    // 2026-09-30. Manny set out to test Delete account with a throwaway and deleted
+    // his REAL organizer, k8fYkL1hsPb6ZDL3wgQi8hywPi42, founder pass and all. Rounds
+    // were untouched, as designed. The path, from the code:
+    //
+    //   1. He was signed in as the real account and tapped Continue with Google with
+    //      what he believed was a throwaway. planOauth() sees a NON-anonymous user,
+    //      so it takes the sign-in branch - and Firebase, with one-account-per-email,
+    //      AUTO-LINKS a verified Google credential to the existing account that has
+    //      that email. So he was signed into the SAME uid, and noteFor() correctly
+    //      said "This is the same organizer account".
+    //   2. The delete then deleted exactly that account, and it was right to.
+    //
+    // THE FOUNDER-PASS WARNING DID NOT SHOUT, and that is the bug in this file rather
+    // than in his tapping. The loud sentence needs standingOf() to see a pass, and the
+    // record it reads was fetched ONCE at page load, by organizer-gate.js readStanding,
+    // through window.authReady - a ONE-SHOT promise that resolves to the uid the page
+    // BOOTED with. Sign in inside the panel and the uid changes underneath a record
+    // nothing re-reads. He had signed out first, so the boot uid was anonymous, its
+    // record was null, and deleteWarning() produced the HEDGED line - "if this account
+    // has a founder pass" - instead of the one in capitals.
+    //
+    // SO THIS FILE NOW READS THE PASS ITSELF, off auth.currentUser.uid, at the moment
+    // of the delete. Not authReady, which is the boot uid; not a record cached at
+    // load. accountStanding() below is that read, and the screen refuses to delete a
+    // pass-holding account on a tap alone - it has to be typed.
     function coded(code, message) {
         var e = new Error(message || code);
         e.code = code;
         return e;
+    }
+
+    // ---- WHO YOU ARE SIGNED IN AS, IN WORDS ------------------------------
+    //
+    // The line the panel shows instead of two buttons that would sign you into
+    // something else. providerData is what Firebase says is ON the account, so
+    // "Apple" appears because apple.com is linked, not because Apple was the last
+    // thing tapped.
+    var PROVIDER_LABEL = {
+        'apple.com': 'Apple',
+        'google.com': 'Google',
+        'password': 'email',
+        'emailLink': 'email link'
+    };
+    function accountProviders(user) {
+        var list = (user && user.providerData) || [];
+        var out = [];
+        for (var i = 0; i < list.length; i += 1) {
+            var id = list[i] && list[i].providerId;
+            if (!id) continue;
+            var label = PROVIDER_LABEL[id] || String(id);
+            if (out.indexOf(label) === -1) out.push(label);
+        }
+        return out;
+    }
+    function describeAccount(user) {
+        if (!user || !user.uid || user.isAnonymous) return '';
+        var who = user.email || 'this account';
+        var p = accountProviders(user);
+        return 'Signed in as ' + who + (p.length ? ' (' + p.join(' and ') + ')' : '');
     }
 
     // ---- WHO SEES THE CARD AT ALL ----------------------------------------
@@ -201,6 +262,61 @@
             return WORDS.deleteWarn2 + ' ' + WORDS.founderWarn;
         }
         return WORDS.deleteWarn2 + ' ' + WORDS.founderMaybe;
+    }
+
+    // THE PASS, READ NOW, OFF THE UID THAT IS SIGNED IN. Resolves to
+    //   { pass: true, kind: 'founder' }   a live pass on THIS account
+    //   { pass: false }                   a record with no pass
+    //   { unknown: true }                 no session, a refused read, or too slow
+    // An UNKNOWN is never treated as "no pass": the delete still warns, and the
+    // incident above is what that rule is for.
+    var STANDING_MS = 4000;
+    function accountStanding(deps) {
+        var auth = deps && deps.auth;
+        var db = deps && deps.db;
+        var user = auth && auth.currentUser;
+        if (!user || !user.uid || !db || typeof db.ref !== 'function') {
+            return Promise.resolve({ unknown: true });
+        }
+        var read;
+        try {
+            read = Promise.resolve(db.ref('organizers/' + user.uid).once('value')).then(function (snap) {
+                var v = (snap && typeof snap.val === 'function') ? snap.val() : null;
+                var pass = v && v.pass;
+                if (!pass) return { pass: false };
+                var exp = Number(pass.expiresAt || 0);
+                if (exp && exp < Date.now()) return { pass: false, expired: true };
+                return { pass: true, kind: String(pass.kind || '') };
+            }, function () { return { unknown: true }; });
+        } catch (e) { return Promise.resolve({ unknown: true }); }
+        var timer = new Promise(function (resolve) {
+            setTimeout(function () { resolve({ unknown: true }); }, STANDING_MS);
+        });
+        return Promise.race([read, timer]);
+    }
+    // A FOUNDER PASS CANNOT BE GIVEN UP ON A TAP. Typing is the point: it is the one
+    // thing on this screen that cannot be done by accident, and the incident above is
+    // a person who meant to delete a different account.
+    var TYPE_WORD = 'DELETE';
+    function deleteNeedsTyping(standing) {
+        return !!(standing && standing.pass && standing.kind === 'founder');
+    }
+    function typedIsRight(typed) {
+        return String(typed === null || typed === undefined ? '' : typed).trim().toUpperCase() === TYPE_WORD;
+    }
+    // The last-check sentence, now NAMING the account. "Delete account" with no name
+    // on it is what let a real organizer be deleted in place of a throwaway.
+    function deleteFinalWarning(user, standing) {
+        var who = describeAccount(user);
+        var head = who ? who.replace(/^Signed in as /, 'You are about to delete ') + '.' : '';
+        if (deleteNeedsTyping(standing)) {
+            return (head ? head + ' ' : '') + WORDS.deleteWarn2 + ' ' + WORDS.founderWarn
+                + ' Type ' + TYPE_WORD + ' to confirm.';
+        }
+        if (standing && standing.unknown) {
+            return (head ? head + ' ' : '') + WORDS.deleteWarn2 + ' ' + WORDS.founderUnknown;
+        }
+        return (head ? head + ' ' : '') + WORDS.deleteWarn2 + ' ' + WORDS.founderMaybe;
     }
 
     // ---- ERRORS ----------------------------------------------------------
@@ -325,6 +441,13 @@
         WORDS: WORDS,
         KEEPS: KEEPS,
         planExit: planExit,
+        describeAccount: describeAccount,
+        accountProviders: accountProviders,
+        accountStanding: accountStanding,
+        deleteNeedsTyping: deleteNeedsTyping,
+        typedIsRight: typedIsRight,
+        deleteFinalWarning: deleteFinalWarning,
+        TYPE_WORD: TYPE_WORD,
         deletePlan: deletePlan,
         deleteWarning: deleteWarning,
         needsReauth: needsReauth,

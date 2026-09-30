@@ -1074,6 +1074,7 @@ html {
         <p id="oauth-lead">One tap. Your rounds, the free trial and a founder pass stay on this same account.</p>
         <button type="button" id="oauth-apple" class="btn-primary" onclick="oauthTap('apple')">&#63743;&nbsp; Continue with Apple</button>
         <button type="button" id="oauth-google" class="btn-outline" onclick="oauthTap('google')">Continue with Google</button>
+        <p id="oauth-who" role="status" style="display:none; font-weight:bold;"></p>
         <p id="oauth-status" role="status"></p>
         <button type="button" id="oauth-email-toggle" class="btn-outline" onclick="toggleEmailFallback()">Use email instead</button>
     </section>
@@ -7223,12 +7224,55 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } catch (e) { return null; }
     }
 
-    function exitGo() {
+    async function exitGo() {
         if (!window.accountExit) return;
-        const W = window.accountExit.WORDS;
+        const X = window.accountExit;
+        const W = X.WORDS;
         const status = document.getElementById('account-exit-status');
         const step = exitStep;
         if (step !== 'signout' && step !== 'delete2') return;
+        let auth0 = null;
+        try { auth0 = firebase.auth(); } catch (e) { auth0 = null; }
+        // THE LAST GATE, AND IT READS THE PASS ITSELF (2026-09-30 incident). The
+        // standing organizer-gate.js fetched at page load belongs to the uid the page
+        // BOOTED with - sign in inside this panel and that record is somebody else's.
+        // So the pass is read here, now, off auth.currentUser, and a founder pass has
+        // to be TYPED away rather than tapped away.
+        if (step === 'delete2' && auth0) {
+            setTextOnce(status, 'Checking this account\u2026');
+            const standing = await X.accountStanding({ auth: auth0, db: (typeof db !== 'undefined') ? db : null });
+            const user = auth0.currentUser;
+            setTextOnce(document.getElementById('account-exit-warn'), X.deleteFinalWarning(user, standing));
+            if (X.deleteNeedsTyping(standing)) {
+                const typed = await uiPrompt({
+                    title: 'Type ' + X.TYPE_WORD + ' to delete ' + ((user && user.email) || 'this account'),
+                    body: 'This account holds a FOUNDER PASS. Deleting it gives that pass up for good - nothing brings it back, and a new account does not get one.',
+                    code: true, maxLength: 12, placeholder: X.TYPE_WORD,
+                    confirmText: 'Delete for good', cancelText: 'Keep my account'
+                });
+                if (!X.typedIsRight(typed)) {
+                    exitStep = 'none';
+                    setTextOnce(status, typed === null || typed === undefined
+                        ? 'Nothing was deleted.'
+                        : 'That did not match ' + X.TYPE_WORD + '. Nothing was deleted.');
+                    syncAccountExit();
+                    return;
+                }
+            }
+            const ok = await uiConfirm({
+                title: 'Delete ' + ((user && user.email) || 'this account') + '?',
+                body: X.deleteFinalWarning(user, standing),
+                confirmText: 'Delete ' + ((user && user.email) || 'my account'),
+                cancelText: 'Keep my account',
+                danger: true
+            });
+            if (!ok) {
+                exitStep = 'none';
+                setTextOnce(status, 'Nothing was deleted.');
+                syncAccountExit();
+                return;
+            }
+        }
         setTextOnce(status, step === 'signout' ? W.signingOut : W.deleting);
         let auth = null;
         try { auth = firebase.auth(); } catch (e) { auth = null; }
@@ -7274,8 +7318,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!plan.show) { exitStep = 'none'; return; }
         const standing = (window.organizerGate && typeof window.organizerGate.standingOf === 'function')
             ? window.organizerGate.standingOf(organizerRecord, Date.now()) : null;
+        // delete1 names the account as well, because "Delete account" with no name on
+        // it is exactly what let a real organizer be deleted in place of a throwaway.
+        const who = window.accountExit.describeAccount(u);
         const warn = exitStep === 'signout' ? W.signOutWarn
-            : exitStep === 'delete1' ? W.deleteWarn1
+            : exitStep === 'delete1' ? (who ? who.replace(/^Signed in as /, 'This is ') + '. ' : '') + W.deleteWarn1
             : exitStep === 'delete2' ? window.accountExit.deleteWarning(standing) : '';
         setTextOnce(document.getElementById('account-exit-warn'), warn);
         const go = document.getElementById('account-exit-go');
@@ -7295,8 +7342,41 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             exitStep === 'delete1' ? 'Yes, continue' : 'Delete account');
     }
 
+    // SIGNED IN MEANS THE TWO BUTTONS COME OFF THE SCREEN (2026-09-30 incident).
+    //
+    // They used to stay, with the lead reading "Tap either one again only to move
+    // this organizer onto another browser or phone". That sentence was true and the
+    // buttons were a trap: tapped while signed in, planOauth takes the SIGN-IN
+    // branch, and Firebase auto-links a verified Google credential to whichever
+    // existing account already has that email - so tapping Continue with Google with
+    // a "throwaway" signed Manny straight back into his real organizer, which he then
+    // deleted. Nothing about that was a wrong tap; the screen offered it.
+    //
+    // So a signed-in panel SAYS who you are and offers no way to sign into something
+    // else. Moving an organizer to another device is the email link, which is still
+    // one tap away and says what it is for.
+    function syncOauthCard() {
+        if (!window.accountExit) return;
+        const linked = accountIsLinked();
+        const u = (() => {
+            try { return (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null; }
+            catch (e) { return null; }
+        })();
+        ['oauth-apple', 'oauth-google'].forEach(id => {
+            const b = document.getElementById(id);
+            const want = linked ? 'none' : '';
+            if (b && b.style.display !== want) b.style.display = want;
+        });
+        const who = document.getElementById('oauth-who');
+        const line = linked ? window.accountExit.describeAccount(u) : '';
+        setTextOnce(who, line);
+        const whoWant = line ? '' : 'none';
+        if (who && who.style.display !== whoWant) who.style.display = whoWant;
+    }
+
     function refreshAccountState() {
         const linked = accountIsLinked();
+        if (typeof syncOauthCard === 'function') syncOauthCard();
         // The beta switch lives in this panel now, so it repaints with the panel -
         // including the moment a sign-in completes without the panel closing (v214's
         // held-note flush does the same thing for the note above it).
@@ -7311,7 +7391,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             setTextOnce(document.getElementById('email-link-lead'),
                 'Signed in. Use this again only to move this organizer onto another browser or phone.');
             setTextOnce(document.getElementById('oauth-lead'),
-                'Signed in. Tap either one again only to move this organizer onto another browser or phone.');
+                'Signed in. To put this same organizer on another phone or browser, use the email link below - do not sign in again here.');
         }
     }
 

@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v110-groupdelete. The tournament product cache
+// The consumer product cache is consumer-v111-namedaccount. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3797,7 +3797,19 @@
 // sharedGroups pointer - measured in my_groups_delete_test.js. A shared row says who
 // can remove it instead. An installed device would otherwise keep a list with no way
 // to prune it.
-const CACHE_VERSION = 'golfapp-v269-groupdelete';
+// Moved to v270 AFTER A REAL ACCOUNT WAS DELETED IN PLACE OF A THROWAWAY.
+// 2026-09-30: signed in as his real organizer, Manny tapped Continue with Google with
+// what he believed was a throwaway. A signed-in tap takes the sign-in branch, and
+// Firebase auto-links a verified Google credential to whichever account already holds
+// that email - so he was signed back into the SAME uid, the note said "same organizer
+// account", and the delete then deleted it. The founder-pass warning did not shout
+// because the record it reads is fetched once at page load for the uid the page
+// BOOTED with, and he had signed out first.
+// So: a signed-in panel no longer offers either provider button and says who you are
+// instead, both delete warnings NAME the account, and a founder pass has to be TYPED
+// away after a read taken at the moment of the delete. An installed device would
+// otherwise keep serving the screen that offered the tap.
+const CACHE_VERSION = 'golfapp-v270-namedaccount';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
