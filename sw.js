@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v107-signincode. The tournament product cache
+// The consumer product cache is consumer-v108-accountexit. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3769,7 +3769,19 @@
 // signs in with the credential FIREBASE puts on the error rather than re-presenting
 // the one the failed link already consumed. An installed device would otherwise keep
 // showing a sentence that cannot be diagnosed.
-const CACHE_VERSION = 'golfapp-v266-signincode';
+// Moved to v267 SO AN ACCOUNT CAN BE SIGNED OUT OF AND DELETED. App Review 5.1.1(v)
+// asks an app that creates accounts to let somebody delete one from inside it, and
+// Wave 33 made Apple and Google the front door while the app had neither a sign-out
+// nor a delete anywhere in it. account-exit.js joins the shell. An installed device
+// would otherwise keep serving a panel with no way out of the account it just made.
+//
+// WHAT A DELETE CAN REACH IS MEASURED, NOT ASSUMED. Under the live Stage 1 rules the
+// owner may remove organizers/<uid>/groups and each sharedGroups pointer, and the
+// client deletes the Auth user - which is the account. organizers/<uid> itself,
+// firstSeenAt and pass are all refused by rule, so two keys survive a delete and the
+// second warning says a founder pass does not come back. Rounds are never touched:
+// other golfers may still be scoring one.
+const CACHE_VERSION = 'golfapp-v267-accountexit';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3886,6 +3898,15 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './oauth-signin.js',
+    // account-exit.js: sign out, and delete account - App Review 5.1.1(v), which
+    // asks an app that creates accounts to let somebody delete one from inside it.
+    // Precached because the panel it lives in has to work on a device that has not
+    // been online since the last release, and because a golfer who wants out should
+    // not be told to find signal first.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './account-exit.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -

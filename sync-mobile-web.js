@@ -131,6 +131,14 @@ const CONSUMER_SHELL = [
     // breaking - but the email link is the flow that failed on a real phone, so it
     // ships. NO APOSTROPHES IN THIS BLOCK.
     'oauth-signin.js',
+    // account-exit.js (v267): sign out, and delete account. App Review 5.1.1(v)
+    // asks an app that creates accounts to let somebody delete one from inside it,
+    // and Wave 33 made Apple and Google the front door. admin.html calls it through
+    // a typeof guard, so a bundle without it simply has no card - which is the one
+    // thing the next review must not see, so it ships. It is also why it is
+    // precached: a golfer who wants out should not be told to find signal first.
+    // NO APOSTROPHES IN THIS BLOCK.
+    'account-exit.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in

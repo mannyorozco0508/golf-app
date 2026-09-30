@@ -55,6 +55,7 @@
          its own email-and-password form and does not load this. -->
     <script src="email-link-auth.js"></script>
     <script src="oauth-signin.js"></script>
+    <script src="account-exit.js"></script>
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="action-model.js"></script>
@@ -1098,6 +1099,26 @@ html {
         <h2 id="my-groups-beta-title">My Groups (beta)</h2>
         <p id="my-groups-flag-state">…</p>
         <button type="button" id="my-groups-beta-btn" class="btn-primary" onclick="toggleMyGroupsFeature()">Turn My Groups on</button>
+    </section>
+    <!-- SIGN OUT AND DELETE ACCOUNT (Wave 34). Required by App Review 5.1.1(v):
+         an app that lets somebody create an account has to let them delete it from
+         inside the app, and Wave 33 made Apple and Google the front door. Shown
+         only to a signed-in organizer, because an anonymous one has no account to
+         sign out of or delete.
+         BOTH WARN FIRST, and the warnings say DIFFERENT things - sign out is not a
+         lighter delete. Two taps to delete: a warning, then a last check that names
+         the founder pass. account-exit.js holds the words and the plan; every write
+         in here goes through setTextOnce, because this card is inside
+         #account-modal and watchAccountStatus observes that subtree. -->
+    <section id="account-exit-card" class="email-link-card" aria-labelledby="account-exit-title" style="display:none;">
+        <h2 id="account-exit-title">This account</h2>
+        <p id="account-exit-lead">Signed in. Sign out to hand this device back to a new organizer, or delete the account entirely.</p>
+        <button type="button" id="account-signout" class="btn-outline" onclick="exitTap('signout')">Sign out</button>
+        <button type="button" id="account-delete" class="btn-outline" onclick="exitTap('delete')">Delete account</button>
+        <p id="account-exit-warn" role="status"></p>
+        <button type="button" id="account-exit-go" class="btn-primary" style="display:none;" onclick="exitGo()">Sign out</button>
+        <button type="button" id="account-exit-cancel" class="btn-outline" style="display:none;" onclick="exitTap('cancel')">Keep my account</button>
+        <p id="account-exit-status" role="status"></p>
     </section>
       </div>
     </div>
@@ -7159,12 +7180,128 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function setAttrOnce(el, name, value) {
         if (el && el.getAttribute(name) !== value) el.setAttribute(name, value);
     }
+    // ---- SIGN OUT / DELETE ACCOUNT (Wave 34) --------------------------------
+    //
+    // THE STEP IS A VARIABLE, NOT A READ OF style.display. mini-dom does not parse
+    // a static style attribute, so a card that ships display:none reads back
+    // undefined there and a toggle keyed on the string would behave differently in
+    // the harness from the browser - which is the harness proving the thing you are
+    // assuming. One string, both places. Same lesson as emailFallbackShown.
+    //
+    // 'none' -> nothing pending. 'signout' -> warned, one tap from signing out.
+    // 'delete1' -> warned once. 'delete2' -> last check shown, one tap from gone.
+    // VAR, NOT LET, AND THAT IS NOT A STYLE CHOICE. refreshAccountState() is called
+    // SYNCHRONOUSLY at the bottom of loadOrganizerStanding, thousands of lines ABOVE
+    // this line, and it now calls syncAccountExit. A `let` here is in its temporal
+    // dead zone at that moment: "Cannot access exitStep before initialization",
+    // swallowed by that call site's try/catch and then thrown again, unhandled, out
+    // of the standing read's own .then - which is how four Chrome suites went red.
+    // var hoists, so the early call reads undefined, which every comparison below
+    // treats exactly like 'none'. emailFallbackShown is a var for the same reason.
+    var exitStep = 'none';
+
+    function exitTap(what) {
+        if (what === 'cancel') exitStep = 'none';
+        else if (what === 'signout') exitStep = 'signout';
+        else if (what === 'delete') exitStep = (exitStep === 'delete1') ? 'delete2' : 'delete1';
+        setTextOnce(document.getElementById('account-exit-status'), '');
+        syncAccountExit();
+    }
+
+    // The provider to re-authenticate with, or null when there is nothing this page
+    // can drive. Firebase asks for a fresh sign-in before it will delete a user,
+    // and the honest answer for an email-link account is to say so rather than
+    // pretend: messageFor turns requires-recent-login into "sign in once more".
+    function accountReauthFn() {
+        try {
+            const u = firebase.auth().currentUser;
+            const ids = ((u && u.providerData) || []).map(p => p && p.providerId);
+            const which = ids.indexOf('apple.com') > -1 ? 'apple'
+                : (ids.indexOf('google.com') > -1 ? 'google' : null);
+            if (!which || !window.oauthSignin || typeof window.oauthSignin.signIn !== 'function') return null;
+            return () => window.oauthSignin.signIn(which);
+        } catch (e) { return null; }
+    }
+
+    function exitGo() {
+        if (!window.accountExit) return;
+        const W = window.accountExit.WORDS;
+        const status = document.getElementById('account-exit-status');
+        const step = exitStep;
+        if (step !== 'signout' && step !== 'delete2') return;
+        setTextOnce(status, step === 'signout' ? W.signingOut : W.deleting);
+        let auth = null;
+        try { auth = firebase.auth(); } catch (e) { auth = null; }
+        if (!auth) return setTextOnce(status, 'Sign-in is not ready yet. Wait a moment and try again.');
+        const deps = {
+            auth: auth,
+            db: (typeof db !== 'undefined') ? db : null,
+            reauth: accountReauthFn(),
+            reload: () => { try { location.reload(); } catch (e) { } }
+        };
+        const run = step === 'signout'
+            ? window.accountExit.signOut(deps)
+            : window.accountExit.deleteAccount(deps);
+        run.then(() => {
+            // The reload inside the action is what actually clears the screen; this
+            // only matters when it is stubbed, which is every test.
+            exitStep = 'none';
+            syncAccountExit();
+        }, (err) => {
+            exitStep = 'none';
+            setTextOnce(status, window.accountExit.messageFor(err));
+            syncAccountExit();
+        });
+    }
+
+    function syncAccountExit() {
+        if (!window.accountExit) return;
+        const W = window.accountExit.WORDS;
+        // EVERY firebase.auth() CALL ON THIS PAGE IS WRAPPED, and this one was not
+        // until setup_account_link_test.js caught it: that file deletes
+        // window.firebase and then swaps in an auth() that THROWS - the state a page
+        // is in before auth lands - and the standing read calls refreshAccountState
+        // from inside a .then, so the throw came back out as an unhandled rejection.
+        // accountIsLinked has had this try/catch since Wave 1 for the same reason.
+        let u = null;
+        try {
+            u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+        } catch (e) { u = null; }
+        const plan = window.accountExit.planExit(u);
+        const card = document.getElementById('account-exit-card');
+        const cardWant = plan.show ? '' : 'none';
+        if (card && card.style.display !== cardWant) card.style.display = cardWant;
+        if (!plan.show) { exitStep = 'none'; return; }
+        const standing = (window.organizerGate && typeof window.organizerGate.standingOf === 'function')
+            ? window.organizerGate.standingOf(organizerRecord, Date.now()) : null;
+        const warn = exitStep === 'signout' ? W.signOutWarn
+            : exitStep === 'delete1' ? W.deleteWarn1
+            : exitStep === 'delete2' ? window.accountExit.deleteWarning(standing) : '';
+        setTextOnce(document.getElementById('account-exit-warn'), warn);
+        const go = document.getElementById('account-exit-go');
+        const cancel = document.getElementById('account-exit-cancel');
+        // The GO button only exists for the two steps that actually do something:
+        // delete1 shows the warning and the SECOND tap of "Delete account" is what
+        // arms it, so a single stray tap can never delete an account.
+        const armed = exitStep === 'signout' || exitStep === 'delete2';
+        const goWant = armed ? '' : 'none';
+        if (go && go.style.display !== goWant) go.style.display = goWant;
+        if (armed) setTextOnce(go, exitStep === 'signout' ? W.signOutGo : W.deleteGo);
+        const cancelWant = exitStep === 'none' ? 'none' : '';
+        if (cancel && cancel.style.display !== cancelWant) cancel.style.display = cancelWant;
+        if (exitStep !== 'none') setTextOnce(cancel, W.keep);
+        // A second tap of "Delete account" is the second step, so the button says so.
+        setTextOnce(document.getElementById('account-delete'),
+            exitStep === 'delete1' ? 'Yes, continue' : 'Delete account');
+    }
+
     function refreshAccountState() {
         const linked = accountIsLinked();
         // The beta switch lives in this panel now, so it repaints with the panel -
         // including the moment a sign-in completes without the panel closing (v214's
         // held-note flush does the same thing for the note above it).
         if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+        if (typeof syncAccountExit === 'function') syncAccountExit();
         const flag = linked ? '1' : '0';
         const link = document.getElementById('account-link');
         setTextOnce(link, linked ? 'Organizer saved' : 'Account');
