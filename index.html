@@ -6376,17 +6376,89 @@ html {
         return { changed, whole, refused, updates: whole ? wholeUpdates : updates, players, after, warnings, money: playersSheetMoney(data, after) };
     }
     // "Pot $920 → $880 · Flight B 11 → 10", and the recompute note once any score is in.
+    // WHAT THIS CHANGE DOES TO THE MONEY, IN NUMBERS, BEFORE IT IS SAVED.
+    //
+    // The line used to say "Pot $320 -> $360" and then "net finish and skins will
+    // recompute" - a promise instead of a figure, on the one screen where a golfer
+    // is about to change who pays what. MEASURED on an eight-golfer $40 round with a
+    // $100 KP and a $70 Net Finish, remainder skins:
+    //
+    //     add a 9th golfer   pot $320 -> $360   SKINS $150 -> $190   $16.67 -> $21.11 a skin
+    //     mark one Out       pot $320 -> $280   SKINS $150 -> $110   $16.67 -> $12.22 a skin
+    //     Net Finish and KP  UNCHANGED in both - they are fixed dollar amounts here,
+    //                        and skins is the remainder bucket that absorbs the whole
+    //                        headcount change
+    //
+    // So the number that actually moves is the one the old line did not print, and
+    // the per-skin value is what a group argues about on the 18th. Both are here now.
+    //
+    // ONLY WHAT MOVES IS SHOWN. A figure repeated unchanged is noise on a phone, and
+    // it also hides the one that did change. Net Finish and KP appear only when they
+    // differ - which they do on a pool configured as shares rather than fixed amounts.
+    //
+    // NOTHING IS COMPUTED HERE. Every figure is pool-engine.js computeMoneyPool, run
+    // once on the round as it stands and once on the round as the draft would leave
+    // it. If the engine is absent or the pool is off, this says nothing at all rather
+    // than guessing.
     function playersSheetMoney(before, after) {
-        const pot = d => { if (!d.moneyPool || d.moneyPool.enabled === false || typeof computeMoneyPool !== 'function') return null; try { const r = computeMoneyPool(d, d.courseData || [], d.scores || {}); return r ? r.totalPoolCents : null; } catch (e) { return null; } };
-        const counts = d => { const on = d.flights && d.flights.enabled === true; if (!on) return null; const live = (d.players || []).filter(p => p.playingForMoney !== false); return { A: live.filter(p => p.flight !== 'B').length, B: live.filter(p => p.flight === 'B').length }; };
+        const pool = d => {
+            if (!d.moneyPool || d.moneyPool.enabled === false || typeof computeMoneyPool !== 'function') return null;
+            try {
+                const r = computeMoneyPool(d, d.courseData || [], d.scores || {});
+                if (!r || !r.valid) return null;
+                const sk = r.skins || null;
+                return {
+                    pot: r.totalPoolCents,
+                    // The skins BUCKET, not the sum of what has been won so far: that is
+                    // the money the headcount moves. Null when the bucket is unfunded -
+                    // a pot whose fixed amounts already spend it has no remainder.
+                    skins: sk ? sk.amountCents : null,
+                    units: sk ? (sk.totalUnits || 0) : 0,
+                    net: r.net ? r.net.amountCents : null,
+                    kp: r.kp ? r.kp.amountCents : null
+                };
+            } catch (e) { return null; }
+        };
+        const counts = d => {
+            const on = d.flights && d.flights.enabled === true;
+            if (!on) return null;
+            const live = (d.players || []).filter(p => p.playingForMoney !== false);
+            return { A: live.filter(p => p.flight !== 'B').length, B: live.filter(p => p.flight === 'B').length };
+        };
+        const dollars = c => '$' + (Math.round(c) % 100 === 0 ? String(Math.round(c / 100)) : (c / 100).toFixed(2));
         const bits = [];
-        const p0 = pot(before), p1 = pot(after);
-        if (p0 !== null && p1 !== null) bits.push('Pot $' + Math.round(p0 / 100) + (p1 !== p0 ? ' \u2192 $' + Math.round(p1 / 100) : ''));
+        const b = pool(before), a = pool(after);
+        if (b && a) {
+            const moved = (label, k) => {
+                if (b[k] === null || a[k] === null) return;
+                if (b[k] === a[k]) return;
+                bits.push(label + ' ' + dollars(b[k]) + ' → ' + dollars(a[k]));
+            };
+            bits.push('Pot ' + dollars(b.pot) + (a.pot !== b.pot ? ' → ' + dollars(a.pot) : ''));
+            moved('Skins', 'skins');
+            // THE PER-SKIN VALUE, which is what the group actually counts on the 18th.
+            // Only when the bucket AND the unit count are known on both sides, and only
+            // when the number moves.
+            if (b.skins !== null && a.skins !== null && b.units > 0 && a.units > 0) {
+                const pb = Math.round(b.skins / b.units), pa = Math.round(a.skins / a.units);
+                if (pb !== pa) bits.push(dollars(pb) + ' → ' + dollars(pa) + ' a skin');
+            }
+            moved('Net Finish', 'net');
+            moved('KP', 'kp');
+            // A bucket that goes from funded to unfunded, or back, is the biggest change
+            // of all and has no before-and-after pair to print.
+            if (b.skins !== null && a.skins === null) bits.push('Skins UNFUNDED — KP and Net Finish take the whole pot');
+            if (b.skins === null && a.skins !== null) bits.push('Skins funded again at ' + dollars(a.skins));
+        }
         const c0 = counts(before), c1 = counts(after);
-        if (c0 && c1) ['A', 'B'].forEach(f => { if (c0[f] !== c1[f]) bits.push('Flight ' + f + ' ' + c0[f] + ' \u2192 ' + c1[f]); });
+        if (c0 && c1) ['A', 'B'].forEach(f => { if (c0[f] !== c1[f]) bits.push('Flight ' + f + ' ' + c0[f] + ' → ' + c1[f]); });
+        let line = bits.join(' · ');
+        // WHAT STILL CANNOT BE PREVIEWED, said narrowly. The buckets above are exact.
+        // WHO wins a skin, and who finishes where, depend on the scores and are
+        // recomputed on save - and only worth saying once scores exist.
         const scored = Object.keys(before.scores || {}).some(k => before.scores[k] > 0);
-        let line = bits.join(' \u00B7 ');
-        if (scored && bits.some(b => /\u2192/.test(b))) line += (line ? '. ' : '') + 'Scores are in \u2014 net finish and skins will recompute.';
+        const anyMove = bits.some(x => /→|UNFUNDED|funded again/.test(x));
+        if (scored && anyMove) line += (line ? '. ' : '') + 'Who wins each skin and who places recompute on save.';
         return line;
     }
     function psRefreshMoney() {

@@ -68,6 +68,14 @@ function draftFrom(data, changes, added) {
 const ENG = loadJsFile('pool-engine.js', ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
 const pool = d => { ENG.__d = J(d); return J(run(ENG, 'computeMoneyPool(__d, __d.courseData, __d.scores)')); };
 
+// RE-PINNED 2026-09-30 (v262): the money line now PRICES the change instead of
+// promising to. It used to read "Pot $460 -> $440 - Flight B 11 -> 10. Scores are in
+// - net finish and skins will recompute." - which named the two figures it was not
+// going to tell you. The skins bucket is the one a roster change actually moves
+// (KP and Net Finish are fixed dollar amounts; skins is the remainder), so it is on
+// the line now, with the per-skin value when it moves, and what is left of the
+// promise is narrowed to the thing that genuinely cannot be previewed: WHO wins.
+// Measured in edit_players_money_test.js.
 describe('THE NARROW WRITES: rename, handicap, flight, Out - only the changed keys', () => {
     const data = round();
     test('a rename ("Anthony." cleaned) writes players/1/name and nothing else', async () => {
@@ -154,14 +162,14 @@ describe('OUT: scores kept, out of the pot and every field payout, the KP warnin
         assert.equal(l.state, 'unresolved'); assert.equal(l.reason, 'out');
         assert.ok(!/KP/.test(r.refund.reasons.join(' ')), 'no KP refund');
     });
-    test('the money line: "Pot $460 → $440 · Flight B 11 → 10. Scores are in — net finish and skins will recompute."', () => {
+    test('the money line: "Pot $460 → $440 · Skins $220 → $200 · Flight B 11 → 10. Who wins each skin and who places recompute on save."', () => {
         const sb = page(data);
-        assert.equal(build(sb, draftFrom(data, [{ idx: 12, out: true }])).money, 'Pot $460 → $440 · Flight B 11 → 10. Scores are in — net finish and skins will recompute.');
-        assert.equal(build(sb, draftFrom(data, [{ idx: 12, flight: 'A' }])).money, 'Pot $460 · Flight A 12 → 13 · Flight B 11 → 10. Scores are in — net finish and skins will recompute.');
+        assert.equal(build(sb, draftFrom(data, [{ idx: 12, out: true }])).money, 'Pot $460 → $440 · Skins $220 → $200 · Flight B 11 → 10. Who wins each skin and who places recompute on save.');
+        assert.equal(build(sb, draftFrom(data, [{ idx: 12, flight: 'A' }])).money, 'Pot $460 · Flight A 12 → 13 · Flight B 11 → 10. Who wins each skin and who places recompute on save.');
         assert.equal(build(sb, draftFrom(data)).money, 'Pot $460', 'nothing moving: the pot alone, no note');
         const fresh = round({ thru: 0 }); delete fresh.scores.p900_h1;
         const sb2 = page(fresh);
-        assert.equal(build(sb2, draftFrom(fresh, [{ idx: 12, out: true }])).money, 'Pot $460 → $440 · Flight B 11 → 10', 'no score in yet: no recompute note');
+        assert.equal(build(sb2, draftFrom(fresh, [{ idx: 12, out: true }])).money, 'Pot $460 → $440 · Skins $220 → $200 · Flight B 11 → 10', 'no score in yet: no recompute note');
     });
 });
 
@@ -190,7 +198,7 @@ describe('ADD A GOLFER TO GROUP N', () => {
             team: '', squad: 'red', playingForMoney: true, flight: 'B' });
         assert.deepEqual(P.slice(9).map(p => p.id), data.players.slice(8).map(p => p.id), 'groups 3-6: the same ids in the same order');
         assert.deepEqual(u.updates.groupSizeOverrides, { 0: 4, 1: 5, 2: 4, 3: 4, 4: 4, 5: 3 });
-        assert.equal(u.money, 'Pot $460 → $480 · Flight B 11 → 12. Scores are in — net finish and skins will recompute.');
+        assert.equal(u.money, 'Pot $460 → $480 · Skins $220 → $240 · Flight B 11 → 12. Who wins each skin and who places recompute on save.');
     });
     test('two added to different groups, plus a rename in the same save: one whole write carrying all of it', () => {
         const sb = page(data);
@@ -492,7 +500,7 @@ describe('CHROME: real taps - open the sheet, mark Out, Save', () => {
     });
     test('the tap on Out: the row struck through, the money line moved', () => {
         assert.match(v('ROW'), /ps-is-out/);
-        assert.equal(v('M1'), 'Pot $460 → $440 · Flight A 12 → 11. Scores are in — net finish and skins will recompute.');   // Fay is in A
+        assert.equal(v('M1'), 'Pot $460 → $440 · Skins $220 → $200 · Flight A 12 → 11. Who wins each skin and who places recompute on save.');   // Fay is in A
     });
     test('the tap on Save wrote the two narrow keys and closed the sheet', () => {
         const w = JSON.parse(v('W'));

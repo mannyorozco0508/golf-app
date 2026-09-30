@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v102-mygroups. The tournament product cache
+// The consumer product cache is consumer-v103-rosterprice. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3676,7 +3676,33 @@
 // THE WRITE RULE FOR organizers/<uid>/groups IS NOT PUBLISHED YET. Until it is,
 // every save is refused by the server, nothing is written, and the organizer is told.
 // my_groups_test.js carries the exact rules block the next publish must add.
-const CACHE_VERSION = 'golfapp-v261-mygroups';
+// Moved to v262 SO A ROSTER CHANGE IS PRICED BEFORE IT IS SAVED.
+//
+// RECON FIRST, AND IT CHANGED THE JOB. Editing players from the scorecard already
+// existed - the Players sheet, v195, organizer-only behind canReachSetup, a row per
+// golfer with name / HCP / A-B / Out, "+ Add golfer" under each group, group moves,
+// a warnings line and a re-read-guarded single write. Building a second one would
+// have been two entry points for one job.
+//
+// WHAT WAS MISSING WAS THE MONEY. The line said "Pot $320 -> $360" and then "net
+// finish and skins will recompute" - a promise instead of a figure, on the one
+// screen where an organizer changes who pays what. MEASURED with pool-engine.js on
+// an eight-golfer $40 round, $100 KP, $70 Net Finish, remainder skins:
+//
+//     add a 9th golfer   pot $320 -> $360   SKINS $150 -> $190   $16.67 -> $21.11 a skin
+//     mark one Out       pot $320 -> $280   SKINS $150 -> $110   $16.67 -> $12.22 a skin
+//
+// The whole headcount change lands on SKINS, because KP and Net Finish are fixed
+// dollar amounts and skins is the remainder bucket. So the number the old line did
+// not print is the only one that moved, and the per-skin value is what a group
+// counts on the 18th. Both are on screen now, and only what MOVES is shown.
+//
+// AN INSTALLED DEVICE WITHOUT THIS BUMP keeps the promise instead of the figures.
+// No money moves either way: pool-engine.js is untouched and every number is
+// computeMoneyPool, run once on the round and once on the draft.
+//
+// GUARDED BY edit_players_money_test.js.
+const CACHE_VERSION = 'golfapp-v262-rosterprice';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
