@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v101-signinwhy. The tournament product cache
+// The consumer product cache is consumer-v102-kpprobe. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3650,7 +3650,27 @@
 // live app is unaffected either way; this only changes what a failure says.
 //
 // GUARDED BY preview_signin_domain_test.js.
-const CACHE_VERSION = 'golfapp-v260-signinwhy';
+// Moved to v261 FOR THE KP SCROLL PROBE - DIAGNOSTIC, BRANCH ONLY, NOT FOR MAIN.
+//
+// Manny: tapping "Change KP" jumps the page. Five measured arms in headless Chrome
+// say it does not move - a synthetic round, the REAL GFLBAM round with the second
+// snapshot the write causes, and three viewport-height arms emulating Chrome on
+// iPhone hiding and showing its toolbars. scrollY 1838 -> 1838 every time.
+//
+// And his screenshots say my fixture is not his page: he sees LIVE LEADERBOARD,
+// Skins Won and Live Matches & Presses at the TOP with Hole 4 below, and all three
+// of those mounts sit BELOW the KP box - so his page ended up further DOWN than the
+// box. In my runs the bet strip has no content and the top of the screen is a score
+// row. The difference is his round, not his browser.
+//
+// So this build reads the numbers on HIS phone: ?kpprobe=1 wraps the Change KP press
+// and prints four numbered samples - before, rendered, next frame, +800ms - as a
+// fixed readout. WITHOUT the flag it renders nothing and hooks nothing: changeKpAnswer
+// calls its body directly.
+//
+// THIS VERSION IS NOT MEANT FOR MAIN. It exists so one tap answers what no fixture
+// could guess.
+const CACHE_VERSION = 'golfapp-v261-kpprobe';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

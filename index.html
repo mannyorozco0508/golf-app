@@ -4588,6 +4588,77 @@ html {
     // three gates - a KP pot, a KP hole, a link that may write - stay in
     // buildPoolKpEntry. A missing mount (a page state with no hole card, or a
     // test that never registered it) is a no-op, not an error.
+    // ===== THE KP SCROLL PROBE (diagnostic, ?kpprobe=1 only) ==============
+    //
+    // WHY THIS EXISTS. Manny's report - tapping "Change KP" jumps the page - could
+    // not be reproduced in headless Chrome. Five measured arms said the page does not
+    // move: a synthetic round, the REAL GFLBAM round with the second snapshot the
+    // write causes, and three viewport-height arms emulating Chrome on iPhone hiding
+    // and showing its toolbars. In every one: scrollY 1838 -> 1838, the box at 279.
+    //
+    // AND THE SCREENSHOTS SAY MY FIXTURE IS NOT HIS PAGE. He sees LIVE LEADERBOARD,
+    // Skins Won and Live Matches & Presses at the top of the screen with Hole 4 below.
+    // All three of those mounts sit BELOW the KP box inside #hole-view-card - so his
+    // page ended up FURTHER DOWN than the box, not above it. In my runs the bet strip
+    // has no content at all and the top of the screen is a score row. The difference
+    // is his round, not his browser, and no fixture I write is going to guess it.
+    //
+    // So this reads the numbers on HIS phone. It is off unless the link carries
+    // ?kpprobe=1, it renders nothing and hooks nothing otherwise, and it is on a
+    // branch that is not merged.
+    function kpProbeOn() {
+        try { return urlParams.get('kpprobe') === '1'; } catch (e) { return false; }
+    }
+    function kpProbeSample(tag) {
+        const m = document.getElementById('kp-entry-mount');
+        const b = m ? m.querySelector('.kp-block') : null;
+        const r = b && b.getBoundingClientRect ? b.getBoundingClientRect() : null;
+        const doc = document.documentElement;
+        return {
+            tag: tag,
+            sy: Math.round(window.pageYOffset || 0),
+            ih: Math.round(window.innerHeight || 0),
+            vv: (window.visualViewport ? Math.round(window.visualViewport.height) : 0),
+            doc: Math.round(doc ? doc.scrollHeight : 0),
+            max: Math.round((doc ? doc.scrollHeight : 0) - (window.innerHeight || 0)),
+            box: r ? Math.round(r.top) : null,
+            bh: r ? Math.round(r.height) : null
+        };
+    }
+    let kpProbeRows = [];
+    function kpProbeRender() {
+        let el = document.getElementById('kp-probe');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'kp-probe';
+            el.setAttribute('style', 'position:fixed; left:6px; right:6px; bottom:6px; z-index:99999;'
+                + ' background:#111; color:#0f0; font:11px/1.35 ui-monospace,Menlo,monospace;'
+                + ' padding:8px; border-radius:8px; white-space:pre; overflow:auto; max-height:44vh;');
+            document.body.appendChild(el);
+        }
+        const line = r => (r.tag + '  sy=' + r.sy + ' ih=' + r.ih + ' vv=' + r.vv
+            + ' doc=' + r.doc + ' max=' + r.max + ' box=' + r.box + ' bh=' + r.bh);
+        el.textContent = 'KP SCROLL PROBE - read these back\n'
+            + kpProbeRows.map((r, i) => (i + 1) + ') ' + line(r)).join('\n')
+            + (kpProbeRows.length ? '' : '(press Change KP)');
+    }
+    // Four samples around the press: before it, immediately after the render, on the
+    // next frame (after layout and any scroll anchoring), and 800ms later (after the
+    // snapshot the write causes has come back and re-rendered everything).
+    function kpProbeAround(hole, run) {
+        if (!kpProbeOn()) return run();
+        kpProbeRows = [kpProbeSample('1 before ')];
+        run();
+        kpProbeRows.push(kpProbeSample('2 rendered'));
+        kpProbeRender();
+        try {
+            requestAnimationFrame(function () {
+                kpProbeRows.push(kpProbeSample('3 nextFrm')); kpProbeRender();
+            });
+        } catch (e) { /* no rAF: the other three still answer */ }
+        setTimeout(function () { kpProbeRows.push(kpProbeSample('4 +800ms')); kpProbeRender(); }, 800);
+    }
+
     function renderKpEntryMount() {
         const mount = document.getElementById('kp-entry-mount');
         if (!mount) return;
@@ -4959,9 +5030,13 @@ html {
         renderKpEntryMount();
     }
     function changeKpAnswer(hole) {
-        clearKpGroupAnswer(hole);
-        kpEntryOpenHole = hole;
-        renderKpEntryMount();
+        // The probe wraps the whole press - clear, open, render - so sample 1 is taken
+        // before anything happens. With ?kpprobe=1 absent this is a direct call.
+        kpProbeAround(hole, function () {
+            clearKpGroupAnswer(hole);
+            kpEntryOpenHole = hole;
+            renderKpEntryMount();
+        });
     }
 
     // ---- THE FORCED DECISION (Wave 23) ---------------------------------------
