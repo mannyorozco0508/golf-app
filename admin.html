@@ -7544,7 +7544,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                      + '</span>'
                      + '<span style="color:var(--text-muted); font-size:0.82rem;">' + n + '</span>'
                      + '<button class="btn-outline-sm" onclick="pickMyGroup(\'' + escapeHtml(e.id) + '\',' + (shared ? '\'' + escapeHtml(e.ownerUid) + '\'' : 'null') + ')">Start from this</button>'
-                     + '</div>';
+                     // THE TRASH IS THE OWNER'S ONLY, and that is the live rules
+                     // rather than a policy choice: every grant on this subtree is
+                     // auth.uid === the owner, so a co-organizer cannot delete the
+                     // group, cannot remove their own coOrganizers entry, and cannot
+                     // even remove their own sharedGroups pointer. Measured against
+                     // database.rules.stage2delete.json in my_groups_delete_test.js.
+                     // A "Leave group" button would be refused every time, so the
+                     // row says who can remove it instead of offering one.
+                     + (shared ? '' : '<button class="btn-outline-sm" aria-label="Delete group"'
+                         + ' onclick="deleteMyGroup(\'' + escapeHtml(e.id) + '\')">\uD83D\uDDD1</button>')
+                     + '</div>'
+                     + (shared ? '<p style="font-size:0.72rem; color:var(--text-muted); margin:-4px 0 6px 2px;">'
+                         + 'Only the organizer who shared this can remove it from the list.</p>' : '');
             });
         }
         html += '<div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">'
@@ -7840,6 +7852,52 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (g.coOrganizers) delete g.coOrganizers[key];
         renderMyGroupsBody();
         uiToast('Removed');
+    }
+
+    // ---- DELETE ONE GROUP FROM THE LIST (Wave 34b) --------------------------
+    //
+    // ONE CONFIRM, and it says the thing a golfer would be afraid of: the golfers go
+    // out of this SAVED LIST and nothing happens to a round. The sentence lives in
+    // my-groups.js so the test asserts the words rather than a paraphrase of them.
+    //
+    // OWNER ONLY, and that is the live ruleset, not a preference: every grant under
+    // organizers/$uid is auth.uid === the owner, so a co-organizer cannot delete the
+    // group NOR remove their own invite NOR their own sharedGroups pointer. The list
+    // therefore shows no trash on a shared row and says who can remove it.
+    //
+    // THE POINTERS GO FIRST, for the same reason the account delete does it that way:
+    // their paths are only knowable while the group is still there. If a pointer
+    // removal fails the group is LEFT ALONE, because a group that is gone with a live
+    // pointer still pointing at it is a row in somebody else's list that can never
+    // be opened or removed.
+    async function deleteMyGroup(id) {
+        const u = myGroupsUser();
+        const g = id && myGroupAt(id, null);
+        if (!u || !g) return;
+        if (!myGroupIsOwner(g, u.uid)) {
+            return uiRefuse('Only the organizer who shared this can remove it from the list.');
+        }
+        const name = (g.name || 'this group');
+        const ok = await uiConfirm({
+            title: myGroupDeleteConfirm(name),
+            body: 'It is only this saved list. Rounds you have already set up keep their own copy of the roster.',
+            confirmText: 'Delete ' + name,
+            cancelText: 'Keep it',
+            danger: true
+        });
+        if (!ok) return;
+        const plan = myGroupDeletePlan(u.uid, id, g);
+        try {
+            for (const path of plan.removals) await db.ref(path).remove();
+        } catch (e) {
+            return uiFail('Could not delete it: ' + (e && e.message ? e.message : 'permission denied'));
+        }
+        delete myGroupsState.groups[id];
+        // A group that was picked or used is no longer either of those.
+        if (myGroupsState.pickedId === id) { myGroupsState.pickedId = null; myGroupsState.pickedOwner = null; }
+        if (myGroupsState.usedId === id) { myGroupsState.usedId = null; myGroupsState.usedOwner = null; }
+        renderMyGroupsBody();
+        uiToast(name + ' deleted');
     }
 
     // Appends parsed players to whatever's already in the list — reuses the exact same

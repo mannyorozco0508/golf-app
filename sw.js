@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v109-deleterecord. The tournament product cache
+// The consumer product cache is consumer-v110-groupdelete. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3788,7 +3788,16 @@
 // detection: the same build is correct before and after the publish, and nothing
 // needs re-releasing when it lands. A device holding the earlier v267 from the branch
 // preview would keep the groups-only version.
-const CACHE_VERSION = 'golfapp-v268-deleterecord';
+// Moved to v269 FOR A TRASH ICON ON EVERY GROUP ROW. My Groups had no way to remove
+// a saved group at all - the only way out of a group typed in by mistake was to stop
+// using it. The owner now gets one confirm and the group goes with its co-organizer
+// invites. There is NO leave button for a co-organizer, and that is the live rules
+// rather than a choice: every grant under organizers/$uid is the owner, so a
+// co-organizer cannot delete the group, their own invite, or even their own
+// sharedGroups pointer - measured in my_groups_delete_test.js. A shared row says who
+// can remove it instead. An installed device would otherwise keep a list with no way
+// to prune it.
+const CACHE_VERSION = 'golfapp-v269-groupdelete';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
