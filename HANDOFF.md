@@ -3057,7 +3057,24 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
-## Where things stand, 2026-09-30
+## Where things stand, 2026-10-01
+
+**1.0.5 BUILD 1 IS UPLOADED AND RELEASED.** Manny archived from `main` at `416e7ae`
+and uploaded on 2026-10-01, and reports the version released. `MARKETING_VERSION`
+1.0.5 / `CURRENT_PROJECT_VERSION` 1 on both configurations. What is in it: Wave 33's
+one-tap sign-in with Apple and Google, and Wave 34 - sign out, delete account, the
+owner-only full delete under the published rules, the My Groups trash icon, and the
+incident fixes. The web bundle inside the binary is `golfapp-v271-signedinclosed`,
+regenerated from that tree before the archive.
+
+- **App Review 5.1.1(v) is answered by this build:** sign out and delete account are
+  both in the Account panel, signed-in only. If a reviewer asks where: Home ->
+  Account -> "This account".
+- **Status is as Manny reports it.** There is no App Store Connect API key on this
+  Mac - `altool` refuses without one - so nothing here read the release state back.
+  The archive and upload were his; this record is his report of them.
+- **The next build starts at 1.0.6 build 1**, or 1.0.5 build 2 if 1.0.5 is still open
+  when it is wanted.
 
 **INCIDENT, 2026-09-30: MANNY'S REAL ORGANIZER WAS DELETED DURING THE WAVE 34 TEST.**
 
