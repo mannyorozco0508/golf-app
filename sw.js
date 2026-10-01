@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v112-signedinclosed. The tournament product cache
+// The consumer product cache is consumer-v113-coachgate. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3816,7 +3816,18 @@
 // then deleted it. Signed in, the toggle is gone, the card is shut, and the handler
 // refuses on its own so a stale onclick or a cached shell cannot open it. Moving an
 // organizer to another device is: sign OUT here, sign in over there.
-const CACHE_VERSION = 'golfapp-v271-signedinclosed';
+// Moved to v272 SO THE SETUP COACH CANNOT HAND OVER A HOLLOW ROUND. "Help me set
+// this up" asks how many golfers and then used to hand over to Review & Save
+// whatever had been answered - Course "Not selected", Players "0 added", with the
+// Save button under it. Skipping the last step did the same. Now the handoff goes to
+// the first thing that is missing, on that field's own editor, with a line saying
+// why; Review names what is missing and gives a button per item that jumps to its
+// editor; Save refuses with the same sentence if it is reached another way; and Skip
+// is off the two required answers. All of it scoped to a ?coach=1 round, because
+// saveSettings deliberately allows a round with NO players - a host sets up a whole
+// trip of rounds in advance and fills the rosters in later. An installed device
+// would otherwise keep the version that walks to a blank Review.
+const CACHE_VERSION = 'golfapp-v272-coachgate';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3942,6 +3953,13 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './account-exit.js',
+    // setup-coach-gate.js: what the Setup Coach still needs before it hands over.
+    // Precached because the coach is the path a first-time host takes, and the one
+    // thing it must not do is hand over a round with no course and nobody on it.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './setup-coach-gate.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -

@@ -271,7 +271,18 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
         // asserts the coach block contains no goToWizardStep(<digits>) at all -
         // Ryder Cup's workflow has no money step, so a number walks a host into a
         // step their own format does not have.
-        assert.equal((ADMIN.match(/goToWizardStep\(wizardStepNumber\('review'\)\)/g) || []).length, 3);
+        // RE-PINNED 2026-10-01 (UI Wave 35, was 3): coachFinish no longer jumps to
+        // Review unconditionally. It asks the coach gate first and goes to the step
+        // of the first MISSING thing - the course, the tee, the scoring or the
+        // players - because it used to hand a first-time host a Review that read
+        // "Course: Not selected". So its jump now reads
+        //   goToWizardStep(first ? Number(first.step) : wizardStepNumber('review'))
+        // and the literal pair appears twice rather than three times. The teeth are
+        // the assertion below and setup_coach_gate_test.js, which holds the target
+        // against the gate rather than against a number.
+        assert.equal((ADMIN.match(/goToWizardStep\(wizardStepNumber\('review'\)\)/g) || []).length, 2);
+        assert.match(ADMIN, /goToWizardStep\(first \? Number\(first\.step\) : wizardStepNumber\('review'\)\)/,
+            'the coach jump must still be semantic, and now conditional on the gate');
         assert.ok(!ADMIN.includes('goToWizardStep(7)'), 'no hardcoded Review jump remains');
     });
 });

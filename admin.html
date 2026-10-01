@@ -56,6 +56,7 @@
     <script src="email-link-auth.js"></script>
     <script src="oauth-signin.js"></script>
     <script src="account-exit.js"></script>
+    <script src="setup-coach-gate.js"></script>
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="action-model.js"></script>
@@ -1294,6 +1295,12 @@ html {
 
     
     <div class="wizard-progress" id="wizard-progress"></div>
+    <!-- WHAT THE COACH IS STILL WAITING FOR. Shown when a coach-started round lands
+         on an editor because something required is unset, so the host knows WHY they
+         are on this screen rather than on the Review they tapped towards. A toast
+         would float away before they had read it. -->
+    <p id="coach-gate-note" role="status" style="display:none; max-width:var(--widget-max); margin:0 auto 10px auto;
+       font-size:0.82rem; font-weight:bold; color:var(--brand-green); text-align:center;"></p>
 
     <div class="wizard-step" id="wizard-step-1" data-step="1">
         <div class="wizard-step-title">⛳ Course · <span class="wiz-step-n" id="wiz-n-course">Step 1</span></div>
@@ -2174,6 +2181,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-step-title">✅ Review &amp; Save · <span class="wiz-step-n" id="wiz-n-review">Step 7</span></div>
         <div class="wizard-step-sub">Quick check before you start the round — tap any step above to jump back and change something.</div>
         <div id="wizard-review-summary"></div>
+        <!-- THE COACH GATE (UI Wave 35). Only ever filled on a round the Setup Coach
+             started: it is the one path where the host has just been asked how many
+             golfers are playing, so "0 added" is an unfinished answer rather than the
+             deliberate set-up-the-trip-now-fill-the-roster-later workflow that
+             saveSettings documents. Each missing thing gets a button that goes to its
+             real editor, not back to the top of the wizard. -->
+        <div id="coach-review-gate" style="display:none;"></div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-7" onclick="wizardBack(7)">◀ Back</button>
         </div>
@@ -3180,6 +3194,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // see wizardSideMatchLine above - never from the form.
         const sideMatchLine = wizardSideMatchLine();
         if (sideMatchLine) rows.push(['Side Match', sideMatchLine, 6, SEC_ACTION]);
+
+        // THE GATE IS PART OF REVIEW, drawn from the same read. Called after the rows
+        // so a host sees what the round IS and then what it still needs.
+        if (typeof renderCoachReviewGate === 'function') {
+            try { renderCoachReviewGate(); } catch (e) { /* never block the summary */ }
+        }
+        if (typeof syncCoachGateNote === 'function' && typeof coachGateUnmet === 'function') {
+            try {
+                const left = coachGateUnmet();
+                syncCoachGateNote(left.length ? left[0] : null);
+            } catch (e) { /* the note is never worth a broken Review */ }
+        }
 
         // Grouped so SCORING, PLAYERS and GAMES & MONEY read as separate answers.
         const ORDER = [SEC_SCORING, SEC_PLAYERS, SEC_ACTION];
@@ -4781,6 +4807,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (q) q.textContent = def.q;
         if (sub) sub.textContent = def.sub || '';
         if (back) back.textContent = coachStep === 0 ? '← Home' : '← Back';
+        // SKIP IS FOR THE OPTIONAL EXTRAS ONLY. It used to sit on every step, and on
+        // a required one it walked straight to the end - which is how a Review with
+        // no course and no players got reached. Flights, money and handicaps keep it;
+        // how many golfers, and what is being played, do not.
+        const skipBtn = document.getElementById('coach-skip');
+        if (skipBtn) {
+            const optional = !(window.setupCoachGate
+                && window.setupCoachGate.coachStepIsRequired(def.key));
+            const want = optional ? '' : 'none';
+            if (skipBtn.style.display !== want) skipBtn.style.display = want;
+        }
         if (foot) {
             foot.textContent = 'Nothing is saved until you press Save on the Review page. '
                 + 'Skip anything you would rather set yourself.';
@@ -4828,6 +4865,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // unset key is simply not applied, so the wizard keeps its own default.
     function coachSkip() {
         const def = coachStepDef(coachStep);
+        // Hiding the button is not the rule. A required step cannot be skipped from a
+        // stale onclick, a cached shell or the console either.
+        if (def && window.setupCoachGate && window.setupCoachGate.coachStepIsRequired(def.key)) return;
         if (def) delete coachAnswers[def.key];
         coachNext();
     }
@@ -4895,6 +4935,106 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (typeof mpRecalc === 'function') mpRecalc();
     }
 
+    // ---- THE GATE (UI Wave 35) ---------------------------------------------
+    //
+    // WHAT IT IS FOR. The coach's last step is a handoff, and it used to hand over to
+    // REVIEW whatever had been answered - so Review could read "Course: Not selected"
+    // and "Players: 0 added" with Save & Start Round under it. Now the handoff goes
+    // to the first thing that is actually missing, on that field's own editor, and
+    // Review refuses to save until there is nothing missing.
+    //
+    // SCOPED TO A COACH ROUND, and that scoping is load-bearing rather than caution.
+    // saveSettings deliberately allows a round with NO players - a host sets up a
+    // whole trip's rounds in advance and fills the rosters in later, and its comment
+    // says so. That workflow must not be broken by a gate meant for a host who was
+    // just asked how many golfers are playing and answered. coachGateActive() is the
+    // whole of that scoping: the ?coach=1 arrival flag, nothing else.
+    function coachGateActive() {
+        return !!(coachRequested && window.setupCoachGate);
+    }
+
+    // THE DOM IS THE STATE, as everywhere else in this wizard. Read, never cached.
+    function coachGateState() {
+        const course = document.getElementById('course-search-input');
+        const fmt = document.getElementById('game-format-select');
+        const count = document.getElementById('player-count');
+        // The tee only matters when the course HAS rated tees (the panel is shown)
+        // and the handicaps are indexes that need converting. A course with no rated
+        // tees asks for nothing, which is why teeRequired is read and not assumed.
+        const panel = document.getElementById('tee-rating-panel');
+        const basis = document.getElementById('handicap-basis-select');
+        const panelShown = !!(panel && panel.style.display !== 'none');
+        const needsIndex = !!(basis && basis.value === 'ghin-index');
+        let teeComplete = false;
+        try {
+            const tee = (typeof readTeeRatingFromDom === 'function') ? readTeeRatingFromDom() : null;
+            const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : null;
+            teeComplete = !!(status && status.complete);
+        } catch (e) { teeComplete = false; }
+        return {
+            courseName: course ? String(course.value || '').trim() : '',
+            formatValue: fmt ? String(fmt.value || '') : '',
+            teeRequired: panelShown && needsIndex,
+            teeComplete: teeComplete,
+            playerCount: count ? (parseInt(String(count.textContent || '0'), 10) || 0) : 0,
+            expected: window.setupCoachGate.coachExpectedGolfers(coachAnswers.size)
+        };
+    }
+    function coachGateSteps() {
+        return {
+            course: (typeof wizardStepNumber === 'function') ? wizardStepNumber('course') : 1,
+            format: (typeof wizardStepNumber === 'function') ? wizardStepNumber('format') : 3,
+            players: (typeof wizardStepNumber === 'function') ? wizardStepNumber('players') : 5
+        };
+    }
+    function coachGateUnmet() {
+        if (!coachGateActive()) return [];
+        return window.setupCoachGate.coachUnmet(coachGateState(), coachGateSteps());
+    }
+
+    // The note under the progress bar: why the host is on this screen. Cleared the
+    // moment nothing is missing, so it cannot nag after the work is done.
+    function syncCoachGateNote(first) {
+        const el = document.getElementById('coach-gate-note');
+        if (!el) return;
+        const text = first ? (first.cta + ' \u2014 ' + first.why) : '';
+        setTextOnce(el, text);
+        const want = text ? '' : 'none';
+        if (el.style.display !== want) el.style.display = want;
+    }
+
+    // Review's own block, with one button per missing thing. Each goes to the field's
+    // REAL editor - the course step for a course, the players step for players - and
+    // never to the top of the wizard.
+    function renderCoachReviewGate() {
+        const box = document.getElementById('coach-review-gate');
+        if (!box) return;
+        const unmet = coachGateUnmet();
+        const save = document.getElementById('main-save-btn');
+        if (!unmet.length) {
+            if (box.style.display !== 'none') box.style.display = 'none';
+            box.innerHTML = '';
+            if (save && save.disabled && !save.dataset.coachBlocked) { /* a real save is in flight */ }
+            if (save && save.dataset.coachBlocked === '1') {
+                save.disabled = false;
+                delete save.dataset.coachBlocked;
+            }
+            return;
+        }
+        const line = window.setupCoachGate.coachBlockLine(coachGateState(), coachGateSteps());
+        box.innerHTML = '<div style="border:1px solid var(--brand-green); border-radius:8px; padding:10px 12px;">'
+            + '<p style="margin:0 0 8px 0; font-size:0.85rem; font-weight:bold; color:var(--brand-green);">'
+            + escapeHtml(line) + '</p>'
+            + unmet.map(r => '<button type="button" class="btn-outline" style="width:100%; margin-top:6px;"'
+                + ' onclick="goToWizardStep(' + Number(r.step) + ')">' + escapeHtml(r.cta) + '</button>').join('')
+            + '</div>';
+        if (box.style.display !== '') box.style.display = '';
+        // THE BUTTON IS DISABLED, AND MARKED AS DISABLED BY THIS GATE. saveSettings
+        // hands the button back in exactly one place and nothing else may fight it
+        // for ownership, so the flag says which of us turned it off.
+        if (save) { save.disabled = true; save.dataset.coachBlocked = '1'; }
+    }
+
     function coachFinish() {
         try {
             coachApply();
@@ -4904,11 +5044,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (c) c.style.display = 'none';
             const a = document.getElementById('admin-screen');
             if (a) a.style.display = 'block';
-            // ON REVIEW, BY NAME. Never a literal 7: the workflow is format-first and
-            // steps are skippable - Ryder Cup has no money step at all - so a number
-            // would walk the host into a step their own format does not have.
+            // THE HANDOFF GOES TO THE FIRST THING THAT IS MISSING, not to Review.
+            // ON REVIEW, BY NAME, when nothing is - never a literal 7: the workflow is
+            // format-first and steps are skippable, so a number would walk the host
+            // into a step their own format does not have.
             if (typeof goToWizardStep === 'function' && typeof wizardStepNumber === 'function') {
-                goToWizardStep(wizardStepNumber('review'));
+                const unmet = coachGateUnmet();
+                const first = unmet.length ? unmet[0] : null;
+                syncCoachGateNote(first);
+                goToWizardStep(first ? Number(first.step) : wizardStepNumber('review'));
             }
         }
     }
@@ -9387,6 +9531,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         try {
             if (saveBtn) { saveBtn.innerText = "\u23F3 Saving..."; saveBtn.disabled = true; }
 
+            // THE COACH GATE, AND IT IS NOT DECORATION ON TOP OF THE DISABLED BUTTON.
+            // Hiding or disabling a control is not a refusal: goToWizardStep resets
+            // the label on every step change, a cached shell can hold older markup,
+            // and onclick="saveSettings()" is reachable from the console. So the
+            // refusal lives here too, named, and it only ever fires on a round the
+            // coach started - saveSettings deliberately allows a round with no
+            // players for the set-up-now-fill-the-roster-later workflow.
+            if (typeof coachGateUnmet === 'function') {
+                const unmet = coachGateUnmet();
+                if (unmet.length) {
+                    uiRefuse('\u26A0\uFE0F ' + window.setupCoachGate.coachBlockLine(
+                        coachGateState(), coachGateSteps()));
+                    if (typeof goToWizardStep === 'function') goToWizardStep(Number(unmet[0].step));
+                    if (typeof syncCoachGateNote === 'function') syncCoachGateNote(unmet[0]);
+                    return;
+                }
+            }
+
             let courseKey = courseHiddenSelect.value;
             let selectedCourseName = courseSearchInput.value.trim();
 
@@ -9997,6 +10159,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // AFTER goToWizardStep above, so the wizard is in a valid state underneath -
     // coachFinish() only has to reveal it and jump to Review.
     if (urlParams.get('coach') === '1') {
+        // THE FLAG IS SET ON ARRIVAL TOO, and this line is why the gate is not
+        // decoration. coachRequested was only ever set by startSetupCoach() on the
+        // LOBBY, and createRoom then navigates - a full page load, where it is false
+        // again. So every gate scoped to "is this a coach round" was dead on the only
+        // page that matters, and the first run of the guard caught exactly that: the
+        // handoff still went to Review. ?coach=1 IS the fact that this round came
+        // from the coach; it is the only thing that survives the navigation.
+        coachRequested = true;
         showCoachScreen();
     }
     markCoachFirstRun();

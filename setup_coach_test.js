@@ -238,7 +238,12 @@ describe('2. THE COACH DRIVES THE WIZARD, AND INVENTS NOTHING', () => {
         });
     });
 
-    test('Skip and Back exist on every step', () => {
+    // RENAMED IN WAVE 35. This said "on every step", which stopped being true when
+    // Skip came off the two required answers - how many golfers, and what is being
+    // played - because a Skip there walked straight to a blank Review. The
+    // assertions below were always about the functions EXISTING, which is still the
+    // claim; setup_coach_gate_test.js owns which steps show the button.
+    test('Skip, Back and Next all exist as functions', () => {
         const coach = coachBlock();
         assert.match(coach, /function coachBack\s*\(/, 'no Back');
         assert.match(coach, /function coachSkip\s*\(/, 'no Skip');

@@ -139,6 +139,13 @@ const CONSUMER_SHELL = [
     // precached: a golfer who wants out should not be told to find signal first.
     // NO APOSTROPHES IN THIS BLOCK.
     'account-exit.js',
+    // setup-coach-gate.js (v272): what the Setup Coach still needs before it may hand
+    // over - the course, the tee when the handicaps need one, the scoring, and enough
+    // golfers for the answer the host gave on step 1. admin.html calls it through a
+    // typeof guard, so a bundle without it would put the coach back to landing on
+    // Review with Course Not selected, which is the defect this wave fixed. It ships.
+    // NO APOSTROPHES IN THIS BLOCK.
+    'setup-coach-gate.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in
