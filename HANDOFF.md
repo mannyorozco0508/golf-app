@@ -3059,6 +3059,30 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Where things stand, 2026-10-02
 
+**A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
+First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
+
+- **What happened.** The push landed, the assets uploaded, and then the deployment
+  failed with **"Failed to publish your Function. Unknown internal error"** at 2:00 PM
+  PT. Production kept serving the PREVIOUS shell - `golfapp-v271-signedinclosed` -
+  for about forty minutes. Manny retried the deployment from the Pages dashboard at
+  2:38 PM PT and it succeeded: deployment `0c4d176e-0f1e-43a0-a556-ef56fab3496a`.
+- **THE FUNCTION IS THE COURSE PROXY**, `functions/api/` - the "Search online" row's
+  `/api/course-search` and `/api/course/<id>`. So an asset-only wave still depends on
+  that publish step succeeding, and a failure there takes the whole deployment with
+  it: no new HTML, no new `sw.js`, nothing. The proxy answers again since the retry
+  (`/api/course-search?q=pebble` -> 200 with real courses).
+- **HOW TO TELL IT APART from a slow build, measured that day rather than guessed:**
+  the BRANCH PREVIEW for the same commit was serving the new shell happily, which
+  rules out Pages being broken; production's `index.html` had none of the new markup;
+  and production's `/card-is-in.js` returned **200 with the HTML fallback** rather
+  than the file - a 200 that is `index.html` is not evidence the file is there, and
+  checking the first bytes is what tells the difference.
+- **WHAT TO DO.** If production lags a merge by more than a few minutes: Cloudflare
+  Pages -> golf-app-5a5 -> **Deployments**, newest first. A Failed production
+  deployment retries from that page and nothing in the repo needs changing. Do not
+  start debugging the wave; verify the branch preview first.
+
 **WAVE 36 IS ON MAIN: FINISH ROUND IS ONE POPUP.** Merged at `10ee062`
 (`golfapp-v274-finishpopup`, consumer `v114`), fast-forward. Manny tested it on his
 iPhone through Xcode: GFLBAM group 3 -> Finish Round -> the popup with that group's
@@ -3093,6 +3117,10 @@ scores -> See Results -> the Results tab. Approved.
   "Not final yet" with who is out, or "Final" - and passes `hasGroupLock: false` on
   purpose, so a `?group=` on the Receipt's URL can never turn it into a claim about
   one foursome.
+- **Production confirmed 2026-10-02 after the retry above:**
+  `golf-app-5a5.pages.dev/sw.js` serves `golfapp-v274-finishpopup`, `card-is-in.js`
+  is real JavaScript (12,418 bytes, not the HTML fallback), and the served
+  `index.html` sha matches the repo byte for byte with the popup markup in it.
 - `card_is_in_test.js` owns it: 40 tests, of which 1 was green at `c086dca` before
   the wave (the organizer-tools test, which reads the untouched recap). The figure is
   in the guard's own header in the checked form; written shorthand here so this file
