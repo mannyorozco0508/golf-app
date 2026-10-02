@@ -778,18 +778,41 @@
            wants at this moment is a single obvious next step. 48px of button, over
            the 44px minimum, measured the same way every other control on this page
            is. No colour that means money: this card is an instruction, not a total. */
-        .cii-card { border: 2px solid var(--brand-green); border-radius: 10px;
-            padding: 14px; margin: 0 0 12px 0; background: var(--nassau-box-bg); text-align: center; }
-        .cii-card.cii-waiting { border-color: var(--border-mid); background: transparent; }
-        .cii-head { font-size: 1.05rem; font-weight: bold; color: var(--brand-green); }
-        .cii-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; line-height: 1.35; }
-        .cii-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; line-height: 1.35; }
+        /* ONE LINE (Wave 36 revision). The full card was too much on a screen whose
+           job is score entry; the popup carries the scores now. A row, not a panel:
+           text that wraps, and a button that does not shrink below a thumb. */
+        .cii-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            border: 1px solid var(--brand-green); border-radius: 8px;
+            padding: 8px 10px; margin: 0 0 10px 0; background: var(--nassau-box-bg); }
+        .cii-line.cii-waiting { border-color: var(--border-mid); background: transparent; }
+        .cii-line-text { flex: 1 1 160px; font-size: 0.85rem; font-weight: bold;
+            color: var(--brand-green); line-height: 1.3; }
+        .cii-line.cii-waiting .cii-line-text { font-weight: normal; color: var(--text-muted); }
+        .cii-line-btn { flex: 0 0 auto; min-height: 40px; padding: 0 14px; border: 0;
+            border-radius: 6px; background: var(--brand-green); color: #ffffff;
+            font-size: 0.85rem; font-weight: bold; cursor: pointer; }
         .cii-cta { display: block; width: 100%; box-sizing: border-box; min-height: 48px;
             margin-top: 12px; border: 0; border-radius: 8px; background: var(--brand-green);
             color: #ffffff; font-size: 1rem; font-weight: bold; cursor: pointer; }
         .cii-fix { display: block; width: 100%; box-sizing: border-box; min-height: 44px;
             margin-top: 8px; border: 0; background: transparent; color: var(--text-muted);
             font-size: 0.85rem; text-decoration: underline; cursor: pointer; }
+        /* THE FINISH POPUP (Wave 36 revision). A header, the group's rows, one
+           button. Nothing else - the Results tab is one tap away and owns the
+           detail. */
+        .cip-content { max-width: 420px; }
+        .cip-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 2px;
+            border-bottom: 1px solid var(--border-faint); }
+        .cip-name { flex: 1 1 auto; font-weight: bold; }
+        .cip-num { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+        .cip-topar { width: 40px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .cip-head-row { display: flex; gap: 8px; padding: 0 2px 4px 2px; font-size: 0.72rem;
+            text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+        .cip-head-row .cip-name { font-weight: normal; }
+        .cip-wait { font-size: 0.8rem; color: var(--text-muted); margin: 10px 0 0 0; line-height: 1.35; }
+        .cip-tools { display: block; width: 100%; box-sizing: border-box; min-height: 40px;
+            margin-top: 10px; border: 0; background: transparent; color: var(--text-muted);
+            font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
         .finish-round-nav-btn {
             flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; border: none;
             background: linear-gradient(135deg, var(--brand-green), var(--accent-teal)); color: #fff; cursor: pointer;
@@ -1761,6 +1784,31 @@ html {
 
 <!-- THE FORCED KP DECISION (Wave 23). Body built by renderKpForcedModal(). -->
 <div id="kp-force-overlay"><div class="kpf-card" id="kp-force-body"></div></div>
+
+<!-- FINISH ROUND IS THIS POPUP NOW (Wave 36 revision). Manny tested the first
+     version on a device and it was too much: a full card above the hole view, and a
+     recap modal carrying every game, every press, a PDF and a row of jump links at
+     the one moment a group wants a single answer. So this popup holds ONLY the
+     group's own card - name, gross, net, to par - and one button to the Results tab,
+     which is where all of that detail already lives.
+     THE ORGANIZER'S TOOLS ARE NOT GONE. Scores Look Right, the KP no-winner and KP
+     cancel answers and the per-golfer correction diff all still live in
+     #finish-round-modal-overlay below, reached from the "Organizer tools" link in
+     here, which is shown only when canReachSetup() is true. A group scorekeeper
+     never sees it. -->
+<div class="modal-overlay" id="card-in-popup">
+    <div class="modal-content cip-content">
+        <div class="modal-header">
+            <span id="cip-title">✅ Your card is in</span>
+            <button class="close-modal" onclick="closeCardInPopup()" aria-label="Close">&times;</button>
+        </div>
+        <div id="cip-rows"></div>
+        <p id="cip-wait" class="cip-wait" style="display:none;"></p>
+        <button type="button" id="cip-cta" class="cii-cta" onclick="cardInPopupResults()">See Results</button>
+        <button type="button" class="cii-fix" onclick="closeCardInPopup()">Fix a score</button>
+        <button type="button" id="cip-tools" class="cip-tools" style="display:none;" onclick="cardInPopupTools()">Organizer tools</button>
+    </div>
+</div>
 
 <div class="modal-overlay" id="finish-round-modal-overlay">
     <div class="modal-content finish-round-modal-content">
@@ -2814,7 +2862,7 @@ html {
         // card meant one picked-up ball on hole 12 left a group standing on 18 with a
         // Next button that went nowhere - at the exact moment they most wanted an answer.
         const nextBtnHtml = isLastHole
-            ? `<button class="finish-round-nav-btn" onmousedown="event.preventDefault()" onclick="openFinishRoundModal()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
+            ? `<button class="finish-round-nav-btn" onmousedown="event.preventDefault()" onclick="openCardInPopup()">${roundComplete ? '🏁 Finish Round' : '🏁 Finish — Check Scores'}</button>`
             : `<button class="hole-view-nav-btn" onmousedown="event.preventDefault()" onclick="goToAdjacentHole(1)">Next ▶</button>`;
 
         // onmousedown preventDefault on Prev, Next, the position button and (Wave A)
@@ -3218,6 +3266,14 @@ html {
         if (typeof setViewMode === 'function') { try { setViewMode('hole'); } catch (e) {} }
     }
 
+    // ONE LINE, NOT A CARD (Wave 36 revision, and this is the "your call" the brief
+    // left open). Manny tested the full card on a device and it was too much on a
+    // screen whose job is score entry. DROPPED ALTOGETHER was the other option and
+    // this is why it was not taken: the popup only opens on the tap or on the moment
+    // the last score posts, so dismissing it would leave no way back, and a WATCHER
+    // never gets the popup at all - this line is the only thing that ever tells them
+    // who is still out. So: one line of text, one small button, no sub-heading and no
+    // second copy of the waiting names.
     function renderCardIsIn() {
         const el = document.getElementById('card-is-in');
         if (!el) return;
@@ -3231,19 +3287,135 @@ html {
         if (!st.show) {
             if (el.style.display !== 'none') el.style.display = 'none';
             el.innerHTML = '';
+            cardInPopupMaybeOpen(null);
             return;
         }
         const esc = (typeof escapeHtml === 'function') ? escapeHtml : (x => String(x));
-        el.innerHTML = '<div class="cii-card cii-' + esc(st.kind) + '">'
-            + '<div class="cii-head">' + esc(st.head) + '</div>'
-            + (st.sub ? '<div class="cii-sub">' + esc(st.sub) + '</div>' : '')
-            + (st.note ? '<div class="cii-note">' + esc(st.note) + '</div>' : '')
-            + '<button type="button" class="cii-cta" onclick="cardIsInGo(\'' + esc(st.ctaKind) + '\')">'
+        const line = window.cardIsIn.cardIsInOneLine(st);
+        el.innerHTML = '<div class="cii-line cii-' + esc(st.kind) + '">'
+            + '<span class="cii-line-text">' + esc(line) + '</span>'
+            + '<button type="button" class="cii-line-btn" onclick="cardIsInGo(\'' + esc(st.ctaKind) + '\')">'
             + esc(st.cta) + '</button>'
-            + (st.fix ? '<button type="button" class="cii-fix" onclick="cardIsInFix()">'
-                + esc(window.cardIsIn.WORDS.fix) + '</button>' : '')
             + '</div>';
         if (el.style.display !== 'block') el.style.display = 'block';
+        // AND THE POPUP OPENS ITSELF, ONCE, the moment this group's card completes.
+        cardInPopupMaybeOpen(st);
+    }
+
+    // ---- THE FINISH POPUP (Wave 36 revision) --------------------------------
+    //
+    // ONLY the group's own card and one button. The rows are built by
+    // computeNetToParStandings in money-engine.js - the same builder the live board
+    // and every other surface uses - so there is no second opinion about anybody's
+    // net, and nothing in this block adds, subtracts or allocates anything.
+    //
+    // ONE LATCH, PER ROUND AND PER GROUP. The popup opens itself when the last score
+    // posts, and a snapshot arrives on every write in the round: without the latch it
+    // would reopen over the top of a golfer trying to fix a number. Closing it is
+    // remembered for the session, so it never fights the person using it.
+    // THE TRANSITION, NOT THE STATE. This opens on the MOMENT the last score posts -
+    // false becoming true - and never on an arrival at a round that was already
+    // complete. The first version opened on the state, and two things went wrong at
+    // once: a golfer coming back to a finished round got a popup over the page they
+    // asked for, and the 1-18 picker could not be tapped at all underneath it, which
+    // is how the KP suite caught it.
+    //
+    // st.fix IS THE PREDICATE, and it is not an abbreviation for st.kind: true
+    // exactly when THIS session is keeping a card and that card is complete - 'mine'
+    // while the round runs, 'final' once it is over. A spectator never has it true.
+    let cipWasIn = {};
+    function cardInPopupKey() {
+        return String(currentMode || '') + '/' + String(hasGroupLock ? lockedGroup : 'all');
+    }
+    function cardInPopupMaybeOpen(st) {
+        const key = cardInPopupKey();
+        const isIn = !!(st && st.fix);
+        const seen = Object.prototype.hasOwnProperty.call(cipWasIn, key);
+        const was = seen ? cipWasIn[key] : null;
+        cipWasIn[key] = isIn;
+        // The first thing this session ever saw about this card is not a transition.
+        if (!seen) return;
+        if (isIn && was === false) openCardInPopup();
+    }
+
+    function cardInPopupRows() {
+        const data = currentData || {};
+        const players = window.cardIsIn.groupMembers(
+            data.players || [], cardIsInInput().groupOf, lockedGroup, hasGroupLock);
+        if (typeof computeNetToParStandings !== 'function' || !players.length) return '';
+        const rows = computeNetToParStandings(players, data.courseData || [], data.scores || {},
+            { basis: 'net' });
+        const esc = (typeof escapeHtml === 'function') ? escapeHtml : (x => String(x));
+        const par = (typeof formatToPar === 'function') ? formatToPar : (v => String(v));
+        return '<div class="cip-head-row"><span class="cip-name">Golfer</span>'
+            + '<span class="cip-num">Gross</span><span class="cip-num">Net</span>'
+            + '<span class="cip-topar">+/-</span></div>'
+            + rows.map(r => '<div class="cip-row">'
+                + '<span class="cip-name">' + esc(r.name || '') + '</span>'
+                + '<span class="cip-num">' + (r.started ? r.gross : '\u2014') + '</span>'
+                + '<span class="cip-num">' + (r.started ? r.net : '\u2014') + '</span>'
+                + '<span class="cip-topar">' + (r.started ? esc(par(r.toPar)) : '') + '</span>'
+                + '</div>').join('');
+    }
+
+    function openCardInPopup() {
+        // THE SAME PREAMBLE openFinishRoundModal HAS, and leaving it out was a real
+        // defect for as long as it took the suite to tell me. Two things:
+        //
+        //   1. commitPendingScore(). A golfer types a score, does not blur the box
+        //      and taps Finish. Without this the popup reads the round BEFORE that
+        //      number is saved and shows a card missing the score they just entered -
+        //      which is exactly the Wave A defect, reintroduced one wave later.
+        //   2. kpGateBefore. On the last hole this button REPLACES Next, so when 18
+        //      is a KP hole this is the only way off it and has to be gated like one.
+        //      The commit comes first: the eighteenth score is what completes the
+        //      hole the gate is about to ask about.
+        if (typeof commitPendingScore === 'function') commitPendingScore();
+        if (typeof kpGateBefore === 'function' && kpGateBefore(currentViewedHole, openCardInPopup)) return;
+        const ov = document.getElementById('card-in-popup');
+        if (!ov || !window.cardIsIn) return;
+        let st = null;
+        try { st = window.cardIsIn.cardIsInState(cardIsInInput()); } catch (e) { st = null; }
+        const title = document.getElementById('cip-title');
+        if (title) {
+            title.textContent = (st && st.kind === 'final')
+                ? window.cardIsIn.WORDS.finalHead
+                : (st && st.kind === 'mine' ? window.cardIsIn.WORDS.mine.replace(/\.$/, '')
+                                            : window.cardIsIn.WORDS.waitHead);
+        }
+        const rows = document.getElementById('cip-rows');
+        if (rows) rows.innerHTML = cardInPopupRows();
+        const wait = document.getElementById('cip-wait');
+        if (wait) {
+            const line = (st && st.waiting && st.waiting.length)
+                ? window.cardIsIn.waitingShort(st.waiting) : '';
+            wait.textContent = line;
+            wait.style.display = line ? 'block' : 'none';
+        }
+        // ORGANIZER ONLY, and by the same door every other organizer control on this
+        // page uses. A group scorekeeper never sees this link.
+        const tools = document.getElementById('cip-tools');
+        if (tools) tools.style.display = (typeof canReachSetup === 'function' && canReachSetup()) ? 'block' : 'none';
+        ov.style.display = 'flex';
+    }
+    function closeCardInPopup() {
+        const ov = document.getElementById('card-in-popup');
+        if (ov) ov.style.display = 'none';
+    }
+    // THE RESULTS TAB, which is settlement.html for this round and this group - not
+    // the old recap modal, and not a second results screen.
+    function cardInPopupResults() {
+        closeCardInPopup();
+        const g = urlParams.get('group');
+        window.location.href = 'settlement.html?game=' + currentMode + (g ? '&group=' + g : '');
+    }
+    // EVERY ORGANIZER TOOL THE OLD MODAL HELD IS STILL IN THE OLD MODAL: Scores Look
+    // Right (frShowResults(true)), the KP no-winner and KP cancel answers
+    // (#fr-kp-block) and the per-golfer correction diff (frOpenPlayer ->
+    // #fr-detail-impact). This link is how the organizer gets there.
+    function cardInPopupTools() {
+        closeCardInPopup();
+        if (typeof openFinishRoundModal === 'function') openFinishRoundModal();
     }
 
     function liveStandings(scope) {
@@ -7772,6 +7944,18 @@ html {
     // Review first, exactly as the on-screen "‹ Back to Review" does; pwa-boot.js
     // walks this before its generic modal close, so the NEXT press closes the
     // modal. Only the Finish Round modal has sub-states; the others close outright.
+    // HARDWARE BACK CLOSES THE POPUP, before the recap's own handler gets a look.
+    // Higher priority because it is the one in front: on Android the back button
+    // must dismiss what is on screen, not what is behind it.
+    if (window.GolfBack) window.GolfBack.register({
+        name: 'card-in-popup', priority: 2,
+        isOpen: function () {
+            const ov = document.getElementById('card-in-popup');
+            return !!ov && ov.style.display === 'flex';
+        },
+        close: closeCardInPopup
+    });
+
     if (window.GolfBack) window.GolfBack.register({
         name: 'finish-round-review', priority: 1,
         isOpen: function () {

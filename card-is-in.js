@@ -178,6 +178,47 @@
         return { show: false, kind: 'none', head: '', sub: '', note: '', cta: '', ctaKind: '', fix: false, waiting: [] };
     }
 
+    // THE POPUP'S WAITING LINE (Wave 36 revision). Shorter than the card's: no
+    // count, because the names are right there - "Waiting on Group 4 (thru 16),
+    // Group 6 (thru 14)."
+    function waitingShort(waiting) {
+        var list = waiting || [];
+        if (!list.length) return '';
+        return 'Waiting on ' + list.map(function (g) {
+            return 'Group ' + g.group + ' (thru ' + g.thru + ')';
+        }).join(', ') + '.';
+    }
+
+    // THE ABOVE-THE-HOLE CARD IS NOW ONE LINE (Wave 36 revision). Manny tested the
+    // full card on a device and it was too much on a screen whose job is score
+    // entry. The popup carries the scores; this is the ambient line that remains,
+    // and for a watcher it is the only thing that ever says who is still out.
+    function cardIsInOneLine(state) {
+        var st = state || {};
+        if (!st.show) return '';
+        if (st.kind === 'final') return WORDS.finalHead;
+        if (st.kind === 'mine') {
+            // The card-keeper's line keeps the waiting names, because on a
+            // multi-group round that is the whole answer to "are we done".
+            return st.note ? WORDS.mine + ' ' + st.note : WORDS.mine;
+        }
+        return st.note || WORDS.waitHead;
+    }
+
+    // WHO IS IN THIS GROUP, for the popup's score rows. The popup shows THIS
+    // GROUP only - the whole point of it - and this is the one place that decides
+    // which golfers that means, so the popup and the waiting line cannot disagree.
+    //
+    // NO SCORING MATH HERE. The rows themselves are built by
+    // computeNetToParStandings in money-engine.js, which is what every other
+    // surface in the app uses; this only picks the players.
+    function groupMembers(players, groupOf, lockedGroup, hasGroupLock) {
+        var list = (players || []).filter(function (p) { return p && !p.out; });
+        if (!hasGroupLock || lockedGroup === null || lockedGroup === undefined) return list;
+        var map = groupOf || {};
+        return list.filter(function (p) { return String(map[String(p.id)]) === String(lockedGroup); });
+    }
+
     // The Results tab's one line, from the same state: who is still out, or Final.
     function resultsBanner(state) {
         var st = state || {};
@@ -190,6 +231,9 @@
         WORDS: WORDS,
         groupProgress: groupProgress,
         waitingLine: waitingLine,
+        waitingShort: waitingShort,
+        cardIsInOneLine: cardIsInOneLine,
+        groupMembers: groupMembers,
         cardIsInState: cardIsInState,
         resultsBanner: resultsBanner
     };

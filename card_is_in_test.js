@@ -34,14 +34,20 @@
 // and the Receipt), and See Leaderboard sets window.location - both are asserted as
 // the call, not the arrival.
 //
-// THE BASELINE, all 29 tests, measured against main c086dca in a clean worktree -
+// THE BASELINE, all 40 tests, measured against main c086dca in a clean worktree -
 // where card-is-in.js does not exist and neither surface says anything:
 //
-//     0 PASS / 29 FAIL
+//     1 PASS / 39 FAIL
 //
-// Every one is red for the same reason: no module, so the require throws and the two
-// page realms have no window.cardIsIn to render. The file earns its keep from its
-// first line, and the useful per-arm figures are in the controls at the bottom.
+// The one green is "EVERY ORGANIZER TOOL IS STILL THERE", and it is supposed to be:
+// it reads the old Finish Round modal, which main has and this wave does not touch.
+// Its job is forward - it is what goes red if a later wave deletes the verification,
+// the KP answers or the correction diff while moving the door to them.
+//
+// AND THE REVISION HAS ITS OWN FIGURE, in shorthand so it cannot read as a second
+// baseline: against 40690c7 - the first version of this wave, which Manny tested on a
+// device and did not like - 29/40 green, 11 red. The eleven are the ten new popup
+// tests plus the one card test revised from a full card to one line.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -245,14 +251,19 @@ describe('3. ON THE SCORECARD', () => {
     const html = sb => card(sb).innerHTML;
     const shown = sb => card(sb).style.display === 'block';
 
-    test('ARRIVE AND TOUCH NOTHING: group 1 has holed out, and the card says so', () => {
-        // The page renders itself from the round - nothing here calls renderCardIsIn.
+    test('ARRIVE AND TOUCH NOTHING: group 1 has holed out, and ONE LINE says so', () => {
+        // REVISED (Wave 36 revision): this was a full card with a headline, a
+        // sub-line, the waiting note and two buttons. Manny tested it on a device and
+        // it was too much above a screen whose job is score entry. One line, one
+        // button; the scores moved into the popup.
         const sb = page({ group: 1, scores: scoresFor(Object.assign(ALL(4), { 5: 16, 6: 16, 7: 16, 8: 16 })) });
-        assert.equal(shown(sb), true, 'the card must be on the scorecard');
+        assert.equal(shown(sb), true, 'the line must be on the scorecard');
         assert.match(html(sb), /Your card is in/);
-        assert.match(html(sb), /Waiting on 1 group/);
+        assert.match(html(sb), /Waiting on 1 group/, 'the card-keepers line keeps the names');
         assert.match(html(sb), /See Leaderboard/);
-        assert.match(html(sb), /Fix a score/, 'and it says the card is not locked');
+        assert.ok(!/cii-sub|cii-note/.test(html(sb)), 'no sub-heading and no second copy of the names');
+        assert.ok(!/Fix a score/.test(html(sb)), 'Fix a score lives in the popup now');
+        assert.match(html(sb), /cii-line/, 'and it is the line, not the card');
     });
 
     test('mid-round there is nothing there at all', () => {
@@ -265,8 +276,10 @@ describe('3. ON THE SCORECARD', () => {
         const sb = page({ code: '2', scores: scoresFor(Object.assign(ALL(4), { 5: 16, 6: 16, 7: 16, 8: 16 })) });
         assert.equal(shown(sb), true);
         assert.ok(!/card is in/i.test(html(sb)), html(sb).slice(0, 300));
-        assert.match(html(sb), /Still playing/);
+        assert.match(html(sb), /Waiting on 1 group/, 'a watcher gets the names, which is the only place they get them');
         assert.ok(!/Fix a score/.test(html(sb)));
+        // AND THE POPUP NEVER OPENS ITSELF FOR THEM. It is the card-keepers answer.
+        assert.notEqual(sb.document.getElementById('card-in-popup').style.display, 'flex');
     });
 
     test('See Results opens the EXISTING recap, and does not start a second flow', () => {
@@ -387,5 +400,190 @@ describe('5. CONTROLS', () => {
         assert.equal(f.kind, 'final');
         // This is the point: the engine's answer is what flips it, so the card can
         // never disagree with Net Finish about whether the round is over.
+    });
+});
+
+// ===========================================================================
+// 6. THE FINISH POPUP (Wave 36 revision)
+//
+// MANNY TESTED THE FIRST VERSION ON A DEVICE AND DID NOT LIKE IT. The full card sat
+// above the hole view and Finish Round still opened the old recap - every game, every
+// press, a PDF button and a row of jump links - at the one moment a group wants a
+// single answer. So Finish Round is now a popup holding ONLY the group's own card,
+// one button to the Results tab, and a Fix a score link.
+//
+// THE ORGANIZER'S TOOLS ARE NOT GONE, which is the part that would have been easy to
+// lose. Scores Look Right, the KP no-winner and KP cancel answers, and the per-golfer
+// correction diff all still live in the old modal; the popup carries an "Organizer
+// tools" link to it, shown only when canReachSetup() is true. A group scorekeeper
+// never sees that link, and the tests below assert both halves.
+//
+// MEASURED for these 11 against 40690c7 - the first version of this wave, where the
+// popup does not exist: 10 of the 11 are red. The one green is "EVERY ORGANIZER TOOL
+// IS STILL THERE", which reads the old modal and passes on both versions because
+// neither deletes it. That is what it is for: it goes red the day somebody removes
+// the verification, the KP answers or the correction diff while moving the door.
+// (I first wrote that the green one was the no-recap-content test. It is not - that
+// one is red there, because there is no popup for the ban to be about.)
+// ===========================================================================
+describe('6. THE FINISH POPUP', () => {
+
+    // ONE SNAPSHOT, THEN THE TAP. The popup opens itself only on the TRANSITION -
+    // a card that was not in becoming in - so an arrival at an already-complete
+    // round does NOT open it, and these tests tap Finish the way a golfer does.
+    // The transition itself is driven, with two snapshots, in its own test below.
+    function page(opts) {
+        const o = opts || {};
+        const sb = loadHtmlInlineScript('index.html', ['card-is-in.js'],
+            { search: '?game=POP' + (o.code || '1') + (o.group ? '&group=' + o.group : '') });
+        sb.__snap = (scores) => {
+            const data = {
+                eventName: 'Thursday', gameFormat: 'stroke', courseData: CD,
+                players: o.players || EIGHT.map(p => Object.assign({ hcp: '9' }, p)),
+                scores: scores, groupSizeOverrides: {}
+            };
+            sb.__dbHandlers.filter(h => h.event === 'value').forEach(h => h.cb({ val: () => data }));
+        };
+        sb.__snap(o.scores || {});
+        if (!o.noTap) sb.openCardInPopup();
+        return sb;
+    }
+    const pop = sb => sb.document.getElementById('card-in-popup');
+    const open = sb => pop(sb).style.display === 'flex';
+    const rows = sb => sb.document.getElementById('cip-rows').innerHTML;
+    const wait = sb => sb.document.getElementById('cip-wait');
+
+    test('THE FINISH BUTTON OPENS THE POPUP, not the old recap', () => {
+        const src = read('index.html');
+        assert.match(src, /onclick="openCardInPopup\(\)">\$\{roundComplete \? '🏁 Finish Round'/,
+            'the last hole button must open the popup');
+        const sb = page({ group: 1, code: '2', scores: scoresFor(ALL(8)) });
+        sb.closeCardInPopup();
+        assert.equal(open(sb), false);
+        sb.openCardInPopup();
+        assert.equal(open(sb), true);
+    });
+
+    test('IT OPENS ITSELF ON THE TRANSITION - and not on an arrival, and not twice', () => {
+        const others = { 5: 16, 6: 16, 7: 16, 8: 16 };
+        // ARRIVING at a round whose card is already in must NOT open it. The first
+        // version opened on the STATE, so a golfer coming back to a finished round
+        // got a popup over the page they asked for - and the 1-18 picker could not be
+        // tapped underneath it, which is how the KP suite caught it.
+        const arrive = page({ group: 1, code: '3a', noTap: true,
+            scores: scoresFor(Object.assign(ALL(4), others)) });
+        assert.equal(open(arrive), false, 'an arrival is not a transition');
+        // THE MOMENT THE LAST SCORE POSTS: one hole open, then it lands.
+        const live = page({ group: 1, code: '3b', noTap: true,
+            scores: scoresFor(Object.assign({ 1: 18, 2: 18, 3: 18, 4: 17 }, others)) });
+        assert.equal(open(live), false, 'not yet - golfer 4 is on 17');
+        live.__snap(scoresFor(Object.assign(ALL(4), others)));
+        assert.equal(open(live), true, 'the last score posted, so it opened itself');
+        // AND ONCE. A snapshot arrives on every write in the round; without the latch
+        // it would reopen over a golfer fixing a number.
+        live.closeCardInPopup();
+        live.__snap(scoresFor(Object.assign(ALL(4), others)));
+        assert.equal(open(live), false, 'it must not reopen after being closed');
+    });
+
+    test('THIS GROUPS SCORES ONLY: name, gross, net, to par', () => {
+        const sb = page({ group: 1, code: '4', scores: scoresFor(ALL(8)) });
+        const h = rows(sb);
+        ['P1', 'P2', 'P3', 'P4'].forEach(n => assert.match(h, new RegExp('>' + n + '<'), n + ' missing'));
+        ['P5', 'P6', 'P7', 'P8'].forEach(n => assert.ok(h.indexOf('>' + n + '<') === -1,
+            n + ' is in another group and must not be on this card'));
+        assert.match(h, /Gross/); assert.match(h, /Net/);
+        // 18 holes of par 4 off a 9 handicap: gross 72, net 63, nine under.
+        assert.match(h, /class="cip-num">72</, 'gross');
+        assert.match(h, /class="cip-num">63</, 'net');
+        assert.match(h, /-9/, 'to par');
+        assert.equal((h.match(/class="cip-row"/g) || []).length, 4, 'four rows, four golfers');
+    });
+
+    test('and NOTHING a recap had: no games, no presses, no PDF, no jump links', () => {
+        // READ FROM THE SOURCE, not from innerHTML. The popup's contents are static
+        // markup, and mini-dom's innerHTML returns only what a renderer ASSIGNED -
+        // so asserting on it here would be asserting the harness. The slice is the
+        // markup itself, which is what the ban is about.
+        const src = read('index.html');
+        const mk = src.slice(src.indexOf('<div class="modal-overlay" id="card-in-popup">'),
+                             src.indexOf('<div class="modal-overlay" id="finish-round-modal-overlay">'));
+        assert.ok(mk.length > 400 && mk.length < 2500, 'the slice is the popup and only the popup: ' + mk.length);
+        [/Who Pays Who/i, /Final Money/i, /Receipt/i, /PDF/i, /fr-jump-links/, /press/i, /Skins/i]
+            .forEach(re => assert.ok(!re.test(mk), 'the popup must stay simple: ' + re));
+        assert.match(mk, /See Results/, 'one button');
+        assert.match(mk, /Fix a score/, 'and the way out');
+        assert.equal((mk.match(/<button/g) || []).length, 4,
+            'close, See Results, Fix a score, Organizer tools - and nothing else');
+        // And what the RENDERER writes is scores, not a recap.
+        const sb = page({ group: 1, code: '5', scores: scoresFor(ALL(8)) });
+        assert.ok(!/Who Pays Who|Final Money|Receipt/i.test(rows(sb)), rows(sb).slice(0, 200));
+    });
+
+    test('the waiting line is the SHORT one, and only when groups are out', () => {
+        const out = page({ group: 1, code: '6', scores: scoresFor(Object.assign(ALL(4), { 5: 16, 6: 16, 7: 16, 8: 14 })) });
+        assert.equal(wait(out).style.display, 'block');
+        assert.equal(wait(out).textContent, 'Waiting on Group 2 (thru 14).');
+        const done = page({ group: 1, code: '7', scores: scoresFor(ALL(8)) });
+        assert.equal(wait(done).style.display, 'none', 'nobody out, nothing to say');
+        assert.equal(wait(done).textContent, '');
+    });
+
+    test('SEE RESULTS goes to the Results tab for this round and this group', () => {
+        const sb = page({ group: 1, code: '8', scores: scoresFor(ALL(8)) });
+        sb.cardInPopupResults();
+        assert.match(String(sb.location.href), /settlement\.html\?game=POP8&group=1$/);
+        assert.equal(open(sb), false, 'and it closes on the way out');
+    });
+
+    test('FIX A SCORE just closes it - nothing is locked', () => {
+        const sb = page({ group: 1, code: '9', scores: scoresFor(ALL(8)) });
+        assert.equal(open(sb), true);
+        sb.closeCardInPopup();
+        assert.equal(open(sb), false);
+        const src = read('index.html');
+        const mk = src.slice(src.indexOf('<div class="modal-overlay" id="card-in-popup">'),
+                            src.indexOf('<div class="modal-overlay" id="finish-round-modal-overlay">'));
+        assert.match(mk, /onclick="closeCardInPopup\(\)">Fix a score</, 'the link closes the popup and does nothing else');
+        assert.ok(!/disabled/.test(mk), 'and nothing in here disables anything');
+    });
+
+    test('ORGANIZER TOOLS: hidden for a group scorekeeper', () => {
+        const sb = page({ group: 1, code: '10', scores: scoresFor(ALL(8)) });
+        assert.equal(sb.document.getElementById('cip-tools').style.display, 'none',
+            'a scorekeeper must never be offered verification or a KP answer');
+    });
+
+    test('ORGANIZER TOOLS: shown to the organizer, and they open the OLD modal', () => {
+        const sb = page({ code: '11', players: FOUR.map(p => Object.assign({ hcp: '9' }, p)), scores: scoresFor(ALL(4)) });
+        sb.canReachSetup = () => true;
+        sb.openCardInPopup();
+        assert.equal(sb.document.getElementById('cip-tools').style.display, 'block');
+        let opened = 0;
+        sb.openFinishRoundModal = () => { opened += 1; };
+        sb.cardInPopupTools();
+        assert.equal(opened, 1, 'the link is how the organizer reaches the recap');
+        assert.equal(open(sb), false, 'and the popup gets out of the way');
+    });
+
+    test('EVERY ORGANIZER TOOL IS STILL THERE, in the modal the link opens', () => {
+        // The list the brief asked for, asserted rather than promised: Scores Look
+        // Right, the KP block (no-winner and cancel) and the per-golfer correction
+        // diff. Nothing was deleted; the door moved.
+        const src = read('index.html');
+        assert.match(src, /onclick="frShowResults\(true\)">✓ Scores Look Right/, 'verification');
+        assert.match(src, /id="fr-kp-block"/, 'the KP answers');
+        assert.match(src, /id="fr-detail-impact"/, 'the correction diff');
+        assert.match(src, /function frOpenPlayer/, 'and the way into it');
+        assert.match(src, /id="finish-round-modal-overlay"/, 'the modal itself is untouched');
+    });
+
+    test('hardware BACK closes the popup before the recap behind it', () => {
+        const src = read('index.html');
+        const reg = src.slice(src.indexOf("name: 'card-in-popup'"), src.indexOf("name: 'finish-round-review'"));
+        assert.match(reg, /priority: 2/, 'it is the one in front');
+        assert.match(reg, /close: closeCardInPopup/);
+        const fr = src.slice(src.indexOf("name: 'finish-round-review'"));
+        assert.match(fr.slice(0, 200), /priority: 1/, 'and the recap stays behind it');
     });
 });

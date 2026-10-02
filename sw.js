@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v113-cardisin. The tournament product cache
+// The consumer product cache is consumer-v114-finishpopup. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3827,7 +3827,18 @@
 // a card is theirs, and nothing is locked: "Fix a score" is on the card because a
 // card that is in is not a card that is frozen. An installed device would otherwise
 // keep the version that says nothing at the one moment a group wants an answer.
-const CACHE_VERSION = 'golfapp-v273-cardisin';
+// Moved to v274 BECAUSE THE FIRST VERSION WAS TOO MUCH. Manny tested v273 on a
+// device: a full card above the hole view, and Finish Round still opening the recap
+// with every game, every press, a PDF and a row of jump links - at the one moment a
+// group wants a single answer. So Finish Round is now a POPUP holding only the
+// group's own card (name, gross, net, to par), the short waiting line, one See
+// Results button to the Results tab and a Fix a score link; the card above the hole
+// view is ONE LINE with a small button. The organizer's tools - Scores Look Right,
+// the KP no-winner and KP cancel answers, the per-golfer correction diff - are all
+// still in the old modal, behind an "Organizer tools" link the popup shows only to
+// an organizer. A group scorekeeper never sees it. An installed device would
+// otherwise keep the version he asked to have changed.
+const CACHE_VERSION = 'golfapp-v274-finishpopup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

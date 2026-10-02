@@ -518,7 +518,7 @@ describe('ANSWERING "none" MOVES NO MONEY - and the figures that prove kpNoWinne
     });
 });
 
-describe('THE SOURCE: ONE GATE, FIVE CALLERS, AND NO PROTECTED FILE TOUCHED', () => {
+describe('THE SOURCE: ONE GATE, SIX CALLERS, AND NO PROTECTED FILE TOUCHED', () => {
     const IDX = read('index.html');
 
     test('one gate function exists and every hole exit asks it', () => {
@@ -526,9 +526,14 @@ describe('THE SOURCE: ONE GATE, FIVE CALLERS, AND NO PROTECTED FILE TOUCHED', ()
         // The five exits named in the recon. A sixth appearing later should have to
         // decide deliberately whether it is a hole exit, so the count is pinned.
         const calls = (IDX.match(/kpGateBefore\(/g) || []).length;
-        assert.equal(calls, 6, 'expected the definition plus five callers, found ' + calls);
+        // RE-PINNED (Wave 36 revision, was 6): openCardInPopup is a SIXTH caller, and
+        // it has to be - the Finish button opens the popup now, so on hole 18 that
+        // popup is the only way off a KP hole and must be gated exactly as the recap
+        // was. openFinishRoundModal keeps its own call: the organizer still reaches it
+        // from the popup, and a gate that trusted its caller would be no gate.
+        assert.equal(calls, 7, 'expected the definition plus six callers, found ' + calls);
         ['function goToHole(', 'function jumpToGap(', 'function jumpToMissingHole(',
-         'function openFinishRoundModal(', 'function setViewMode('].forEach(sig => {
+         'function openFinishRoundModal(', 'function openCardInPopup(', 'function setViewMode('].forEach(sig => {
             const at = IDX.indexOf(sig);
             assert.ok(at > -1, sig + ' is gone');
             const body = IDX.slice(at, IDX.indexOf('\n    }', at));
