@@ -3059,6 +3059,45 @@ is the case where "one group IS the field" was the deliberate design.
 
 ## Where things stand, 2026-10-02
 
+**WAVES 35 AND 37 ARE ON MAIN, AND 1.0.6 BUILD 1 IS PREPPED.** `0b915e8` then
+`8a83de3`, cache `golfapp-v276-coachgate-strokesmode` / consumer `v116`.
+
+- **Wave 35 - the Setup Coach cannot hand over a hollow round.** "Help me set this
+  up" used to reach Review & Save with Course "Not selected" and Players "0 added".
+  The handoff now goes to the first MISSING thing on that field's own editor; Review
+  names what is missing with a button per item; `saveSettings` refuses with the same
+  sentence if the button is reached another way; and Skip is off the two required
+  answers. ALL OF IT SCOPED TO `?coach=1`, because `saveSettings` deliberately allows
+  a round with no players - a host sets up a whole trip in advance and fills rosters
+  later - and the guard's control proves that still saves.
+- **Wave 37 - a strokes round stops calling its numbers an Index.** The toggle and
+  the strokes DEFAULT already existed (Wave 13, v212): `as-entered` carries
+  `selected`, the save writes `hcp` = the typed number with no `handicapIndex` and no
+  `courseHandicap`, and an absent `handicapBasis` still means GHIN so no legacy round
+  moves. What was wrong was that three surfaces gave one box three names, including a
+  hardcoded `placeholder="Index"` on the strokes default. One builder in
+  handicap-labels.js names it now; the toggle reads "Strokes (use as typed)" / "GHIN
+  Index (adjust by tee)"; moving it repaints the rows. **No money math changed and no
+  protected file was touched** - `handicap_mode_money_test.js` pins handicap.js,
+  money-engine.js and pool-engine.js by content sha, shows the mode moving real
+  dollars ($16 between two golfers on one round), and freezes a legacy round's net
+  standings and whole pool by sha256.
+- **THE MERGE TOOK A NEW CACHE KEY, and that is the rule when two branches collide:**
+  both were at a v275 of their own, so neither described a tree holding the coach
+  gate, the finish popup and the strokes labels. Both waves' "Moved to vNN" notes are
+  kept in full; the shell count is 62.
+- **1.0.6 BUILD 1 is set on Debug AND Release** (`MARKETING_VERSION` 1.0.6,
+  `CURRENT_PROJECT_VERSION` 1), and Sign in with Apple is confirmed in place for
+  RELEASE: `CODE_SIGN_ENTITLEMENTS = App/App.entitlements` on that configuration,
+  `com.apple.developer.applesignin = ["Default"]` in the file, Team A2Z95T64UU, and
+  GoogleService-Info.plist still in the Resources build phase. **Nothing archived,
+  nothing uploaded.**
+- **ONE THING TO CHECK BEFORE ARCHIVING:** the tree had carried 1.0.6 **build 2**
+  since 2026-10-01 (committed at `6a885ef`, never archived by this session), and the
+  instruction for this prep was build 1. If 1.0.6 build 2 was ever uploaded to App
+  Store Connect, build 1 will be REJECTED as lower and the next one has to be build
+  3. Android is at 1.0.6 versionCode 2 and is unaffected by this change.
+
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
 
