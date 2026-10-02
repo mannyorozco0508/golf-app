@@ -43,6 +43,24 @@
         return (String(v) === 'as-entered') ? 'as-entered' : 'ghin-index';
     }
 
+    // WHAT THE NUMBER IN THE BOX IS CALLED, on this round (Wave 37). ONE builder,
+    // because three surfaces were saying three things about the same box: admin.html's
+    // setup row hardcoded "Index" - wrong on every strokes round, which is the DEFAULT
+    // for a new round - index.html's Players sheet said "HCP", and the Game tab's
+    // sentence said "used as entered". A golfer typing 11 in a box labelled Index has
+    // been told the app will convert it, and on a strokes round it will not.
+    //
+    // STROKES IS NOT A SYNONYM FOR "as entered". It is what Manny's group actually
+    // means - "Jimmy 11" is eleven strokes - and naming the mode after the number
+    // rather than after the storage is the whole point of the wording.
+    function handicapBoxPlaceholder(data) {
+        return handicapBasisOf(data) === 'as-entered' ? 'Strokes' : 'Index';
+    }
+    // The column head on a list. Same answer, said as a heading.
+    function handicapColumnLabel(data) {
+        return handicapBoxPlaceholder(data);
+    }
+
     function hasIndex(player) {
         if (!player) return false;
         var raw = player.handicapIndex;
@@ -144,6 +162,8 @@
 
     var api = {
         handicapBasisOf: handicapBasisOf,
+        handicapBoxPlaceholder: handicapBoxPlaceholder,
+        handicapColumnLabel: handicapColumnLabel,
         handicapCompactLabel: handicapCompactLabel,
         handicapFullLabel: handicapFullLabel,
         handicapBasisSentence: handicapBasisSentence,

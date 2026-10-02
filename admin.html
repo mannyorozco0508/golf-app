@@ -1351,9 +1351,9 @@ html {
              this wave ships, and a setting nobody has asked for is a setting
              that has to be explained on every screen that reads it. -->
         <label for="handicap-basis-select" style="font-size:0.75rem; font-weight:bold; color:var(--brand-green); display:block; margin-top:10px;">Handicaps</label>
-        <select id="handicap-basis-select" onchange="refreshHandicapNote()" style="margin-bottom:4px;">
-            <option value="as-entered" selected>As entered</option>
-            <option value="ghin-index">GHIN index (convert by tee)</option>
+        <select id="handicap-basis-select" onchange="handicapBasisChanged()" style="margin-bottom:4px;">
+            <option value="as-entered" selected>Strokes (use as typed)</option>
+            <option value="ghin-index">GHIN Index (adjust by tee)</option>
         </select>
     </div>
         <div class="wizard-nav-row">
@@ -9305,7 +9305,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         row.style.gridTemplateColumns = baseColumns + flightColumn + (showMoneyCheckbox ? " 46px" : "") + " 38px";
         row.innerHTML = `
             <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
-            <input type="text" class="p-hcp-input" placeholder="Index" value="${hcp}" oninput="refreshHandicapNote()">
+            <input type="text" class="p-hcp-input" placeholder="${handicapSetupBoxLabel()}" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
             ${squadFieldHtml}
             ${moneyCheckboxHtml}
@@ -9314,6 +9314,31 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (flightsOn) appendFlightControl(row, flight, flightAsLine);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
+    }
+
+    // THE SETUP ROW'S LABEL, FROM THE LIVE CONTROL (Wave 37). During setup there is no
+    // saved round to ask, so the mode is whatever #handicap-basis-select says at this
+    // moment - and the rows re-render on every change, so the label follows the toggle
+    // without anything else being wired up. handicap-labels.js owns the two words.
+    // MOVING THE TOGGLE REPAINTS THE ROWS. Without this the boxes keep the old word
+    // until something else happens to re-render them, which is the kind of stale label
+    // that gets believed.
+    function handicapBasisChanged() {
+        if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        const label = handicapSetupBoxLabel();
+        list.querySelectorAll('.p-hcp-input').forEach(box => {
+            if (box.getAttribute('placeholder') !== label) box.setAttribute('placeholder', label);
+        });
+    }
+
+    function handicapSetupBoxLabel() {
+        const el = document.getElementById('handicap-basis-select');
+        const basis = (el && el.value === 'ghin-index') ? 'ghin-index' : 'as-entered';
+        return (typeof handicapBoxPlaceholder === 'function')
+            ? handicapBoxPlaceholder({ handicapBasis: basis })
+            : (basis === 'as-entered' ? 'Strokes' : 'Index');
     }
 
     function updateCount() { 

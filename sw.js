@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v115-coachgate-plus-popup. The tournament product cache
+// The consumer product cache is consumer-v116-strokesmode. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3857,7 +3857,27 @@
 // merge gets its own: an installed device must not be told it already has this shell
 // when it has only one of the two waves in it. The branch is UNMERGED - this version
 // exists so Manny can Cmd+R the coach gate on top of Wave 36.
-const CACHE_VERSION = 'golfapp-v275-coachgate-plus-popup';
+
+// Moved to v275 SO A STROKES ROUND STOPS CALLING ITS NUMBERS AN INDEX. Manny's group
+// plays off strokes as typed - "Jimmy 11" is eleven strokes - and the app has done
+// exactly that for new rounds since v212: the setup toggle defaults to as-entered,
+// the save writes hcp = the typed number with no Index and no Course Handicap, and a
+// round with no handicapBasis field still means GHIN so nothing retro moves. WHAT WAS
+// WRONG WAS THE WORDS. The setup row's box was hardcoded "Index" on every round
+// including the strokes default, the toggle read "As entered", and the Players sheet
+// read "HCP" - three names for one box, on a screen where the name is the only thing
+// telling a golfer whether their 11 will be converted. One builder now names it
+// Strokes or Index, the toggle says "Strokes (use as typed)" and "GHIN Index (adjust
+// by tee)", and moving it repaints the rows. NO MONEY MATH CHANGED and no protected
+// file was touched; handicap_mode_money_test.js pins the dollars both ways.
+//
+// Moved to v276 BECAUSE MAIN NOW HOLDS BOTH WAVES. Wave 35 (the Setup Coach gate) and
+// Wave 37 (the strokes-mode labels) were each at a v275 of their own, on separate
+// branches; neither number describes this tree. The notes above are kept in full from
+// both sides rather than collapsed - the record of why a shell moved is not something
+// a merge gets to drop - and the key is new so an installed device cannot be told it
+// already has a shell it has only half of.
+const CACHE_VERSION = 'golfapp-v276-coachgate-strokesmode';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
