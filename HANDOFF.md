@@ -3057,7 +3057,54 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
-## Where things stand, 2026-10-01
+## Where things stand, 2026-10-02
+
+**WAVE 36 IS ON MAIN: FINISH ROUND IS ONE POPUP.** Merged at `10ee062`
+(`golfapp-v274-finishpopup`, consumer `v114`), fast-forward. Manny tested it on his
+iPhone through Xcode: GFLBAM group 3 -> Finish Round -> the popup with that group's
+scores -> See Results -> the Results tab. Approved.
+
+- **What a group gets.** Tapping Finish Round - or the MOMENT this group's last score
+  posts - opens a popup holding only that group's card: name, gross, net, +/-, built
+  by `computeNetToParStandings` in money-engine.js, the same builder the live board
+  uses. Under it, when groups are still out, one line: "Waiting on Group 4 (thru 16),
+  Group 6 (thru 14)." Then one button, **See Results**, to `settlement.html` for this
+  round and group, and a small **Fix a score** link that closes it. Nothing is locked.
+- **It opens on the TRANSITION, not the state** - a card that was not in becoming in,
+  once, with a close remembered. The first version latched on the state and two
+  things broke at once: a golfer returning to a finished round got a popup over the
+  page they asked for, and the 1-18 picker could not be tapped underneath it.
+- **It carries the same preamble `openFinishRoundModal` has:** `commitPendingScore()`
+  so a score typed and not blurred is saved BEFORE the popup reads the round, and
+  `kpGateBefore()` because on hole 18 that button replaces Next and is the only way
+  off an unanswered KP hole. It did NOT at first; `finish_round_tap_test.js` caught it.
+- **THE ORGANIZER'S TOOLS DID NOT MOVE, the door did.** All four are still in
+  `#finish-round-modal-overlay`, reached by an "Organizer tools" link the popup shows
+  only when `canReachSetup()` is true - a group scorekeeper never sees it:
+  verification `frShowResults(true)` in `#fr-state-review`, the KP no-winner and KP
+  cancel answers in `#fr-kp-block`, the per-golfer correction diff via `frOpenPlayer`
+  into `#fr-detail-impact`, and the whole-field review in `#fr-player-list`.
+- **Above the hole view there is ONE LINE** with a small button - the first version's
+  full card was what Manny rejected. It is kept rather than dropped because the popup
+  only appears on the tap or on that transition, and a SPECTATOR never gets the popup
+  at all: that line is the only thing that ever tells a watcher who is still out. A
+  spectator is never told a card is theirs.
+- **The Results page carries the same state as one line** from the same builder -
+  "Not final yet" with who is out, or "Final" - and passes `hasGroupLock: false` on
+  purpose, so a `?group=` on the Receipt's URL can never turn it into a claim about
+  one foursome.
+- `card_is_in_test.js` owns it: 40 tests, of which 1 was green at `c086dca` before
+  the wave (the organizer-tools test, which reads the untouched recap). The figure is
+  in the guard's own header in the checked form; written shorthand here so this file
+  does not read as a second baseline.
+  Five suites were re-pointed because the Finish button's destination changed and not
+  one because a claim did: `finish_round_tap_test.js`, `back_button_test.js`,
+  `kp_forced_decision_test.js` (the gate census is 7 callers now, the sixth caller
+  being the popup), `kp_never_refunds_test.js` and `hole_view_landing_test.js`.
+
+**`ui-wave35-coach-gate` IS STILL UNMERGED**, waiting on Manny's test: the Setup Coach
+cannot hand over a round with no course and nobody on it. Its own HANDOFF entry rides
+with it.
 
 **1.0.5 BUILD 1 IS UPLOADED AND RELEASED.** Manny archived from `main` at `416e7ae`
 and uploaded on 2026-10-01, and reports the version released. `MARKETING_VERSION`
