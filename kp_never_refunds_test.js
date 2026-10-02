@@ -231,13 +231,18 @@ describe('CHROME: Finish Round shows the hold; recording the winners makes it fi
             // the page lands on hole 1; Finish Round is the last hole's Next - seventeen real taps on Next
             ...[].concat(...Array.from({ length: 17 }, () => [{ tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 120 }])),
             { expression: "'H:' + String(currentViewedHole)" },
-            { tap: '.finish-round-nav-btn', nth: 0 }, { sleep: 400 },
+            // CALLED, NOT TAPPED (Wave 36 revision). The Finish button opens the
+            // group's popup now; this suite's subject is the RECAP's KP hold line and
+            // its money panel, which the organizer reaches from that popup. Tapping
+            // the button here would open the popup and read an empty warning - which
+            // is what it did, and why this line changed rather than the claim.
+            { expression: 'openFinishRoundModal(); "opened the recap"' }, { sleep: 400 },
             { expression: "'W0:' + document.getElementById('fr-incomplete-warning').innerText.replace(/\\s+/g, ' ').trim()" },
             { expression: "'K0:' + (function () { var m = document.getElementById('fr-kp-block'); return m ? m.innerText.replace(/\\s+/g, ' ').slice(0, 400) : 'no kp block'; })()" },
             // the winners arrive (another phone recorded them); the organizer closes and reopens Finish Round
             { deliver: { path: 'events/KPX', value: done } }, { sleep: 400 },
             { tap: '#finish-round-modal-overlay .close-modal', nth: 0 }, { sleep: 250 },
-            { tap: '.finish-round-nav-btn', nth: 0 }, { sleep: 400 },
+            { expression: 'openFinishRoundModal(); "opened the recap"' }, { sleep: 400 },
             { expression: "'W1:' + document.getElementById('fr-incomplete-warning').innerText.replace(/\\s+/g, ' ').trim()" }
         ] });
     });

@@ -61,6 +61,17 @@ function tap(sb, markup, pattern) {
     vm.runInContext('(function () { ' + m[1] + ' }).call({ innerHTML: "" })', sb);
     return m[1];
 }
+// THE ORGANIZER'S TWO TAPS TO THE RECAP (Wave 36 revision). The 18th-hole button
+// opens the group's popup now - "Your card is in", the group's scores, one button -
+// and the recap with its verification, KP answers and correction diff sits behind
+// the popup's "Organizer tools" link. Every test below is about the RECAP's back
+// layering, which is unchanged, so they reach it the way an organizer does rather
+// than by calling it. Both taps are real onclick attributes out of real markup.
+function tapToRecap(sb, card) {
+    tap(sb, card, /onclick="(openCardInPopup\(\))"/);
+    tap(sb, read('index.html'), /onclick="(cardInPopupTools\(\))"/);
+}
+
 // Every rendered mount on the page, joined - for controls whose mount a test
 // should not have to know.
 const rendered = sb => [...sb.__elementRegistry.values()].map(e => e.innerHTML || '').join('\n');
@@ -276,7 +287,7 @@ describe('P2 - A MODAL CLOSES ON ONE PRESS (index.html)', () => {
     test('Finish Round on its Review state, from the 18th-hole button', () => {
         const sb = scorecard();
         const card = walkToLastHole(sb);
-        tap(sb, card, /onclick="(openFinishRoundModal\(\))"/);
+        tapToRecap(sb, card);
         assert.equal(shown(sb, 'finish-round-modal-overlay'), true);
         assert.equal(press(sb), 'modal');
         assert.equal(shown(sb, 'finish-round-modal-overlay'), false);
@@ -315,7 +326,7 @@ describe('P1 - FINISH ROUND: a sub-state goes back to Review before the modal cl
 
     test('detail -> review -> closed, one press each', () => {
         const sb = scorecard();
-        tap(sb, walkToLastHole(sb), /onclick="(openFinishRoundModal\(\))"/);
+        tapToRecap(sb, walkToLastHole(sb));
         tap(sb, sb.document.getElementById('fr-player-list').innerHTML, /onclick="(frOpenPlayer\(\d+\))"/);
         assert.notEqual(run(sb, 'frDetailPlayerId'), null, 'the detail view did not open');
         assert.equal(press(sb), 'finish-round-review');
@@ -327,7 +338,7 @@ describe('P1 - FINISH ROUND: a sub-state goes back to Review before the modal cl
 
     test('results -> review -> closed', () => {
         const sb = scorecard();
-        tap(sb, walkToLastHole(sb), /onclick="(openFinishRoundModal\(\))"/);
+        tapToRecap(sb, walkToLastHole(sb));
         tap(sb, rendered(sb) + read('index.html'), /onclick="(frShowResults\(false\))"/);
         assert.equal(sb.document.getElementById('fr-state-results').style.display, '', 'results did not show');
         assert.equal(press(sb), 'finish-round-review');

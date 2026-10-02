@@ -51,8 +51,11 @@ const STATE = `(function(){ var a = document.activeElement; var card = document.
   var id = (a && a.classList && a.classList.contains('score-input')) ? 'p' + a.getAttribute('data-player-id') + '/h' + a.getAttribute('data-hole') : (a === document.body ? 'BODY' : a.tagName);
   var nav = document.querySelector('.hole-view-nav-row'); var btns = nav ? Array.from(nav.querySelectorAll('button')).map(function (b) { return b.innerText.trim(); }) : [];
   var ov = document.getElementById('finish-round-modal-overlay'); var warn = document.getElementById('fr-incomplete-warning');
+  var pop = document.getElementById('card-in-popup'); var prows = document.getElementById('cip-rows');
   return JSON.stringify({ hole: (document.querySelector('.hv-hole-num') || {}).innerText, boxes: boxes.length, active: id, activeValue: a && a.value !== undefined ? a.value : null, nav: btns,
     finishOpen: getComputedStyle(ov).display, missing: (getComputedStyle(ov).display === 'flex' && warn) ? warn.innerText.replace(/\\s+/g, ' ').trim().slice(0, 40) : null,
+    popOpen: pop ? getComputedStyle(pop).display : null,
+    popRows: (pop && getComputedStyle(pop).display === 'flex' && prows) ? prows.innerText.replace(/\\s+/g, ' ').trim() : null,
     cardValue: (document.querySelector('#full-card-container .score-input[data-player-id="104"][data-hole="18"]') || {}).value,
     ui: window.__ui.splice(0), ev: (window.__ev || []).splice(0) }); })()`;
 const rect = (sel, n) => `(function(){ var el = document.querySelectorAll(${JSON.stringify(sel)})[${n || 0}]; if (!el) return 'null'; var r = el.getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`;
@@ -88,42 +91,62 @@ describe('THE SHAPE', () => {
 
 describe('FIX 3: a score still focused when Finish Round is tapped', () => {
     test('ran', () => assert.ok(S.pending && S.pending.ok, S.pending && S.pending.reason));
-    test('before the tap: "1" sits in the 4th box, focused, unsaved; the modal is closed', () => {
+    // RE-POINTED (Wave 36 revision). The Finish button opens the POPUP now - the
+    // group's own card and one button - because the recap was too much at that
+    // moment. THE CLAIM THIS SUITE EXISTS FOR IS UNCHANGED and is if anything
+    // sharper: whatever the golfer typed and did not blur must be committed BEFORE
+    // the thing that opens reads the round. It used to be proved by the modal
+    // counting 7 missing instead of 8; it is proved now by the typed score being on
+    // the card the golfer is shown. openCardInPopup carries the same
+    // commitPendingScore() and kpGateBefore() preamble openFinishRoundModal has -
+    // it did NOT at first, and this suite is what caught that.
+    test('before the tap: "1" sits in the 4th box, focused, unsaved; nothing is open', () => {
         const b = P(S.pending, 6);
         assert.equal(b.active, 'p104/h18'); assert.equal(b.activeValue, '1'); assert.equal(b.finishOpen, 'none');
+        assert.equal(b.popOpen, 'none', 'the popup is closed too');
         assert.ok(!/change\(Dee/.test(b.ev.join(' > ')), 'nothing saved yet: ' + b.ev.join(' > '));
     });
-    test('ONE tap opens the modal: mousedown AND click reached the button', () => {
+    test('ONE tap opens the POPUP: mousedown AND click reached the button', () => {
         const s = P(S.pending, 10);
-        assert.equal(s.finishOpen, 'flex', 'the Finish Round modal is open after one tap');
+        assert.equal(s.popOpen, 'flex', 'the finish popup is open after one tap');
+        assert.equal(s.finishOpen, 'none', 'and the heavy recap is NOT what opened');
         assert.deepEqual(s.ui, ['mousedown[Finish]', 'click[Finish]']);
     });
-    test('and the score was committed inside the click, BEFORE the modal read the round: change -> value -> render, the card holds the 1, and the modal counts 7 missing, not 8', () => {
+    test('and the score was committed inside the click, BEFORE the popup read the round: change -> value -> render, and the 1 is on the card it shows', () => {
         const s = P(S.pending, 10);
         const ev = s.ev.join(' > ');
         assert.ok(/change\(Dee/.test(ev) && /value->render/.test(ev), ev);
         assert.equal(s.cardValue, '1', 'Dee\'s hole 18 on the full card');
-        assert.match(s.missing, /^⚠️ 7 scores still missing/, 'eight golfers had hole 18 open; Dee\'s 1 landed before the modal counted: ' + s.missing);
+        // Dee's 18 holes are seventeen 4s and the 1 that just landed: gross 69. If
+        // the commit had happened after the read, the popup would show a dash or a
+        // short gross - which is the whole defect this suite was written for.
+        assert.match(s.popRows, /Dee/, 'the group card names her: ' + s.popRows);
+        assert.match(s.popRows, /\b69\b/, 'and her gross includes the score she just typed: ' + s.popRows);
         assert.equal(s.active, 'BODY', 'the box blurred (its commit), nothing refocused');
     });
 });
 
 describe('NOTHING PENDING', () => {
     test('ran', () => assert.ok(S.plain && S.plain.ok, S.plain && S.plain.reason));
-    test('a plain tap on Finish opens the modal with 8 missing, saves nothing, and both events reach the button', () => {
-        const b = P(S.plain, 1); assert.equal(b.active, 'BODY'); assert.equal(b.finishOpen, 'none');
+    test('a plain tap on Finish opens the popup, saves nothing, and both events reach the button', () => {
+        const b = P(S.plain, 1); assert.equal(b.active, 'BODY'); assert.equal(b.popOpen, 'none');
         const s = P(S.plain, 5);
-        assert.equal(s.finishOpen, 'flex');
+        assert.equal(s.popOpen, 'flex');
+        assert.equal(s.finishOpen, 'none', 'the recap is behind the Organizer tools link now');
         assert.deepEqual(s.ui, ['mousedown[Finish]', 'click[Finish]']);
         assert.ok(!/change\(|value->render/.test(s.ev.join(' > ')), 'no save, no re-render: ' + s.ev.join(' > '));
-        assert.match(s.missing, /^⚠️ 8 scores still missing/);
+        // Nothing pending means nothing changed: hole 18 is still open for all eight,
+        // so the popup shows the group with a dash where the score is not in yet.
+        assert.match(s.popRows, /Dee/, s.popRows);
     });
 });
 
 describe('THE SEAM (source)', () => {
     const fn = (name) => { const at = IDX.indexOf('function ' + name + '('); assert.ok(at > 0, name); return IDX.slice(at, IDX.indexOf('\n    function ', at + 30)); };
-    test('the Finish button carries the nav buttons\' mousedown guard, and its handler is still openFinishRoundModal', () => {
-        assert.match(IDX, /<button class="finish-round-nav-btn" onmousedown="event\.preventDefault\(\)" onclick="openFinishRoundModal\(\)">/);
+    test('the Finish button carries the nav buttons\' mousedown guard, and its handler is openCardInPopup', () => {
+        // RE-POINTED (Wave 36 revision): the button opens the popup. The mousedown
+        // guard is the thing this line is really about and it is unchanged.
+        assert.match(IDX, /<button class="finish-round-nav-btn" onmousedown="event\.preventDefault\(\)" onclick="openCardInPopup\(\)">/);
         assert.equal((IDX.match(/onmousedown="event\.preventDefault\(\)"/g) || []).length, 5, 'Prev, Next, the position button, the picker\'s buttons, and now Finish');
     });
     test('openFinishRoundModal commits the pending score FIRST - before frStaged is cleared and before anything reads the round', () => {

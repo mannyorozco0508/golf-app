@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v113-coachgate. The tournament product cache
+// The consumer product cache is consumer-v115-coachgate-plus-popup. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3816,6 +3816,29 @@
 // then deleted it. Signed in, the toggle is gone, the card is shut, and the handler
 // refuses on its own so a stale onclick or a cached shell cannot open it. Moving an
 // organizer to another device is: sign OUT here, sign in over there.
+
+// Moved to v273 SO A GROUP IS TOLD WHEN ITS CARD IS IN. A foursome posted its last
+// score and the app said nothing: the hole view still looked like a hole view, and
+// nobody knew whether they were done, whether the money was settled, or where to go.
+// Now the scorecard says "Your card is in. You are done keeping score." with one
+// button - See Results on a single-group round, See Leaderboard while other groups
+// are out - and the Results page carries the same state as a line. The flip to
+// "Final results are in" is computeRoundFinish over the whole field, the SAME
+// resolver Net Finish asks, so the two can never disagree. A spectator is never told
+// a card is theirs, and nothing is locked: "Fix a score" is on the card because a
+// card that is in is not a card that is frozen. An installed device would otherwise
+// keep the version that says nothing at the one moment a group wants an answer.
+// Moved to v274 BECAUSE THE FIRST VERSION WAS TOO MUCH. Manny tested v273 on a
+// device: a full card above the hole view, and Finish Round still opening the recap
+// with every game, every press, a PDF and a row of jump links - at the one moment a
+// group wants a single answer. So Finish Round is now a POPUP holding only the
+// group's own card (name, gross, net, to par), the short waiting line, one See
+// Results button to the Results tab and a Fix a score link; the card above the hole
+// view is ONE LINE with a small button. The organizer's tools - Scores Look Right,
+// the KP no-winner and KP cancel answers, the per-golfer correction diff - are all
+// still in the old modal, behind an "Organizer tools" link the popup shows only to
+// an organizer. A group scorekeeper never sees it. An installed device would
+// otherwise keep the version he asked to have changed.
 // Moved to v272 SO THE SETUP COACH CANNOT HAND OVER A HOLLOW ROUND. "Help me set
 // this up" asks how many golfers and then used to hand over to Review & Save
 // whatever had been answered - Course "Not selected", Players "0 added", with the
@@ -3827,7 +3850,14 @@
 // saveSettings deliberately allows a round with NO players - a host sets up a whole
 // trip of rounds in advance and fills the rosters in later. An installed device
 // would otherwise keep the version that walks to a blank Review.
-const CACHE_VERSION = 'golfapp-v272-coachgate';
+//
+// Moved to v275 BECAUSE THIS TREE IS BOTH. ui-wave35-coach-gate carries the Setup
+// Coach gate (v272) and has now taken main, which carries the finish popup (v273 and
+// its revision v274). Neither number describes what is being served here, so the
+// merge gets its own: an installed device must not be told it already has this shell
+// when it has only one of the two waves in it. The branch is UNMERGED - this version
+// exists so Manny can Cmd+R the coach gate on top of Wave 36.
+const CACHE_VERSION = 'golfapp-v275-coachgate-plus-popup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3960,6 +3990,13 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './setup-coach-gate.js',
+    // card-is-in.js: your card is in, who is still out, or final. Precached because
+    // the moment it speaks is the moment a group has just walked off 18, which is
+    // where the signal is worst.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './card-is-in.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -
