@@ -23,12 +23,12 @@ android {
         applicationId "com.rattlegolf.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // versionCode is Android's own sequence and starts at 1; the iOS build
-        // number is a different counter. versionName is Android's own too
-        // (2026-09-17: the two stores may diverge) - android_release_test.js pins
-        // this literal and holds it to semver; move both together.
-        versionCode 1
-        versionName "1.0.0"
+        // versionCode is Android's own sequence (independent of iOS build
+        // number). versionName may match iOS when shipping together —
+        // android_release_test.js pins this literal and holds it to semver;
+        // move both together.
+        versionCode 2
+        versionName "1.0.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

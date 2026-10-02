@@ -56,11 +56,11 @@ describe('VERSION', () => {
         const m = /versionName "([^"]+)"/.exec(GRADLE);
         assert.ok(m, 'build.gradle declares no versionName');
         assert.match(m[1], /^[0-9]+\.[0-9]+\.[0-9]+$/, 'versionName must be MAJOR.MINOR.PATCH: ' + m[1]);
-        assert.equal(m[1], '1.0.0', 'Android ships 1.0.0; move this pin when Android moves');
+        assert.equal(m[1], '1.0.6', 'Android ships 1.0.6; move this pin when Android moves');
     });
 
-    test('versionCode is its own sequence and starts at 1', () => {
-        assert.match(GRADLE, /versionCode 1\b/, 'versionCode is not 1; the iOS build number is not this sequence');
+    test('versionCode is its own sequence and is pinned here', () => {
+        assert.match(GRADLE, /versionCode 2\b/, 'versionCode is not 2; the iOS build number is not this sequence');
     });
 });
 

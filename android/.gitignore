@@ -62,7 +62,22 @@ captures/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+#
+# UNCOMMENTED 2026-10-01 so it cannot be committed by accident. It is NOT in the
+# repo and never has been (empty git log for the path), and the Android build does
+# not need it: android/app/build.gradle applies the com.google.gms.google-services
+# plugin only inside a try/catch that reads the file first, so its absence logs one
+# line and the build proceeds. Nothing on Android uses native Firebase either - the
+# plugin set is @capacitor/app, @capacitor/filesystem and @capacitor/share, and
+# @capacitor-firebase/authentication is iOS-only by the capacitor.config.ts
+# allowlist.
+#
+# WHEN ANDROID DOES GET NATIVE SIGN-IN this line is the thing to revisit, and it is
+# a decision rather than an obstacle: the iOS twin, GoogleService-Info.plist, is
+# COMMITTED on purpose (see ios/.gitignore for the reasoning - nothing in it is a
+# secret and a tree without it ships a binary with Firebase unconfigured). If
+# Android goes the same way, drop this line rather than reaching for git add -f.
+google-services.json
 
 # Freeline
 freeline.py

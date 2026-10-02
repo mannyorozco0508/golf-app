@@ -411,8 +411,14 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // pointer removal failed has to say so rather than look deleted. And it
         // CONFIRMS the delete, because a row vanishing is the kind of thing somebody
         // needs told rather than inferred.
-        assert.equal(refuse + fail + toast, 63,
-            'the alerts should still be 63 messages, got '
+        // 64 SINCE THE COACH GATE (v272): saveSettings refuses one more way. A round
+        // the Setup Coach started cannot be saved while the course, the tee, the
+        // scoring or the golfers are missing, and that refusal has to live in
+        // saveSettings as well as on the disabled button - goToWizardStep resets the
+        // label on every step change, a cached shell can hold older markup, and
+        // onclick="saveSettings()" is reachable from the console.
+        assert.equal(refuse + fail + toast, 64,
+            'the alerts should still be 64 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
