@@ -217,6 +217,17 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
             const display = Object.assign({}, a.display);
             assert.equal(display['group-missing-note'], 'none', 'the note is hidden');
             delete display['group-missing-note'];
+            // RE-PINNED (v273, UI Wave 36): card-is-in joined the page - the "Your card
+            // is in" card above both view mounts. It is ONE ADDED DISPLAY KEY and it is
+            // 'none' on all three of these links, which is why the text map is still
+            // byte-identical: none of these fixtures has a group whose card is complete
+            // in this realm, and netFinishNamesAllowed() fails closed without
+            // settlement-engine, so the card has nothing to say. Asserted rather than
+            // merely deleted - if it ever RENDERS on one of these links, that is a real
+            // change to the old page and this line is where it shows up.
+            assert.equal(display['card-is-in'], 'none',
+                'card-is-in rendered on a link whose round is not complete');
+            delete display['card-is-in'];
             assert.deepEqual(display, PREV.links[k].display);
             assert.equal(a.sb.window.__scGroupMissing, false);
         }));

@@ -65,6 +65,7 @@
 <script src="grouping.js"></script>
 <!-- score-gaps.js (v192): "Not final — Marty is missing hole 1" on the money surfaces while a card has a blank hole inside it. -->
 <script src="score-gaps.js"></script>
+<script src="card-is-in.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -215,6 +216,14 @@
         /* v195: a golfer marked Out on the Players sheet. */
         .golfer-out td { opacity: 0.55; text-decoration: line-through; }
         .gap-line { font-weight: bold; color: var(--accent-red); font-size: 0.85rem; margin: 0 0 8px 0; }
+        /* NOT FINAL YET / FINAL (Wave 36). A tag and a line, not a panel: the
+           Receipt's job is the money and this is context above it. */
+        .rfb { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+            border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 10px; margin: 0 0 10px 0; }
+        .rfb-final { border-color: var(--brand-green); }
+        .rfb-tag { font-size: 0.78rem; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.04em; color: var(--brand-green); }
+        .rfb-note { font-size: 0.82rem; color: var(--text-muted); }
         /* THE HEADING HIERARCHY (v195b). A payer reading the Receipt could not see
            where Flight A ended and Flight B began: the section heads were the size of
            the rows. Three sizes, top down, each with a rule under it and air above:
@@ -542,6 +551,10 @@ html {
            #settle-content       the main format's settlement and the side games
            #results-net          settled only: Net +/− for every golfer, collapsed
            #receipt-scorecard    the card, last -->
+    <!-- WHO IS STILL OUT, OR FINAL (Wave 36). The same card-is-in.js state the
+         scorecard renders, said as one line: one builder, two surfaces, so the
+         Receipt and the scorecard cannot disagree about whether the round is over. -->
+    <div id="results-final-banner" role="status" style="display:none;"></div>
     <div id="results-gap-line"></div>
     <div id="results-top"></div>
     <div id="money-pool-section"></div>
@@ -699,6 +712,7 @@ html {
             currentData = snapshot.val() || {};
             document.getElementById("main-title").textContent = `🤝 Settle (${currentData.eventName || "Weekend Round"})`;
             renderResultsGapLine(currentData);
+            renderFinalBanner(currentData, currentData.courseData || [], currentData.scores || {});
             renderMoneyPoolSection(currentData, currentData.courseData || [], currentData.scores || {});
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
@@ -842,6 +856,54 @@ html {
         const mount = document.getElementById('results-gap-line');
         if (!mount) return;
         mount.innerHTML = gapLineHtml(data, 'gap-line results-gap');
+    }
+
+    // ---- NOT FINAL YET, OR FINAL (Wave 36) ----------------------------------
+    //
+    // The same card-is-in.js state the scorecard renders, said as one line. ONE
+    // BUILDER, TWO SURFACES: a Receipt that said Final while the scorecard was
+    // still waiting on Group 6 would be the two-answers-to-one-question defect this
+    // repo has already paid for twice.
+    //
+    // computeRoundFinish, not .settled: an unresolved KP holds KP money and is a
+    // different question from whether every group is off the course. The money
+    // sections below have their own gates for that and are untouched.
+    function renderFinalBanner(data, courseData, savedScores) {
+        const mount = document.getElementById('results-final-banner');
+        if (!mount) return;
+        if (!window.cardIsIn || typeof window.cardIsIn.cardIsInState !== 'function') {
+            mount.style.display = 'none';
+            return;
+        }
+        let b = { show: false };
+        try {
+            const players = (data && data.players) || [];
+            const groupOf = (typeof playerGroupMap === 'function')
+                ? playerGroupMap(players, (data && data.groupSizeOverrides) || {}) : {};
+            let count = 1;
+            try {
+                count = (typeof computeGroupBoundaries === 'function')
+                    ? computeGroupBoundaries(players.length, (data && data.groupSizeOverrides) || {}).length : 1;
+            } catch (e) { count = 1; }
+            const finished = (typeof computeRoundFinish === 'function')
+                && !!computeRoundFinish(data, courseData || [], savedScores || {}).finished;
+            // NO ?group= IS READ HERE ON PURPOSE. The Receipt is the whole round's
+            // document, so this line answers "is the round over", never "is your
+            // card in" - which is the scorecard's question and needs a card-keeper.
+            const st = window.cardIsIn.cardIsInState({
+                players: players, courseData: courseData || [], scores: savedScores || {},
+                groupOf: groupOf, hasGroupLock: false, lockedGroup: null,
+                groupCount: count, roundFinished: finished
+            });
+            b = window.cardIsIn.resultsBanner(st);
+        } catch (e) { b = { show: false }; }
+        if (!b.show) { mount.style.display = 'none'; mount.innerHTML = ''; return; }
+        const esc = (typeof escapeHtml === 'function') ? escapeHtml : (x => String(x));
+        mount.innerHTML = '<div class="rfb' + (b.text === 'Final' ? ' rfb-final' : '') + '">'
+            + '<span class="rfb-tag">' + esc(b.text) + '</span>'
+            + (b.note ? '<span class="rfb-note">' + esc(b.note) + '</span>' : '')
+            + '</div>';
+        mount.style.display = 'block';
     }
 
     // ---- THE ONE MONEY DISPLAY RULE FOR THIS DOCUMENT -----------------------

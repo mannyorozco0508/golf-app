@@ -82,6 +82,7 @@
          the outlined box, the banner, the Board's flag and the money pages' "Not
          final" all draw from it. Pure; reads scores the way the engines do. -->
     <script src="score-gaps.js"></script>
+    <script src="card-is-in.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -773,6 +774,22 @@
         }
         .hole-view-position { font-size: 0.85rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
 
+        /* YOUR CARD IS IN (Wave 36). Full width, because the one thing a group
+           wants at this moment is a single obvious next step. 48px of button, over
+           the 44px minimum, measured the same way every other control on this page
+           is. No colour that means money: this card is an instruction, not a total. */
+        .cii-card { border: 2px solid var(--brand-green); border-radius: 10px;
+            padding: 14px; margin: 0 0 12px 0; background: var(--nassau-box-bg); text-align: center; }
+        .cii-card.cii-waiting { border-color: var(--border-mid); background: transparent; }
+        .cii-head { font-size: 1.05rem; font-weight: bold; color: var(--brand-green); }
+        .cii-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; line-height: 1.35; }
+        .cii-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; line-height: 1.35; }
+        .cii-cta { display: block; width: 100%; box-sizing: border-box; min-height: 48px;
+            margin-top: 12px; border: 0; border-radius: 8px; background: var(--brand-green);
+            color: #ffffff; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .cii-fix { display: block; width: 100%; box-sizing: border-box; min-height: 44px;
+            margin-top: 8px; border: 0; background: transparent; color: var(--text-muted);
+            font-size: 0.85rem; text-decoration: underline; cursor: pointer; }
         .finish-round-nav-btn {
             flex: 1; padding: 12px; font-size: 0.95rem; font-weight: bold; border-radius: 10px; border: none;
             background: linear-gradient(135deg, var(--brand-green), var(--accent-teal)); color: #fff; cursor: pointer;
@@ -1581,6 +1598,13 @@ html {
          them. 👥 Players below is where a roster is managed: its Out box writes
          players[i].out on the ROSTER, which is a different thing entirely. -->
     <div id="handicap-basis-note" class="match-hcp-note" style="display:none; white-space:pre-line;"></div>
+
+    <!-- YOUR CARD IS IN (Wave 36). Written by renderCardIsIn() from renderScorecard,
+         static and above BOTH view mounts - the same reason #group-missing-note is
+         there: a foursome that just holed out should be told so in Hole View and in
+         the Full Card, not in whichever one they happen to be looking at. The words
+         and the decision are card-is-in.js; this page only mounts them. -->
+    <div id="card-is-in" role="status" style="display:none;"></div>
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
@@ -3137,6 +3161,89 @@ html {
         el.textContent = `\u26A0\uFE0F This link is for Group ${group}, but this round has ${groupCount} group${groupCount === 1 ? '' : 's'}. `
             + 'No scores are shown \u2014 ask the organizer for a current link.';
         el.style.display = 'block';
+    }
+
+    // ---- YOUR CARD IS IN (Wave 36) ------------------------------------------
+    //
+    // ONE BUILDER, TWO SURFACES. card-is-in.js decides what to say; this renders it,
+    // and settlement.html renders the same state as its Results banner. The round's
+    // finishedness comes from netFinishNamesAllowed() - computeRoundSettlement's
+    // .finished, which is what Net Finish already asks before it prints names - so
+    // "is the round over" has exactly one answer on this page.
+    //
+    // THE BUTTON REUSES THE EXISTING FLOWS and starts nothing new: See Results opens
+    // the Finish Round modal (the recap that already has review, results and the
+    // Receipt in it) and See Leaderboard goes where the Leaderboard pill goes.
+    function cardIsInInput() {
+        const data = currentData || {};
+        const players = data.players || [];
+        const groupOf = (typeof playerGroupMap === 'function')
+            ? playerGroupMap(players, data.groupSizeOverrides || {}) : {};
+        let count = 1;
+        try {
+            count = (typeof computeGroupBoundaries === 'function')
+                ? computeGroupBoundaries(players.length, data.groupSizeOverrides || {}).length : 1;
+        } catch (e) { count = 1; }
+        return {
+            players: players,
+            courseData: data.courseData || [],
+            scores: data.scores || {},
+            groupOf: groupOf,
+            hasGroupLock: hasGroupLock,
+            lockedGroup: lockedGroup,
+            groupCount: count,
+            roundFinished: netFinishNamesAllowed()
+        };
+    }
+
+    function cardIsInGo(kind) {
+        if (kind === 'results') {
+            // The existing recap, not a second one.
+            if (typeof openFinishRoundModal === 'function') return openFinishRoundModal();
+            return;
+        }
+        const g = urlParams.get('group');
+        window.location.href = 'leaderboard.html?game=' + currentMode + (g ? '&group=' + g : '');
+    }
+
+    // THE SCORE BOXES ARE NOT TOUCHED by any of this. A card that is in is not a card
+    // that is frozen, and the link says so rather than leaving a group guessing
+    // whether they may still correct a number.
+    function cardIsInFix() {
+        const el = document.getElementById('card-is-in');
+        if (el) el.style.display = 'none';
+        // setViewMode is the page's own view switch - the same call the Hole View
+        // button makes. Named rather than guessed: switchScorecardView does not
+        // exist, and a typeof guard around a wrong name is a no-op that looks fine.
+        if (typeof setViewMode === 'function') { try { setViewMode('hole'); } catch (e) {} }
+    }
+
+    function renderCardIsIn() {
+        const el = document.getElementById('card-is-in');
+        if (!el) return;
+        if (!window.cardIsIn || typeof window.cardIsIn.cardIsInState !== 'function') {
+            el.style.display = 'none';
+            return;
+        }
+        let st;
+        try { st = window.cardIsIn.cardIsInState(cardIsInInput()); }
+        catch (e) { el.style.display = 'none'; return; }
+        if (!st.show) {
+            if (el.style.display !== 'none') el.style.display = 'none';
+            el.innerHTML = '';
+            return;
+        }
+        const esc = (typeof escapeHtml === 'function') ? escapeHtml : (x => String(x));
+        el.innerHTML = '<div class="cii-card cii-' + esc(st.kind) + '">'
+            + '<div class="cii-head">' + esc(st.head) + '</div>'
+            + (st.sub ? '<div class="cii-sub">' + esc(st.sub) + '</div>' : '')
+            + (st.note ? '<div class="cii-note">' + esc(st.note) + '</div>' : '')
+            + '<button type="button" class="cii-cta" onclick="cardIsInGo(\'' + esc(st.ctaKind) + '\')">'
+            + esc(st.cta) + '</button>'
+            + (st.fix ? '<button type="button" class="cii-fix" onclick="cardIsInFix()">'
+                + esc(window.cardIsIn.WORDS.fix) + '</button>' : '')
+            + '</div>';
+        if (el.style.display !== 'block') el.style.display = 'block';
     }
 
     function liveStandings(scope) {
@@ -9399,6 +9506,7 @@ html {
         window.__scFilteredPlayers = filteredPlayers;
         window.__scGroupMissing = groupMissing;
         renderGroupMissingNote(groupMissing, selectedGroup, groupBoundaries.length);
+        renderCardIsIn();
         renderSupersededBanner();
         renderGapBanner(viewGaps);
         maybeOpenPlayersSheetFromLink();

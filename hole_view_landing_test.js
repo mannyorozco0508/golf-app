@@ -271,7 +271,15 @@ describe('THE FOCUS FOLLOWS THE BOXES: the first empty one, or nothing at all', 
     test('every box on hole 2 holds a score: the landing is the same, and NOTHING is focused', () => {
         const s = P(S.full, 3); landed(s, 2); assert.equal(s.enabled, 4);
         assert.equal(s.active, 'BODY', 'a full hole took focus anyway');
-        assert.equal(s.headingTop, P(S.part, 3).headingTop);
+        // RE-PINNED (UI Wave 36, was an exact equality): LNDFULL has every hole scored
+        // for every golfer, so the round is complete and the new "Your card is in" card
+        // renders above the hole view - LNDPART's does not. The landing still puts the
+        // heading in the same place; the two fixtures now differ by 0.3px of sub-pixel
+        // scroll because the documents are different heights. The claim is "the landing
+        // is the same", so the tolerance is this file's own: 1px, as used against
+        // OFFSET in landed().
+        assert.ok(Math.abs(s.headingTop - P(S.part, 3).headingTop) <= 1,
+            'the landing moved: ' + s.headingTop + ' vs ' + P(S.part, 3).headingTop);
     });
     test('a remote snapshot afterwards does not focus anything either - there was nothing to restore', () => {
         // The clean half of the pair: on a FULL hole the landing focused nothing, so

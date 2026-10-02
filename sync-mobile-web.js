@@ -139,6 +139,13 @@ const CONSUMER_SHELL = [
     // precached: a golfer who wants out should not be told to find signal first.
     // NO APOSTROPHES IN THIS BLOCK.
     'account-exit.js',
+    // card-is-in.js (v273): what to say the moment a groups last score posts - your
+    // card is in, who is still out, or final - and the Results banner that says the
+    // same thing. index.html and settlement.html both reach it through a typeof
+    // guard, so a bundle without it simply says nothing; it ships because a group
+    // standing on 18 with no idea whether they are done is the defect this fixed.
+    // NO APOSTROPHES IN THIS BLOCK.
+    'card-is-in.js',
     // ui-dialogs.js (v226): the shared telling, asking and typing that replaced
     // alert/confirm/prompt. sidematches.html loads it unguarded, so a bundle
     // without it ships a page that breaks on the first refusal. No apostrophes in

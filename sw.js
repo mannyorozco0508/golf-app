@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v112-signedinclosed. The tournament product cache
+// The consumer product cache is consumer-v113-cardisin. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3816,7 +3816,18 @@
 // then deleted it. Signed in, the toggle is gone, the card is shut, and the handler
 // refuses on its own so a stale onclick or a cached shell cannot open it. Moving an
 // organizer to another device is: sign OUT here, sign in over there.
-const CACHE_VERSION = 'golfapp-v271-signedinclosed';
+// Moved to v273 SO A GROUP IS TOLD WHEN ITS CARD IS IN. A foursome posted its last
+// score and the app said nothing: the hole view still looked like a hole view, and
+// nobody knew whether they were done, whether the money was settled, or where to go.
+// Now the scorecard says "Your card is in. You are done keeping score." with one
+// button - See Results on a single-group round, See Leaderboard while other groups
+// are out - and the Results page carries the same state as a line. The flip to
+// "Final results are in" is computeRoundFinish over the whole field, the SAME
+// resolver Net Finish asks, so the two can never disagree. A spectator is never told
+// a card is theirs, and nothing is locked: "Fix a score" is on the card because a
+// card that is in is not a card that is frozen. An installed device would otherwise
+// keep the version that says nothing at the one moment a group wants an answer.
+const CACHE_VERSION = 'golfapp-v273-cardisin';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -3942,6 +3953,13 @@ const SHELL_FILES = [
     // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
     // matching quoted strings, and one apostrophe swallows every entry after it.
     './account-exit.js',
+    // card-is-in.js: your card is in, who is still out, or final. Precached because
+    // the moment it speaks is the moment a group has just walked off 18, which is
+    // where the signal is worst.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './card-is-in.js',
     './hole-events.js',
     './pool-engine.js',
     // net-finish-line.js (v252): the Net Finish split - "1st $50, 2nd $30, 3rd $20" -
