@@ -3092,11 +3092,17 @@ is the case where "one group IS the field" was the deliberate design.
   `com.apple.developer.applesignin = ["Default"]` in the file, Team A2Z95T64UU, and
   GoogleService-Info.plist still in the Resources build phase. **Nothing archived,
   nothing uploaded.**
-- **ONE THING TO CHECK BEFORE ARCHIVING:** the tree had carried 1.0.6 **build 2**
-  since 2026-10-01 (committed at `6a885ef`, never archived by this session), and the
-  instruction for this prep was build 1. If 1.0.6 build 2 was ever uploaded to App
-  Store Connect, build 1 will be REJECTED as lower and the next one has to be build
-  3. Android is at 1.0.6 versionCode 2 and is unaffected by this change.
+- **WHAT ACTUALLY SHIPPED: 1.0.6 BUILD 3, uploaded and submitted for review on
+  2026-10-02, with build 2 removed.** `CURRENT_PROJECT_VERSION` is 3 on Debug and
+  Release. The build-1 prep above was superseded within the hour, and the reason is
+  worth keeping: build 2 HAD been used, so build 1 could not be uploaded - it is
+  lower. The rule for next time is the one that caught this: App Store Connect will
+  not take a build number at or below one that version has already seen, so the next
+  1.0.6 build is 4, and a fresh version starts at 1.
+- **APP STORE CONNECT, as of 2026-10-02:** 1.0.5 is **Ready for Distribution**, and
+  1.0.6 (3) is **Waiting for Review**. Read from the console by Manny - there is no
+  App Store Connect key on this Mac, so nothing here checked it.
+- Android is at 1.0.6 versionCode 2 and is unaffected by any of this.
 
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
