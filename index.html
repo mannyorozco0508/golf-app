@@ -6403,7 +6403,15 @@ html {
         // admin.html's wizard uses for a row loaded from a pre-conversion round).
         return String((p && p.hcp) || '');
     }
-    function psBoxLabel() { return psBoxIsIndex() ? 'Index' : 'HCP'; }
+    // WAVE 37: "HCP" became "Strokes" on a strokes round. HCP named the FIELD; the
+    // golfer wants to know what the NUMBER is, and on this round it is strokes as
+    // typed. handicap-labels.js owns both words so the setup row, this sheet and the
+    // Game tab cannot drift into three names for one box.
+    function psBoxLabel() {
+        return (typeof handicapColumnLabel === 'function')
+            ? handicapColumnLabel(currentData)
+            : (psBoxIsIndex() ? 'Index' : 'Strokes');
+    }
     // The line under the box. One builder (handicap-labels.js) with the Board and
     // the Game tab, so the three surfaces cannot drift into three sentences about
     // the same numbers.

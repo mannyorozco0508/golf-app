@@ -159,10 +159,17 @@ describe('2. THE BOX SHOWS THE INDEX, AND SAYS SO', () => {
         assert.match(html, /class="ps-hcp"[^>]*placeholder="Index"/, 'the box says Index');
         assert.ok(!/class="ps-hcp"[^>]*placeholder="HCP"/.test(html), 'and not HCP on a GHIN round');
     });
-    test('an AS-ENTERED round: the box holds the playing handicap and is labelled HCP', () => {
+    test('an AS-ENTERED round: the box holds the playing handicap and is labelled STROKES', () => {
+        // RE-POINTED (Wave 37, was "HCP"). HCP named the FIELD; the golfer wants to
+        // know what the NUMBER is, and on an as-entered round it is strokes as typed.
+        // Manny's group plays off strokes, and "HCP" is the kind of label that lets a
+        // golfer assume the app will convert their 11. handicap-labels.js now owns
+        // both words - handicapColumnLabel - so the setup row, this sheet and the Game
+        // tab cannot drift into three names for one box. THE VALUE IS UNCHANGED, which
+        // is the assertion above: the box still holds the playing handicap.
         const sb = page(round({ handicapBasis: 'as-entered' }));
         assert.deepEqual(boxValues(sb), ['22', '7', '9', '12'], 'boxes: ' + JSON.stringify(boxValues(sb)));
-        assert.match(sheetHtml(sb), /class="ps-hcp"[^>]*placeholder="HCP"/);
+        assert.match(sheetHtml(sb), /class="ps-hcp"[^>]*placeholder="Strokes"/);
     });
     test('the note names the DERIVED Course number beside the box', () => {
         const sb = page(round());
