@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v116-strokesmode. The tournament product cache
+// The consumer product cache is consumer-v117-freetierquota. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3877,7 +3877,16 @@
 // both sides rather than collapsed - the record of why a shell moved is not something
 // a merge gets to drop - and the key is new so an installed device cannot be told it
 // already has a shell it has only half of.
-const CACHE_VERSION = 'golfapp-v276-coachgate-strokesmode';
+// Moved to v277 BECAUSE THE QUOTA SENTENCE CHANGED, AND IT IS A SENTENCE GOLFERS
+// WILL NOW ACTUALLY READ. The GolfCourseAPI account is the FREE tier - 35 requests
+// a day shared by everybody - not the Pro plan a scaling audit reported on
+// 2026-10-03. course-import-rules.js is precached and holds the sentence; a device
+// on v276 would keep serving "Online search has used up today's lookups", which
+// says nothing about what to do instead, on the one afternoon a group needs to be
+// told to pick a saved course. admin.html moved with it (its own suffix joins onto
+// the new sentence), and functions/api/_lib.js is server-side so no device caches
+// it: the ceiling it reads from GOLFCOURSE_DAILY_LIMIT changes for everyone at once.
+const CACHE_VERSION = 'golfapp-v277-freetierquota';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -4,11 +4,12 @@
 //
 // MANUAL ONLY. THIS SPENDS QUOTA. IT MUST NEVER RUN IN npm test.
 //
-// The account is on Pro - 10,000 requests a day, not 35 - so one request is no
-// longer expensive. The --live gate STAYS anyway: a tool that costs money should
-// be deliberate, every sweep here globs tools/*check*.js and that filename
-// matches, and a header saying "manual only" cannot stop a glob. What has come
-// down is the alarm, not the gate.
+// The account is the FREE tier - 35 requests a day, shared by every golfer on
+// the site (corrected 2026-10-03; this header claimed Pro, 10,000 a day, from
+// 2026-09-11, and the upgrade never happened). ONE REQUEST HERE IS A THIRTY-FIFTH
+// OF THE DAY. The --live gate is load-bearing again, not merely tidy: every sweep
+// in this repo globs tools/*check*.js and that filename matches, and a header
+// saying "manual only" cannot stop a glob.
 //
 // course_api_proxy_test.js drives a stub whose success responses are bytes
 // captured from the live API. That stub is the only thing standing between us
@@ -23,8 +24,9 @@
 //
 // WHY IT IS NOT IN THE SUITE. A test suite that spends a metered budget is a
 // suite you stop running, and the day you stop running it is the day it stops
-// protecting anything. That was acute at 35 a day and is merely true at 10,000.
-// So this is a tool you invoke deliberately, and it tells you what it cost.
+// protecting anything. At 35 a day that is acute: a suite run twice in an hour
+// would spend a fifth of the day. So this is a tool you invoke deliberately, and
+// it tells you what it cost.
 //
 //   node tools/golfcourse-contract-check.js --live            1 request
 //   node tools/golfcourse-contract-check.js --live --detail   2 requests
@@ -269,8 +271,9 @@ const OPTED_IN = process.argv.includes('--live')
     const verdict = failures.length ? 'FAIL' : 'PASS';
     console.log(JSON.stringify({
         verdict, requestsSpent: spent,
-        note: 'These came out of the daily budget - 10,000 on Pro. The proxy has its own counter in KV and '
-            + 'knows nothing about requests made by this tool.',
+        note: 'These came out of the daily budget - 35 a day on the free tier. The proxy has its own '
+            + 'counter in KV and knows nothing about requests made by this tool, so it will still '
+            + 'believe it has the whole day.',
         failures, observed
     }, null, 2));
     process.exit(failures.length ? 1 : 0);

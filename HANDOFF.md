@@ -359,9 +359,11 @@ list every time and every assertion was true of nothing. It was caught by
 forcing the rule to an impossible value and watching the suite stay green. That
 impossible rule is now a permanent test in the file.
 
-**The provider quota was accidentally a brake on all of this.** At 35 requests
-a day, a runaway import could not do much damage. The account is on Pro at
-10,000 a day, so that brake is gone and this clause is what remains.
+**The provider quota is accidentally a brake on all of this.** At 35 requests a
+day, a runaway import cannot do much damage. This paragraph said "the account is
+on Pro at 10,000 a day, so that brake is gone" from 2026-09-11 to 2026-10-03.
+**It was never true — the account is the free tier.** The brake is still there,
+and this clause is what backs it up.
 
 **`global_courses` is enumerable by anyone.** `.read: true` sits on the parent
 and has since the file was created, so `GET /global_courses.json?shallow=true`
@@ -1873,9 +1875,13 @@ v109 page, goes red on both halves. Individual mode was measured unaffected.
 
 **Unmapped courses now seed a BLANK grid**, not par 4 with stroke indexes 1–18. That old seed was a complete, well-formed, fictional card that passed every validation check, and saving it poisoned `global_courses` for all users. Blank makes the existing "Hole 1 is missing a Par" refusal reachable. Don't reintroduce a default.
 
-A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **The account is on the PRO plan: 10,000 requests/day.** The free tier is 35 — this line said 50 until 2026-09-11, then 35, and the upgrade landed the same week. The proxy was designed against 35 and its numbers moved with the plan; the design notes below keep the free-tier reasoning because it explains the shape of the code, not because it still binds. Each course still costs two: search returns only a *count* of tee boxes, so the tee data needs a second request by id.
+A backfill script lives outside the repo at `~/rattle-backfill`, pulling par and handicap from GolfCourseAPI. Match rate on a 20-course sample was **50%** — good on name-brand clubs, thin on small municipals. **THE ACCOUNT IS ON THE FREE PLAN: "$0 per month / Up to 35 requests per day" — corrected 2026-10-03.** This line claimed the Pro plan (10,000/day) from 2026-09-11 until 2026-10-03, and the proxy's numbers were retuned on the strength of it: the daily ceiling went 30 → 9,000, the search cache 7 days → 1 hour, and zero results stopped being cached. **The upgrade never happened.** Pro is $9.99/month for 10,000/day and Enterprise $24.99 for 100,000/day (golfcourseapi.com), so upgrading is cheap and may well be the right answer before monetization — but nothing may assume it has been done.
 
-**Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail, comfortably inside 10,000 a day. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
+**The ceiling is now an environment read: `GOLFCOURSE_DAILY_LIMIT` in the Pages project.** Default 35; set it to **9000** (`PRO_DAILY_CEILING` in `functions/api/_lib.js`) the day the plan changes, and no deploy is needed. `course_quota_free_tier_test.js` proves the variable is wired into the admission gate rather than merely exported, and that a malformed value falls back to 35 rather than to NaN (infinite ceiling) or 0 (every search refused). **A provider 429 now reports `daily_limit`,** the same reason as our own ceiling, so running out says "Course search is resting for today — pick a saved course instead" instead of "isn't answering right now".
+
+Each course costs two requests: search returns only a *count* of tee boxes, so the tee data needs a second request by id. So 35 a day is roughly **17 new courses a day across every golfer using the site** — and not 17 rounds, since a course already in `global_courses` or in the KV cache costs nothing.
+
+**Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail. On the free tier that is **17 courses a day**, so a 200-course seed is twelve days of patience or a month of Pro; on Pro (10,000/day) it is one sitting. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
 
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
@@ -2106,7 +2112,7 @@ Open these in any browser, in order. Each rung tells you something the one befor
 | Request | Expected | If you get something else |
 |---|---|---|
 | `/api/course-search?q=ab` | `{"status":"unavailable","reason":"query_too_short"}` | Routing is broken. This rung needs no key and no KV, so it is the cheapest proof Cloudflare is serving the Function at all |
-| `/api/course-search?q=streamsong` | `{"status":"ok","courses":[…]}` — four Streamsong courses. **This spends one request** (of 10,000 on Pro) | See the reading below |
+| `/api/course-search?q=streamsong` | `{"status":"ok","courses":[…]}` — four Streamsong courses. **This spends one request** (of **35 a day** on the free tier — do not poke this idly) | See the reading below |
 | the same URL again | identical, instantly, **and no second request spent** | The cache is not working — check the binding *name* |
 
 **The reading — this replaces an earlier version of these notes that was wrong:**
@@ -3057,10 +3063,50 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03
+
+**THE GOLFCOURSEAPI PLAN WAS WRONG EVERYWHERE, AND IT IS CORRECTED.** The account
+is the **FREE tier - "$0 per month / Up to 35 requests per day"**. From 2026-09-11
+to 2026-10-03 this file, `functions/api/_lib.js` and a scaling audit all said Pro,
+10,000 a day. The upgrade never happened, and the proxy's numbers had been retuned
+on the strength of it: the daily ceiling went 30 -> 9,000, which on a 35-a-day key
+is not a runaway detector but no ceiling at all - the provider's whole day is spent
+257 times before ours notices.
+
+- **The ceiling is 35, read from `GOLFCOURSE_DAILY_LIMIT`** in the Pages
+  environment. Set it to **9000** (`PRO_DAILY_CEILING`) the day the plan changes:
+  one dashboard field, no deploy. A malformed value falls back to 35 in both
+  directions - NaN would make the ceiling infinite, and a `0` typed to mean "off"
+  would refuse every search on a fresh morning while looking exactly like a
+  genuinely spent quota.
+- **A provider 429 now reports `daily_limit`,** the same reason as our own ceiling,
+  because to a golfer on the first tee they mean the same thing. A 401 deliberately
+  still reports `upstream_error`: that is a wrong key, and "try again tomorrow"
+  would hide a misconfigured deploy for ever.
+- **Running out says what to do.** "Course search is resting for today - pick a
+  saved course instead. It works again tomorrow." `admin.html` adds "You can still
+  type the card in below." because it has a grid; `tournament.html` has none and
+  does not promise one. **The brief asked for "add it with the scanner" and there
+  is no scanner** - the scorecard-photo OCR was deleted from Consumer 1.0, partly so
+  `privacy.html`'s "no photos or camera access" stayed true - so the sentence names
+  the path that exists. `course_quota_free_tier_test.js` (19 tests) holds all of it.
+- **What 35 a day actually buys:** two requests per course, so ~17 NEW courses a
+  day across every golfer using the site. Not 17 rounds - a course already in
+  `global_courses` or warm in KV costs nothing. Pro is $9.99/month and is the
+  cheapest fix on the whole scaling list.
+- **Still open: the whole `global_courses` node is downloaded on every setup-page
+  load** - `admin.html:3259` `.on('value')`, `tournament.html:836`, `trip.html:575`
+  and `:875`. Measured 2026-10-03: 42 courses, 61,258 bytes, avg 1,440 B/course,
+  API imports 7.1-8.6 KB each. `?shallow=true` is 941 bytes, 65x smaller. **The
+  Firebase JS SDK has no shallow read** - it is a REST-only parameter - so a
+  lightweight index is either a new database node (a `database.rules.json` delta,
+  STRICT, needs approval) or a REST shallow probe plus a cached name index. That is
+  Wave 38 and it is not started.
+
 ## Where things stand, 2026-10-02
 
 **WAVES 35 AND 37 ARE ON MAIN, AND 1.0.6 BUILD 1 IS PREPPED.** `0b915e8` then
-`8a83de3`, cache `golfapp-v276-coachgate-strokesmode` / consumer `v116`.
+`8a83de3`, cache `golfapp-v276-coachgate-strokesmode` / consumer `v116`. Superseded by `golfapp-v277-freetierquota` / consumer `v117` (the free-tier quota sentence, 2026-10-03).
 
 - **Wave 35 - the Setup Coach cannot hand over a hollow round.** "Help me set this
   up" used to reach Review & Save with Course "Not selected" and Players "0 added".
@@ -3546,13 +3592,16 @@ success — the API answered, it just answered with nothing. So a golfer typing
 "Quintaro" for "Quintero" spent a request to learn nothing, and then that empty
 answer was served to everyone for a week, indistinguishable from "this course does
 not exist".
-  - **What closed it was the Pro upgrade, not a clever fix.** At 35 requests a day
-    the trade was real: caching zeros was free protection against a repeated typo,
-    and not caching them risked burning the budget on a common misspelling. At
-    10,000 a day re-asking costs one request and the wrong answer costs a golfer
-    their round, so zeros are simply not stored. `functions/api/_lib.js` asserts
-    it both ways — an empty result is fetched again, a non-empty one is still
-    cached.
+  - **What closed it was believed to be a Pro upgrade. There was no upgrade**
+    (corrected 2026-10-03), so the trade is still real: caching zeros is free
+    protection against a repeated typo, and not caching them risks burning a
+    35-request day on a common misspelling. **Zeros are still not cached anyway**,
+    deliberately — the failure it prevents is telling a golfer a course does not
+    exist when it does, which is the defect the whole proxy exists to prevent, and
+    it already ended once with an offer to add a duplicate. A typo costing a
+    second request is a worse day for the budget and a better day for the golfer.
+    `functions/api/_lib.js` asserts it both ways — an empty result is fetched
+    again, a non-empty one is still cached.
   - **The spelling problem itself is still open and still its own wave.** The
     upstream's `fuzzy_match` is a whole-string substring test, so it fails on a
     misspelling exactly as it failed on "Legacy Golf Club" vs "Legacy Golf
@@ -3860,8 +3909,8 @@ nobody reads them as evidence about a rendered page.
   `--query <text>` (default Streamsong) and `--param <name>=<value>`, appended to
   the search URL only when given, and `observed` records every top-level key and
   every id returned — that is how the ceiling above was measured. (The "35/DAY"
-  in this bullet's title is the free tier the check was written against; the
-  account is Pro, 10,000 a day, and the gate stays regardless.)
+  in this bullet's title is correct and current: the account is the **free tier**,
+  35 a day. A line here claimed Pro from 2026-09-11 to 2026-10-03; it was wrong.)
 
 These exist because the node suite **structurally cannot** assert two things:
 **geometry** — `helpers/mini-dom.js` returns a hard-coded zero rect and implements

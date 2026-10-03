@@ -67,7 +67,12 @@ describe('THE MESSAGES', () => {
         assert.match(R.courseImportMessage('daily_limit'), /tomorrow/);
         assert.doesNotMatch(R.courseImportMessage('daily_limit'), /type|below|yourself/i);
         const admin = loadHtmlInlineScript('admin.html', [], { only: false });
-        assert.match(admin.onlineSearchMessage('daily_limit'), /^Online search has used up today's lookups\. It works again tomorrow — you can still type the card in below\.$/);
+        // RE-PINNED 2026-10-03. The account is the free tier - 35 a day, not the
+        // 10,000 a scaling audit reported - so this sentence went from the rare
+        // case to the Saturday-afternoon case and now leads with somewhere to go.
+        // The suffix is its own sentence because the base already carries an
+        // em-dash and two in one line wrapped badly on a phone.
+        assert.match(admin.onlineSearchMessage('daily_limit'), /^Course search is resting for today — pick a saved course instead\. It works again tomorrow\. You can still type the card in below\.$/);
         assert.equal(admin.onlineSearchMessage('network'), R.courseImportMessage('network'));
     });
 });
