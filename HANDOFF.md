@@ -3063,6 +3063,52 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03 (later)
+
+**WAVE 38 AND THE LIVE MATCHES FINAL TOTAL ARE ON MAIN.** `a9fbf8d`, cache
+`golfapp-v278-courseindex` / consumer `v118`. Production verified from a fresh
+codeload tarball and live.
+
+- **Wave 38 - the setup pages stop downloading every course anybody ever added.**
+  MEASURED: `global_courses` is 61,258 bytes for 42 courses and grows about 8 KB
+  per import, and admin.html, tournament.html and trip.html each read ALL of it on
+  every load (a live listener on the first two). `?shallow=true` answers the same
+  node in **941 bytes** - but it is a REST parameter and **the Firebase JS SDK has
+  no shallow read**, which is why the probe is a plain `fetch` and not a `ref`.
+  `course-index.js` is the one builder for all three pages, every dependency
+  injected. Steady state: **941 bytes a load instead of 61 KB**, plus one record
+  for a course added since the last visit and one when a course is picked.
+  **Cards are never cached, only names** - the probe cannot see a record CHANGE,
+  and a stale stroke index pays the wrong golfer.
+  - **No cache means no probe.** Found by `tools/tournament-net-reachable-check.js`,
+    which passed standalone and went red inside the full suite because the probe
+    had not answered when the row was clicked.
+  - A hanging probe is a failed probe after 4s, and a failed probe KEEPS the cache:
+    `null` means "could not ask", never "there are no courses".
+- **The LIVE MATCHES & PRESSES card now says who won what.** One bold line at the
+  bottom of a FINISHED match - "Reese +$80 (won 4 of 4 bets)", "Reese +$40 ·
+  Manny +$40 — All square" - consuming `sideMatchDecidedNet`/`Tally` over the
+  receipt settlement-engine already priced. Nothing recomputes money. And a
+  finished segment now reads **the Receipt's wording**: a bet that closed on the
+  16th is **3&2**, where money-engine's live reading says "3 UP" - true while a
+  match runs, false once it is over. Mid-round there is no total.
+- **WAVE 39 (push notifications) IS RECON + THE PURE HALF, ON `ui-wave39-push`,
+  NOT MERGED.** `docs/wave39-push-plan.md` has the full plan, the proposed rules
+  delta and Manny's numbered checklist (APNs key, Firebase Cloud Messaging, Xcode
+  capability, Cloudflare secret).
+  - **A ROUND HAS NO TEE TIME.** Measured: `teeTime` is in no page and in no rule.
+    A round carries `roundDay` (a LABEL, "Single Round") and `createdAt`. So
+    notifications 1 and 2 cannot exist until round setup asks for one -
+    `pushDecide` refuses them with `reason: 'no-tee-time'` rather than inventing a
+    time. **Manny's decision: add the field, or ship v1 with four of the six.**
+  - **The roster→device mapping already exists**: `golfapp_me_<code>` +
+    `resolvedMeId()` from Wave 17, plus the uid every golfer has from auth-boot.
+    A registration is `{ uid, playerId, token }` and nobody is asked a new question.
+  - **Tee-time reminders should be LOCAL notifications** scheduled on the device at
+    join, not server-side: no scheduler, no token, no rules, and they fire offline.
+    Pages Functions do not support scheduled handlers - a cron needs a separate
+    Worker.
+
 ## Where things stand, 2026-10-03
 
 **THE GOLFCOURSEAPI PLAN WAS WRONG EVERYWHERE, AND IT IS CORRECTED.** The account
