@@ -353,6 +353,12 @@ html {
             <div id="round-planner"></div>
         </div>
 
+        <!-- WHAT THE BUILD BUTTON IS ABOUT TO USE. Lives OUT HERE, not inside
+             the paste card, because collapsing that card used to be the last
+             thing a golfer saw of his itinerary before the button denied it
+             existed. -->
+        <p id="itin-ready-note" style="display:none; font-size:0.82rem; font-weight:bold; margin:12px 0 0 0; color:var(--brand-green);"></p>
+
         <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">➕ Build Trip &amp; All Rounds</button>
 
         <div style="text-align:center; margin-top:12px;">
@@ -683,30 +689,72 @@ html {
     // APPLY: the rows become the planner's round configs, and the golfer sees them
     // in the planner they already know - where they can change anything before
     // Build Trip writes a single thing.
+    //
+    // THE ROWS ARE ALSO KEPT HERE. Everything on screen is rebuilt from the day
+    // count box, so an itinerary that lived only in the form was one blank box
+    // away from being gone - which is exactly what happened to Manny's seven
+    // Myrtle rounds: the review read them, the planner was rebuilt from an
+    // empty "How Many Days", and the button said to set up at least one day.
+    let itinApplied = null;
+
+    function itinRowsToConfigs(rows) {
+        // The planner's own day model, so the labels, the AM/PM split and the
+        // day count are the ones every other surface already reads.
+        const days = tripItinDays(rows);
+        const flat = [];
+        days.forEach((day, dayIdx) => {
+            day.rows.forEach((r, k) => {
+                const subLabel = day.rows.length === 2 ? (k === 0 ? ' AM' : ' PM') : '';
+                flat.push({
+                    label: 'Day ' + (dayIdx + 1) + subLabel,
+                    courseId: r.courseKey || '',
+                    playerCount: 4,
+                    frontNineKey: r.frontNineKey || '',
+                    backNineKey: r.backNineKey || '',
+                    // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The
+                    // tee-time field is Wave 39 and is not merged yet, so on
+                    // main these two are carried and ignored; the moment that
+                    // wave lands they are what the planner's own date and time
+                    // boxes read. Parsed either way, because re-reading the
+                    // paste later is not something anybody will do.
+                    teeDate: r.date || '',
+                    teeClock: r.time || ''
+                });
+            });
+        });
+        return { days: days, flat: flat };
+    }
+
+    function renderItinReadyNote() {
+        const note = document.getElementById('itin-ready-note');
+        if (!note) return;
+        if (!itinApplied || !itinApplied.length) { note.style.display = 'none'; note.textContent = ''; return; }
+        note.style.display = 'block';
+        note.textContent = '\ud83d\udccb ' + itinApplied.length + ' round'
+            + (itinApplied.length === 1 ? '' : 's') + ' from your itinerary ready \u2014 Build Trip uses '
+            + (itinApplied.length === 1 ? 'it' : 'them') + ', even with the paste box closed.';
+    }
+
     function applyItinerary() {
         if (!itinPlan) return;
         const usable = itinPlan.rows.filter(r => r.ok);
         if (!usable.length) return;
-        // ONE DAY PER ROW, in date order, so the planner's labels line up with the
-        // itinerary rather than with the order it was typed.
-        const sorted = usable.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-        plannedDays = sorted.map(() => ({ roundsToday: 1 }));
+        // In date order, so the planner's labels line up with the itinerary
+        // rather than with the order it was typed.
+        const sorted = usable.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))
+            || String(a.time || '').localeCompare(String(b.time || '')));
+        itinApplied = sorted;
+        const plan = itinRowsToConfigs(sorted);
+        // THE DAY COUNT BOX IS PART OF THE STATE, not a decoration. renderDayPlanner
+        // reads it and rebuilds plannedDays from it, so leaving it empty here
+        // rebuilt zero days and renderRoundPlanner then threw every round away.
+        plannedDays = plan.days.map(d => ({ roundsToday: d.rows.length }));
+        const daysInput = document.getElementById('trip-days-input');
+        if (daysInput) daysInput.value = String(plan.days.length);
         renderDayPlanner();
-        roundConfigs = sorted.map((r, i) => ({
-            label: 'Day ' + (i + 1),
-            courseId: r.courseKey || '',
-            playerCount: (roundConfigs[0] && roundConfigs[0].playerCount) || 4,
-            frontNineKey: r.frontNineKey || '',
-            backNineKey: r.backNineKey || '',
-            // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The tee-time
-            // field is Wave 39 and is not merged yet, so on this branch these two
-            // are carried and ignored; the moment that wave lands they are what
-            // the planner's own date and time boxes read. Parsed either way,
-            // because re-reading the paste later is not something anybody will do.
-            teeDate: r.date || '',
-            teeClock: r.time || ''
-        }));
-        renderRoundPlanner();
+        roundConfigs = plan.flat;
+        renderRoundPlanner(true);
+        renderItinReadyNote();
         const card = document.getElementById('itin-paste-card');
         if (card) card.open = false;
         uiToast('\ud83d\udccb ' + usable.length + ' round' + (usable.length === 1 ? '' : 's')
@@ -840,11 +888,15 @@ html {
         renderDayPlanner();
     }
 
-    function renderRoundPlanner() {
+    // skipCapture: the caller has JUST set roundConfigs authoritatively and the
+    // form on screen still belongs to the previous render. Reading it back then
+    // is not a capture, it is an erase - which is how a pasted itinerary came
+    // out of applyItinerary with seven rounds and reached the button with none.
+    function renderRoundPlanner(skipCapture) {
         // Capture whatever's currently in the round-config form fields before rebuilding,
         // so toggling a day's hole count elsewhere doesn't wipe course/headcount choices
         // already made for other rounds.
-        roundConfigs.forEach((cfg, i) => {
+        if (!skipCapture) roundConfigs.forEach((cfg, i) => {
             const courseEl = document.getElementById(`round-course-${i}`);
             const playersEl = document.getElementById(`round-players-${i}`);
             const frontEl = document.getElementById(`round-frontnine-${i}`);
@@ -859,7 +911,7 @@ html {
         plannedDays.forEach((d, dayIdx) => {
             for (let r = 0; r < d.roundsToday; r++) {
                 const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
-                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '' });
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '' });
             }
         });
         // Carry forward previously entered values by position — good enough for the common
@@ -870,6 +922,12 @@ html {
                 cfg.playerCount = roundConfigs[i].playerCount || 4;
                 cfg.frontNineKey = roundConfigs[i].frontNineKey || '';
                 cfg.backNineKey = roundConfigs[i].backNineKey || '';
+                // CARRIED, not re-derived: these two come from a pasted
+                // itinerary and have no box on screen to read them back from,
+                // so a rebuild that forgot them would lose the tee times
+                // silently the first time a day was toggled 18 to 36.
+                cfg.teeDate = roundConfigs[i].teeDate || '';
+                cfg.teeClock = roundConfigs[i].teeClock || '';
             }
         });
         roundConfigs = newFlat;
@@ -1046,12 +1104,45 @@ html {
     function buildTrip() {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
-        if (roundConfigs.length === 0) { uiRefuse('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
+        // AN ITINERARY THAT WAS ACCEPTED IS WHAT THIS BUILDS, whatever the form
+        // on screen currently holds. Manny pasted seven rounds, the review read
+        // all seven, and this button told him to "set up at least one day" -
+        // because every round on screen is rebuilt from the day count box and
+        // that box was empty. The planner is a view of the plan now, not the
+        // only copy of it.
+        if (roundConfigs.length === 0 && itinApplied && itinApplied.length) {
+            const plan = itinRowsToConfigs(itinApplied);
+            plannedDays = plan.days.map(d => ({ roundsToday: d.rows.length }));
+            const daysInput = document.getElementById('trip-days-input');
+            if (daysInput) daysInput.value = String(plan.days.length);
+            renderDayPlanner();
+            roundConfigs = plan.flat;
+            renderRoundPlanner(true);
+            renderItinReadyNote();
+        }
+        if (roundConfigs.length === 0) {
+            // AND THE REFUSAL NAMES THE RIGHT MISSING STEP. A golfer who pasted
+            // an itinerary and read it but never tapped Use these N rounds has
+            // not failed to set up a day; he has one more tap to make, and
+            // telling him otherwise sends him to the wrong part of the screen.
+            if (itinPlan && itinPlan.ready) {
+                uiRefuse('⚠️ Your itinerary is read but not loaded yet — open the paste card and tap "Use these '
+                    + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's') + '".');
+                return;
+            }
+            uiRefuse('⚠️ Set up at least one day above, or use "Skip planning" below.');
+            return;
+        }
 
         // Pull one final read of every field in case the last edit didn't fire onchange yet.
+        // GUARDED, because the configs can now come from an accepted itinerary
+        // rather than from the form - and an unrendered round has no boxes to
+        // read, which would have thrown before writing anything.
         roundConfigs.forEach((cfg, i) => {
-            cfg.courseId = document.getElementById(`round-course-${i}`).value;
-            cfg.playerCount = parseInt(document.getElementById(`round-players-${i}`).value, 10) || 0;
+            const courseEl = document.getElementById(`round-course-${i}`);
+            const playersEl = document.getElementById(`round-players-${i}`);
+            if (courseEl) cfg.courseId = courseEl.value;
+            if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
             const frontEl = document.getElementById(`round-frontnine-${i}`);
             const backEl = document.getElementById(`round-backnine-${i}`);
             if (frontEl) cfg.frontNineKey = frontEl.value;

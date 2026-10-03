@@ -98,7 +98,7 @@ const PRODUCTS = {
         // keeps that read, and has no course-index.js to load.
         // Moved to v117: the free-tier quota sentence in course-import-rules.js
         // (the account is 35 a day, not Pro's 10,000 - corrected 2026-10-03).
-        cacheName: 'consumer-v119-roadtrip',
+        cacheName: 'consumer-v120-itinbuild',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

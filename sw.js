@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v119-roadtrip. The tournament product cache
+// The consumer product cache is consumer-v120-itinbuild. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3926,7 +3926,21 @@
 // score has a settled money position - handicaps off its roster, side matches naming
 // its ids, a pool charging per golfer - so it keeps the roster it was played with,
 // and the organizer is told by name which rounds were left alone.
-const CACHE_VERSION = 'golfapp-v279-roadtrip';
+// Moved to v280 BECAUSE THE BUILD BUTTON IGNORED THE ITINERARY IT WAS SHOWN.
+//
+// Manny pasted seven Myrtle rounds, the review read all seven, and Build Trip said
+// "Set up at least one day above" - the planner rebuilds every round on screen from
+// the day-count box, that box was empty, and the rebuild threw the seven rounds away
+// the moment they were made. An accepted itinerary is now kept, the day count is
+// written from it, two lines on one date are one 36-hole day rather than two days,
+// and a line near the button says what Build is about to use.
+//
+// Also the nines in brackets: "Thistle Golf Club (NC - 27 Hole) (mackay/cameron)" is
+// how a golfer copying the app's own course name writes the loops, and they were
+// dropped silently - Thistle then played Cameron/MacKay, a different stroke index and
+// different money. A device left on v279 keeps a planner that refuses a pasted
+// itinerary and a parser that mis-orders those two nines.
+const CACHE_VERSION = 'golfapp-v280-itinbuild';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

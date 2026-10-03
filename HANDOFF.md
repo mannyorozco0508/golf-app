@@ -3063,6 +3063,53 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## The Build button ignored the itinerary it was shown (2026-10-03, same day)
+
+Manny pasted seven Myrtle rounds on his phone, the review read all seven, and
+"Build Trip & All Rounds" answered **"Set up at least one day above, or use Skip
+planning below."** Cache `golfapp-v280-itinbuild` / consumer `v120`.
+
+- **NOTHING WAS WRONG WITH THE PARSER OR THE REVIEW.** The planner rebuilds every
+  round on screen from the "How Many Days" box; that box was empty, so
+  `renderDayPlanner()` made zero days and `renderRoundPlanner()` threw all seven
+  rounds away in the same tick `applyItinerary()` created them. **And its first
+  act - reading the form back into the configs - was an ERASE, not a capture**,
+  because the form on screen still belonged to the previous render. It now takes
+  `skipCapture`, and the caller that has just set the configs authoritatively uses
+  it.
+- **AN ACCEPTED ITINERARY OUTLIVES THE FORM.** `itinApplied` holds the rows, the
+  day-count box is written from them, and `buildTrip()` rebuilds from them when
+  the planner is empty - so a cleared box or a collapsed paste card cannot delete
+  a plan the golfer was shown. A line above the button says what Build is about to
+  use, and it lives OUTSIDE the paste card, which collapses.
+- **ONE DAY PER DATE, NOT ONE DAY PER LINE** (`tripItinDays`). Two lines on 10/12
+  are one 36-hole day: seven lines over five dates is a **five**-day trip, which is
+  the number every "Day N" label, the trip leaderboard and the round-count
+  invariant read. A third line on one date starts another day slot rather than
+  being dropped - wrong about the calendar, right about the money, and visible on
+  the review first.
+- **AND A SECOND DEFECT THE CHROME CHECK FOUND, which no source scan would have:**
+  the nines in brackets. The app's own name for that course is "Thistle Golf Club
+  (NC - 27 Hole)", so a golfer copying it writes the loops the same way - "...
+  (NC - 27 Hole) (mackay/cameron)" - and the comma-segment rule never saw them.
+  Dropped silently, **Thistle played Cameron/MacKay instead of MacKay/Cameron: two
+  different nines, two different stroke indexes, different money.** A bracket with
+  no slash in it is still left alone.
+- **`tools/trip-itinerary-build-check.js`** is the guard that matters here: a cold
+  `trip.html` at 390x844, seven lines typed with real CDP keystrokes, real taps on
+  Read it / Use these 7 rounds / Build, and nothing the page defines called. It
+  measured the refusal before the fix and, after it, seven rounds, five days, the
+  day box reading 5, Thistle's nines in order, and the navigation to
+  `?trip=...&organizer=...` that proves the trip was written.
+  `trip_itinerary_build_test.js` holds the pure grouping and the wiring; it cannot
+  drive `applyItinerary`, because trip.html's top-level `let` bindings are not
+  mini-dom sandbox properties, and says so.
+- **A NOTE ON THE SUITE'S OWN NUMBER:** this repo has **both** `*_test.js` and
+  `*.test.js` files. `node --test *_test.js` is 9,862 registered and misses 92
+  tests in nine dot-form files; the full suite is **`node --test *_test.js
+  *.test.js` = 9,970**. A report that quotes the smaller number has silently not
+  run the older integration files.
+
 ## Road Trip, 2026-10-03: a round with no course, a pasted itinerary, a changeable roster
 
 Built for Manny's Myrtle Beach trip, **12-16 October**. Cache

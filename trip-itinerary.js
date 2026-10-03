@@ -155,6 +155,18 @@ function tripItinCourse(text) {
     if (time) t = t.replace(time.raw, ' ');
     // The nines, if a segment looks like "A/B" with letters on both sides.
     var nines = null;
+    // IN BRACKETS TOO. The app's own name for that course is "Thistle Golf Club
+    // (NC - 27 Hole)", so a golfer copying it writes the loops the same way -
+    // "Thistle Golf Club (NC - 27 Hole) (mackay/cameron)" - and the segment rule
+    // below never sees them, because the comma split leaves one segment with
+    // brackets round it. Dropped silently, Thistle would play Cameron/MacKay
+    // instead: two different nines, two different stroke indexes, different
+    // money. The bracket with no slash in it ("(NC - 27 Hole)") is left alone.
+    var paren = /\(\s*([A-Za-z][A-Za-z'\u2019 ]{1,20})\s*\/\s*([A-Za-z][A-Za-z'\u2019 ]{1,20})\s*\)/.exec(t);
+    if (paren) {
+        nines = [paren[1].trim(), paren[2].trim()];
+        t = t.replace(paren[0], ' ').replace(/\s{2,}/g, ' ').trim();
+    }
     var parts = t.split(',').map(function (p) { return p.trim(); }).filter(Boolean);
     var kept = [];
     parts.forEach(function (p) {
@@ -330,6 +342,28 @@ function tripItinPlan(text, ctx) {
     };
 }
 
+// ONE DAY PER DATE, NOT ONE DAY PER LINE (2026-10-03).
+//
+// The planner counts DAYS and asks each one 18 or 36, and a trip's own round
+// count comes from that. Two lines on 10/12 are one 36-hole day, so mapping a
+// line to a day would have told Manny's five-day Myrtle week it was seven days
+// long - and the trip leaderboard, the round-count invariant and every "Day N"
+// label downstream read that number.
+//
+// The planner holds at most two rounds in a day. A third line on the same date
+// is not refused and not dropped: it starts another day slot, which is wrong
+// about the calendar and right about the money, and the golfer can see it on
+// the review before anything is written. Rows must already be in date order.
+function tripItinDays(rows) {
+    var days = [];
+    (rows || []).forEach(function (row) {
+        var last = days[days.length - 1];
+        if (last && last.date === row.date && last.rows.length < 2) { last.rows.push(row); return; }
+        days.push({ date: row.date, rows: [row] });
+    });
+    return days;
+}
+
 // The label a review row reads as, so the screen and any future surface cannot
 // word it differently.
 function tripItinRowLabel(row) {
@@ -346,6 +380,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         TRIP_ITIN_MONTHS, tripItinDate, tripItinTime, tripItinUndecided, tripItinOptions,
         tripItinCourse, tripItinParseLine, tripItinParse, tripItinNormalise,
-        tripItinMatch, tripItinNines, tripItinPlan, tripItinRowLabel
+        tripItinMatch, tripItinNines, tripItinPlan, tripItinDays, tripItinRowLabel
     };
 }

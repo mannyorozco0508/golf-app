@@ -466,7 +466,10 @@ describe('6. THE SWEEP IS FINISHED', () => {
             // golfer ASKS, because it changes who is in the rounds not yet
             // played, and this guard exists to make sure such a question is a
             // dialog rather than a native alert that blocks.
-            'trip.html':    { refuse: 18, fail: 13, toast: 4, confirm: 2 },
+            // 18 -> 19 refusals: Build Trip now names the tap that is missing
+            // when an itinerary has been read but never accepted, instead of
+            // sending the golfer to the day planner he does not need.
+            'trip.html':    { refuse: 19, fail: 13, toast: 4, confirm: 2 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };
