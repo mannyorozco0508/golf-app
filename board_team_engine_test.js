@@ -194,11 +194,33 @@ function widgetTotal(html) {
         || (segs.length === 1 ? segs[0] : null);
 }
 
+// THE WIDGET NOW SPEAKS TWO LANGUAGES, AND THAT IS THE POINT (Job 2, 2026-10-03).
+//
+// It used to report the live scoreboard reading in every state: "O'Brien 10 UP",
+// "AS". A finished bet now reads the RECEIPT's wording instead - "O'Brien 10&8",
+// "All square" - because "10 UP" is how a match taken to the 18th is described
+// and this one ended on the 10th. The board banner has always said
+// "FINAL: O'Brien 10 & 8"; the two panels now AGREE in substance, and this
+// parser is what lets the parity assertion below keep checking that they do.
+//
+// Both wordings are parsed here rather than relaxing the comparison, so a real
+// divergence - a different margin, a different leader - still fails.
 function widgetMargin(statusText) {
     const s = String(statusText).replace(/\s*·\s*FINAL\s*$/, '').trim();
     const closed = /FINAL/.test(statusText);
     if (s === 'AS' || s === 'Not Started') return { margin: 0, who: null, closed: false, as: s === 'AS' };
-    const m = /^(.*) (\d+) UP$/.exec(s);
+    // The receipt's level wording. closed:false matches the board's own reading
+    // of ALL SQUARE - a level match is never "closed", because at the 18th the
+    // lead does not exceed the holes remaining.
+    if (/^All square$/i.test(s)) return { margin: 0, who: null, closed: false, as: true };
+    // The receipt's closed wording: "<name> N&M".
+    let m = /^(.*) (\d+)&(\d+)$/.exec(s);
+    if (m) return { margin: Number(m[2]), who: m[1], left: Number(m[3]), closed: true };
+    // The receipt's went-the-distance wording: "<name> N up", lower case.
+    m = /^(.*) (\d+) up$/.exec(s);
+    if (m) return { margin: Number(m[2]), who: m[1], closed };
+    // The live scoreboard reading, which is still what an unfinished bet says.
+    m = /^(.*) (\d+) UP$/.exec(s);
     if (!m) return null;
     return { margin: Number(m[2]), who: m[1], closed };
 }

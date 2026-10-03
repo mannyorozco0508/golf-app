@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v117-freetierquota. The tournament product cache
+// The consumer product cache is consumer-v118-courseindex. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3886,7 +3886,30 @@
 // told to pick a saved course. admin.html moved with it (its own suffix joins onto
 // the new sentence), and functions/api/_lib.js is server-side so no device caches
 // it: the ceiling it reads from GOLFCOURSE_DAILY_LIMIT changes for everyone at once.
-const CACHE_VERSION = 'golfapp-v277-freetierquota';
+// Moved to v278 BECAUSE THE SETUP PAGES STOPPED DOWNLOADING THE WHOLE COURSE LIST.
+// MEASURED: global_courses is 61,258 bytes for 42 courses and grows about 8 KB per
+// import, and admin.html, tournament.html and trip.html each read ALL of it on every
+// load - a live listener on the first two. ?shallow=true answers the same node in 941
+// bytes, but it is a REST parameter and the Firebase SDK has no shallow read, so the
+// new course-index.js probes over fetch, keeps a NAME index in localStorage, and reads
+// one global_courses/<key> record when a course is actually selected. Cards are never
+// cached, only names: the probe cannot see a record CHANGE, and a stale stroke index
+// puts a handicap stroke on the wrong hole and pays the wrong golfer.
+//
+// A DEVICE ON v277 KEEPS THE 61 KB READ, which is the whole point of the bump - and
+// course-index.js is new, so a cached shell that was told it already has this version
+// would load three pages whose unguarded courseIndexLoader call does not exist.
+//
+// v278 ALSO CARRIES THE LIVE MATCHES & PRESSES FINAL TOTAL. With presses, that card
+// said who was up in each segment and never who had won what overall - measured on
+// Manny's GFLBAM round, group 3. It now ends a FINISHED match with one bold line
+// ("Reese +$80 (won 4 of 4 bets)"), and a finished segment reads the Receipt's own
+// wording: a bet that closed on the 16th is 3&2, where money-engine's live reading
+// says "3 UP" - true while a match runs, false once it is over. index.html,
+// leaderboard.html and side-match-lines.js all moved, and leaderboard.html now loads
+// side-match-lines.js, so a device on v277 keeps a card that cannot answer the
+// question a group asks at the end of a round.
+const CACHE_VERSION = 'golfapp-v278-courseindex';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4040,6 +4063,11 @@ const SHELL_FILES = [
     './live-skins.js',
     './course-data.js',
     './course-import-rules.js',
+    // The shared course list, read cheaply - the probe, the name index and the
+    // per-course fetch. admin.html, tournament.html and trip.html call
+    // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
+    // before the setup page draws anything. That is why it is precached.
+    './course-index.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

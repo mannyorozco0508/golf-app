@@ -41,15 +41,20 @@ function surface(sb) {
 }
 // The Save gate on the setup screen (no record): the alert it raises, and the
 // creating set() it writes, for this user.
-function fillSetup(sb) {
+async function fillSetup(sb) {
     const d = sb.document;
     d.getElementById('t-name').value = 'Created Scramble';
     // course search (2026-09-17): a course with no card anywhere is no longer
     // selected - the silent par-4 fallback is gone - so the fixture hands the page
-    // a card for cameron the way one arrives: through its own global_courses
-    // listener. The captured surface (the save's alerts and set) is unchanged.
-    sb.__dbHandlers.filter(h => h.event === 'value' && /global_courses$/.test(h.path)).forEach(h =>
-        h.cb({ val: () => ({ cameron: { name: 'Cameron', data: COURSE } }), exists: () => true }));
+    // a card for cameron the way one arrives. The captured surface (the save's
+    // alerts and set) is unchanged.
+    //
+    // WAVE 38: it arrives through the course index's cold read now -
+    // db.ref('global_courses').once('value'), answered from __dbReads - not a
+    // live listener. pickCourse itself stays synchronous once the card is in
+    // hand, which is why only the seeding is awaited.
+    sb.__dbReads = Object.assign({}, sb.__dbReads, { global_courses: { cameron: { name: 'Cameron', data: COURSE } } });
+    await new Promise(r => setImmediate(r));
     sb.pickCourse('cameron', 'Cameron');
     const list = d.getElementById('teams-list'); d.body.appendChild(list);
     const card = d.createElement('div'); card.className = 'team-card';
@@ -63,7 +68,7 @@ async function save(user) {
     const sb = loadHtmlInlineScript('tournament.html');
     sb.__auth.setUser(user);
     const alerts = []; sb.alert = (m) => alerts.push(String(m));
-    fillSetup(sb);
+    await fillSetup(sb);
     await sb.saveTournament();
     await new Promise(r => setImmediate(r));
     const sets = sb.__dbWrites.filter(x => /^tournaments\/[A-Z0-9]+$/.test(x.path) && x.op === 'set');

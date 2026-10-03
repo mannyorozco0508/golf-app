@@ -520,8 +520,17 @@ describe('D. THE COURSE CARD STATES WHAT THE CODE DOES WITH A SAVED COURSE', () 
             'the import no longer writes under global_courses/');
         assert.ok(src.includes('db.ref(`global_courses/${courseKey}`).update('),
             'the typed-card publish no longer writes under global_courses/');
-        assert.ok(src.includes("db.ref('global_courses').on('value'"),
-            'the picker no longer reads global_courses live');
+        // RE-POINTED FOR WAVE 38. This pinned a LIVE listener on the whole
+        // shared node, which is the 61 KB read that wave removed: the picker now
+        // draws from a cached name index, probes the key list over REST
+        // (?shallow=true, 941 bytes) and reads ONE global_courses/<key> record
+        // when a course is selected. What has to stay true is the claim the guide
+        // makes - a saved course reaches the picker for everyone - so what is
+        // pinned is that the page still reads the shared node, not how.
+        assert.ok(src.includes('courseIndexLoader({'),
+            'the picker no longer reads the shared course list at all');
+        assert.ok(src.includes("db.ref('global_courses/' + key).once('value')"),
+            'nothing reads a single shared course, so a saved card can never be found');
         assert.equal(globalCoursesWriteRule().read, true, 'global_courses is no longer readable by every client');
         assert.match(guideCourseCard(), /every future round/i,
             'the guide must say a saved course reaches every future round');

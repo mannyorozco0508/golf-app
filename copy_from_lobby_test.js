@@ -76,7 +76,12 @@ const alerts = (sb) => J(run(sb, 'window.__alerts'));
 // 2026-09-20: admin.html reads organizers/<uid> once at load for the standing
 // line (organizer_standing_test.js). Not a round read; filtered here so these
 // assertions stay about the copy field.
-const onces = (sb) => sb.__once.filter(p => !/^organizers\//.test(p));
+// global_courses JOINS organizers/ IN THIS FILTER (Wave 38). These ledgers are
+// about the ROUND reads - which code was read, in what order, and whether the
+// issuer was asked - and the setup page now also reads the shared course list
+// through course-index.js. organizers/ was already excluded for the same reason:
+// a read that is not part of the claim must not be able to break it.
+const onces = (sb) => sb.__once.filter(p => !/^organizers\/|^global_courses/.test(p));
 const params = (href) => Object.fromEntries([...new URLSearchParams(href.split('?')[1] || '')]);
 
 describe('FIX 1 - the lobby field', () => {

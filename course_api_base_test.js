@@ -60,13 +60,15 @@ describe('THE WEB PATH IS UNCHANGED', () => {
         const urls = [];
         sb.fetch = async (u) => { urls.push(String(u)); return { json: async () => ({ status: 'ok', courses: [] }) }; };
         await sb.runOnlineCourseSearch('streamsong', null);
-        assert.deepEqual(urls, ['/api/course-search?q=streamsong']);
+        // /api/ ONLY (Wave 38): the page also probes global_courses?shallow=true
+        // through its own fetch now, and this claim is about the proxy URL.
+        assert.deepEqual(urls.filter((u) => u.indexOf('/api/') === 0), ['/api/course-search?q=streamsong']);
     });
     test('and the detail fetch likewise', async () => {
         const sb = arrive();
         const urls = [];
         sb.fetch = async (u) => { urls.push(String(u)); return { json: async () => ({ status: 'unavailable', reason: 'not_configured' }) }; };
         await sb.openImportConfirm({ id: 'c0000001', club_name: 'X', course_name: 'Y' });
-        assert.deepEqual(urls, ['/api/course/c0000001']);
+        assert.deepEqual(urls.filter((u) => u.indexOf('/api/') === 0), ['/api/course/c0000001']);
     });
 });

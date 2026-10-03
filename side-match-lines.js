@@ -201,6 +201,146 @@ function sideMatchDecidedTally(receipt) {
     return t;
 }
 
+// ===========================================================================
+// THE FINAL TOTAL ON THE LIVE CARD (Job 2, 2026-10-03)
+//
+// WHY. Manny's GFLBAM round, group 3, iPhone: a match with presses, every bet
+// decided, and the LIVE MATCHES & PRESSES card said who was up in each segment
+// and the stake beside it - and never said who had won what overall. The card
+// reads buildLiveMatchState() in money-engine.js, which is a presenter of the
+// match engine and knows nothing about money; settlement does, and it is a tab
+// away. So a group looking at four closed rows had to add it up themselves.
+//
+// NOTHING HERE COMPUTES MONEY, same as the rest of this file: every figure comes
+// out of sideMatchDecidedNet() and sideMatchDecidedTally(), which read a receipt
+// settlement-engine.js has already priced. If this and the Receipt ever disagree
+// it is a bug in one of two string builders, never in two sums.
+//
+// WHY A SECOND LINE AND NOT sideMatchNetLine(). That one is the Receipt's
+// sentence and it is deliberately wordy - "Reese +$100 - Reese won 5 bets
+// ($100)" - because the Receipt is the document people settle from. This is one
+// bold line at the bottom of a live card on a phone, so it is the same facts in
+// the shortest honest form: "Reese +$100 (won 5 of 5 bets)".
+//
+// MID-ROUND IT IS EMPTY, and that is the point of `complete` being an argument.
+// A running total on an unfinished match is the defect settlement.html had: a
+// Match Play bet thru 6 printed "MATCH NET - Reese +$30" with twelve holes
+// unplayed. An empty string is the correct answer until the bet is over.
+function sideMatchFinalTotal(receipt, opts) {
+    if (!receipt || !(opts && opts.complete)) return '';
+    const t = sideMatchDecidedTally(receipt);
+    const net = sideMatchDecidedNet(receipt);
+    const nameA = receipt.nameA || 'Side A';
+    const nameB = receipt.nameB || 'Side B';
+    // "of N" counts EVERY bet in the match, presses included, because that is
+    // what a golfer is looking at on the card. When the match is complete there
+    // are no live segments left, so the denominator is the rows on screen.
+    const won = (n) => '(won ' + n + ' of ' + t.total + ' bet' + (t.total === 1 ? '' : 's') + ')';
+
+    if (net > 0) return nameA + ' +$' + smlMoney(net) + ' ' + won(t.aBets);
+    if (net < 0) return nameB + ' +$' + smlMoney(-net) + ' ' + won(t.bBets);
+
+    // LEVEL, AND THE TWO KINDS ARE NOT THE SAME NEWS. Both sides winning $40
+    // each is a match where four bets changed hands; every bet halved is a match
+    // where none did. A single "All square" for both is what made Manny go
+    // looking for a bug in the first place.
+    if (t.aBets === 0 && t.bBets === 0) return 'All square — nobody pays';
+    return nameA + ' +$' + smlMoney(t.aMoney) + ' · ' + nameB + ' +$' + smlMoney(t.bMoney)
+        + ' — All square';
+}
+
+// THE RECEIPT'S OWN WORDING FOR EVERY SEGMENT, KEYED SO A LIVE CARD CAN USE IT.
+//
+// THE DEFECT THIS FIXES. money-engine.js's statusText is a scoreboard reading -
+// "Reese 3 UP" - which is right while a match is running and WRONG once it is
+// over. A match play bet that ended on the 16th is "3&2": three up with two to
+// play, and it cannot be any other number. "3 UP" on a finished bet is how
+// golfers describe a match that went to the 18th, so printing it on a bet that
+// closed early says something false about where it finished - and the Receipt,
+// one tab away, correctly says 3&2 about the same bet.
+//
+// match-engine.js sets m.finalResult when a segment closes and
+// settlement-engine.js puts it on seg.result, so the true sentence already
+// exists and the live card simply was not reading it. Keyed by baseId and press
+// number, which is the only pair that identifies a segment: a Nassau's Total
+// press and its Back 9 press are both "Press 1" and both run H11-18.
+function sideMatchResultByKey(receipt) {
+    const out = {};
+    if (!receipt || !receipt.segments) return out;
+    receipt.segments.forEach(function (seg) {
+        if (!seg) return;
+        const key = String(seg.baseId === undefined || seg.baseId === null ? '' : seg.baseId)
+            + '|' + Number(seg.pressNum || 0);
+        if (seg.result) out[key] = seg.result;
+    });
+    return out;
+}
+
+function sideMatchResultKey(baseId, pressNum) {
+    return String(baseId === undefined || baseId === null ? '' : baseId) + '|' + Number(pressNum || 0);
+}
+
+// WHAT THE LIVE CARD NEEDS, FOR EVERY WAGER ON IT, IN ONE CALL.
+//
+// TWO SURFACES draw LIVE MATCHES & PRESSES - index.html's scorecard and
+// leaderboard.html - from the same buildLiveMatchStates(). So the join between a
+// live state and its priced receipt lives here once rather than being written
+// twice; CLAUDE.md has cost this project a hand-written copy per page before.
+//
+// Returns a map keyed the way the card is: the wager id for a side match, and
+// '__main' for the round's own format, which is what buildSideMatchReceipts
+// calls the legacy main wager.
+//
+//   { complete, total, results }
+//
+// complete comes from sideMatchRangeComplete(), NOT from seg.closed. A segment
+// closes when the lead exceeds the holes left, so at the 18th |0| > 0 is false
+// and an all-square match that went the distance is never "closed" - a card
+// keyed on that would call a finished bet live. And `roundFinished` is derived
+// here from computeRoundFinish() when it is available, so both pages agree
+// about a verified round or a group that picked up, without either having to
+// ask.
+//
+// A MISSING ENGINE RETURNS AN EMPTY MAP, so a cached shell without
+// settlement-engine.js draws exactly the card it drew before this wave rather
+// than throwing inside a renderer.
+function sideMatchLiveFinals(data, courseData, savedScores, states, opts) {
+    const out = {};
+    if (!states || !states.length) return out;
+    if (typeof buildSideMatchReceipts !== 'function') return out;
+    let receipts = [];
+    try { receipts = buildSideMatchReceipts(data, courseData, savedScores) || []; } catch (e) { return out; }
+    const byId = {};
+    receipts.forEach(r => { if (r && r.matchId) byId[r.matchId] = r; });
+
+    const d = data || {};
+    const sideMatches = d.sideMatches || {};
+    let roundFinished = !!(opts && opts.roundFinished);
+    if (!roundFinished && typeof computeRoundFinish === 'function') {
+        try { roundFinished = !!computeRoundFinish(d, courseData, savedScores).finished; } catch (e) { roundFinished = false; }
+    }
+
+    states.forEach(st => {
+        const matchId = (st && st.isSideMatch && st.wagerId) ? st.wagerId : '__main';
+        const receipt = byId[matchId];
+        if (!receipt || out[matchId]) return;
+        const sm = (st && st.isSideMatch && st.wagerId)
+            ? sideMatches[st.wagerId]
+            : (typeof legacyMainAsSideMatch === 'function' ? legacyMainAsSideMatch(d) : null);
+        const complete = sideMatchRangeComplete(sm, d.players || [], courseData, savedScores,
+            { roundFinished: roundFinished });
+        out[matchId] = {
+            complete: complete,
+            total: sideMatchFinalTotal(receipt, { complete: complete }),
+            // THE RECEIPT'S WORDING, AND ONLY WHEN THE BET IS OVER. Mid-round the
+            // scoreboard reading is the right one - "Reese 3 UP" is what is true
+            // while it is being played.
+            results: complete ? sideMatchResultByKey(receipt) : {}
+        };
+    });
+    return out;
+}
+
 // THE MATCH LINE. Replaces a bare "$0" or a push with no reason, and - just as
 // importantly - replaces a NET FIGURE ON AN UNFINISHED BET. settlement.html's
 // MATCH NET read `receipt.net`, which includes open segments, so a Match Play

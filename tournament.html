@@ -37,6 +37,7 @@
          card is, the canonical tee, every refusal sentence. Loaded before the inline
          script; nothing below may re-declare its names. -->
     <script src="course-import-rules.js"></script>
+    <script src="course-index.js"></script>
     <script src="code-issuer.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
     <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
@@ -832,9 +833,49 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // the record (importedCourses) so allCourses() can offer them per round.
     let setupImportedCourses = {};
 
-    db.ref('global_courses').on('value', (snap) => {
-        globalCourses = snap.val() || {};
+    // THE SHARED COURSE LIST - NAMES CHEAPLY, CARDS ONE AT A TIME (Wave 38).
+    //
+    // This was a live listener on the WHOLE node: 61,258 bytes measured for 42
+    // courses, growing about 8 KB per import, on every load of this page. The
+    // logic, the measurements and the argument are all in course-index.js, which
+    // admin.html and trip.html use the same way - one builder, because three
+    // hand-written copies is how one gets fixed and the others do not.
+    //
+    // globalCourses now holds { name } STUBS until a card is needed.
+    // resolveCourseCard() reads .data and returns null without it, which is the
+    // "no card anywhere" branch - so pickCourse() waits for the record before
+    // deciding, or every real course would be offered as an online fetch.
+    const courseIndex = courseIndexLoader({
+        into: globalCourses,
+        databaseURL: firebaseConfig.databaseURL,
+        readRecord: (key) => db.ref('global_courses/' + key).once('value').then((snap) => snap.val()),
+        readAll: () => db.ref('global_courses').once('value').then((snap) => snap.val()),
+        // A HANGING PROBE IS A FAILED PROBE AFTER FOUR SECONDS. The loader keeps
+        // the cached names on null, so the worst a timeout costs is that a course
+        // somebody else added today is not in the picker until the next load -
+        // and it never costs a golfer a page that will not draw.
+        //
+        // NO fetch AT ALL IS THE SAME ANSWER. helpers/mini-dom.js provides none,
+        // and without the guard every suite that loads this page raised
+        // "ReferenceError: fetch is not defined" from a promise nobody awaited -
+        // an unhandled rejection that failed eleven tests in three files.
+        fetchJson: (url) => {
+            if (typeof fetch !== 'function') return Promise.resolve(null);
+            return Promise.race([
+                fetch(url, { cache: 'no-store' }).then((r) => (r && r.ok ? r.json() : null)).catch(() => null),
+                new Promise((res) => setTimeout(() => res(null), 4000))
+            ]);
+        },
+        getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* one full read next time */ } },
+        // This page draws its course list only when the picker is opened, so
+        // there is nothing standing to redraw when names land.
+        onApply: () => {}
     });
+    // Deferred one microtask for the same reason admin.html defers it: this runs
+    // thousands of lines above the rest of the script, and anything it reaches
+    // would otherwise touch a `let` still in its temporal dead zone.
+    Promise.resolve().then(courseIndex.load);
 
     function openCourseDropdown() { filterCourseDropdown(document.getElementById('course-search-input').value); }
 
@@ -882,7 +923,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         dropdown.style.display = 'block';
     }
 
+    // THE CARD IS FETCHED BEFORE THE DECISION IS MADE (Wave 38). globalCourses
+    // holds a name until a course is chosen, and this is that moment.
+    // resolveCourseCard() returns null for a stub, which is the "no card
+    // anywhere" branch - so without this wait, every real course in the shared
+    // list would be refused and offered as an online search instead.
+    //
+    // A course already in hand - a directory preset, this event's own import, a
+    // second pick - resolves on the same microtask and is indistinguishable
+    // from the synchronous version.
     function pickCourse(key, name) {
+        // IF THE CARD IS ALREADY HERE, NOTHING WAITS. resolveCourseCard() is the
+        // one place that answers "do I have a card for this key" - the shared
+        // list, the bundled presets, this event's own imports - so a pick that
+        // needs no read stays exactly as synchronous as it was. That matters for
+        // more than speed: tools/tournament-net-reachable-check.js clicks the
+        // row and reads #course-key on the next line, the way a tap does.
+        if (resolveCourseCard(key)) { pickCourseNow(key, name); return; }
+        courseIndex.ensureCard(key).then(() => pickCourseNow(key, name));
+    }
+
+    function pickCourseNow(key, name) {
         const card = resolveCourseCard(key);
         if (!card) {
             // NO CARD ANYWHERE. Not selected - the event would score on fiction.

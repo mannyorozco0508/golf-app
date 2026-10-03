@@ -59,6 +59,7 @@
     <script src="setup-coach-gate.js"></script>
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
+    <script src="course-index.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="settlement-engine.js"></script>
@@ -3254,14 +3255,94 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     });
     // ------------------
 
-    // Fetch Global Courses immediately
+    // ========================================================================
+    // THE SHARED COURSE LIST - NAMES CHEAPLY, CARDS ONE AT A TIME (Wave 38)
+    //
+    // This was `db.ref('global_courses').on('value')`: a live listener on the
+    // WHOLE node, MEASURED at 61,258 bytes for 42 courses, growing by about 8 KB
+    // per imported course, downloaded on every single load of this page. At 500
+    // courses that is 4.3 MB a load against a Spark quota of 10 GB a month.
+    //
+    // ?shallow=true answers the same node in 941 bytes - but it is a REST
+    // parameter and the Firebase SDK has NO shallow read, which is why the probe
+    // is a plain fetch and not a ref. course-index.js carries the argument, the
+    // measurements, and every line of the logic; this page supplies only its own
+    // IO and its own redraw, because three pages do this and a hand-written copy
+    // in each is how one gets fixed and the others do not.
+    //
+    // globalCourses NOW HOLDS STUBS - { name } - until a card is needed. Three
+    // places below read globalCourses[key].data synchronously, so a stub
+    // deliberately carries no data key at all: absent takes the "unmapped" path,
+    // while `data: []` would have taken the "mapped" path and built a round off
+    // an empty card. ensureCourseCard() fills a real record in, and both places
+    // a course can be CHOSEN wait for it.
     let globalCourses = {};
-    db.ref('global_courses').on('value', (snap) => {
-        globalCourses = snap.val() || {};
-        // A course can be chosen before this snapshot lands. If the tee list is
-        // still empty, fill it from the record that just arrived. A list that
-        // already has tees is left alone so a later snapshot cannot change the
-        // tee the golfer picked.
+
+    const courseIndex = courseIndexLoader({
+        into: globalCourses,
+        databaseURL: firebaseConfig.databaseURL,
+        readRecord: (key) => db.ref('global_courses/' + key).once('value').then((snap) => snap.val()),
+        readAll: () => db.ref('global_courses').once('value').then((snap) => snap.val()),
+        // NO fetch AT ALL IS JUST ANOTHER FAILED PROBE. helpers/mini-dom.js
+        // provides none, and without this guard every suite that loads this page
+        // raised "ReferenceError: fetch is not defined" from a promise nobody
+        // awaited - an unhandled rejection that failed eleven tests in three
+        // files. It is also right in production: a probe is an optimisation, and
+        // a page that cannot make one must still work.
+        // A HANGING PROBE IS A FAILED PROBE AFTER FOUR SECONDS. The loader keeps
+        // the cached names on null, so the worst a timeout costs is that a course
+        // somebody else added today is not in the picker until the next load -
+        // and it never costs a golfer a page that will not draw.
+        //
+        // NO fetch AT ALL IS THE SAME ANSWER. helpers/mini-dom.js provides none,
+        // and without the guard every suite that loads this page raised
+        // "ReferenceError: fetch is not defined" from a promise nobody awaited -
+        // an unhandled rejection that failed eleven tests in three files.
+        fetchJson: (url) => {
+            if (typeof fetch !== 'function') return Promise.resolve(null);
+            return Promise.race([
+                fetch(url, { cache: 'no-store' }).then((r) => (r && r.ok ? r.json() : null)).catch(() => null),
+                new Promise((res) => setTimeout(() => res(null), 4000))
+            ]);
+        },
+        // EVERY localStorage TOUCH IS WRAPPED. A private window, blocked site
+        // data or a quota error throws on access, and this runs before the page
+        // has drawn anything.
+        getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* costs one full read next time */ } },
+        onApply: () => courseIndexRedraw()
+    });
+    // A CARD IS "IN HAND" WITHOUT A FETCH in three cases, and they are the common
+    // ones: the bundled directory presets (course-data.js), Thistle's nine-hole
+    // loops, and a shared course whose record has already been read or was just
+    // imported. courseCardInHand() is what keeps selectCourse SYNCHRONOUS for all
+    // of them.
+    //
+    // MEASURED COST OF NOT HAVING IT: every directory pick fired a database read
+    // for a key that is not in global_courses at all, and deferred the grid
+    // repaint by a microtask - which turned two selection tests red because they
+    // call selectCourse and read the grid on the next line, exactly as a tap does.
+    function courseCardInHand(key) {
+        if (!key) return true;
+        if (typeof coursePresets !== 'undefined' && coursePresets[key]) return true;
+        if (typeof nineHoleLoops !== 'undefined' && nineHoleLoops[key]) return true;
+        const rec = globalCourses[key];
+        // A STUB IS A RECORD WHOSE ONLY KEY IS name. Testing for `.data` instead
+        // was wrong on a real and supported record: a global_courses entry can
+        // carry rated TEES and no hole card at all - handicap_index_test.js pins
+        // exactly that shape - and treating it as un-fetched deferred the tee
+        // fields behind a read that would never add anything.
+        if (!rec) return false;
+        const keys = Object.keys(rec);
+        return !(keys.length === 1 && keys[0] === 'name');
+    }
+    const ensureCourseCard = (key) => courseIndex.ensureCard(key);
+
+    // What the old listener did when a snapshot landed, unchanged: a course can
+    // be chosen before the names arrive, so fill an empty tee list from the
+    // record, and redraw an open dropdown. A list that already has tees is left
+    // alone so this cannot change the tee the golfer picked.
+    function courseIndexRedraw() {
         const keyEl = document.getElementById('course-select');
         const sel = document.getElementById('tee-rating-select');
         let hasTee = false;
@@ -3273,10 +3354,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (keyEl && keyEl.value && !hasTee) {
             syncTeeRatingFromCourse(keyEl.value, { clearWhenEmpty: false, keepSelection: true });
         }
-        if(document.getElementById('course-search-input').value.length > 0) {
-            populateCourseDropdown(document.getElementById('course-search-input').value);
-        }
-    });
+        const box = document.getElementById('course-search-input');
+        if (box && box.value.length > 0) populateCourseDropdown(box.value);
+    }
+
+    // DEFERRED BY ONE MICROTASK, AND THIS IS NOT A STYLE CHOICE.
+    //
+    // The listener this replaces was asynchronous by nature: its callback could
+    // not run until the whole inline script had parsed. load() draws the cached
+    // names IMMEDIATELY, which is the point - but calling it here, thousands of
+    // lines above the rest of the script, ran courseIndexRedraw() ->
+    // populateCourseDropdown() -> runOnlineCourseSearch() while
+    // `onlineSearchInFlight` was still in its temporal dead zone:
+    // "ReferenceError: Cannot access 'onlineSearchInFlight' before
+    // initialization", and four suites went red. That is the same defect
+    // `exitStep` had in the account panel, from the same cause. A microtask runs
+    // after this script finishes, so every `let` below is initialised, and it is
+    // still the same tick - nothing a golfer could perceive.
+    Promise.resolve().then(courseIndex.load);
 
     // GPS-based "near you" course sorting has been turned off — no location prompt.
     // Course dropdown falls back to the default region order.
@@ -6081,7 +6176,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         courseHiddenSelect.value = id;
         courseSearchInput.value = name;
         courseDropdown.style.display = "none";
-        handleCourseChange(); 
+        // THE CARD IS FETCHED BEFORE THE GRID IS PAINTED (Wave 38).
+        //
+        // globalCourses holds a { name } stub until a course is actually chosen,
+        // so this is the moment the card is needed. handleCourseChange() reads
+        // globalCourses[key].data SYNCHRONOUSLY and takes the "unmapped" branch
+        // when it is absent - which would seed a blank grid for a course that
+        // has a perfectly good card in the database.
+        //
+        // The name is on screen first and the grid follows, which is the order a
+        // golfer already sees when they pick an online course. THE COMMON CASES
+        // DO NOT WAIT AT ALL: a directory preset, a nine-hole loop, a second pick
+        // of the same course and a course just imported are all already in hand,
+        // and those stay exactly as synchronous as they were.
+        if (courseCardInHand(id)) { handleCourseChange(); return; }
+        ensureCourseCard(id).then(() => { handleCourseChange(); });
     }
 
     courseSearchInput.addEventListener('focus', () => {
@@ -8862,9 +8971,38 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 courseHiddenSelect.value = "";
                 courseSearchInput.value = "";
             }
-            
+
+            // REOPENING A SAVED ROUND NEEDS ITS CARD (Wave 38), for the same
+            // reason selectCourse does: the index holds a name, and
+            // handleCourseChange reads .data synchronously. Without this an
+            // organizer reopening a round would find the par/handicap grid blank
+            // and the tee list empty - the round's own course, unmapped.
+            //
+            // The rest of the restore does NOT wait on it. Everything below
+            // reads the saved record, not the course card, and holding it back
+            // behind a network read would leave the wizard half-populated on a
+            // slow connection.
+            //
+            // THE SYNCHRONOUS PATH IS UNTOUCHED. The restore runs exactly as it
+            // did, and the fetch only adds a SECOND repaint, and only when a
+            // card actually arrives that was not already in hand. A round whose
+            // course is a directory preset, a nine-hole loop, or already fetched
+            // takes no extra work at all.
+            const needsCard = data.activeCourseKey && !courseCardInHand(data.activeCourseKey);
             handleCourseChange();
             if (data.teeRating) applyStoredTeeRating(data.teeRating);
+            if (needsCard) {
+                ensureCourseCard(data.activeCourseKey).then((rec) => {
+                    if (!rec || !rec.data) return;
+                    // handleCourseChange repaints only when the course IDENTITY
+                    // changes, and it has not - the key was set before the first
+                    // call. Clearing it is what makes the real card replace the
+                    // blank grid the first pass drew.
+                    lastCourseChangeKey = null;
+                    handleCourseChange();
+                    if (data.teeRating) applyStoredTeeRating(data.teeRating);
+                });
+            }
             // v212: AND THE BASIS THOSE NUMBERS WERE READ UNDER. A setting that is
             // written and never read back is worse than none: reopening an
             // "as entered" round would restore this control to GHIN, and the next

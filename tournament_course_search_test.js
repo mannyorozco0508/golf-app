@@ -90,6 +90,19 @@ const onlineRow = (sb) => rows(sb).find(r => r.id === 'course-online-search-row'
 const host = (sb) => sb.document.getElementById('course-import-host');
 const panel = (sb) => (host(sb).children || []).find(c => c.id === 'course-import-confirm') || null;
 const settle = () => new Promise(r => setImmediate(r)).then(() => new Promise(r => setImmediate(r)));
+// EVERY PROVIDER CALL, AND NOTHING ELSE (Wave 38). sb.__fetches now also records
+// the course-index shallow probe - an absolute RTDB URL - because the index
+// loader uses the page's own fetch. Counting raw fetches would make "offered,
+// not spent" fail on a request that spends no provider quota at all, so these
+// assertions read the /api/ calls, which is what they were always about.
+const apiCalls = (sb) => (sb.__fetches || []).filter((u) => String(u).indexOf('/api/') === 0);
+// pickCourse FETCHES THE CARD FIRST (Wave 38): globalCourses holds a name until
+// a course is chosen, so the decision waits one microtask for the record.
+const pick = async (sb, key, name) => { sb.pickCourse(key, name); await settle(); };
+// Seeds the shared list the way the page actually reads it - the index loader's
+// cold path, db.ref('global_courses').once('value'). This replaces firing a
+// listener callback by hand, because there is no listener any more.
+const seedGlobalCourses = (sb, records) => { sb.__dbReads = Object.assign({}, sb.__dbReads, { global_courses: records }); };
 // The user types: the input's oninput is filterCourseDropdown(this.value) (markup :316).
 function typeCourse(sb, text) { sb.document.getElementById('course-search-input').value = text; sb.filterCourseDropdown(text); }
 async function searchAndOpen(sb, query, searchAnswer, detailAnswer) {
@@ -144,7 +157,7 @@ describe('1. THE ONLINE ROW', () => {
         assert.ok(r, 'the online row is offered at three characters');
         assert.equal(rows(sb)[rows(sb).length - 1], r, 'appended last');
         assert.match(rowText(r), /Search online for "tal"/);
-        assert.equal(sb.__fetches.length, 0, 'a keystroke must never spend a request');
+        assert.equal(apiCalls(sb).length, 0, 'a keystroke must never spend a request');
     });
     test('the row sits below the local matches, and below the empty-state sentence when there are none', () => {
         const sb = arrive();
@@ -162,8 +175,8 @@ describe('1. THE ONLINE ROW', () => {
         sb.fetch = (url) => { sb.__fetches.push(String(url)); return new Promise(res => { resolveIt = () => res({ ok: true, json: () => Promise.resolve(OK([])) }); }); };
         typeCourse(sb, 'talking stick');
         onlineRow(sb).click();
-        assert.equal(sb.__fetches.length, 1, 'one request');
-        assert.equal(sb.__fetches[0], '/api/course-search?q=talking%20stick');
+        assert.equal(apiCalls(sb).length, 1, 'one request');
+        assert.equal(apiCalls(sb)[0], '/api/course-search?q=talking%20stick');
         assert.match(rowText(onlineRow(sb)), /Searching online/);
         // The organizer keeps typing: the dropdown re-renders with a FRESH online
         // row (its own onclick), and an impatient thumb taps it. The in-flight
@@ -171,7 +184,7 @@ describe('1. THE ONLINE ROW', () => {
         // being removed cannot, because this is a different row.
         typeCourse(sb, 'talking stick g');
         onlineRow(sb).click();
-        assert.equal(sb.__fetches.length, 1, 'still one request - the second tap spent nothing');
+        assert.equal(apiCalls(sb).length, 1, 'still one request - the second tap spent nothing');
         resolveIt(); await settle();
     });
 });
@@ -240,7 +253,7 @@ describe('3. THE DETAIL AND THE CONFIRM', () => {
         const sb = arrive();
         await searchAndOpen(sb, 'talking', OK([STICK]), { status: 'ok', course: STICK_DETAIL });
         find(sb, /Talking Stick Piipaash/).click();
-        assert.equal(sb.__fetches[1], '/api/course/a1b2c3d4');
+        assert.equal(apiCalls(sb)[1], '/api/course/a1b2c3d4');
         await settle();
     });
     test('the detail is refused: the sentence, nothing selected, the search box keeps the typed text', async () => {
@@ -363,9 +376,11 @@ describe('4. CONFIRM INLINES THE CARD - INTO THE EVENT, NEVER global_courses', (
     test('a directory pick after an import: importedCourses is not written when nothing was imported for it', async () => {
         const sb = arrive();
         sb.__auth.setUser(ORGANIZER);
-        // seed a card for cameron the way it arrives - the page's own global_courses listener
-        sb.__dbHandlers.filter(h => h.event === 'value' && /global_courses$/.test(h.path)).forEach(h => h.cb({ val: () => ({ cameron: { name: 'Cameron', data: holes(SI_BLUE).map((h, i) => ({ hole: i + 1, par: h.par, hcpIndex: h.handicap })) } }), exists: () => true }));
-        sb.pickCourse('cameron', 'Cameron');
+        // seed a card for cameron the way it arrives - the index loader's cold
+        // path reads global_courses once (Wave 38; it used to be a listener)
+        seedGlobalCourses(sb, { cameron: { name: 'Cameron', data: holes(SI_BLUE).map((h, i) => ({ hole: i + 1, par: h.par, hcpIndex: h.handicap })) } });
+        await settle();
+        await pick(sb, 'cameron', 'Cameron');
         assert.equal(sb.document.getElementById('course-key').value, 'cameron');
         noGlobalWrite(sb);
     });
@@ -373,33 +388,33 @@ describe('4. CONFIRM INLINES THE CARD - INTO THE EVENT, NEVER global_courses', (
 
 // ===========================================================================
 describe('5. THE SILENT FALLBACK IS GONE', () => {
-    test('a directory course with no card anywhere is NOT selected; the row offers the online fetch by name', () => {
+    test('a directory course with no card anywhere is NOT selected; the row offers the online fetch by name', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
-        sb.pickCourse('cameron', 'Cameron');
+        await pick(sb, 'cameron', 'Cameron');
         assert.equal(sb.document.getElementById('course-key').value || '', '', 'no card, no selection');
         const t = rows(sb).map(rowText).join(' | ');
         assert.match(t, /No card for Cameron yet\./);
         const r = onlineRow(sb);
         assert.ok(r && /Get the card for "Cameron" online/.test(rowText(r)));
-        assert.equal(sb.__fetches.length, 0, 'offered, not spent');
+        assert.equal(apiCalls(sb).length, 0, 'offered, not spent');
     });
     test('the fetch row for a card-less pick searches the course NAME', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
-        sb.pickCourse('cameron', 'Cameron');
+        await pick(sb, 'cameron', 'Cameron');
         onlineRow(sb).click(); await settle();
-        assert.equal(sb.__fetches[0], '/api/course-search?q=Cameron');
+        assert.equal(apiCalls(sb)[0], '/api/course-search?q=Cameron');
     });
-    test('a directory course WITH a preset still selects at once, no request', () => {
+    test('a directory course WITH a preset still selects at once, no request', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         // caledonia is the first coursePresets key in course-data.js (18 holes).
-        sb.pickCourse('caledonia', 'Caledonia Golf & Fish Club');
+        await pick(sb, 'caledonia', 'Caledonia Golf & Fish Club');
         assert.equal(sb.document.getElementById('course-key').value, 'caledonia');
-        assert.equal(sb.__fetches.length, 0);
+        assert.equal(apiCalls(sb).length, 0);
     });
     test('resolveCourseCard never fabricates: no eighteen par-4s indexed 1..18 in the page', () => {
         const at = SRC.indexOf('function resolveCourseCard(');
