@@ -118,8 +118,16 @@ describe('2. INITIALS: Randy T. / Randy C. / Matt M. / Matt B. / Matt H. on ever
     });
     test('the group picker rows, the Group Links panel rows', () => {
         const sb = arrive(round12(), '?game=nm1', ['group-pick-body', 'group-links-panel']);
-        assert.match(html(sb, 'group-pick-body'), /Group 1 · Randy T\., Randy C\., Marty, Matt M\./);
-        assert.match(html(sb, 'group-pick-body'), /Group 2 · Matt B\., Matt H\., Ann, Ben/);
+        // Wave 39: the row reads "Keep score for Group N" with the names on a
+        // second line, so the names no longer sit after a middle dot. What this
+        // test is about is unchanged - the SHORTENED names, "Randy T." where two
+        // Randys play - so it asserts the name run and the group label separately.
+        assert.match(html(sb, 'group-pick-body'), /Keep score for Group 1/);
+        assert.match(html(sb, 'group-pick-body'), />Randy T\., Randy C\., Marty, Matt M\.</);
+        assert.match(html(sb, 'group-pick-body'), /Keep score for Group 2/);
+        assert.match(html(sb, 'group-pick-body'), />Matt B\., Matt H\., Ann, Ben</);
+        assert.doesNotMatch(html(sb, 'group-pick-body'), />Randy,|>Matt,/,
+            'CONTROL: no bare Randy or Matt - two of each play in this round');
         run(sb, "window.authBootState.uid = currentData.ownerUid = 'anon-stub'; groupLinksPanelOpen = true; renderGroupLinksPanel()");
         assert.match(html(sb, 'group-links-panel'), /Randy T\., Randy C\., Marty, Matt M\./);
     });

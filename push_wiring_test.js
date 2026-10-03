@@ -14,11 +14,11 @@
 //      fires 'registrationError' and that must be quiet - no alert, no retry
 //      loop, no promise left hanging.
 //
-//   2. THE REMINDER IS SCHEDULED ONCE PER CHANGE. Re-registering on every
-//      snapshot is how a phone pending queue fills with duplicates of one
-//      reminder, and this listener fires on every write to the round. The id is
-//      derived from the round code so a reschedule REPLACES, and the device
-//      remembers the ISO it scheduled so an unchanged time does nothing.
+//   2. THE TEE-TIME REMINDER IS GONE. It was built in this wave as a local
+//      notification and removed on Manny's call before it shipped; the FIELD
+//      stays. Eleven tests covered it and came out with it, and four replaced
+//      them to assert the removal left nothing dormant - a plugin still linked
+//      still ships and still asks for a permission the app never uses.
 //
 //   3. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER. functions/api/_push.js is the
 //      only file that reads FCM_SERVICE_ACCOUNT, and with it unset every route
@@ -36,12 +36,18 @@
 //
 // MEASURED with stubs for push-boot.js AND functions/api/_push.js - every
 // exported function present and returning undefined - over the FINISHED file,
-// all 21 tests: 1 PASS / 20 FAIL. Both modules were restored by sha from saved
-// copies (3ec2930142fcddef, eb8526e087d16e90), never with git restore.
+// all 16 tests: 4 PASS / 12 FAIL. Both modules were restored by sha from saved
+// copies (c9727474c618ed95 and the _push copy), never with git restore.
 //
-//   THE ONE PASS is "the route is thin, POST-only, and the catch-all knows it",
-//   which is a source scan of push-send.js and the catch-all - neither of which
-//   the stub touched. It is a real guard and it says nothing about behaviour.
+//   THE FOUR PASSES ARE ALL SOURCE SCANS, and three of them scan the REMOVAL -
+//   push-boot.js having no scheduler, the plugin being out of the build,
+//   index.html scheduling nothing - which a stub satisfies because the stub has
+//   none of it either. The fourth is the route scan. Not one says anything about
+//   behaviour.
+//
+// RE-MEASURED after the tee-time reminder came out: eleven reminder tests left
+// this file and four replaced them, so the 21-test figure this header was first
+// written with describes a file that no longer exists.
 //
 //   The 20 reds are every inertness claim, every reminder rule, the no-APNs-key
 //   path, the settings shape, and the three credential assertions.
@@ -63,33 +69,13 @@ const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const TEE = require('./tee-time.js');
 Object.assign(global, TEE, P);
 
-const PHX = TEE.teeTimeBuild('2026-10-04', '08:40', 420, 'America/Phoenix');
-const ROUND = Object.assign({ eventName: 'Saturday at Legacy', courseName: 'Legacy Golf Resort' }, PHX);
-const BEFORE = Date.UTC(2026, 9, 3, 12, 0);
-
-// A recording LocalNotifications stand-in, the shape the plugin exposes.
-function fakeLocal(over) {
-    const o = over || {};
-    const log = { scheduled: [], cancelled: [], asked: 0 };
-    return {
-        log,
-        async checkPermissions() { return { display: o.display || 'granted' }; },
-        async requestPermissions() { log.asked++; return { display: o.afterAsk || 'granted' }; },
-        async schedule(req) { if (o.throwOnSchedule) throw new Error('nope'); log.scheduled.push(req); },
-        async cancel(req) { log.cancelled.push(req); }
-    };
-}
 
 // ===========================================================================
 describe('1. ON THE WEB, NOTHING HAPPENS AT ALL', () => {
 
-    test('no plugin means a reason and no side effect, on every entry point', async () => {
-        const none = { plugins: { native: false, push: null, local: null } };
-        assert.deepEqual(await B.pushScheduleReminder('GFLBAM', ROUND, none),
-            { scheduled: false, reason: 'no-plugin' });
+    test('no plugin means a reason and no side effect', async () => {
         assert.deepEqual(await B.pushRegisterToken({ plugins: { push: null } }),
             { registered: false, reason: 'no-plugin' });
-        assert.equal(await B.pushEnsureLocalPermission(null), false);
     });
 
     test('pushPlugins() answers safely with no Capacitor at all', () => {
@@ -97,7 +83,6 @@ describe('1. ON THE WEB, NOTHING HAPPENS AT ALL', () => {
         const p = B.pushPlugins();
         assert.equal(p.native, false);
         assert.equal(p.push, null);
-        assert.equal(p.local, null);
     });
 
     test('A TOKEN IS NEVER WRITTEN WITHOUT A UID, A PLAYER AND A WRITER', async () => {
@@ -109,99 +94,54 @@ describe('1. ON THE WEB, NOTHING HAPPENS AT ALL', () => {
 });
 
 // ===========================================================================
-describe('2. THE REMINDER IS SCHEDULED ONCE PER CHANGE', () => {
+describe('2. THE TEE-TIME REMINDER IS GONE, AND NOTHING OF IT IS LEFT DORMANT', () => {
 
-    test('a round with a tee time schedules one notification, 30 minutes before', async () => {
-        const local = fakeLocal();
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND, { plugins: { local }, now: BEFORE, stored: null });
-        assert.equal(r.scheduled, true, r.reason);
-        assert.equal(local.log.scheduled.length, 1);
-        const n = local.log.scheduled[0].notifications[0];
-        assert.equal(n.schedule.at.getTime(), TEE.teeTimeOf(ROUND).ms - 30 * 60 * 1000);
-        assert.match(n.title, /30 minutes/);
-        assert.match(n.body, /Saturday at Legacy/);
-        assert.match(n.body, /8:40 AM/, 'the body must quote the tee time in the ROUND\'s zone');
-        assert.equal(n.extra.roundCode, 'GFLBAM');
-    });
+    // A 30-minute local reminder was built in this wave - scheduled on the
+    // device, rescheduled when the organizer moved the time - and REMOVED on
+    // Manny's call before it shipped. The tee-time FIELD stays everywhere it
+    // shows. Eleven tests covered the reminder and came out with it; these four
+    // assert the removal left nothing behind, because a dormant plugin still
+    // ships and still asks for a permission the app never uses.
 
-    test('AN UNCHANGED TEE TIME SCHEDULES NOTHING, which is the whole point', async () => {
-        // This runs on every snapshot of the round - every score anybody posts.
-        const local = fakeLocal();
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND,
-            { plugins: { local }, now: BEFORE, stored: PHX.teeTimeISO });
-        assert.equal(r.scheduled, false);
-        assert.equal(r.reason, 'unchanged');
-        assert.equal(local.log.scheduled.length, 0,
-            're-registering on every snapshot fills a phone pending queue with duplicates of '
-            + 'one reminder');
-    });
-
-    test('A MOVED TEE TIME RESCHEDULES, and the id is the same so it REPLACES', async () => {
-        const moved = Object.assign({}, ROUND, TEE.teeTimeBuild('2026-10-04', '09:10', 420, 'America/Phoenix'));
-        const local = fakeLocal();
-        const r = await B.pushScheduleReminder('GFLBAM', moved,
-            { plugins: { local }, now: BEFORE, stored: PHX.teeTimeISO });
-        assert.equal(r.scheduled, true, r.reason);
-        assert.equal(r.id, B.pushReminderId('GFLBAM'),
-            'a changing id would leave the old reminder pending and add a second one');
-        assert.equal(local.log.cancelled.length, 0, 'schedule replaces; a cancel first opens a window to lose it');
-    });
-
-    test('a round with NO tee time schedules nothing - and CANCELS one it had', async () => {
-        const local = fakeLocal();
-        const fresh = await B.pushScheduleReminder('GFLBAM', {}, { plugins: { local }, now: BEFORE, stored: null });
-        assert.deepEqual(fresh, { scheduled: false, reason: 'no-tee-time' });
-        assert.equal(local.log.scheduled.length, 0);
-
-        const cleared = await B.pushScheduleReminder('GFLBAM', {},
-            { plugins: { local }, now: BEFORE, stored: PHX.teeTimeISO });
-        assert.equal(cleared.reason, 'cleared');
-        assert.equal(local.log.cancelled.length, 1,
-            'an organizer who removes a tee time must stop the reminder, not leave it pending');
-    });
-
-    test('A TEE TIME THAT HAS PASSED IS NEVER SCHEDULED', async () => {
-        // A phone fires a past notification immediately: a golfer opening a
-        // finished round would be told to go and tee off.
-        const local = fakeLocal();
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND,
-            { plugins: { local }, now: Date.UTC(2027, 0, 1), stored: null });
-        assert.equal(r.scheduled, false);
-        assert.equal(r.reason, 'already-passed');
-        assert.equal(local.log.scheduled.length, 0);
-    });
-
-    test('ids are per round, stable, and valid 32-bit positives', () => {
-        assert.equal(B.pushReminderId('GFLBAM'), B.pushReminderId('GFLBAM'));
-        assert.notEqual(B.pushReminderId('GFLBAM'), B.pushReminderId('ABCDEF'));
-        ['GFLBAM', 'A', 'ZZZZZZ', ''].forEach((c) => {
-            const id = B.pushReminderId(c);
-            assert.ok(Number.isInteger(id) && id > 0 && id < 2147483647, c + ' -> ' + id);
+    test('push-boot.js has no scheduler, no permission prompt and no stored key', () => {
+        ['pushScheduleReminder', 'pushEnsureLocalPermission', 'pushReminderId',
+         'pushReminderKey', 'pushReminderStored', 'pushReminderRemember'].forEach((n) => {
+            assert.equal(B[n], undefined, n + ' is still exported with nothing calling it');
         });
+        const src = read('push-boot.js').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+        assert.ok(!/LocalNotifications|golfapp_tee_reminder/.test(src),
+            'push-boot.js still reaches for the local-notification plugin');
     });
 
-    test('DENIED PERMISSION IS NOT ASKED AGAIN, and schedules nothing', async () => {
-        const local = fakeLocal({ display: 'denied' });
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND, { plugins: { local }, now: BEFORE, stored: null });
-        assert.equal(r.reason, 'no-permission');
-        assert.equal(local.log.asked, 0, 'iOS gives one chance and a declined prompt must not be re-shown');
-        assert.equal(local.log.scheduled.length, 0);
+    test('pushPlugins() resolves the push handle only', () => {
+        const p = B.pushPlugins();
+        assert.deepEqual(Object.keys(p).sort(), ['native', 'push']);
     });
 
-    test('a prompt is shown when permission has never been asked', async () => {
-        const local = fakeLocal({ display: 'prompt' });
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND, { plugins: { local }, now: BEFORE, stored: null });
-        assert.equal(r.scheduled, true, r.reason);
-        assert.equal(local.log.asked, 1);
+    test('the plugin is out of package.json, the allowlist AND the iOS binary', () => {
+        assert.ok(!/local-notifications/.test(read('package.json')));
+        assert.ok(!/local-notifications/.test(read('capacitor.config.ts').replace(/\/\/[^\n]*/g, ' ')));
+        assert.ok(!/LocalNotifications/.test(read('ios/App/CapApp-SPM/Package.swift')),
+            'an unused third-party SDK in the binary is what the Facebook trait exclusion '
+            + 'exists to prevent');
+        // THE POSITIVE HALF: push IS still linked, so this block is not satisfied
+        // by a tree with no notification plugins at all.
+        assert.match(read('ios/App/CapApp-SPM/Package.swift'), /CapacitorPushNotifications/);
     });
 
-    test('A THROWING PLUGIN IS A REASON, NOT AN EXCEPTION', async () => {
-        const local = fakeLocal({ throwOnSchedule: true });
-        const r = await B.pushScheduleReminder('GFLBAM', ROUND, { plugins: { local }, now: BEFORE, stored: null });
-        assert.equal(r.scheduled, false);
-        assert.equal(r.reason, 'schedule-failed');
+    test('index.html schedules nothing, and tee-time.js lost the reminder-only functions', () => {
+        const src = read('index.html').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+        assert.ok(!/pushScheduleReminder|maybeScheduleTeeReminder/.test(src));
+        const TT = require('./tee-time.js');
+        assert.equal(TT.teeTimeReminderAt, undefined, 'only the reminder used it');
+        assert.equal(TT.teeTimeChanged, undefined, 'and only the reminder used this');
+        // AND THE FIELD IS STILL THERE, which is the point of the removal being
+        // surgical rather than a revert.
+        assert.equal(typeof TT.teeTimeLabel, 'function');
+        assert.match(src, /teeTimeLabel\(currentData\)/, 'the scorecard header still shows it');
     });
 });
+
 
 // ===========================================================================
 describe('3. NO APNs KEY IS THE STATE TODAY, AND IT MUST BE QUIET', () => {

@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v119-teetime. The tournament product cache
+// The consumer product cache is consumer-v120-following. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3923,7 +3923,23 @@
 //
 // The push half stays inert until the APNs key and the Cloudflare secret exist, so
 // this bump ships the reminder working and the rest waiting.
-const CACHE_VERSION = 'golfapp-v279-teetime-notify';
+// Moved to v280: FOLLOWING ALONG AS A PLAYER, and the reminder removed.
+//
+// A round had two ways in - the scorekeeper with a ?group= link and the spectator
+// with the bare link - and no way to be the third and most common thing: a golfer who
+// is PLAYING and not keeping score. round-role.js is new and precached, index.html
+// offers all three on arrival, and only a playing golfer is registered for
+// notifications: the bare link is what gets forwarded to group chats, and the
+// scorekeeper is holding the card.
+//
+// AND THE TEE-TIME REMINDER IS GONE from v279, on Manny's call, before it shipped.
+// The tee-time FIELD stays. @capacitor/local-notifications came out of the build with
+// it rather than being left linked, because an unused third-party SDK still ships and
+// still asks for a permission the app never uses.
+//
+// A DEVICE ON v279 keeps a scorecard that offers no way to follow along, and has no
+// round-role.js for the unguarded arrival-sheet call - which is why the key moves.
+const CACHE_VERSION = 'golfapp-v280-following-along';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4098,6 +4114,9 @@ const SHELL_FILES = [
     // course is exactly who it is for.
     './push-notify.js',
     './push-boot.js',
+    // The three ways into a round. index.html calls it unguarded from the arrival
+    // sheet, so a cached shell without it throws before a golfer can choose.
+    './round-role.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

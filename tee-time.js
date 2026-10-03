@@ -2,9 +2,15 @@
 // THE TEE TIME A ROUND NEVER HAD (Wave 39)
 //
 // Wave 39's recon found that a round carries no tee time at all: `roundDay` is a
-// LABEL ("Single Round") and `createdAt` is when the round was made. So the two
-// notifications a golfer most wants - "you're in, here is when" and a reminder
-// half an hour before - had nothing to quote and nothing to schedule against.
+// LABEL ("Single Round") and `createdAt` is when the round was made. So a golfer
+// opening a round could not see when the group tees off, and the "you're in"
+// notification had nothing to quote.
+//
+// A 30-MINUTE REMINDER WAS BUILT HERE AND REMOVED on Manny's call before it
+// shipped. The FIELD stays, on every surface that shows it; the two functions
+// only the reminder used (teeTimeReminderAt, teeTimeChanged) came out with it,
+// because unreachable code still ships and git history is the right home for
+// code that is not running.
 //
 // THIS FILE IS THE WHOLE RULE, and it is pure: no DOM, no db, no Date.now()
 // except where a caller passes one in. One builder, because four surfaces read a
@@ -174,37 +180,10 @@ function teeTimeShort(data, fmt) {
     return p ? p.timeText : '';
 }
 
-// ---------------------------------------------------------------------------
-// THE REMINDER'S INSTANT. push-notify.js owns the window; this owns WHEN.
-//
-// Returns null when there is nothing to schedule, which includes a tee time that
-// has already passed - rescheduling a notification into the past is how a phone
-// fires one immediately, which is the opposite of a reminder.
-var TEE_TIME_REMINDER_MS = 30 * 60 * 1000;
-
-function teeTimeReminderAt(data, now) {
-    var t = teeTimeOf(data);
-    if (!t) return null;
-    var at = t.ms - TEE_TIME_REMINDER_MS;
-    var n = Number(now);
-    if (isFinite(n) && at <= n) return null;
-    return at;
-}
-
-// HAS THE ORGANIZER MOVED IT? The device reschedules when this says so, and only
-// then - re-registering the same notification on every page load is how a phone's
-// pending queue fills up with duplicates of one reminder.
-function teeTimeChanged(prevIso, data) {
-    var t = teeTimeOf(data);
-    var now = t ? t.iso : null;
-    var was = (typeof prevIso === 'string' && prevIso) ? prevIso : null;
-    return now !== was;
-}
-
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        TEE_TIME_ISO_FIELD, TEE_TIME_ZONE_FIELD, TEE_TIME_REMINDER_MS,
+        TEE_TIME_ISO_FIELD, TEE_TIME_ZONE_FIELD,
         teeTimeOf, hasTeeTime, teeTimeBuild, teeTimeInputs, teeTimeParts,
-        teeTimeLabel, teeTimeShort, teeTimeReminderAt, teeTimeChanged
+        teeTimeLabel, teeTimeShort
     };
 }

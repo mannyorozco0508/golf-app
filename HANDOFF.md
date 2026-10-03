@@ -3063,6 +3063,76 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03 (Wave 39 additions, on a branch)
+
+**STILL `ui-wave39-push`, STILL NOT MERGED.** Cache `golfapp-v280-following-along`
+/ consumer `v120`. Full suite 10,011 tests, 0 fail.
+
+- **THE TEE-TIME REMINDER IS GONE**, on Manny's call, before it shipped. The tee-time
+  FIELD stays everywhere it shows. Nothing is dormant:
+  `@capacitor/local-notifications` came out of `package.json`, the iOS allowlist and
+  `Package.swift`; `tee-time.js` lost `teeTimeReminderAt`/`teeTimeChanged`;
+  `push-notify.js` is five kinds, not six. Eleven tests came out with it and four
+  replaced them, asserting the removal left nothing behind.
+- **THREE WAYS INTO A ROUND.** `round-role.js`: keep score for Group N / I'm playing
+  (not keeping score) / Just watching. "I'm playing" is two steps - role, then name -
+  reusing `setMe()` and `golfapp_me_<code>`. **Only a playing golfer is registered
+  for notifications:** a spectator never is (the bare link is what gets forwarded to
+  group chats) and neither is the scorekeeper (they are holding the card).
+  - **THE RECON ANSWER Manny asked for first:** a spectator could ALREADY pick "Who
+    am I?" - `index.html:5797` has no spectator gate, and `setMe()` at `:5681` is
+    reachable - but it is rendered only inside the Action Center body
+    (`index.html:6156`), which is **collapsed by default** and **empty on a round
+    with no bets** (`:5954`, `:5955`). Measured: a spectator on a round with one side
+    bet got 190 bytes, the toggle alone. The machinery was there; the entry point
+    was not.
+  - **THE SHEET IS MULTI-GROUP ONLY; A FOURSOME GETS A LINE.** Making it a sheet
+    everywhere turned **39 guards red** - the byte-for-byte arrival pins, three
+    Chrome layout checks and the modal-layering tests - because a foursome's bare
+    link is how most of this app's checks and most of its golfers arrive. A
+    multi-group round has asked on arrival since 2026-09-20, so two more rows change
+    nothing there. **If Manny wants a foursome interrupted too, that is one line in
+    `roundRoleShouldAsk`.**
+  - **THE OWNER IS NOT EXCLUDED from the multi-group sheet** - caught by
+    `organizer_doors_after_picker_test.js`: on a multi-group round the organizer is
+    one of the golfers and picks their group like anybody else. The exclusion belongs
+    on the single-group line, where they already hold the whole card.
+- **ITEM 3's RECON CHANGES IT: there is exactly ONE accept/decline record in the app.**
+  `sidematches.html:2685` `respondAloha()` writes
+  `events/<code>/sideMatches/<id>/aloha {status, respondedAt}`. **A press has no
+  offer and no answer** - `index.html:4823` `confirmSidePress()` writes it straight
+  to `presses` when the golfer taps, because pressing is a thing you do, not a thing
+  you ask - and a bet challenge has no record either. Inventing one would be a NEW
+  money record, which is STRICT and not approved, so I did not. `?aloha=<matchId>`
+  focuses the card with the EXISTING buttons; the write is `respondAloha()`, same
+  path, same gate. **And money does not move from a URL** - `sidematches.html` has
+  refused that since the `?press=` link was built.
+  - **ONE THING FOR MANNY:** `respondAloha()` is gated on `canPressSideMatch()`,
+    which a following player does not pass. Widening it is a money-write rule change
+    and therefore STRICT. Default is to leave it: the notification tells the playing
+    golfer, the scorekeeper taps - which is how a bet already works for golfers
+    without the app.
+- **ITEM 2 IS PROPOSED, NOT BUILT** (`docs/wave39-push-plan.md`):
+  `organizers/<ownerUid>/groups/<groupId>/members/<memberKey>/devices/<uid> = true`,
+  **written by the GOLFER**, so no sign-in is ever needed, the organizer never writes
+  somebody else's uid, and there is no global name-to-uid index to leak. Needs a
+  rules delta - STRICT. Already true with no new mechanism: `pushDecide` refuses with
+  `no-device`, so a golfer the app has never seen is never sent anything.
+- **FOUR MORE SELF-INFLICTED FAILURES, same class as the last four:** a name of mine
+  colliding with a selector or a literal some guard already owns. The offer line
+  borrowed `.whoami-line-btn` and became the first match for a tap `whoami_line_test.js`
+  aims at the name picker; the sheet's two new outline rows made
+  `.btn-outline` ambiguous for six Chrome checks (fixed by giving every row a
+  `data-role`); a guide sentence used "read-only", which a guard bans because the app
+  once wrongly called a group LINK that; and `baseline_arithmetic_test.js` had a
+  latent `lineOf is not defined` - a branch that had never executed, so the first
+  real fault it found crashed instead of reporting.
+- **AND A REAL DEFECT CAUGHT BY A PIN:** `card_scope_closed_prev.fixture.json` showed
+  the bare link saying "Just watching." underneath a sheet still asking how the golfer
+  was joining. `roundRoleOf()` defaults to watching because a bare link grants
+  nothing - right for permissions, wrong as a sentence. The note now speaks only for
+  a role the golfer chose.
+
 ## Where things stand, 2026-10-03 (Wave 39, on a branch)
 
 **WAVE 39 IS BUILT ON `ui-wave39-push` AND NOT MERGED** - awaiting Manny's Cmd+R.

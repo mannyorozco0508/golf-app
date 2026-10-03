@@ -10,15 +10,18 @@
 // THE SIX, as briefed:
 //
 //   1 youre-in        "<round>, <date> <tee time>"            essentials
-//   2 tee-reminder    30 minutes before the tee time          essentials
-//   3 final-results   "you won $40" / "you owe $25"           essentials
-//   4 bet-challenge   "Jimmy challenged you: $20 Nassau"      bets    + actions
-//   5 press-offered   a press or an Aloha, offered to you     bets    + actions
-//   6 hype            hot streak, eagle, ace                  hype
+//   2 final-results   "you won $40" / "you owe $25"           essentials
+//   3 bet-challenge   "Jimmy challenged you: $20 Nassau"      bets    + actions
+//   4 press-offered   a press or an Aloha, offered to you     bets    + actions
+//   5 hype            hot streak, eagle, ace                  hype
+//
+// FIVE, NOT SIX. A tee-time reminder was the second and it is GONE - removed on
+// Manny's call before it shipped. The tee-time FIELD stays, and 'youre-in' still
+// quotes it.
 //
 // ESSENTIALS CANNOT BE TURNED OFF, and that is a product decision worth stating:
-// 1-3 are the notifications a golfer is relying on to show up at the right tee
-// at the right time and to find out what they owe. Bets and Hype are opt-out.
+// knowing you are in a round, and what you ended up owing, are the two a golfer
+// is relying on. Bets and Hype are opt-out.
 // A golfer who wants none of it turns the whole thing off at the OS level, which
 // is the honest place for that switch.
 //
@@ -88,7 +91,6 @@
 var PUSH_CHANNELS = ['essentials', 'bets', 'hype'];
 var PUSH_KIND_CHANNEL = {
     'youre-in': 'essentials',
-    'tee-reminder': 'essentials',
     'final-results': 'essentials',
     'bet-challenge': 'bets',
     'press-offered': 'bets',
@@ -97,24 +99,6 @@ var PUSH_KIND_CHANNEL = {
 // The kinds a single hole can fire more than one of. Everything else is an
 // occasion, not an event on a hole.
 var PUSH_HOLE_SCOPED = { 'press-offered': true, 'hype': true };
-
-// Thirty minutes, in milliseconds, and it is the brief's number rather than a
-// guess: a reminder earlier than this is a diary entry and later than this is
-// no use to somebody still in the car park.
-var PUSH_TEE_REMINDER_MS = 30 * 60 * 1000;
-
-// THE WINDOW HAS TWO EDGES AND THE LATE ONE IS MEASURED FROM THE TEE TIME, not
-// from the fire point.
-//
-// The first version put a ten-minute grace on the FIRE point, which made the
-// window [tee-30, tee-20] - and a scheduler that runs every fifteen minutes can
-// miss a ten-minute window entirely, so the reminder would simply never arrive.
-// Measured on the fixtures and caught by the test that asked for tee-5.
-//
-// Five minutes before the tee time is the last moment this is worth sending: it
-// is still useful to somebody in the car park, and after it the group is on the
-// tee and a buzz saying "in 30 minutes" is worse than silence.
-var PUSH_REMINDER_LATEST_MS = 5 * 60 * 1000;
 
 function pushChannelOf(kind) {
     return PUSH_KIND_CHANNEL[kind] || null;
@@ -166,13 +150,6 @@ function pushCopy(kind, facts) {
         var when = [String(f.dateText || '').trim(), String(f.teeTimeText || '').trim()]
             .filter(Boolean).join(' ');
         return { title: "You're in", body: round + (when ? ', ' + when : '') };
-    }
-    if (kind === 'tee-reminder') {
-        return {
-            title: 'Tee time in 30 minutes',
-            body: [round, String(f.courseName || '').trim(), String(f.teeTimeText || '').trim()]
-                .filter(Boolean).join(' · ')
-        };
     }
     if (kind === 'final-results') {
         // THE ONE SENTENCE A GROUP WAITS FOR. Signed to the reader: positive is
@@ -290,17 +267,7 @@ function pushDecide(input) {
 
     // THE TEE TIME A ROUND DOES NOT HAVE YET. Refused cleanly rather than
     // inventing a time - see the recon note at the top of this file.
-    if ((kind === 'youre-in' || kind === 'tee-reminder') && !facts.teeTimeText) return no('no-tee-time');
-
-    // A REMINDER THAT MISSED ITS SLOT IS NOT SENT. "Tee time in 30 minutes",
-    // twenty minutes after the group teed off, is worse than silence.
-    if (kind === 'tee-reminder') {
-        var due = Number(facts.teeTimeMs);
-        var now = Number(d.now);
-        if (!due || !now) return no('no-tee-time');
-        if (now < due - PUSH_TEE_REMINDER_MS) return no('too-early');
-        if (now > due - PUSH_REMINDER_LATEST_MS) return no('too-late');
-    }
+    if (kind === 'youre-in' && !facts.teeTimeText) return no('no-tee-time');
 
     var dedupeKey = pushDedupeKey(kind, facts);
     if (d.alreadySent && d.alreadySent[dedupeKey]) return no('already-sent');
@@ -325,8 +292,8 @@ function pushDecide(input) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        PUSH_CHANNELS, PUSH_KIND_CHANNEL, PUSH_HOLE_SCOPED, PUSH_TEE_REMINDER_MS,
-        PUSH_REMINDER_LATEST_MS, PUSH_STREAK_BIRDIES, PUSH_STREAK_WINDOW,
+        PUSH_CHANNELS, PUSH_KIND_CHANNEL, PUSH_HOLE_SCOPED,
+        PUSH_STREAK_BIRDIES, PUSH_STREAK_WINDOW,
         pushChannelOf, pushPrefsNormalise, pushAllowed, pushMoneyText, pushCopy,
         pushHypeTitle, pushHypeBody, pushHypeFor, pushDedupeKey, pushThrottleKey,
         pushDecide

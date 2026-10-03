@@ -89,7 +89,12 @@ async function journey(startPage, query, opts) {
     // the spectator the page itself offers, and dismissing it is what makes this case
     // real - my first version tapped into the overlay, read "no back btn", and blamed
     // the feature.
-    const steps = (o.dismissPicker ? [{ tap: '#group-pick-overlay .btn-outline' }, { sleep: 700 }] : [])
+    // data-role="watching" NAMES THE ROW (Wave 39). The sheet had one
+    // btn-outline - "Just watching" - and this selected it by class. It now
+    // has three rows, two of them outline, so a class selector picks
+    // whichever comes first: measured, it tapped "I'm playing" and landed on
+    // the name picker instead of the card.
+    const steps = (o.dismissPicker ? [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 700 }] : [])
         .concat([{ expression: "'START:' + " + LOOK },
                    { tap: '.top-nav-item[href^="instructions.html"]' }, { sleep: 1200 },
                    { expression: "'GUIDE:' + " + LOOK }]);

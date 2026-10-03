@@ -25,10 +25,14 @@
 // push-notify.js does not exist, the require throws at load, and node reports the
 // FILE as one failing test - which proves nothing per assertion.
 //
-// MEASURED with a stub in place - all eleven exported functions present and
-// returning undefined, the constants present and empty - over the FINISHED file,
-// all 27 tests: 2 PASS / 25 FAIL. The module was restored from a saved copy by
-// sha (3917c94ed9fc), never with git restore.
+// MEASURED with a stub in place - every exported function present and returning
+// undefined, the constants present and empty - over the FINISHED file,
+// all 29 tests: 2 PASS / 27 FAIL. The module was restored from a saved copy by
+// sha (724077d2424a9aa7), never with git restore.
+//
+// RE-MEASURED after the tee-time reminder came out and the known-device rows went
+// in: this header was first written against a 27-test file, and a baseline is a
+// statement about the file as it stands rather than a historical record.
 //
 //   BOTH PASSES ARE INERT AGAINST THE STUB AND I AM NOT GOING TO DRESS THEM UP:
 //     - "the dedupe key is derived from the EVENT, never from the clock" passes
@@ -52,7 +56,7 @@ const path = require('path');
 const P = require('./push-notify.js');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 
-const SIX = ['youre-in', 'tee-reminder', 'final-results', 'bet-challenge', 'press-offered', 'hype'];
+const KINDS = ['youre-in', 'final-results', 'bet-challenge', 'press-offered', 'hype'];
 const base = (over) => Object.assign({
     kind: 'final-results',
     tokens: ['tok-1'],
@@ -62,19 +66,18 @@ const base = (over) => Object.assign({
 }, over || {});
 
 // ===========================================================================
-describe('1. SIX NOTIFICATIONS, THREE CHANNELS, AND ESSENTIALS CANNOT BE SILENCED', () => {
+describe('1. FIVE NOTIFICATIONS, THREE CHANNELS, AND ESSENTIALS CANNOT BE SILENCED', () => {
 
-    test('every export is a function, and the six kinds are the six briefed', () => {
+    test('every export is a function, and the five kinds are the five that shipped', () => {
         ['pushChannelOf', 'pushPrefsNormalise', 'pushAllowed', 'pushCopy', 'pushHypeFor',
          'pushDedupeKey', 'pushThrottleKey', 'pushDecide'].forEach((n) => {
             assert.equal(typeof P[n], 'function', 'push-notify.js must export ' + n);
         });
-        assert.deepEqual(Object.keys(P.PUSH_KIND_CHANNEL).sort(), SIX.slice().sort());
+        assert.deepEqual(Object.keys(P.PUSH_KIND_CHANNEL).sort(), KINDS.slice().sort());
     });
 
-    test('1-3 are essentials, 4-5 are bets, 6 is hype', () => {
+    test('you-are-in and the final result are essentials, the two offers are bets, hype is hype', () => {
         assert.equal(P.pushChannelOf('youre-in'), 'essentials');
-        assert.equal(P.pushChannelOf('tee-reminder'), 'essentials');
         assert.equal(P.pushChannelOf('final-results'), 'essentials');
         assert.equal(P.pushChannelOf('bet-challenge'), 'bets');
         assert.equal(P.pushChannelOf('press-offered'), 'bets');
@@ -266,40 +269,76 @@ describe('5. THE SAME EVENT IS NEVER SENT TWICE', () => {
 });
 
 // ===========================================================================
-describe('6. THE TEE TIME A ROUND DOES NOT HAVE YET', () => {
+describe('6. THE TEE TIME, AND THE REMINDER THAT IS NOT HERE', () => {
 
-    test('WITHOUT A TEE TIME, 1 and 2 REFUSE - they never invent one', () => {
-        // MEASURED: `teeTime` is in no page and in no rule. A round carries
-        // roundDay, which is a label, and createdAt, which is when it was made.
-        ['youre-in', 'tee-reminder'].forEach((kind) => {
-            const r = P.pushDecide(base({ kind, facts: { uid: 'u-1', roundCode: 'G', roundName: 'Sat' } }));
-            assert.equal(r.send, false, kind);
-            assert.equal(r.reason, 'no-tee-time',
-                kind + ' must refuse rather than send a time nobody set');
+    test('WITHOUT A TEE TIME, "You are in" REFUSES - it never invents one', () => {
+        // A round where the organizer left the tee time blank is normal - a
+        // pickup round nobody wrote down - and it must not produce a notification
+        // naming a time nobody set.
+        const r = P.pushDecide(base({ kind: 'youre-in', facts: { uid: 'u-1', roundCode: 'G', roundName: 'Sat' } }));
+        assert.equal(r.send, false);
+        assert.equal(r.reason, 'no-tee-time');
+    });
+
+    test('WITH one, it quotes the round, the date and the time', () => {
+        const r = P.pushDecide(base({
+            kind: 'youre-in',
+            facts: { uid: 'u-1', roundCode: 'G', roundName: 'Saturday at Legacy',
+                     dateText: 'Sun Oct 4', teeTimeText: '8:40 AM' }
+        }));
+        assert.equal(r.send, true, r.reason);
+        assert.equal(r.copy.body, 'Saturday at Legacy, Sun Oct 4 8:40 AM');
+    });
+
+    test('THERE IS NO TEE-TIME REMINDER, AND NOTHING OF IT IS LEFT DORMANT', () => {
+        // Built as a local notification in this wave and REMOVED on Manny's call
+        // before it shipped. The FIELD stays. This asserts the removal rather
+        // than trusting it: a dormant kind would still be addressable by the
+        // sender, and @capacitor/local-notifications would still be in the binary
+        // asking for a permission the app never uses - which is exactly what the
+        // Facebook trait exclusion exists to prevent.
+        assert.equal(P.pushChannelOf('tee-reminder'), null, 'the kind is gone');
+        assert.equal(P.pushCopy('tee-reminder', { roundName: 'Sat' }), null, 'and so is its sentence');
+        assert.equal(P.pushDecide(base({ kind: 'tee-reminder' })).reason, 'unknown-kind');
+        assert.deepEqual(Object.keys(P.PUSH_KIND_CHANNEL).sort(),
+            ['bet-challenge', 'final-results', 'hype', 'press-offered', 'youre-in']);
+        const src = read('push-notify.js');
+        assert.ok(!/PUSH_TEE_REMINDER_MS|PUSH_REMINDER_LATEST_MS/.test(src),
+            'the reminder window constants are still here with nothing reading them');
+        assert.ok(!/local-notifications/.test(read('package.json')),
+            'the plugin is still a dependency');
+        assert.ok(!/local-notifications/.test(read('capacitor.config.ts').replace(/\/\/[^\n]*/g, ' ')),
+            'the plugin is still in the iOS allowlist');
+        assert.ok(!/LocalNotifications/.test(read('ios/App/CapApp-SPM/Package.swift')),
+            'the plugin is still linked into the iOS binary');
+    });
+});
+
+
+// ===========================================================================
+describe('6b. "YOU ARE IN" GOES ONLY TO A DEVICE WE ALREADY KNOW', () => {
+
+    test('no token means no notification, by construction', () => {
+        // THE RULE ASKED FOR, and it needs no new mechanism: pushDecide refuses
+        // with no-device, so a golfer the app has never seen is never sent
+        // anything. There is no queue, no retry and nothing stored waiting for a
+        // device to appear - which also means nothing to leak if a roster name
+        // matches somebody else.
+        const facts = { uid: 'u-1', roundCode: 'G', roundName: 'Sat',
+                        dateText: 'Sun Oct 4', teeTimeText: '8:40 AM' };
+        [[], null, undefined].forEach((tokens) => {
+            const r = P.pushDecide(base({ kind: 'youre-in', tokens, facts }));
+            assert.equal(r.send, false, JSON.stringify(tokens));
+            assert.equal(r.reason, 'no-device');
         });
+        // The positive half, so this is not satisfied by refusing everything.
+        assert.equal(P.pushDecide(base({ kind: 'youre-in', tokens: ['t'], facts })).send, true);
     });
 
-    test('with one, the reminder fires 30 minutes before and NOT a minute earlier', () => {
-        const tee = Date.UTC(2026, 9, 4, 15, 40);
-        const facts = { uid: 'u-1', roundCode: 'G', roundName: 'Sat', teeTimeText: '8:40 AM', teeTimeMs: tee };
-        const at = (ms) => P.pushDecide(base({ kind: 'tee-reminder', facts, now: ms }));
-        assert.equal(at(tee - 31 * 60000).reason, 'too-early');
-        assert.equal(at(tee - 30 * 60000).send, true, 'exactly 30 minutes is the moment');
-        assert.equal(at(tee - 20 * 60000).send, true, 'a scheduler that runs every quarter hour');
-        assert.equal(at(tee - 5 * 60000).send, true, 'still useful to somebody in the car park');
-        // THE WINDOW'S LATE EDGE IS MEASURED FROM THE TEE TIME, not from the fire
-        // point. A first version put a ten-minute grace on the fire point, making
-        // the window [tee-30, tee-20] - which a cron running every fifteen
-        // minutes can miss entirely, so the reminder would never arrive at all.
-        assert.equal(at(tee - 4 * 60000).reason, 'too-late');
-    });
-
-    test('A MISSED SLOT IS NOT SENT LATE - "tee time in 30 minutes" after they teed off is worse than silence', () => {
-        const tee = Date.UTC(2026, 9, 4, 15, 40);
-        const facts = { uid: 'u-1', roundCode: 'G', roundName: 'Sat', teeTimeText: '8:40 AM', teeTimeMs: tee };
-        const late = P.pushDecide(base({ kind: 'tee-reminder', facts, now: tee + 60 * 60000 }));
-        assert.equal(late.send, false);
-        assert.equal(late.reason, 'too-late');
+    test('and a golfer with no uid is not addressable either', () => {
+        const r = P.pushDecide(base({ kind: 'youre-in', facts: { roundCode: 'G', roundName: 'Sat', teeTimeText: '8:40 AM' } }));
+        assert.equal(r.reason, 'no-recipient',
+            'a roster name is not a recipient - the uid is what a token hangs off');
     });
 });
 

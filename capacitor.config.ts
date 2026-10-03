@@ -29,24 +29,23 @@ const config: CapacitorConfig = {
     // the shell a popup has no window to open, so Continue with Apple and Continue
     // with Google need the native Apple and Google SDKs. It is named here
     // deliberately, like the other two.
-    // @capacitor/push-notifications AND @capacitor/local-notifications join for
-    // WAVE 39. Two plugins, two different jobs, and the split is deliberate:
+    // @capacitor/push-notifications joins for WAVE 39: you're in, final results, a
+    // bet challenge, a press offered, and hype. Five notifications, all of which
+    // have to come from outside the phone, so all of them need a token and a
+    // sender.
     //
-    //   LOCAL does the tee-time reminder, scheduled on the device when a golfer
-    //   opens a round that has one. No server, no token, no scheduler, no rules -
-    //   and it fires with the phone in a pocket and no signal, which is the state
-    //   a golfer driving to a course is actually in.
+    // @capacitor/local-notifications WAS HERE AND IS GONE. It did one job - a
+    // 30-minute tee-time reminder - and that was removed on Manny's call before
+    // it shipped. The plugin came out with it rather than being left linked: an
+    // unused third-party SDK in the binary is exactly what the Facebook trait
+    // exclusion below exists to prevent, and leaving it would mean shipping a
+    // notification permission the app never uses.
     //
-    //   PUSH does the five that have to come from outside: you're in, final
-    //   results, a bet challenge, a press offered, and hype. Those need a token
-    //   and a sender.
-    //
-    // BOTH ARE INERT UNTIL MANNY'S SETUP EXISTS. Push needs the APNs key in
-    // Firebase and the Push Notifications capability in Xcode; without them
-    // register() rejects and the app carries on exactly as it does today. Local
-    // needs only the permission prompt, so the reminder works first.
+    // INERT UNTIL MANNY'S SETUP EXISTS. Push needs the APNs key in Firebase and
+    // the Push Notifications capability in Xcode; without them register() fires
+    // registrationError and the app carries on exactly as it does today.
     includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
-                     '@capacitor/push-notifications', '@capacitor/local-notifications']
+                     '@capacitor/push-notifications']
   },
   // ANDROID IS NOW AN ALLOWLIST TOO, AND THE REASON IS THIS WAVE'S PLUGIN.
   //

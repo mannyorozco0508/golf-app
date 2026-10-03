@@ -79,6 +79,10 @@ const SHARED_SHELL = [
     // reminder is the half that works first and it must survive going offline.
     'push-notify.js',
     'push-boot.js',
+    // round-role.js: the three ways into a round - keep score, play, watch.
+    // index.html calls it UNGUARDED from the arrival sheet, so a cached shell
+    // without it throws before a golfer can choose anything.
+    'round-role.js',
     // code-issuer.js issues every round, trip and tournament code and checks it is
     // free before handing it out. admin.html, trip.html and tournament.html all
     // load it, so without it here the native bundle 404s and none of them can

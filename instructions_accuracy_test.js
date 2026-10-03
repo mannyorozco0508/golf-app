@@ -82,6 +82,21 @@ const GUIDE = 'instructions.html';
 const REAL_PAGES = ['index.html', 'admin.html', 'settlement.html', 'sidematches.html',
     'leaderboard.html', 'skins.html', 'stats.html', 'trip.html', 'shared.html'];
 
+// AND THE SHARED MODULES THAT HOLD USER-FACING COPY (Wave 39).
+//
+// The haystack was pages only, and that stopped being the whole truth as soon as
+// sentences started moving into one builder: course-import-rules.js holds every
+// online-search refusal, side-match-lines.js holds the match sentences, and
+// round-role.js now holds the three row titles on the arrival sheet. A guide that
+// quotes "I'm playing (not keeping score)" was reported as inventing a control
+// that does not exist, when the control exists and the copy simply does not live
+// in a .html file any more.
+//
+// Widening this makes the check STRONGER: it can now catch a guide quoting a
+// sentence that no page AND no shared builder contains.
+const SHARED_COPY = ['round-role.js', 'course-import-rules.js', 'side-match-lines.js',
+    'handicap-labels.js', 'card-is-in.js', 'push-notify.js', 'tee-time.js'];
+
 const read = (f) => (fs.existsSync(path.join(__dirname, f))
     ? decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8')) : '');
 
@@ -104,7 +119,7 @@ function withoutComments(src) {
         .replace(/\s+/g, ' ');
 }
 
-const HAYSTACK = REAL_PAGES.map((p) => ({ page: p, src: withoutComments(read(p)) }));
+const HAYSTACK = REAL_PAGES.concat(SHARED_COPY).map((p) => ({ page: p, src: withoutComments(read(p)) }));
 const existsSomewhere = (s) => HAYSTACK.filter((h) => h.src.includes(s)).map((h) => h.page);
 
 // The guide's markup, with its own script and comments gone.

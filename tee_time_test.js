@@ -28,10 +28,9 @@
 // require throws at load, and node reports the FILE as one failing test - no
 // per-assertion signal.
 //
-// MEASURED with a stub whose ten functions return undefined and whose three
-// constants are empty, over the FINISHED file, all 19 tests: 4 PASS / 15 FAIL.
-// The module was restored by sha from a saved copy (8fc8c909ceafb410), never
-// with git restore.
+// MEASURED with a stub whose functions return undefined and whose constants are
+// empty, over the FINISHED file, all 16 tests: 4 PASS / 12 FAIL. The module was
+// restored by sha from a saved copy (bc55d30f01b30d29), never with git restore.
 //
 //   THE FOUR PASSES ARE ALL SOURCE SCANS of a tree where the PAGES had already
 //   been wired and only the module had not: the purity scan (of the stub itself),
@@ -40,11 +39,15 @@
 //   to pretend otherwise - they are in the file because a module nothing loads
 //   and nothing calls is the other way this wave could have failed.
 //
-//   The 15 reds are the field names, building a string, the offset sign, the
+//   The reds are the field names, building a string, the offset sign, the
 //   half-hour zone, the malformed inputs, the corrupt-round case, the zone rule,
 //   the two-rounds-read-8:40 case, the label shape, the fallback, the editing
-//   round-trip, the reminder instant, the past-tee-time refusal, the change
-//   detector, and the no-hand-formatting scan.
+//   round-trip, and the no-hand-formatting scan.
+//
+// RE-MEASURED AFTER THE REMINDER CAME OUT. A 30-minute local reminder was built
+// in this wave and REMOVED on Manny's call before it shipped; the FIELD stays.
+// Its three tests came out with it, and the figures below are the re-run - a
+// baseline is a statement about the file as it stands, not a historical record.
 //
 // I first wrote this header from the draft rather than from a run, with a
 // 22-test total and a split that did not match it. baseline_arithmetic_test.js
@@ -174,39 +177,7 @@ describe('2. THE TIME IS THE COURSE\'S, NEVER THE READER\'S', () => {
 });
 
 // ===========================================================================
-describe('3. THE REMINDER\'S INSTANT', () => {
-
-    test('thirty minutes before, and the brief\'s number is the file\'s number', () => {
-        assert.equal(T.TEE_TIME_REMINDER_MS, 30 * 60 * 1000);
-        const b = built(PHX);
-        assert.equal(T.teeTimeReminderAt(b, Date.UTC(2026, 9, 4, 0, 0)),
-            T.teeTimeOf(b).ms - 30 * 60 * 1000);
-    });
-
-    test('A REMINDER IS NEVER SCHEDULED INTO THE PAST', () => {
-        // A phone fires a past notification immediately, which is the opposite
-        // of a reminder: a golfer opening a finished round would be told to go
-        // and tee off.
-        const b = built(PHX);
-        assert.equal(T.teeTimeReminderAt(b, Date.UTC(2027, 0, 1)), null);
-        assert.equal(T.teeTimeReminderAt(b, T.teeTimeOf(b).ms - 30 * 60 * 1000), null, 'the exact moment counts as gone');
-        assert.equal(T.teeTimeReminderAt(null, Date.now()), null);
-    });
-
-    test('the change detector fires on a MOVED time and stays quiet otherwise', () => {
-        const b = built(PHX);
-        assert.equal(T.teeTimeChanged(b.teeTimeISO, b), false,
-            're-registering the same notification on every page load fills a phone\'s queue '
-            + 'with duplicates of one reminder');
-        assert.equal(T.teeTimeChanged(null, b), true, 'a tee time appearing is a change');
-        assert.equal(T.teeTimeChanged(b.teeTimeISO, {}), true, 'a tee time REMOVED is a change');
-        assert.equal(T.teeTimeChanged(b.teeTimeISO, built({ date: '2026-10-04', time: '09:10', off: 420, zone: PHX.zone })), true);
-        assert.equal(T.teeTimeChanged(null, {}), false);
-    });
-});
-
-// ===========================================================================
-describe('4. ONE BUILDER, AND EVERY SURFACE READS IT', () => {
+describe('3. ONE BUILDER, AND EVERY SURFACE READS IT', () => {
 
     test('PURE: no DOM, no db, no clock of its own', () => {
         const m = read('tee-time.js').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ').replace(/\/\*[\s\S]*?\*\//g, ' ');

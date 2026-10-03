@@ -966,11 +966,20 @@ html {
             // blank builder would hide the preset most trips actually want.
             smApplyRyderArrival();
 
-            const pressTarget = urlParams.get('press');
-            if (pressTarget && !window.__smPressFocused && (currentData.players || []).length) {
+            // ?press=<wagerId> and ?aloha=<wagerId> BOTH ONLY FOCUS A CARD.
+            //
+            // ?aloha= is Wave 39's: a notification telling a golfer the other side
+            // offered them an Aloha carries them here, to the card with the Accept
+            // and Decline buttons on it. IT ANSWERS NOTHING. respondAloha() is the
+            // one writer and the golfer taps it - for exactly the reason stated
+            // above for the press: an Aloha doubles the match, and money must not
+            // move because a URL was opened. A notification is a tap on a banner,
+            // which is not the same as a decision.
+            const focusTarget = urlParams.get('press') || urlParams.get('aloha');
+            if (focusTarget && !window.__smPressFocused && (currentData.players || []).length) {
                 window.__smPressFocused = true;
                 setTimeout(() => {
-                    const card = document.getElementById('sm-card-' + pressTarget);
+                    const card = document.getElementById('sm-card-' + focusTarget);
                     if (!card) return;
                     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     card.classList.add('sm-card-focus');

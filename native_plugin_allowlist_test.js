@@ -108,25 +108,25 @@ const IOS_PLUGINS = {
     '@capacitor/filesystem': 'CapacitorFilesystem',
     '@capacitor/share': 'CapacitorShare',
     '@capacitor-firebase/authentication': 'CapacitorFirebaseAuthentication',
-    // WAVE 39, and the two are a deliberate pair with different jobs.
+    // WAVE 39: the five notifications that have to come from outside the phone -
+    // you're in, final results, a bet challenge, a press offered, and hype.
     //
-    //   LOCAL does the tee-time reminder, scheduled on the device when a golfer
-    //   opens a round that has one. No token, no server, no scheduler, no rules -
-    //   and it fires with the phone in a pocket and no signal, which is the state
-    //   a golfer driving to a course is actually in. It needs only a permission
-    //   prompt, so it is the half that works first.
+    // IT STAYS INERT until the APNs key is in Firebase and the Push Notifications
+    // capability is in Xcode: without them register() fires registrationError,
+    // push-boot.js records a reason, and the app carries on.
     //
-    //   PUSH does the five that have to come from outside the phone. It stays
-    //   inert until the APNs key is in Firebase and the Push Notifications
-    //   capability is in Xcode: without them register() fires
-    //   'registrationError', push-boot.js records a reason and the app carries on.
+    // @capacitor/local-notifications WAS HERE AND IS GONE. It did one job - a
+    // 30-minute tee-time reminder - removed on Manny's call before it shipped,
+    // and the plugin came out with it rather than being left linked. An unused
+    // third-party SDK in the binary is what the Facebook trait exclusion above
+    // exists to prevent, and leaving it would ship a notification permission the
+    // app never uses.
     //
-    // NEITHER IS ON ANDROID, and that is not an omission - push on Android needs
+    // NOT ON ANDROID, and that is not an omission - push there needs
     // google-services.json and the com.google.gms.google-services gradle plugin,
-    // neither of which this repo has, so naming them in the Android allowlist
-    // would break that build for a feature Android does not ship.
-    '@capacitor/push-notifications': 'CapacitorPushNotifications',
-    '@capacitor/local-notifications': 'CapacitorLocalNotifications'
+    // neither of which this repo has, so naming it in the Android allowlist would
+    // break that build for a feature Android does not ship.
+    '@capacitor/push-notifications': 'CapacitorPushNotifications'
 };
 // SPM package traits, per plugin id. An id absent from here must have NO traits in
 // Package.swift; an id present here must have exactly these. The plugin's own

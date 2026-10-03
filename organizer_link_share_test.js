@@ -452,7 +452,7 @@ const PROBE1 = `(() => JSON.stringify({
 const C = {};
 before(async () => {
     const r = await arriveCold({ url: fileUrl('index.html', 'game=ORG1'), db: DB, settleMs: 4000, steps: [
-        { tap: '#group-pick-overlay .btn-outline', nth: 0 }, { sleep: 250 },
+        { tap: '#group-pick-overlay [data-role="watching"]', nth: 0 }, { sleep: 250 },
         { expression: PROBE0 },
         { tap: '#oc-input', nth: 0 }, { sleep: 150 },
         ...(ORIGIN + '/index.html?game=ORG1&organizer=' + TOKEN).split('').map(ch => ({ cdp: { method: 'Input.insertText', params: { text: ch } } })),

@@ -15,8 +15,11 @@
 //     and does nothing. The web app behaves exactly as it does today.
 //   - In the SHELL without an APNs key, register() rejects. That is caught, the
 //     reason is recorded, and the app carries on. No alert, no retry loop.
-//   - THE LOCAL REMINDER DOES NOT WAIT FOR ANY OF IT. It needs one permission
-//     and no server, so the tee-time reminder is the part that works first.
+//   - THERE IS NO TEE-TIME REMINDER. One was built here as a local notification
+//     and REMOVED on Manny's call before it shipped; the tee-time FIELD stays.
+//     Nothing is left dormant - the plugin came out of package.json and the iOS
+//     allowlist with it, because unreachable code still ships and git history is
+//     the right home for code that is not running.
 //
 // PERMISSION IS ASKED AFTER JOINING A ROUND, NEVER ON FIRST LAUNCH. A prompt on
 // launch is the one a golfer declines before they know what the app is for, and
@@ -35,116 +38,8 @@ function pushPlugins() {
     var p = (cap && cap.Plugins) ? cap.Plugins : {};
     return {
         native: !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()),
-        push: p.PushNotifications || null,
-        local: p.LocalNotifications || null
+        push: p.PushNotifications || null
     };
-}
-
-// ONE NOTIFICATION ID PER ROUND, derived from the round code, so rescheduling
-// REPLACES the pending reminder instead of adding a second one. A phone's
-// pending queue filling up with duplicates of one reminder is the defect this
-// prevents, and it is why the id is a hash of the code rather than a counter.
-function pushReminderId(roundCode) {
-    var s = String(roundCode || '');
-    var h = 0;
-    for (var i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
-    // LocalNotifications ids must be a positive 32-bit int on iOS.
-    return Math.abs(h) % 2000000000 + 1;
-}
-
-// What the device remembers about a round's reminder, so it only reschedules
-// when the tee time actually MOVED. localStorage throws in a private window, so
-// both halves are wrapped and the failure mode is "reschedule once more than
-// necessary", never a broken page.
-function pushReminderKey(roundCode) { return 'golfapp_tee_reminder_' + String(roundCode || ''); }
-
-function pushReminderStored(roundCode) {
-    try { return localStorage.getItem(pushReminderKey(roundCode)); } catch (e) { return null; }
-}
-function pushReminderRemember(roundCode, iso) {
-    try {
-        if (iso) localStorage.setItem(pushReminderKey(roundCode), iso);
-        else localStorage.removeItem(pushReminderKey(roundCode));
-    } catch (e) { /* one extra reschedule, and nothing else */ }
-}
-
-// ---------------------------------------------------------------------------
-// THE TEE-TIME REMINDER. Local, on the device, scheduled when a golfer opens a
-// round that has one and rescheduled when the organizer moves it.
-//
-// Returns a reason in every case, including success, so this is debuggable from
-// a console on a real phone - which is the only place it runs.
-async function pushScheduleReminder(roundCode, data, deps) {
-    var d = deps || {};
-    var plugins = d.plugins || pushPlugins();
-    var local = plugins.local;
-    var now = d.now || Date.now();
-    if (!local) return { scheduled: false, reason: 'no-plugin' };
-    if (!roundCode) return { scheduled: false, reason: 'no-round' };
-
-    var at = (typeof teeTimeReminderAt === 'function') ? teeTimeReminderAt(data, now) : null;
-    var iso = (typeof teeTimeOf === 'function' && teeTimeOf(data)) ? teeTimeOf(data).iso : null;
-    var was = (d.stored === undefined) ? pushReminderStored(roundCode) : d.stored;
-    var id = pushReminderId(roundCode);
-
-    // NOTHING TO SCHEDULE. A round with no tee time, or one whose tee time has
-    // already passed - scheduling into the past makes a phone fire immediately,
-    // which would tell a golfer opening a finished round to go and tee off.
-    if (at === null) {
-        if (was) {
-            try { await local.cancel({ notifications: [{ id: id }] }); } catch (e) { /* nothing pending */ }
-            pushReminderRemember(roundCode, null);
-            return { scheduled: false, reason: iso ? 'already-passed' : 'cleared' };
-        }
-        return { scheduled: false, reason: iso ? 'already-passed' : 'no-tee-time' };
-    }
-
-    // UNCHANGED MEANS UNTOUCHED. Re-registering on every page load is how the
-    // queue fills with duplicates.
-    if (!(typeof teeTimeChanged === 'function' ? teeTimeChanged(was, data) : was !== iso)) {
-        return { scheduled: false, reason: 'unchanged' };
-    }
-
-    var granted = await pushEnsureLocalPermission(local);
-    if (!granted) return { scheduled: false, reason: 'no-permission' };
-
-    var copy = (typeof pushCopy === 'function')
-        ? pushCopy('tee-reminder', {
-            roundName: (data && data.eventName) || 'Your round',
-            courseName: (data && data.courseName) || '',
-            teeTimeText: (typeof teeTimeShort === 'function') ? teeTimeShort(data) : ''
-        })
-        : null;
-    if (!copy || !copy.body) return { scheduled: false, reason: 'no-copy' };
-
-    try {
-        // SCHEDULE REPLACES, because the id is the round's. cancel-then-schedule
-        // would leave a window in which a crash loses the reminder entirely.
-        await local.schedule({
-            notifications: [{
-                id: id, title: copy.title, body: copy.body,
-                schedule: { at: new Date(at), allowWhileIdle: true },
-                extra: { roundCode: String(roundCode), kind: 'tee-reminder' }
-            }]
-        });
-    } catch (e) {
-        return { scheduled: false, reason: 'schedule-failed' };
-    }
-    pushReminderRemember(roundCode, iso);
-    return { scheduled: true, reason: 'ok', at: at, id: id };
-}
-
-// THE ASK, AT THE MOMENT IT EXPLAINS ITSELF. iOS gives one chance, so this is
-// called when a golfer opens a round that HAS a tee time - never on launch.
-async function pushEnsureLocalPermission(local) {
-    if (!local) return false;
-    try {
-        var state = await local.checkPermissions();
-        if (state && state.display === 'granted') return true;
-        if (state && state.display === 'denied') return false;
-        var asked = await local.requestPermissions();
-        return !!(asked && asked.display === 'granted');
-    } catch (e) { return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +97,52 @@ async function pushRegisterToken(deps) {
 }
 
 // ---------------------------------------------------------------------------
+// WHERE A TAPPED NOTIFICATION LANDS (Wave 39, item 3)
+//
+// THE RULE: ACCEPT AND DECLINE MUST WRITE WHAT THE IN-APP BUTTONS WRITE, so this
+// does not write anything. It carries the golfer to the control that does.
+//
+// RECON, BEFORE BUILDING, and it changes what is possible:
+//
+//   THE ALOHA IS THE ONLY ACCEPT/DECLINE RECORD IN THE APP.
+//   sidematches.html respondAloha() updates
+//   events/<code>/sideMatches/<id>/aloha { status, respondedAt } - or
+//   matchPresses/aloha for the main game - and that is the whole of it.
+//
+//   A PRESS HAS NO OFFER AND NO ANSWER. index.html confirmSidePress() writes the
+//   press straight to sideMatches/<id>/presses when the golfer taps it: there is
+//   nobody to accept, because pressing is a thing you do, not a thing you ask.
+//   So a "press offered" notification has no record to answer, and inventing one
+//   would be a NEW money record - which is STRICT and is not approved. The
+//   press-offered notification therefore carries a golfer to the match, and the
+//   notification for a press that has already been made is news, not a decision.
+//
+//   A BET CHALLENGE HAS NO RECORD EITHER. Bets are created by the organizer or
+//   the scorekeeper in person. Same conclusion.
+//
+// AND MONEY DOES NOT MOVE FROM A URL. sidematches.html has refused that since
+// the ?press= link was built - "deep-linking straight into a write would mean
+// money moving from a URL" - and a notification is a tap on a banner, which is
+// not the same as a decision. So ?aloha=<id> brings the card with the Accept and
+// Decline buttons into view and the golfer taps the one they mean.
+function pushActionHref(origin, dir, roundCode, data) {
+    var d = data || {};
+    var base = String(origin || '') + String(dir || '/');
+    var code = encodeURIComponent(String(roundCode || d.roundCode || ''));
+    var kind = String(d.kind || '');
+    if (kind === 'press-offered' || kind === 'bet-challenge') {
+        var id = String(d.matchId || '');
+        // The Aloha is the only one with something to answer, so it is the only
+        // one that asks for the card to be focused.
+        return base + 'sidematches.html?game=' + code
+            + (id ? (d.aloha ? '&aloha=' : '&press=') + encodeURIComponent(id) : '');
+    }
+    if (kind === 'final-results') return base + 'settlement.html?game=' + code;
+    // youre-in and hype both belong on the round itself.
+    return base + 'index.html?game=' + code;
+}
+
+// ---------------------------------------------------------------------------
 // THE SETTINGS. Three switches, and only two of them are switches:
 // Essentials cannot be turned off - push-notify.js forces it true whatever is
 // stored - so the stored shape has two keys and the screen says why.
@@ -214,8 +155,6 @@ function pushPrefsForSave(prefs) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        pushPlugins, pushReminderId, pushReminderKey, pushReminderStored,
-        pushReminderRemember, pushScheduleReminder, pushEnsureLocalPermission,
-        pushRegisterToken, pushPrefsForSave
+        pushPlugins, pushRegisterToken, pushPrefsForSave, pushActionHref
     };
 }
