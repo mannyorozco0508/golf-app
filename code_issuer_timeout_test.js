@@ -328,11 +328,22 @@ describe('trip.html - the planner\'s COURSE read is timed (it sits ahead of ever
         assert.equal(sb.window.__alerts.length, 1, JSON.stringify(sb.window.__alerts));
         assert.match(sb.window.__alerts[0], /TRIP NOT CREATED/);
     });
-    test('the planner reads the course list through readWithTimeout (source pin)', () => {
+    test('the planner reads the courses it USES through readWithTimeout (source pin)', () => {
+        // RE-POINTED FOR WAVE 38. This used to pin a read of the WHOLE
+        // global_courses node - 61,258 bytes measured, to build a trip that
+        // names four courses. The planner now reads only the configured ids,
+        // through the course index's own per-course read, and the thing that
+        // must not change is that the read is still RACED: it sits ahead of
+        // every code the planner issues, and with the network cut it would
+        // otherwise hold the button on "Building..." for ever.
         const src = read('trip.html');
         const fn = src.slice(src.indexOf('function buildTrip()'), src.indexOf('\n    function ', src.indexOf('function buildTrip()') + 30));
-        assert.match(fn, /readWithTimeout\(db\.ref\('global_courses'\)\.once\('value'\)/);
-        assert.ok(!/\bdb\.ref\('global_courses'\)\.once\('value'\)\.then/.test(fn), 'no bare course read left');
+        assert.match(fn, /readWithTimeout\(/, 'the course read is no longer timed at all');
+        assert.match(fn, /tripCourseIndex\.readOne\(/,
+            'the planner must read the courses it uses - a positive assertion, so this slice '
+            + 'cannot be satisfied by a buildTrip that reads no courses at all');
+        assert.ok(!/\bdb\.ref\(['"]global_courses['"]\)\.once\(['"]value['"]\)/.test(fn),
+            'the whole-node read is back inside buildTrip');
     });
 });
 

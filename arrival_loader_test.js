@@ -50,6 +50,11 @@ const SOURCE = { eventName: 'Thu', gameFormat: 'stroke', activeCourseKey: 'comm_
 // Every read is logged with its resolution order so a test can assert which
 // landed last.
 function arrive(search, records, delays, rejectNth) {
+    // global_courses JOINS organizers/ IN THIS FILTER (Wave 38). These ledgers are
+    // about the ROUND reads - which code was read, in what order, and whether the
+    // issuer was asked - and the setup page now also reads the shared course list
+    // through course-index.js. organizers/ was already excluded for the same reason:
+    // a read that is not part of the claim must not be able to break it.
     const seen = {}; const log = { reads: [], landed: [] };
     const sb = loadHtmlInlineScript('admin.html', [], { search, beforeRun: (sandbox) => {
         // Installed BEFORE the page parses, so the arrival reads go through it.
@@ -87,7 +92,7 @@ const state = (sb) => ({ rows: rows(sb), ids: J(run(sb, 'captureCurrentPlayerInp
     banner: run(sb, "document.getElementById('copy-from-banner').style.display"), flightsOn: run(sb, "document.getElementById('flights-enabled').value"),
     // organizers/<uid> is read once at load for the standing line (2026-09-20,
     // organizer_standing_test.js); not a round read, so not part of the race.
-    stored: run(sb, 'storedPlayersTemp.length'), reads: sb.__log.reads.filter(r => !/^organizers\//.test(r)), landed: sb.__log.landed.filter(r => !/^organizers\//.test(r)), alerts: J(run(sb, 'window.__alerts')) });
+    stored: run(sb, 'storedPlayersTemp.length'), reads: sb.__log.reads.filter(r => !/^organizers\/|^global_courses/.test(r)), landed: sb.__log.landed.filter(r => !/^organizers\/|^global_courses/.test(r)), alerts: J(run(sb, 'window.__alerts')) });
 const EXPECT_ROWS = NAMES.map((n, i) => [n, i % 2 ? 'B' : 'A']);
 
 describe('A COPY, in every ordering of the reads', () => {

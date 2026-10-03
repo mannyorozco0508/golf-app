@@ -48,6 +48,7 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <script src="course-index.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
@@ -571,17 +572,66 @@ html {
     function showCreateTripForm() {
         document.getElementById('create-trip-form').style.display = 'block';
         renderDayPlanner();
-        if (globalCoursesCache === null) {
-            db.ref('global_courses').once('value').then(snap => {
-                globalCoursesCache = snap.val() || {};
+        if (!tripIndexStarted) {
+            // THE COURSE INDEX, NOT THE WHOLE NODE (Wave 38). This read was
+            // 61,258 bytes measured for 42 courses, growing about 8 KB per
+            // import, every time the planner opened - and all this page does
+            // with it is ask whether a course has a card. The loader draws from
+            // a cached name index and probes the key list in 941 bytes;
+            // course-index.js carries the argument, and admin.html and
+            // tournament.html use the same builder.
+            tripIndexStarted = true;
+            const done = () => {
+                globalCoursesCache = tripCourses;
                 renderRoundPlanner(); // refresh any already-drawn cards now that real mapping data is in
-            }).catch(() => { globalCoursesCache = {}; });
+            };
+            tripCourseIndex.load().then(done, done);
         }
     }
 
     // null = not fetched yet (treat as "unknown", not "unmapped", to avoid a flash of false
     // warnings before the read completes). {} once the fetch resolves either way.
     let globalCoursesCache = null;
+
+    // THE SHARED COURSE LIST, VIA THE ONE LOADER (Wave 38). This page asks it two
+    // things: does a course have a card at all (isCourseMapped, which is a key
+    // test the stubs answer exactly as full records did), and - at build time,
+    // for the handful of courses the planner actually configured - what the card
+    // is. It never needs the node whole.
+    //
+    // tripCourses IS A STABLE OBJECT and globalCoursesCache is a POINTER to it.
+    // The loader mutates `into` in place, so reassigning globalCoursesCache to
+    // {} would have cut the loader loose from the thing this page reads. And the
+    // pointer stays null until the first load RESOLVES, because null is what
+    // isCourseMapped reads as "I do not know yet" - the state that stops a flash
+    // of "this course is unmapped" warnings over courses that are perfectly fine.
+    const tripCourses = {};
+    let tripIndexStarted = false;
+    const tripCourseIndex = courseIndexLoader({
+        into: tripCourses,
+        databaseURL: firebaseConfig.databaseURL,
+        readRecord: (key) => db.ref('global_courses/' + key).once('value').then((snap) => snap.val()),
+        readAll: () => db.ref('global_courses').once('value').then((snap) => snap.val()),
+        // A HANGING PROBE IS A FAILED PROBE AFTER FOUR SECONDS. The loader keeps
+        // the cached names on null, so the worst a timeout costs is that a course
+        // somebody else added today is not in the picker until the next load -
+        // and it never costs a golfer a page that will not draw.
+        //
+        // NO fetch AT ALL IS THE SAME ANSWER. helpers/mini-dom.js provides none,
+        // and without the guard every suite that loads this page raised
+        // "ReferenceError: fetch is not defined" from a promise nobody awaited -
+        // an unhandled rejection that failed eleven tests in three files.
+        fetchJson: (url) => {
+            if (typeof fetch !== 'function') return Promise.resolve(null);
+            return Promise.race([
+                fetch(url, { cache: 'no-store' }).then((r) => (r && r.ok ? r.json() : null)).catch(() => null),
+                new Promise((res) => setTimeout(() => res(null), 4000))
+            ]);
+        },
+        getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* one full read next time */ } },
+        onApply: () => { if (typeof renderRoundPlanner === 'function') renderRoundPlanner(); }
+    });
 
     // A course counts as "mapped" if it has real hole-by-hole data from either source —
     // the local seed set in course-data.js, or Firebase's live community database. Thistle's
@@ -869,11 +919,31 @@ html {
         buildBtn.innerText = '⏳ Building...';
         buildBtn.disabled = true;
 
-        // Timed (code-issuer.js readWithTimeout): this read sits ahead of every
-        // code the planner issues, and with the network cut it would hold the
-        // button on "⏳ Building..." forever before the issuer's own timer ran.
-        readWithTimeout(db.ref('global_courses').once('value'), { what: 'the course list' }).then(async snap => {
-            const globalCoursesData = snap.val() || {};
+        // ONLY THE COURSES THIS TRIP ACTUALLY USES (Wave 38).
+        //
+        // This read the WHOLE shared list - 61,258 bytes measured, growing with
+        // every course anybody imports - to build a trip that names four of
+        // them. Now it reads the configured ids and nothing else: a four-round
+        // trip costs four records, about 6 KB, and a trip that revisits one
+        // course costs one.
+        //
+        // Still timed (code-issuer.js readWithTimeout) for the original reason:
+        // this sits ahead of every code the planner issues, and with the network
+        // cut it would hold the button on "⏳ Building..." forever before the
+        // issuer's own timer ran.
+        const wanted = [];
+        roundConfigs.forEach((cfg) => {
+            if (cfg.courseId && wanted.indexOf(cfg.courseId) === -1) wanted.push(cfg.courseId);
+        });
+        readWithTimeout(
+            Promise.all(wanted.map((id) => tripCourseIndex.readOne(id))),
+            { what: 'the course list' }
+        ).then(async recs => {
+            // The index's stubs are still here for the NAMES; the records that
+            // just landed carry the cards. Merged so resolveCourseDataAndName
+            // reads exactly the shape it always did.
+            const globalCoursesData = Object.assign({}, tripCourses);
+            wanted.forEach((id, i) => { if (recs[i] && recs[i].name) globalCoursesData[id] = recs[i]; });
             // ONE Set across BOTH roots, which is what the original guaranteed by
             // seeding it with the trip code: a round in this trip can never be given
             // the trip's own code. The database check cannot do that job - it knows

@@ -269,16 +269,20 @@ function tapCard(sb, key) {
     assert.ok(m, 'no onclick on fmt-' + key);
     vm.runInContext(m[1], sb);
 }
-function fillSetup(sb) {
+async function fillSetup(sb) {
     const d = sb.document;
     d.getElementById('t-name').value = 'Polished Event';
     // course search (2026-09-17): a course with no card anywhere is no longer
     // selected - the silent par-4 fallback is gone - so the fixture hands the page
-    // a card for cameron the way one arrives: through its own global_courses
-    // listener. Nothing here calls a renderer.
+    // a card for cameron the way one arrives.
+    //
+    // WAVE 38: it arrives through the course index's cold read now -
+    // db.ref('global_courses').once('value'), answered from __dbReads - not a
+    // live listener, so this is awaited before the pick. pickCourse itself stays
+    // synchronous once the card is in hand. Nothing here calls a renderer.
     const CAMERON = [...Array(18)].map((_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
-    sb.__dbHandlers.filter((h) => h.event === 'value' && /global_courses$/.test(h.path)).forEach((h) =>
-        h.cb({ val: () => ({ cameron: { name: 'Cameron', data: CAMERON } }), exists: () => true }));
+    sb.__dbReads = Object.assign({}, sb.__dbReads, { global_courses: { cameron: { name: 'Cameron', data: CAMERON } } });
+    await new Promise((r) => setImmediate(r));
     sb.pickCourse('cameron', 'Cameron');
     const list = d.getElementById('teams-list'); d.body.appendChild(list);
     const card = d.createElement('div'); card.className = 'team-card';
@@ -313,7 +317,7 @@ describe('THE PICKER still writes the format it shows', () => {
             sb.__auth.setUser(ORGANIZER);
             sb.alert = () => {};
             tapCard(sb, k);
-            fillSetup(sb);   // individual reads the same cards as a field of names
+            await fillSetup(sb);   // individual reads the same cards as a field of names
             await sb.saveTournament();
             await new Promise((r) => setImmediate(r));
             const sets = creatingSets(sb);

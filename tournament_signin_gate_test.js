@@ -323,16 +323,21 @@ describe('e) and f) CREATING a tournament', () => {
     // A valid setup, built from real nodes: mini-dom parses no innerHTML, so the
     // team card the page builds with innerHTML has no readable inputs. The card
     // here is what the page's own addTeam() produces, as nodes.
-    function fillSetup(sb) {
+    async function fillSetup(sb) {
         const d = sb.document;
         d.getElementById('t-name').value = 'Created Scramble';
         // 2c/course search (2026-09-17): a course with no card anywhere is no longer
     // selected - the silent par-4 fallback is gone - so the fixture hands the page
-    // a card for cameron the way one arrives: through its own global_courses
-    // listener. Nothing here calls a renderer.
-    sb.__dbHandlers.filter(h => h.event === 'value' && /global_courses$/.test(h.path)).forEach(h =>
-        h.cb({ val: () => ({ cameron: { name: 'Cameron', data: COURSE } }), exists: () => true }));
+    // a card for cameron the way one arrives.
+    //
+    // WAVE 38: it arrives through the course index's cold read now, not a live
+    // listener - db.ref('global_courses').once('value'), which the harness answers
+    // from __dbReads - and pickCourse fetches the record before deciding, so this
+    // is awaited. Nothing here calls a renderer.
+    sb.__dbReads = Object.assign({}, sb.__dbReads, { global_courses: { cameron: { name: 'Cameron', data: COURSE } } });
+    await new Promise(r => setImmediate(r));
     sb.pickCourse('cameron', 'Cameron');
+    await new Promise(r => setImmediate(r));
         const list = d.getElementById('teams-list');
         d.body.appendChild(list);
         const card = d.createElement('div'); card.className = 'team-card';
@@ -348,7 +353,7 @@ describe('e) and f) CREATING a tournament', () => {
     test('e) SIGNED OUT: refused with a clear message, nothing written', async () => {
         const sb = loadHtmlInlineScript(PAGE);
         const alerts = []; sb.alert = (m) => alerts.push(String(m));
-        fillSetup(sb);
+        await fillSetup(sb);
         await sb.saveTournament();
         await new Promise(r => setImmediate(r));
         assert.equal(tournamentSets(sb).length, 0, 'a signed-out save must write nothing: ' + JSON.stringify(sb.__dbWrites));
@@ -359,7 +364,7 @@ describe('e) and f) CREATING a tournament', () => {
     test('f) SIGNED IN: the record is created with ownerUid === auth.uid, in the same set()', async () => {
         const sb = loadHtmlInlineScript(PAGE);
         sb.__auth.setUser(ORGANIZER);
-        fillSetup(sb);
+        await fillSetup(sb);
         await sb.saveTournament();
         await new Promise(r => setImmediate(r));
         const sets = tournamentSets(sb);
