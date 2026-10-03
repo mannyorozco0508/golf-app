@@ -59,6 +59,9 @@
     <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
+    <script src="tee-time.js"></script>
+    <script src="push-notify.js"></script>
+    <script src="push-boot.js"></script>
     <script src="live-skins.js"></script>
     <!-- Ryder Cup competition layer. MUST load after money-engine.js: it adapts
          calculateMatchEngine for hole arithmetic and does nothing on its own.
@@ -2174,6 +2177,20 @@ html {
             if (window.organizerGate) window.organizerGate.rememberOrganizerToken(currentMode, currentData, organizerTokenParam);
             loadRyderHostCup();
             renderScorecard();
+            // THE TEE-TIME REMINDER, ON EVERY SNAPSHOT (Wave 39).
+            //
+            // Called here rather than once on arrival because the organizer can
+            // MOVE a tee time, and this listener is how the device finds out.
+            // pushScheduleReminder does nothing unless the time actually changed -
+            // re-registering on every snapshot is how a phone's pending queue
+            // fills with duplicates of one reminder - and the notification id is
+            // the round's, so a reschedule REPLACES rather than adds.
+            //
+            // IT IS A LOCAL NOTIFICATION. No token, no server, no rules, and it
+            // fires with the phone in a pocket and no signal, which is the state
+            // a golfer driving to a course is actually in. On the web there is no
+            // plugin and this returns 'no-plugin' without touching anything.
+            maybeScheduleTeeReminder();
         });
         // The uid lands asynchronously (auth-boot.js). Whichever of the snapshot and
         // the token arrives second decides what the organizer controls show, so a
@@ -5682,6 +5699,53 @@ html {
         storeMe(id);
         whoAmIPickerOpen = false;
         renderScorecard();
+        // SAYING WHO YOU ARE IS THE MOMENT A TOKEN BECOMES WORTH ANYTHING
+        // (Wave 39). Before this, a device is anonymous to the sender; after it,
+        // it is Marty's phone and a bet challenge can be addressed to him.
+        //
+        // AND IT IS THE RIGHT MOMENT TO ASK FOR PERMISSION. iOS gives exactly one
+        // chance, and a prompt on first launch is the one a golfer declines
+        // before they know what the app is for.
+        maybeRegisterPushToken();
+    }
+
+    // ---- THE DEVICE HALF (Wave 39). push-boot.js does the work; this supplies
+    // the round, the uid and the writer, and nothing here runs on the web. ----
+    function maybeScheduleTeeReminder() {
+        if (typeof pushScheduleReminder !== 'function') return;
+        try {
+            pushScheduleReminder(currentMode, currentData).catch(() => {});
+        } catch (e) { /* a reminder is never worth breaking a scorecard for */ }
+    }
+
+    let pushTokenTried = false;
+    function maybeRegisterPushToken() {
+        if (pushTokenTried || typeof pushRegisterToken !== 'function') return;
+        const playerId = (typeof resolvedMeId === 'function') ? resolvedMeId() : null;
+        if (!playerId) return;
+        let uid = null;
+        try { uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null; } catch (e) { uid = null; }
+        if (!uid) return;
+        pushTokenTried = true;
+        try {
+            pushRegisterToken({
+                uid: uid, playerId: playerId, roundCode: currentMode,
+                // ONE DEVICE, ONE ROW. The row key is the token's own fingerprint,
+                // so re-registering the same phone updates its row instead of
+                // adding a second one - and a golfer with a phone and a watch
+                // legitimately has two.
+                save: (rec) => db.ref('pushTokens/' + uid + '/' + pushDeviceKey(rec.token)).set(rec)
+            }).catch(() => {});
+        } catch (e) { /* no token today; the app is unchanged */ }
+    }
+
+    // A stable short key from the token. Not the token itself: an FCM token is up
+    // to ~400 characters and a database key may not contain '/', which they do.
+    function pushDeviceKey(token) {
+        const s = String(token || '');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return 'd' + Math.abs(h).toString(36);
     }
     function skipWhoAmI() {
         storeWhoAmISkipped();
@@ -9719,8 +9783,19 @@ html {
         // "Match Play · Net" three lines down the same screen. scoringType itself is
         // untouched and still exported for the parity guard; only this label moved.
         const subtitleBasis = roundScoringBasis();
+        // THE TEE TIME RIDES THE SUBTITLE, when there is one (Wave 39). A round
+        // without one reads exactly as it always did - this is an addition to a
+        // line, not a new row, because an empty row for an optional field is
+        // clutter on the one screen a golfer looks at twenty times a round.
+        //
+        // tee-time.js formats it IN THE ROUND'S OWN ZONE. A Road Trip round set
+        // in Oregon must read 8:40 AM to the organizer on the tee and to his wife
+        // reading the link at home, and toLocaleTimeString here would give her
+        // 9:40 - which is why no page formats a tee time by hand.
+        const teeLabel = (typeof teeTimeLabel === 'function') ? teeTimeLabel(currentData) : '';
         document.getElementById("format-subtitle").textContent =
-            `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
+            `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`
+            + (teeLabel ? ` • ⛳ ${teeLabel}` : '');
 
         renderGroupFilters(players.length);
 

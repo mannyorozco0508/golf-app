@@ -60,6 +60,9 @@
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="course-index.js"></script>
+    <script src="tee-time.js"></script>
+    <script src="push-notify.js"></script>
+    <script src="push-boot.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="settlement-engine.js"></script>
@@ -1113,6 +1116,28 @@ html {
          the founder pass. account-exit.js holds the words and the plan; every write
          in here goes through setTextOnce, because this card is inside
          #account-modal and watchAccountStatus observes that subtree. -->
+    <!-- NOTIFICATIONS (Wave 39). Three channels, and only two of them are
+         switches: Essentials cannot be turned off, so the screen SAYS SO rather
+         than offering a control that does nothing. A disabled checkbox a golfer
+         can tap and watch spring back is worse than a sentence.
+         HIDDEN UNTIL THERE IS SOMETHING TO SET - syncNotifyCard() shows it only
+         in the native shell, because a browser has no plugin and the switches
+         would save a preference nothing could ever act on. -->
+    <section id="notify-card" class="email-link-card" aria-labelledby="notify-title" style="display:none;">
+        <h2 id="notify-title">Notifications</h2>
+        <p id="notify-lead">You're asked for permission when you open a round, not before.</p>
+        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. Your round and tee time, the 30-minute reminder, and the final results.</p>
+        <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
+            <input type="checkbox" id="notify-bets" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>💰 Bets &mdash; somebody challenges you, or offers a press</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
+            <input type="checkbox" id="notify-hype" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>🔥 Hype &mdash; a hot streak, an eagle, an ace. Never the standings.</span>
+        </label>
+        <p id="notify-note" role="status"></p>
+    </section>
+
     <section id="account-exit-card" class="email-link-card" aria-labelledby="account-exit-title" style="display:none;">
         <h2 id="account-exit-title">This account</h2>
         <p id="account-exit-lead">Signed in. Sign out to hand this device back to a new organizer, or delete the account entirely.</p>
@@ -1331,6 +1356,24 @@ html {
             </div>
         </div>
     </div>
+    <!-- TEE TIME, AND IT IS OPTIONAL (Wave 39).
+         A pickup round at 7am that nobody wrote down is normal, so this must never
+         block a save and never show an empty row on the card. What it buys when it
+         IS set: the scorecard header and the Game tab say when the group tees off,
+         and the device schedules its own reminder half an hour before.
+         STORED AS AN INSTANT PLUS THE ZONE IT WAS SET IN - tee-time.js carries the
+         whole argument. The short version: a tee time is a fact about the golf
+         course, not about the reader's phone, so a Road Trip round set in Oregon
+         must read 8:40 AM to the organizer on the tee AND to his wife at home. -->
+    <div class="form-group" id="tee-time-group">
+        <label for="tee-time-date">Tee time <span style="font-weight:normal; color:var(--text-muted);">(optional)</span></label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="date" id="tee-time-date" style="flex:1 1 150px; min-width:140px;" onchange="teeTimeEdited()">
+            <input type="time" id="tee-time-clock" style="flex:1 1 110px; min-width:110px;" onchange="teeTimeEdited()">
+        </div>
+        <p id="tee-time-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">Leave it blank if you don't know yet &mdash; you can add it later.</p>
+    </div>
+
     <!-- Tee ratings come from the course. The golfer picks a tee; Slope, Course
          Rating and Par fill from that tee. There is no hand-typed block. A course
          with no rated tees leaves this hidden and the Index is the Playing
@@ -6247,6 +6290,131 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     });
 
+    // ---- THE TEE TIME: READ, WRITE, RESTORE (Wave 39) ----
+    //
+    // tee-time.js owns every rule; this page owns the two inputs. The ONE thing
+    // that cannot move out of here is the offset: getTimezoneOffset() has to be
+    // asked about the INSTANT the organizer typed, not about today, or a round
+    // set in March for August lands an hour out when daylight saving moves.
+    function teeTimeFromSetup() {
+        const dateEl = document.getElementById('tee-time-date');
+        const clockEl = document.getElementById('tee-time-clock');
+        const dateText = dateEl ? String(dateEl.value || '').trim() : '';
+        const timeText = clockEl ? String(clockEl.value || '').trim() : '';
+        // BOTH OR NEITHER. A date with no time is not a tee time, and guessing
+        // one is how a reminder fires at midnight.
+        if (!dateText || !timeText) return { teeTimeISO: null, teeTimeZone: null };
+        // The offset FOR THAT DAY, which is the whole reason this line is here.
+        const probe = new Date(dateText + 'T' + timeText + ':00');
+        const off = isNaN(probe.getTime()) ? new Date().getTimezoneOffset() : probe.getTimezoneOffset();
+        let zone = null;
+        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { zone = null; }
+        const built = (typeof teeTimeBuild === 'function') ? teeTimeBuild(dateText, timeText, off, zone) : null;
+        return built || { teeTimeISO: null, teeTimeZone: null };
+    }
+
+    // What the note under the boxes says once there is something to say. Kept
+    // here rather than in the module because it is this screen's sentence, and
+    // the module must not know about a DOM node.
+    function teeTimeEdited() {
+        const note = document.getElementById('tee-time-note');
+        if (!note) return;
+        const built = teeTimeFromSetup();
+        const label = (typeof teeTimeLabel === 'function') ? teeTimeLabel(built) : '';
+        note.textContent = label
+            ? 'Tees off ' + label + '. Everyone in the round gets a reminder 30 minutes before.'
+            : "Leave it blank if you don't know yet \u2014 you can add it later.";
+    }
+
+    // RESTORED FOR EDITING, from the string's own fields rather than from a Date,
+    // so the organizer sees the time they typed wherever they are now.
+    function restoreTeeTimeInputs(data) {
+        const dateEl = document.getElementById('tee-time-date');
+        const clockEl = document.getElementById('tee-time-clock');
+        if (!dateEl || !clockEl) return;
+        const v = (typeof teeTimeInputs === 'function') ? teeTimeInputs(data || {}) : { date: '', time: '' };
+        dateEl.value = v.date;
+        clockEl.value = v.time;
+        teeTimeEdited();
+    }
+
+    // ---- NOTIFICATION SETTINGS (Wave 39) ----
+    //
+    // Two switches and a sentence. ESSENTIALS IS NOT A CONTROL, because it cannot
+    // be turned off - push-notify.js forces it true whatever is stored, and the
+    // proposed rules refuse the key outright - so offering a checkbox for it
+    // would be offering a control that does nothing.
+    //
+    // THE CARD IS HIDDEN OUTSIDE THE NATIVE SHELL. A browser has no plugin, so
+    // the switches would save a preference nothing could ever act on, and a
+    // golfer would reasonably conclude notifications were on.
+    var notifyPrefsSaving = false;
+
+    function notifyPrefsPath(uid) { return 'pushPrefs/' + uid; }
+
+    function notifyUid() {
+        try {
+            var u = firebase.auth().currentUser;
+            return u && u.uid ? u.uid : null;
+        } catch (e) { return null; }
+    }
+
+    function syncNotifyCard() {
+        var card = document.getElementById('notify-card');
+        if (!card) return;
+        var native = false;
+        try { native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+        catch (e) { native = false; }
+        card.style.display = native ? 'block' : 'none';
+        if (!native) return;
+        var uid = notifyUid();
+        if (!uid) return;
+        // READ ONCE, and a failure leaves the defaults on screen - pushPrefsNormalise
+        // answers "everything on" for an absent record, which is what somebody who
+        // has never opened this screen is asking for.
+        db.ref(notifyPrefsPath(uid)).once('value').then(function (snap) {
+            notifyPrefsApply(snap.val());
+        }).catch(function () { notifyPrefsApply(null); });
+    }
+
+    function notifyPrefsApply(raw) {
+        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { bets: true, hype: true };
+        var bets = document.getElementById('notify-bets');
+        var hype = document.getElementById('notify-hype');
+        if (bets) bets.checked = !!p.bets;
+        if (hype) hype.checked = !!p.hype;
+    }
+
+    async function notifyPrefsChanged() {
+        var note = document.getElementById('notify-note');
+        var uid = notifyUid();
+        if (!uid) { if (note) note.textContent = 'Sign in to save this on your account.'; return; }
+        if (notifyPrefsSaving) return;
+        notifyPrefsSaving = true;
+        var bets = document.getElementById('notify-bets');
+        var hype = document.getElementById('notify-hype');
+        // DELIBERATELY NOT NAMED payload. persistence_contract_test.js locates the
+        // round save by the first occurrence of the round-save update call in this
+        // file, and checks the settlementMode deletion sits before it - so a
+        // second update with the same argument name three thousand lines earlier
+        // makes a true claim look false. The guard is right; the name was mine to
+        // change. And this comment does not spell the call out, because doing so
+        // trips the same search.
+        var prefsPayload = (typeof pushPrefsForSave === 'function')
+            ? pushPrefsForSave({ bets: bets && bets.checked, hype: hype && hype.checked })
+            : { bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+        try {
+            await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
+            if (note) note.textContent = 'Saved.';
+        } catch (e) {
+            // THE RULES ARE NOT PUBLISHED YET, so this is the expected answer
+            // today and it must read as "not yet", never as a broken screen.
+            if (note) note.textContent = 'Not saved yet \u2014 notifications are still being set up.';
+            notifyPrefsApply(null);
+        }
+        notifyPrefsSaving = false;
+    }
+
     function updateCustomCoursePars() {
         let outPar = 0;
         for(let i=1; i<=9; i++) {
@@ -7664,6 +7832,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // held-note flush does the same thing for the note above it).
         if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
         if (typeof syncAccountExit === 'function') syncAccountExit();
+        // The notification switches live in this panel, so they repaint with it -
+        // including the moment a sign-in completes without the panel closing.
+        if (typeof syncNotifyCard === 'function') syncNotifyCard();
         const flag = linked ? '1' : '0';
         const link = document.getElementById('account-link');
         setTextOnce(link, linked ? 'Organizer saved' : 'Account');
@@ -8962,6 +9133,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
+            // THE ORGANIZER CAN MOVE IT LATER, which is the whole reason this is
+            // restored rather than only written: reopening a saved round puts the
+            // stored tee time back in the boxes, and the next save writes whatever
+            // is in them - including nothing, if it has been cleared.
+            restoreTeeTimeInputs(data);
             if (data.eventCategory) currentCategory = data.eventCategory;
 
             if (data.activeCourseKey) {
@@ -9971,6 +10147,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const payload = {
                 eventName: baseEventName,
                 roundDay: roundDay,
+                // THE TEE TIME, OR NULL (Wave 39). Always written, so clearing the
+                // boxes clears the round's tee time rather than leaving the old one
+                // behind - the one thing worse than no tee time is a stale one that
+                // a group is still being reminded about.
+                ...teeTimeFromSetup(),
                 // SETTLEMENT MODE - new rounds settle in whole dollars.
                 //
                 // Written on creation so it is a property of THIS round, not a global

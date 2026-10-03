@@ -123,9 +123,21 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
         // sentence rather than any control - grading prose as though it were markup.
         const l = lobby().replace(/<!--[\s\S]*?-->/g, '');
         const afterWidgets = l.slice(l.indexOf('home-widgets'));
-        const inputs = afterWidgets.match(/<input/g) || [];
-        assert.equal(inputs.length, 5,
-            'the home screen asks for ' + inputs.length + ' things to be typed');
+        // TYPED MEANS TYPED. A checkbox is not a thing somebody is asked to type,
+        // and Wave 39 put two of them in the account panel (the Bets and Hype
+        // notification switches) which lives in this same slice. Counting every
+        // <input> would make this assertion about markup rather than about the
+        // claim in its own name - so the count is text entry, and the checkboxes
+        // are asserted separately below so they cannot grow unnoticed either.
+        const all = afterWidgets.match(/<input[^>]*>/g) || [];
+        const typed = all.filter((t) => !/type="(?:checkbox|radio)"/.test(t));
+        const ticked = all.filter((t) => /type="checkbox"/.test(t));
+        assert.equal(typed.length, 5,
+            'the home screen asks for ' + typed.length + ' things to be typed');
+        assert.equal(ticked.length, 2,
+            'two switches, both in the account panel: Bets and Hype. Essentials is NOT a '
+            + 'switch - it cannot be turned off, so the panel says so instead of offering a '
+            + 'control that does nothing.');
         assert.match(afterWidgets, /id="email-link-input"/, 'the sign-in email');
         assert.match(afterWidgets, /id="email-link-paste"/, 'the pasted sign-in link');
         assert.match(afterWidgets, /id="join-code-input"/, 'the game code');

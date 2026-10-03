@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v118-courseindex. The tournament product cache
+// The consumer product cache is consumer-v119-teetime. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3909,7 +3909,21 @@
 // leaderboard.html and side-match-lines.js all moved, and leaderboard.html now loads
 // side-match-lines.js, so a device on v277 keeps a card that cannot answer the
 // question a group asks at the end of a round.
-const CACHE_VERSION = 'golfapp-v278-courseindex';
+// Moved to v279 FOR THE TEE TIME AND THE NOTIFICATIONS. Three new precached files -
+// tee-time.js, push-notify.js, push-boot.js - and four pages changed around them:
+// admin.html sets a tee time and carries the notification switches, index.html shows
+// it in the header and schedules the LOCAL reminder, game.html shows it on the Course
+// card, trip.html sets one per round and prints it on the itinerary.
+//
+// A DEVICE ON v278 HAS NO TEE TIME AT ALL and no reminder, and - because all three
+// files are new - a cached shell told it already had this version would load four
+// pages whose tee-time calls do not exist. The display calls are UNGUARDED on
+// purpose: a tee time either shows or the page is wrong, and a silently missing
+// formatter is how a round would read "Invalid Date" instead.
+//
+// The push half stays inert until the APNs key and the Cloudflare secret exist, so
+// this bump ships the reminder working and the rest waiting.
+const CACHE_VERSION = 'golfapp-v279-teetime-notify';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4068,6 +4082,22 @@ const SHELL_FILES = [
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
     // before the setup page draws anything. That is why it is precached.
     './course-index.js',
+    // NO SINGLE QUOTES IN THESE COMMENTS. This list is read by matching
+    // single-quoted strings, so one stray quote - an apostrophe, or a quoted
+    // pattern - pairs with the next real one and swallows the entries between
+    // them. Measured three times in one wave: here, and twice in
+    // sync-mobile-web.js. CLAUDE.md records the trap under its own heading.
+    //
+    // THE TEE TIME, formatted in the zone it was set in rather than the zone of
+    // whoever is reading. Four pages load it and the display calls are
+    // unguarded, so it is precached.
+    './tee-time.js',
+    // Notifications: the pure decider and the device half. Every call site is
+    // typeof-guarded, so these are precached for the sake of the tee-time
+    // reminder - it is local, it works with no signal, and a golfer driving to a
+    // course is exactly who it is for.
+    './push-notify.js',
+    './push-boot.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

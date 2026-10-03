@@ -90,12 +90,15 @@ const PRODUCTS = {
         // to the next free key rather than reusing one an installed device holds.
         // Moved to v64. The Board's team view reads calculateMatchEngine, one
         // call per pair. A device on v63 still invents that margin itself.
+        // Moved to v119: tee-time.js, push-notify.js and push-boot.js join SHARED -
+        // a round can carry a tee time and the device schedules its own reminder.
+        // A device on v118 has no tee time at all.
         // Moved to v118: course-index.js joins SHARED. The setup pages no longer
         // download the whole 61 KB course list on every load; a device on v117
         // keeps that read, and has no course-index.js to load.
         // Moved to v117: the free-tier quota sentence in course-import-rules.js
         // (the account is 35 a day, not Pro's 10,000 - corrected 2026-10-03).
-        cacheName: 'consumer-v118-courseindex',
+        cacheName: 'consumer-v119-teetime',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

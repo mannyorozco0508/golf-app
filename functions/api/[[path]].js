@@ -24,6 +24,7 @@
 import { noSuchRoute, methodNotAllowed } from './_lib.js';
 import * as courseSearch from './course-search.js';
 import * as courseDetail from './course/[id].js';
+import * as pushSend from './push-send.js';
 
 // onRequestGet -> 'GET', onRequestPost -> 'POST', ...
 const methodsOf = (mod) => Object.keys(mod)
@@ -37,7 +38,13 @@ export const ROUTES = [
     { file: 'course-search.js', matches: (seg) => seg.length === 1 && seg[0] === 'course-search',
       methods: methodsOf(courseSearch) },
     { file: 'course/[id].js', matches: (seg) => seg.length === 2 && seg[0] === 'course' && seg[1].length > 0,
-      methods: methodsOf(courseDetail) }
+      methods: methodsOf(courseDetail) },
+    // push-send.js exports onRequestPost ONLY, so a GET to /api/push-send falls
+    // through here and gets 405 with Allow: POST rather than Pages' SPA
+    // fallback - which would answer index.html at 200 and tell a caller the
+    // send succeeded.
+    { file: 'push-send.js', matches: (seg) => seg.length === 1 && seg[0] === 'push-send',
+      methods: methodsOf(pushSend) }
 ];
 
 export async function onRequest(context) {

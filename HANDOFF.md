@@ -3063,6 +3063,60 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03 (Wave 39, on a branch)
+
+**WAVE 39 IS BUILT ON `ui-wave39-push` AND NOT MERGED** - awaiting Manny's Cmd+R.
+Cache `golfapp-v279-teetime-notify` / consumer `v119`. Full suite green.
+
+- **A ROUND CAN CARRY A TEE TIME, which it never could.** Optional date + time on
+  the setup screen, editable later, and per round in the trip planner. Shown on the
+  scorecard header, the Game tab's Course card, and the trip itinerary.
+  - **STORED AS `teeTimeISO` + `teeTimeZone`**, and the two fields are not
+    redundant: an instant answers "when do they tee off" (what a reminder is
+    scheduled against) and the ZONE answers "what does the card say". A tee time is
+    a fact about the golf course, not about the reader - a Road Trip round set in
+    Oregon must read 8:40 AM to the organizer on the tee AND to his wife reading
+    the link at home. `tee-time.js` is the only formatter and a test proves the
+    display asks for the round's zone.
+  - **The offset is captured, never re-derived.** A round set in March for August
+    would land an hour out if the offset came from the zone name at save time.
+  - Absent is first class: a pickup round nobody wrote down, and a round carrying a
+    corrupt string, both render as nothing - never an empty row or "Invalid Date".
+- **THE REMINDER IS A LOCAL NOTIFICATION**, scheduled on the device when a golfer
+  opens a round with a tee time and rescheduled when the organizer moves it. No
+  server, no token, no scheduler, no rules - and it fires with the phone in a
+  pocket and no signal. The id is the round's, so a reschedule REPLACES; an
+  unchanged time schedules nothing (this runs on every snapshot of the round).
+- **`database.rules.push.json` IS PREPARED AND NOT PUBLISHED.** Two new top-level
+  nodes, `pushTokens/$uid` and `pushPrefs/$uid`, owner-only read and write;
+  **every pre-existing node is byte-identical** and a test asserts it.
+  `database.rules.rollback-stage2delete.json` is the rollback. Both are on the
+  Desktop as `PUBLISH-THIS-database.rules.push.json` and
+  `ROLLBACK-database.rules.stage2delete.json`. `rules_push_tokens_test.js`: 9
+  targaryen tests including 3 negative controls (world-readable tokens, a dropped
+  uid check, a dropped record validate).
+  - **NOTE: the repo's own `database.rules.json` is NOT what is live.** Live is
+    `database.rules.stage2delete.json` (published 2026-09-30) and that is the base
+    this delta is built on. A test pins it.
+- **THE PUSH HALF IS WIRED AND INERT.** `@capacitor/push-notifications` and
+  `@capacitor/local-notifications`, iOS allowlist only - Android deliberately
+  untouched, because push there needs google-services.json and the gradle plugin.
+  Token registration fires when a golfer answers "Who am I?" (the existing Wave 17
+  `golfapp_me_<code>`), and with no APNs key `register()` fires
+  `registrationError`, a reason is recorded and the app carries on. `POST
+  /api/push-send` (FCM HTTP v1, `FCM_SERVICE_ACCOUNT`) answers `not_configured`
+  until the secret exists. Settings (Essentials / Bets / Hype) are in the account
+  panel, native shell only.
+- **FOUR SELF-INFLICTED FAILURES WORTH RECORDING**, all the same class: a comment
+  or a variable name of mine tripping a guard that searches for a literal. An
+  apostrophe inside `SHARED_SHELL` (the list is parsed by matching single-quoted
+  strings) swallowed two entries; the comment explaining it quoted the pattern and
+  did it again; the same trap in `sw.js`; and a local named `payload` whose
+  `.update` call sits above the round save, which
+  `persistence_contract_test.js` finds by first occurrence. **No single quotes in
+  comments inside those list blocks, and do not spell a banned literal out in the
+  comment that explains the ban.**
+
 ## Where things stand, 2026-10-03 (later)
 
 **WAVE 38 AND THE LIVE MATCHES FINAL TOTAL ARE ON MAIN.** `a9fbf8d`, cache

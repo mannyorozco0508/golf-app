@@ -29,7 +29,24 @@ const config: CapacitorConfig = {
     // the shell a popup has no window to open, so Continue with Apple and Continue
     // with Google need the native Apple and Google SDKs. It is named here
     // deliberately, like the other two.
-    includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication']
+    // @capacitor/push-notifications AND @capacitor/local-notifications join for
+    // WAVE 39. Two plugins, two different jobs, and the split is deliberate:
+    //
+    //   LOCAL does the tee-time reminder, scheduled on the device when a golfer
+    //   opens a round that has one. No server, no token, no scheduler, no rules -
+    //   and it fires with the phone in a pocket and no signal, which is the state
+    //   a golfer driving to a course is actually in.
+    //
+    //   PUSH does the five that have to come from outside: you're in, final
+    //   results, a bet challenge, a press offered, and hype. Those need a token
+    //   and a sender.
+    //
+    // BOTH ARE INERT UNTIL MANNY'S SETUP EXISTS. Push needs the APNs key in
+    // Firebase and the Push Notifications capability in Xcode; without them
+    // register() rejects and the app carries on exactly as it does today. Local
+    // needs only the permission prompt, so the reminder works first.
+    includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
+                     '@capacitor/push-notifications', '@capacitor/local-notifications']
   },
   // ANDROID IS NOW AN ALLOWLIST TOO, AND THE REASON IS THIS WAVE'S PLUGIN.
   //
@@ -46,6 +63,12 @@ const config: CapacitorConfig = {
   // capacitor.settings.gradle byte-identical - measured 2026-09-30, and that is the
   // point of the list. When Android does get one-tap sign-in, it gets google-services
   // .json, the gradle plugin, and a fourth entry here, together, on purpose.
+  // ANDROID DOES NOT GET THE WAVE 39 PLUGINS YET, for the same reason it does not
+  // get the auth plugin: push on Android needs google-services.json and the
+  // com.google.gms.google-services gradle plugin, neither of which this repo has,
+  // so naming them would break the Android build for a feature Android does not
+  // ship. When Android gets push, it gets the json, the gradle plugin and the
+  // entries here together, on purpose.
   android: {
     includePlugins: ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share']
   },

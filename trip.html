@@ -49,6 +49,7 @@
          every link between them breaking. -->
     <script src="product-links.js"></script>
     <script src="course-index.js"></script>
+    <script src="tee-time.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
@@ -704,13 +705,19 @@ html {
             if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
             if (frontEl) cfg.frontNineKey = frontEl.value;
             if (backEl) cfg.backNineKey = backEl.value;
+            // THE TEE TIME, PER ROUND (Wave 39). Captured with everything else so
+            // changing a day's hole count does not wipe a time already typed.
+            const dEl = document.getElementById(`round-teedate-${i}`);
+            const tEl = document.getElementById(`round-teeclock-${i}`);
+            if (dEl) cfg.teeDate = dEl.value;
+            if (tEl) cfg.teeClock = tEl.value;
         });
 
         let newFlat = [];
         plannedDays.forEach((d, dayIdx) => {
             for (let r = 0; r < d.roundsToday; r++) {
                 const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
-                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '' });
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '' });
             }
         });
         // Carry forward previously entered values by position — good enough for the common
@@ -721,6 +728,8 @@ html {
                 cfg.playerCount = roundConfigs[i].playerCount || 4;
                 cfg.frontNineKey = roundConfigs[i].frontNineKey || '';
                 cfg.backNineKey = roundConfigs[i].backNineKey || '';
+                cfg.teeDate = roundConfigs[i].teeDate || '';
+                cfg.teeClock = roundConfigs[i].teeClock || '';
             }
         });
         roundConfigs = newFlat;
@@ -779,9 +788,20 @@ html {
             html += `<div class="settle-card" style="margin-bottom:10px;">
                 <div style="font-weight:bold; margin-bottom:8px;">${cfg.label}</div>
                 ${coursePickerHtml}
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group" style="margin-bottom:8px;">
                     <label>Players</label>
                     <input type="number" id="round-players-${i}" min="0" max="40" value="${cfg.playerCount}">
+                </div>
+                <!-- OPTIONAL, like the single-round version. A trip is exactly where
+                     tee times matter - four rounds over three days, each with its own -
+                     and exactly where a wrong one costs somebody a morning, which is
+                     why tee-time.js stores the zone it was set in. -->
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Tee time <span style="font-weight:normal; color:var(--text-muted);">(optional)</span></label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <input type="date" id="round-teedate-${i}" value="${cfg.teeDate || ''}" style="flex:1 1 150px; min-width:140px;">
+                        <input type="time" id="round-teeclock-${i}" value="${cfg.teeClock || ''}" style="flex:1 1 110px; min-width:110px;">
+                    </div>
                 </div>
             </div>`;
         });
@@ -856,6 +876,23 @@ html {
     // Firebase's global_courses is the live source of truth for a course's real hole data
     // (see the course-data-override note in project memory) - falls back to the local
     // seed data in course-data.js, then a flat placeholder if neither has it yet.
+    // THE PLANNER'S TEE TIME, one row at a time. tee-time.js owns every rule; the
+    // only thing that cannot move out of a page is the offset, which has to be
+    // asked about the INSTANT typed rather than about today.
+    function tripTeeTimeFor(cfg) {
+        const dateText = String((cfg && cfg.teeDate) || '').trim();
+        const timeText = String((cfg && cfg.teeClock) || '').trim();
+        // BOTH OR NEITHER: a date with no time is not a tee time, and guessing one
+        // is how a reminder fires at midnight.
+        if (!dateText || !timeText) return { teeTimeISO: null, teeTimeZone: null };
+        const probe = new Date(dateText + 'T' + timeText + ':00');
+        const off = isNaN(probe.getTime()) ? new Date().getTimezoneOffset() : probe.getTimezoneOffset();
+        let zone = null;
+        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { zone = null; }
+        const built = (typeof teeTimeBuild === 'function') ? teeTimeBuild(dateText, timeText, off, zone) : null;
+        return built || { teeTimeISO: null, teeTimeZone: null };
+    }
+
     function resolveCourseData(courseId, globalCoursesData) {
         if (globalCoursesData[courseId] && globalCoursesData[courseId].data) return globalCoursesData[courseId].data;
         if (coursePresets[courseId]) return coursePresets[courseId].data;
@@ -976,9 +1013,15 @@ html {
                     players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
                 }
 
+                // TEE TIME PER ROUND. The offset is taken FOR THAT DAY - a trip
+                // spanning a daylight-saving change would otherwise put one round
+                // an hour out, which is exactly the trip where it matters.
+                const tee = tripTeeTimeFor(cfg);
                 updates[`events/${roundCode}`] = {
                     eventName: cfg.label,
                     roundDay: cfg.label,
+                    teeTimeISO: tee.teeTimeISO,
+                    teeTimeZone: tee.teeTimeZone,
                     eventCategory: 'weekend',
                     categoryIcon: '⛳',
                     activeCourseKey: cfg.courseId,
@@ -3042,6 +3085,7 @@ html {
                 html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
                     <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
                     <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
+                    ${(typeof teeTimeLabel === 'function' && teeTimeLabel(data)) ? `<div><strong>Tee time:</strong> ${escapeHtml(teeTimeLabel(data))}</div>` : ''}
                     <div><strong>Format:</strong> ${formatLabel}</div>
                     <div><strong>Players (${players.length}):</strong> ${playerNames}</div>
                 </div>`;
