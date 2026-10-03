@@ -88,7 +88,13 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-const { PAIR, findAll, checkBaselines, countTests, filesWithBaselines, ROOT }
+// lineOf WAS NEVER IMPORTED, and that is the whole of the bug below: the helper
+// has exported it all along, this file used it in one branch, and that branch had
+// never executed - no prose file had ever restated a pair no suite claimed. So
+// the first time one did, the guard threw "lineOf is not defined" instead of
+// reporting the fault it had correctly found. A guard that cannot report is a
+// guard that is not working.
+const { PAIR, findAll, checkBaselines, countTests, filesWithBaselines, lineOf, ROOT }
     = require('./helpers/baseline-headers');
 
 describe('baseline arithmetic', () => {

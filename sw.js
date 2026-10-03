@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v118-courseindex. The tournament product cache
+// The consumer product cache is consumer-v119-roadtrip. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3909,7 +3909,24 @@
 // leaderboard.html and side-match-lines.js all moved, and leaderboard.html now loads
 // side-match-lines.js, so a device on v277 keeps a card that cannot answer the
 // question a group asks at the end of a round.
-const CACHE_VERSION = 'golfapp-v278-courseindex';
+// Moved to v279 FOR THE ROAD TRIP: a round with no course yet, a pasted itinerary,
+// and golfers added or removed on a trip.
+//
+// A trip round could not be saved without a course, so Friday being "Prestwick or
+// Man O' War (not chosen)" meant waiting on a decision or inventing one - and an
+// invented course is an invented par and stroke-index card, which is invented money.
+// A round with no course is now a saved round with no courseData, which the app
+// already handles, and the organizer picks the course when the group decides.
+//
+// trip-itinerary.js and trip-roster.js are new and PRECACHED: trip.html calls both
+// unguarded, so a device on v278 told it already had this version would throw when
+// the Golfers section renders.
+//
+// A ROSTER CHANGE APPLIES ONLY TO ROUNDS WITH NO SCORES. A round with one posted
+// score has a settled money position - handicaps off its roster, side matches naming
+// its ids, a pool charging per golfer - so it keeps the roster it was played with,
+// and the organizer is told by name which rounds were left alone.
+const CACHE_VERSION = 'golfapp-v279-roadtrip';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4068,6 +4085,12 @@ const SHELL_FILES = [
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
     // before the setup page draws anything. That is why it is precached.
     './course-index.js',
+    // The paste-an-itinerary parser. trip.html calls it unguarded from the review
+    // button, so it is precached.
+    './trip-itinerary.js',
+    // Which rounds a roster change may touch - a round with scores keeps the
+    // roster it was played with. trip.html calls it unguarded.
+    './trip-roster.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

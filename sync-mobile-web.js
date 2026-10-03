@@ -59,6 +59,14 @@ const SHARED_SHELL = [
     // tournament.html and trip.html all call courseIndexLoader UNGUARDED, so a
     // cached shell without it throws on load and the setup page never draws.
     'course-index.js',
+    // trip-itinerary.js: the paste-an-itinerary parser. trip.html calls
+    // tripItinPlan UNGUARDED from the review button, so a cached shell without it
+    // throws when the button is tapped.
+    'trip-itinerary.js',
+    // trip-roster.js: which rounds a roster change may touch. trip.html calls
+    // tripRosterPlan UNGUARDED, so a cached shell without it throws when the
+    // Golfers section renders.
+    'trip-roster.js',
     // code-issuer.js issues every round, trip and tournament code and checks it is
     // free before handing it out. admin.html, trip.html and tournament.html all
     // load it, so without it here the native bundle 404s and none of them can

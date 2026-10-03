@@ -107,7 +107,11 @@ function countTests(file) {
 // Every file in the repo that carries a baseline. Kept as a scan rather than a list
 // so a new guard is covered the day it is written, not the day someone remembers.
 function filesWithBaselines() {
-    const skip = new Set(['node_modules', '.git', 'test-runs', 'www', 'ios', 'android', 'dist']);
+    // docs/ IS NEVER STAGED - Manny's standing rule - so it holds scratch notes
+    // and plans that are not part of the repo's record. Scanning it made this
+    // guard fail on a working-tree file from an unmerged branch, which is a fault
+    // in the scan rather than in any baseline.
+    const skip = new Set(['node_modules', '.git', 'test-runs', 'www', 'ios', 'android', 'dist', 'docs']);
     const found = [];
     (function walk(dir, rel) {
         for (const name of fs.readdirSync(dir)) {

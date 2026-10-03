@@ -3063,6 +3063,59 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Road Trip, 2026-10-03: a round with no course, a pasted itinerary, a changeable roster
+
+Built for Manny's Myrtle Beach trip, **12-16 October**. Cache
+`golfapp-v279-roadtrip` / consumer `v119`. FAST lane, merged.
+
+- **A TRIP ROUND CAN BE SAVED WITH NO COURSE.** Friday is "Prestwick or Man O'
+  War (not chosen)", and the planner used to refuse to build until every course
+  was picked - so the choice was wait, or invent one. **An invented course is an
+  invented par and stroke-index card, which is invented money.** A course-less
+  round is saved with `activeCourseKey: null` and `courseData: null`, a state the
+  app already handles, and the organizer picks the course when the group decides.
+  `resolveCourseData()`'s eighteen-par-4s fallback is deliberately NOT used - that
+  is the fictional card admin.html stopped seeding, because saving it poisoned
+  `global_courses` for everyone.
+- **PASTE AN ITINERARY.** `trip-itinerary.js` turns a booking email into one round
+  per line - date, course, optional tee time - and a review screen shows what it
+  made of each line before anything is written.
+  - **Saved courses are matched first and cost nothing.** Only unmatched ones are
+    searched, and the review says how many lookups that is **before** the golfer
+    agrees: the provider is the FREE tier, 35 a day shared by everybody, two calls
+    per course. Measured on Manny's own three lines: **zero lookups** - Caledonia
+    and Thistle are already bundled and Friday is undecided.
+  - **"X or Y (not chosen)" is no course at all**, and both options are kept so the
+    review shows what he actually wrote.
+  - **27-hole combos map to the right nines.** "Thistle, McKay/Cameron" ->
+    `mackay` / `cameron`, in that order. **Manny writes "McKay", the data says
+    "MacKay"** - matched by dropping vowels, applied ONLY to the three nines on one
+    course, never to course names, where it would collide freely.
+  - **A two-digit date carries no year and one is never invented** - inferring it
+    from today is how a December booking for January lands eleven months early. The
+    year is a box on the review screen.
+- **ADD / REMOVE GOLFERS ON A TRIP** (`trip-roster.js`), organizer-token only.
+  **A change applies to rounds with NO SCORES; a round with one posted score keeps
+  the roster it was played with** - handicaps are read off it, side matches name its
+  player ids, the pool charges per golfer, skins and dots are per hole per player.
+  The untouched rounds are **named** in the note, because "some rounds were skipped"
+  is not something an organizer can check. Guarded as money: the same played round
+  settled before and after, to the cent, engines frozen by sha.
+  - Ids are computed **per round** (a trip's rounds are separate events, so one
+    shared counter would collide), a name already present is not added twice, and
+    removing the last golfer from a round is refused - delete the round instead.
+  - `tripRoundHasScores` counts any value **> 0**, so a cleared `0` or `null` is not
+    a score and an untouched round stays editable.
+- **A CROSS-BRANCH NOTE: the tee time parses but cannot be stored yet.** The
+  tee-time field is Wave 39, which is unmerged, so a pasted time is carried on the
+  planner's round configs and ignored here. The moment that wave lands it is what
+  the planner's own date and time boxes read - no further change needed.
+- **AND `baseline_arithmetic_test.js` HAD A LATENT BUG ON MAIN:** it called
+  `lineOf()` without importing it, in a branch that had never executed, so the
+  first real fault it found would have thrown instead of reporting. Now imported
+  (the helper exported it all along), and `filesWithBaselines()` skips `docs/` -
+  which is never staged, so it holds scratch notes that are not part of the record.
+
 ## Where things stand, 2026-10-03
 
 **THE GOLFCOURSEAPI PLAN WAS WRONG EVERYWHERE, AND IT IS CORRECTED.** The account
