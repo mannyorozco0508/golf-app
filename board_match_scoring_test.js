@@ -163,8 +163,14 @@ describe('v220: the Board honours GROSS on every match format, ryder and scrambl
                 assert.ok(b.widget.length > 0,
                     'the engine widget rendered nothing, so agreement is vacuous');
                 assert.match(b.widget, /LIVE MATCHES/, 'the widget must be the match widget');
-                // The widget writes "AS" for all square; the team view "ALL SQUARE".
-                const widgetSquare = /\|AS\|/.test(b.widget) || /ALL SQUARE/.test(b.widget);
+                // THREE SPELLINGS OF THE SAME FACT, and the test accepts all three
+                // because the claim is agreement, not wording. The widget writes
+                // "AS" while a match is running, the team view "ALL SQUARE", and
+                // since Job 2 (2026-10-03) a FINISHED bet on the widget carries
+                // the Receipt's own "All square" - which is the point of that
+                // change: a bet that is over should read the way the Receipt
+                // reads, and a level one has no margin to spell either way.
+                const widgetSquare = /\|AS\|/.test(b.widget) || /all square/i.test(b.widget);
                 const teamSquare = /ALL SQUARE/.test(b.status);
                 assert.equal(teamSquare, widgetSquare,
                     'the two panels disagree on the same round. widget: '
