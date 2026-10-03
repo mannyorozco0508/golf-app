@@ -190,7 +190,7 @@ describe('2. THE THREE OUTCOME SHAPES', () => {
         const sb = arrive();
         await searchAndOpen(sb, 'zzq course', UNAVAILABLE('daily_limit'), null);
         const t = rows(sb).map(rowText).join(' | ');
-        assert.match(t, /used up today's lookups\. It works again tomorrow\./);
+        assert.match(t, /resting for today — pick a saved course instead\. It works again tomorrow\./);
         assert.match(t, /Couldn't check online just now, and "zzq course" isn't in the built-in list\. Try again in a moment\. To start the event now, pick a course from the list — the event scores on that course's card\./);
         assert.doesNotMatch(t, /type|grid|below/i, 'there is no grid on this page');
         assert.ok(!rows(sb).some(r => /Add|placeholder/i.test(rowText(r))));

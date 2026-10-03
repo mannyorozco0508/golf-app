@@ -10,19 +10,26 @@
 //   200 - so any file in the tree is a downloadable URL. The key lives only in
 //   the Pages encrypted environment and only this Worker ever sees it.
 //
-//   THE QUOTA WAS THE HARDER PROBLEM, AND PRO CHANGED THAT. This was built
-//   against the free tier: 35 requests a day, divided by a foursome setting up on
-//   a Saturday morning, is not many. The cache, the daily ceiling, the per-IP cap
-//   and the minimum query length all exist because of that number.
+//   THE QUOTA IS THE HARDER PROBLEM, AND IT IS STILL THE FREE TIER (corrected
+//   2026-10-03). This file spent two weeks saying the account had moved to Pro -
+//   10,000 a day - and every number in it was re-tuned on that basis: the
+//   ceiling went 30 -> 9,000, the search cache 7 days -> 1 hour, and zero
+//   results stopped being cached. THE ACCOUNT WAS NEVER UPGRADED. The plan is
+//   "$0 per month / Up to 35 requests per day", and a 9,000 ceiling on a 35-a-day
+//   key is not a runaway detector - it is no ceiling at all, because the
+//   provider's whole day is gone two hundred and fifty times before ours
+//   notices.
 //
-//   The account is now Pro - 10,000 a day - so the pressure those were built
-//   under is gone. THEY HAVE NOT BEEN REMOVED, and the reasoning below is kept
-//   rather than rewritten, because it explains why the code has the shape it has.
-//   What changed is which of them are load-bearing: the ceiling became a runaway
-//   detector rather than a ration, the per-IP cap now guards a PAID key, and the
-//   cache became an optimisation rather than the difference between working and
-//   not. Said plainly: at 10,000 a day you could delete the cache and the app
-//   would still work. That was not true at 35.
+//   So the cache, the daily ceiling, the per-IP cap and the minimum query length
+//   are load-bearing again, exactly as first written: 35 requests a day, divided
+//   by a foursome setting up on a Saturday morning, is not many. At 35 a day you
+//   cannot delete the cache and still have a working app.
+//
+//   THE CEILING IS NOW READ FROM THE ENVIRONMENT - GOLFCOURSE_DAILY_LIMIT - so
+//   the day the plan does change, it is one edit in the Pages dashboard and no
+//   deploy. PRO_DAILY_CEILING below is the number to put in it. That is the
+//   whole reason the Pro figure is kept rather than deleted: the mistake this
+//   correction is undoing was a number nobody could see from outside the code.
 //
 // WHY THIS FILE EXISTS AT ALL, RATHER THAN THE RULE LIVING IN EACH ROUTE.
 // CLAUDE.md: two entry points means one builder. A hand-written copy in each
@@ -54,7 +61,13 @@
 //                     the API's own spec declares. Refused for free rather than
 //                     spending a request to be told it does not exist.
 //   rate_limited      this IP has used its hourly allowance.
-//   daily_limit       the 30-of-35 ceiling for today is reached.
+//   daily_limit       the day's lookups are gone - OURS OR THEIRS. Either our
+//                     own ceiling for today is reached (see DAILY_CEILING and
+//                     GOLFCOURSE_DAILY_LIMIT), or the provider answered 429.
+//                     ONE reason for both deliberately: to a golfer on the
+//                     first tee they mean the same thing and the advice is
+//                     identical, and a vocabulary with two sentences saying the
+//                     same thing has stopped meaning anything.
 //   upstream_error    the API answered with something we cannot use - any
 //                     non-200, or a 200 whose body is not the shape we expect.
 //                     If this appears immediately on a fresh day, suspect a
@@ -92,12 +105,20 @@
 // from the same budget this file protects. Also unknown: when their day resets,
 // and whether they count failed requests as we do.
 //
-// SO NOTHING HERE BRANCHES ON A QUOTA-SPECIFIC SIGNAL. No 429 check, no error
-// body parse, no header read. One question is asked: did I get a 200 whose body
-// parses as JSON and carries the payload I expect? Everything else is
-// unavailable. If the real API answers exhaustion with a 429, a 403, a 200
-// holding an error object, or a 418 with a poem in it, the behaviour is
-// identical and correct.
+// SO THERE IS EXACTLY ONE QUOTA-SPECIFIC BRANCH, AND IT IS 429 (2026-10-03).
+// No error body parse, no header read, no second guess. A 429 is the
+// conventional answer to "you have used your quota", and on a 35-a-day key it
+// is a state golfers will actually reach - so it maps onto daily_limit, which
+// is the one reason whose sentence already tells somebody what to do instead.
+// Everything else still asks the single question: did I get a 200 whose body
+// parses as JSON and carries the payload I expect?
+//
+// THIS IS HONEST RATHER THAN COMPLETE, and the gap is worth naming. If the real
+// API answers exhaustion with a 403, or a 200 holding an error object, that is
+// upstream_error - "isn't answering right now" - which is wrong advice on a
+// spent quota. We have never seen their exhaustion response and finding out
+// costs requests from the budget this file protects. The fix, the day it turns
+// up in a log, is one line in ask().
 //
 // The one thing that would still surprise us is the upstream changing its
 // SUCCESS shape. tools/golfcourse-contract-check.js is the answer to that: one
@@ -109,65 +130,123 @@
 //
 // Cloudflare's Cache API is per-data-centre: "the contents of the cache do not
 // replicate outside of the originating data center". A 35-a-day budget is
-// GLOBAL, so a search cached in Portland did nothing for a golfer whose request
-// landed in Dallas, and every data centre took its own miss. That is why this
-// uses KV, which is global, and it is still an accurate description of the two
-// products.
+// GLOBAL, so a search cached in Portland does nothing for a golfer whose request
+// lands in Dallas, and every data centre takes its own miss.
 //
-// It is no longer why the code MUST be this way. On Pro the arithmetic that made
-// KV mandatory does not bind. KV is kept for latency, for resilience when the
-// provider is down - a cached course still resolves - and because changing it
-// would buy nothing. The paragraph is left standing because someone will
-// otherwise re-derive the Cache API as an obvious simplification and be right
-// about today and wrong about the reasoning.
+// That is why this uses KV, which is global, and ON THE FREE TIER IT IS AGAIN
+// THE REASON THE CODE MUST BE THIS WAY rather than a nicety. A Pro-era edit of
+// this file said the arithmetic no longer binds. It binds: thirty-five, split
+// across Cloudflare's data centres, is not a working app. Do not re-derive the
+// Cache API as an obvious simplification.
 // ============================================================================
 
-// NINE THOUSAND, AND ITS PURPOSE HAS CHANGED.
+// THIRTY-FIVE, WHICH IS THE WHOLE DAY, AND WHY THERE IS NO LONGER A RESERVE.
 //
-// This was 30 of 35 on the free tier, and it was RATIONING: five in reserve for
-// a retry, the detail fetch that follows a search, and the undercount eventual
-// consistency permits. Every one of those thirty mattered.
+// The free tier is 35 requests a day. This was 30 of 35 when first written -
+// five held back for a retry, for the detail fetch that follows a search, and
+// for the undercount that KV's eventual consistency permits. The reserve bought
+// one thing: it kept us from ever meeting the provider's own refusal, whose
+// shape we had never seen and could not report sensibly.
 //
-// On Pro - 10,000 a day - rationing is over. The ceiling is now a RUNAWAY
-// DETECTOR. Nothing this app legitimately does approaches nine thousand lookups
-// in a day; a foursome setting up a round costs two. So reaching it does not
-// mean "we have been busy", it means SOMETHING IS LOOPING, and the right
-// response is to look rather than to wait for tomorrow.
+// A 429 NOW MAPS ONTO daily_limit, so meeting their refusal and meeting ours
+// produce the same answer and the same sentence. The reserve was protecting us
+// from an outcome that is now handled, and five of thirty-five is a seventh of
+// the day - enough to matter on a Saturday morning. So the ceiling is the whole
+// 35, and overshooting it costs a golfer nothing worse than the message they
+// were about to get anyway.
 //
-// The thousand of headroom is still there for the same undercount reason.
-export const DAILY_CEILING = 9000;
+// A foursome setting up a round costs two requests: one search, one detail. So
+// 35 is roughly seventeen new courses a day across every golfer using the site -
+// and NOT seventeen rounds, because a course already in global_courses or in the
+// KV cache costs nothing. That is the real shape of the limit.
+//
+// AND IT IS AN ENVIRONMENT READ. GOLFCOURSE_DAILY_LIMIT in the Pages project
+// overrides this; PRO_DAILY_CEILING is what to put in it on the $9.99 plan.
+// Pinned by course_quota_free_tier_test.js, which also proves the override is
+// wired into admit() rather than merely exported.
+export const DAILY_CEILING = 35;
+
+// The Pro tier's ceiling: 9,000 of their 10,000, the thousand of headroom being
+// the same undercount allowance the old reserve was. Not used by default - it is
+// the value GOLFCOURSE_DAILY_LIMIT takes the day the plan changes, kept here so
+// nobody has to re-derive it from a pricing page.
+export const PRO_DAILY_CEILING = 9000;
+
+// A MALFORMED LIMIT FALLS BACK TO THE FREE TIER, IN BOTH DIRECTIONS.
+//
+// This is the only place a typo in a dashboard field can reach the budget, and
+// it can go wrong two ways that look nothing alike:
+//
+//   NaN - '', '  ', 'abc', a stray object - would make every `>=` comparison
+//   against it false, and the ceiling INFINITE. One bad character and we hand
+//   the provider's whole day to the first script that finds us.
+//
+//   ZERO - a '0' typed to mean "off" - would refuse every search with
+//   daily_limit on a fresh morning, indistinguishable from the quota being
+//   genuinely gone. Nobody would look at the dashboard, because the app would
+//   be saying exactly what it says when it is working correctly.
+//
+// So only a clean positive integer counts. Anything else is 35, which is the
+// value that is both safe and true.
+export function dailyCeiling(env) {
+    const raw = env && env.GOLFCOURSE_DAILY_LIMIT;
+    if (raw === null || raw === undefined) return DAILY_CEILING;
+    const text = String(raw).trim();
+    if (!/^[0-9]+$/.test(text)) return DAILY_CEILING;
+    const n = parseInt(text, 10);
+    return n > 0 ? n : DAILY_CEILING;
+}
 export const MIN_QUERY = 3;
-// SIXTY AN HOUR, NOT FIVE. Five was tight enough that setting up a four-round
-// trip was painful, and it only made sense while the whole day was thirty-five.
-// It matters MORE now, not less: this is the only thing protecting a PAID key
-// from one bad actor, and sixty is invisible to a person while still stopping a
-// script.
+// SIXTY AN HOUR, AND IT IS NOW LARGER THAN THE WHOLE DAY.
+//
+// Five an hour was the free-tier figure, raised to sixty for Pro because five
+// made setting up a four-round trip painful. On 35 a day the per-IP cap can no
+// longer be the thing that rations - the daily ceiling gets there first, every
+// time - so this is purely an abuse brake: it stops one script from emptying the
+// day in a burst, and it is invisible to a person.
+//
+// LEFT AT SIXTY DELIBERATELY, not lowered back to five. Lowering it would make
+// a trip organiser the person it hurts, and it would not save a single request
+// that the 35 ceiling does not already save.
 export const IP_HOURLY_CAP = 60;
 
-// ONE HOUR FOR SEARCH, A MONTH FOR DETAIL.
+// ONE HOUR FOR SEARCH, A MONTH FOR DETAIL - AND THE HOUR IS NOW A JUDGEMENT CALL
+// RATHER THAN A FREE ONE.
 //
-// Search was SEVEN DAYS because requests were scarce - a week-long cache cost one
-// request per query per week instead of one per golfer. On Pro that pressure is
-// gone, and a long search cache has a cost of its own: a course added upstream
-// stays unfindable until the entry expires. An hour keeps the latency win and
-// the protection against a hammering client, and lets a new course show up the
-// same morning.
+// Search was SEVEN DAYS when requests were scarce: a week-long cache cost one
+// request per query per week instead of one per golfer. It was shortened to an
+// hour on the belief that the account was Pro, which was wrong, so the trade is
+// back - and it is a real trade now, not an obvious win either way.
+//
+// LEFT AT AN HOUR, and here is the reasoning rather than a silent revert. The
+// week-long cache paid off against the SAME query repeated across days, which is
+// not the traffic this app has: a group searches a course once, imports it, and
+// from then on it is in global_courses and never searched again. What the hour
+// does buy is that a course added upstream shows up the same morning instead of
+// next week. If the day's 35 start running out in practice, this is the first
+// dial to turn back up - and course_quota_free_tier_test.js is where to record
+// it when that happens.
 //
 // Detail stays a month. Par and stroke index do not change, and re-fetching them
 // buys nothing.
 export const SEARCH_TTL = 60 * 60;
-// AND A ZERO RESULT IS NO LONGER CACHED AT ALL. That was an open decision while
-// requests were scarce: a zero IS a success - the API answered, with nothing - so
-// caching it was free protection against a repeated typo, at the price of
-// serving that emptiness to everyone for a week, indistinguishable from "no such
-// course". A golfer who mistyped "Quintero" once made it unfindable until the
-// entry expired.
+// AND A ZERO RESULT IS STILL NOT CACHED, WHICH IS THE EXPENSIVE CHOICE.
 //
-// On Pro the trade disappears: re-asking costs a request out of ten thousand, and
-// the wrong answer costs a golfer their course. So zeros are not stored. This
-// closes the open item HANDOFF.md recorded under Known open items - not by
-// solving the spelling problem, which is still its own wave, but by removing the
-// part that made a typo persistent.
+// A zero IS a success - the API answered, with nothing - so caching it would be
+// free protection against a repeated typo. The price is serving that emptiness
+// to everyone until it expires, indistinguishable from "no such course": a
+// golfer who mistyped "Quintero" once made it unfindable for the whole TTL.
+//
+// That was traded away on the Pro reading, where re-asking cost one request out
+// of ten thousand. On 35 a day the arithmetic is genuinely close, and this KEEPS
+// the uncached behaviour anyway, for one reason: the failure it prevents is the
+// defect this whole file exists to prevent. Telling a golfer a course does not
+// exist when it does is what the local picker did, and it ended with an offer to
+// add a duplicate under a key no client can delete. A typo costing a second
+// request is a worse day for the budget and a better day for the golfer.
+//
+// HANDOFF.md's Known open items records this as the half-fix it is: the spelling
+// problem is still its own wave.
 export const DETAIL_TTL = 30 * 24 * 60 * 60;
 
 const DEFAULT_BASE = 'https://api.golfcourseapi.com';
@@ -210,10 +289,11 @@ const unavailable = (reason) => ({ status: 'unavailable', reason });
 // free here, and the ceiling drifts high exactly when things are going wrong.
 //
 // KV IS EVENTUALLY CONSISTENT, so two requests arriving together can both read
-// the same count and both write count+1 - an undercount. That is why the
-// ceiling is 9,000 of 10,000 rather than 10,000 of 10,000 - it was 30 of 35
-// when this was written against the free tier. Exact counting needs Durable
-// Objects, which is a paid product and more machinery than this earns.
+// the same count and both write count+1 - an undercount. We therefore drift
+// OVER the ceiling, never under it, which is why the reserve used to exist and
+// why removing it was only safe once a provider 429 had a sensible answer.
+// Exact counting needs Durable Objects, which is a paid product and more
+// machinery than this earns.
 // ---------------------------------------------------------------------------
 async function bump(kv, key, ttl) {
     const n = parseInt((await kv.get(key)) || '0', 10) + 1;
@@ -260,20 +340,28 @@ function wire(d) {
         now: d.clock && d.clock.date ? d.clock.date() : new Date(),
         doFetch: d.fetch || globalThis.fetch,
         base: (d.env && d.env.GOLFCOURSE_API_BASE) || DEFAULT_BASE,
-        key: d.env && d.env.GOLFCOURSE_API_KEY
+        key: d.env && d.env.GOLFCOURSE_API_KEY,
+        // Resolved HERE, with everything else injectable, so both routes get the
+        // same number from the same place and a test can set it the way the
+        // dashboard does - through env - rather than through a back door.
+        ceiling: dailyCeiling(d.env)
     };
 }
 
 // The gate every upstream call passes: per-IP first, then the daily ceiling,
 // then the increment. A request refused by either must spend nothing.
-async function admit(kv, ip, now) {
+async function admit(kv, ip, now, ceiling) {
     if (ip) {
         const rk = rateKey(ip, now);
         if (await readCount(kv, rk) >= IP_HOURLY_CAP) return unavailable('rate_limited');
         await bump(kv, rk, 60 * 60);
     }
     const ck = counterKey(now);
-    if (await readCount(kv, ck) >= DAILY_CEILING) return unavailable('daily_limit');
+    // The ceiling is a PARAMETER, not the constant. Reading DAILY_CEILING here
+    // would make GOLFCOURSE_DAILY_LIMIT a variable that exists, is documented,
+    // and does nothing - which is the exact shape of the dead wires CLAUDE.md
+    // keeps recording.
+    if (await readCount(kv, ck) >= ceiling) return unavailable('daily_limit');
     await bump(kv, ck, 2 * 24 * 60 * 60);
     return null;
 }
@@ -294,7 +382,14 @@ async function ask(doFetch, url, key, pick) {
         // like - are the same thing to a golfer: we could not ask.
         return { error: 'network' };
     }
-    if (!res || !res.ok) return { error: 'upstream_error' };
+    if (!res) return { error: 'upstream_error' };
+    // THE ONE QUOTA-SPECIFIC BRANCH. 429 is the provider saying the day is
+    // spent, which is daily_limit - the reason whose sentence tells a golfer
+    // what to do instead. Everything else non-200 stays upstream_error, and a
+    // 401 in particular MUST: that is a wrong key, and reporting it as "try
+    // again tomorrow" would hide a misconfigured deploy for ever.
+    if (res.status === 429) return { error: 'daily_limit' };
+    if (!res.ok) return { error: 'upstream_error' };
     let body;
     try { body = await res.json(); } catch (e) { return { error: 'upstream_error' }; }
     const value = pick(body);
@@ -304,7 +399,7 @@ async function ask(doFetch, url, key, pick) {
 
 // ---------------------------------------------------------------------------
 export async function handleSearch(d) {
-    const { kv, now, doFetch, base, key } = wire(d);
+    const { kv, now, doFetch, base, key, ceiling } = wire(d);
     const q = normaliseQuery(d.q);
 
     // Refused before anything is read or spent. A short query is not a search
@@ -320,7 +415,7 @@ export async function handleSearch(d) {
     const cached = await kv.get(searchCacheKey(q));
     if (cached) return { status: 'ok', courses: JSON.parse(cached) };
 
-    const refused = await admit(kv, d.ip, now);
+    const refused = await admit(kv, d.ip, now, ceiling);
     if (refused) return refused;
 
     const asked = await ask(doFetch,
@@ -340,8 +435,8 @@ export async function handleSearch(d) {
     // whole TTL. And an EMPTY result is the subtler version of the same thing: a
     // golfer who mistypes a course name once would make that misspelling
     // permanently answer "nothing", indistinguishable from the course not
-    // existing, for everyone. On Pro, re-asking costs one request out of ten
-    // thousand and the wrong answer costs a golfer their round.
+    // existing, for everyone. Re-asking costs one of thirty-five, which is not
+    // nothing - and the wrong answer costs a golfer their round.
     if (asked.value.length > 0) {
         await kv.put(searchCacheKey(q), JSON.stringify(asked.value), { expirationTtl: SEARCH_TTL });
     }
@@ -350,7 +445,7 @@ export async function handleSearch(d) {
 
 // ---------------------------------------------------------------------------
 export async function handleDetail(d) {
-    const { kv, now, doFetch, base, key } = wire(d);
+    const { kv, now, doFetch, base, key, ceiling } = wire(d);
     const id = String(d.id || '').toLowerCase();
 
     // Same reasoning as the short query: a malformed id is refused for free
@@ -361,7 +456,7 @@ export async function handleDetail(d) {
     const cached = await kv.get(detailCacheKey(id));
     if (cached) return { status: 'ok', course: JSON.parse(cached) };
 
-    const refused = await admit(kv, d.ip, now);
+    const refused = await admit(kv, d.ip, now, ceiling);
     if (refused) return refused;
 
     const asked = await ask(doFetch, base + '/v1/courses/' + encodeURIComponent(id), key,

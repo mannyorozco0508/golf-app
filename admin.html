@@ -5555,7 +5555,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // this page has a grid the golfer can type into and tournament.html does not.
     function onlineSearchMessage(reason) {
         const base = courseImportMessage(reason);
-        return reason === 'daily_limit' ? base.replace(/\.$/, '') + ' \u2014 you can still type the card in below.' : base;
+        // A NEW SENTENCE, NOT A DASH ONTO THE OLD ONE. The shared sentence now
+        // carries its own em-dash ("resting for today - pick a saved course"),
+        // and appending a second one produced a run-on that wrapped badly on a
+        // phone. So the suffix is a sentence of its own and the base keeps its
+        // full stop.
+        return reason === 'daily_limit' ? base + ' You can still type the card in below.' : base;
     }
 
 

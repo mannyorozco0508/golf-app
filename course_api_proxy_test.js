@@ -214,22 +214,32 @@ describe('THE MODULE EXISTS AND EXPOSES ONE BUILDER', () => {
          'counterKey', 'rateKey'].forEach((name) => {
             assert.equal(typeof LIB[name], 'function', `_lib.js must export ${name}`);
         });
-        // RE-PINNED FOR PRO. Every one of these moved when the account went from
-        // 35 requests a day to 10,000, and re-pinning them is the deliberate
-        // confirmation this guard exists to demand - not a workaround.
-        assert.equal(LIB.DAILY_CEILING, 9000,
-            'the ceiling is no longer a ration - nothing this app legitimately does approaches '
-            + '9,000 lookups in a day, so reaching it means something is LOOPING');
+        // RE-PINNED TWICE. First for Pro, when these all moved on the belief that
+        // the account had gone from 35 requests a day to 10,000. THERE WAS NO
+        // UPGRADE (corrected 2026-10-03): the plan is the free tier, 35 a day, and
+        // the ceiling is back to rationing. The other four are left where Pro put
+        // them, each for a reason stated below rather than by default.
+        assert.equal(LIB.DAILY_CEILING, 35,
+            'the free tier is "Up to 35 requests per day" and the ceiling is the whole of it. '
+            + 'At 9,000 the provider\'s entire day is spent 257 times before ours notices, so '
+            + 'the ceiling was not a runaway detector - it was absent.');
+        assert.equal(LIB.PRO_DAILY_CEILING, 9000,
+            'kept as the value GOLFCOURSE_DAILY_LIMIT takes the day the plan changes, so the '
+            + 'number nobody could see from outside the code is now one dashboard field');
         assert.equal(LIB.MIN_QUERY, 3,
             'unchanged, and deliberately: this was never about quota. It stops a single letter '
             + 'being sent to a substring matcher.');
         assert.equal(LIB.IP_HOURLY_CAP, 60,
-            'five an hour made setting up a four-round trip painful. Sixty is invisible to a '
-            + 'person and still stops a script - and it matters MORE now, because it guards a '
-            + 'PAID key.');
+            'five an hour made setting up a four-round trip painful. Sixty is now LARGER than '
+            + 'the whole day, so it cannot ration - it is purely an abuse brake against a burst, '
+            + 'and lowering it would hurt a trip organiser without saving a request the 35 '
+            + 'ceiling does not already save.');
         assert.equal(LIB.SEARCH_TTL, 60 * 60,
-            'search cached an hour, not seven days. A long cache was scarcity protection; its '
-            + 'cost is that a newly added course stays unfindable until it expires.');
+            'search cached an hour, not seven days - LEFT at the Pro-era value on the free tier '
+            + 'deliberately. The week-long cache paid off against the same query repeated across '
+            + 'days, which is not this app\'s traffic: a group searches a course once and then it '
+            + 'lives in global_courses. This is the first dial to turn back up if the 35 start '
+            + 'running out in practice.');
         assert.equal(LIB.DETAIL_TTL, 30 * 24 * 60 * 60,
             'detail unchanged - par and stroke index do not change');
     });
@@ -532,7 +542,12 @@ describe('R4 - ERROR, TIMEOUT AND GARBAGE ALL RETURN unavailable', () => {
 
     const cases = [
         ['a 500 from upstream', () => jsonResponse({ error: 'boom' }, 500), 'upstream_error'],
-        ['a 429 from upstream', () => jsonResponse({ error: 'slow down' }, 429), 'upstream_error'],
+        // 429 LEFT THIS TABLE on 2026-10-03 and has its own test in
+        // course_quota_free_tier_test.js: on a 35-a-day key it is the provider
+        // saying the day is spent, which is daily_limit, not a broken provider.
+        // A 401 stays here and is the negative control on that branch - a wrong
+        // key must never be reported as "try again tomorrow".
+        ['a 429 from upstream', () => jsonResponse({ error: 'slow down' }, 429), 'daily_limit'],
         ['a 401 from upstream', () => jsonResponse({ error: 'unauthorized' }, 401), 'upstream_error'],
         ['fetch throwing', () => { throw new TypeError('fetch failed'); }, 'network'],
         ['a timeout', () => { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }, 'network'],

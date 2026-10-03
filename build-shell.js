@@ -90,7 +90,9 @@ const PRODUCTS = {
         // to the next free key rather than reusing one an installed device holds.
         // Moved to v64. The Board's team view reads calculateMatchEngine, one
         // call per pair. A device on v63 still invents that margin itself.
-        cacheName: 'consumer-v116-strokesmode',
+        // Moved to v117: the free-tier quota sentence in course-import-rules.js
+        // (the account is 35 a day, not Pro's 10,000 - corrected 2026-10-03).
+        cacheName: 'consumer-v117-freetierquota',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

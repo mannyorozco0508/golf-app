@@ -35,12 +35,27 @@ var ONLINE_SEARCH_CEILING = 25;
 // daily_limit here says WHEN it comes back and nothing about a manual path:
 // admin.html has a grid the golfer can type into and appends that offer itself;
 // tournament.html has no grid and must not promise one.
+//
+// AND daily_limit IS A STATE GOLFERS WILL ACTUALLY REACH (2026-10-03). The
+// account is the free tier - 35 provider requests a DAY, shared by everybody -
+// not the Pro plan a scaling audit wrongly reported. This sentence was written
+// as the rare case and is now the Saturday-afternoon case, so it leads with
+// somewhere to go rather than with what went wrong: every page that searches
+// online also has a picker over the courses already imported, and on a spent
+// quota that picker is the answer.
+//
+// IT DOES NOT MENTION A SCANNER, and the brief that asked for this wording did.
+// The scorecard-photo OCR was removed from Consumer 1.0 - deleted, not dormant -
+// partly so privacy.html's "no photos or camera access" stayed true. The real
+// second path is typing the card in, which is admin.html's suffix because
+// admin.html is the only page with a grid. course_quota_free_tier_test.js holds
+// the sentence against both facts.
 var ONLINE_SEARCH_MESSAGES = {
     query_too_short: 'Type a little more to search online.',
     not_configured: "Online search isn't set up yet.",
     bad_course_id: "That course link didn't work — try searching again.",
     rate_limited: "You've searched online a few times just now. Try again in a few minutes.",
-    daily_limit: "Online search has used up today's lookups. It works again tomorrow.",
+    daily_limit: 'Course search is resting for today \u2014 pick a saved course instead. It works again tomorrow.',
     upstream_error: "Online search isn't answering right now.",
     network: "Couldn't reach online search. Check your signal."
 };
