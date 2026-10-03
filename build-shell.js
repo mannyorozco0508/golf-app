@@ -90,6 +90,9 @@ const PRODUCTS = {
         // to the next free key rather than reusing one an installed device holds.
         // Moved to v64. The Board's team view reads calculateMatchEngine, one
         // call per pair. A device on v63 still invents that margin itself.
+        // Moved to v121: challenges.js joins SHARED - a pending side-bet offer, and
+        // the one payload builder every side match is created from. A device on
+        // v120 cannot create a side bet, because saveSideMatch calls it unguarded.
         // Moved to v120: round-role.js joins SHARED - three ways into a round, where
         // there were two. A device on v119 can keep score or watch, and cannot
         // follow along as a player.
@@ -101,7 +104,7 @@ const PRODUCTS = {
         // keeps that read, and has no course-index.js to load.
         // Moved to v117: the free-tier quota sentence in course-import-rules.js
         // (the account is 35 a day, not Pro's 10,000 - corrected 2026-10-03).
-        cacheName: 'consumer-v120-following',
+        cacheName: 'consumer-v121-challenges',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

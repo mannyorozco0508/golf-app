@@ -338,9 +338,18 @@ describe('BACKWARD COMPATIBILITY', () => {
     });
 
     test('startHole is purely additive — no migration, no rewrite', () => {
+        // RE-POINTED IN WAVE 39. The payload literal moved out of saveSideMatch
+        // into challenges.js sideMatchPayloadFromTerms, because an accepted
+        // CHALLENGE has to write a side match byte-identical to the one this form
+        // writes - and two hand-written builders is the bug this project has
+        // already paid for. So the claim is now asserted where the field is
+        // actually set, plus the fact that the form still hands it over.
+        const builder = read('challenges.js');
+        assert.match(builder, /startHole: startHole/, 'the one builder stores it');
         const sm = read('sidematches.html');
-        assert.ok(/let payload = \{ format, scoring, teamAIds, teamBIds, startHole, createdAt/.test(sm),
-            'new matches store it');
+        assert.match(sm, /sideMatchPayloadFromTerms\(terms, \{/,
+            'saveSideMatch no longer goes through the shared builder');
+        assert.match(sm, /startHole: startHole,/, 'and still passes the hole it computed');
         assert.ok(!/migrat/i.test(sm.slice(sm.indexOf('function saveSideMatch'), sm.indexOf('function saveSideMatch') + 2000)),
             'nothing existing is rewritten');
     });

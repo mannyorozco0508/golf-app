@@ -26,6 +26,50 @@
         "kpGroupAnswers": {
           ".write": "root.child('events/' + $eventCode).exists()"
         },
+        "challenges": {
+          ".write": "root.child('events/' + $eventCode).exists()",
+          "$challengeId": {
+            ".validate": "newData.val() === null || (newData.hasChildren(['from', 'to', 'status', 'terms']) && newData.child('from').isString() && newData.child('from').val().length <= 16 && newData.child('to').isString() && newData.child('to').val().length <= 16 && newData.child('from').val() !== newData.child('to').val())",
+            "from": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
+            },
+            "to": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
+            },
+            "status": {
+              ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'accepted' || newData.val() === 'declined' || newData.val() === 'cancelled' || newData.val() === 'closed')"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber() && newData.val() <= now"
+            },
+            "answeredAt": {
+              ".validate": "newData.isNumber() && newData.val() <= now"
+            },
+            "matchId": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "terms": {
+              ".validate": "newData.hasChildren(['format']) && (newData.child('format').val() === 'match' || newData.child('format').val() === 'nassau' || newData.child('format').val() === 'stroke')",
+              "format": { ".validate": "newData.isString()" },
+              "scoring": { ".validate": "newData.isString() && (newData.val() === 'net' || newData.val() === 'gross')" },
+              "startHole": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 18" },
+              "stake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+              "holeStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+              "overallStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+              "frontStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+              "backStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+              "autoPressStake": { ".validate": "newData.val() === null || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },
+              "pressRule": { ".validate": "newData.isString() && newData.val().length <= 16" },
+              "tieRule": { ".validate": "newData.isString() && newData.val().length <= 16" },
+              "overallMode": { ".validate": "newData.isString() && newData.val().length <= 16" },
+              "segment": { ".validate": "newData.isString() && newData.val().length <= 8" },
+              "$other": { ".validate": false }
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "sideMatches": {
           ".write": "root.child('events/' + $eventCode).exists()",
           "$matchId": {

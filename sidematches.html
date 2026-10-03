@@ -40,6 +40,7 @@
          After text-safe.js, whose escapeHtml it uses when the page has it. -->
     <script src="ui-dialogs.js"></script>
     <script src="action-model.js"></script>
+    <script src="challenges.js"></script>
     <!-- v215: the Aloha bet. Its rules and its two sentences live here; this page
          draws the row and writes the record, and settlement-engine.js calls the
          same file - so the offer a golfer sees and the money that settles cannot
@@ -422,8 +423,18 @@ html {
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Any Group)</h3>
         <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
         <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
+        <!-- PENDING CHALLENGES (Wave 39). A bet that has been OFFERED and not yet
+             answered. Above the live matches, because an unanswered offer is the
+             thing on this page that needs a decision; below the badge, because
+             which group this link is still comes first. Empty until there is one. -->
+        <div id="challenges-list"></div>
         <div id="sidematches-list"></div>
         <button class="btn-primary" onclick="openSideMatchModal()">➕ SIDE BETS</button>
+        <!-- CHALLENGE opens the SAME form, in challenge mode: the side-match
+             creator with one side fixed to you and Save replaced by Send. Any
+             golfer in the round can tap it, which is the point - a following
+             player holds no scorekeeper link and could not create a bet at all. -->
+        <button class="btn-primary" id="sm-challenge-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openChallengeModal()">🤝 CHALLENGE SOMEBODY</button>
         <button class="btn-primary" id="sm-autopair-btn" style="background:var(--brand-navy); margin-top:8px;" onclick="openAutoPairModal()">🏌️ Auto-Pair Whole Field (Club Day)</button>
             <!-- Was window.print(), which printed this page's own side-match maths as if it were
                  an authoritative payout. There is ONE settlement document, and this opens it. -->
@@ -689,7 +700,11 @@ html {
             <p id="sm-start-hole-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
         </div>
 
-        <button class="btn-primary" onclick="saveSideMatch()">💾 Start Action</button>
+        <button class="btn-primary" id="sm-save-btn" onclick="saveSideMatch()">💾 Start Action</button>
+        <!-- CHALLENGE MODE uses the SAME form and the same terms, and swaps only
+             this button: nothing is created, an offer is sent, and the other side
+             decides. One form, so the two cannot drift about what a bet is. -->
+        <button class="btn-primary" id="sm-send-challenge-btn" style="display:none; background:var(--brand-navy);" onclick="sendChallenge()">🤝 Send Challenge</button>
         </div>
     </div>
 </div>
@@ -975,6 +990,21 @@ html {
             // above for the press: an Aloha doubles the match, and money must not
             // move because a URL was opened. A notification is a tap on a banner,
             // which is not the same as a decision.
+            // ?challenge=<id> (Wave 39) focuses a PENDING offer's card, whose
+            // Accept and Decline buttons are the existing ones. Same rule as the
+            // other two: it answers nothing.
+            const challengeTarget = urlParams.get('challenge');
+            if (challengeTarget && !window.__smChallengeFocused && (currentData.players || []).length) {
+                window.__smChallengeFocused = true;
+                setTimeout(() => {
+                    const card = document.getElementById('sm-card-ch-' + challengeTarget);
+                    if (!card) return;
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.classList.add('sm-card-focus');
+                    setTimeout(() => card.classList.remove('sm-card-focus'), 2600);
+                }, 220);
+            }
+
             const focusTarget = urlParams.get('press') || urlParams.get('aloha');
             if (focusTarget && !window.__smPressFocused && (currentData.players || []).length) {
                 window.__smPressFocused = true;
@@ -1068,7 +1098,92 @@ html {
         return roundGroupNumbers().length > 1;
     }
 
+    // CHALLENGE MODE: the same creator, one side fixed to you, Save replaced by
+    // Send. Any golfer in the round may open it - which is the point, because a
+    // following player holds no scorekeeper link and cannot create a bet at all.
+    function openChallengeModal() {
+        const me = challengeMeId();
+        if (!me) {
+            return uiRefuse('\u26A0\uFE0F Pick which golfer you are first \u2014 open the Scorecard and tap your name.');
+        }
+        challengeMode = true;
+        openSideMatchModal();
+        // YOU ARE ALWAYS SIDE A of your own challenge, tapped in for you, so the
+        // only thing left to choose is the opponent. The pick order is the same
+        // structure the form already holds, so nothing else in it has to know.
+        sidematchPickOrder = [String(me)];
+        if (typeof renderSideMatchPlayers === 'function') renderSideMatchPlayers();
+        syncChallengeMode();
+    }
+
+    function syncChallengeMode() {
+        const save = document.getElementById('sm-save-btn');
+        const send = document.getElementById('sm-send-challenge-btn');
+        if (save) save.style.display = challengeMode ? 'none' : '';
+        if (send) send.style.display = challengeMode ? '' : 'none';
+    }
+
+    // THE OFFER. Reads the SAME form fields saveSideMatch() reads, through the
+    // same terms object, so what is stored is exactly what Accept will build a
+    // side match out of. Nothing is created here and no money is held.
+    async function sendChallenge() {
+        const me = challengeMeId();
+        if (!me) return uiRefuse('\u26A0\uFE0F Pick which golfer you are first.');
+        const opponent = sidematchPickOrder.map(String).find(id => id !== String(me));
+        if (!opponent) return uiRefuse('\u26A0\uFE0F Tap the golfer you want to play.');
+
+        const terms = challengeTermsFromForm();
+        const refuse = challengeTermsRefuse(terms);
+        if (refuse) return uiRefuse('\u26A0\uFE0F ' + refuse);
+
+        const rec = challengeRecord({ from: me, to: opponent, terms: terms, now: Date.now() });
+        if (!requireOnlineForMoney('CHALLENGE NOT SENT', 'Reconnect before sending a challenge.')) return;
+        const key = db.ref(`events/${currentMode}/challenges`).push().key;
+        try {
+            await db.ref(`events/${currentMode}/challenges/${key}`).set(rec);
+            challengeMode = false;
+            syncChallengeMode();
+            closeSideMatchModal();
+            uiToast('\ud83e\udd1d CHALLENGE SENT\n' + challengeNameOf(opponent)
+                + ' has to accept it. Nothing is owed until they do.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F CHALLENGE NOT SENT\n' + err.message + '\nNothing was created \u2014 try again.');
+        }
+    }
+
+    // THE FORM'S TERMS, read the same way saveSideMatch() reads them. Kept beside
+    // the sender rather than shared with it, because saveSideMatch also needs the
+    // sides and the scope and this does not - but the FIELD LIST is identical, and
+    // challenge_terms_test.js holds the two against each other.
+    function challengeTermsFromForm() {
+        const format = document.getElementById('sm-format').value;
+        const apMode = document.getElementById('sm-autopress-mode');
+        const startEl = document.getElementById('sm-start-hole');
+        const chosen = startEl ? parseInt(startEl.value, 10) : NaN;
+        return {
+            format: format,
+            scoring: document.getElementById('sm-scoring').value,
+            startHole: (!isNaN(chosen) && chosen > 0) ? chosen : 1,
+            stake: document.getElementById('sm-stake').value,
+            pressRule: document.getElementById('sm-press-rule').value,
+            holeStake: document.getElementById('sm-holestake').value,
+            overallStake: format === 'nassau'
+                ? document.getElementById('sm-overall-stake').value
+                : document.getElementById('sm-overallstake').value,
+            tieRule: document.getElementById('sm-tie-rule').value,
+            overallMode: document.getElementById('sm-overall-mode').value,
+            segment: document.getElementById('sm-segment').value,
+            frontStake: document.getElementById('sm-front-stake').value,
+            backStake: document.getElementById('sm-back-stake').value,
+            autoPressStake: (apMode && apMode.value === 'custom')
+                ? document.getElementById('sm-autopress-stake').value : null
+        };
+    }
+
     function openSideMatchModal() {
+        // A plain "+ SIDE BETS" tap leaves challenge mode behind, so the button
+        // cannot be stuck on Send from a previous visit.
+        if (!challengeMode) syncChallengeMode();
         sidematchPickOrder = [];
         fieldActionPick = {};
         actionScope = null;
@@ -1196,6 +1311,8 @@ html {
     }
 
     function closeSideMatchModal() {
+        challengeMode = false;
+        syncChallengeMode();
         document.getElementById("sidematch-modal").style.display = "none";
     }
 
@@ -2243,54 +2360,59 @@ html {
         const chosen = chosenEl ? parseInt(chosenEl.value, 10) : NaN;
         const startHole = (!isNaN(chosen) && chosen > 0) ? chosen : (autoStart || 1);
 
-        let payload = { format, scoring, teamAIds, teamBIds, startHole, createdAt: Date.now() };
+        // THE TERMS THIS FORM EXPRESSES, read once, then handed to the ONE payload
+        // builder (challenges.js sideMatchPayloadFromTerms).
+        //
+        // WHY IT MOVED OUT OF HERE (Wave 39). An accepted CHALLENGE has to create
+        // a side match that is byte-identical to the one this form would have
+        // written from the same terms. Two hand-written payload builders is the
+        // exact bug this project has already paid for - a per-press stake that
+        // reached the engine but not the pages - and "byte-identical" asserted
+        // against a copy is a claim with a shelf life. So the copy is gone and
+        // both entry points call the same function.
+        //
+        // The DOM reads stay here, where the DOM is. The builder takes values.
+        const apMode = document.getElementById("sm-autopress-mode");
+        const terms = {
+            format: format,
+            scoring: scoring,
+            startHole: startHole,
+            stake: document.getElementById("sm-stake").value,
+            pressRule: document.getElementById("sm-press-rule").value,
+            holeStake: document.getElementById("sm-holestake").value,
+            overallStake: format === 'nassau'
+                ? document.getElementById("sm-overall-stake").value
+                : document.getElementById("sm-overallstake").value,
+            tieRule: document.getElementById("sm-tie-rule").value,
+            overallMode: document.getElementById("sm-overall-mode").value,
+            segment: document.getElementById("sm-segment").value,
+            frontStake: document.getElementById("sm-front-stake").value,
+            backStake: document.getElementById("sm-back-stake").value,
+            autoPressStake: (apMode && apMode.value === 'custom')
+                ? document.getElementById("sm-autopress-stake").value : null
+        };
+
+        // THE STROKE REFUSAL STAYS ON THIS SURFACE, because it is a sentence about
+        // this form. challenges.js has the same rule for a challenge's terms; both
+        // exist because a bet with neither amount tracks no money, and a golfer who
+        // tapped Save deserves to be told which box to fill in.
+        if (format === 'stroke') {
+            const hs = parseFloat(terms.holeStake) || 0;
+            const os = parseFloat(terms.overallStake) || 0;
+            if (hs <= 0 && os <= 0) {
+                uiRefuse("⚠️ Set a $ Per Hole or $ Overall amount above 0, or this match won't track any money.");
+                return;
+            }
+        }
 
         // Ownership metadata, same reasoning as saveFieldAction: participants say who
         // pays, scope and ownerGroup say whose wager it is. Omitted entirely on a
         // one-group round, so those wagers stay byte-identical to existing ones.
-        if (isMultiGroupRound() && actionScope) {
-            payload.scope = actionScope;
-            if (actionScope === 'group' && actionOwnerGroup !== null) payload.ownerGroup = actionOwnerGroup;
-        }
-
-        if (format === 'stroke') {
-            const holeStake = parseFloat(document.getElementById("sm-holestake").value) || 0;
-            const overallStake = parseFloat(document.getElementById("sm-overallstake").value) || 0;
-            if (holeStake <= 0 && overallStake <= 0) {
-                uiRefuse("⚠️ Set a $ Per Hole or $ Overall amount above 0, or this match won't track any money.");
-                return;
-            }
-            payload.holeStake = holeStake;
-            payload.overallStake = overallStake;
-            payload.tieRule = document.getElementById("sm-tie-rule").value;
-            payload.overallMode = document.getElementById("sm-overall-mode").value;
-            payload.segment = document.getElementById("sm-segment").value;
-        } else {
-            payload.stake = parseFloat(document.getElementById("sm-stake").value) || 0;
-            payload.pressRule = document.getElementById("sm-press-rule").value;
-            if (format === 'nassau') {
-                // ONE BUILDER, TWO ENTRY POINTS. buildNassauWagerPayload lives in
-                // action-model.js and is used identically by Step 6 of round setup.
-                // Two hand-written payload builders would drift, and this project has
-                // already paid for that class of bug once.
-                const apMode = document.getElementById("sm-autopress-mode");
-                const built = buildNassauWagerPayload({
-                    teamAIds: teamAIds,
-                    teamBIds: teamBIds,
-                    frontStake: document.getElementById("sm-front-stake").value,
-                    backStake: document.getElementById("sm-back-stake").value,
-                    overallStake: document.getElementById("sm-overall-stake").value,
-                    autoPressStake: (apMode && apMode.value === 'custom')
-                        ? document.getElementById("sm-autopress-stake").value : null,
-                    pressRule: document.getElementById("sm-press-rule").value,
-                    scoring: document.getElementById("sm-scoring").value,
-                    startHole: startHole,
-                });
-                // Scope/ownerGroup and any other side-match context set above are kept;
-                // the builder owns only the Nassau wager fields.
-                payload = Object.assign({}, payload, built);
-            }
-        }
+        const payload = sideMatchPayloadFromTerms(terms, {
+            teamAIds: teamAIds, teamBIds: teamBIds, startHole: startHole, now: Date.now(),
+            scope: (isMultiGroupRound() && actionScope) ? actionScope : null,
+            ownerGroup: (isMultiGroupRound() && actionScope === 'group') ? actionOwnerGroup : null
+        });
 
         const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${pushKey}`).set(payload)
@@ -2661,6 +2783,26 @@ html {
     // refuses to build one the rules do not allow - so a stale screen cannot write
     // an offer that is no longer legal.
     // '__main' is the round's own match. Everything else is a side match id.
+    // THE VIEWER'S ROLE AND NAME, read from the same per-round storage index.html
+    // writes: golfapp_role_<code> and golfapp_me_<code>. Both wrapped, because a
+    // private window throws on get and the failure mode must be the OLD behaviour
+    // - the scorekeeper gate alone - never a page that will not render.
+    function alohaViewerRole() {
+        try { return localStorage.getItem('golfapp_role_' + currentMode) || ''; }
+        catch (e) { return ''; }
+    }
+    function alohaViewerPlayerId() {
+        try {
+            const raw = localStorage.getItem('golfapp_me_' + currentMode);
+            if (!raw) return null;
+            // A STALE OR INVENTED ID DEGRADES TO NOTHING, the same rule
+            // resolvedMeId() applies on the scorecard: it must name a golfer who
+            // is actually in this round.
+            const match = (currentData.players || []).find(p => String(p.id) === String(raw));
+            return match ? String(match.id) : null;
+        } catch (e) { return null; }
+    }
+
     function alohaMatchFor(matchId) {
         return String(matchId) === '__main' ? mainGameAloha() : sideMatchById(matchId);
     }
@@ -2693,8 +2835,29 @@ html {
     // way - there is no timer, because an unanswered offer settles as no bet.
     function respondAloha(matchId, answer) {
         const sm = alohaMatchFor(matchId);
-        if (!canPressSideMatch(sm)) return refuseGroupWrite('answer the Aloha on that match');
         const rec = (typeof alohaRecordOf === 'function') ? alohaRecordOf(sm, currentData) : (sm && sm.aloha);
+        // THE GATE WIDENS BY EXACTLY ONE CASE (Wave 39): a PLAYING golfer may
+        // answer an Aloha offered to the side they are ON.
+        //
+        // canPressSideMatch() asks whether this LINK holds a scorekeeper scope
+        // with a stake in the match. A following player holds no group link at
+        // all, so on a multi-group round the answer was no - and an Aloha is
+        // offered TO A SIDE, not to a scorekeeper. The golfer whose money it is
+        // could not answer for it.
+        //
+        // Not any match, the one they are in. Not the OFFERING side - the side
+        // that is down offers and the side that is up has to accept, which is
+        // the whole shape of the bet. Not a spectator. And the scorekeeper keeps
+        // everything they had, because golfers without the app are answered for
+        // in person exactly as their bets are created for them today.
+        const mayRespond = (typeof alohaMayRespond === 'function') && alohaMayRespond({
+            canPress: canPressSideMatch(sm),
+            role: alohaViewerRole(),
+            meId: alohaViewerPlayerId(),
+            offeredToSideIds: (typeof alohaAnsweringSideIds === 'function')
+                ? alohaAnsweringSideIds(sm, rec) : []
+        });
+        if (!mayRespond) return refuseGroupWrite('answer the Aloha on that match');
         if (!rec || String(rec.status) !== 'offered') { uiRefuse('\u26A0\uFE0F That Aloha has already been answered.'); return; }
         const status = answer === 'accepted' ? 'accepted' : 'declined';
         if (!requireOnlineForMoney('ALOHA NOT SAVED', 'Reconnect before answering the Aloha.')) return;
@@ -3779,8 +3942,121 @@ html {
             });
     }
 
+    // ---- CHALLENGES: OFFER, ANSWER, AND THE CARD THAT SHOWS ONE (Wave 39) ----
+    //
+    // challenges.js owns every rule: what terms are valid, what a status may
+    // become, who may answer, and - the one that matters - the payload an
+    // ACCEPT writes. That payload comes from sideMatchPayloadFromTerms(), the
+    // same function saveSideMatch() now calls, so an accepted challenge produces
+    // a side match byte-identical to the one this form would have written from
+    // the same terms. There is no second money path.
+    let challengeMode = false;
+
+    function challengeNameOf(id) {
+        const p = (currentData.players || []).find(x => String(x.id) === String(id));
+        return p ? p.name.split(' ')[0] : '?';
+    }
+
+    // The viewer, as a roster id - the same storage the scorecard writes.
+    function challengeMeId() { return alohaViewerPlayerId(); }
+    function challengeAmScorekeeper() { return hasGroupLock || canPressSideMatch(null); }
+
+    function renderChallenges() {
+        const list = document.getElementById('challenges-list');
+        if (!list) return;
+        if (typeof challengesPending !== 'function') { list.innerHTML = ''; return; }
+        const pending = challengesPending(currentData);
+        if (!pending.length) { list.innerHTML = ''; return; }
+        const me = challengeMeId();
+        const keeper = challengeAmScorekeeper();
+        list.innerHTML = pending.map(ch => {
+            const may = challengeMayAnswer(ch, { meId: me, isScorekeeper: keeper });
+            const line = challengePendingLine(ch, challengeNameOf);
+            let btns = '';
+            if (may.accept) {
+                btns += '<button class="btn-primary-sm" onclick="acceptChallenge(\'' + ch.id + '\')">\u2705 Accept</button>'
+                     + '<button class="btn-outline-sm" onclick="answerChallenge(\'' + ch.id + '\', \'decline\')">\u2716 Decline</button>';
+            } else if (may.cancel) {
+                btns += '<button class="btn-outline-sm" onclick="answerChallenge(\'' + ch.id + '\', \'cancel\')">Withdraw</button>';
+            }
+            return '<div class="side-match-card" id="sm-card-ch-' + ch.id + '">'
+                + '<div style="font-weight:bold;">' + escapeHtml(line) + '</div>'
+                + '<div style="font-size:0.76rem; color:var(--text-muted); margin:4px 0 8px 0;">'
+                + 'Starts hole ' + (Number((ch.terms || {}).startHole) || 1)
+                + ' \u00B7 ' + escapeHtml(((ch.terms || {}).scoring === 'gross') ? 'Gross' : 'Net')
+                + ' \u00B7 nothing is owed until it is accepted</div>'
+                + (btns || '<div style="font-size:0.76rem; color:var(--text-muted);">Waiting on '
+                    + escapeHtml(challengeNameOf(ch.to)) + '.</div>')
+                + '</div>';
+        }).join('');
+    }
+
+    // ACCEPT. Two writes, in one update, so a side match and the answer that
+    // created it cannot disagree: a crash between them would otherwise leave a
+    // bet nobody agreed to, or an accepted challenge with no bet.
+    async function acceptChallenge(id) {
+        const ch = ((currentData.challenges || {})[id]) || null;
+        if (!ch) return;
+        const may = challengeMayAnswer(ch, { meId: challengeMeId(), isScorekeeper: challengeAmScorekeeper() });
+        if (!may.accept) return refuseGroupWrite('accept that challenge');
+        // RE-READ AT THE MOMENT OF THE TAP. A challenge answered while this card
+        // sat open must not be answered twice - the second answer would create a
+        // second bet.
+        if (!challengeIsPending(ch)) return uiRefuse('\u26A0\uFE0F That challenge has already been answered.');
+        const refuse = challengeTermsRefuse(ch.terms);
+        if (refuse) return uiFail('\u26A0\uFE0F NOT ACCEPTED\n' + refuse);
+
+        // THE START HOLE IS WHERE THE ACCEPT HAPPENS, not where the offer did. A
+        // challenge struck on the 6th and accepted on the 9th must start on the
+        // 9th, or one side walks in already knowing three holes of the result.
+        const parts = (currentData.players || [])
+            .filter(p => String(p.id) === String(ch.from) || String(p.id) === String(ch.to));
+        const auto = (typeof sideMatchStartHole === 'function')
+            ? sideMatchStartHole(parts, currentData.courseData || [], currentData.scores || {}) : 1;
+        const startHole = Math.max(Number(ch.terms.startHole) || 1, auto || 1);
+
+        const payload = sideMatchPayloadFromTerms(ch.terms, {
+            teamAIds: [String(ch.from)], teamBIds: [String(ch.to)],
+            startHole: startHole, now: Date.now(),
+            scope: isMultiGroupRound() ? 'cross' : null, ownerGroup: null
+        });
+        if (!requireOnlineForMoney('NOT ACCEPTED', 'Reconnect before accepting a challenge.')) return;
+        const matchKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
+        const updates = {};
+        updates[`events/${currentMode}/sideMatches/${matchKey}`] = payload;
+        updates[`events/${currentMode}/challenges/${id}/status`] = 'accepted';
+        updates[`events/${currentMode}/challenges/${id}/answeredAt`] = Date.now();
+        updates[`events/${currentMode}/challenges/${id}/matchId`] = matchKey;
+        try {
+            await db.ref().update(updates);
+            uiToast('\u2705 BET ON\n' + challengePendingLine(ch, challengeNameOf).replace(/^Pending: /, ''));
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT ACCEPTED\n' + err.message + '\nNothing was created \u2014 try again.');
+        }
+    }
+
+    // DECLINE, WITHDRAW, CLOSE. Status only - nothing is created and nothing is
+    // removed, so the record of the offer survives and cannot be re-answered.
+    async function answerChallenge(id, action) {
+        const ch = ((currentData.challenges || {})[id]) || null;
+        if (!ch) return;
+        const may = challengeMayAnswer(ch, { meId: challengeMeId(), isScorekeeper: challengeAmScorekeeper() });
+        if (action === 'decline' && !may.decline) return refuseGroupWrite('decline that challenge');
+        if (action === 'cancel' && !may.cancel) return refuseGroupWrite('withdraw that challenge');
+        const next = challengeStatusAfter(ch, action);
+        if (!next) return uiRefuse('\u26A0\uFE0F That challenge has already been answered.');
+        try {
+            await db.ref(`events/${currentMode}/challenges/${id}`)
+                .update({ status: next, answeredAt: Date.now() });
+            uiToast(next === 'declined' ? '\u2716 DECLINED\nNo bet was created.' : 'Withdrawn.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
     function renderSideMatches() {
         renderGroupLockBadge();
+        renderChallenges();
         const list = document.getElementById("sidematches-list");
         if (!list) return;
 

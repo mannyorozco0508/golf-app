@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v120-following. The tournament product cache
+// The consumer product cache is consumer-v121-challenges. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3939,7 +3939,24 @@
 //
 // A DEVICE ON v279 keeps a scorecard that offers no way to follow along, and has no
 // round-role.js for the unguarded arrival-sheet call - which is why the key moves.
-const CACHE_VERSION = 'golfapp-v280-following-along';
+// Moved to v281: SIDE BET CHALLENGES, and the Aloha answerable by the golfer whose
+// money it is.
+//
+// A side bet could only be created by somebody holding a scorekeeper link, so the
+// three golfers who can now follow along as players could want a bet and had no way
+// to ask for one. A CHALLENGE is a pending offer that holds no money: it lives at
+// events/<code>/challenges, which NOTHING that counts money reads, and accepting it
+// writes a side match through the SAME payload builder saveSideMatch now uses - so
+// there is no second money path and no second answer to the same terms.
+//
+// AND respondAloha WIDENS BY ONE CASE: a playing golfer may answer an Aloha offered
+// to the side they are ON. It was gated on holding a scorekeeper scope, and an Aloha
+// is offered to a SIDE - the golfer whose money it is could not answer for it.
+//
+// A DEVICE ON v280 has no Challenge button, cannot see or answer a pending one, and
+// has no challenges.js - which saveSideMatch now calls unguarded, so a cached shell
+// told it already had this version could not create a side bet at all.
+const CACHE_VERSION = 'golfapp-v281-challenges';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4117,6 +4134,10 @@ const SHELL_FILES = [
     // The three ways into a round. index.html calls it unguarded from the arrival
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
+    // A pending side-bet offer, and the one payload builder every side match is
+    // created from. sidematches.html calls it unguarded, so a cached shell
+    // without it cannot create a side bet.
+    './challenges.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

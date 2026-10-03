@@ -38,10 +38,13 @@
 // with no auth. So enforcement here is targaryen, the harness all of this repo's
 // rules suites use.
 //
-// BASELINE, measured against pre-build main (89b3c1a), over the FINISHED file,
-// all 9 tests: 0 PASS / 9 FAIL - database.rules.push.json does not exist there,
-// so every row refuses and every structural pin fails. There is no partial
-// state for a rules file to be in: it is the old one or the new one.
+// BASELINE, measured against pre-build main, over the FINISHED file, all 12
+// tests: 0 PASS / 12 FAIL - database.rules.push.json does not exist there, so
+// every row refuses and every structural pin fails. There is no partial state
+// for a rules file to be in: it is the old one or the new one.
+//
+// RE-MEASURED when challenges joined the file: this header was first written
+// against a 9-test version, and three controls came with the new node.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -59,7 +62,9 @@ const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
 
 const ME = 'u-me';
 const ROOT = {
-    events: { ZZTEST: { eventName: 'Thursday', ownerUid: ME, scores: { p101_h1: 4 } } },
+    events: { ZZTEST: { eventName: 'Thursday', ownerUid: ME, scores: { p101_h1: 4 },
+        challenges: { c1: { from: '101', to: '102', status: 'pending', createdAt: 1,
+            terms: { format: 'match', scoring: 'net', startHole: 1, stake: 20, pressRule: 'none' } } } } },
     organizers: { [ME]: { firstSeenAt: 1 } },
     pushTokens: { [ME]: { dev1: { token: 'apns-aaa', playerId: '101', at: 1 } } },
     pushPrefs: { [ME]: { bets: true, hype: true } }
@@ -122,7 +127,70 @@ const W = [
       why: 'the most common write in the app, and this delta must not go near it' },
     { id: 'X2', what: 'the owner still cannot write themselves a pass', who: 'me', next: 'refuse', live: 'refuse',
       path: 'organizers/' + ME + '/pass', data: { kind: 'founder', expiresAt: 4102444800000 },
-      why: 'the Wave 34 delta still stands - a later publish must not loosen an earlier one' }
+      why: 'the Wave 34 delta still stands - a later publish must not loosen an earlier one' },
+
+    // ---- CHALLENGES, AND WHAT THIS DELTA ACTUALLY ADDS ----
+    //
+    // MEASURED, AND IT IS NOT WHAT I EXPECTED. Under the file that is LIVE today,
+    // EVERY ONE of these eleven writes is ALLOWED - including a made-up status, a
+    // golfer challenging himself, a $100,001 stake, a start hole of 19 and a
+    // stray key. The `live` column below says so on every row.
+    //
+    // WHY: `.write` at events/$eventCode governs its whole subtree, and an
+    // unknown child has no .validate, so the database would already accept
+    // arbitrary junk at events/<code>/challenges. The permission was never the
+    // missing piece.
+    //
+    // SO THIS DELTA IS A VALIDATION, NOT A GRANT, and that is the honest way to
+    // describe it to whoever publishes it. The write model is deliberately the one
+    // sideMatches already uses - the gate is that the round exists - because a
+    // following player holds no scorekeeper link and must still be able to ASK,
+    // and a challenge holds LESS than a side match does: no money moves until it
+    // is accepted, and accepting writes a sideMatch through the normal path.
+    //
+    // The three rows that stay ALLOW under the new file are the three the feature
+    // needs: offer, answer, withdraw. The other eight are shapes that would
+    // otherwise sit in the database waiting for Accept to read them.
+    { id: 'C1', what: 'a golfer offers a challenge', who: 'nobody', next: 'allow', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 1, terms: { format: 'match', scoring: 'net', startHole: 1, stake: 20, pressRule: 'none' } },
+      why: 'the point of the delta - a following player has no scorekeeper link and must still be able to ASK' },
+    { id: 'C2', what: 'the answer is written', who: 'nobody', next: 'allow', live: 'allow',
+      path: 'events/ZZTEST/challenges/c1/status', data: 'accepted',
+      why: 'accept and decline are the whole point of a pending record' },
+    { id: 'C3', what: 'a challenge is withdrawn', who: 'nobody', next: 'allow', live: 'allow',
+      path: 'events/ZZTEST/challenges/c1', data: null,
+      why: 'a challenger who changes their mind leaves nothing behind' },
+    { id: 'C4', what: 'a made-up status', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c1/status', data: 'half-accepted',
+      why: 'the status vocabulary is closed - a reader switching on it needs it finite' },
+    { id: 'C5', what: 'a challenge with no terms', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2', data: { from: '101', to: '102', status: 'pending', createdAt: 1 },
+      why: 'a bet nobody can read the terms of cannot be accepted, and would sit pending for ever' },
+    { id: 'C6', what: 'a challenge against yourself', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '101', status: 'pending', createdAt: 1, terms: { format: 'match', scoring: 'net', startHole: 1, stake: 20 } },
+      why: 'a match needs two sides, and the engine would price a golfer against himself' },
+    { id: 'C7', what: 'a made-up format', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 1, terms: { format: 'skins', scoring: 'net', startHole: 1, stake: 20 } },
+      why: 'Accept would have to build a side match out of it, and only three formats have a builder' },
+    { id: 'C8', what: 'a stake above the money ceiling', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 1, terms: { format: 'match', scoring: 'net', startHole: 1, stake: 100001 } },
+      why: 'the same [0, 100000] bound every other money field in this ruleset carries' },
+    { id: 'C9', what: 'a stray key smuggled into the terms', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 1, terms: { format: 'match', scoring: 'net', startHole: 1, stake: 20, payout: 999 } },
+      why: 'an open terms record under a writable node is a place to park anything, and Accept reads terms' },
+    { id: 'C10', what: 'a start hole of 19', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 1, terms: { format: 'match', scoring: 'net', startHole: 19, stake: 20 } },
+      why: 'a bet that starts after the round is over cannot be settled, and the creator refuses it too' },
+    { id: 'C11', what: 'a createdAt in the future', who: 'nobody', next: 'refuse', live: 'allow',
+      path: 'events/ZZTEST/challenges/c2',
+      data: { from: '101', to: '102', status: 'pending', createdAt: 4102444800000, terms: { format: 'match', scoring: 'net', startHole: 1, stake: 20 } },
+      why: 'the same now-bound every other timestamp in this ruleset carries' }
 ];
 
 // READS ARE THEIR OWN TABLE, because canRead takes a bare user name.
@@ -175,6 +243,8 @@ describe('THE PUSH NODES, AND THE LINE THEY DO NOT CROSS', () => {
         assert.ok(W.filter((r) => r.next === 'allow').length >= 5,
             'a table of refusals is satisfied by a ruleset that refuses everything');
         assert.ok(W.filter((r) => r.next === 'refuse').length >= 8);
+        assert.ok(W.filter((r) => r.id[0] === 'C').length >= 10,
+            'the challenges node is new and money-adjacent - it needs more than a row or two');
         assert.ok(W.some((r) => r.who === 'nobody' && r.next === 'refuse'));
         assert.ok(W.some((r) => r.who === 'anon' && r.next === 'allow'),
             'most golfers in a round are anonymous - a rule that excluded them would ship a '
@@ -196,21 +266,39 @@ describe('THE PUSH NODES, AND THE LINE THEY DO NOT CROSS', () => {
             });
             Object.keys(a).forEach((k) => { if (!(k in b)) added.push('REMOVED ' + p + '/' + k); });
         })(live, next, '');
-        assert.deepEqual(added, ['/rules/pushTokens', '/rules/pushPrefs'],
-            'the publish must add two nodes and change nothing else: ' + JSON.stringify(added));
+        assert.deepEqual(added.sort(), ['/rules/events/$eventCode/challenges',
+                                       '/rules/pushPrefs', '/rules/pushTokens'].sort(),
+            'the publish must add exactly these three and change nothing else: ' + JSON.stringify(added));
     });
 
-    test('events/ IS BYTE-IDENTICAL, and so is every other node that was already there', () => {
-        // Rounds, scores, side matches and money are what the whole app does. A
-        // push wave that touched this parent would be a different wave with a
-        // different approval.
+    test('EVERY NODE THAT COUNTS MONEY IS BYTE-IDENTICAL - events/ gains one child and nothing moves', () => {
+        // Rounds, scores, side matches and money are what the whole app does.
+        //
+        // events/ IS NO LONGER BYTE-IDENTICAL AS A WHOLE, and that is the one
+        // thing this wave changes about it: challenges/ is a NEW CHILD. Asserted
+        // child by child instead, so the claim gets stronger rather than weaker -
+        // scores, sideMatches, matchPresses, ownerUid and the parent .write are
+        // all pinned individually, and a publish that touched any of them fails
+        // here even though the parent has legitimately changed.
         const live = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
         const next = JSON.parse(fs.readFileSync(NEXT, 'utf8'));
         Object.keys(live.rules).forEach((k) => {
+            if (k === 'events') return;
             assert.equal(JSON.stringify(next.rules[k]), JSON.stringify(live.rules[k]),
                 'the publish changed ' + k);
         });
-        assert.equal(JSON.stringify(next.rules.events), JSON.stringify(live.rules.events));
+        const a = live.rules.events.$eventCode;
+        const b = next.rules.events.$eventCode;
+        Object.keys(a).forEach((k) => {
+            assert.equal(JSON.stringify(b[k]), JSON.stringify(a[k]),
+                'the publish changed events/$eventCode/' + k);
+        });
+        assert.deepEqual(Object.keys(b).filter((k) => !(k in a)), ['challenges'],
+            'events/$eventCode gained something other than challenges');
+        // AND THE MONEY CHILDREN BY NAME, because "every key" is satisfied by a
+        // ruleset in which those keys happen not to exist.
+        ['scores', 'sideMatches', 'matchPresses', 'strokePresses', 'ownerUid', '.write']
+            .forEach((k) => assert.ok(k in b, 'events/$eventCode lost ' + k));
     });
 
     test('THE ROLLBACK IS BYTE-IDENTICAL TO WHAT IS LIVE', () => {
@@ -247,6 +335,30 @@ describe('THE PUSH NODES, AND THE LINE THEY DO NOT CROSS', () => {
         const f = mutated((d) => { d.rules.pushTokens.$uid['.write'] = 'auth != null'; });
         const { code } = run(f, 'next');
         assert.notEqual(code, 0, 'any signed-in golfer could register a phone as somebody else');
+    });
+
+    test('CONTROL: dropping the terms validate lets anything into a challenge', () => {
+        // Accept READS terms and builds a side match out of them, so an open terms
+        // record is a way to put arbitrary keys in front of the payload builder.
+        const f = mutated((d) => { delete d.rules.events.$eventCode.challenges.$challengeId.terms['$other']; });
+        const { code } = run(f, 'next');
+        assert.notEqual(code, 0, 'a stray key passed the suite - the terms validate is decoration');
+    });
+
+    test('CONTROL: dropping the status vocabulary lets a made-up status through', () => {
+        const f = mutated((d) => { delete d.rules.events.$eventCode.challenges.$challengeId.status; });
+        const { code } = run(f, 'next');
+        assert.notEqual(code, 0, 'any string became a status - a reader cannot switch on that');
+    });
+
+    test('CONTROL: dropping the self-challenge check lets a golfer bet himself', () => {
+        const f = mutated((d) => {
+            const v = d.rules.events.$eventCode.challenges.$challengeId['.validate'];
+            d.rules.events.$eventCode.challenges.$challengeId['.validate'] =
+                v.replace(" && newData.child('from').val() !== newData.child('to').val()", '');
+        });
+        const { code } = run(f, 'next');
+        assert.notEqual(code, 0, 'the engine would price a golfer against himself');
     });
 
     test('CONTROL: dropping the record validate lets a stray key through', () => {

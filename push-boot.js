@@ -130,10 +130,21 @@ function pushActionHref(origin, dir, roundCode, data) {
     var base = String(origin || '') + String(dir || '/');
     var code = encodeURIComponent(String(roundCode || d.roundCode || ''));
     var kind = String(d.kind || '');
-    if (kind === 'press-offered' || kind === 'bet-challenge') {
+    if (kind === 'bet-challenge') {
+        // WAVE 39: a challenge now HAS something to answer. ?challenge=<id>
+        // brings the pending card - with its own Accept and Decline buttons - into
+        // view on the Matches tab. It answers nothing: money does not move
+        // because a URL was opened, and a notification is a tap on a banner
+        // rather than a decision.
+        var cid = String(d.offerId || d.challengeId || '');
+        return base + 'sidematches.html?game=' + code
+            + (cid ? '&challenge=' + encodeURIComponent(cid) : '');
+    }
+    if (kind === 'press-offered') {
         var id = String(d.matchId || '');
-        // The Aloha is the only one with something to answer, so it is the only
-        // one that asks for the card to be focused.
+        // An ALOHA is answered on its own card; a press has no offer to answer at
+        // all - index.html confirmSidePress writes it straight through - so that
+        // notification is news and lands on the match.
         return base + 'sidematches.html?game=' + code
             + (id ? (d.aloha ? '&aloha=' : '&press=') + encodeURIComponent(id) : '');
     }

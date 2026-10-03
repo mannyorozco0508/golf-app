@@ -3063,6 +3063,58 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03 (Wave 39 challenges, on a branch)
+
+**STILL `ui-wave39-push`, STILL NOT MERGED.** Cache `golfapp-v281-challenges` /
+consumer `v121`. Full suite 10,028 tests, 0 fail.
+
+- **SIDE BET CHALLENGES.** `events/<code>/challenges/<id> = { from, to, terms,
+  status, createdAt }` - a pending offer that holds no money. Any golfer in the
+  round can tap **🤝 CHALLENGE SOMEBODY** on the Matches tab, which opens the
+  SAME side-match form with one side fixed to them and Save replaced by Send.
+  Pending offers list above the live matches as "Pending: Jimmy v Manny $20
+  Nassau" with Accept / Decline.
+- **THE SAFETY MODEL IS A DIFFERENT NODE, NOT A FILTER.** Every engine that counts
+  money reads `sideMatches`; none has ever heard of `challenges` and none is being
+  taught. `challenge_money_test.js` settles the same round twice - once with $1,745
+  of pending offers sitting in the data - and the money is identical, the Receipt
+  rows identical, and `money-engine`, `settlement-engine`, `pool-engine`,
+  `action-model` and `handicap` are frozen by sha.
+- **ACCEPT CREATES NOTHING NEW.** `saveSideMatch()` no longer builds its own
+  payload: it calls `challenges.js sideMatchPayloadFromTerms()`, which is the same
+  function an accepted challenge calls. Byte-identical is true BY CONSTRUCTION
+  rather than asserted against a copy, and a test holds the two surfaces' FIELD
+  LISTS against each other so a field added to one cannot be missed by the other.
+  The accept is ONE atomic `db.ref().update()` - a crash between two writes would
+  leave either a bet nobody agreed to or an accepted challenge with no bet.
+  - **The start hole is where the ACCEPT happens**, not where the offer did:
+    `max(offered, sideMatchStartHole(now))`, or one side walks in already knowing
+    three holes of the result.
+  - A second answer is not an answer - `challengeStatusAfter` returns null for
+    anything not pending, so two taps cannot create two bets.
+- **RULES: `challenges` ADDED TO `database.rules.push.json`** (Desktop updated, 20,774
+  bytes, **not published**). **MEASURED, AND NOT WHAT I EXPECTED: under the file
+  that is LIVE today, all eleven challenge writes are ALLOWED** - including a
+  made-up status, a $100,001 stake and a stray key - because `.write` at
+  `events/$eventCode` governs its whole subtree and an unknown child has no
+  validate. **So this delta is a VALIDATION, not a grant**, and the test's `live`
+  column says so on every row. 12 targaryen tests, 6 controls (3 new: the terms
+  validate, the status vocabulary, the self-challenge check). `events/$eventCode`
+  is asserted child by child now, since the parent legitimately gains one.
+- **ALOHA BY THE PLAYER.** `respondAloha()` widens by exactly one case: a PLAYING
+  golfer may answer an Aloha offered to the side they are ON. Not the offering
+  side (the side that is down offers, the side that is up accepts), not another
+  match, not a spectator. The scorekeeper keeps everything. **No rules change was
+  needed** - the database already permits any write under an existing event, which
+  is how a scorekeeper with no account posts a score; it was the client gate.
+- **THREE MORE PINS RE-POINTED, and one was a real drift:**
+  `ryder_cup_phase3b_test.js` sliced the Cup surface to `function
+  renderSideMatches` - not the end of the Cup, just the next thing in the file - so
+  my challenge functions landed inside it and its "no money field" claim went red
+  for code that is not the Cup's. It now ends at the next section banner, with a
+  positive assertion that the slice is not empty. `setup_nassau_test.js` and
+  `hole_bet_scope_test.js` follow the payload chain instead of the old literal.
+
 ## Where things stand, 2026-10-03 (Wave 39 additions, on a branch)
 
 **STILL `ui-wave39-push`, STILL NOT MERGED.** Cache `golfapp-v280-following-along`

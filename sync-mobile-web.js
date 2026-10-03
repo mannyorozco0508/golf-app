@@ -83,6 +83,11 @@ const SHARED_SHELL = [
     // index.html calls it UNGUARDED from the arrival sheet, so a cached shell
     // without it throws before a golfer can choose anything.
     'round-role.js',
+    // challenges.js: a pending side-bet offer, and the ONE payload builder a side
+    // match is created from. sidematches.html calls both UNGUARDED - saveSideMatch
+    // goes through sideMatchPayloadFromTerms - so a cached shell without it cannot
+    // create a side bet at all.
+    'challenges.js',
     // code-issuer.js issues every round, trip and tournament code and checks it is
     // free before handing it out. admin.html, trip.html and tournament.html all
     // load it, so without it here the native bundle 404s and none of them can

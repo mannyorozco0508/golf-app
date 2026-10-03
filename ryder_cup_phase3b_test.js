@@ -483,8 +483,23 @@ describe('ORGANIZER GATING AND PAGE WIRING', () => {
     });
 
     test('no money input exists anywhere in the Cup surface', () => {
+        // THE ENDPOINT MOVED, AND THIS IS THE DRIFT CLAUDE.md WARNS ABOUT. It
+        // sliced to `function renderSideMatches`, which is not the end of the Cup
+        // surface - it is just the next thing in the file. Wave 39 put the
+        // challenge functions between them, and they legitimately mention stakes
+        // and presses, so the Cup's own claim went red for code that is not the
+        // Cup's.
+        //
+        // Now it ends at the next SECTION BANNER, which is what actually bounds
+        // this surface, and falls back to renderSideMatches if the banner ever
+        // goes - with a positive assertion that the slice is not empty, because a
+        // slice that truncates to nothing satisfies every negative in it for ever.
         const at = SM.indexOf('RYDER CUP SETUP');
-        const surface = SM.slice(at, SM.indexOf('function renderSideMatches'));
+        const nextSection = SM.indexOf('    // ---- CHALLENGES:', at);
+        const end = nextSection > -1 ? nextSection : SM.indexOf('function renderSideMatches', at);
+        const surface = SM.slice(at, end);
+        assert.ok(surface.length > 2000, 'the Cup surface slice collapsed to ' + surface.length + ' characters');
+        assert.match(surface, /validateRyderCupSave\(/, 'and it really is the Cup surface');
         assert.ok(!/\$|stake|wager|press/i.test(surface.replace(/\/\/.*$/gm, '')),
             'the Cup setup must offer no money field');
     });

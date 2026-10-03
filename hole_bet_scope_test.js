@@ -218,7 +218,18 @@ describe('NO ENGINE OR SETTLEMENT CHANGED', () => {
     });
 
     test('and are still configured from Action, not Step 6', () => {
-        assert.match(read('sidematches.html'), /payload\.holeStake = holeStake;/);
+        // RE-POINTED IN WAVE 39. The payload literal moved out of saveSideMatch
+        // into challenges.js sideMatchPayloadFromTerms, because an accepted
+        // CHALLENGE must write a side match byte-identical to the one the form
+        // writes. The claim is unchanged - hole bets are configured from Action -
+        // so it is asserted where the field is now set, plus the Action form
+        // still reading it.
+        assert.match(read('challenges.js'), /payload\.holeStake = num\(t\.holeStake, 0\);/,
+            'the one builder no longer sets a hole stake');
+        assert.match(read('sidematches.html'), /holeStake: document\.getElementById\("sm-holestake"\)\.value/,
+            'the Action form no longer reads a hole stake');
         assert.ok(!read('sidematches.html').includes('formatsWithHoleBets'));
+        assert.ok(!read('admin.html').includes('sm-holestake'),
+            'Step 6 must still not configure a hole bet');
     });
 });
