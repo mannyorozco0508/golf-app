@@ -460,7 +460,13 @@ describe('6. THE SWEEP IS FINISHED', () => {
     test('the split per page: what refuses, what fails, what floats', () => {
         const n = (src, k) => (codeOf(src).match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
         const rows = {
-            'trip.html':    { refuse: 14, fail: 11, toast: 1, confirm: 1 },
+            // RE-PINNED 2026-10-03 (Road Trip): paste-an-itinerary and add/remove
+            // golfers brought four refusals, two failures, three toasts and one
+            // confirm. The confirm is the one that matters here - removing a
+            // golfer ASKS, because it changes who is in the rounds not yet
+            // played, and this guard exists to make sure such a question is a
+            // dialog rather than a native alert that blocks.
+            'trip.html':    { refuse: 18, fail: 13, toast: 4, confirm: 2 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

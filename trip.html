@@ -49,6 +49,8 @@
          every link between them breaking. -->
     <script src="product-links.js"></script>
     <script src="course-index.js"></script>
+    <script src="trip-itinerary.js"></script>
+    <script src="trip-roster.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
@@ -315,6 +317,29 @@ html {
             <input type="text" id="trip-name-input" placeholder="e.g. Myrtle Beach 2026">
         </div>
 
+        <!-- PASTE THE ITINERARY (2026-10-03), like pasting players.
+             One round per line. The parser is trip-itinerary.js; this box only
+             collects the text and shows what it made of it. NOTHING IS WRITTEN
+             until the review below is accepted - a parser that writes straight
+             through is a parser whose mistakes end up in the database. -->
+        <details class="settle-card" id="itin-paste-card" style="margin-bottom:12px;">
+            <summary style="font-weight:bold; cursor:pointer;">📋 Paste an itinerary instead</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                One round per line &mdash; a date, the course, and a tee time if you have one.
+                Courses already saved cost nothing to match; anything else is looked up online,
+                and the review tells you how many lookups that is before you agree to it.
+            </p>
+            <textarea id="itin-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
+                placeholder="Tue 10/13 — Caledonia Golf &amp; Fish Club, Pawleys Island, 8:24 AM&#10;Thu 10/15 — Thistle, McKay/Cameron, Sunset Beach&#10;Fri 10/16 — Prestwick or Man O' War (not chosen)"></textarea>
+            <div class="form-group" style="margin:8px 0;">
+                <label>Year these dates are in</label>
+                <input type="number" id="itin-year" min="2024" max="2099" style="max-width:120px;">
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">A date like 10/13 carries no year, and guessing one is how a trip lands eleven months early.</p>
+            </div>
+            <button type="button" class="btn-outline" onclick="reviewItinerary()">Read it →</button>
+            <div id="itin-review" style="margin-top:10px;"></div>
+        </details>
+
         <div class="form-group">
             <label>How Many Days?</label>
             <input type="number" id="trip-days-input" min="1" max="14" placeholder="e.g. 4" oninput="renderDayPlanner()">
@@ -421,6 +446,30 @@ html {
         <summary>👥 Golfers on This Trip</summary>
         <div class="trip-section-body">
             <div id="trip-roster"></div>
+            <!-- ADD / REMOVE A GOLFER (2026-10-03). Applies to rounds with NO
+                 SCORES; a round with scores keeps the roster it was played with,
+                 because handicaps, side matches, the pool and every per-player
+                 game were priced against it. The note above the buttons names the
+                 rounds it will NOT touch, so the organizer can check it against
+                 what they remember playing. -->
+            <div id="trip-roster-edit" style="margin-top:10px; display:none;">
+                <div class="form-group" style="margin-bottom:6px;">
+                    <label>Add a golfer to this trip</label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <input type="text" id="trip-add-name" placeholder="Name" style="flex:1 1 150px; min-width:140px;">
+                        <input type="text" id="trip-add-hcp" placeholder="HCP" style="flex:0 0 72px;" inputmode="numeric">
+                        <button type="button" class="btn-outline" onclick="tripAddGolfer()">Add</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:6px;">
+                    <label>Remove a golfer</label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <select id="trip-remove-name" style="flex:1 1 170px;"></select>
+                        <button type="button" class="btn-outline" onclick="tripRemoveGolfer()">Remove</button>
+                    </div>
+                </div>
+                <p id="trip-roster-note" role="status" style="font-size:0.78rem; color:var(--text-muted); margin:0;"></p>
+            </div>
             <div id="trip-identity-questions"></div>
         </div>
     </details>
@@ -569,8 +618,108 @@ html {
 
 
 
+    // ---- PASTE AN ITINERARY (2026-10-03) ----
+    //
+    // trip-itinerary.js turns text into rows and says what it is confident about;
+    // this reviews them and, only on a second tap, turns them into the planner's
+    // own round configs. Nothing is written here either - the planner's existing
+    // Build Trip does the writing, through the one path it always did.
+    let itinPlan = null;
+
+    function itinKnownCourses() {
+        // THE SAME NAMES THE PICKER OFFERS: the bundled directory plus whatever is
+        // in the shared list. Matching against this is free; everything else costs
+        // a lookup on a 35-a-day key.
+        const known = {};
+        (typeof courseDirectory !== 'undefined' ? courseDirectory : []).forEach(g =>
+            (g.items || []).forEach(i => { known[i.id] = i.name; }));
+        Object.keys(tripCourses || {}).forEach(k => {
+            if (tripCourses[k] && tripCourses[k].name) known[k] = tripCourses[k].name;
+        });
+        return known;
+    }
+
+    function reviewItinerary() {
+        const box = document.getElementById('itin-paste-box');
+        const out = document.getElementById('itin-review');
+        if (!box || !out || typeof tripItinPlan !== 'function') return;
+        const yearEl = document.getElementById('itin-year');
+        const year = yearEl ? parseInt(yearEl.value, 10) : NaN;
+        if (!(year >= 2024 && year <= 2099)) {
+            out.innerHTML = '<p style="color:var(--warn-text); font-weight:bold;">Put the year in first &mdash; a date like 10/13 does not carry one.</p>';
+            return;
+        }
+        itinPlan = tripItinPlan(box.value, {
+            year: year,
+            known: itinKnownCourses(),
+            loops: (typeof nineHoleLoops !== 'undefined') ? nineHoleLoops : {}
+        });
+        const rows = itinPlan.rows;
+        if (!rows.length) {
+            out.innerHTML = '<p style="color:var(--text-muted);">Nothing to read yet.</p>';
+            return;
+        }
+        let html = '<ul style="margin:0 0 10px 18px; padding:0; font-size:0.84rem;">'
+            + rows.map(r => '<li style="margin-bottom:4px;' + (r.ok ? '' : ' color:var(--warn-text);') + '">'
+                + escapeHtml(tripItinRowLabel(r)) + '</li>').join('')
+            + '</ul>';
+        // THE COST, BEFORE THE GOLFER AGREES TO IT. The provider is the free tier:
+        // 35 requests a day shared by everybody, and a course is two - a search
+        // then a detail, because the search returns only a count of tee boxes.
+        html += '<p style="font-size:0.8rem; font-weight:bold;">'
+            + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's')
+            + (itinPlan.problems ? ' \u00B7 ' + itinPlan.problems + ' line'
+                + (itinPlan.problems === 1 ? '' : 's') + ' I could not read' : '')
+            + ' \u00B7 ' + (itinPlan.searches
+                ? itinPlan.searches + ' online lookup' + (itinPlan.searches === 1 ? '' : 's')
+                  + ' (of 35 a day, shared by everyone)'
+                : 'no online lookups needed')
+            + '</p>';
+        html += '<button type="button" class="btn-primary" onclick="applyItinerary()">Use these '
+            + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's') + '</button>';
+        out.innerHTML = html;
+    }
+
+    // APPLY: the rows become the planner's round configs, and the golfer sees them
+    // in the planner they already know - where they can change anything before
+    // Build Trip writes a single thing.
+    function applyItinerary() {
+        if (!itinPlan) return;
+        const usable = itinPlan.rows.filter(r => r.ok);
+        if (!usable.length) return;
+        // ONE DAY PER ROW, in date order, so the planner's labels line up with the
+        // itinerary rather than with the order it was typed.
+        const sorted = usable.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        plannedDays = sorted.map(() => ({ roundsToday: 1 }));
+        renderDayPlanner();
+        roundConfigs = sorted.map((r, i) => ({
+            label: 'Day ' + (i + 1),
+            courseId: r.courseKey || '',
+            playerCount: (roundConfigs[0] && roundConfigs[0].playerCount) || 4,
+            frontNineKey: r.frontNineKey || '',
+            backNineKey: r.backNineKey || '',
+            // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The tee-time
+            // field is Wave 39 and is not merged yet, so on this branch these two
+            // are carried and ignored; the moment that wave lands they are what
+            // the planner's own date and time boxes read. Parsed either way,
+            // because re-reading the paste later is not something anybody will do.
+            teeDate: r.date || '',
+            teeClock: r.time || ''
+        }));
+        renderRoundPlanner();
+        const card = document.getElementById('itin-paste-card');
+        if (card) card.open = false;
+        uiToast('\ud83d\udccb ' + usable.length + ' round' + (usable.length === 1 ? '' : 's')
+            + ' loaded into the planner. Change anything you like, then Build Trip.');
+    }
+
     function showCreateTripForm() {
         document.getElementById('create-trip-form').style.display = 'block';
+        // The year box starts on this one - the common case is a trip being
+        // planned in the year it happens - and it is a box rather than an
+        // assumption because the uncommon case is a December booking for January.
+        const yearEl = document.getElementById('itin-year');
+        if (yearEl && !yearEl.value) yearEl.value = String(new Date().getFullYear());
         renderDayPlanner();
         if (!tripIndexStarted) {
             // THE COURSE INDEX, NOT THE WHOLE NODE (Wave 38). This read was
@@ -909,8 +1058,21 @@ html {
             if (backEl) cfg.backNineKey = backEl.value;
         });
 
-        if (roundConfigs.some(cfg => !cfg.courseId)) {
-            uiRefuse('⚠️ Pick a course for every round before building the trip.');
+        // A ROUND WITH NO COURSE IS ALLOWED NOW (2026-10-03). Friday on Manny's
+        // Myrtle trip is "Prestwick or Man O' War (not chosen)", and refusing to
+        // build the trip until every course is picked meant either waiting on a
+        // decision nobody had made or inventing one - and a round carries a par
+        // and stroke-index card, so an invented course is invented money.
+        //
+        // The round is saved with no activeCourseKey and no courseData, which is
+        // a state the app already handles: index.html shows the course as not
+        // selected, isCourseMapped() reads it as unmapped, and the organizer
+        // opens the round and picks the course when the group decides. The ONE
+        // thing that must not happen is a fabricated card, and that is why
+        // nothing is written rather than a placeholder being written.
+        const noCourseCount = roundConfigs.filter(cfg => !cfg.courseId).length;
+        if (noCourseCount === roundConfigs.length) {
+            uiRefuse('\u26A0\uFE0F Pick a course for at least one round, or there is nothing to build.');
             return;
         }
 
@@ -970,7 +1132,16 @@ html {
             roundConfigs.forEach((cfg, cfgIdx) => {
                 const roundCode = roundCodes[cfgIdx];
 
-                const { courseData, courseName } = resolveCourseDataAndName(cfg, globalCoursesData);
+                // NO COURSE, NO CARD. resolveCourseData() falls back to eighteen
+                // par 4s indexed 1-18, which is a complete, well-formed,
+                // FICTIONAL card - the exact thing admin.html stopped seeding
+                // because saving it poisoned global_courses for everyone. A round
+                // with no course gets courseData: null and the organizer picks
+                // the course later.
+                const undecided = !cfg.courseId;
+                const { courseData, courseName } = undecided
+                    ? { courseData: null, courseName: '' }
+                    : resolveCourseDataAndName(cfg, globalCoursesData);
                 const players = [];
                 for (let p = 0; p < cfg.playerCount; p++) {
                     players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
@@ -981,8 +1152,8 @@ html {
                     roundDay: cfg.label,
                     eventCategory: 'weekend',
                     categoryIcon: '⛳',
-                    activeCourseKey: cfg.courseId,
-                    courseName: courseName,
+                    activeCourseKey: cfg.courseId || null,
+                    courseName: courseName || null,
                     gameFormat: 'stroke',
                     courseData: courseData,
                     players: players
@@ -1623,6 +1794,7 @@ html {
         return 'in ' + count + ' of ' + rounds + ' rounds';
     }
     function renderTripRoster() {
+        renderTripRosterEdit();
         const mount = document.getElementById('trip-roster');
         if (!mount) return;
         const counted = cachedCountedResults || [];
@@ -1632,6 +1804,101 @@ html {
         mount.innerHTML = lines.map(r =>
             '<div class="trip-roster-line"><span class="trip-roster-name">' + escapeHtml(r.name) + '</span>'
             + '<span class="trip-roster-count">' + escapeHtml(rosterCountText(r.count, r.rounds)) + '</span></div>').join('');
+    }
+
+    // ---- ADD / REMOVE A GOLFER ON THE TRIP (2026-10-03) ----
+    //
+    // trip-roster.js owns the one rule that makes this safe: a change applies to
+    // rounds with NO SCORES, and a round with scores keeps the roster it was
+    // played with. Handicaps are read off that roster, side matches name its
+    // player ids, the pool charges per golfer and skins and dots are per hole per
+    // player - so editing a played round would change who was in a bet that is
+    // already settled.
+    function tripRosterPlanNow() {
+        // EVERY linked round, not just the counted ones: a round excluded from
+        // trip totals is still a round somebody plays, and its roster still needs
+        // the new golfer.
+        return tripRosterPlan((cachedRoundResults || []).map(cr => ({
+            code: cr.code,
+            label: ((tripData.rounds || {})[cr.code] || {}).label || cr.code,
+            data: cr.data
+        })));
+    }
+
+    function renderTripRosterEdit() {
+        const box = document.getElementById('trip-roster-edit');
+        if (!box || typeof tripRosterPlan !== 'function') return;
+        // Organizer only, like every other write on this page.
+        // THE SAME AUTHORITY EVERY OTHER TRIP WRITE USES - the organizer token,
+        // through the predicate the page already has. A roster change moves who is
+        // in a bet, so it is not a thing the plain share link may do.
+        const may = (typeof hasTripOrganizerAuthority === 'function') && hasTripOrganizerAuthority();
+        box.style.display = (may && (cachedRoundResults || []).length) ? 'block' : 'none';
+        if (box.style.display === 'none') return;
+        const plan = tripRosterPlanNow();
+        const note = document.getElementById('trip-roster-note');
+        if (note) note.textContent = tripRosterPlanNote(plan, 'change');
+        const sel = document.getElementById('trip-remove-name');
+        if (sel) {
+            const names = tripOpenRosterNames(plan);
+            const was = sel.value;
+            sel.innerHTML = names.map(n =>
+                '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>').join('');
+            if (names.indexOf(was) !== -1) sel.value = was;
+        }
+    }
+
+    async function tripAddGolfer() {
+        const el = document.getElementById('trip-add-name');
+        const hcpEl = document.getElementById('trip-add-hcp');
+        const name = el ? el.value.trim() : '';
+        if (!name) return uiRefuse('\u26A0\uFE0F Type a name first.');
+        const plan = tripRosterPlanNow();
+        const built = tripRosterAddUpdates(plan, name, { hcp: hcpEl ? hcpEl.value.trim() : '' });
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse(built.skipped.length
+                ? '\u26A0\uFE0F ' + name + ' is already on every round that has no scores.'
+                : '\u26A0\uFE0F Every round in this trip has scores, so its roster stays as it was played.');
+        }
+        try {
+            await db.ref().update(built.updates);
+            if (el) el.value = '';
+            if (hcpEl) hcpEl.value = '';
+            uiToast('\u2705 ' + name + ' added to ' + built.added.length + ' round'
+                + (built.added.length === 1 ? '' : 's') + '.'
+                + (plan.closed.length ? ' Rounds with scores were left alone.' : ''));
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+    async function tripRemoveGolfer() {
+        const sel = document.getElementById('trip-remove-name');
+        const name = sel ? sel.value : '';
+        if (!name) return uiRefuse('\u26A0\uFE0F Pick a golfer to remove.');
+        const plan = tripRosterPlanNow();
+        const built = tripRosterRemoveUpdates(plan, name);
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse(built.refused.length
+                ? '\u26A0\uFE0F ' + name + ' is the only golfer on ' + built.refused.join(', ')
+                  + '. Delete the round instead of emptying it.'
+                : '\u26A0\uFE0F Nothing to remove \u2014 every round with ' + name + ' in it has scores.');
+        }
+        const ok = await uiConfirm({
+            title: 'Remove ' + name + '?',
+            body: tripRosterPlanNote(plan, 'remove ' + name + ' from')
+                + ' Their scores and money in played rounds are untouched.'
+        });
+        if (!ok) return;
+        try {
+            await db.ref().update(built.updates);
+            uiToast('\u2705 ' + name + ' removed from ' + built.removed.length + ' round'
+                + (built.removed.length === 1 ? '' : 's') + '.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
     }
 
     // THE COLLISIONS - the only reasons the app asks. Over the counted rounds'
