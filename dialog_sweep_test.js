@@ -473,7 +473,13 @@ describe('6. THE SWEEP IS FINISHED', () => {
             // (2026-10-03): the pasted trip roster refuses an empty paste and a
             // trip whose every round has scores, and ASKS before it writes;
             // renaming a trip refuses an empty name and reports a refused write.
-            'trip.html':    { refuse: 22, fail: 14, toast: 6, confirm: 3 },
+            // 22 -> 28 refusals, 14 -> 15 fails, 6 -> 9 toasts, 3 -> 4 confirms
+            // (2026-10-04, the trip pot and the daily pot): a pot whose places do
+            // not add up to the buy-ins is REFUSED rather than saved, a pot with no
+            // buy-in and a daily pot with no round to go in are refused, each save
+            // says what it did, and putting a pot into every unplayed round ASKS
+            // first and names the rounds it will not touch.
+            'trip.html':    { refuse: 28, fail: 15, toast: 9, confirm: 4 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

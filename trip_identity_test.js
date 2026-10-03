@@ -39,7 +39,14 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const sha8 = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT, f))).digest('hex').slice(0, 8);
 const strip = h => String(h == null ? '' : h).replace(/<[^>]+>/g, '|').replace(/[\s|]*\|[\s|]*/g, '|').replace(/\s+/g, ' ').trim();
 const FIXTURE = 'trip_identity_prev.fixture.json';
-const FIXTURE_SHA = '3309154c';
+// 3309154c -> 8b39f817 on 2026-10-04: the `mikes` entry was RE-CAPTURED when the
+// points race moved to the trip's own field size (1st is worth 24 in a 24-man
+// trip, not however many posted that day). That fixture has six golfers in the
+// trip and four finishing each round, so its points moved 6.5 -> 10.5 and so on.
+// MEASURED BEFORE RE-PINNING: money, board and awards came back BYTE-IDENTICAL -
+// only points, and the two surfaces that print points, changed. Nothing about
+// what anybody is owed moved, which is the claim this fixture exists to hold.
+const FIXTURE_SHA = '8b39f817';
 const PREV = JSON.parse(read(FIXTURE)).trips;
 const T = trips();
 
