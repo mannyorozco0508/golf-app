@@ -282,11 +282,77 @@ function challengesPending(data) {
     return Object.keys(all)
         .map(function (id) {
             var ch = all[id] || {};
-            var out = { id: id };
+            var out = {};
             Object.keys(ch).forEach(function (k) { out[k] = ch[k]; });
+            out.id = id;   // the map key wins - see challengesVisible
             return out;
         })
         .filter(challengeIsPending)
+        .sort(function (a, b) { return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0); });
+}
+
+// ---------------------------------------------------------------------------
+// WHO SEES A CHALLENGE (Wave 39, Job 1)
+//
+// THE SAME SCOPING SIDE MATCHES ALREADY HAVE, plus the two golfers themselves.
+//
+// grouping.js canLinkSeeWager() is the one rule for "may this link see this
+// wager", and it is DERIVED FROM PARTICIPANTS rather than from a stored
+// ownerGroup - which is what makes a cross-group bet resolve to "mine" for BOTH
+// groups in it, by construction. A Group 4 v Group 1 challenge therefore shows on
+// Group 4's card and on Group 1's, and on nobody else's. That is exactly the
+// behaviour asked for, and it needs no new scoping concept.
+//
+// WHAT IS NEW IS THE TWO PHONES. A following player holds no ?group= link at
+// all, so the link-based rule alone would either show them everything or nothing.
+// A golfer is shown a challenge THEY ARE IN, whoever they are holding it as -
+// because it is their money and, if they are the one it was sent to, their
+// decision.
+//
+// A SPECTATOR SEES NONE OF THEM. The bare link is what gets forwarded to wives,
+// friends and group chats; a list of who is betting what is not for that reader,
+// and they have nothing to answer. This is deliberately STRICTER than side
+// matches, which a spectator can see - a struck bet is part of the round's story,
+// an unanswered offer between two other people is not.
+//
+// THE ROUND'S OWNER SEES THEM ALL, because they manage the round: a pending offer
+// nobody is going to answer is theirs to tidy up, which is why
+// challengeMayAnswer() gives a scorekeeper `cancel`.
+//
+// RESULTS AND THE RECEIPT ARE UNTOUCHED. They list side matches, and an accepted
+// challenge IS a side match by then - so an accepted bet appears there exactly as
+// it does today, through nothing this function does.
+function challengeVisibleTo(ch, who) {
+    if (!ch) return false;
+    var w = who || {};
+    if (w.isOwner) return true;
+    var me = w.meId === undefined || w.meId === null ? '' : String(w.meId);
+    // THEIR OWN, whatever link they hold.
+    if (me && (me === String(ch.from) || me === String(ch.to))) return true;
+    // A GROUP SCOREKEEPER, through the one rule side matches use.
+    if (w.lockedGroup === null || w.lockedGroup === undefined) return false;
+    if (typeof canLinkSeeWager !== 'function') return false;
+    return canLinkSeeWager([String(ch.from), String(ch.to)], w.lockedGroup, w.groupOf || {});
+}
+
+// Every challenge this viewer may see, in whatever status - so one filter serves
+// the pending list and anything that later wants the answered ones.
+function challengesVisible(data, who) {
+    var all = (data && data.challenges) || {};
+    return Object.keys(all)
+        .map(function (id) {
+            var ch = all[id] || {};
+            var out = {};
+            Object.keys(ch).forEach(function (k) { out[k] = ch[k]; });
+            // THE MAP KEY WINS, always, and it is set LAST. A stored `id` field -
+            // written by an older client, or copied in by hand - would otherwise
+            // overwrite the key the page writes answers to, and Accept would
+            // update a challenge that does not exist. Caught by the ordering test
+            // in challenge_money_test.js, whose fixture carried both.
+            out.id = id;
+            return out;
+        })
+        .filter(function (ch) { return challengeVisibleTo(ch, who); })
         .sort(function (a, b) { return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0); });
 }
 
@@ -349,6 +415,7 @@ if (typeof module !== 'undefined' && module.exports) {
         challengeRecord, challengeIsPending, challengeStatusAfter, challengeMayAnswer,
         challengeStakeText, challengeFormatLabel, challengePendingLine,
         challengeNotifyFacts, challengesPending,
-        alohaMayRespond, alohaAnsweringSideIds
+        alohaMayRespond, alohaAnsweringSideIds,
+        challengeVisibleTo, challengesVisible
     };
 }

@@ -3960,12 +3960,28 @@ html {
     // The viewer, as a roster id - the same storage the scorecard writes.
     function challengeMeId() { return alohaViewerPlayerId(); }
     function challengeAmScorekeeper() { return hasGroupLock || canPressSideMatch(null); }
+    // THE ROUND'S OWNER, and only on the bare link. canPressSideMatch(null)
+    // answers true for the bare link on a SINGLE-group round - where that link IS
+    // the organizer's - and false on a multi-group one, where the same URL is
+    // what spectators hold. That is the existing distinction this page already
+    // makes, reused rather than re-derived.
+    function challengeAmOwner() { return !hasGroupLock && canPressSideMatch(null); }
 
     function renderChallenges() {
         const list = document.getElementById('challenges-list');
         if (!list) return;
         if (typeof challengesPending !== 'function') { list.innerHTML = ''; return; }
-        const pending = challengesPending(currentData);
+        // SCOPED THE WAY SIDE MATCHES ARE, through the same participant-derived
+        // rule (grouping.js canLinkSeeWager) - so a Group 4 v Group 1 challenge
+        // shows on both those cards and on nobody else's, and the two golfers see
+        // their own whatever link they hold. challenges.js carries the whole
+        // argument, including why a spectator sees none.
+        const pending = challengesVisible(currentData, {
+            lockedGroup: hasGroupLock ? lockedGroup : null,
+            groupOf: buildPlayerGroupMap(),
+            meId: challengeMeId(),
+            isOwner: challengeAmOwner()
+        }).filter(challengeIsPending);
         if (!pending.length) { list.innerHTML = ''; return; }
         const me = challengeMeId();
         const keeper = challengeAmScorekeeper();

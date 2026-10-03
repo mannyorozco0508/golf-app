@@ -33,12 +33,16 @@
 // BASELINE. Against pre-build main (0eb4a66) challenges.js does not exist, the
 // require throws at load, and node reports the FILE as one failing test.
 //
-// MEASURED with a stub - all fourteen exported functions present and returning
-// undefined, the constants present and empty - over the FINISHED file, all 14
-// tests: 8 PASS / 6 FAIL. The module was restored by sha from a saved copy
-// (a4db24a13057822d), never with git restore.
+// MEASURED with a stub - every exported function present and returning undefined,
+// the constants present and empty - over the FINISHED file, all 21 tests:
+// 9 PASS / 12 FAIL. The module was restored by sha from a saved copy
+// (7fc9ed67d513a1b1), never with git restore.
 //
-//   EIGHT PASSES IS A LOT, AND SEVEN OF THEM ARE THE POINT RATHER THAN A
+// RE-MEASURED when the group scoping landed: this header was first written
+// against a 14-test file, and a baseline is a statement about the file as it
+// stands rather than a historical record.
+//
+//   NINE PASSES IS A LOT, AND EIGHT OF THEM ARE THE POINT RATHER THAN A
 //   WEAKNESS - they are the STRICT half, and they are meant to be true before
 //   and after:
 //     - the three settle-twice tests pass because nothing that counts money
@@ -52,8 +56,13 @@
 //       already wired when the stub went in. They describe a tree where the page
 //       had moved and the module had not.
 //
-//   THE SIX REDS are every rule the module owns: the three payload shapes, the
-//   builder-versus-byhand settle, the status machine, and who may answer.
+//     - and the Receipt scan plus the page's use of the scoping rule, which are
+//       also source scans of a page that was already wired.
+//
+//   THE TWELVE REDS are every rule the module owns: the three payload shapes, the
+//   builder-versus-byhand settle, the status machine, who may answer, and all
+//   five visibility rules - cross-group both ways, other groups refused, the two
+//   phones, the spectator, and the ordering.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -73,7 +82,7 @@ const ctx = { console, JSON, Math, Number, String, Object, Array, Boolean, isNaN
               parseInt, parseFloat, Date, isFinite };
 vm.createContext(ctx);
 ['handicap.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
- 'pool-engine.js', 'settlement-engine.js', 'challenges.js']
+ 'pool-engine.js', 'settlement-engine.js', 'grouping.js', 'challenges.js']
     .forEach((f) => vm.runInContext(read(f), ctx, { filename: f }));
 
 const cd18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
@@ -241,6 +250,88 @@ describe('2. ACCEPTING BUILDS THE CREATOR\'S OWN PAYLOAD', () => {
             'the challenge form and the side-match form read different fields:\n  save: '
             + saveSide.join(',') + '\n  challenge: ' + challenge.join(','));
         assert.ok(saveSide.length >= 12, 'both lists should carry every format\'s fields');
+    });
+});
+
+// ===========================================================================
+describe('2b. WHO SEES A CHALLENGE - THE SCOPING SIDE MATCHES ALREADY HAVE', () => {
+
+    // grouping.js canLinkSeeWager() is the one rule, and it is derived from
+    // PARTICIPANTS rather than a stored ownerGroup - which is what makes a
+    // cross-group bet resolve to "mine" for BOTH groups by construction.
+    const GROUP_OF = { 101: 1, 102: 1, 103: 1, 104: 1, 105: 2, 106: 2, 107: 2, 108: 2,
+                       113: 4, 114: 4, 115: 4, 116: 4 };
+    const CROSS = { id: 'x1', from: '116', to: '101', status: 'pending' };   // Group 4 v Group 1
+    const LOCAL = { id: 'l1', from: '105', to: '106', status: 'pending' };   // both Group 2
+    const see = (ch, who) => ctx.challengeVisibleTo(ch, Object.assign({ groupOf: GROUP_OF }, who));
+
+    test('A CROSS-GROUP CHALLENGE SHOWS ON BOTH GROUPS\' CARDS - Group 4 v Group 1', () => {
+        assert.equal(see(CROSS, { lockedGroup: 4 }), true, 'the challenger\'s group cannot see it');
+        assert.equal(see(CROSS, { lockedGroup: 1 }), true, 'the opponent\'s group cannot see it');
+    });
+
+    test('AND ON NOBODY ELSE\'S, mid-round', () => {
+        assert.equal(see(CROSS, { lockedGroup: 2 }), false,
+            'Group 2 was shown a bet between Group 4 and Group 1');
+        assert.equal(see(LOCAL, { lockedGroup: 1 }), false, 'Group 1 was shown Group 2\'s own bet');
+        assert.equal(see(LOCAL, { lockedGroup: 2 }), true, 'and Group 2 cannot see its own');
+    });
+
+    test('THE TWO GOLFERS SEE THEIRS whatever link they hold', () => {
+        // A following player holds no ?group= at all, so the link rule alone would
+        // show them everything or nothing. It is their money, and if they are the
+        // one it was sent to it is their decision.
+        assert.equal(see(CROSS, { lockedGroup: null, meId: '116' }), true, 'the challenger');
+        assert.equal(see(CROSS, { lockedGroup: null, meId: '101' }), true, 'the opponent');
+        assert.equal(see(CROSS, { lockedGroup: null, meId: '105' }), false,
+            'a playing golfer who is not in it was shown somebody else\'s offer');
+    });
+
+    test('A SPECTATOR SEES NONE - stricter than side matches, deliberately', () => {
+        // The bare link is what gets forwarded to wives, friends and group chats.
+        // A struck bet is part of the round's story; an unanswered offer between
+        // two other people is not.
+        assert.equal(see(CROSS, { lockedGroup: null }), false);
+        assert.equal(see(LOCAL, { lockedGroup: null }), false);
+        // AND THE OWNER SEES THEM ALL, because a pending offer nobody will answer
+        // is theirs to tidy up - which is why challengeMayAnswer gives a
+        // scorekeeper `cancel`.
+        assert.equal(see(CROSS, { lockedGroup: null, isOwner: true }), true);
+    });
+
+    test('challengesVisible filters and keeps the offer order', () => {
+        const data = { challenges: { b: Object.assign({ createdAt: 2 }, LOCAL),
+                                     a: Object.assign({ createdAt: 1 }, CROSS) } };
+        const forG4 = ctx.challengesVisible(data, { lockedGroup: 4, groupOf: GROUP_OF });
+        assert.deepEqual(forG4.map((c) => c.id), ['a'], 'Group 4 sees only the one it is in');
+        const forG2 = ctx.challengesVisible(data, { lockedGroup: 2, groupOf: GROUP_OF });
+        assert.deepEqual(forG2.map((c) => c.id), ['b']);
+        const owner = ctx.challengesVisible(data, { lockedGroup: null, isOwner: true, groupOf: GROUP_OF });
+        assert.deepEqual(owner.map((c) => c.id), ['a', 'b'], 'oldest first, as offered');
+    });
+
+    test('AN ACCEPTED CHALLENGE IS SCOPED THE SAME WAY, and the Receipt is untouched', () => {
+        // Accepted or pending, the visibility rule is the same - but by then it is
+        // ALSO a side match, and Results and the Receipt list side matches. So an
+        // accepted bet appears there exactly as it does today, through nothing
+        // this rule does.
+        const accepted = Object.assign({}, CROSS, { status: 'accepted' });
+        assert.equal(see(accepted, { lockedGroup: 4 }), true);
+        assert.equal(see(accepted, { lockedGroup: 2 }), false);
+        const src = read('settlement.html');
+        assert.ok(!/challenges/.test(src.replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')),
+            'the Receipt reads challenges. It must list side matches and nothing else, so an '
+            + 'accepted bet appears there as a bet and a pending one cannot appear at all.');
+    });
+
+    test('THE PAGE USES THE RULE, rather than listing every challenge', () => {
+        const src = read('sidematches.html');
+        const fn = src.slice(src.indexOf('function renderChallenges'), src.indexOf('async function acceptChallenge'));
+        assert.match(fn, /challengesVisible\(currentData, \{/, 'the card list is not scoped at all');
+        assert.match(fn, /lockedGroup: hasGroupLock \? lockedGroup : null/);
+        assert.match(fn, /groupOf: buildPlayerGroupMap\(\)/, 'the group map must be the round\'s own');
+        assert.ok(!/challengesPending\(currentData\)/.test(fn),
+            'the unscoped list is still being used - every group would see every offer');
     });
 });
 
