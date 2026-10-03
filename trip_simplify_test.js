@@ -35,7 +35,7 @@
 //
 // BASELINE. Against 0acaef3 (trip.html sha ae07af0fae77, trip-roster.js sha
 // 460730b503a0, roster-paste.js sha 6b9b4aa7ac2b), over the FINISHED file:
-// all 24 tests: 5 PASS / 19 FAIL. The three files were restored by sha from saved
+// all 26 tests: 5 PASS / 21 FAIL. The three files were restored by sha from saved
 // copies (trip.html 447633f3de456d05, trip-roster.js 9d42ae2a0bf4a05b,
 // roster-paste.js e6e1c1cdac284bbb), never with git restore.
 //
@@ -53,7 +53,8 @@
 //       were red here.
 //
 //   Everything about headers, people counts, the calendar label, the groups, the
-//   re-read and the quiet line is red.
+//   re-read and the quiet line is red - as is the placeholder rule added on
+//   2026-10-04, after the iPhone build could not paste into "The golfers".
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -319,6 +320,56 @@ describe('e) ONE QUIET LINE FOR PLACEHOLDERS', () => {
 });
 
 // ===========================================================================
+describe('A PLACEHOLDER NEVER OVERFLOWS ITS BOX', () => {
+    // Manny could not paste into "The golfers" on the iPhone build: tapping it
+    // raised the keyboard, a long-press offered no Paste, and the box kept its
+    // grey example. The itinerary textarea on the same screen, in the same kind
+    // of card, pasted fine.
+    //
+    // MEASURED, not guessed: every computed style of the two fields matched
+    // (user-select, touch-callout, pointer-events, touch-action, position,
+    // overflow, transform, opacity, z-index and the rest), both rects were
+    // 296x96, neither was readOnly or disabled, and elementFromPoint at three
+    // points down each box returned the box itself - so nothing was covering it.
+    // ONE thing differed: the placeholder was EIGHT lines in a six-row control,
+    // which left scrollHeight 124 inside a 94px client box. A field that is
+    // already scrolled before a character is typed is where WebKit's caret and
+    // its long-press menu go missing.
+    //
+    // The rule is the fix: a placeholder has to fit the control it is in.
+    const PAGES = fs.readdirSync(__dirname).filter((f) => /\.html$/.test(f));
+
+    test('every textarea in the app shows an example that fits', () => {
+        const over = [];
+        PAGES.forEach((f) => {
+            const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
+            (src.match(/<textarea[^>]*>/g) || []).forEach((tag) => {
+                const ph = /placeholder="([^"]*)"/.exec(tag);
+                if (!ph) return;
+                const lines = ph[1].split(/&#10;|&#xA;|\\n/).length;
+                const rowsAttr = /rows="(\d+)"/.exec(tag);
+                const rows = rowsAttr ? Number(rowsAttr[1]) : 2;   // the HTML default
+                if (lines > rows) over.push(f + ': ' + lines + ' placeholder lines in a ' + rows + '-row box');
+            });
+        });
+        assert.deepEqual(over, [], 'a placeholder taller than its box scrolls the field before anybody types in it');
+    });
+
+    test('and the two boxes on the new-trip screen are the same shape', () => {
+        const box = (id) => {
+            const at = TRIP.indexOf('id="' + id + '"');
+            assert.ok(at > 0, id + ' is gone');
+            return TRIP.slice(TRIP.lastIndexOf('<textarea', at), TRIP.indexOf('>', at) + 1);
+        };
+        const itin = box('itin-paste-box'), golfers = box('setup-golfers-box');
+        [/rows="6"/, /width:100%/, /font-size:0\.84rem/].forEach((re) => {
+            assert.match(itin, re);
+            assert.match(golfers, re);
+        });
+        assert.ok(!/readonly|disabled/i.test(golfers), 'the golfers box must be writable');
+    });
+});
+
 describe('THE NEW-TRIP SCREEN IS FOUR THINGS', () => {
 
     test('name, the rounds, the golfers, Build - and the day planner is one line', () => {

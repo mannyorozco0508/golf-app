@@ -358,10 +358,21 @@ html {
             <summary style="font-weight:bold; cursor:pointer;">👥 The golfers</summary>
             <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
                 One golfer per line &mdash; name, then the handicap. A blank line or a
-                &ldquo;Group 2&rdquo; header starts the next group.
+                &ldquo;Group 2&rdquo; header starts the next group, so a whole tee sheet
+                can go straight in.
             </p>
+            <!-- THE PLACEHOLDER FITS THE BOX (2026-10-04). It was EIGHT lines in a
+                 six-row textarea - the only difference of any kind between this
+                 field and the itinerary one above, which pastes fine: measured in
+                 Chrome, every computed style, both rects, readOnly, disabled,
+                 tabIndex and the hit test at three points down the box are
+                 identical, and the placeholder line count is not (8 vs 3). A
+                 placeholder taller than its control leaves WebKit scrolled inside
+                 the field before a word is typed, which is where a long-press
+                 Paste and the caret go missing on iOS. The example it was showing
+                 is in the sentence above the box, where it costs nothing. -->
             <textarea id="setup-golfers-box" rows="6" style="width:100%; font-size:0.84rem;"
-                placeholder="Group 1&#10;Zack Carrano 6&#10;Derrick J Doncaster 15&#10;Mike Treacy 11&#10;Pat Morrissey 8&#10;&#10;Group 2&#10;Tom Kelly 4"></textarea>
+                placeholder="Group 1&#10;Zack Carrano 6&#10;Derrick J Doncaster 15"></textarea>
             <button type="button" class="btn-outline" data-role="setup-golfers-review"
                     onclick="reviewSetupGolfers()">Read it →</button>
             <div id="setup-golfers-review" style="margin-top:10px;"></div>
@@ -575,8 +586,13 @@ html {
                         and a leading A or B is a flight. Pasted golfers take the placeholder slots first,
                         in order, then keep adding.
                     </p>
+                    <!-- THE SAME RULE AS THE SETUP SCREEN'S BOX: a placeholder has to
+                         fit its control, or the field is scrolled before anybody types
+                         and iOS loses the caret and the long-press Paste with it. This
+                         one was seven lines in a six-row box - found by the guard
+                         written for the other, not by a second bug report. -->
                     <textarea id="trip-roster-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
-                        placeholder="B Jimmy 11 (captain)&#10;A Paul 3.5&#10;Marty 9&#10;Lance 14.3&#10;&#10;Reese 6&#10;Mike 12"></textarea>
+                        placeholder="B Jimmy 11 (captain)&#10;A Paul 3.5&#10;Marty 9"></textarea>
                     <button type="button" class="btn-outline" data-role="trip-roster-paste-review"
                             onclick="reviewTripRosterPaste()">Read it →</button>
                     <div id="trip-roster-paste-review" style="margin-top:10px;"></div>
