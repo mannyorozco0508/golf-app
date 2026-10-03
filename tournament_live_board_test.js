@@ -170,8 +170,19 @@ describe('4. THE HARNESS AND THE SEAMS', () => {
         assert.match(c, /VALUE_LISTENERS\.push\(/);
         assert.match(c, /if \(step\.deliver\) \{/);
         assert.match(c, /listeners: hits\.length, threw: threw/, 'the step reports how many listeners it reached and whether one threw');
-        // v193: set()/update() RECORD what a real tap wrote (window.__coldWrites) and still re-fire nothing - delivery is opt-in
-        assert.match(c, /set: function \(v\) \{ window\.__coldWrites\.push\(\{ op: 'set', path: pathStr, value: v \}\); return Promise\.resolve\(\); \}/, 'set() records and re-fires nothing');
+        // v193: set()/update() RECORD what a real tap wrote (window.__coldWrites)
+        // and still RE-FIRE NOTHING - delivery stays opt-in, through __coldDeliver.
+        //
+        // 2026-10-04: they also LAND IN THE FIXTURE now, so a page that reads a
+        // node again sees what it just wrote. Recording alone could not tell a
+        // write that never happened from a SCREEN THAT NEVER RE-READ, and the
+        // second is a real bug this harness missed: a trip roster paste wrote 24
+        // golfers and left Player 1..4 on the page. The claim pinned here is the
+        // one that matters - no listener is re-fired by a write.
+        assert.match(c, /set: function \(v\) \{ window\.__coldWrites\.push\(\{ op: 'set', path: parts\.join\('\/'\), value: v \}\); applyWrite\(parts, v, true\); return Promise\.resolve\(\); \}/,
+            'set() records, applies, and re-fires nothing');
+        assert.match(c, /function applyWrite\(parts, value, replace\)/);
+        assert.ok(!/hits\.forEach[\s\S]{0,400}applyWrite/.test(c), 'a write must not deliver to listeners');
         assert.match(c, /window\.__coldWrites = \[\];/);
     });
     test('journey records a thrown listener and raises it from evaluate', () => {

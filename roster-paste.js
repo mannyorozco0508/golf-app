@@ -88,6 +88,46 @@ function splitLeadingFlight(line) {
     return { flight: letter, rest: m[3], notAFlight: false };
 }
 
+// ---- A HEADER IS A BOUNDARY, NOT A GOLFER (2026-10-04) -------------------
+//
+// Manny pasted his real 24-golfer list, written the way a tee sheet is written:
+//
+//     Group 1
+//     Zack Carrano 6
+//     Derrick J Doncaster 15
+//     ...
+//     Group 2
+//     ...
+//
+// Every "Group N" line parsed as a GOLFER - name "Group", handicap N - so a
+// 24-man list reviewed as "30 golfers", and six phantom players would have gone
+// into every round with a handicap each. A handicap is strokes, and strokes are
+// money.
+//
+// THREE KINDS OF LINE ARE SEPARATORS: a blank line (as before), a group header,
+// and a line that is only a tee time. Each CLOSES the current group and opens the
+// next, exactly as a blank line does - so a list written "Group 1 ... Group 2 ..."
+// with no blank lines in it is still six groups.
+//
+// THE HEADER WORDS ARE A CLOSED LIST - group, grp, flight, foursome, team, tee,
+// tee time - optionally followed by a number or a single letter, and optionally
+// followed by a tee time. Nothing else is a header: "Group Captain Smith 8" has a
+// name after the number and stays a golfer, which is the direction this must err
+// in. A golfer is never silently dropped; at worst a header nobody listed stays a
+// golfer, and that is visible on the review.
+var ROSTER_HEADER_WORDS = /^(?:group|grp|flight|foursome|team|tee\s*time|tee)\s*[:#.\-\u2013\u2014]?\s*(?:[0-9]{1,2}|[A-Za-z])?$/i;
+var ROSTER_TRAILING_TIME = /[\s\-\u2013\u2014(,:]*\d{1,2}[:.]\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)?\s*\)?$/i;
+
+// '' for a golfer line; 'blank', 'header' or 'time' for a separator.
+function rosterPasteSeparator(line) {
+    var t = String(line == null ? '' : line).trim();
+    if (!t) return 'blank';
+    var head = t.replace(ROSTER_TRAILING_TIME, '').trim();
+    if (!head) return 'time';                       // the whole line was a tee time
+    if (ROSTER_HEADER_WORDS.test(head)) return 'header';
+    return '';
+}
+
 function parsePlayerPasteText(text) {
     const lines = text.split('\n');
     let validPlayers = [];
@@ -98,7 +138,10 @@ function parsePlayerPasteText(text) {
     let inGroup = false;     // true while inside a run of non-empty lines
     lines.forEach((rawLine, idx) => {
         const line = rawLine.trim();
-        if (line === '') { inGroup = false; return; }   // blank: closes the current run (a boundary) or is leading/trailing nothing
+        // A BLANK LINE, A GROUP HEADER OR A BARE TEE TIME all close the current run.
+        // See rosterPasteSeparator above for why a header must not be a golfer: six
+        // "Group N" lines became six phantom golfers, each with a handicap.
+        if (rosterPasteSeparator(line)) { inGroup = false; return; }
         if (!inGroup) { groups.push(0); inGroup = true; }
 
         // v194: a trailing period comes off a pasted name ("Anthony." -> "Anthony";
@@ -150,5 +193,6 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, splitNameAndHcp, splitLeadingFlight, parsePlayerPasteText };
+    module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+        splitLeadingFlight, rosterPasteSeparator, parsePlayerPasteText };
 }

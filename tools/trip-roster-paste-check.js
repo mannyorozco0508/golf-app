@@ -132,8 +132,11 @@ const PROBE = `(function(){
             // plausible rects out of the collapsed card. Asserted, not assumed.
             { expression: `(function(){var s=Array.from(document.querySelectorAll('summary')).find(function(x){return /Golfers/.test(x.innerText||'');}); if(!s) return 'no golfers section'; if(!s.parentElement.open) s.parentElement.open = true; return 'golfers open';})()` },
             { sleep: 400 },
-            scrollTo('#trip-roster-paste-card summary'),
-            { tap: '#trip-roster-paste-card summary' },
+            // THE PASTE CARD IS BEHIND ITS OWN BUTTON since 2026-10-04 - the Golfers
+            // section offers "Paste golfers" and "Add / remove" rather than four
+            // controls at once - so this opens it the way a thumb does.
+            scrollTo('[data-role="trip-roster-paste-open"]'),
+            { tap: '[data-role="trip-roster-paste-open"]' },
             { sleep: 400 },
             scrollTo('#trip-roster-paste-box'),
             { tap: '#trip-roster-paste-box' },
@@ -181,7 +184,7 @@ const PROBE = `(function(){
     }
 
     // ---- THE REVIEW --------------------------------------------------------
-    if (!/Jimmy . 11/.test(reviewed.review)) failures.push('review: the handicap was not read off "B Jimmy 11 (captain)": ' + JSON.stringify(reviewed.review.slice(0, 300)));
+    if (!/Jimmy 11/.test(reviewed.review)) failures.push('review: the handicap was not read off "B Jimmy 11 (captain)": ' + JSON.stringify(reviewed.review.slice(0, 300)));
     if (!/8 golfers pasted, 8 with a handicap/.test(reviewed.review)) failures.push('review: it does not count what it read: ' + JSON.stringify(reviewed.review.slice(0, 300)));
     if (!/Will update 2 of 3 rounds/.test(reviewed.review)) failures.push('review: it does not price the change: ' + JSON.stringify(reviewed.review.slice(0, 400)));
     if (!/Untouched \(already has scores\): Day 1 AM/.test(reviewed.review)) failures.push('review: the played round is not named as untouched: ' + JSON.stringify(reviewed.review.slice(0, 400)));

@@ -196,17 +196,101 @@ function tripRoundWhen(date) {
     return TRIP_WEEKDAYS[d.getDay()] + ' ' + Number(m[2]) + '/' + Number(m[3]);
 }
 
-// "Tue 10/13 AM - Caledonia". The AM/PM suffix comes off the round's own label,
-// which is where the planner put it, so a 36-hole day stays legible.
+// 24-HOUR IN, A CLOCK OUT. The itinerary stores "08:24"; a golfer reads 8:24 AM.
+function tripRoundClock(time) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(time || '').trim());
+    if (!m) return '';
+    var h = Number(m[1]);
+    if (!(h >= 0 && h <= 23)) return '';
+    var suffix = h < 12 ? 'AM' : 'PM';
+    var h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + ':' + m[2] + ' ' + suffix;
+}
+
+// "Tue 10/13 - 8:24 AM - Caledonia", which is what the round IS: a day, a tee
+// time and a course. With no tee time the AM/PM comes off the round's own label,
+// where the planner put it, so a 36-hole day stays legible either way.
 function tripRoundPickerLabel(round) {
     var r = round || {};
     var when = tripRoundWhen(r.date);
+    var clock = tripRoundClock(r.time);
     var label = String(r.label || r.code || '').trim();
     var half = /\b(AM|PM)\b\s*$/i.exec(label);
-    var left = when ? (when + (half ? ' ' + half[1].toUpperCase() : '')) : label;
+    var left = when
+        ? (when + (clock ? ' \u00B7 ' + clock : (half ? ' ' + half[1].toUpperCase() : '')))
+        : label;
     var course = String(r.courseName || '').trim();
     if (!left) left = label || String(r.code || '');
     return course ? left + ' \u00B7 ' + course : left;
+}
+
+// ---------------------------------------------------------------------------
+// THE GOLFERS, IN THEIR GROUPS (2026-10-04).
+//
+// A trip roster read as one long alphabetical list, which is not how anybody
+// holds it: a trip is groups, and a group is who you are playing with and who
+// can see your bets. `sizes` comes from grouping.js computeGroupSizes - the
+// page's own answer - because reimplementing grouping here is how two surfaces
+// end up disagreeing about who is in group 3.
+function tripGroupRows(players, sizes) {
+    var list = (players || []).slice();
+    var out = [];
+    var at = 0;
+    (sizes || []).forEach(function (size, i) {
+        var members = list.slice(at, at + size);
+        at += size;
+        if (members.length) out.push({ group: i + 1, players: members });
+    });
+    // Anything the sizes did not cover is still somebody: a trailing group rather
+    // than a golfer who vanishes off the screen.
+    if (at < list.length) out.push({ group: out.length + 1, players: list.slice(at) });
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// ONE QUIET LINE FOR PLACEHOLDERS (2026-10-04).
+//
+// tripIdentityProblems reports one problem per placeholder PER ROUND, which for
+// 24 unnamed golfers over three rounds is seventy-two paragraphs - repeated in
+// the money card, the awards card and the leaderboard. Each paragraph was true
+// and the page was unreadable.
+//
+// A PLACEHOLDER IS NOT THE DANGEROUS CASE. It is the normal state of a trip
+// nobody has pasted names into yet: the trip total correctly waits, and all the
+// organizer needs is one line telling them what to do. A DUPLICATE REAL NAME is
+// the dangerous case - two golfers one balance - and those keep their own
+// sentence, every one of them.
+function tripIdentityDigest(problems) {
+    var list = problems || [];
+    var names = {};
+    var rounds = {};
+    var others = [];
+    list.forEach(function (p) {
+        if (p && p.kind === 'placeholder') {
+            names[tripNameKey(p.name)] = true;
+            if (p.round) rounds[p.round] = true;
+            return;
+        }
+        others.push(p);
+    });
+    return {
+        placeholders: Object.keys(names).length,
+        placeholderRounds: Object.keys(rounds),
+        others: others
+    };
+}
+
+function tripPlaceholderNote(digest) {
+    var d = digest || { placeholders: 0 };
+    if (!d.placeholders) return '';
+    // THE ROUNDS ARE NAMED, THE GOLFERS ARE NOT. Which round to open is the only
+    // part an organizer has to act on; "Player 2", "Player 3", "Player 4" in each
+    // of three rounds is the wall this replaced.
+    var rounds = (d.placeholderRounds || []);
+    return 'Add real names before the first round \u2014 ' + d.placeholders + ' golfer'
+        + (d.placeholders === 1 ? ' is' : 's are') + ' still a placeholder'
+        + (rounds.length ? ' in ' + rounds.join(', ') : '') + '. '
+        + 'Trip totals wait until then; each round\u2019s own money is unaffected.';
 }
 
 // Dated rounds first, in date order (then by the label so AM precedes PM), and
@@ -217,6 +301,12 @@ function tripRoundPickerRows(rounds) {
             code: r.code,
             label: tripRoundPickerLabel(r),
             date: String(r.date || ''),
+            // THE TIME SORTS, NOT THE FINISHED LABEL (2026-10-04). Sorting
+            // same-date rounds by the label put "1:40 PM" before "7:50 AM",
+            // because "1" is less than "7". 24-hour time is the only form of a tee
+            // time that sorts, which is the form that gets stored.
+            time: String(r.time || ''),
+            raw: String(r.label || ''),
             addedAt: Number(r.addedAt) || 0,
             idx: i
         };
@@ -224,7 +314,11 @@ function tripRoundPickerRows(rounds) {
     rows.sort(function (a, b) {
         if (!!a.date !== !!b.date) return a.date ? -1 : 1;
         if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-        if (a.date && a.label !== b.label) return a.label < b.label ? -1 : 1;
+        if (a.date && a.time !== b.time) {
+            if (!a.time || !b.time) return a.time ? -1 : 1;   // a timed round before an untimed one
+            return a.time < b.time ? -1 : 1;
+        }
+        if (a.date && a.raw !== b.raw) return a.raw < b.raw ? -1 : 1;   // "Day 2 AM" before "Day 2 PM"
         if (a.addedAt !== b.addedAt) return a.addedAt - b.addedAt;
         return a.idx - b.idx;
     });
@@ -265,11 +359,13 @@ function tripRosterPasteUpdates(plan, pasted, opts) {
         return String((p && p.name) || '').trim() !== '';
     });
     var groups = ((pasted || {}).groups || []).filter(function (n) { return n > 0; });
-    // leftoverPlaceholders is the LARGEST number left on any one round, with
-    // leftoverRounds counting how many rounds have any: a sum across rounds
-    // ("8 placeholders left over" on two rounds of four) is a number the
-    // organizer cannot check against anything on screen.
-    var out = { updates: {}, changed: [], skipped: [], replaced: 0, added: 0,
+    // EVERY COUNT HERE IS PEOPLE, NOT WRITES (2026-10-04). The confirm said
+    // "28 placeholders replaced, 147 golfers added" for a 24-man list, because it
+    // added up what it did to each round - and a trip of seven rounds multiplies
+    // every number by seven. An organizer counts people. `perRound` keeps the
+    // per-round figures for the rare case the rounds differ.
+    var out = { updates: {}, changed: [], skipped: [], people: incoming.length,
+                replaced: 0, added: 0, perRound: [],
                 leftoverPlaceholders: 0, leftoverRounds: 0, groupsWritten: [] };
     if (!incoming.length) return out;
 
@@ -314,8 +410,12 @@ function tripRosterPasteUpdates(plan, pasted, opts) {
         if (!replaced && !added) { out.skipped.push(r.label); return; }
         out.updates['events/' + r.code + '/players'] = players;
         out.changed.push(r.label);
-        out.replaced += replaced;
-        out.added += added;
+        out.perRound.push({ label: r.label, replaced: replaced, added: added });
+        // PEOPLE: the largest figure any one round saw, not the sum over rounds.
+        // On the normal trip every round is the same list, so these ARE the
+        // per-person counts; where rounds differ, the note says so.
+        if (replaced > out.replaced) out.replaced = replaced;
+        if (added > out.added) out.added = added;
         if (slots.length) {
             out.leftoverRounds++;
             if (slots.length > out.leftoverPlaceholders) out.leftoverPlaceholders = slots.length;
@@ -354,10 +454,18 @@ function tripRosterPasteNote(plan, result, incoming, groups) {
         lines.push('Every round in this trip has scores, so nothing will change — a round with scores keeps the roster it was played with.');
         return lines.join('\n');
     }
+    var same = (result.perRound || []).every(function (r) {
+        return r.replaced === result.replaced && r.added === result.added;
+    });
     lines.push('Will update ' + result.changed.length + ' of ' + p.total + ' round'
-        + (p.total === 1 ? '' : 's') + ': ' + result.replaced + ' placeholder'
-        + (result.replaced === 1 ? '' : 's') + ' replaced, ' + result.added + ' golfer'
-        + (result.added === 1 ? '' : 's') + ' added.');
+        + (p.total === 1 ? '' : 's')
+        + (same
+            ? ': each gets these ' + n + ' golfer' + (n === 1 ? '' : 's') + ' \u2014 '
+              + result.replaced + ' into placeholder slot' + (result.replaced === 1 ? '' : 's')
+              + ', ' + result.added + ' added.'
+            : ': ' + (result.perRound || []).map(function (r) {
+                  return r.label + ' (' + r.replaced + ' replaced, ' + r.added + ' added)';
+              }).join(', ') + '.'));
     if (result.leftoverPlaceholders) {
         lines.push(result.leftoverPlaceholders + ' placeholder'
             + (result.leftoverPlaceholders === 1 ? '' : 's') + ' left over on '
@@ -397,6 +505,7 @@ if (typeof module !== 'undefined' && module.exports) {
         tripRoundHasScores, tripRoundIsClosed, tripRosterPlan, tripRosterPlanNote,
         tripNextPlayerId, tripNameKey, tripRosterAddUpdates, tripRosterRemoveUpdates,
         tripOpenRosterNames, tripIsPlaceholderName, tripRosterPasteUpdates, tripRosterPasteNote,
-        tripRoundWhen, tripRoundPickerLabel, tripRoundPickerRows
+        tripRoundWhen, tripRoundClock, tripRoundPickerLabel, tripRoundPickerRows,
+        tripGroupRows, tripIdentityDigest, tripPlaceholderNote
     };
 }

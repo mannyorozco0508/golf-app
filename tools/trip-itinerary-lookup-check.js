@@ -124,7 +124,11 @@ const PASTE = [
     { tap: '#tmp-start' },
     { tap: '#trip-name-input' },
     { cdp: { method: 'Input.insertText', params: { text: 'Myrtle Beach 2026' } } },
-    { tap: '#itin-paste-card summary' },
+    // THE ITINERARY CARD SHIPS OPEN since 2026-10-04 (a new trip is name,
+    // rounds, golfers, Build) - so tapping its summary CLOSED it, and every
+    // tap after that landed on whatever had moved under it. Opened only if
+    // it is shut.
+    { expression: `(function(){var d=document.getElementById('itin-paste-card'); if(!d) return 'no card'; if(!d.open) d.open = true; return 'itinerary open';})()` },
     { tap: '#itin-paste-box' },
     { cdp: { method: 'Input.insertText', params: { text: LINES } } },
     { sleep: 150 },

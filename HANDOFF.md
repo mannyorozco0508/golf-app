@@ -3063,6 +3063,54 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Road Trip, simplified - and a group header that was being paid as a golfer (2026-10-04, branch `trip-simplify`, NOT merged)
+
+Manny pasted his real 24-golfer list on the live app. Five things were wrong, and
+the first costs money. Cache `golfapp-v283-tripsimplify` / consumer `v123`.
+
+- **"Group 4" WAS PARSED AS A GOLFER** - name "Group", handicap 4 - so a 24-man
+  list reviewed as **30 golfers**, and six phantom players with handicaps would
+  have gone into every round. A handicap is strokes and strokes are money. A group
+  header, a bare tee time and a blank line are all group separators now. The
+  header words are a closed list (group, grp, flight, foursome, team, tee, tee
+  time) with an optional number or letter and an optional time; **"Group Captain
+  Smith 8" is still a golfer**, because the rule must err toward the name.
+- **THE WRITE LANDED AND THE SCREEN DID NOT CHANGE.** Player 1-4 stayed on the
+  page after Yes: every round's players come from a ONE-SHOT `events/<code>` read,
+  and the `trips/` listener that fires afterwards is for the trip node. All three
+  roster writes re-read now. **The harness could not have caught this** - it
+  recorded writes without applying them, so a page that never re-read looked
+  identical to one that did; `tools/lib/cold-arrival.js` now lands every write in
+  the fixture (and its root ref no longer resolves to a path called "undefined").
+- **THE CONFIRM COUNTED WRITES, NOT PEOPLE:** "28 placeholders replaced, 147
+  golfers added" for 24 golfers over seven rounds. The counts are people now, with
+  the per-round figures kept for the rare trip where rounds differ.
+- **THE ROUNDS LIST WAS IN MAP-KEY ORDER** with the Day label alone, so his week
+  opened on "Day 2 PM". Each row reads **"Tue 10/13 · 8:24 AM · Caledonia"** with
+  Open on the row and Edit tucked inside. **The TIME sorts, not the label:**
+  sorting the finished label put 1:40 PM before 7:50 AM, because "1" is less than
+  "7".
+- **AND THE PLACEHOLDER WARNING WAS PRINTED PER GOLFER PER ROUND**, on three
+  cards - seventy-odd paragraphs for 24 unnamed golfers. One quiet line now, which
+  names the ROUNDS to open and counts the golfers rather than listing them. **A
+  duplicate real name still gets the loud box and its own sentence, every time**:
+  that is the dangerous case, two golfers one balance.
+- **THE REDESIGN.** A new trip is four things on one screen - name, the rounds
+  (paste the itinerary), the golfers (paste the list or give a headcount), Build -
+  with the day planner behind one line that opens itself the moment it holds
+  rounds. A pasted roster goes straight into every round the Build makes, groups
+  and all. The trip page reads name, rounds, golfers, then the numbers, and the
+  golfers are shown **in their groups**, because a group is who you play with and
+  who can see your bets.
+- **`tools/trip-simplify-check.js`** drives his exact list in Chrome at 390x844
+  and writes three full-page screenshots to the Desktop (the harness gained a
+  `{ shot: path }` step). It measured all five bugs and both screens.
+  - **TWO MORE HARNESS TRAPS, worth knowing:** `window.name` does NOT survive a
+    file:// navigation (opaque origin, Chrome clears it) but **localStorage
+    does** - which is how the check reads what Build wrote before the page left;
+    and the Build chain finishes in the SAME task as the click, so ten probes
+    issued back to back after the tap all ran on the next document.
+
 ## The pasted trip roster, a trip that can be renamed, and a round picker that reads like a calendar (2026-10-03)
 
 Cache `golfapp-v282-rosterpaste` / consumer `v122`. Four jobs; the first was
