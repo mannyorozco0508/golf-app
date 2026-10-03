@@ -352,6 +352,11 @@ describe('7. validateCourseGrid GATES EVERY WRITE', () => {
 });
 
 // ===========================================================================
+// buildImportRecord MOVED to course-import-rules.js on 2026-10-03, shared with
+// trip.html's pasted-itinerary import, and lost its first parameter on the way:
+// the provider SUMMARY was never read by it - everything stored comes from the
+// detail record, which is the one that carries the tees. Same record, two
+// arguments. These calls are re-pinned to that signature.
 describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     const DETAIL = {
@@ -373,7 +378,7 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     test('data[18] is canonical and in the existing shape', () => {
         const build = need('buildImportRecord');
-        const rec = build(PHOENIX, DETAIL, 'male/Copper');
+        const rec = build(DETAIL, 'male/Copper');
         assert.equal(rec.data.length, 18);
         ['hole', 'par', 'hcpIndex'].forEach((k) => assert.ok(k in rec.data[0],
             `data[] lost ${k} - every existing reader expects it`));
@@ -382,7 +387,7 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     test('tees are ARRAYS, not a map keyed by tee name', () => {
         const build = need('buildImportRecord');
-        const rec = build(PHOENIX, DETAIL, 'male/Copper');
+        const rec = build(DETAIL, 'male/Copper');
         assert.ok(Array.isArray(rec.tees.male), 'tees.male must be an array');
         assert.ok(Array.isArray(rec.tees.female), 'tees.female must be an array');
         // AND THE REASON, ASSERTED. Firebase keys cannot contain a forward
@@ -397,7 +402,7 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     test('source.siFrom records WHICH tee the stroke index came from', () => {
         const build = need('buildImportRecord');
-        const rec = build(PHOENIX, DETAIL, 'male/Copper');
+        const rec = build(DETAIL, 'male/Copper');
         assert.equal(rec.source.siFrom, 'male/Copper',
             'without siFrom, a womens round allocated on mens indexes is undetectable '
             + 'afterwards');
@@ -410,7 +415,7 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     test('location is carried, and no lat/long is invented', () => {
         const build = need('buildImportRecord');
-        const rec = build(PHOENIX, DETAIL, 'male/Copper');
+        const rec = build(DETAIL, 'male/Copper');
         assert.equal(rec.location.city, 'Phoenix');
         assert.equal(rec.location.state, 'AZ');
         const s = JSON.stringify(rec);
@@ -421,7 +426,7 @@ describe('6. THE IMPORTED RECORD IS THE SHAPE WE AGREED', () => {
 
     test('the record carries nothing the rules would refuse', () => {
         const build = need('buildImportRecord');
-        const rec = build(PHOENIX, DETAIL, 'male/Copper');
+        const rec = build(DETAIL, 'male/Copper');
         const rules = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'database.rules.json'), 'utf8'));
         const v = rules.rules.global_courses.$courseId['.validate'];
         assert.match(v, /hasChildren\(\['name','data'\]\)/,

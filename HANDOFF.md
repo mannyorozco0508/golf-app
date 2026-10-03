@@ -3063,6 +3063,58 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## A pasted course nobody had saved went nowhere (2026-10-03, same day)
+
+Manny's review read **"2026-10-14 14:06 - Myrtlewood PineHills - will look up
+online"** and **"2 online lookups"**. After Use these 7 rounds, Day 2 PM's course
+was blank - "Search / Select Course" - with no message. Cache
+`golfapp-v281-itinlookup` / consumer `v121`.
+
+- **THE EXPENSIVE FAULT FIRST: THAT COURSE WAS ALREADY SAVED.** The directory
+  calls it "Myrtlewood - Pine Hills"; he wrote "Myrtlewood PineHills". Normalised,
+  those are `myrtlewood pine hills` and `myrtlewood pinehills` - **one space
+  apart** - so the matcher missed and a course he already had was sent to a search
+  that costs two of the day's 35 requests. `tripItinTight` compares them
+  space-free for the EXACT test only; containment still runs on the spaced form,
+  where "pinehills" has to stay different from "pine lakes" (both are in the
+  Myrtle group). **Measured on his line now: 0 lookups.**
+- **AND NOTHING LOOKED ANYTHING UP.** The review priced a lookup the apply step
+  never performed - it set `courseId` to `''` and moved on, so a round that said
+  "will look up online" became a blank box **that looks exactly like a choice the
+  golfer made**. Use these N rounds and Build both run the lookups now,
+  sequentially (free tier, two requests per course).
+- **THE IMPORT IS THE ONE THAT ALREADY EXISTED.** `course-import-rules.js` gained
+  `buildImportRecord`, `importedCourseKeyFor` and `courseProxyBase`, and
+  **admin.html no longer declares its own** - it calls the shared ones. So the
+  record a pasted itinerary writes is the record a tap writes: same validator
+  (`importCardOrRefuse`, BEFORE the write), same `global_courses/<key>`, same
+  merge, same `source.siFrom`. `buildImportRecord` also lost its first parameter,
+  which it never read.
+- **AMBIGUITY IS A QUESTION.** A multi-course facility answers a search with its
+  whole family - Myrtlewood is PineHills, Palmetto and Hummingbird - and three
+  different eighteens carry three different stroke indexes, which is three
+  different amounts of money. `tripItinPickOnline` picks only on an exact name or
+  on every word the golfer typed; otherwise the round shows a pick list.
+- **NEVER A SILENT BLANK.** A round with no course after all that says **"Needs a
+  course: Myrtlewood PineHills"**, gives the reason in the shared sentence for
+  that refusal ("Course search is resting for today..." on a 429), pre-fills the
+  box with the pasted name, and offers one tap that searches again. An undecided
+  Friday is NOT in that state - it is a deliberate blank, and pestering about it
+  would make the honest state look like a fault. The planner's picker also lists
+  imported courses now and carries its own online-search row.
+- **A TRAP WORTH REMEMBERING: `renderRoundPlanner` REBUILDS THE CONFIG OBJECTS.**
+  A `cfg` captured before a render is an orphan after it, so the first draft's
+  async handlers wrote the lookup's answer into a dead object and the card read
+  "Searching online..." forever with the answer in hand. Every handler addresses
+  rounds by INDEX now, and `tools/trip-itinerary-lookup-check.js` is what caught
+  it - no source scan would have.
+- **THE CHECK** opens trip.html cold at 390x844 with the proxy replaced by canned
+  payloads and his exact line typed in, in four arrivals: the saved course
+  matching for free (0 API calls), the unsaved one imported and filled (2 calls,
+  the record verified on `global_courses/gca_mw_pine`), a 429 showing "Needs a
+  course" and writing nothing, and an ambiguous name producing a pick list that
+  fills the round when tapped.
+
 ## The Build button ignored the itinerary it was shown (2026-10-03, same day)
 
 Manny pasted seven Myrtle rounds on his phone, the review read all seven, and

@@ -254,14 +254,25 @@ function tripItinNormalise(name) {
         .trim();
 }
 
+// A SPACE IS NOT A DIFFERENT COURSE. Manny's own line says "Myrtlewood
+// PineHills" and the saved course is "Myrtlewood - Pine Hills": normalised,
+// those are "myrtlewood pinehills" and "myrtlewood pine hills", one space apart
+// - and that one space sent a course he already had to the online search, which
+// spent two of the day's 35 lookups and then left the round blank. Compared
+// space-free, they are the same string. Applied to the EXACT test only:
+// containment still works on the spaced form, where "pinehills" has to stay
+// different from "pine lakes".
+function tripItinTight(name) { return tripItinNormalise(name).replace(/\s+/g, ''); }
+
 function tripItinMatch(name, known) {
     var want = tripItinNormalise(name);
+    var tight = tripItinTight(name);
     if (!want) return null;
     var hits = [];
     Object.keys(known || {}).forEach(function (key) {
         var have = tripItinNormalise(known[key]);
         if (!have) return;
-        if (have === want) { hits.push({ key: key, exact: true }); return; }
+        if (have === want || tripItinTight(known[key]) === tight) { hits.push({ key: key, exact: true }); return; }
         if (have.indexOf(want) !== -1 || want.indexOf(have) !== -1) hits.push({ key: key, exact: false });
     });
     if (!hits.length) return null;
@@ -364,6 +375,46 @@ function tripItinDays(rows) {
     return days;
 }
 
+// ---------------------------------------------------------------------------
+// WHICH ONLINE RESULT IS THE ONE HE MEANT.
+//
+// A multi-course facility answers a search with its whole family: Myrtlewood
+// comes back as PineHills, Palmetto and the Hummingbird Course. Picking the
+// first would put the round on a different 18 holes with a different stroke
+// index, which is different money - so this picks ONLY when the answer is not
+// in doubt, and otherwise hands back the list for a human to tap.
+//
+// `candidates` is [{ id, name }] - the display name each result reads as, built
+// by the caller through courseDisplayName so the chooser and the record agree.
+// Returns { pick: candidate } or { choices: [candidate, ...] } (never empty when
+// there was anything to choose from), or null when the list was empty.
+function tripItinPickOnline(typed, candidates) {
+    var list = (candidates || []).filter(function (c) { return c && c.name; });
+    if (!list.length) return null;
+    var want = tripItinNormalise(typed);
+    var tight = tripItinTight(typed);
+    if (!want) return { choices: list };
+    var exact = list.filter(function (c) {
+        return tripItinNormalise(c.name) === want || tripItinTight(c.name) === tight;
+    });
+    if (exact.length === 1) return { pick: exact[0] };
+    if (exact.length > 1) return { choices: exact };
+    // EVERY WORD HE TYPED, SOMEWHERE IN THE NAME. "Myrtlewood PineHills" against
+    // "Myrtlewood Golf Club (PineHills)" is both words; against "Myrtlewood Golf
+    // Club (Palmetto)" it is one. One survivor is the answer; more than one is a
+    // question.
+    var words = want.split(/\s+/).filter(function (w) { return w.length > 2; });
+    if (words.length) {
+        var all = list.filter(function (c) {
+            var have = tripItinTight(c.name);
+            return words.every(function (w) { return have.indexOf(w.replace(/\s+/g, '')) !== -1; });
+        });
+        if (all.length === 1) return { pick: all[0] };
+        if (all.length > 1) return { choices: all };
+    }
+    return { choices: list };
+}
+
 // The label a review row reads as, so the screen and any future surface cannot
 // word it differently.
 function tripItinRowLabel(row) {
@@ -380,6 +431,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         TRIP_ITIN_MONTHS, tripItinDate, tripItinTime, tripItinUndecided, tripItinOptions,
         tripItinCourse, tripItinParseLine, tripItinParse, tripItinNormalise,
-        tripItinMatch, tripItinNines, tripItinPlan, tripItinDays, tripItinRowLabel
+        tripItinMatch, tripItinTight, tripItinNines, tripItinPlan, tripItinDays,
+        tripItinPickOnline, tripItinRowLabel
     };
 }

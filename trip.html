@@ -48,6 +48,7 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <script src="course-import-rules.js"></script>
     <script src="course-index.js"></script>
     <script src="trip-itinerary.js"></script>
     <script src="trip-roster.js"></script>
@@ -708,6 +709,12 @@ html {
                 flat.push({
                     label: 'Day ' + (dayIdx + 1) + subLabel,
                     courseId: r.courseKey || '',
+                    // THE NAME HE TYPED, for the rounds no saved course matched.
+                    // Without it the round is a blank box with nothing to search
+                    // for, which is exactly how "Myrtlewood PineHills" became
+                    // "Search / Select Course" and no message.
+                    wantCourse: (!r.courseKey && !r.undecided) ? (r.courseName || '') : '',
+                    needsCourse: (!r.courseKey && !r.undecided) ? (r.courseName || '') : '',
                     playerCount: 4,
                     frontNineKey: r.frontNineKey || '',
                     backNineKey: r.backNineKey || '',
@@ -725,9 +732,200 @@ html {
         return { days: days, flat: flat };
     }
 
-    function renderItinReadyNote() {
+// ---- THE ONLINE LOOKUP FOR A COURSE THE ITINERARY NAMES (2026-10-03) ----
+    //
+    // A pasted course that is not already saved USED TO LEAVE THE ROUND BLANK.
+    // The review said "will look up online" and "2 online lookups", and then
+    // nothing looked anything up: applyItinerary set courseId to '' and the card
+    // read "Search / Select Course" with no message, which is the worst of the
+    // three possible outcomes because it looks like a choice the golfer made.
+    //
+    // THE SAME PROXY, THE SAME RULES, THE SAME RECORD as admin.html's import -
+    // course-import-rules.js holds all three, and the write lands on the same
+    // global_courses/<key> with the same key shape. What is different here is
+    // only who starts it: a tap on Use these N rounds rather than a tap on a
+    // search result.
+    let itinLookupInFlight = false;
+
+    function tripCourseApiBase() { return courseProxyBase(document, GOLF_WEB_ORIGIN); }
+
+    function itinDirectoryNames() {
+        const names = {};
+        (typeof courseDirectory !== 'undefined' ? courseDirectory : []).forEach(g =>
+            (g.items || []).forEach(i => { names[i.id] = i.name; }));
+        return names;
+    }
+
+    async function itinFetchJson(url) {
+        // NO fetch AT ALL IS A FAILED LOOKUP, NOT A CRASH. mini-dom provides
+        // none, and a page that cannot ask must still show a round that needs a
+        // course rather than throwing on the way to drawing it.
+        if (typeof fetch !== 'function') return { status: 'unavailable', reason: 'network' };
+        try {
+            const res = await fetch(url);
+            return await res.json();
+        } catch (e) { return { status: 'unavailable', reason: 'network' }; }
+    }
+
+    // { ok, key, name } imported and ready | { choices } a facility answered with
+    // several courses | { error } could not ask, nothing matched, or no card.
+    async function itinLookupCourse(name) {
+        const payload = await itinFetchJson(tripCourseApiBase()
+            + '/api/course-search?q=' + encodeURIComponent(name));
+        if (!payload || payload.status !== 'ok') {
+            return { error: courseImportMessage((payload && payload.reason) || 'upstream_error') };
+        }
+        const cands = (payload.courses || []).map(c => ({ id: c.id, name: courseDisplayName(c) }));
+        const chosen = tripItinPickOnline(name, cands);
+        if (!chosen) return { error: 'Nothing online matched \u201C' + name + '\u201D.' };
+        if (chosen.choices) return { choices: chosen.choices };
+        return itinImportProviderCourse(chosen.pick);
+    }
+
+    async function itinImportProviderCourse(cand) {
+        const payload = await itinFetchJson(tripCourseApiBase()
+            + '/api/course/' + encodeURIComponent(cand.id));
+        if (!payload || payload.status !== 'ok' || !payload.course) {
+            return { error: courseImportMessage((payload && payload.reason) || 'upstream_error') };
+        }
+        const detail = payload.course;
+        const canonical = pickCanonicalTee(detail);
+        // NO CARD, NO RECORD. importCardOrRefuse is the one validator, and a
+        // course whose card it refuses leaves the round needing one - the
+        // alternative is stamping plausible numbers into a par and stroke-index
+        // layout, which is inventing money.
+        const card = canonical ? importCardOrRefuse(canonical.tee)
+            : { ok: false, reason: 'This course has no tee data from the provider.' };
+        if (!card.ok) return { error: courseDisplayName(detail) + ': ' + card.reason };
+        const siFrom = canonical.gender + '/' + canonical.tee.tee_name;
+        const key = importedCourseKeyFor(detail, itinDirectoryNames(), tripCourses);
+        const rec = buildImportRecord(detail, siFrom);
+        const p = db.ref('global_courses/' + key).update(rec);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        try { await p; } catch (e) {
+            return { error: courseDisplayName(detail) + ' was found, but the shared course list refused the write.' };
+        }
+        tripCourses[key] = rec;
+        return { ok: true, key: key, name: rec.name };
+    }
+
+    // EVERY ROUND THE ITINERARY COULD NOT MATCH, ONE AT A TIME. Sequential on
+    // purpose: the provider is the free tier, 35 requests a day shared by
+    // everybody and two per course, so a parallel burst is how a five-course
+    // paste spends ten of them before the first answer arrives.
+    // A SKIPCAPTURE RENDER LOSES WHAT IS IN THE FORM, and the one field a golfer
+    // may have typed while a lookup was in flight is the headcount. The course
+    // boxes must NOT be read back here - that is the erase this whole fix is
+    // about - so only the player counts are taken.
+    function captureRoundPlayerCounts() {
+        roundConfigs.forEach((cfg, i) => {
+            const playersEl = document.getElementById(`round-players-${i}`);
+            if (playersEl && playersEl.value !== '') cfg.playerCount = parseInt(playersEl.value, 10) || cfg.playerCount;
+        });
+    }
+
+    function itinPendingLookups() {
+        return roundConfigs
+            .map((cfg, i) => ({ cfg: cfg, i: i }))
+            .filter(x => !x.cfg.courseId && x.cfg.wantCourse && !x.cfg.lookupTried);
+    }
+
+    // EVERY ROUND REFERRED TO BY INDEX, NEVER BY A HELD OBJECT. renderRoundPlanner
+    // rebuilds roundConfigs into NEW objects and copies the fields across, so a
+    // `cfg` captured before a render is an orphan afterwards - writing to it
+    // updates nothing and the card stays on whatever it last said. That is not
+    // hypothetical: it left this round reading "Searching online..." forever with
+    // the answer already in hand, and the Chrome check caught it.
+    function itinApplyOutcome(i, typedName, out) {
+        const cfg = roundConfigs[i];
+        if (!cfg) return;
+        if (out && out.ok) {
+            cfg.courseId = out.key;
+            cfg.needsCourse = '';
+            cfg.needsWhy = '';
+            cfg.choices = null;
+        } else if (out && out.choices) {
+            // AMBIGUOUS IS A QUESTION, NOT A GUESS. Myrtlewood answers a search
+            // with PineHills, Palmetto and Hummingbird: three different eighteens
+            // with three different stroke indexes, which is three different
+            // amounts of money.
+            cfg.needsCourse = typedName;
+            cfg.needsWhy = 'More than one course matched \u2014 pick the right one.';
+            cfg.choices = out.choices;
+        } else {
+            cfg.needsCourse = typedName;
+            cfg.needsWhy = (out && out.error) || 'The lookup did not answer.';
+            cfg.choices = null;
+        }
+    }
+
+    // One at a time, sequentially: the provider is the free tier, 35 requests a
+    // day shared by everybody and two per course, so a parallel burst is how a
+    // five-course paste spends ten of them before the first answer arrives.
+    async function resolveItinCourses() {
+        if (itinLookupInFlight) return;
+        const pending = itinPendingLookups();
+        if (!pending.length) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        renderItinReadyNote('\ud83c\udf10 Looking up ' + pending.length + ' course'
+            + (pending.length === 1 ? '' : 's') + ' online\u2026');
+        try {
+            for (const item of pending) {
+                const want = item.cfg.wantCourse;
+                if (roundConfigs[item.i]) roundConfigs[item.i].lookupTried = true;
+                const out = await itinLookupCourse(want);
+                itinApplyOutcome(item.i, want, out);
+            }
+        } finally {
+            itinLookupInFlight = false;
+            renderRoundPlanner(true);
+            renderItinReadyNote();
+        }
+    }
+
+    // A tap on "Tap to search" - this one round, asked again, with whatever is in
+    // its box now rather than what the itinerary said.
+    async function runRoundOnlineSearch(i) {
+        if (!roundConfigs[i] || itinLookupInFlight) return;
+        const input = document.getElementById(`round-course-input-${i}`);
+        const typed = (input && input.value.trim()) || roundConfigs[i].needsCourse || roundConfigs[i].wantCourse || '';
+        if (!typed) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        roundConfigs[i].needsCourse = typed;
+        roundConfigs[i].needsWhy = '\ud83c\udf10 Searching online\u2026';
+        roundConfigs[i].choices = null;
+        renderRoundPlanner(true);
+        let out;
+        try { out = await itinLookupCourse(typed); }
+        finally { itinLookupInFlight = false; }
+        itinApplyOutcome(i, typed, out);
+        renderRoundPlanner(true);
+    }
+
+    // A tap on one row of the pick list. The id is the provider's, which is not
+    // user text, so it is safe in a handler; the name is read back from the list.
+    async function pickRoundOnlineCourse(i, providerId) {
+        if (!roundConfigs[i] || itinLookupInFlight) return;
+        const cand = (roundConfigs[i].choices || []).filter(c => String(c.id) === String(providerId))[0];
+        if (!cand) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        roundConfigs[i].needsWhy = '\ud83c\udf10 Fetching the card\u2026';
+        roundConfigs[i].choices = null;
+        renderRoundPlanner(true);
+        let out;
+        try { out = await itinImportProviderCourse(cand); }
+        finally { itinLookupInFlight = false; }
+        itinApplyOutcome(i, cand.name, out);
+        renderRoundPlanner(true);
+    }
+
+    function renderItinReadyNote(overrideText) {
         const note = document.getElementById('itin-ready-note');
         if (!note) return;
+        if (overrideText) { note.style.display = 'block'; note.textContent = overrideText; return; }
         if (!itinApplied || !itinApplied.length) { note.style.display = 'none'; note.textContent = ''; return; }
         note.style.display = 'block';
         note.textContent = '\ud83d\udccb ' + itinApplied.length + ' round'
@@ -757,6 +955,10 @@ html {
         renderItinReadyNote();
         const card = document.getElementById('itin-paste-card');
         if (card) card.open = false;
+        // AND THE LOOKUPS THE REVIEW PROMISED ACTUALLY RUN. The review's "2
+        // online lookups" was a statement about what this tap would spend, and
+        // until now it spent nothing and left the round blank.
+        resolveItinCourses();
         uiToast('\ud83d\udccb ' + usable.length + ' round' + (usable.length === 1 ? '' : 's')
             + ' loaded into the planner. Change anything you like, then Build Trip.');
     }
@@ -911,7 +1113,7 @@ html {
         plannedDays.forEach((d, dayIdx) => {
             for (let r = 0; r < d.roundsToday; r++) {
                 const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
-                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '' });
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '', wantCourse: '', needsCourse: '', needsWhy: '', choices: null, lookupTried: false });
             }
         });
         // Carry forward previously entered values by position — good enough for the common
@@ -928,6 +1130,15 @@ html {
                 // silently the first time a day was toggled 18 to 36.
                 cfg.teeDate = roundConfigs[i].teeDate || '';
                 cfg.teeClock = roundConfigs[i].teeClock || '';
+                // AND THE LOOKUP STATE, for the same reason: none of it has a box
+                // on screen to be read back from, so a rebuild that forgot it
+                // would turn a round that needs a course into a silent blank
+                // again the first time a day was toggled 18 to 36.
+                cfg.wantCourse = roundConfigs[i].wantCourse || '';
+                cfg.needsCourse = roundConfigs[i].needsCourse || '';
+                cfg.needsWhy = roundConfigs[i].needsWhy || '';
+                cfg.choices = roundConfigs[i].choices || null;
+                cfg.lookupTried = !!roundConfigs[i].lookupTried;
             }
         });
         roundConfigs = newFlat;
@@ -940,7 +1151,12 @@ html {
         let html = '';
         roundConfigs.forEach((cfg, i) => {
             const loops = nineHoleLoops[cfg.courseId];
-            const selectedName = cfg.courseId ? (getCourseNameById(cfg.courseId, {}) || cfg.courseId) : '';
+            // PRE-FILLED WITH THE NAME HE PASTED when nothing is selected yet, so
+            // the box a golfer taps already holds the search instead of being
+            // empty next to a round he thought he had set up.
+            const selectedName = cfg.courseId
+                ? (getCourseNameById(cfg.courseId, {}) || (tripCourses[cfg.courseId] || {}).name || cfg.courseId)
+                : (cfg.needsCourse || '');
             let coursePickerHtml = `
                 <div class="form-group" style="margin-bottom:8px;">
                     <label>Course</label>
@@ -973,6 +1189,26 @@ html {
                             <option value="none" ${backKey === 'none' ? 'selected' : ''}>-- None (9 Holes Only) --</option>
                         </select>
                     </div>
+                </div>`;
+            }
+
+            // NEVER A SILENT BLANK (2026-10-03). A round whose pasted course did
+            // not match a saved one and did not survive the lookup says so, names
+            // the course the itinerary asked for, and gives one tap that searches
+            // for it again - with the box above already holding the name. The
+            // round still BUILDS without a course; what it must not do is look
+            // like a blank the golfer chose.
+            if (!cfg.courseId && cfg.needsCourse) {
+                const pickRows = (cfg.choices || []).map(c =>
+                    `<div class="course-picker-option" style="border-top:1px solid var(--border-faint);"
+                          onclick="pickRoundOnlineCourse(${i}, '${escapeHtml(String(c.id).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(c.name)}</div>`).join('');
+                coursePickerHtml += `
+                <div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:10px; margin-bottom:8px; font-size:0.78rem; color:var(--warn-text);">
+                    <div><strong>Needs a course: ${escapeHtml(cfg.needsCourse)}</strong></div>
+                    ${cfg.needsWhy ? `<div style="margin-top:4px;">${escapeHtml(cfg.needsWhy)}</div>` : ''}
+                    ${pickRows ? `<div style="margin-top:6px; background:var(--card-bg); border-radius:6px;">${pickRows}</div>` : ''}
+                    <button type="button" class="btn-outline" data-role="needs-course-search-${i}"
+                            style="margin-top:8px; font-size:0.78rem;" onclick="runRoundOnlineSearch(${i})">🔍 Tap to search</button>
                 </div>`;
             }
 
@@ -1021,7 +1257,33 @@ html {
             }
         });
 
+        // THE SHARED LIST TOO (2026-10-03). This offered the bundled directory
+        // only, so a course somebody imported - including one this page has just
+        // imported from a pasted itinerary - could not be picked here at all.
+        const dirIds = {};
+        courseDirectory.forEach(g => (g.items || []).forEach(item => { dirIds[item.id] = true; }));
+        const shared = Object.keys(tripCourses || {}).filter(k => !dirIds[k]
+            && tripCourses[k] && tripCourses[k].name
+            && String(tripCourses[k].name).toLowerCase().includes(typed));
+        if (shared.length) {
+            html += `<div class="course-picker-group-label">\ud83c\udf10 Imported courses</div>`;
+            shared.forEach(k => {
+                html += `<div class="course-picker-option" onclick="selectRoundCourseById(${i}, '${escapeHtml(String(k).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(tripCourses[k].name)}</div>`;
+            });
+        }
+
         dropdown.innerHTML = html || `<div class="course-picker-empty">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
+        // AND ONE ROW THAT ASKS THE PROVIDER, fired by a tap and nothing else -
+        // two of the day's 35 requests, spent only when a golfer presses it.
+        if (typed.length > 2) {
+            const row = document.createElement('div');
+            row.className = 'course-picker-option';
+            row.style.fontWeight = 'bold';
+            row.setAttribute('data-role', 'round-online-search-' + i);
+            row.textContent = '\ud83c\udf10 Search online for \u201C' + input.value.trim() + '\u201D';
+            row.onclick = () => { runRoundOnlineSearch(i); };
+            dropdown.appendChild(row);
+        }
         dropdown.style.display = 'block';
     }
 
@@ -1034,7 +1296,10 @@ html {
         (courseDirectory || []).forEach(g => (g.items || []).forEach(item => {
             if (String(item.id) === String(id)) found = item;
         }));
-        selectRoundCourse(i, id, found ? found.name : '');
+        // An imported course is not in the directory; its name is in the shared
+        // list this page already holds.
+        const sharedName = (tripCourses[id] || {}).name || '';
+        selectRoundCourse(i, id, found ? found.name : sharedName);
     }
 
     function selectRoundCourse(i, id, name) {
@@ -1050,6 +1315,9 @@ html {
         roundConfigs[i].courseId = id;
         roundConfigs[i].frontNineKey = '';
         roundConfigs[i].backNineKey = '';
+        roundConfigs[i].needsCourse = '';
+        roundConfigs[i].needsWhy = '';
+        roundConfigs[i].choices = null;
         renderRoundPlanner();
     }
 
@@ -1119,6 +1387,16 @@ html {
             roundConfigs = plan.flat;
             renderRoundPlanner(true);
             renderItinReadyNote();
+        }
+        // THE LOOKUPS RUN ON BUILD TOO, not only on Use these N rounds - a golfer
+        // who tapped Build straight after the review, or whose first attempt hit
+        // a dead network, would otherwise build a round with a blank course and
+        // no explanation. One pass only: lookupTried is set per round, so this
+        // cannot loop, and a round that still has no course after it builds
+        // anyway, carrying the line that says what it needs.
+        if (roundConfigs.length && itinPendingLookups().length) {
+            resolveItinCourses().then(() => buildTrip());
+            return;
         }
         if (roundConfigs.length === 0) {
             // AND THE REFUSAL NAMES THE RIGHT MISSING STEP. A golfer who pasted

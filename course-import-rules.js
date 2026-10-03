@@ -138,6 +138,82 @@ function courseDisplayName(c) {
     return club + ' (' + course + ')';
 }
 
+// ---- WHERE THE PROXY IS, FOR EVERY PAGE THAT ASKS IT ----------------------
+//
+// '' on the web, so a relative '/api/...' stays byte for byte what it always
+// was. In the shell the page's origin is capacitor://localhost and a relative
+// '/api/...' resolves to a path the shell does not serve, so the SAME
+// Cloudflare proxy is named by its canonical origin (product-links.js
+// GOLF_WEB_ORIGIN). html.is-native is what pwa-boot publishes, and it is read
+// at fetch time, after load.
+//
+// SHARED because trip.html searches the proxy too now (2026-10-03). A second
+// two-line copy of this rule is how one page ends up reaching the proxy in the
+// shell and another silently not.
+function courseProxyBase(doc, origin) {
+    try {
+        return (doc && doc.documentElement
+            && doc.documentElement.classList.contains('is-native')) ? origin : '';
+    } catch (e) { return ''; }
+}
+
+// ---- THE RECORD, AND THE KEY IT LANDS ON ----------------------------------
+//
+// Both pure, both shared for the same reason as the card rules above: the
+// record admin.html writes from a tap and the record trip.html writes from a
+// pasted itinerary must be the same shape, or a course imported one way is a
+// course the other way cannot read. The provider summary is NOT a parameter -
+// everything stored comes from the detail record, which is the one that carries
+// the tees.
+function buildImportRecord(detail, siFrom) {
+    var parts = String(siFrom).split('/');
+    var mapTees = function (g) {
+        return ((detail.tees || {})[g] || []).map(function (t) {
+            return {
+                name: t.tee_name, rating: t.course_rating, slope: t.slope_rating,
+                totalYards: t.total_yards, parTotal: t.par_total,
+                holes: (t.holes || []).map(function (h) {
+                    return { par: h.par, yardage: h.yardage, hcpIndex: h.handicap };
+                })
+            };
+        });
+    };
+    var tee = ((detail.tees || {})[parts[0]] || []).filter(function (t) { return t.tee_name === parts[1]; })[0];
+    var card = importCardOrRefuse(tee);
+    return {
+        name: courseDisplayName(detail),
+        data: card.ok ? card.data : [],
+        location: detail.location || {},
+        tees: { male: mapTees('male'), female: mapTees('female') },
+        source: {
+            provider: 'golfcourseapi',
+            providerCourseId: detail.id,
+            providerClubName: detail.club_name,
+            importedAt: Date.now(),
+            siFrom: siFrom
+        }
+    };
+}
+
+// THE COMPOSED NAME, lowercased - so "Talking Stick Golf Club" / "O'odham"
+// meets the directory's "Talking Stick Golf Club (O'odham)" instead of writing
+// a shadow gca_ record beside it. The directory is passed in as a flat map of
+// id -> name, because the two callers hold it in different shapes.
+function importedCourseKeyFor(course, directoryNames, globalCoursesRef) {
+    var nm = courseDisplayName(course).toLowerCase();
+    var found = null;
+    Object.keys(directoryNames || {}).forEach(function (id) {
+        if (String(directoryNames[id] || '').toLowerCase() === nm) found = id;
+    });
+    if (!found) {
+        Object.keys(globalCoursesRef || {}).forEach(function (k) {
+            if (String((globalCoursesRef[k] || {}).name || '').toLowerCase() === nm) found = k;
+        });
+    }
+    return found || ('gca_' + course.id);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ONLINE_SEARCH_CEILING, ONLINE_SEARCH_MESSAGES, courseImportMessage, importCardOrRefuse, pickCanonicalTee, allTeeSets, courseDisplayName };
+    module.exports = { ONLINE_SEARCH_CEILING, ONLINE_SEARCH_MESSAGES, courseImportMessage, importCardOrRefuse,
+        pickCanonicalTee, allTeeSets, courseDisplayName, courseProxyBase, buildImportRecord, importedCourseKeyFor };
 }

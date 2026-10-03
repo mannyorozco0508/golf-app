@@ -238,7 +238,13 @@ describe('THE INLINE HANDLER CARRIES NO USER TEXT', () => {
 
     test('the lookup returns the real name, so selection still works', () => {
         assert.match(trip, /function selectRoundCourseById\(i, id\)/);
-        assert.match(trip, /selectRoundCourse\(i, id, found \? found\.name : ''\)/);
+        // 2026-10-03: the fallback is no longer '' but the shared list's own name,
+        // because an imported course - including one this page just imported from
+        // a pasted itinerary - is not in the bundled directory at all. The rule
+        // this pins is unchanged: the name is LOOKED UP from an app-held list, not
+        // carried in the handler.
+        assert.match(trip, /selectRoundCourse\(i, id, found \? found\.name : sharedName\)/);
+        assert.match(trip, /const sharedName = \(tripCourses\[id\] \|\| \{\}\)\.name \|\| '';/);
     });
 });
 

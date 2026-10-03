@@ -3433,8 +3433,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Cloudflare proxy is named by its canonical origin (product-links.js
     // GOLF_WEB_ORIGIN). No second path, no CDN. Read at fetch time - on a tap,
     // after load - through the one native detection above.
+    // ONE IMPLEMENTATION, in course-import-rules.js (2026-10-03), because
+    // trip.html asks the proxy too now. isNativeApp() stays the page's own
+    // single native detection and is what this reads.
     function courseApiBase() {
-        return isNativeApp() ? GOLF_WEB_ORIGIN : '';
+        return courseProxyBase(isNativeApp() ? document : null, GOLF_WEB_ORIGIN);
     }
 
     // --- SECRET TAP LOGIC ---
@@ -5606,17 +5609,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // THE COMPOSED NAME, lowercased - so "Talking Stick Golf Club" / "O'odham"
         // meets the directory's "Talking Stick Golf Club (O'odham)" instead of
         // writing a shadow gca_ record beside it.
-        const nm = courseDisplayName(course).toLowerCase();
-        let found = null;
-        courseDirectory.forEach(g => g.items.forEach(i => {
-            if (i.name.toLowerCase() === nm) found = i.id;
-        }));
-        if (!found) {
-            Object.keys(globalCoursesRef || {}).forEach(k => {
-                if (String((globalCoursesRef[k] || {}).name || '').toLowerCase() === nm) found = k;
-            });
-        }
-        return found || ('gca_' + course.id);
+        const names = {};
+        courseDirectory.forEach(g => g.items.forEach(i => { names[i.id] = i.name; }));
+        return importedCourseKeyFor(course, names, globalCoursesRef);
     }
 
     // A MISSING CITY PRINTS "?", the same way the result row shows it. A real
@@ -5672,32 +5667,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // source.siFrom records WHICH tee the canonical stroke index came from.
     // Without it, a women's round allocated on men's indexes is undetectable
     // afterwards.
-    function buildImportRecord(summary, detail, siFrom) {
-        const parts = String(siFrom).split('/');
-        const mapTees = g => ((detail.tees || {})[g] || []).map(t => ({
-            name: t.tee_name,
-            rating: t.course_rating,
-            slope: t.slope_rating,
-            totalYards: t.total_yards,
-            parTotal: t.par_total,
-            holes: (t.holes || []).map(h => ({ par: h.par, yardage: h.yardage, hcpIndex: h.handicap }))
-        }));
-        const tee = ((detail.tees || {})[parts[0]] || []).filter(t => t.tee_name === parts[1])[0];
-        const card = importCardOrRefuse(tee);
-        return {
-            name: courseDisplayName(detail),
-            data: card.ok ? card.data : [],
-            location: detail.location || {},
-            tees: { male: mapTees('male'), female: mapTees('female') },
-            source: {
-                provider: 'golfcourseapi',
-                providerCourseId: detail.id,
-                providerClubName: detail.club_name,
-                importedAt: Date.now(),
-                siFrom: siFrom
-            }
-        };
-    }
+    // THE RECORD AND ITS KEY ARE IN course-import-rules.js (2026-10-03), and this
+    // page no longer declares its own. Two pages write that record now - this one
+    // from a tap, trip.html from a pasted itinerary - and a second copy is how a
+    // course imported one way becomes a course the other way cannot read. The
+    // provider summary was never read by it: everything stored comes from the
+    // detail record, which is the one that carries the tees.
 
 
     // ---- THE SEARCH. FIRED BY A TAP AND NOTHING ELSE. ----
@@ -5859,7 +5834,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const importKey = importedCourseKey(detail, globalCourses);
         pendingImport = {
             key: importKey,
-            record: buildImportRecord(course, detail, siFrom),
+            record: buildImportRecord(detail, siFrom),
             detail: detail
         };
 

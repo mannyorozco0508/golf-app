@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v120-itinbuild. The tournament product cache
+// The consumer product cache is consumer-v121-itinlookup. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3940,7 +3940,24 @@
 // dropped silently - Thistle then played Cameron/MacKay, a different stroke index and
 // different money. A device left on v279 keeps a planner that refuses a pasted
 // itinerary and a parser that mis-orders those two nines.
-const CACHE_VERSION = 'golfapp-v280-itinbuild';
+// Moved to v281 BECAUSE A PASTED COURSE WENT NOWHERE.
+//
+// Manny's review read "Myrtlewood PineHills - will look up online" and "2 online
+// lookups"; the round came out BLANK with no message. Two faults. His course was
+// already saved as "Myrtlewood - Pine Hills" - one space apart after
+// normalisation - so the matcher missed and a free match became a paid search.
+// And nothing performed that search: the review priced a lookup the apply step
+// never made. Now a saved course matches space-free for nothing, an unsaved one
+// is looked up and imported through the same rules and onto the same
+// global_courses/<key> as admin.html, a multi-course facility asks which course
+// rather than guessing, and a round that still has none says "Needs a course:
+// <name>" with the search pre-filled instead of showing an empty box.
+//
+// course-import-rules.js gains the record builder, its key chooser and the proxy
+// base - one implementation, shared with trip.html, which precaches it already.
+// A device left on v280 keeps a planner that silently drops any course it does
+// not already hold.
+const CACHE_VERSION = 'golfapp-v281-itinlookup';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
