@@ -3094,6 +3094,12 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   day across every golfer using the site. Not 17 rounds - a course already in
   `global_courses` or warm in KV costs nothing. Pro is $9.99/month and is the
   cheapest fix on the whole scaling list.
+- **RECORDED, NOT BUILT: a 429 does not latch the day.** Once the provider starts
+  refusing, every subsequent search still spends one upstream call and three KV
+  writes to be refused again. A latch - write the daily counter up to the ceiling
+  on the first 429 - is three lines and was deliberately not added without asking,
+  because it changes behaviour nobody asked to change. Worth doing if a real 429
+  ever shows up in a log.
 - **Still open: the whole `global_courses` node is downloaded on every setup-page
   load** - `admin.html:3259` `.on('value')`, `tournament.html:836`, `trip.html:575`
   and `:875`. Measured 2026-10-03: 42 courses, 61,258 bytes, avg 1,440 B/course,
