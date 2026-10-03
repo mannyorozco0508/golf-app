@@ -20,6 +20,7 @@
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
     <script src="my-groups.js"></script>
+    <script src="roster-paste.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -7160,118 +7161,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // line inside it is ONE group, and the commit below leaves the round's group sizes
     // alone in that case - exactly what the box did before it understood blank lines.
     //
-    // A BARE TRAILING HANDICAP. With no comma on the line, a last token that looks like
-    // a handicap - optional sign, one or two digits, at most one decimal place, within
-    // -10..54 - is one: "Marty 9", "Marty +2", "Lance 14.3". Anything else stays part
-    // of the name, so "Matt H" and "Tommy Chen" are whole names, "Marty 99" is a name,
-    // and a line that is ONLY a number ("12") is a name too - the token must follow
-    // whitespace after at least one character of name. The comma form is untouched:
-    // when a comma is present the line splits there, as it always has.
-    const BARE_HCP_RE = /^(.+?)\s+([+-]?\d{1,2}(?:\.\d)?)$/;
-    function splitNameAndHcp(line) {
-        const commaIdx = line.indexOf(',');
-        if (commaIdx !== -1) {
-            return { name: line.slice(0, commaIdx).trim(), hcp: line.slice(commaIdx + 1).trim() };
-        }
-        const m = BARE_HCP_RE.exec(line);
-        if (m) {
-            const v = parseFloat(m[2]);
-            if (v >= -10 && v <= 54) return { name: m[1].trim(), hcp: m[2] };
-        }
-        return { name: line, hcp: '' };
-    }
+    // THE PASTE PARSER IS IN roster-paste.js (2026-10-03). It used to live here,
+    // and trip.html now reads the same pasted list for a whole trip's roster -
+    // handicaps included, which is money - so the rules moved to one file rather
+    // than being written twice. splitNameAndHcp, splitLeadingFlight and
+    // parsePlayerPasteText are that file's; everything that called them by name
+    // still does.
 
-    // A LEADING FLIGHT LETTER (2026-09-21). Manny keeps his list with the flight
-    // beside each name - "A · Randy T 12" - and pastes it as-is. A LEADING A or B,
-    // then ANY run of separators (spaces, commas, dashes, dots, colons, middots),
-    // then the name, sets that golfer's flight; case-insensitive. The handicap
-    // still reads as the trailing number of what is left. If any line carries a
-    // flight, the commit turns flights on for the round.
-    //
-    // NEVER A TRAILING LETTER. "Matt B" and "Jim B" carry a last initial; reading
-    // it as a flight would strip both and drop both golfers into B. Leading only -
-    // the regex is anchored at ^ and nothing looks at the end of a line.
-    //
-    // THE INITIALS GUARD. A lone dot or dash GLUED to the next letter is part of a
-    // name: "B.J. Smith", "A.J.", "A-Rod" are names, not flights. A dot with a
-    // space after it ("B. J Smith"), a run of dots ("B... Jim"), or any other
-    // separator ("A, Randy", "A: Randy", "A · Randy") is a flight. The rule errs
-    // toward the name: a real golfer is never silently moved; at worst a flight
-    // typed as "B.Jim" lands in A with "B.Jim" for a name, which is visible.
-    //
-    // ONLY A AND B EXIST. A leading C, D or any other single letter followed by a
-    // separator run is NOT a flight and is not invented into one: the line is kept
-    // as typed for the name and the preview says so (flaggedFlights), so the
-    // organizer fixes the row after adding rather than losing the golfer.
-    //
-    // NO LETTER WHERE OTHERS HAVE ONE: the golfer goes in A - the same default a
-    // fresh row gets when flights are switched on (appendFlightControl) - and the
-    // preview counts them so the organizer can move them.
-    // Separators: whitespace , - – — . : · • (a regex literal - a doubled
-    // escape in a string is the defect course_import_name_test.js scans for).
-    const LEAD_FLIGHT_RE = /^([A-Za-z])([\s,\-\u2013\u2014.:\u00B7\u2022]+)(\S.*)$/;
-    function splitLeadingFlight(line) {
-        const m = LEAD_FLIGHT_RE.exec(line);
-        if (!m) return { flight: undefined, rest: line, notAFlight: false };
-        const gluedInitial = (m[2] === '.' || m[2] === '-') && /^[A-Za-z]/.test(m[3]);
-        if (gluedInitial) return { flight: undefined, rest: line, notAFlight: false };
-        const letter = m[1].toUpperCase();
-        if (letter !== 'A' && letter !== 'B') return { flight: undefined, rest: line, notAFlight: true };
-        return { flight: letter, rest: m[3], notAFlight: false };
-    }
-
-    function parsePlayerPasteText(text) {
-        const lines = text.split('\n');
-        let validPlayers = [];
-        let flaggedLines = [];
-        let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
-        let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
-        let groups = [];
-        let inGroup = false;     // true while inside a run of non-empty lines
-        lines.forEach((rawLine, idx) => {
-            const line = rawLine.trim();
-            if (line === '') { inGroup = false; return; }   // blank: closes the current run (a boundary) or is leading/trailing nothing
-            if (!inGroup) { groups.push(0); inGroup = true; }
-
-            // v194: a trailing period comes off a pasted name ("Anthony." -> "Anthony";
-            // the iPhone's double-space-for-a-period puts one on every line). Only
-            // trailing, only periods; "Jr." at the end loses its dot too - accepted.
-            // Stored names are never rewritten; this is the paste only.
-            // A TRAILING NOTE IN BRACKETS COMES OFF FIRST (v260). Measured before
-            // this: "B Jimmy 11 (captain)" parsed to the NAME "Jimmy 11 (captain)"
-            // with NO handicap, because the note sat between the number and the end
-            // of the line. The note is reported rather than dropped silently, so the
-            // review says what it ignored.
-            const noted = (typeof stripTrailingNote === 'function')
-                ? stripTrailingNote(line) : { text: line, note: '' };
-            if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
-            const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
-            // A not-a-flight line is kept AS TYPED: its comma is part of what was
-            // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
-            // trailing number is read off it.
-            const { name, hcp } = notAFlight ? splitNameAndHcp(rest.replace(/,/g, '\u0000')) : splitNameAndHcp(rest);
-
-            if (name === '') {
-                flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' });
-                return;
-            }
-            if (notAFlight) flaggedFlights.push({ lineNumber: idx + 1, text: line, letter: line[0].toUpperCase() });
-            // v194: a trailing period comes off the NAME ("Anthony." -> "Anthony", "Matt H. 12"
-            // -> Matt H / 12): the iPhone's double-space-for-a-period puts one on every
-            // line. Only trailing, only periods; "Jr." at the end loses its dot too -
-            // accepted. Stored names are never rewritten; this is the paste only.
-            const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
-            if (flight) player.flight = flight;
-            validPlayers.push(player);
-            groups[groups.length - 1]++;
-        });
-        groups = groups.filter(n => n > 0);   // a run made only of flagged lines is not a group
-        const anyFlight = validPlayers.some(p => p.flight);
-        const flights = anyFlight
-            ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
-            : null;
-        return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights };
-    }
 
     function openPastePlayersModal() {
         document.getElementById('paste-players-modal').classList.add('open');

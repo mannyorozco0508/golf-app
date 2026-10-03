@@ -55,6 +55,7 @@ const SHARED_SHELL = [
     // valid card is, the canonical tee, every refusal sentence. admin.html and
     // tournament.html both load it (2026-09-17); one builder, two entry points.
     'course-import-rules.js',
+    'roster-paste.js',
     // course-index.js: the shared course list, read cheaply. admin.html,
     // tournament.html and trip.html all call courseIndexLoader UNGUARDED, so a
     // cached shell without it throws on load and the setup page never draws.

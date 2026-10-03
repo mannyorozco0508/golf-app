@@ -170,6 +170,210 @@ function tripRosterRemoveUpdates(plan, name) {
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// THE ROUND PICKER'S LABEL AND ORDER (2026-10-03).
+//
+// "Start From" listed rounds by the key order of the trip's rounds map and
+// showed the Day label alone - so a seven-round trip offered "Day 1 AM", "Day 3",
+// "Day 1 PM" in whatever order they were written, and nothing on the row said
+// which course. An organizer copying Friday's settings from Tuesday's round has
+// to recognise it by the course.
+//
+// THE DATE IS THE ORDER WHEN THERE IS ONE. A round built from a pasted itinerary
+// carries the date it was pasted with; a round linked by hand has none, and an
+// invented one would sort it wrongly with confidence, so those keep their
+// addedAt order and sit after the dated ones.
+var TRIP_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function tripRoundWhen(date) {
+    // yyyy-mm-dd, read as a LOCAL date: new Date('2026-10-13') is UTC midnight,
+    // which prints as the 12th anywhere west of Greenwich - the whole trip would
+    // read a day early.
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+    if (!m) return '';
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (isNaN(d.getTime())) return '';
+    return TRIP_WEEKDAYS[d.getDay()] + ' ' + Number(m[2]) + '/' + Number(m[3]);
+}
+
+// "Tue 10/13 AM - Caledonia". The AM/PM suffix comes off the round's own label,
+// which is where the planner put it, so a 36-hole day stays legible.
+function tripRoundPickerLabel(round) {
+    var r = round || {};
+    var when = tripRoundWhen(r.date);
+    var label = String(r.label || r.code || '').trim();
+    var half = /\b(AM|PM)\b\s*$/i.exec(label);
+    var left = when ? (when + (half ? ' ' + half[1].toUpperCase() : '')) : label;
+    var course = String(r.courseName || '').trim();
+    if (!left) left = label || String(r.code || '');
+    return course ? left + ' \u00B7 ' + course : left;
+}
+
+// Dated rounds first, in date order (then by the label so AM precedes PM), and
+// undated ones after in the order they were added.
+function tripRoundPickerRows(rounds) {
+    var rows = (rounds || []).map(function (r, i) {
+        return {
+            code: r.code,
+            label: tripRoundPickerLabel(r),
+            date: String(r.date || ''),
+            addedAt: Number(r.addedAt) || 0,
+            idx: i
+        };
+    });
+    rows.sort(function (a, b) {
+        if (!!a.date !== !!b.date) return a.date ? -1 : 1;
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (a.date && a.label !== b.label) return a.label < b.label ? -1 : 1;
+        if (a.addedAt !== b.addedAt) return a.addedAt - b.addedAt;
+        return a.idx - b.idx;
+    });
+    return rows;
+}
+
+// ---------------------------------------------------------------------------
+// THE PASTED ROSTER (2026-10-03).
+//
+// A trip is built before anybody knows who is coming, so every round starts with
+// placeholders - "Player 1" ... "Player 12", which is three groups. Later the
+// organizer has the real list in a note on his phone, with handicaps and blank
+// lines between groups, and pastes it whole.
+//
+// PASTED GOLFERS REPLACE THE PLACEHOLDERS IN ORDER, THEN KEEP ADDING. Twelve
+// placeholders and thirty-two pasted names is eight groups: the first twelve
+// slots are overwritten and twenty more are appended. REPLACING KEEPS THE SLOT'S
+// ID, so anything in an open round that already points at a player id - a side
+// match the organizer set up in advance, a pool entry - still points at the same
+// seat rather than at a golfer who no longer exists.
+//
+// A NAME ALREADY ON THE ROUND IS NOT ADDED TWICE. Two entries with one name and
+// two ids is two golfers to every engine in this app.
+//
+// AND IT ONLY TOUCHES ROUNDS WITH NO SCORES. tripRosterPlan draws that line, and
+// a round with one posted score keeps the roster it was played with - handicaps
+// are read off it, side matches name its ids, the pool charges per golfer. The
+// untouched rounds are NAMED.
+function tripIsPlaceholderName(name) {
+    // The exact shape the planner writes, and nothing looser: a real golfer
+    // called "Player" (it happens - a surname) must not be treated as a slot.
+    return /^player\s*\d+$/i.test(String(name || '').trim());
+}
+
+function tripRosterPasteUpdates(plan, pasted, opts) {
+    var o = opts || {};
+    var incoming = ((pasted || {}).validPlayers || []).filter(function (p) {
+        return String((p && p.name) || '').trim() !== '';
+    });
+    var groups = ((pasted || {}).groups || []).filter(function (n) { return n > 0; });
+    // leftoverPlaceholders is the LARGEST number left on any one round, with
+    // leftoverRounds counting how many rounds have any: a sum across rounds
+    // ("8 placeholders left over" on two rounds of four) is a number the
+    // organizer cannot check against anything on screen.
+    var out = { updates: {}, changed: [], skipped: [], replaced: 0, added: 0,
+                leftoverPlaceholders: 0, leftoverRounds: 0, groupsWritten: [] };
+    if (!incoming.length) return out;
+
+    (plan && plan.open ? plan.open : []).forEach(function (r) {
+        var players = ((r.data || {}).players || []).map(function (p) {
+            return Object.assign({}, p);
+        });
+        var have = {};
+        players.forEach(function (p) {
+            if (!tripIsPlaceholderName(p.name)) have[tripNameKey(p.name)] = true;
+        });
+        var slots = [];
+        players.forEach(function (p, i) { if (tripIsPlaceholderName(p.name)) slots.push(i); });
+
+        var replaced = 0;
+        var added = 0;
+        incoming.forEach(function (g) {
+            var clean = String(g.name).trim();
+            var key = tripNameKey(clean);
+            if (have[key]) return;               // already on this round, under a real name
+            have[key] = true;
+            var seat = {
+                name: clean,
+                hcp: (g.hcp === undefined || g.hcp === null) ? '' : String(g.hcp).trim(),
+                team: 'Team 1', squad: 'red', playingForMoney: true
+            };
+            if (g.flight) seat.flight = g.flight;
+            if (slots.length) {
+                var at = slots.shift();
+                // THE ID STAYS WITH THE SEAT. A fresh id here would orphan
+                // anything already pointing at that slot.
+                seat.id = players[at].id;
+                players[at] = seat;
+                replaced++;
+            } else {
+                seat.id = tripNextPlayerId(players);
+                players.push(seat);
+                added++;
+            }
+        });
+
+        if (!replaced && !added) { out.skipped.push(r.label); return; }
+        out.updates['events/' + r.code + '/players'] = players;
+        out.changed.push(r.label);
+        out.replaced += replaced;
+        out.added += added;
+        if (slots.length) {
+            out.leftoverRounds++;
+            if (slots.length > out.leftoverPlaceholders) out.leftoverPlaceholders = slots.length;
+        }
+
+        // GROUPS FROM THE PASTE, ONLY WHEN THEY CAN TILE THE ROSTER EXACTLY.
+        // Group sizes are POSITIONAL, so writing the pasted runs over a roster
+        // that still holds leftover placeholders or golfers who were already
+        // there would put somebody in the wrong group - and a group is who sees
+        // which wagers. When they cannot tile it, nothing is written and the
+        // round keeps the automatic sizes, which is the state it was already in.
+        var tiles = groups.length > 1 && !slots.length
+            && groups.reduce(function (a, b) { return a + b; }, 0) === players.length;
+        if (tiles) {
+            var overrides = {};
+            groups.forEach(function (size, i) { overrides[i] = size; });
+            out.updates['events/' + r.code + '/groupSizeOverrides'] = overrides;
+            out.groupsWritten.push(r.label);
+        }
+    });
+
+    if (o.note !== false) out.note = tripRosterPasteNote(plan, out, incoming, groups);
+    return out;
+}
+
+// WHAT THE REVIEW SCREEN SAYS BEFORE ANYTHING IS WRITTEN. Counts, not adjectives,
+// and the rounds it will not touch by name.
+function tripRosterPasteNote(plan, result, incoming, groups) {
+    var p = plan || { open: [], closed: [], total: 0 };
+    var lines = [];
+    var n = (incoming || []).length;
+    var withHcp = (incoming || []).filter(function (g) { return String(g.hcp || '').trim() !== ''; }).length;
+    lines.push(n + ' golfer' + (n === 1 ? '' : 's') + ' pasted, ' + withHcp + ' with a handicap'
+        + ((groups || []).length > 1 ? ', ' + groups.length + ' groups as pasted' : ''));
+    if (!p.open.length) {
+        lines.push('Every round in this trip has scores, so nothing will change — a round with scores keeps the roster it was played with.');
+        return lines.join('\n');
+    }
+    lines.push('Will update ' + result.changed.length + ' of ' + p.total + ' round'
+        + (p.total === 1 ? '' : 's') + ': ' + result.replaced + ' placeholder'
+        + (result.replaced === 1 ? '' : 's') + ' replaced, ' + result.added + ' golfer'
+        + (result.added === 1 ? '' : 's') + ' added.');
+    if (result.leftoverPlaceholders) {
+        lines.push(result.leftoverPlaceholders + ' placeholder'
+            + (result.leftoverPlaceholders === 1 ? '' : 's') + ' left over on '
+            + result.leftoverRounds + ' round' + (result.leftoverRounds === 1 ? '' : 's')
+            + ' — the pasted list is shorter than the round. Remove them, or paste the rest.');
+    }
+    if ((groups || []).length > 1 && !result.groupsWritten.length) {
+        lines.push('Groups are left as they are: the pasted groups do not fit this roster exactly, and a group decides who sees which bets.');
+    }
+    if (p.closed.length) {
+        lines.push('Untouched (already has scores): '
+            + p.closed.map(function (r) { return r.label; }).join(', ') + '.');
+    }
+    return lines.join('\n');
+}
+
 // Every name on the trip's OPEN rounds, so the remove list offers only golfers a
 // change could actually reach.
 function tripOpenRosterNames(plan) {
@@ -192,6 +396,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         tripRoundHasScores, tripRoundIsClosed, tripRosterPlan, tripRosterPlanNote,
         tripNextPlayerId, tripNameKey, tripRosterAddUpdates, tripRosterRemoveUpdates,
-        tripOpenRosterNames
+        tripOpenRosterNames, tripIsPlaceholderName, tripRosterPasteUpdates, tripRosterPasteNote,
+        tripRoundWhen, tripRoundPickerLabel, tripRoundPickerRows
     };
 }

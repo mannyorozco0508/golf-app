@@ -3063,6 +3063,70 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## The pasted trip roster, a trip that can be renamed, and a round picker that reads like a calendar (2026-10-03)
+
+Cache `golfapp-v282-rosterpaste` / consumer `v122`. Four jobs; the first was
+already done.
+
+- **CHALLENGE GROUP SCOPING (Job 1) WAS ALREADY DONE** - `4f5f6b4` on
+  `ui-wave39-push`, still unmerged, waiting on Manny's Cmd+R test.
+- **A TRIP CAN BE RENAMED.** The name was typed once, at creation, and never
+  again: Manny's Myrtle week went in as "Myrtle Beach 2006" and the only way to
+  correct it was to build the whole trip a second time. It is on the recap card,
+  the share text and the itinerary print, so a wrong one is wrong everywhere. The
+  control is organizer-token only at render AND in the handler, refuses an empty
+  name, and writes **`trips/<code>/name` alone** - a `set()` on the trip node
+  would replace the rounds, the organizer token and the pool, and the rules allow
+  that write, so nothing would have stopped it.
+- **"ADD A ROUND TO THIS TRIP" IS ONE LINE NOW.** The itinerary paste builds every
+  round, so Start From and the game-code link-in are the exception rather than the
+  way a trip is made; both sit behind "+ Add another round". Collapsing is not
+  permitting: the section is still inside the organizer-only wrapper.
+- **AND "START FROM" READS LIKE A CALENDAR:** "Tue 10/13 AM · Caledonia", in date
+  order. It listed rounds in the key order of the rounds map with the Day label
+  alone, so a seven-round trip offered "Day 1 AM / Day 3 / Day 1 PM" and nothing
+  said which course - which is how an organizer recognises the round he wants to
+  copy. The date comes from the itinerary paste (stored on the round record now);
+  a round linked by hand has none and keeps its `addedAt` order after the dated
+  ones, because an invented date sorts a trip wrongly with confidence.
+  `tripRoundWhen` reads yyyy-mm-dd as a LOCAL date: `new Date('2026-10-13')` is
+  UTC midnight, which prints as the 12th anywhere west of Greenwich.
+- **THE ROSTER CAN BE PASTED (STRICT).** A trip is built before anybody knows who
+  is coming, so every round starts with "Player 1".."Player 12" - twelve is three
+  groups - and the real list arrives later with handicaps and blank lines between
+  groups.
+  - **ONE PARSER FOR BOTH PAGES.** `parsePlayerPasteText` moved out of admin.html
+    into **`roster-paste.js`** (new shell file, precached: trip.html calls it
+    unguarded). The same list goes into a round and into the trip holding it, and
+    two copies of those rules would be two different sets of strokes. The note
+    stripper stays in my-groups.js, reached by the same typeof guard admin.html
+    always used; trip.html loads both.
+  - **PASTED GOLFERS TAKE THE PLACEHOLDER SEATS IN ORDER, AND THE SEAT KEEPS ITS
+    ID**, so anything in an open round already pointing at a player id still
+    points at the same seat. Then they are appended: twelve placeholders and
+    thirty-two names is eight groups.
+  - **ROUNDS WITH SCORES ARE NEVER TOUCHED**, and the guard is not "the field was
+    not written" - it is the played round settling to the same cent before and
+    after, with a $40 match on it, through the engines in one realm. The untouched
+    rounds are NAMED on the review screen.
+  - **GROUPS ONLY WHEN THEY TILE THE ROSTER EXACTLY.** Group sizes are positional
+    and a group decides who sees which wagers, so a pasted run written over a
+    roster holding leftover placeholders would put somebody in the wrong group.
+    When they cannot tile it, nothing is written and the review says so.
+- **`tools/trip-roster-paste-check.js`** is the user-path proof: a cold trip.html
+  at 390x844 as the organizer, real CDP taps and keystrokes, one played round and
+  two with twelve placeholders. It measured the rename writing one child, the
+  date-ordered picker, the review reading "B Jimmy 11 (captain)" as Jimmy/11/B,
+  and the apply writing only `events/RD2|RD3/players` with the seats keeping ids.
+  - **TWO HARNESS TRAPS IT COST TO FIND, both worth knowing.** The Golfers section
+    **ships open**, so tapping its summary CLOSED it - and every tap afterwards
+    landed on the section underneath while the probes still read plausible rects
+    out of the collapsed card. And `el.scrollIntoView({block:'center'})`, which
+    the tap step uses, **moves nothing on this page**: measured, scrollY stays put
+    with the element 1,110px below the fold, so the check scrolls with
+    `window.scrollTo` before each tap. Neither is a page fault; a thumb scrolls
+    the page itself.
+
 ## A pasted course nobody had saved went nowhere (2026-10-03, same day)
 
 Manny's review read **"2026-10-14 14:06 - Myrtlewood PineHills - will look up

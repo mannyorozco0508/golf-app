@@ -49,6 +49,11 @@
          every link between them breaking. -->
     <script src="product-links.js"></script>
     <script src="course-import-rules.js"></script>
+    <!-- THE PASTED ROSTER, same parser as the weekly game (2026-10-03). my-groups.js
+         is here for its note stripper, which roster-paste.js reaches by the same
+         typeof guard admin.html uses - one implementation, not a second copy. -->
+    <script src="my-groups.js"></script>
+    <script src="roster-paste.js"></script>
     <script src="course-index.js"></script>
     <script src="trip-itinerary.js"></script>
     <script src="trip-roster.js"></script>
@@ -396,6 +401,28 @@ html {
     </div>
     <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
 
+    <!-- RENAME, ORGANIZER ONLY (2026-10-03). A trip's name was typed once, at
+         creation, and never again - Manny's Myrtle week went in as "Myrtle Beach
+         2006" and the only way to correct a typo was to build the whole trip a
+         second time. The name is on the recap card, the share text and the
+         itinerary print, so a wrong one is wrong in every one of them. -->
+    <div id="trip-rename-row" style="display:none; text-align:center; margin:-8px 0 12px 0;">
+        <button type="button" class="btn-outline" data-role="trip-rename-open"
+                style="width:auto; padding:4px 12px; font-size:0.76rem;" onclick="openTripRename()">✏️ Rename trip</button>
+    </div>
+    <div id="trip-rename-edit" style="display:none; margin:-4px 0 12px 0;">
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Trip name</label>
+            <input type="text" id="trip-rename-input" maxlength="60" placeholder="e.g. Myrtle Beach 2026">
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-primary" data-role="trip-rename-save"
+                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="saveTripRename()">Save name</button>
+            <button type="button" class="btn-outline" data-role="trip-rename-cancel"
+                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="closeTripRename()">Cancel</button>
+        </div>
+    </div>
+
     <!-- ORGANIZER TOOLS. Withheld from a plain trip link, which is the one that
          gets shared and the one printed on the recap card. Withholding these must
          NOT withhold the trip itself - the rounds, the standings, the money and
@@ -403,8 +430,14 @@ html {
          of the link. -->
     <div id="trip-organizer-tools">
     <hr class="section-divider">
-    <h3>🔗 Add a Round to This Trip</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+    <!-- COLLAPSED (2026-10-03). The itinerary paste builds every round of the trip
+         in one go, so this whole section - Start From, and linking a round in by
+         its game code - is now the exception rather than the way a trip is made.
+         It is one line until it is wanted. -->
+    <details class="trip-section" id="add-round-card">
+        <summary style="font-weight:bold; cursor:pointer;">➕ Add another round</summary>
+        <div class="trip-section-body">
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
 
     <div class="form-group" id="copy-from-round-group" style="display:none; margin-bottom:8px;">
         <label>Start From (optional)</label>
@@ -428,6 +461,8 @@ html {
         </div>
         <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
     </div>
+        </div>
+    </details>
     </div><!-- /trip-organizer-tools -->
 
     <hr class="section-divider">
@@ -475,7 +510,27 @@ html {
                         <button type="button" class="btn-outline" onclick="tripRemoveGolfer()">Remove</button>
                     </div>
                 </div>
-                <p id="trip-roster-note" role="status" style="font-size:0.78rem; color:var(--text-muted); margin:0;"></p>
+                <!-- THE WHOLE LIST AT ONCE (2026-10-03). A trip is built before
+                     anybody knows who is coming, so every round starts with
+                     "Player 1".."Player N"; the real list arrives later, in a note
+                     on the organizer's phone, with handicaps and blank lines
+                     between groups. Same parser as the weekly game's paste
+                     (roster-paste.js), and nothing is written until the review
+                     below is accepted. -->
+                <details class="settle-card" id="trip-roster-paste-card" style="margin:8px 0;">
+                    <summary style="font-weight:bold; cursor:pointer;">📋 Paste the whole list</summary>
+                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                        One golfer per line &mdash; name, then the handicap. A blank line starts a new group,
+                        and a leading A or B is a flight. Pasted golfers take the placeholder slots first,
+                        in order, then keep adding.
+                    </p>
+                    <textarea id="trip-roster-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
+                        placeholder="B Jimmy 11 (captain)&#10;A Paul 3.5&#10;Marty 9&#10;Lance 14.3&#10;&#10;Reese 6&#10;Mike 12"></textarea>
+                    <button type="button" class="btn-outline" data-role="trip-roster-paste-review"
+                            onclick="reviewTripRosterPaste()">Read it →</button>
+                    <div id="trip-roster-paste-review" style="margin-top:10px;"></div>
+                </details>
+                <p id="trip-roster-note" role="status" style="font-size:0.78rem; color:var(--text-muted); margin:0; white-space:pre-line;"></p>
             </div>
             <div id="trip-identity-questions"></div>
         </div>
@@ -1527,7 +1582,13 @@ html {
                     courseData: courseData,
                     players: players
                 };
-                updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
+                // THE DATE, WHEN THE ITINERARY GAVE ONE (2026-10-03). It orders the
+                // round pickers and labels them the way the golfer wrote them
+                // ("Tue 10/13 AM"). A round with no date keeps its addedAt order;
+                // inventing one would sort the trip wrongly with confidence.
+                const roundRow = { label: cfg.label, addedAt: Date.now() };
+                if (cfg.teeDate) roundRow.date = cfg.teeDate;
+                updates[`trips/${tripCode}/rounds/${roundCode}`] = roundRow;
             });
 
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js): the token awaited,
@@ -1768,6 +1829,64 @@ html {
         uiFail('⚠️ ' + what + '\n\n' + why + ' ' + consequence);
     }
 
+// ---- RENAME THE TRIP (2026-10-03) ----
+    //
+    // The whole control is withheld from a plain trip link, and the handlers check
+    // the token again: hiding a button is not a gate, which is the rule every
+    // other organizer action on this page already follows.
+    function renderTripRenameControl() {
+        const row = document.getElementById('trip-rename-row');
+        if (!row) return;
+        row.style.display = hasTripOrganizerAuthority() ? 'block' : 'none';
+        if (!hasTripOrganizerAuthority()) closeTripRename();
+    }
+
+    function openTripRename() {
+        if (!hasTripOrganizerAuthority()) return;
+        const box = document.getElementById('trip-rename-input');
+        const edit = document.getElementById('trip-rename-edit');
+        const row = document.getElementById('trip-rename-row');
+        if (!box || !edit || !row) return;
+        box.value = (tripData && tripData.name) || '';
+        edit.style.display = 'block';
+        row.style.display = 'none';
+        try { box.focus(); } catch (e) { /* no focus in a harness */ }
+    }
+
+    function closeTripRename() {
+        const edit = document.getElementById('trip-rename-edit');
+        if (edit) edit.style.display = 'none';
+        const row = document.getElementById('trip-rename-row');
+        if (row) row.style.display = hasTripOrganizerAuthority() ? 'block' : 'none';
+    }
+
+    function saveTripRename() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const box = document.getElementById('trip-rename-input');
+        const name = (box ? box.value : '').trim();
+        if (!name) { uiRefuse('\u26A0\uFE0F A trip needs a name \u2014 type one or tap Cancel.'); return; }
+        if (name === ((tripData && tripData.name) || '')) { closeTripRename(); return; }
+        // ONE CHILD, NOT THE TRIP. A set() on trips/<code> would replace the whole
+        // node - the rounds, the organizer token, the pool, the prize spots - and
+        // the rules allow that write, so nothing would stop it.
+        const p = db.ref(`trips/${currentTripCode}/name`).set(name);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        p.then(() => {
+            // The listener redraws the header on its own; this is for the surfaces
+            // that read tripData.name when they are next rendered.
+            if (tripData) tripData.name = name;
+            const h = document.getElementById('manage-trip-name');
+            if (h) h.textContent = '\ud83d\ude90 ' + name;
+            closeTripRename();
+            uiToast('\u270f\ufe0f Renamed to ' + name + '.');
+            refreshTripComputations();
+        }).catch((err) => {
+            reportTripWriteFailure(err, 'The trip was not renamed.', 'It still reads '
+                + ((tripData && tripData.name) || 'its old name') + '.');
+        });
+    }
+
     function linkRound() {
         // CHECKED IN THE HANDLER, not only at render. Removing the visual state
         // in devtools, or calling this from the console, must achieve nothing -
@@ -1984,8 +2103,23 @@ html {
         } else {
             copyGroup.style.display = 'block';
             const currentSelection = copySelect.value;
+            // IN DATE ORDER, NAMING THE COURSE (2026-10-03). This listed rounds in
+            // the key order of the rounds map and showed the Day label alone, so a
+            // seven-round trip offered "Day 1 AM / Day 3 / Day 1 PM" with nothing
+            // saying which course - and the course is how an organizer recognises
+            // the round he wants to copy. trip-roster.js holds the label and the
+            // order; the course name comes from the round's own event record.
+            const byCode = {};
+            (cachedRoundResults || []).forEach(cr => { byCode[cr.code] = cr.data || {}; });
+            const pickerRows = tripRoundPickerRows(roundCodes.map(code => ({
+                code: code,
+                label: rounds[code].label,
+                date: rounds[code].date || '',
+                addedAt: rounds[code].addedAt || 0,
+                courseName: (byCode[code] || {}).courseName || ''
+            })));
             copySelect.innerHTML = '<option value="">🆕 Blank round</option>' +
-                roundCodes.map(code => `<option value="${code}">${rounds[code].label}</option>`).join('');
+                pickerRows.map(r => `<option value="${r.code}">${escapeHtml(r.label)}</option>`).join('');
             if (roundCodes.includes(currentSelection)) copySelect.value = currentSelection;
         }
 
@@ -2265,6 +2399,89 @@ html {
             await db.ref().update(built.updates);
             uiToast('\u2705 ' + name + ' removed from ' + built.removed.length + ' round'
                 + (built.removed.length === 1 ? '' : 's') + '.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+// ---- PASTE THE WHOLE ROSTER (2026-10-03) ----
+    //
+    // The parser is roster-paste.js, the same one the weekly game's paste uses -
+    // handicaps are money, and a list that parsed one way into a round and another
+    // way into the trip holding it would be two different sets of strokes. The
+    // planner is trip-roster.js: it replaces the placeholder slots in order, keeps
+    // their ids, then adds, and it only ever touches rounds with NO SCORES.
+    let tripRosterPasted = null;
+
+    function reviewTripRosterPaste() {
+        const box = document.getElementById('trip-roster-paste-box');
+        const out = document.getElementById('trip-roster-paste-review');
+        if (!box || !out || typeof parsePlayerPasteText !== 'function') return;
+        const parsed = parsePlayerPasteText(box.value);
+        if (!parsed.validPlayers.length) {
+            tripRosterPasted = null;
+            out.innerHTML = '<p style="color:var(--text-muted);">Nothing to read yet.</p>';
+            return;
+        }
+        const plan = tripRosterPlanNow();
+        const built = tripRosterPasteUpdates(plan, parsed);
+        tripRosterPasted = parsed;
+        let html = '<ul style="margin:0 0 10px 18px; padding:0; font-size:0.84rem;">'
+            + parsed.validPlayers.map(g => '<li>' + escapeHtml(g.name)
+                + (String(g.hcp || '').trim() ? ' \u00B7 ' + escapeHtml(String(g.hcp)) : ' \u00B7 no handicap')
+                + (g.flight ? ' \u00B7 ' + escapeHtml(g.flight) : '') + '</li>').join('')
+            + '</ul>';
+        if (parsed.flaggedLines.length) {
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">'
+                + parsed.flaggedLines.length + ' line'
+                + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
+                + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.notedLines.length) {
+            // Said, not swallowed: the note came off the line so the handicap could
+            // be read, and the organizer is told which words were ignored.
+            html += '<p style="font-size:0.8rem; color:var(--text-muted);">Notes ignored: '
+                + escapeHtml(parsed.notedLines.map(l => l.note).join(', ')) + '</p>';
+        }
+        html += '<p style="font-size:0.8rem; font-weight:bold; white-space:pre-line;">'
+            + escapeHtml(built.note || '') + '</p>';
+        if (Object.keys(built.updates).length) {
+            html += '<button type="button" class="btn-primary" data-role="trip-roster-paste-save"'
+                + ' onclick="applyTripRosterPaste()">Use these ' + parsed.validPlayers.length
+                + ' golfer' + (parsed.validPlayers.length === 1 ? '' : 's') + '</button>';
+        }
+        out.innerHTML = html;
+    }
+
+    async function applyTripRosterPaste() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!tripRosterPasted) return;
+        const plan = tripRosterPlanNow();
+        const built = tripRosterPasteUpdates(plan, tripRosterPasted);
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse('\u26A0\uFE0F Nothing to change \u2014 every round in this trip has scores, so each keeps the roster it was played with.');
+        }
+        const ok = await uiConfirm({
+            title: 'Use this list on ' + built.changed.length + ' round'
+                + (built.changed.length === 1 ? '' : 's') + '?',
+            body: built.note + '\n\nScores and money in played rounds are untouched.'
+        });
+        if (!ok) return;
+        try {
+            await db.ref().update(built.updates);
+            tripRosterPasted = null;
+            const box = document.getElementById('trip-roster-paste-box');
+            if (box) box.value = '';
+            const out = document.getElementById('trip-roster-paste-review');
+            if (out) out.innerHTML = '';
+            const card = document.getElementById('trip-roster-paste-card');
+            if (card) card.open = false;
+            uiToast('\u2705 ' + built.replaced + ' placeholder'
+                + (built.replaced === 1 ? '' : 's') + ' replaced and ' + built.added + ' golfer'
+                + (built.added === 1 ? '' : 's') + ' added across ' + built.changed.length + ' round'
+                + (built.changed.length === 1 ? '' : 's') + '.'
+                + (plan.closed.length ? ' Rounds with scores were left alone.' : ''));
         } catch (err) {
             uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
         }
@@ -4085,6 +4302,7 @@ html {
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-trip-name').textContent = `🚐 ${tripData.name}`;
+            renderTripRenameControl();
             if (!tripLoadedOnce) {
                 tripLoadedOnce = true;
                 renderPrizeSpotInputs(); // build the $ inputs once before points race tries to sync payouts against them

@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v121-itinlookup. The tournament product cache
+// The consumer product cache is consumer-v122-rosterpaste. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3957,7 +3957,23 @@
 // base - one implementation, shared with trip.html, which precaches it already.
 // A device left on v280 keeps a planner that silently drops any course it does
 // not already hold.
-const CACHE_VERSION = 'golfapp-v281-itinlookup';
+// Moved to v282 FOR THE PASTED TRIP ROSTER, a trip that can be renamed, and a
+// round picker that reads like a calendar.
+//
+// roster-paste.js is NEW AND PRECACHED: trip.html calls parsePlayerPasteText
+// unguarded, so a device told it already had this version would throw when the
+// Golfers section renders. The parser moved out of admin.html, which had the only
+// copy - two pages read that same pasted list now, and handicaps are money.
+//
+// A trip's name was typed once at creation and never again (Manny's Myrtle week
+// went in as "Myrtle Beach 2006"), and the name is on the recap, the share text
+// and the itinerary print. The pasted roster replaces the "Player 1..N"
+// placeholders in order, keeping each seat's id, then adds - and it touches only
+// rounds with NO scores, because a played round's roster is where its handicaps,
+// its side-match ids and its pool charges come from. "Add a round to this trip"
+// is collapsed behind one line now that the itinerary paste builds every round,
+// and "Start From" lists rounds in date order naming the course.
+const CACHE_VERSION = 'golfapp-v282-rosterpaste';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4111,6 +4127,7 @@ const SHELL_FILES = [
     './live-skins.js',
     './course-data.js',
     './course-import-rules.js',
+    './roster-paste.js',
     // The shared course list, read cheaply - the probe, the name index and the
     // per-course fetch. admin.html, tournament.html and trip.html call
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws

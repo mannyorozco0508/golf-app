@@ -469,7 +469,11 @@ describe('6. THE SWEEP IS FINISHED', () => {
             // 18 -> 19 refusals: Build Trip now names the tap that is missing
             // when an itinerary has been read but never accepted, instead of
             // sending the golfer to the day planner he does not need.
-            'trip.html':    { refuse: 19, fail: 13, toast: 4, confirm: 2 },
+            // 19 -> 22 refusals, 13 -> 14 fails, 4 -> 6 toasts, 2 -> 3 confirms
+            // (2026-10-03): the pasted trip roster refuses an empty paste and a
+            // trip whose every round has scores, and ASKS before it writes;
+            // renaming a trip refuses an empty name and reports a refused write.
+            'trip.html':    { refuse: 22, fail: 14, toast: 6, confirm: 3 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

@@ -224,8 +224,13 @@ describe('NO LETTERS AT ALL: nothing changes', () => {
 
 describe('THE SOURCE RULE, pinned: leading only, glued dot or dash guarded, A and B only', () => {
     const fs = require('fs'), path = require('path');
-    const src = fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8');
+    // THE PARSER MOVED to roster-paste.js on 2026-10-03, shared with trip.html's
+    // trip-wide roster paste. The rules below are unchanged; only their file is.
+    const src = fs.readFileSync(path.join(__dirname, 'roster-paste.js'), 'utf8');
     const fn = src.slice(src.indexOf('function splitLeadingFlight('), src.indexOf('function parsePlayerPasteText('));
+    assert.ok(fn.length > 200, 'the slice is empty - splitLeadingFlight moved again');
+    assert.ok(!/function splitLeadingFlight\(/.test(fs.readFileSync(path.join(__dirname, 'admin.html'), 'utf8')),
+        'admin.html declares the flight splitter again - two parsers for one pasted list');
     test('anchored at the start of the line, never the end', () => {
         assert.match(src, /const LEAD_FLIGHT_RE = \/\^\(\[A-Za-z\]\)\(\[/, 'anchored ^, a regex literal');
         assert.match(fn, /LEAD_FLIGHT_RE\.exec\(line\)/);
