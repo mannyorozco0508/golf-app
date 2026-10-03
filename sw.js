@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v123-tripsimplify. The tournament product cache
+// The consumer product cache is consumer-v124-trippots. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3991,7 +3991,21 @@
 // A new trip is four things on one screen now - name, the rounds, the golfers,
 // Build - and the trip page reads name, rounds, golfers, then the numbers, with
 // the golfers shown in their groups.
-const CACHE_VERSION = 'golfapp-v283-tripsimplify';
+// Moved to v284 FOR THE TRIP'S OWN MONEY: a pot on the points race, and a pot in
+// every round. Both are OFF until an organizer switches them on, and with both
+// off the trip settles byte for byte as it did - asserted against a golden taken
+// from the page before this existed.
+//
+// trip-pots.js is NEW AND PRECACHED: trip.html calls tripPotConfig unguarded when
+// it draws the money, so a device told it already had this version would throw on
+// the settlement rather than merely miss a feature.
+//
+// THE POINTS SCALE CHANGED with it: 1st is worth the whole trip's field size (24
+// in a 24-man trip), not however many posted that day, so a thin Thursday is
+// worth the same as a full Monday for the same finish. No money was ever attached
+// to those points before this wave; now there can be, which is why the scale had
+// to stop moving.
+const CACHE_VERSION = 'golfapp-v284-trippots';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4146,6 +4160,7 @@ const SHELL_FILES = [
     './course-data.js',
     './course-import-rules.js',
     './roster-paste.js',
+    './trip-pots.js',
     // The shared course list, read cheaply - the probe, the name index and the
     // per-course fetch. admin.html, tournament.html and trip.html call
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws

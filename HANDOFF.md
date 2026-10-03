@@ -3063,6 +3063,50 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, branch `trip-pots`, NOT merged)
+
+STRICT. Two optional pots, both OFF until an organizer switches them on. Cache
+`golfapp-v284-trippots` / consumer `v124`.
+
+- **THE TRIP POT** is the points race played for money: every golfer in the trip
+  pays one buy-in, the pot is buy-in x field, and it pays the finishing order
+  through **payouts.js allocatePlacePayouts** - the same place-and-tie rule the
+  prize calculator and the Tournament desk use. It is the only money in this app
+  that belongs to the TRIP rather than to a round, so it is added once, to BOTH
+  trip totals (the daily one and the settle-once one), and the scope sentence
+  gains "and the Trip Pot" **only while it is on**.
+  - **IT BALANCES TO ZERO OR IT IS NOT APPLIED.** The places must add up to the
+    buy-ins before Save will take them, and `tripPotLedger` refuses any pot whose
+    entries do not sum to zero - which is the backstop that caught the real
+    defect below.
+- **THE DAILY POT** is not new money: it is each round's own Weekly Game
+  (`data.moneyPool`), set once on the trip and copied into every round **with no
+  scores**, through `trip-roster.js tripRosterPlan` - the same open/closed split
+  every other trip-wide change uses. A round can still be edited afterwards.
+  - **THE BUCKETS ARE SHARES, NOT DOLLARS, AND THAT WAS FORCED BY MEASUREMENT.** A
+    round's pot is the buy-in times whoever is in THAT round, so a fixed "KP $40,
+    net $60" written into a four-man $80 round is "$20 over budget" and
+    pool-engine.js refuses the whole pool. A percentage is right at every
+    headcount; skins takes the remainder so the last cent always lands.
+- **THE POINTS SCALE CHANGED:** 1st is worth the whole trip's field size (24 in a
+  24-man trip), not however many posted that day, and there is a Net/Gross switch.
+  A thin Thursday used to be worth less than a full Monday for the same finish.
+  **Money did not move:** the re-captured `trip_identity_prev.fixture.json` came
+  back byte-identical on money, board and awards - only the points changed.
+- **A REAL DEFECT, FOUND BY MY OWN CONTROL.** Forcing a pot on changed nothing,
+  and the reason was that `computeTripPointsRace` keyed its totals by golfer and
+  then `Object.values()` threw the key away - so no prize could ever be matched to
+  a payer and the pot refused itself every single time. **Every unit rule can pass
+  with a feature that never runs**; it took rendering the page with a pot switched
+  on to see it, and that test is now in the file.
+- **WITH BOTH OFF, THE TRIP SETTLES BYTE FOR BYTE AS IT DID** - money card, points
+  race, leaderboard and prize calculator - against
+  `helpers/trip-money-no-pots.golden.json`, captured from the page before any of
+  this existed.
+- **Five controls fired behaviourally**, one was inert and is reported as inert
+  (forcing the apply branch while the pot is off changes nothing, because a
+  refused pot carries no entries). Engines frozen by sha, payouts.js included.
+
 ## Road Trip, simplified - and a group header that was being paid as a golfer (2026-10-04, branch `trip-simplify`, NOT merged)
 
 Manny pasted his real 24-golfer list on the live app. Five things were wrong, and

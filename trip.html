@@ -60,6 +60,9 @@
     <script src="course-index.js"></script>
     <script src="trip-itinerary.js"></script>
     <script src="trip-roster.js"></script>
+    <!-- The trip's own money: the points-race pot and the daily pot. Pure rules;
+         the page reads the trip, the module says what the money is, the page writes. -->
+    <script src="trip-pots.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
@@ -454,6 +457,10 @@ html {
          2006" and the only way to correct a typo was to build the whole trip a
          second time. The name is on the recap card, the share text and the
          itinerary print, so a wrong one is wrong in every one of them. -->
+    <!-- ONE LINE ABOUT THE TRIP'S OWN MONEY, under the name, where somebody
+         opening the trip will read it. -->
+    <p id="trip-pots-line" style="display:none; text-align:center; font-size:0.8rem; font-weight:bold; color:var(--brand-green); margin:-4px 0 10px 0;"></p>
+
     <div id="trip-rename-row" style="display:none; text-align:center; margin:-8px 0 12px 0;">
         <button type="button" class="btn-outline" data-role="trip-rename-open"
                 style="width:auto; padding:4px 12px; font-size:0.76rem;" onclick="openTripRename()">✏️ Rename trip</button>
@@ -484,6 +491,37 @@ html {
         <div class="trip-section-body">
             <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
             <div id="rounds-list"></div>
+            <!-- THE DAILY POT (2026-10-04). Not new money: it is each round's own
+                 Weekly Game, set once here and copied into every round that has
+                 NOT been played. A round can still be edited on its own afterwards. -->
+            <div id="daily-pot-card" style="display:none; margin:10px 0;">
+                <div class="settle-card" style="padding:10px 12px;">
+                    <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="daily-pot-on" style="width:auto;" onchange="dailyPotTouched(); renderDailyPotRow()">
+                        <span>💵 A pot in every round</span>
+                    </label>
+                    <div id="daily-pot-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="form-group" style="margin:0; flex:0 0 108px;">
+                                <label>Each ($)</label>
+                                <input type="number" id="daily-pot-buyin" min="0" value="0" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 96px;">
+                                <label>KP (%)</label>
+                                <input type="number" id="daily-pot-kp" min="0" max="100" value="0" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 108px;">
+                                <label>Net finish (%)</label>
+                                <input type="number" id="daily-pot-net" min="0" max="100" value="50" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                        </div>
+                        <p id="daily-pot-note" style="font-size:0.8rem; margin:8px 0; white-space:pre-line;"></p>
+                        <button type="button" class="btn-primary" data-role="daily-pot-save"
+                                style="padding:10px; font-size:0.9rem;" onclick="saveDailyPot()">Save &amp; put it in every unplayed round</button>
+                    </div>
+                </div>
+            </div>
+
             <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
         </div>
     </details>
@@ -650,6 +688,40 @@ html {
             <div id="trip-points-race"></div>
 
             <hr class="section-divider" style="margin:18px 0;">
+
+            <!-- THE TRIP POT (2026-10-04). Off until an organizer switches it on.
+                 One row: a buy-in per golfer, how many places pay, and the amounts -
+                 which must add up to the pot before Save will take them, because a
+                 pot that does not balance is money appearing from nowhere. Saved on
+                 the TRIP, so every golfer sees the same numbers. -->
+            <div id="trip-pot-card" style="display:none; margin:10px 0 14px 0;">
+                <div class="settle-card" style="padding:10px 12px;">
+                    <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="trip-pot-on" style="width:auto;" onchange="tripPotTouched(); renderTripPotRow()">
+                        <span>💰 Play the points race for money</span>
+                    </label>
+                    <div id="trip-pot-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="form-group" style="margin:0; flex:0 0 110px;">
+                                <label>Buy-in ($)</label>
+                                <input type="number" id="trip-pot-buyin" min="0" value="0" inputmode="numeric" oninput="tripPotTouched(); renderTripPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 110px;">
+                                <label>Places paid</label>
+                                <input type="number" id="trip-pot-spots" min="1" max="20" value="3" oninput="tripPotTouched(); renderTripPotSpots(true)">
+                            </div>
+                        </div>
+                        <div id="trip-pot-amounts" style="margin-top:8px;"></div>
+                        <p id="trip-pot-balance" style="font-size:0.8rem; font-weight:bold; margin:8px 0;"></p>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn-primary" data-role="trip-pot-save"
+                                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="saveTripPot()">Save the pot</button>
+                            <button type="button" class="btn-outline" data-role="trip-pot-even"
+                                    style="flex:0 0 auto; padding:10px 12px; font-size:0.84rem;" onclick="evenTripPotSplit()">Split evenly</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <p class="trip-section-sub" style="margin-bottom:8px;"><strong>Prize Payout Calculator</strong> — set the pool and how many spots pay, and it maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
             <div class="form-group" style="margin-bottom:8px;">
@@ -2985,6 +3057,7 @@ html {
                 // rather than asking the question again.
                 recomputeTripGate();
                 renderTripRoster();
+                renderTripPotsControls();
                 renderTripIdentityQuestions();
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
@@ -3203,6 +3276,17 @@ html {
         'the Birdie Pool', 'KPs', 'the Weekly Game'
     ];
 
+    // THE TRIP POT IS NAMED ONLY WHEN IT IS ON. It is not a seventh category of
+    // round money - it is the trip's own pot - and a sentence that listed it on
+    // every trip would be telling most groups about money they do not have. The
+    // daily pot needs no entry: it IS the Weekly Game, already named above.
+    let cachedTripPot = { applied: false, entries: [], reason: 'off' };
+    function tripTotalCategories() {
+        return (cachedTripPot && cachedTripPot.applied)
+            ? TRIP_TOTAL_INCLUDES.concat(['the Trip Pot'])
+            : TRIP_TOTAL_INCLUDES;
+    }
+
     // THE ONLY THING IN THIS FILE THAT MAY PRODUCE A SENTENCE ABOUT WHAT THE
     // TOTAL CONTAINS.
     //
@@ -3229,8 +3313,9 @@ html {
     // carries the sentence, and changing the wording here changes it
     // everywhere at once.
     function tripTotalScopeSentence() {
-        return 'Includes ' + TRIP_TOTAL_INCLUDES.slice(0, -1).join(', ')
-            + ' and ' + TRIP_TOTAL_INCLUDES[TRIP_TOTAL_INCLUDES.length - 1] + '.';
+        const list = tripTotalCategories();
+        return 'Includes ' + list.slice(0, -1).join(', ')
+            + ' and ' + list[list.length - 1] + '.';
     }
 
     // NAMES ARE THE ONLY THING THAT CROSSES ROUNDS, and the trip total is built by
@@ -3535,6 +3620,31 @@ html {
         // (settlement-engine.js roundNetTotalsToWholeDollars), run once over the
         // exact sum, short by exactly the KP money still withheld - the same call
         // each round makes for itself.
+        // ---- THE TRIP POT (2026-10-04) --------------------------------------
+        //
+        // The only money in this app that belongs to the TRIP rather than to a
+        // round, so it is added once, here, to BOTH totals - the daily one and
+        // the settle-once one - because it is the same money under either
+        // agreement. Buy-ins and prizes are whole dollars, so neither total has
+        // to round anything it did not round before.
+        //
+        // NOT BALANCED, NOT APPLIED. trip-pots.js refuses a pot whose places do
+        // not add up to the buy-ins, and the reason is shown instead of a number.
+        const potCfg = tripPotConfig(tripData);
+        const potField = tripFieldKeys(cachedCountedResults);
+        const potLedger = tripPotLedger(potCfg, potField,
+            computeTripPointsRace(cachedCountedResults) || [], allocatePlacePayouts);
+        cachedTripPot = potLedger;
+        if (potLedger.applied) {
+            potLedger.entries.forEach(e => {
+                const dollars = e.netCents / 100;
+                if (!netByName[e.key]) netByName[e.key] = { name: e.name, net: 0 };
+                netByName[e.key].net += dollars;
+                if (!exactByName[e.key]) exactByName[e.key] = { name: e.name, net: 0 };
+                exactByName[e.key].net += dollars;
+            });
+        }
+
         const onceByName = {};
         Object.keys(exactByName).forEach(k => { onceByName[k] = { name: exactByName[k].name, net: exactByName[k].net }; });
         const onceRounded = roundNetTotalsToWholeDollars(onceByName, -unresolvedDollars);
@@ -3984,8 +4094,27 @@ html {
     // automatically no matter how many played. Ties split the combined points
     // for their tied spots evenly. Totals accumulate across every counted round.
     // ============================================================================
+// THE TRIP'S FIELD: every golfer who appears in any counted round, by the same
+    // key the standings and the money use. A buy-in is for the week, so a man who
+    // misses Tuesday is still in the pot and still on the scale.
+    function tripFieldKeys(results) {
+        const seen = {};
+        (results || []).forEach(({ code, data }) => {
+            ((data || {}).players || []).forEach(p => {
+                const key = tripGolferKey(code, p);
+                if (!key) return;
+                if (!seen[key]) seen[key] = { key: key, name: tripGolferLabel(key, p.name) };
+            });
+        });
+        return Object.values(seen);
+    }
+
     function computeTripPointsRace(results) {
         const totals = {}; // lowercased name -> { name, points, roundsPlayed }
+        const potCfg = tripPotConfig(tripData);
+        // EVERY GOLFER IN THE TRIP, not just today's finishers - the scale below
+        // and the pot's buy-in are both per person for the week.
+        const tripFieldSize = tripFieldKeys(results).length;
 
         results.forEach(({ code, data }) => {
             const courseData = data.courseData || [];
@@ -3998,38 +4127,42 @@ html {
             // sample look artificially good or bad and distort the standings mid-round.
             let roundResults = [];
             players.forEach(p => {
-                let net = 0, holesPlayed = 0;
+                let net = 0, gross = 0, holesPlayed = 0;
                 courseData.forEach(h => {
                     const v = scores[`p${p.id}_h${h.hole}`];
                     if (v > 0) {
+                        gross += parseInt(v, 10);
                         net += (parseInt(v, 10) - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
                         holesPlayed++;
                     }
                 });
-                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net, key: tripGolferKey(code, p) });
+                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net, gross, key: tripGolferKey(code, p) });
             });
 
             if (roundResults.length === 0) return; // nobody's finished this round yet
 
-            roundResults.sort((a, b) => a.net - b.net);
-            const fieldSize = roundResults.length;
+            // NET BY DEFAULT, GROSS BY CHOICE. The switch is the trip pot's, because
+            // the pot is this race played for money; with no pot it is still the
+            // organizer's call what the race is scored on.
+            const scoring = potCfg.scoring;
+            roundResults.sort((a, b) => (scoring === 'gross' ? a.gross - b.gross : a.net - b.net));
 
-            let i = 0;
-            while (i < roundResults.length) {
-                let j = i;
-                while (j + 1 < roundResults.length && roundResults[j + 1].net === roundResults[i].net) j++;
-                // positions i+1..j+1 (1-indexed) are tied — split the combined points for those spots evenly
-                let pointsSum = 0;
-                for (let pos = i + 1; pos <= j + 1; pos++) pointsSum += (fieldSize - pos + 1);
-                const avgPoints = pointsSum / (j - i + 1);
-                for (let k = i; k <= j; k++) {
-                    const key = roundResults[k].key;
-                    if (!totals[key]) totals[key] = { name: tripGolferLabel(key, roundResults[k].name), points: 0, roundsPlayed: 0 };
-                    totals[key].points += avgPoints;
-                    totals[key].roundsPlayed += 1;
-                }
-                i = j + 1;
-            }
+            // THE SCALE IS THE WHOLE TRIP'S FIELD, not the number who posted that
+            // day: a win on a thin Thursday is worth the same as a win on a full
+            // Monday, which is what makes a week of them a race. trip-pots.js owns
+            // the award and the tie split.
+            const ranked = roundResults.map(r => ({ key: r.key, name: r.name,
+                score: scoring === 'gross' ? r.gross : r.net }));
+            tripPointsAward(ranked, tripFieldSize).forEach(a => {
+                // THE KEY TRAVELS WITH THE STANDING. The map was keyed by the trip
+                // golfer and Object.values() then threw that key away, so a prize
+                // had a name and nothing to match a payer against - measured: the
+                // pot refused itself with "does not balance to zero" every time,
+                // which is the backstop doing its job over a defect one line up.
+                if (!totals[a.key]) totals[a.key] = { key: a.key, name: tripGolferLabel(a.key, a.name), points: 0, roundsPlayed: 0 };
+                totals[a.key].points += a.points;
+                totals[a.key].roundsPlayed += 1;
+            });
         });
 
         let standings = Object.values(totals).sort((a, b) => b.points - a.points);
@@ -4094,6 +4227,223 @@ html {
 
     // Rebuilds the per-spot $ inputs whenever pool size or paid-spot count changes, preserving
     // whatever the person already typed into any spot that still exists after the change.
+// ---- THE TRIP POT AND THE DAILY POT (2026-10-04) ----
+    //
+    // Both are organizer-only at render AND in every handler, both are saved on
+    // the trip so every golfer sees the same numbers, and both are OFF until
+    // somebody switches them on. The rules are trip-pots.js; this is the screen.
+    function renderTripPotsLine() {
+        const line = document.getElementById('trip-pots-line');
+        if (!line) return;
+        const text = tripPotsLine(tripPotConfig(tripData), dailyPotConfig(tripData),
+            tripFieldKeys(cachedCountedResults).length);
+        line.style.display = text ? 'block' : 'none';
+        line.textContent = text;
+    }
+
+    function tripPotFieldSize() { return tripFieldKeys(cachedCountedResults).length; }
+
+    function readTripPotForm() {
+        const on = !!(document.getElementById('trip-pot-on') || {}).checked;
+        const buyIn = parseFloat((document.getElementById('trip-pot-buyin') || {}).value) || 0;
+        const spots = parseInt((document.getElementById('trip-pot-spots') || {}).value, 10) || 1;
+        const places = [];
+        for (let i = 0; i < spots; i++) {
+            const el = document.getElementById('trip-pot-place-' + i);
+            places.push(el ? (parseFloat(el.value) || 0) : 0);
+        }
+        return tripPotConfig({ tripPot: { on, buyIn, places, scoring: tripPotConfig(tripData).scoring } });
+    }
+
+    function renderTripPotSpots(prefill) {
+        const cfg = readTripPotForm();
+        const spotsEl = document.getElementById('trip-pot-spots');
+        let n = parseInt(spotsEl ? spotsEl.value : '3', 10);
+        if (isNaN(n) || n < 1) n = 1;
+        if (n > 20) { n = 20; if (spotsEl) spotsEl.value = '20'; }
+        const box = document.getElementById('trip-pot-amounts');
+        if (!box) return;
+        const even = tripPotDefaultPlaces(cfg, tripPotFieldSize(), n);
+        let html = '';
+        for (let i = 0; i < n; i++) {
+            const existing = document.getElementById('trip-pot-place-' + i);
+            const value = (prefill || !existing) ? even[i] : existing.value;
+            html += '<div class="form-group" style="margin-bottom:6px; display:flex; gap:8px; align-items:center;">'
+                + '<label style="margin:0; flex:0 0 70px;">' + ordinal(i + 1) + '</label>'
+                + '<input type="number" id="trip-pot-place-' + i + '" min="0" value="' + value
+                + '" inputmode="numeric" oninput="tripPotTouched(); renderTripPotRow()"></div>';
+        }
+        box.innerHTML = html;
+        renderTripPotRow();
+    }
+
+    function evenTripPotSplit() { renderTripPotSpots(true); }
+
+    function renderTripPotRow() {
+        const row = document.getElementById('trip-pot-row');
+        const on = !!(document.getElementById('trip-pot-on') || {}).checked;
+        if (row) row.style.display = on ? 'block' : 'none';
+        const note = document.getElementById('trip-pot-balance');
+        if (!note) return;
+        const cfg = readTripPotForm();
+        const field = tripPotFieldSize();
+        const bal = tripPotBalance(cfg, field);
+        const pot = Math.round(bal.potCents / 100);
+        const paid = Math.round(bal.paidCents / 100);
+        if (!on) { note.textContent = ''; return; }
+        if (bal.potCents <= 0) { note.textContent = 'Set a buy-in to make a pot.'; return; }
+        note.textContent = bal.balanced
+            ? '\u2705 $' + pot + ' pot from ' + field + ' golfer' + (field === 1 ? '' : 's') + ', all of it paid out.'
+            : (paid > pot
+                ? '\u26A0\uFE0F The places add up to $' + paid + ', which is $' + (paid - pot) + ' more than the $' + pot + ' pot.'
+                : '\u26A0\uFE0F The places add up to $' + paid + ', which is $' + (pot - paid) + ' short of the $' + pot + ' pot.');
+    }
+
+    async function saveTripPot() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const cfg = readTripPotForm();
+        if (!cfg.on) {
+            // SWITCHED OFF IS A SAVE TOO, and it must leave nothing behind that a
+            // later render could apply.
+            try {
+                await db.ref(`trips/${currentTripCode}/tripPot`).update({ on: false });
+                refreshTripComputations();
+                uiToast('\u2705 Trip pot is off.');
+            } catch (err) { reportTripWriteFailure(err, 'The trip pot was not saved.', 'It is unchanged.'); }
+            return;
+        }
+        const field = tripPotFieldSize();
+        const bal = tripPotBalance(cfg, field);
+        if (bal.potCents <= 0) { uiRefuse('\u26A0\uFE0F Set a buy-in first.'); return; }
+        // REFUSED RATHER THAN ROUNDED. The pot is the golfers' money; a saved pot
+        // that does not add up would pay somebody a dollar nobody put in.
+        if (!bal.balanced) {
+            uiRefuse('\u26A0\uFE0F The places must add up to the $' + Math.round(bal.potCents / 100)
+                + ' pot \u2014 they come to $' + Math.round(bal.paidCents / 100) + '.');
+            return;
+        }
+        try {
+            await db.ref(`trips/${currentTripCode}/tripPot`).update({
+                on: true, buyIn: cfg.buyIn, places: cfg.places, scoring: cfg.scoring
+            });
+            refreshTripComputations();
+            uiToast('\u2705 Trip pot saved: $' + Math.round(bal.potCents / 100) + ' on the points race.');
+        } catch (err) {
+            reportTripWriteFailure(err, 'The trip pot was not saved.', 'It is unchanged.');
+        }
+    }
+
+    function readDailyPotForm() {
+        return dailyPotConfig({ dailyPot: {
+            on: !!(document.getElementById('daily-pot-on') || {}).checked,
+            buyIn: parseFloat((document.getElementById('daily-pot-buyin') || {}).value) || 0,
+            kpPct: parseFloat((document.getElementById('daily-pot-kp') || {}).value) || 0,
+            netPct: parseFloat((document.getElementById('daily-pot-net') || {}).value) || 0,
+            scoring: dailyPotConfig(tripData).scoring
+        } });
+    }
+
+    function renderDailyPotRow() {
+        const row = document.getElementById('daily-pot-row');
+        const on = !!(document.getElementById('daily-pot-on') || {}).checked;
+        if (row) row.style.display = on ? 'block' : 'none';
+        const note = document.getElementById('daily-pot-note');
+        if (!note) return;
+        if (!on) { note.textContent = ''; return; }
+        const cfg = readDailyPotForm();
+        const built = dailyPotUpdates(tripRosterPlanNow(), cfg, moneyPoolParticipants);
+        if (cfg.buyIn <= 0) { note.textContent = 'Set what each golfer puts in.'; return; }
+        const lines = built.amounts.map(a => a.label + ': ' + a.golfers + ' golfers, $' + a.pot
+            + ' \u2014 KP $' + a.kp + ', net $' + a.net + ', skins $' + a.skins);
+        if (built.skipped.length) lines.push('Untouched (already has scores): ' + built.skipped.join(', ') + '.');
+        if (built.noCard.length) lines.push('No course card yet, so no pot: ' + built.noCard.join(', ') + '.');
+        note.textContent = lines.join('\n') || 'No rounds to put a pot in yet.';
+    }
+
+    async function saveDailyPot() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const cfg = readDailyPotForm();
+        const updates = {};
+        updates[`trips/${currentTripCode}/dailyPot`] = {
+            on: cfg.on, buyIn: cfg.buyIn, kpPct: cfg.kpPct, netPct: cfg.netPct,
+            netPlaces: cfg.netPlaces, skins: cfg.skins, scoring: cfg.scoring
+        };
+        if (cfg.on) {
+            if (cfg.buyIn <= 0) { uiRefuse('\u26A0\uFE0F Set what each golfer puts in.'); return; }
+            // ONLY ROUNDS WITH NO SCORES. trip-roster.js draws that line for every
+            // trip-wide change, so there is one answer to "may this round be edited".
+            const built = dailyPotUpdates(tripRosterPlanNow(), cfg, moneyPoolParticipants);
+            if (!built.changed.length) {
+                uiRefuse('\u26A0\uFE0F No round to put a pot in \u2014 every round either has scores already or has no course card yet.');
+                return;
+            }
+            const ok = await uiConfirm({
+                title: 'Put a $' + cfg.buyIn + ' pot in ' + built.changed.length + ' round'
+                    + (built.changed.length === 1 ? '' : 's') + '?',
+                body: built.changed.join(', ') + '.'
+                    + (built.skipped.length ? '\n\nUntouched (already has scores): ' + built.skipped.join(', ') + '.' : '')
+                    + '\n\nEach round keeps its own setup afterwards \u2014 edit any of them from its round setup.'
+            });
+            if (!ok) return;
+            Object.keys(built.updates).forEach(k => { updates[k] = built.updates[k]; });
+        }
+        try {
+            await db.ref().update(updates);
+            refreshTripComputations();
+            uiToast(cfg.on ? '\u2705 Daily pot saved into every unplayed round.' : '\u2705 Daily pot is off.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+    // THE SWITCHES ARE ORGANIZER-ONLY, and what they hold comes from the trip.
+    function renderTripPotsControls() {
+        const may = (typeof hasTripOrganizerAuthority === 'function') && hasTripOrganizerAuthority();
+        const potCard = document.getElementById('trip-pot-card');
+        const dailyCard = document.getElementById('daily-pot-card');
+        if (potCard) potCard.style.display = may ? 'block' : 'none';
+        if (dailyCard) dailyCard.style.display = may ? 'block' : 'none';
+        renderTripPotsLine();
+        if (!may) return;
+        const pot = tripPotConfig(tripData);
+        const on = document.getElementById('trip-pot-on');
+        const buyIn = document.getElementById('trip-pot-buyin');
+        const spots = document.getElementById('trip-pot-spots');
+        if (on && !tripPotFormTouched) {
+            on.checked = pot.on;
+            if (buyIn) buyIn.value = String(pot.buyIn || 0);
+            if (spots && pot.places.length) spots.value = String(pot.places.length);
+            renderTripPotSpots(false);
+            if (pot.places.length) {
+                pot.places.forEach((v, i) => {
+                    const el = document.getElementById('trip-pot-place-' + i);
+                    if (el) el.value = String(v);
+                });
+            }
+            renderTripPotRow();
+        }
+        const daily = dailyPotConfig(tripData);
+        const dOn = document.getElementById('daily-pot-on');
+        if (dOn && !dailyPotFormTouched) {
+            dOn.checked = daily.on;
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
+            set('daily-pot-buyin', daily.buyIn || 0);
+            set('daily-pot-kp', daily.kpPct || 0);
+            set('daily-pot-net', daily.netPct || 0);
+            renderDailyPotRow();
+        }
+    }
+
+    // A SAVED SETTING IS THE STARTING POINT, NOT AN OVERWRITE. Once the organizer
+    // has typed in these boxes, a refresh must not reach in and replace what they
+    // are in the middle of.
+    let tripPotFormTouched = false;
+    let dailyPotFormTouched = false;
+    function tripPotTouched() { tripPotFormTouched = true; }
+    function dailyPotTouched() { dailyPotFormTouched = true; }
+
     function renderPrizeSpotInputs() {
         const spotsInput = document.getElementById('prize-spots-input');
         let n = parseInt(spotsInput.value, 10);
