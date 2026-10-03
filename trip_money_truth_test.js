@@ -308,8 +308,14 @@ describe('A NAME THAT CANNOT IDENTIFY A GOLFER REFUSES THE TRIP TOTAL', () => {
     // per-round breakdown below, so asserting it anywhere in the html passes even
     // when the refusal names no round at all - which is exactly what a control
     // removing it proved.
+    // TWO HEADINGS SINCE 2026-10-04, one rule. A trip that cannot tell two
+    // golfers apart still reads "Trip Total Not Shown" in a warning box; a trip
+    // whose golfers are simply unnamed yet reads "Trip Total waiting for real
+    // names", quietly - the number is withheld either way, and only the volume
+    // differs. Both are this card.
     const refusalCard = h => {
-        const at = h.indexOf('Trip Total Not Shown');
+        let at = h.indexOf('Trip Total Not Shown');
+        if (at === -1) at = h.indexOf('Trip Total waiting for real names');
         if (at === -1) return '';
         const end = h.indexOf('Per-Round Breakdown', at);
         return h.slice(at, end === -1 ? h.length : end);
@@ -326,12 +332,19 @@ describe('A NAME THAT CANNOT IDENTIFY A GOLFER REFUSES THE TRIP TOTAL', () => {
             'the refusal does not say what to do: ' + card.replace(/<[^>]*>/g, ' ').slice(0, 200));
     });
 
-    test('a placeholder refusal names its round too', async () => {
+    test('a placeholder refusal names its round, and no longer every placeholder', async () => {
+        // 2026-10-04: this named EVERY placeholder in EVERY round - "Player 2" in
+        // Caledonia, "Player 2" in True Blue, "Player 3" in Caledonia - which for
+        // a 24-man trip is seventy-odd paragraphs repeated on three cards. The
+        // round is still named, because that is the part an organizer acts on; the
+        // golfers are counted instead of listed.
         const sb = arriveOnTrip({ DAY1: roundOf(BLANK, 'Caledonia') });
         await settle();
         const card = refusalCard(money(sb));
-        assert.match(card, /Player 2/, 'the refusal does not name the placeholder');
-        assert.match(card, /Caledonia/, 'the refusal does not say which round to fix');
+        assert.match(card, /Caledonia/, 'the refusal does not say which round to fix: ' + card.replace(/<[^>]*>/g, ' ').slice(0, 300));
+        assert.match(card, /still a placeholder/, 'the refusal does not say what is wrong');
+        assert.match(card, /Add real names/, 'the refusal does not say what to do');
+        assert.ok(!/Player 2/.test(card), 'the per-golfer wall is back: ' + card.replace(/<[^>]*>/g, ' ').slice(0, 200));
     });
 
     test('placeholder names refuse it too', async () => {

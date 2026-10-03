@@ -195,8 +195,16 @@ describe('2. PLACEHOLDERS FIRST, IN ORDER, KEEPING THE SEAT', () => {
         assert.deepEqual(list.slice(0, 8).map((p) => p.id), [101, 102, 103, 104, 105, 106, 107, 108],
             'the seat keeps its id, or anything pointing at it is orphaned');
         assert.deepEqual(list.slice(8).map((p) => p.name), ['Player 9', 'Player 10', 'Player 11', 'Player 12']);
-        assert.equal(built.replaced, 16, 'eight in each of the two open rounds');
+        // PEOPLE, NOT WRITES (2026-10-04). This read 16 - eight in each of the two
+        // open rounds - and the same arithmetic told Manny "28 placeholders
+        // replaced, 147 golfers added" for a 24-man list. The counts are now the
+        // largest any one round saw, which on the normal trip (every round the
+        // same list) is the per-person figure.
+        assert.equal(built.replaced, 8, 'eight people, not eight per round summed');
         assert.equal(built.added, 0);
+        assert.equal(built.people, 8);
+        assert.deepEqual(built.perRound.map((r) => [r.label, r.replaced, r.added]),
+            [['Day 1 PM', 8, 0], ['Day 2', 8, 0]], 'the per-round figures are still kept');
         assert.match(built.note, /4 placeholders left over/);
     });
 

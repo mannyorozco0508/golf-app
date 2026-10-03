@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v122-rosterpaste. The tournament product cache
+// The consumer product cache is consumer-v123-tripsimplify. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3973,7 +3973,25 @@
 // its side-match ids and its pool charges come from. "Add a round to this trip"
 // is collapsed behind one line now that the itinerary paste builds every round,
 // and "Start From" lists rounds in date order naming the course.
-const CACHE_VERSION = 'golfapp-v282-rosterpaste';
+// Moved to v283 FOR THE ROAD TRIP TIDY-UP, and one of these is money.
+//
+// A "Group 4" line in a pasted roster was read as a GOLFER called Group with a
+// handicap of 4 - so Manny's 24-man list reviewed as 30 golfers, and six phantom
+// players with handicaps would have gone into every round. A header, a bare tee
+// time and a blank line are all group separators now. A device left on v282 keeps
+// the parser that invents those six.
+//
+// And the rest of what he hit: the paste wrote and the screen still showed
+// Player 1..4, because every round's players come from a one-shot read nothing
+// repeated; the confirm counted writes rather than people ("28 placeholders
+// replaced, 147 golfers added" for 24 golfers); the rounds list was in map-key
+// order with no date or course on any row; and the same placeholder paragraph was
+// printed per golfer per round in three places until the page could not be read.
+//
+// A new trip is four things on one screen now - name, the rounds, the golfers,
+// Build - and the trip page reads name, rounds, golfers, then the numbers, with
+// the golfers shown in their groups.
+const CACHE_VERSION = 'golfapp-v283-tripsimplify';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

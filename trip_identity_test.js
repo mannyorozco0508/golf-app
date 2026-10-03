@@ -78,14 +78,28 @@ describe('NO MAPPING, NO COLLISION: BYTE-IDENTICAL TO 1ef9b27 ON ALL SIX SURFACE
 });
 
 describe('THE ROSTER, always visible', () => {
+    // 2026-10-04: the roster now leads with the GROUPS of the next unplayed round
+    // - a trip is groups, and a group is who sees which bets - and the cross-round
+    // list follows under "Across every counted round". That list is what the
+    // assertions below are about and it is UNCHANGED: it is the only tell for two
+    // different people typed with one exact name. `crossRound` takes the part
+    // after the groups so the rule is read where it lives.
+    const crossRound = (sb) => {
+        const all = roster(sb);
+        const at = all.indexOf('Across every counted round');
+        assert.ok(at > -1, 'the cross-round list is gone from the roster');
+        return all.slice(at + 'Across every counted round'.length);
+    };
     test('one line per golfer with how many of the trip\'s rounds they are in', () => {
         const sb = arrive(T.clean);
-        assert.equal(roster(sb), '|Carp Dean|in 2 of 2 rounds|Lance Webb|in 2 of 2 rounds|Marty Sharp|in 2 of 2 rounds|Zach Hill|in 2 of 2 rounds|');
+        assert.equal(crossRound(sb), '|Carp Dean|in 2 of 2 rounds|Lance Webb|in 2 of 2 rounds|Marty Sharp|in 2 of 2 rounds|Zach Hill|in 2 of 2 rounds|');
+        // AND THE GROUPS, which is what an organizer reads first.
+        assert.match(roster(sb), /^\|4 golfers in 1 group[^|]*\|Group 1\|/);
     });
     test('a one-round trip says "in 1 round", never "1 of 1"', () => {
         const sb = arrive(T.oneRound);
-        assert.equal(roster(sb), '|Carp Dean|in 1 round|Lance Webb|in 1 round|Marty Sharp|in 1 round|Zach Hill|in 1 round|');
-        assert.ok(!/of 1/.test(roster(sb)));
+        assert.equal(crossRound(sb), '|Carp Dean|in 1 round|Lance Webb|in 1 round|Marty Sharp|in 1 round|Zach Hill|in 1 round|');
+        assert.ok(!/of 1/.test(crossRound(sb)));
     });
     test('THE TELL: two different Mikes with one exact name merge, and the roster shows "Mike · in 2 of 2 rounds" - no question is asked because nothing can tell them apart', () => {
         const sb = arrive(T.sameKey);
@@ -96,7 +110,7 @@ describe('THE ROSTER, always visible', () => {
         const r = linked([roundOf('Day 1', ['Ann A', 'Ben B'], s => { Object.keys(s).forEach(k => { if (/^p102_/.test(k)) delete s[k]; }); }),
                           roundOf('Day 2', ['Ann A', 'Cal C'], s => { Object.keys(s).forEach(k => delete s[k]); })]);
         const sb = arrive(r);
-        assert.equal(roster(sb), '|Ann A|in 2 of 2 rounds|Ben B|in 1 of 2 rounds|Cal C|in 1 of 2 rounds|');
+        assert.equal(crossRound(sb), '|Ann A|in 2 of 2 rounds|Ben B|in 1 of 2 rounds|Cal C|in 1 of 2 rounds|');
     });
     test('an excluded round is not counted', () => {
         const r = T.clean.map((x, i) => Object.assign({}, x, { countsTowardTrip: i === 0 }));
