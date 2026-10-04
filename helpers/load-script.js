@@ -193,13 +193,22 @@ const MODULE_PREREQS = {
     // computeCombinedNetTotals and buildSideMatchReceipts both call it, for side
     // matches and for the main game's Aloha.
     // action-model.js too (Wave 18): the two side-match tie sites call holeTiesCarry().
-    'settlement-engine.js': ['handicap.js', 'match-engine.js', 'action-model.js'],
+    // play-order.js since 2026-10-04: playOrderOf() calls playOrder() and
+    // teeStartHole() as plain globals, exactly as the five pages that load
+    // settlement-engine.js supply them. It is typeof-guarded and falls back to the
+    // order the card carries - which is the SILENT failure this map exists to
+    // prevent, because a test without it would settle a 10th-tee round in number
+    // order and report a pass.
+    'settlement-engine.js': ['handicap.js', 'match-engine.js', 'action-model.js', 'play-order.js'],
     // computeTournamentPayouts() calls allocatePlacePayouts() as a global, exactly
     // as it does in the browser where both tournament pages load payouts.js first.
     // tournament-engine.js calls allocatePlacePayouts() for prize money and
     // getStrokes()/parseHcp() for individual net allocation, all as plain globals -
     // exactly as it does in the browser, where both tournament pages load them first.
     'tournament-engine.js': ['handicap.js', 'payouts.js'],
+    // bet-strip.js: betStripPlayOrder() calls the same two globals, with the same
+    // typeof guard and the same silent-pass risk if they are absent.
+    'bet-strip.js': ['play-order.js'],
     // ryder-cup.js calls parseHcp for the Foursomes allowance and
     // calculateMatchEngine for Four-Ball, both as plain globals, exactly as the
     // browser supplies them. Without them the Foursomes path throws

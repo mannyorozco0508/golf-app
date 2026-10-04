@@ -178,7 +178,7 @@ describe('1. A PENDING CHALLENGE NEVER REACHES A SETTLEMENT', () => {
         // format_first_wizard_test.js freezes these for the same reason: a wave
         // that must not change arithmetic should be checked, not trusted.
         assert.equal(sha12('money-engine.js'), '12bfa41c2c8e');
-        assert.equal(sha12('settlement-engine.js'), 'd9ee5e5a1afc');
+        assert.equal(sha12('settlement-engine.js'), '6ddd4c8676cd');
         assert.equal(sha12('pool-engine.js'), '372e76d7d5c4');
         assert.equal(sha12('action-model.js'), '399ba26f0025');
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');

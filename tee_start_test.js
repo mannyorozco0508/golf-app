@@ -39,8 +39,37 @@
 //   A $20 swing to the wrong golfer, from hole arithmetic standing in for
 //   sequence. That is the defect this wave fixes, and test 3 below is it.
 //
-// BASELINE, measured over the FINISHED file with play-order.js present and
-// match-engine.js UNTOUCHED, all 14 tests: 11 PASS / 3 FAIL. 11 + 3 = 14.
+// TWO BASELINES, because this file was built in two approved halves.
+//
+// BASELINE 2 (the settlement half, 2026-10-04): measured over the FINISHED file
+// against 3b436a8 - the branch with the engine and the pages already in play
+// order and settlement-engine.js / bet-strip.js UNTOUCHED - all 22 tests:
+// 18 PASS / 4 FAIL. 18 + 4 = 22. The four reds are exactly the three approvals:
+// the Receipt's start-hole label, the auto-press that only exists off the 10th
+// tee, the skins carry onto the 1st, and the bet strip's main chip.
+//   CONTROLS, each fired behaviourally and each restored by sha from a saved
+//   copy (never git restore): reverting the receipts' engine call to number
+//   order reds section 4; reverting the skins carry reds section 5; reverting
+//   the main chip to holes[0] reds section 6.
+//
+// AND AN HONEST CORRECTION TO WHAT MOVES MONEY. For a single match segment the
+// final status is the sum of its holes whichever order they are added in, so a
+// side bet with no presses pays the same either way - measured over 6,000 random
+// cards, there is no divergence at all without a press. What moves money is the
+// AUTO-PRESS: two down on the 18th green off the 10th tee leaves NINE holes to
+// play and the press fires, where in number order the 18th is the last hole and
+// no press can exist. The $20 swing in the header below was real but it was a
+// MISMATCH - play-order accumulation against number-order arithmetic - which is
+// the state this wave removed rather than a difference between the two tees.
+//
+// BASELINE 1 (the engine half), measured over the then-FINISHED file with
+// play-order.js present and match-engine.js UNTOUCHED, all 14 tests:
+// 11 PASS / 3 FAIL. 11 + 3 = 14.
+//
+// BASELINE COUNT DELTA: +8 - eight tests were added on 2026-10-04 after that
+// first baseline was measured, when Manny approved settlement-engine.js and
+// bet-strip.js per file. They are sections 4, 5 and 6, and baseline 2 above is
+// the measurement that covers all 22.
 //   Most of this file passes before the fix, and that is the honest shape of it:
 //   the play-order module is new code and its seven tests are about itself; the
 //   key-collision test describes a trap that was already there; and the 1st-tee
@@ -284,5 +313,248 @@ describe('3. PRESSES AND NASSAU SEGMENTS IN PLAY ORDER', () => {
         // Same money both ways on THIS card: front -$5, back +$5, overall -$10.
         assert.equal(one.money, -10);
         assert.equal(ten.money, -10);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// 4. THE SETTLEMENT HALF (2026-10-04, per-file approved: settlement-engine.js
+//    and bet-strip.js)
+//
+// The main game settled in play order first, and for one commit a side bet on
+// the same round settled in NUMBER order - so two wagers over the same holes
+// could disagree about who was three up. That is the gap these close.
+//
+// EVERY WORKED EXAMPLE BELOW IS THE SAME SCORES TWICE: once off the 1st tee and
+// once off the 10th, with nothing else different. The 1st-tee arm is the control
+// that keeps the other one honest.
+// ---------------------------------------------------------------------------
+const { loadJsFile } = require('./helpers/load-script.js');
+const SETTLE = loadJsFile('settlement-engine.js', ['money-engine.js']);
+
+const SM_PLAYERS = [
+    { id: 1, name: 'Ann Alpha', hcp: '0' }, { id: 2, name: 'Ben Bravo', hcp: '0' },
+    { id: 3, name: 'Cal Charlie', hcp: '0' }, { id: 4, name: 'Dee Delta', hcp: '0' }
+];
+// The worked example from section 2, as a SIDE match: Ann wins 10, 11, 12; Ben
+// wins 1, 2, 3, 4; everything else halved. Cal and Dee match Ben, so the skins
+// fixtures below have ties to carry.
+function roundFor(tee, extra) {
+    const scores = {};
+    CD.forEach(h => {
+        const annWins = [10, 11, 12].includes(h.hole);
+        const benWins = [1, 2, 3, 4].includes(h.hole);
+        scores['p1_h' + h.hole] = annWins ? 4 : (benWins ? 5 : 4);
+        scores['p2_h' + h.hole] = annWins ? 5 : (benWins ? 4 : 4);
+        scores['p3_h' + h.hole] = 5;
+        scores['p4_h' + h.hole] = 5;
+    });
+    return Object.assign({
+        players: SM_PLAYERS, courseData: CD, scores,
+        startingHole: tee === 10 ? 10 : 1,
+        sideMatches: {
+            sm1: {
+                teamAIds: [1], teamBIds: [2], format: 'match', scoring: 'gross',
+                stake: 10, pressRule: 'none', startHole: 1, createdAt: 1
+            }
+        }
+    }, extra || {});
+}
+const receiptsFor = (data) => SETTLE.buildSideMatchReceipts(data, data.courseData, data.scores);
+
+describe('4. A SIDE MATCH SETTLES LIKE THE MAIN GAME', () => {
+
+    test('the same scores, both tees: Ben 1 up either way - and the 10th used to say Ann', () => {
+        const one = receiptsFor(roundFor(1))[0];
+        const ten = receiptsFor(roundFor(10))[0];
+        assert.ok(one && ten, 'no side-match receipt was built at all');
+        const segOf = r => (r.segments || []).find(s => !/press/i.test(String(s.label || '')));
+        // THE CONTROL ARM: unchanged, and it is the arm the goldens pin.
+        assert.match(String(segOf(one).result), /Ben 1 up/, '1st tee: ' + segOf(one).result);
+        // THE APPROVED CHANGE: the same money, reached through the sequence. Before
+        // it, this read "Ann 3&2" - closed on the card's 16th with ELEVEN holes
+        // still to play - and paid the other golfer.
+        assert.match(String(segOf(ten).result), /Ben 1 up/, '10th tee: ' + segOf(ten).result);
+        assert.equal(segOf(one).money, segOf(ten).money,
+            'the two tees paid different money on identical scores: '
+            + segOf(one).money + ' vs ' + segOf(ten).money);
+    });
+
+    test('and the Receipt says the hole it STARTED on, which off the 10th is the 10th', () => {
+        // settlement.html prints "Started Hole ${row.startHole}" off each segment,
+        // and that number comes from the first hole of the range IN PLAY ORDER.
+        const base = (tee) => receiptsFor(roundFor(tee))[0].segments[0];
+        assert.equal(base(1).startHole, 1);
+        assert.equal(base(10).startHole, 10,
+            'the Receipt still names the lowest-numbered hole rather than the first one played');
+        assert.equal(base(10).endHole, 9, 'and the last hole played is the 9th');
+    });
+
+    test('THE PRESS THAT ONLY EXISTS OFF THE 10th TEE - and it is the money', () => {
+        // THE WORKED EXAMPLE, and the honest one. For a single match segment the
+        // final status is the sum of the holes whichever order they are added in,
+        // so a side bet with NO presses pays the same either way (the test above).
+        // What moves money is an AUTO-PRESS: standing on the 18th green two down,
+        // a group that teed off the 10th has NINE holes still to play and the press
+        // fires; in number order the 18th is the last hole and no press is possible
+        // at all. Measured over 6,000 random cards, this is the shape of every
+        // divergence there is.
+        //   Ann wins 1, 3, 6, 13, 16, 18. Ben wins 2, 4, 5, 7, 14. $10, 2-down rule.
+        const press = (tee) => {
+            const scores = {};
+            const annWins = [1, 3, 6, 13, 16, 18], benWins = [2, 4, 5, 7, 14];
+            CD.forEach(h => {
+                const a = annWins.includes(h.hole), b = benWins.includes(h.hole);
+                scores['p1_h' + h.hole] = a ? 4 : (b ? 5 : 4);
+                scores['p2_h' + h.hole] = a ? 5 : (b ? 4 : 4);
+            });
+            const data = {
+                players: [SM_PLAYERS[0], SM_PLAYERS[1]], courseData: CD, scores,
+                startingHole: tee === 10 ? 10 : 1,
+                sideMatches: { sm1: { teamAIds: [1], teamBIds: [2], format: 'match',
+                    scoring: 'gross', stake: 10, pressRule: '2down', startHole: 1, createdAt: 1 } }
+            };
+            return SETTLE.buildSideMatchReceipts(data, CD, scores)[0];
+        };
+        const one = press(1), ten = press(10);
+        // 1st TEE: one wager, Ann 1 up, $10 to Ann. No press - the only hole she was
+        // two down on was the last one.
+        assert.equal(one.segments.length, 1, '1st tee segments: ' + JSON.stringify(one.segments));
+        assert.equal(one.netTo, 'Ann');
+        assert.equal(one.netAmount, 10);
+        // 10th TEE: the same scores raise a press on the 18th - the ninth hole they
+        // played - covering 1..9, which Ben wins. $10 each way, nobody pays.
+        assert.equal(ten.segments.length, 2, '10th tee segments: ' + JSON.stringify(ten.segments));
+        const p = ten.segments.find(x => /press/i.test(String(x.label)));
+        assert.ok(p, 'no press was raised with nine holes still to play');
+        assert.equal(p.startHole, 1, 'the press starts on the hole AFTER the 18th, which is the 1st');
+        assert.equal(p.endHole, 9, 'and it runs to the last hole played');
+        assert.match(String(p.result), /Ben 1 up/);
+        assert.equal(ten.netAmount, 0, 'the press did not reach the money: ' + JSON.stringify(ten.segments));
+    });
+
+    test('a NASSAU side bet: each nine by number, the Overall in play order', () => {
+        const nassau = (tee) => {
+            const d = roundFor(tee);
+            d.sideMatches.sm1 = Object.assign({}, d.sideMatches.sm1,
+                { format: 'nassau', frontStake: 5, backStake: 5, overallStake: 10 });
+            return receiptsFor(d)[0];
+        };
+        const one = nassau(1), ten = nassau(10);
+        const label = (r, re) => (r.segments || []).find(s => re.test(String(s.label || '')));
+        // Front is holes 1-9 and Back is 10-18 whichever tee, so each nine settles
+        // identically - only the order of the two nines differs, and they are
+        // independent wagers. `money` is a magnitude and `toSideA` the direction,
+        // so both are compared: equal magnitudes paid the other way round would be
+        // the whole bug.
+        ['Front', 'Back', 'Total'].forEach(name => {
+            const a = label(one, new RegExp(name)), b = label(ten, new RegExp(name));
+            assert.ok(a && b, name + ' segment missing');
+            assert.equal(a.money, b.money, name + ': ' + a.money + ' vs ' + b.money);
+            assert.equal(a.toSideA, b.toSideA, name + ' went to the other side');
+            assert.equal(a.result, b.result, name + ': ' + a.result + ' vs ' + b.result);
+        });
+        // AND THE THREE WAGERS REALLY DID GO DIFFERENT WAYS on this card, so the
+        // test above is not satisfied by three identical rows: Ben took the front
+        // 4&3, Ann took the back 3&2, Ben took the Total 1 up.
+        assert.notEqual(label(one, /Front/).toSideA, label(one, /Back/).toSideA,
+            'the front and the back went to the same golfer, so this fixture proves nothing');
+        assert.match(String(label(ten, /Front/).result), /Ben 4&3/);
+        assert.match(String(label(ten, /Back/).result), /Ann 3&2/);
+        assert.match(String(label(ten, /Total/).result), /Ben 1 up/);
+    });
+});
+
+describe('5. SKINS CARRY TO THE NEXT HOLE PLAYED', () => {
+
+    // Ann alone birdies the 1st; everybody halves the 18th. Off the 1st tee the
+    // 18th is the last hole and its skin is left pending. Off the 10th tee the
+    // 18th is the NINTH hole played and the tie carries forward to the 1st - which
+    // Ann wins, so she takes two units instead of one.
+    function skinsRound(tee) {
+        const scores = {};
+        CD.forEach(h => { SM_PLAYERS.forEach(p => { scores['p' + p.id + '_h' + h.hole] = 4; }); });
+        scores['p1_h1'] = 3;                       // Ann alone wins the 1st
+        return {
+            players: SM_PLAYERS, courseData: CD, scores,
+            startingHole: tee === 10 ? 10 : 1,
+            skinsBuyIn: 5, skinsPotFormat: 'gross', skinsCarryOver: true
+        };
+    }
+    const skinsOf = (data) => SETTLE.computeSkinsPayoutLines(data, data.courseData, data.scores);
+    const linesOf = (r) => ((r.gross && r.gross.lines) || []);
+
+    test('off the 1st tee: the 1st is the first hole played, so nothing has carried', () => {
+        const r = skinsOf(skinsRound(1));
+        const won = linesOf(r);
+        assert.equal(won.length, 1, 'skins won: ' + JSON.stringify(won));
+        assert.equal(won[0].hole, 1);
+        assert.equal(won[0].units, 1, 'something carried onto the first hole played');
+        assert.equal(r.gross.pendingUnits, 17,
+            'the seventeen halved holes after it are pending: got ' + r.gross.pendingUnits);
+    });
+
+    test('off the 10th tee the SAME scores carry nine ties onto the 1st', () => {
+        const r = skinsOf(skinsRound(10));
+        const won = linesOf(r);
+        assert.equal(won.length, 1, 'skins won: ' + JSON.stringify(won));
+        assert.equal(won[0].hole, 1, 'the only hole anybody won outright is still the 1st');
+        // THE WORKED EXAMPLE: holes 10 to 18 are played first and all nine halve,
+        // so nine units ride onto the 1st - which Ann wins outright - and she takes
+        // ten. The eight holes after it (2 to 9) halve and stay pending.
+        assert.equal(won[0].units, 10,
+            'the nine halved holes of the back nine did not carry onto the 1st: got '
+            + won[0].units + ' unit(s)');
+        assert.equal(r.gross.pendingUnits, 8,
+            'the eight holes played after the 1st are pending: got ' + r.gross.pendingUnits);
+    });
+
+    test('and a first-tee round is byte-identical, which is the whole promise', () => {
+        // The helper hands back the CALLER'S OWN ARRAY for a first-tee round, so
+        // nothing re-sorts and nothing re-orders. Asserted on the serialised result
+        // rather than on the arithmetic, because "byte-identical" is the claim.
+        const data = skinsRound(1);
+        const before = JSON.stringify(skinsOf(data));
+        const asPlayed = SETTLE.computeSkinsPayoutLines(data, P.playOrder(data.courseData, 1), data.scores);
+        assert.equal(JSON.stringify(asPlayed), before);
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('6. THE BET STRIP SAYS THE HOLE IT STARTED ON', () => {
+
+    // bet-strip.js is PROTECTED and this is the one approved site: the main chip's
+    // "Started Hole N". Off the 10th tee the main bet started on the 10th, and the
+    // chip has to agree with the Receipt segment two sections above - they are the
+    // same wager on the same screen.
+    const STRIP = loadJsFile('bet-strip.js',
+        ['handicap.js', 'match-engine.js', 'action-model.js', 'money-engine.js', 'settlement-engine.js']);
+    const strokePlayers = [
+        { id: 1, name: 'Ann Alpha', hcp: '0', playingForMoney: true },
+        { id: 2, name: 'Ben Bravo', hcp: '0', playingForMoney: true }
+    ];
+    function stripFor(tee) {
+        const scores = {};
+        CD.forEach(h => { scores['p1_h' + h.hole] = 4; scores['p2_h' + h.hole] = 5; });
+        const data = {
+            players: strokePlayers, courseData: CD, scores, startingHole: tee,
+            gameFormat: 'match', matchScoringStyle: 'stroke', matchStake: 10,
+            matchScoring: 'gross', matchPressRule: 'none'
+        };
+        return STRIP.buildBetStrip(data, CD, scores, strokePlayers);
+    }
+
+    test('the main chip starts on the first hole PLAYED', () => {
+        const one = stripFor(1), ten = stripFor(10);
+        assert.equal(one.eligible, true, 'the strip is not eligible, so nothing is being measured');
+        assert.equal(ten.eligible, true);
+        assert.equal(one.chips[0].detail.startHole, 1);
+        assert.equal(one.chips[0].detail.rangeText, 'Started Hole 1');
+        assert.equal(ten.chips[0].detail.startHole, 10,
+            'the chip still names the lowest-numbered hole: ' + ten.chips[0].detail.rangeText);
+        assert.equal(ten.chips[0].detail.rangeText, 'Started Hole 10');
+        // AND THE WAGER ITSELF IS THE SAME WAGER either way - same stake, same
+        // winner, same money - so the hole number is the only thing that moved.
+        assert.equal(one.chips[0].stake, ten.chips[0].stake);
+        assert.equal(one.chips[0].statusText, ten.chips[0].statusText);
     });
 });

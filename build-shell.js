@@ -114,7 +114,9 @@ const PRODUCTS = {
         // bare link satisfied.
         // Moved to v133: play-order.js joins SHARED - a round that starts on the
         // 10th tee. A device on v132 has no such file and plays 1..18.
-        cacheName: 'consumer-v133-teestart',
+        // Moved to v134: side bets, the Receipt labels and the skins carry follow
+        // the order the holes were played. A device on v133 settles them by number.
+        cacheName: 'consumer-v134-playorder',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

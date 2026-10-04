@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v133-teestart. The tournament product cache
+// The consumer product cache is consumer-v134-playorder. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4182,7 +4182,13 @@
 // triggers and holes-remaining come from the sequence rather than from hole
 // arithmetic. A device on v292 plays every round 1..18 and would close a match
 // "3&2" with eleven holes still to play.
-const CACHE_VERSION = 'golfapp-v293-teestart';
+// Moved to v294: the SETTLEMENT half of the 10th tee (per-file approved).
+// settlement-engine.js settles side bets and Nassau segments in play order, the
+// Receipt names the hole a wager STARTED on rather than its lowest number, skins
+// CARRY rolls a tied hole onto the next hole PLAYED, and bet-strip.js main chip
+// agrees with the Receipt. A device on v293 settles the main game in play order
+// and the side bets by number - two wagers over the same holes disagreeing.
+const CACHE_VERSION = 'golfapp-v294-playorder';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
