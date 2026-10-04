@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v126-noteetime. The tournament product cache
+// The consumer product cache is consumer-v127-playersstep. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4083,7 +4083,23 @@
 // quote a time that nothing in the app can set.
 //
 // A DEVICE ON v285 keeps four pages that load a file this build no longer ships.
-const CACHE_VERSION = 'golfapp-v286-noteetime';
+// Moved to v287: THE PLAYERS STEP STOPS EXPLAINING ITSELF, and My Groups is for
+// everybody.
+//
+// Step 5 printed a line per golfer - "Randy T: Index 0, no tee rating, used as
+// Playing Handicap" - which on a full field pushed the player boxes off the
+// bottom of a phone, and every line restated a number already in the box beside
+// the name. One line at most now, and on a Strokes round it says Strokes:
+// handicap-labels.js is the only thing that names that box, so the subtitle, the
+// column head, the placeholder and the note cannot say three different things
+// about it again. A paste now lands on the golfers it just added.
+//
+// AND MY GROUPS IS RELEASED. The per-device beta flag, its toggle and the
+// "My Groups (beta)" card are gone; the button is an ordinary control on the
+// Players step, and what it does depends on whether there is an account to save a
+// roster on. A device on v286 keeps the wall of per-golfer lines and a feature
+// nobody can find.
+const CACHE_VERSION = 'golfapp-v287-playersstep';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

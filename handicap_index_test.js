@@ -152,9 +152,15 @@ describe('Setup fills the tee from the course, and does not ask for the numbers'
         assert.ok(!/<label[^>]*for="tee-par"/.test(panel));
         assert.ok(!/Allowance %/.test(panel));
         assert.ok(!panel.includes(H.handicapUnconvertedNote()));
-        // The players step still says what an unconverted Index means. That
-        // sentence is not a form, and it is the one the converter uses.
-        assert.ok(ADMIN.includes(H.handicapUnconvertedNote()));
+        // THE PLAYERS STEP STILL SAYS WHAT AN UNCONVERTED INDEX MEANS, and since
+        // 2026-10-04 it says it by CALLING the one builder rather than carrying a
+        // copy of the sentence in markup. The note is written at render time now,
+        // because what the box is called depends on the round's mode - a Strokes
+        // round said "Handicap Index" in the markup while its column head said
+        // Strokes.
+        assert.ok(!ADMIN.includes(H.handicapUnconvertedNote()),
+            'the sentence is hard-coded in the page again - two copies, one of them stale');
+        assert.match(ADMIN, /handicapUnconvertedNote\(\)/, 'nothing asks for the sentence at all');
         assert.match(ADMIN, /playerHandicapFields\(/);
         const save = ADMIN.slice(ADMIN.indexOf('const playersList = []'), ADMIN.indexOf('playersList.push(entry)') + 'playersList.push(entry)'.length);
         assert.ok(save.length > 80);
@@ -207,7 +213,21 @@ describe('Setup fills the tee from the course, and does not ask for the numbers'
         assert.equal(sb.document.getElementById('tee-par').value, '');
         assert.equal(sb.document.getElementById('tee-rating-filled').textContent, '');
         assert.ok(!Array.prototype.some.call(sb.document.getElementById('tee-rating-select').options, o => /No tee rating/.test(o.textContent || '')));
-        assert.match(sb.document.getElementById('handicap-index-note').textContent, /used as the Playing Handicap/);
+        // THE SENTENCE BELONGS TO THE GHIN MODE. On a Strokes round - the default
+        // for a new round - the note now says what a Strokes round does, which is
+        // the contradiction this wave removed: three names for one box on one
+        // screen. Asked in the mode the sentence is about.
+        const basisSel = sb.document.getElementById('handicap-basis-select');
+        const wasBasis = basisSel ? basisSel.value : null;
+        assert.match(sb.document.getElementById('handicap-index-note').textContent, /used as entered/,
+            'a Strokes round must not be told about a Handicap Index');
+        if (basisSel) {
+            basisSel.value = 'ghin-index';
+            vm.runInContext('refreshHandicapNote();', sb);
+            assert.match(sb.document.getElementById('handicap-index-note').textContent, /used as the Playing Handicap/);
+            basisSel.value = wasBasis;
+            vm.runInContext('refreshHandicapNote();', sb);
+        }
         // A record can carry tees and no hole card. The grid write must not
         // throw before the rating fields are filled. Firebase may hand the
         // tee list back as an object keyed "0","1" rather than an array.
