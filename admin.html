@@ -31,6 +31,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: the handicap labels and the one basis sentence (display only).
          The wizard uses that sentence for its own "as entered" note, so the
@@ -1412,11 +1413,32 @@ html {
     <div class="form-group">
         <div id="round-length-container" style="display:none; margin-top: 10px; margin-bottom: 10px;">
             <label style="color:var(--brand-green); font-size: 0.8rem;">Round Length</label>
-            <select id="round-length-select" onchange="mpAutoFillKpHoles()" style="border-color:var(--accent-teal);">
+            <select id="round-length-select" onchange="mpAutoFillKpHoles(); syncTeeStartVisibility();" style="border-color:var(--accent-teal);">
                 <option value="18">Full 18 Holes</option>
                 <option value="front">Front 9 Only (Out)</option>
                 <option value="back">Back 9 Only (In)</option>
             </select>
+        </div>
+
+        <!-- WHICH TEE THE ROUND GOES OFF (2026-10-04).
+             TWO CHOICES, because those are the two that exist on a golf course: a
+             regular start and a back-nine start. The holes are still numbered
+             1-18 on the card and in every score key; what changes is the ORDER
+             they are played in, so the scorecard lands on the 10th, Next from the
+             18th goes to the 1st, Finish Round sits on the 9th, and a match knows
+             how many holes it really has left.
+             NOT CALLED startHole. That field name is taken - it is the hole a BET
+             starts on - and events/<code>/startHole is already read as the legacy
+             Dots start, so reusing it would stop paying dots on the first nine.
+             SHOWN FOR AN 18-HOLE ROUND ONLY: a front-9 round has no 10th hole and
+             a back-9 round starts on the 10th by definition. -->
+        <div id="tee-start-container" class="extra-settings-box" style="margin-top:12px;">
+            <label for="tee-start-select" style="color:var(--brand-green); margin-bottom:6px;">Start on</label>
+            <select id="tee-start-select" onchange="teeStartChanged()">
+                <option value="1" selected>Hole 1</option>
+                <option value="10">Hole 10</option>
+            </select>
+            <div id="tee-start-note" style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;"></div>
         </div>
 
         <div id="nine-loop-selector" class="extra-settings-box">
@@ -2949,6 +2971,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const boundaries = computeGroupBoundaries(players.length,
             (data && data.groupSizeOverrides) || {});
+        // A TWO-TEE START IS ONLY A QUESTION ON A FULL ROUND. A nine-hole card has
+        // no second tee to send anybody to.
+        const eighteen = (((data && data.courseData) || []).length) > 9;
         let html = '';
         // ONE LINK FOR EVERYONE, FIRST (2026-09-20). On a round with more than one
         // group the round's own link - index.html?game=CODE, no group - opens the
@@ -2986,6 +3011,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + '<button class="btn-outline" onclick="copyGroupLink(\'' + url + '\', '
                 + b.group + ', ' + escapeHtml(JSON.stringify(names)) + ')">🔗 Copy Link</button>'
                 + '</div>';
+            // THE GROUP'S OWN TEE, on a two-tee start. Only where the question can
+            // arise: an 18-hole round with more than one group. Absent means the
+            // round's own tee, so a round nobody touches here is unchanged.
+            if (eighteen && boundaries.length > 1) {
+                const gTee = groupStartingHoleOf(data, b.group);
+                html += '<div class="group-tee-row" style="display:flex; align-items:center; gap:8px;'
+                    + ' margin:-4px 0 10px 0; font-size:0.8rem; color:var(--text-muted);">'
+                    + '<label for="group-tee-' + b.group + '">Starts on</label>'
+                    + '<select id="group-tee-' + b.group + '" onchange="groupTeeChanged(' + b.group + ', this.value)" style="max-width:120px; margin:0;">'
+                    + '<option value="1"' + (gTee === 1 ? ' selected' : '') + '>Hole 1</option>'
+                    + '<option value="10"' + (gTee === 10 ? ' selected' : '') + '>Hole 10</option>'
+                    + '</select></div>';
+            }
         });
         // (a) THE ORGANIZER LINK, OFFERED WHERE THE ORGANIZER IS (v200). One screen
         // after Save, beside the links they are already sending: the link that makes
@@ -8944,6 +8982,62 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
     }
 
+    // ---- WHICH TEE (2026-10-04) --------------------------------------------
+    //
+    // One line that says what the choice means, and the control hides itself on a
+    // round where the question does not arise. teeStartChanged is the only writer
+    // of the wizard's value; the round payload reads the select.
+    function teeStartValue() {
+        const el = document.getElementById('tee-start-select');
+        const n = el ? parseInt(el.value, 10) : 1;
+        return n === 10 ? 10 : 1;
+    }
+    function teeStartChanged() {
+        const note = document.getElementById('tee-start-note');
+        if (!note) return;
+        note.textContent = teeStartValue() === 10
+            ? 'The card still reads 1 to 18. You play 10 through 18 first, then 1 through 9 — the scorecard follows you, and Finish Round waits on the 9th.'
+            : '';
+    }
+    // The control makes no sense on a nine-hole round: a front 9 has no 10th hole
+    // and a back 9 already starts there.
+    function syncTeeStartVisibility() {
+        const box = document.getElementById('tee-start-container');
+        if (!box) return;
+        const sel = document.getElementById('round-length-select');
+        const full = !sel || sel.value === '18';
+        box.style.display = full ? 'block' : 'none';
+        if (!full) {
+            const el = document.getElementById('tee-start-select');
+            if (el) el.value = '1';
+            teeStartChanged();
+        }
+    }
+
+    // ---- TWO-TEE START: ONE GROUP OFF THE 10th (2026-10-04) ------------------
+    //
+    // Written from the Round Ready screen, where the groups and their links are
+    // already listed, because that is the first screen on which groups exist.
+    // ONE FIELD PER GROUP under events/<code>/groupStartingHoles, and a group with
+    // no entry plays the round's own tee - so this write can only ever move the
+    // group it names.
+    // THE GROUP'S TEE AS STORED, 1 unless that group has its own entry. One
+    // reader for the screen and the write, so the control cannot show one thing
+    // and save another.
+    function groupStartingHoleOf(data, group) {
+        const cd = (data && data.courseData) || [];
+        if (typeof groupStartHole === 'function') return groupStartHole(data || {}, cd, group);
+        return 1;
+    }
+    function groupTeeChanged(group, value) {
+        const g = parseInt(group, 10);
+        const n = parseInt(value, 10) === 10 ? 10 : 1;
+        if (!g || !currentMode) return;
+        db.ref('events/' + currentMode + '/groupStartingHoles/' + g).set(n)
+            .then(() => uiToast('Group ' + g + ' goes off hole ' + n + '.'))
+            .catch(() => uiFail('⚠️ Could not save that tee — check your signal.'));
+    }
+
     function handleFormatChange(forceLoad = false) {
         const format = document.getElementById("game-format-select").value;
         // The Step 6 Nassau card's availability follows the round's scoring format.
@@ -9352,6 +9446,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
             if (data.wolfLastPlaceRule && document.getElementById("wolf-lastplace-rule")) document.getElementById("wolf-lastplace-rule").value = data.wolfLastPlaceRule;
             if (data.dotPointVal && document.getElementById("dot-point-value")) document.getElementById("dot-point-value").value = data.dotPointVal;
+            // WHICH TEE THIS ROUND WENT OFF (2026-10-04). Restored rather than
+            // declared: an organizer who opens a 10th-tee round, edits the stakes
+            // and saves must not silently send the group back to the 1st - which
+            // is the Main Pool / settlement-mode bug the contract test exists for.
+            // A round saved before this existed has no field and shows the 1st,
+            // which is the order it was played in.
+            if (document.getElementById("tee-start-select")) {
+                document.getElementById("tee-start-select").value =
+                    String(parseInt(data.startingHole, 10) === 10 ? 10 : 1);
+                if (typeof teeStartChanged === 'function') teeStartChanged();
+                if (typeof syncTeeStartVisibility === 'function') syncTeeStartVisibility();
+            }
             if (document.getElementById("greenie-carryover")) {
                 // An existing round without the flag was played under the old rule and
                 // must show as OFF, not as the new default.
@@ -10250,6 +10356,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 skinsPotFormat: skinsPotFormat,
                 skinsCarryOver: skinsCarryOver,
                 courseData: finalCourseData,
+                // WHICH TEE THE ROUND GOES OFF (2026-10-04). 1 or 10, and NOT
+                // called startHole - that name is the hole a BET starts on, and
+                // events/<code>/startHole is already read as the legacy Dots
+                // start, so reusing it would stop paying dots on the first nine.
+                // A round saved before this existed has no field, which
+                // play-order.js reads as the 1st tee: the order it has always
+                // played in.
+                startingHole: teeStartValue(),
                 teeRating: teeForSave,
                 // v215: does this round allow the Aloha bet on the last hole?
                 // FALSE unless the box is ticked, and absent on every round saved

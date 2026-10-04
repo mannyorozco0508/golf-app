@@ -422,8 +422,14 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // toast confirming it was turned on or off, and the failure for a browser
         // that will not keep the setting. Nothing else lost a message; the feature
         // itself still speaks exactly as it did.
-        assert.equal(refuse + fail + toast, 62,
-            'the alerts should still be 62 messages, got '
+        // 64 SINCE THE 10th-TEE START (2026-10-04, was 62): groupTeeChanged speaks
+        // twice - a toast naming the group and the hole it now goes off, and a
+        // failure if the write does not land. A two-tee start is set from the Round
+        // Ready screen, which is a live write to events/<code> rather than a form
+        // field, so silence there would leave an organizer unsure whether the tee
+        // moved.
+        assert.equal(refuse + fail + toast, 64,
+            'the alerts should still be 64 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

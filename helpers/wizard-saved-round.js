@@ -36,7 +36,12 @@ const PAYLOAD_KEYS = ['eventName', 'roundDay', 'settlementMode', 'skinsRounding'
     // handicaps were saved under ('ghin-index' by default, 'as-entered' the other).
     // alohaAllowed since v215, written right before handicapBasis: whether this
     // round allows the Aloha bet on its last hole. Absent reads as OFF.
-    'courseData', 'teeRating', 'alohaAllowed', 'handicapBasis', 'players'];
+    // startingHole since 2026-10-04, written right after courseData: which tee the
+    // round went off, 1 or 10. NOT called startHole - that name is the hole a BET
+    // starts on, and events/<code>/startHole is already read as the legacy Dots
+    // start. Absent reads as the 1st, which is the order every round before this
+    // was played in.
+    'courseData', 'startingHole', 'teeRating', 'alohaAllowed', 'handicapBasis', 'players'];
 
 function wizardSavedRound(opts) {
     const o = opts || {};
@@ -86,6 +91,10 @@ function wizardSavedRound(opts) {
         stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 4, albatross: 5 },
         dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsPotFormat: null, skinsCarryOver: false,
         courseData,
+        // 1 unless a test asks for the other tee. A fixture that teed off the 10th
+        // is the one that proves the sequence, and every existing fixture keeps the
+        // order it was written for.
+        startingHole: o.startingHole === 10 ? 10 : 1,
         // teeRating since 2026-09-23: every save writes the Slope / Course Rating /
         // Par the wizard had, including an empty set. Nulls here mean the fields
         // were blank, so a reopen must not invent a conversion.

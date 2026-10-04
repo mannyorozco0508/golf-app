@@ -84,6 +84,21 @@ function isPressableFormat(data) {
 // fourteen unrelated bets from other foursomes. The full picture stays on the
 // Bets / Live Action page.
 // ---------------------------------------------------------------------------
+// THE CARD IN THE ORDER IT WAS PLAYED (2026-10-04, per-file approved). One
+// reader, guarded: without play-order.js the range arrives as it always did,
+// which is what a first-tee round plays anyway. settlement-engine.js has the
+// twin of this function and the same early return - the caller's own array back,
+// by identity, when the round went off the 1st.
+function betStripPlayOrder(data, holes) {
+    var cd = holes || [];
+    if (typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return cd;
+    var sorted = cd.slice().sort(function (a, b) { return Number(a.hole) - Number(b.hole); });
+    if (!sorted.length) return cd;
+    var tee = teeStartHole(data || {}, sorted);
+    if (Number(tee) === Number(sorted[0].hole)) return cd;
+    return playOrder(sorted, tee);
+}
+
 function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
     const empty = {
         eligible: false, mode: null, chips: [], canPress: false, nextPressHole: null,
@@ -159,7 +174,16 @@ function buildBetStrip(data, courseData, savedScores, scopedPlayers) {
             });
         }
 
-        const firstHole = holes[0].hole;
+        // THE FIRST HOLE PLAYED (2026-10-04, per-file approved). `holes` is the
+        // range this wager covers, and off the 10th tee the first of them in PLAY
+        // order is the 10th - which is what the main chip has to say it started on,
+        // and what the Receipt says beside it. holes[0] is already the first entry
+        // of the array, so this is one call and no arithmetic: what changed is that
+        // the array arrives in the order the group actually played it. A first-tee
+        // round hands back the same array and the same hole.
+        const playedHoles = (typeof betStripPlayOrder === 'function')
+            ? betStripPlayOrder(data, holes) : holes;
+        const firstHole = playedHoles.length ? playedHoles[0].hole : holes[0].hole;
         strokeChip('MAIN', 'Main Bet', set.original, stake, firstHole);
         set.pressResults.forEach(pr => strokeChip(`P${pr.pressNum}`, `Press #${pr.pressNum}`, pr, pr.stake, pr.startHole));
 

@@ -287,9 +287,13 @@ describe('PART B — ONLY NAVIGATION LANDS', () => {
         const gth = IDX.indexOf('function goToHole');
         assert.ok(gth > -1, 'goToHole is gone');
         assert.match(IDX.slice(gth, gth + 900), /renderHoleView\(\);\s*landOnHole\(\);/, 'goToHole');
+        // WINDOW WIDENED 2026-10-04 (was 900): goToAdjacentHole gained the comment
+        // explaining why it walks the card in PLAY order - off the 10th tee, Next
+        // from the 18th is the 1st - and 900 characters no longer reached the call.
+        // The assertion is unchanged: both still navigate through the one place.
         ['function goToAdjacentHole', 'function jumpToHole'].forEach(name => {
             const at = IDX.indexOf(name);
-            assert.match(IDX.slice(at, at + 900), /goToHole\(/, name + ' no longer navigates through goToHole');
+            assert.match(IDX.slice(at, at + 1600), /goToHole\(/, name + ' no longer navigates through goToHole');
         });
     });
 

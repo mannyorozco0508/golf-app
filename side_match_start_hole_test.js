@@ -368,7 +368,14 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
     // Patching only Live Action would leave the Receipt and the final settlement paying
     // over holes nobody bet on. These assert the scoped course reaches every engine call.
     const files = {
-        'settlement-engine.js': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateOverallBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, smCourse'],
+        // RE-POINTED 2026-10-04 (THE 10th TEE, per-file approved): the match call in
+        // settlement-engine.js now passes playOrderOf(data, smCourse) - the SAME
+        // scoped range, rotated into the order the holes were played, so a side bet
+        // closes out and presses on the same holes the main game does. A first-tee
+        // round receives the identical array. The claim this list makes - every
+        // engine call is scoped to the wager's own holes - is unchanged, which is
+        // why the string moves rather than the assertion.
+        'settlement-engine.js': ['calculateHoleBetEngine([p1, p2], smCourse', 'calculateOverallBetEngine([p1, p2], smCourse', 'calculateMatchEngine(virtualPlayers, playOrderOf(data, smCourse)'],
         // settlement.html no longer calls calculateMatchEngine for a side match at
         // all: that call computed a result nothing read and was removed in v100.
         // The Receipt's side-match numbers come from settlement-engine.js, whose
@@ -455,7 +462,15 @@ describe('EVERY MONEY PATH IS SCOPED, NOT JUST THE VISIBLE ONE', () => {
     test('the Receipt describes the holes it actually settled over', () => {
         const se = read('settlement-engine.js');
         const fn = se.slice(se.indexOf('function buildSideMatchReceipts'), se.indexOf('function computeCombinedNetTotals'));
-        assert.ok(/smCourse\.length \? Math\.min/.test(fn), 'firstHole must come from the scoped range');
+        // RE-POINTED 2026-10-04 (THE 10th TEE, per-file approved). firstHole still
+        // comes from the scoped range - it is now the FIRST HOLE OF IT THAT WAS
+        // PLAYED rather than its lowest number, because off the 10th tee those are
+        // different holes and the Receipt says "Started Hole 10". Math.min was the
+        // right answer for a card played 1..18 and is the same answer there.
+        assert.ok(/const smPlayed = playOrderOf\(data, smCourse\);/.test(fn),
+            'the scoped range is no longer put into play order');
+        assert.ok(/smPlayed\.length \? Number\(smPlayed\[0\]\.hole\) : 1/.test(fn),
+            'firstHole must come from the scoped range, in the order it was played');
         assert.ok(/calculateOverallBetEngine\(\[teamA\[0\], teamB\[0\]\], smCourse/.test(fn));
     });
 });

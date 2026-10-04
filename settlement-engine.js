@@ -23,6 +23,33 @@
 // INVARIANT: every completed wager is zero-sum. SUM(all golfer money) === 0.
 // ============================================================================
 
+    // ---- THE CARD IN THE ORDER IT WAS PLAYED (2026-10-04) ------------------
+    //
+    // PER-FILE APPROVED by Manny for exactly three things: the two internal
+    // calculateMatchEngine calls, the first-hole label below, and the skins
+    // carry-over. A round that goes off the 10th tee plays 10..18 then 1..9, and
+    // the main game already settles in that sequence - this is what stops a side
+    // bet and the main bet on the same round disagreeing about who is 3 up.
+    //
+    // A FIRST-TEE ROUND GETS THE SAME ARRAY BACK, by identity and not by value:
+    // the early return hands back the caller's own array untouched, so nothing
+    // re-sorts, nothing re-orders, and every round ever settled is byte-identical.
+    // That is the claim the money goldens make, and it is why this can be one
+    // helper rather than a flag threaded through nine functions.
+    //
+    // NOT called startHole anywhere: that name is the hole a BET starts on, and
+    // events/<code>/startHole is read as the legacy Dots start. The round's tee is
+    // startingHole; play-order.js owns the rotation and the normalising.
+    function playOrderOf(data, courseData) {
+        const cd = courseData || [];
+        if (typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return cd;
+        const holes = cd.slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+        if (!holes.length) return cd;
+        const tee = teeStartHole(data || {}, holes);
+        if (Number(tee) === Number(holes[0].hole)) return cd;
+        return playOrder(holes, tee);
+    }
+
     function getSkinsHoleScoresForSettle(players, savedScores, h) {
         let holeScores = [];
         players.forEach(p => {
@@ -205,6 +232,13 @@
     }
 
     function computeSkinsPayoutLinesFor(data, courseData, savedScores) {
+        // THE CARRY GOES TO THE NEXT HOLE PLAYED (2026-10-04, approved). A tied
+        // hole rolls its skin forward, and "forward" is the sequence: off the 10th
+        // tee a tie on the 18th carries to the 1st, not to nothing. Void mode does
+        // not carry and is order-free, so it cannot move; the carry mode is the
+        // reason this line exists. A first-tee round receives the identical array
+        // and settles byte-identically.
+        courseData = playOrderOf(data, courseData);
         const allPlayers = (typeof fieldParticipants === 'function')
             ? fieldParticipants(data)
             : (data.players || []).filter(p => p.playingForMoney !== false);
@@ -1030,8 +1064,44 @@
             const smCourse = (typeof sideMatchHoles === 'function')
                 ? sideMatchHoles(sm, courseData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
-            const firstHole = smCourse.length ? Math.min.apply(null, smCourse.map(h => h.hole)) : 1;
-            const lastHole = smCourse.length ? Math.max.apply(null, smCourse.map(h => h.hole)) : 18;
+            // IN PLAY ORDER (2026-10-04, approved). "Started Hole 10" is what a
+            // golfer who teed off the 10th sees on the Receipt, and the first hole
+            // PLAYED is the first entry of the ordered range rather than its lowest
+            // number. On a first-tee round the two are the same hole, which is what
+            // keeps every settled Receipt identical.
+            const smPlayed = playOrderOf(data, smCourse);
+            const firstHole = smPlayed.length ? Number(smPlayed[0].hole) : 1;
+            const lastHole = smPlayed.length ? Number(smPlayed[smPlayed.length - 1].hole) : 18;
+            // AND THE SEGMENT LABELS CLAMP BY SEQUENCE, NOT BY NUMBER.
+            //
+            // The clamp exists so a Nassau window of 1-9 does not print "H1" beside
+            // a side match that only ever played the 9th: the hole is not one this
+            // wager covered. Math.max/Math.min did that by number, which is right
+            // on a card played 1..18 and wrong off the 10th tee in both directions -
+            // it clamped a press starting on the 1st UP to the 10th, and it called
+            // the Overall's first hole the 1st when the group teed off the 10th.
+            //
+            // THE RULE IS: the first hole of this wager's range that was actually
+            // PLAYED, and for a press, the first one at or after the hole it was
+            // raised on - because a press's own startHole is already a play-order
+            // fact, while a Nassau window is a pair of hole numbers. On a card
+            // played 1..18 every answer is the number Math.max/Math.min gave.
+            const smPlayedIdx = {};
+            smPlayed.forEach((h, i) => { smPlayedIdx[String(Number(h.hole))] = i; });
+            const segFrom = (m) => {
+                const at = smPlayedIdx[String(Number(m.startHole))];
+                return (m.pressNum > 0 && at !== undefined) ? at : 0;
+            };
+            const segPlayedEnds = (m) => {
+                let first = null, last = null;
+                for (let i = segFrom(m); i < smPlayed.length; i++) {
+                    const h = Number(smPlayed[i].hole);
+                    if (h < m.startHole || h > m.endHole) continue;
+                    if (first === null) first = h;
+                    last = h;
+                }
+                return { first: first === null ? firstHole : first, last: last === null ? lastHole : last };
+            };
 
             const receipt = {
                 matchId, nameA, nameB, isTeam,
@@ -1151,7 +1221,10 @@
                 // never passed it. Nothing about the arithmetic changes, and a wager
                 // with no per-segment stakes still yields undefined and settles exactly
                 // as it always has.
-                const calc = calculateMatchEngine(virtual, smCourse, savedScores,
+                // THE RANGE IN PLAY ORDER (2026-10-04, approved). match-engine.js
+                // reads the array it is given AS the sequence, so a side bet now
+                // closes out and presses on the same holes the main game does.
+                const calc = calculateMatchEngine(virtual, playOrderOf(data, smCourse), savedScores,
                     sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses,
                     (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
                 if (!calc) return;
@@ -1177,8 +1250,8 @@
                         // that, because the engine only ever saw the scoped holes; printing
                         // the raw window said "H1-9" beside it and invited an argument about
                         // whether the front nine counted. Clamped to what was actually played.
-                        startHole: Math.max(m.startHole, firstHole),
-                        endHole: Math.min(m.endHole, lastHole),
+                        startHole: segPlayedEnds(m).first,
+                        endHole: segPlayedEnds(m).last,
                         // A manual press may carry its own stake (money-engine stores it
                         // on the segment). Absent - every base match, every auto press,
                         // every legacy press - it falls back to the match stake, so old
@@ -1527,7 +1600,8 @@
             } else {
                 const manualPresses = sm.presses ? Object.values(sm.presses) : [];
                 // Same wager, same rule as above: each segment at its own stake.
-                const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses,
+                // The same range, the same order - see the sister call above.
+                const calc = calculateMatchEngine(virtualPlayers, playOrderOf(data, smCourse), savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses,
                     (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
                 if (!calc) return;
                 const t1Share = calc.t1TotalMoney / teamAPlayers.length;

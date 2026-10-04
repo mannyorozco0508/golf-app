@@ -189,8 +189,12 @@ describe('HOLE NAVIGATION', () => {
             IDX.indexOf('function goToHole') + 900);
         assert.match(fn, /renderHoleView\(\);\s*landOnHole\(\);/, 'render, then land');
         assert.ok(!/scrollToHoleCard\(\)|withNavAnchor\(/.test(fn), 'neither earlier scroll rule');
+        // WINDOW WIDENED 2026-10-04 (was 900): goToAdjacentHole gained the comment
+        // explaining why it walks the card in PLAY order - a round off the 10th tee
+        // goes 18 -> 1 - and the window no longer reached the call. The assertion is
+        // unchanged and still the point: one navigator, through goToHole.
         const adj = IDX.slice(IDX.indexOf('function goToAdjacentHole'),
-            IDX.indexOf('function goToAdjacentHole') + 900);
+            IDX.indexOf('function goToAdjacentHole') + 1600);
         assert.match(adj, /goToHole\(/, 'Prev/Next must navigate through the one place');
     });
 
@@ -374,8 +378,14 @@ describe('PROTECTED — this was layout only', () => {
     });
 
     test('the navigation logic itself was not rewritten', () => {
-        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'), IDX.indexOf('function goToAdjacentHole') + 600);
+        // WINDOW WIDENED 2026-10-04 (was 600), same reason as above. The clamp
+        // itself is byte-identical: what changed is the ARRAY it clamps over, which
+        // is now the holes in play order rather than ascending. The ends of the
+        // sequence are still the ends, and they are still clamped, never wrapped.
+        const fn = IDX.slice(IDX.indexOf('function goToAdjacentHole'), IDX.indexOf('function goToAdjacentHole') + 1600);
         assert.ok(/Math\.max\(0, Math\.min\(holeNumbers\.length - 1, idx \+ delta\)\)/.test(fn),
             'the clamp must be unchanged');
+        assert.match(fn, /playOrderCourse\(\)/,
+            'it walks the card in number order again, so a 10th-tee round cannot reach hole 1 from the 18th');
     });
 });

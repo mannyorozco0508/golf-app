@@ -167,7 +167,45 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
     let maxThru = 0;
     let holeLog = {};
 
-    courseData.forEach(hole => {
+    // ---- THE ARRAY ORDER IS THE PLAY ORDER (2026-10-04) --------------------
+    //
+    // A round that starts on the 10th tee plays 10..18 then 1..9. Every caller
+    // has always passed courseData in ascending hole order, and on such a card
+    // every expression below is arithmetically identical to the hole-number
+    // arithmetic it replaces - which is why no settled round moves by a cent and
+    // match_engine_parity_test.js's thirteen fixtures hold across the change.
+    //
+    // WHAT WAS WRONG, measured: feed the same card in play order off the 10th tee
+    // and `hLeft = m.endHole - hNum` reads 2 on the card's 16th hole, when ELEVEN
+    // are still to play. The engine closed the match "3&2" and stopped counting,
+    // so four holes the other side went on to win never reached the money - a $20
+    // swing on a $10 singles match, to the wrong golfer. tee_start_test.js is that
+    // example.
+    //
+    // A SEGMENT IS STILL NAMED BY ITS HOLE NUMBERS. A Nassau Front 9 is holes 1-9
+    // whichever tee the group went off, because that is what golfers mean by it -
+    // so membership stays a number range, and only the SEQUENCE comes from the
+    // array.
+    //
+    // AND THAT RANGE IS ENOUGH, which a control proved rather than an argument. A
+    // `fromIdx` was written here first - the position a press becomes live at, so
+    // a press starting on the 1st off the 10th tee could not claim the holes
+    // already behind it. Deleting it changed NOTHING on any fixture, and it
+    // cannot: this loop only ever moves forward, so a hole inside a press's
+    // number range that was played before the press was raised is never visited
+    // again, and holesLeftFor only counts forward too. A guard that cannot fire
+    // is indistinguishable from one that does not work, so it came out.
+    const liveFor = (m, hNum) => Number(hNum) >= m.startHole && Number(hNum) <= m.endHole;
+    // HOLES OF THIS SEGMENT STILL TO PLAY, from here, in the order being played.
+    const holesLeftFor = (m, pos) => {
+        let left = 0;
+        for (let j = pos + 1; j < courseData.length; j++) {
+            if (liveFor(m, courseData[j].hole)) left++;
+        }
+        return left;
+    };
+
+    courseData.forEach((hole, holePos) => {
         let hNum = hole.hole;
         let t1Best = 999, t2Best = 999;
         let t1Valid = false, t2Valid = false;
@@ -205,10 +243,10 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
             let newPresses = [];
 
             activeMatches.forEach(m => {
-                if (hNum >= m.startHole && hNum <= m.endHole && !m.closed) {
+                if (liveFor(m, hNum) && !m.closed) {
                     m.status += diff;
 
-                    let hLeft = m.endHole - hNum;
+                    let hLeft = holesLeftFor(m, holePos);
                     if (Math.abs(m.status) > hLeft) {
                         m.closed = true;
                         let winnerName = m.status > 0 ? t1Name : t2Name;
@@ -223,7 +261,10 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                             : `${winnerName} ${Math.abs(m.status)}&${hLeft}`;
                     }
 
-                    if (hNum < m.endHole) {
+                    // STILL SOMETHING TO PRESS FOR. On a card played 1..18 this is
+                    // `hNum < m.endHole`, exactly as before; off another tee it is
+                    // the question that sentence was always asking.
+                    if (hLeft > 0) {
                         const threshold = pressRule === '2down' ? 2 : (pressRule === '1down' ? 1 : null);
                         const autoTrigger = threshold !== null && Math.abs(m.status) >= threshold;
                         // PER-PRESS STAKE (authorized change, Aug 2026).
@@ -237,7 +278,10 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                         // AUTO presses never carry a stake here: the trigger rule invented
                         // them, nobody typed an amount, and they settle at the original
                         // stake exactly as before.
-                        const manualPress = (manualPresses || []).find(mp => mp.baseId === m.baseId && mp.startHole === hNum + 1);
+                        // THE NEXT HOLE PLAYED, which off the 10th tee is the 1st
+                        // after the 18th and is never "hole 19".
+                        const nextPlayed = Number(courseData[holePos + 1].hole);
+                        const manualPress = (manualPresses || []).find(mp => mp.baseId === m.baseId && mp.startHole === nextPlayed);
                         const manualTrigger = !!manualPress;
 
                         if ((autoTrigger || manualTrigger) && m.triggers === 0) {
@@ -260,10 +304,10 @@ function calculateMatchEngine(players, courseData, savedScores, scoringType, gam
                                 stake: (manualPress && manualPress.stake !== undefined && manualPress.stake !== null)
                                     ? manualPress.stake
                                     : (gameFormat === 'nassau' ? autoPressStakeFor(m.baseId) : undefined),
-                                startHole: hNum + 1,
+                                startHole: nextPlayed,
                                 endHole: m.endHole,
                                 status: 0,
-                                label: `Press ${nextPressNum} (Hole ${hNum + 1})`,
+                                label: `Press ${nextPressNum} (Hole ${nextPlayed})`,
                                 triggers: 0,
                                 closed: false,
                                 pressNum: nextPressNum
