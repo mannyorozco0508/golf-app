@@ -39,8 +39,33 @@ function pushPlugins() {
     var p = (cap && cap.Plugins) ? cap.Plugins : {};
     return {
         native: !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()),
-        push: p.PushNotifications || null
+        push: p.PushNotifications || null,
+        // FirebaseMessaging is here for ONE call - see pushFcmToken below. It is
+        // not a second push plugin and it does not handle permission or taps.
+        messaging: p.FirebaseMessaging || null
     };
+}
+
+// ---------------------------------------------------------------------------
+// THE TOKEN THE SENDER CAN ACTUALLY ADDRESS.
+//
+// @capacitor/push-notifications hands back the APNs DEVICE TOKEN on iOS: a raw
+// address for Apple's own gateway. This app sends through FCM HTTP v1, where
+// message.token must be an FCM REGISTRATION TOKEN - a different string, issued by
+// Firebase once IT has been given the APNs token. Posting one where the other is
+// expected is an INVALID_ARGUMENT from Google, not a delivery, and nothing on the
+// phone would ever say so.
+//
+// So the FCM token is asked for FIRST, and the APNs listener is the fallback for
+// a build without the messaging plugin. Both are tokens; only one of them is an
+// address the sender holds a credential for.
+async function pushFcmToken(messaging) {
+    if (!messaging || typeof messaging.getToken !== 'function') return null;
+    try {
+        var res = await messaging.getToken();
+        var t = res && res.token ? String(res.token) : '';
+        return t || null;
+    } catch (e) { return null; }
 }
 
 // ---------------------------------------------------------------------------
@@ -87,11 +112,22 @@ async function pushRegisterToken(deps) {
         }
     } catch (e) { return { registered: false, reason: 'permission-failed' }; }
 
-    // THE TOKEN ARRIVES ON AN EVENT, NOT FROM register(). register() resolves as
-    // soon as the OS accepts the request; the token comes later on
-    // 'registration', and 'registrationError' is what fires when there is no
-    // APNs key - which is TODAY, and it must be quiet.
-    var token = await new Promise(function (resolve) {
+    // THE FCM REGISTRATION TOKEN, when the messaging plugin is there. This is the
+    // one the sender can address; see pushFcmToken.
+    var token = await pushFcmToken(plugins.messaging);
+
+    // THE APNs FALLBACK. The token arrives on an EVENT, not from register():
+    // register() resolves as soon as the OS accepts the request, the token comes
+    // later on 'registration', and 'registrationError' is what fires when the
+    // build has no push entitlement.
+    //
+    // AND THE EVENT ONLY FIRES IF THE AppDelegate FORWARDS IT. iOS hands the
+    // device token to application(_:didRegisterForRemoteNotificationsWithDeviceToken:);
+    // the Capacitor plugin sees it only through
+    // NotificationCenter.capacitorDidRegisterForRemoteNotifications. Without those
+    // two methods this promise times out and every caller reports no-token, with
+    // nothing on screen pointing at the AppDelegate. That was the bug.
+    if (!token) token = await new Promise(function (resolve) {
         var done = false;
         var finish = function (v) { if (!done) { done = true; resolve(v); } };
         try {

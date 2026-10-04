@@ -126,7 +126,24 @@ const IOS_PLUGINS = {
     // google-services.json and the com.google.gms.google-services gradle plugin,
     // neither of which this repo has, so naming it in the Android allowlist would
     // break that build for a feature Android does not ship.
-    '@capacitor/push-notifications': 'CapacitorPushNotifications'
+    '@capacitor/push-notifications': 'CapacitorPushNotifications',
+    // 2026-10-04: @capacitor-firebase/messaging, FOR ONE CALL - getToken().
+    //
+    // It is not a second push plugin. push-notifications returns the APNs DEVICE
+    // TOKEN on iOS; the sender is FCM HTTP v1, where message.token must be an FCM
+    // REGISTRATION TOKEN - the string Firebase issues once it has been given the
+    // APNs one. Sending the first where the second is expected is an
+    // INVALID_ARGUMENT from Google rather than a delivery, and nothing on the
+    // phone would say so. The two together are the chain; this one is the half
+    // that makes the token addressable.
+    //
+    // The Firebase iOS SDK is already in this binary for one-tap sign-in, and
+    // GoogleService-Info.plist is already in the app, so what this adds is
+    // FirebaseMessaging rather than Firebase.
+    //
+    // NOT ON ANDROID, for the same reason authentication is not: that side has no
+    // google-services.json.
+    '@capacitor-firebase/messaging': 'CapacitorFirebaseMessaging'
 };
 // SPM package traits, per plugin id. An id absent from here must have NO traits in
 // Package.swift; an id present here must have exactly these. The plugin's own

@@ -1116,10 +1116,15 @@ html {
     <section id="notify-card" class="email-link-card" aria-labelledby="notify-title" style="display:none;">
         <h2 id="notify-title">Notifications</h2>
         <p id="notify-lead">You're asked for permission when you open a round, not before.</p>
-        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. Your round and tee time, the 30-minute reminder, and the final results.</p>
+        <!-- THE COPY NAMES WHAT IS ACTUALLY SENT (2026-10-04). It promised a tee
+             time and a 30-minute reminder, both of which were removed before they
+             shipped, and a press offer, which has no record to answer - a press is
+             a thing you do, not a thing you ask. Five notifications exist: you're
+             in, final results, a bet challenge, an Aloha offer, and hype. -->
+        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. You&rsquo;re in a round, and the final results.</p>
         <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
             <input type="checkbox" id="notify-bets" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
-            <span>💰 Bets &mdash; somebody challenges you, or offers a press</span>
+            <span>💰 Bets &mdash; somebody challenges you to a side bet, or offers you an Aloha</span>
         </label>
         <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
             <input type="checkbox" id="notify-hype" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">

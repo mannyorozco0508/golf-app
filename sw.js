@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v128-pushregister. The tournament product cache
+// The consumer product cache is consumer-v129-fcmtoken. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4117,7 +4117,29 @@
 //
 // A DEVICE ON v287 keeps a token that can only be written from inside a round, by
 // a golfer who has picked a name.
-const CACHE_VERSION = 'golfapp-v288-pushregister';
+// Moved to v289: THE TOKEN IS THE RIGHT KIND, AND THE PHONE CAN GET ONE AT ALL.
+//
+// Both buttons answered "no-token" on a phone with permission granted, and there
+// were two faults behind that one word.
+//
+// THE AppDelegate FORWARDED NOTHING. iOS hands the device token to
+// application(_:didRegisterForRemoteNotificationsWithDeviceToken:), and the
+// Capacitor plugin only ever sees it through NotificationCenter. Without those
+// two methods the 'registration' listener never fires and every caller times out
+// - with nothing on screen pointing at a Swift file.
+//
+// AND THE TOKEN WOULD HAVE BEEN THE WRONG KIND. @capacitor/push-notifications
+// returns the APNs DEVICE TOKEN on iOS; the sender is FCM HTTP v1, where
+// message.token must be an FCM REGISTRATION TOKEN. @capacitor-firebase/messaging
+// joins for one call, getToken(), and push-boot.js asks for that first with the
+// APNs listener as the fallback.
+//
+// The Notifications panel also stopped promising a tee time, a 30-minute reminder
+// and a press offer - the first two were removed before they shipped and the
+// third has no record to answer.
+//
+// A DEVICE ON v288 keeps a page that saves an address the sender cannot use.
+const CACHE_VERSION = 'golfapp-v289-fcmtoken';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

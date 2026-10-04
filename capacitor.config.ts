@@ -41,11 +41,28 @@ const config: CapacitorConfig = {
     // exclusion below exists to prevent, and leaving it would mean shipping a
     // notification permission the app never uses.
     //
-    // INERT UNTIL MANNY'S SETUP EXISTS. Push needs the APNs key in Firebase and
-    // the Push Notifications capability in Xcode; without them register() fires
-    // registrationError and the app carries on exactly as it does today.
+    // @capacitor-firebase/messaging JOINS ON 2026-10-04, AND IT IS NOT A SECOND
+    // PUSH PLUGIN. It is here for ONE call: getToken().
+    //
+    // THE BUG IT FIXES. @capacitor/push-notifications returns the APNs DEVICE
+    // TOKEN on iOS - a raw hex address for Apple's gateway. The sender is FCM HTTP
+    // v1 (functions/api/_push.js posts to /messages:send), and message.token there
+    // must be an FCM REGISTRATION TOKEN, which is a different string issued by
+    // Firebase after IT has been given the APNs token. Sending one where the other
+    // is expected is an INVALID_ARGUMENT from Google, not a delivery.
+    //
+    // The two together are the whole chain: Apple issues the device token,
+    // FirebaseMessaging exchanges it for a registration token, and the sender
+    // addresses that. push-notifications keeps permission and the tap routing.
+    //
+    // ANDROID DOES NOT GET IT: that side has no google-services.json, which is the
+    // same reason the authentication plugin is iOS-only here.
+    //
+    // THE SETUP NOW EXISTS. The APNs key is uploaded to Firebase Cloud Messaging
+    // for development and production, the service account is a Cloudflare secret,
+    // and the app carries the Push Notifications capability.
     includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
-                     '@capacitor/push-notifications']
+                     '@capacitor/push-notifications', '@capacitor-firebase/messaging']
   },
   // ANDROID IS NOW AN ALLOWLIST TOO, AND THE REASON IS THIS WAVE'S PLUGIN.
   //

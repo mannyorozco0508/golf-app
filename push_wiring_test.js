@@ -39,8 +39,8 @@
 // all 16 tests: 4 PASS / 12 FAIL. Both modules were restored by sha from saved
 // copies (c9727474c618ed95 and the _push copy), never with git restore.
 //
-// BASELINE COUNT DELTA: +7 - seven tests were added on 2026-10-04, after this
-// baseline was measured, in two sittings.
+// BASELINE COUNT DELTA: +11 - eleven tests were added on 2026-10-04, after this
+// baseline was measured, in three sittings.
 //
 //   TWO FOR THE TEST BUTTON. Measured on their own against the build before that
 //   work: both RED, because admin.html had no sendTestNotification at all.
@@ -60,6 +60,15 @@
 //   call left "BOTH PAGES refresh on launch" green, because the pattern matched
 //   the sentence ABOVE the call that explains it. It strips comments first now,
 //   and the control fires.
+//
+//   FOUR FOR THE TOKEN ITSELF, after the phone answered no-token to both buttons
+//   with permission already granted. All four were RED before the fix: the
+//   AppDelegate forwarded nothing (so register() could never produce a token),
+//   the APNs device token would have been saved where FCM v1 needs a registration
+//   token, the messaging plugin was not linked, and the panel still promised a
+//   tee time, a 30-minute reminder and a press offer - all three removed.
+//   Controls: deleting the AppDelegate methods fires the first; skipping the FCM
+//   token fires the second.
 //
 //   THE FOUR PASSES ARE ALL SOURCE SCANS, and three of them scan the REMOVAL -
 //   push-boot.js having no scheduler, the plugin being out of the build,
@@ -153,9 +162,12 @@ describe('2. THE TEE-TIME REMINDER IS GONE, AND NOTHING OF IT IS LEFT DORMANT', 
             'push-boot.js still reaches for the local-notification plugin');
     });
 
-    test('pushPlugins() resolves the push handle only', () => {
+    test('pushPlugins() resolves the two handles and nothing else', () => {
+        // 'messaging' joined on 2026-10-04 for getToken() alone - the FCM
+        // registration token the sender can address. Still a closed list: a plugin
+        // handle that appears here without a reason is a plugin in the binary.
         const p = B.pushPlugins();
-        assert.deepEqual(Object.keys(p).sort(), ['native', 'push']);
+        assert.deepEqual(Object.keys(p).sort(), ['messaging', 'native', 'push']);
     });
 
     test('the plugin is out of package.json, the allowlist AND the iOS binary', () => {
@@ -324,6 +336,87 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
     // again - so the phone had permission and no token, and the test button could
     // only report it. Every launch now re-registers silently if permission is
     // already granted.
+    // ---- THE TOKEN TYPE, AND THE AppDelegate (2026-10-04) ----------------
+    //
+    // Manny's phone had permission and still answered "no-token" to both buttons,
+    // and there were TWO faults behind that one word.
+    //
+    //   1. THE AppDelegate FORWARDED NOTHING. iOS hands the device token to
+    //      application(_:didRegisterForRemoteNotificationsWithDeviceToken:), and
+    //      the Capacitor plugin only ever sees it through NotificationCenter.
+    //      Without those two methods the 'registration' listener never fires, the
+    //      promise times out, and every caller reports no-token - with nothing on
+    //      screen pointing at a Swift file.
+    //
+    //   2. AND THE TOKEN WOULD HAVE BEEN THE WRONG KIND. push-notifications
+    //      returns the APNs DEVICE TOKEN on iOS; the sender is FCM HTTP v1, where
+    //      message.token must be an FCM REGISTRATION TOKEN. That is an
+    //      INVALID_ARGUMENT from Google, not a delivery - a second silent failure
+    //      waiting behind the first.
+    test('THE AppDelegate FORWARDS THE DEVICE TOKEN, and the failure too', () => {
+        const app = read('ios/App/App/AppDelegate.swift');
+        assert.match(app, /didRegisterForRemoteNotificationsWithDeviceToken/,
+            'nothing forwards the token: register() can never produce one');
+        assert.match(app, /capacitorDidRegisterForRemoteNotifications/,
+            'the token is received and not handed to Capacitor');
+        assert.match(app, /didFailToRegisterForRemoteNotificationsWithError/,
+            'a failure would be indistinguishable from a slow token');
+        assert.match(app, /capacitorDidFailToRegisterForRemoteNotifications/);
+    });
+
+    test('THE FCM REGISTRATION TOKEN IS PREFERRED, with APNs as the fallback', async () => {
+        const saved = [];
+        const messaging = { async getToken() { return { token: 'FCM-REG' }; } };
+        const push = {
+            async checkPermissions() { return { receive: 'granted' }; },
+            addListener(name, cb) { if (name === 'registration') setTimeout(() => cb({ value: 'APNS-HEX' }), 0); },
+            register() {}
+        };
+        const r = await B.pushRegisterToken({ plugins: { push, messaging }, uid: 'u',
+            save: (rec) => { saved.push(rec); }, timeoutMs: 50 });
+        assert.equal(r.registered, true, r.reason);
+        assert.equal(saved[0].token, 'FCM-REG',
+            'the APNs device token was saved - FCM v1 would answer INVALID_ARGUMENT');
+
+        // WITHOUT the plugin, the APNs listener still answers: a build that has
+        // not been synced must not silently stop registering at all.
+        const saved2 = [];
+        const r2 = await B.pushRegisterToken({ plugins: { push, messaging: null }, uid: 'u',
+            save: (rec) => { saved2.push(rec); }, timeoutMs: 200 });
+        assert.equal(r2.registered, true, r2.reason);
+        assert.equal(saved2[0].token, 'APNS-HEX');
+    });
+
+    test('and the plugin is linked for iOS only, by name', () => {
+        const cfg = read('capacitor.config.ts');
+        assert.match(cfg, /'@capacitor-firebase\/messaging'/, 'the plugin is not on the iOS allowlist');
+        const ios = cfg.slice(cfg.indexOf('ios: {'), cfg.indexOf('android: {'));
+        assert.match(ios, /@capacitor-firebase\/messaging/);
+        const android = cfg.slice(cfg.indexOf('android: {'));
+        assert.ok(!/@capacitor-firebase\/messaging/.test(android),
+            'Android has no google-services.json, which is why authentication is iOS-only too');
+        assert.match(read('ios/App/CapApp-SPM/Package.swift'), /CapacitorFirebaseMessaging/,
+            'the SPM manifest does not link it, so getToken is undefined on the device');
+        assert.match(read('package.json'), /@capacitor-firebase\/messaging/);
+    });
+
+    test('THE PANEL NAMES WHAT IS ACTUALLY SENT', () => {
+        const admin = read('admin.html');
+        // COMMENTS STRIPPED: this is about what the PANEL says, and the comment
+        // explaining the removal necessarily names the thing that was removed.
+        const card = admin.slice(admin.indexOf('id="notify-card"'), admin.indexOf('id="account-exit-card"'))
+            .replace(/<!--[\s\S]*?-->/g, ' ');
+        assert.ok(card.length > 200, 'the slice is empty - the endpoint drifted');
+        // The two that were removed before they ever shipped, and the one that
+        // has no record to answer.
+        assert.ok(!/tee time/i.test(card), 'the panel still promises a tee time');
+        assert.ok(!/30-minute|reminder/i.test(card), 'the panel still promises the reminder');
+        assert.ok(!/offers a press/i.test(card), 'the panel still promises a press offer');
+        assert.match(card, /final results/i, 'Essentials does not name the final results');
+        assert.match(card, /challenges you/i, 'Bets does not name a challenge');
+        assert.match(card, /Aloha/, 'Bets does not name the Aloha offer');
+    });
+
     test('pushRegisterIfGranted NEVER prompts, and says so when it cannot', async () => {
         const asked = [];
         const push = {
