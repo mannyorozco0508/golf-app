@@ -2213,7 +2213,13 @@ html {
         // slow sign-in cannot hide the button from the organizer or show it to a
         // spectator for good.
         if (window.authReady && typeof window.authReady.then === 'function') {
-            window.authReady.then(() => { if (currentData && currentData.players) { renderScorecard(); maybeOpenPlayersSheetFromLink(); } }, () => {});
+            window.authReady.then(() => {
+                if (currentData && currentData.players) { renderScorecard(); maybeOpenPlayersSheetFromLink(); }
+                // AND THE TOKEN, once there is an account to hang it on. See
+                // refreshPushRegistration: a phone that granted permission before
+                // the rules existed has no other way back.
+                refreshPushRegistration();
+            }, () => {});
         }
     }
     // The Game tab's "Players" pill lands here with ?players=1: the sheet opens on
@@ -5832,18 +5838,54 @@ html {
                 // so re-registering the same phone updates its row instead of
                 // adding a second one - and a golfer with a phone and a watch
                 // legitimately has two.
-                save: (rec) => db.ref('pushTokens/' + uid + '/' + pushDeviceKey(rec.token)).set(rec)
+                save: (rec) => {
+                    const key = pushDeviceRow(rec.token);
+                    return key ? db.ref('pushTokens/' + uid + '/' + key).set(rec) : Promise.resolve();
+                }
             }).catch(() => {});
         } catch (e) { /* no token today; the app is unchanged */ }
     }
 
-    // A stable short key from the token. Not the token itself: an FCM token is up
-    // to ~400 characters and a database key may not contain '/', which they do.
-    function pushDeviceKey(token) {
-        const s = String(token || '');
-        let h = 0;
-        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-        return 'd' + Math.abs(h).toString(36);
+    // THE ROW KEY IS push-boot.js's (2026-10-04). It was written out here and
+    // admin.html needs the same answer now: two hashes of one token are two rows
+    // for one phone, and the stale one keeps receiving.
+    function pushDeviceRow(token) {
+        return (typeof pushDeviceKey === 'function') ? pushDeviceKey(token) : null;
+    }
+
+    // ---- REGISTER ON EVERY LAUNCH, IF THE PHONE HAS ALREADY SAID YES --------
+    //
+    // THE BUG THIS FIXES. Manny granted the iOS permission the night before the
+    // push rules were published. The write was refused, nothing retried, and iOS
+    // never shows that prompt twice - so his phone had permission and no token,
+    // and the only code that could have written one ran solely for a golfer who
+    // had chosen "I'm playing" in a round.
+    //
+    // SO THIS ASKS NOTHING AND NEEDS NOTHING. No prompt, no round, no name: if
+    // permission is already granted, the token is fetched and saved under the
+    // signed-in uid. It runs on load and again whenever the account changes,
+    // because a token belongs to a device and a row belongs to an account.
+    let pushRefreshed = false;
+    function refreshPushRegistration() {
+        if (typeof pushRegisterIfGranted !== 'function') return;
+        let uid = null;
+        try { uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null; } catch (e) { uid = null; }
+        if (!uid || pushRefreshed) return;
+        pushRefreshed = true;
+        try {
+            pushRegisterIfGranted({
+                uid: uid,
+                // WHOEVER THIS IS, including nobody in particular. A scorekeeper
+                // and an organizer have phones too; who RECEIVES what is decided
+                // when a notification is sent.
+                playerId: (typeof resolvedMeId === 'function' && resolvedMeId()) || '',
+                roundCode: currentMode || '',
+                save: (rec) => {
+                    const key = pushDeviceRow(rec.token);
+                    return key ? db.ref('pushTokens/' + uid + '/' + key).set(rec) : Promise.resolve();
+                }
+            }).catch(() => {});
+        } catch (e) { /* a launch must never fail on this */ }
     }
     function skipWhoAmI() {
         storeWhoAmISkipped();

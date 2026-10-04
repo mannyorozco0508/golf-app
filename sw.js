@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v127-playersstep. The tournament product cache
+// The consumer product cache is consumer-v128-pushregister. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4099,7 +4099,25 @@
 // Players step, and what it does depends on whether there is an account to save a
 // roster on. A device on v286 keeps the wall of per-golfer lines and a feature
 // nobody can find.
-const CACHE_VERSION = 'golfapp-v287-playersstep';
+// Moved to v288: THE PHONE REGISTERS ITSELF.
+//
+// Manny granted the iOS notification permission the night before the push rules
+// were published. The write was refused, nothing retried, and iOS NEVER SHOWS
+// THAT PROMPT TWICE - so the phone had permission and no token, and the only code
+// that could have written one ran solely for a golfer who had already answered
+// "Who am I?" in a round.
+//
+// Every launch now re-registers silently when permission is already granted: no
+// prompt, no round, no name, under the signed-in uid, idempotently - the row key
+// is the token's own fingerprint, so the same phone rewrites one row and a
+// rotated token writes the new one. The organizer and the scorekeeper register
+// too; who RECEIVES what is decided when a notification is sent, not when a
+// device registers. And the test button offers "Register this phone" instead of
+// reporting a dead end.
+//
+// A DEVICE ON v287 keeps a token that can only be written from inside a round, by
+// a golfer who has picked a name.
+const CACHE_VERSION = 'golfapp-v288-pushregister';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

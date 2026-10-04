@@ -192,7 +192,13 @@ describe('FIRE AND FORGET — the page never waits', () => {
     // sign-in still reaches nobody. The other pages keep the original rule.
     const ALLOWED_CHAINS = {
         // v195: the same chain also opens the Players sheet when the Game tab's pill arrived with ?players=1 (organizer only)
-        'index.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) \{ renderScorecard\(\); maybeOpenPlayersSheetFromLink\(\); \} \}, \(\) => \{\}\)/],
+        // 2026-10-04: and re-registers this phone for notifications once there IS
+        // a uid. Still ONE chain, still with a rejection handler - a push token
+        // is written under the signed-in account, so there is nowhere earlier it
+        // could be done. The bug it fixes: iOS asks for notification permission
+        // once, Manny said yes before the rules were published, the write was
+        // refused, and nothing ever ran again.
+        'index.html': [/window\.authReady\.then\(\(\) => \{[\s\S]{0,600}?refreshPushRegistration\(\);\s*\}, \(\) => \{\}\)/],
         'game.html': [/window\.authReady\.then\(\(\) => \{ if \(currentData && currentData\.players\) renderSetupLink\(currentData\); \}, \(\) => \{\}\)/],
         'admin.html': [/window\.authReady\.then\(\(uid\) => uid, \(\) => null\)/],
         'season.html': [/window\.authReady\.then\(function \(\) \{ syncSeasonOwner\(\); \}, function \(\) \{\}\)/]

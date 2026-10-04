@@ -39,13 +39,27 @@
 // all 16 tests: 4 PASS / 12 FAIL. Both modules were restored by sha from saved
 // copies (c9727474c618ed95 and the _push copy), never with git restore.
 //
-// BASELINE COUNT DELTA: +2 - the two TEST BUTTON tests were added on 2026-10-04,
-// after this baseline was measured. Measured on their own against the build
-// before that work: both RED, because admin.html had no sendTestNotification at
-// all. Controls: a canned decision in place of the decider's fires the first
-// (and caught that the first version of that assertion was inert - it proved the
-// CALL was written, not that its answer was used), and showing the row to
-// everybody fires the second.
+// BASELINE COUNT DELTA: +7 - seven tests were added on 2026-10-04, after this
+// baseline was measured, in two sittings.
+//
+//   TWO FOR THE TEST BUTTON. Measured on their own against the build before that
+//   work: both RED, because admin.html had no sendTestNotification at all.
+//   Controls: a canned decision in place of the decider's fires the first - and
+//   that control caught the first version of that assertion being INERT, since it
+//   proved the CALL was written and not that its answer was used - and showing
+//   the row to everybody fires the second.
+//
+//   FIVE FOR THE LAUNCH REFRESH, after Manny's phone turned out to have
+//   permission and no token: iOS asks once, he said yes before the rules were
+//   published, the write was refused, and nothing ran again. Four were RED before
+//   the fix (pushRegisterIfGranted and pushDeviceKey did not exist, and neither
+//   page refreshed on launch); the fifth - a phone with no name on it still
+//   registers - was red because a missing playerId was a refusal.
+//
+//   AND ONE MORE INERT CONTROL, found and repaired: commenting out the launch
+//   call left "BOTH PAGES refresh on launch" green, because the pattern matched
+//   the sentence ABOVE the call that explains it. It strips comments first now,
+//   and the control fires.
 //
 //   THE FOUR PASSES ARE ALL SOURCE SCANS, and three of them scan the REMOVAL -
 //   push-boot.js having no scheduler, the plugin being out of the build,
@@ -92,11 +106,30 @@ describe('1. ON THE WEB, NOTHING HAPPENS AT ALL', () => {
         assert.equal(p.push, null);
     });
 
-    test('A TOKEN IS NEVER WRITTEN WITHOUT A UID, A PLAYER AND A WRITER', async () => {
+    test('A TOKEN IS NEVER WRITTEN WITHOUT A UID AND A WRITER', async () => {
         const push = { async checkPermissions() { return { receive: 'granted' }; } };
         assert.equal((await B.pushRegisterToken({ plugins: { push }, playerId: '101', save: () => {} })).reason, 'no-uid');
-        assert.equal((await B.pushRegisterToken({ plugins: { push }, uid: 'u', save: () => {} })).reason, 'no-player');
         assert.equal((await B.pushRegisterToken({ plugins: { push }, uid: 'u', playerId: '101' })).reason, 'no-writer');
+    });
+
+    // THE PLAYER ID STOPPED BEING REQUIRED on 2026-10-04, and that is the fix for
+    // a real failure: Manny's phone had permission and no token, because the only
+    // code that could write one ran for a golfer who had already answered "Who am
+    // I?" in a round. An organizer holding the card has a phone too, and who
+    // RECEIVES a notification is decided when one is sent, not when a device
+    // registers.
+    test('A PHONE WITH NO NAME ON IT STILL REGISTERS, and the row says so', async () => {
+        const saved = [];
+        const push = {
+            async checkPermissions() { return { receive: 'granted' }; },
+            addListener(name, cb) { if (name === 'registration') setTimeout(() => cb({ value: 'TOK' }), 0); },
+            register() {}
+        };
+        const r = await B.pushRegisterToken({ plugins: { push }, uid: 'u', save: (rec) => { saved.push(rec); } });
+        assert.equal(r.registered, true, r.reason);
+        assert.equal(saved.length, 1);
+        assert.equal(saved[0].playerId, '', 'an unknown golfer must be an empty string, not undefined - the rules check isString');
+        assert.equal(saved[0].token, 'TOK');
     });
 });
 
@@ -284,6 +317,79 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
     // those words is a way for it to be a lie: a button that posted a canned
     // payload, or called FCM directly, or read somebody else's tokens would still
     // light up a phone.
+    // ---- THE LAUNCH REFRESH (2026-10-04) ---------------------------------
+    //
+    // iOS asks for notification permission ONCE. Manny said yes the night before
+    // the rules were published, the write was refused, and nothing ever asked
+    // again - so the phone had permission and no token, and the test button could
+    // only report it. Every launch now re-registers silently if permission is
+    // already granted.
+    test('pushRegisterIfGranted NEVER prompts, and says so when it cannot', async () => {
+        const asked = [];
+        const push = {
+            async checkPermissions() { return { receive: 'prompt' }; },
+            async requestPermissions() { asked.push(1); return { receive: 'granted' }; },
+            addListener() {}, register() {}
+        };
+        const r = await B.pushRegisterIfGranted({ plugins: { push }, uid: 'u', save: () => {} });
+        assert.equal(r.registered, false);
+        assert.equal(r.reason, 'not-granted');
+        assert.equal(asked.length, 0, 'it raised the iOS prompt - a launch must never do that');
+    });
+
+    test('and with permission already granted it writes the token, idempotently', async () => {
+        const saved = [];
+        const push = {
+            async checkPermissions() { return { receive: 'granted' }; },
+            addListener(name, cb) { if (name === 'registration') setTimeout(() => cb({ value: 'TOK' }), 0); },
+            register() {}
+        };
+        const once = await B.pushRegisterIfGranted({ plugins: { push }, uid: 'u', save: (rec) => { saved.push(rec); } });
+        const twice = await B.pushRegisterIfGranted({ plugins: { push }, uid: 'u', save: (rec) => { saved.push(rec); } });
+        assert.equal(once.registered, true, once.reason);
+        assert.equal(twice.registered, true, twice.reason);
+        // SAME PHONE, SAME ROW. The key is the token's own fingerprint, so a
+        // second launch rewrites one row rather than collecting phones.
+        assert.equal(B.pushDeviceKey('TOK'), B.pushDeviceKey('TOK'));
+        assert.notEqual(B.pushDeviceKey('TOK'), B.pushDeviceKey('OTHER'));
+        assert.ok(!/\//.test(B.pushDeviceKey('a/b+c')), 'a database key may not contain a slash');
+    });
+
+    test('BOTH PAGES refresh on launch, through the shared row key', () => {
+        ['index.html', 'admin.html'].forEach((f) => {
+            const src = read(f);
+            assert.match(src, /pushRegisterIfGranted\(\{/, f + ' never re-registers an already-granted phone');
+            assert.match(src, /function refreshPushRegistration/, f + ' has no launch refresh');
+            assert.ok(!/function pushDeviceKey\(token\) \{/.test(src),
+                f + ' hashes the token itself again - two hashes are two rows for one phone');
+        });
+        // AND THE REFRESH IS ACTUALLY CALLED, not merely defined. The whole bug
+        // was code that existed and never ran.
+        // COMMENTS STRIPPED FIRST. The first version of this matched the sentence
+        // ABOVE the call explaining it, so commenting the call out left the test
+        // green - measured, as a control, and this is the repair.
+        const code = (f) => read(f).replace(/(^|[^:])\/\/[^\n]*/g, '$1 ').replace(/<!--[\s\S]*?-->/g, ' ');
+        assert.match(code('index.html'), /window\.authReady[\s\S]{0,400}refreshPushRegistration\(\)/,
+            'index.html defines the refresh and never calls it after sign-in');
+        assert.match(code('admin.html'), /refreshPushRegistration\(\);/,
+            'admin.html defines the refresh and never calls it');
+    });
+
+    test('the dead end offers Register this phone, and THAT one may ask', () => {
+        const admin = read('admin.html');
+        const fn = admin.slice(admin.indexOf('async function sendTestNotification()'),
+                               admin.indexOf('\n    function ', admin.indexOf('async function sendTestNotification()') + 30));
+        assert.match(fn, /refreshPushRegistration\(true\)/, 'it does not try a silent refresh first');
+        assert.match(fn, /Register this phone/, 'no way out of the dead end');
+        assert.match(fn, /registerThisPhone/, 'the offer is not wired to anything');
+        const reg = admin.slice(admin.indexOf('async function registerThisPhone()'),
+                                admin.indexOf('async function sendTestNotification()'));
+        assert.ok(reg.length > 200, 'the slice is empty - the endpoint drifted');
+        assert.match(reg, /pushRegisterToken\(\{/, 'the offer cannot prompt, so it cannot help a phone that never said yes');
+        assert.ok(!/pushRegisterIfGranted/.test(reg), 'the button that exists to ask must be allowed to ask');
+        assert.match(reg, /out\.reason/, 'a refusal must name itself - denied, no-token and write-failed need different fixes');
+    });
+
     test('it goes through the REAL decider and the REAL route, to this account only', () => {
         const admin = read('admin.html');
         const at = admin.indexOf('async function sendTestNotification()');
@@ -301,8 +407,13 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
         assert.match(fn, /if \(!decided \|\| !decided\.send\)/, 'it sends whatever the decider refused');
         assert.match(fn, /courseApiBase\(\) \+ '\/api\/push-send'/,
             'it does not post to the real route (or would miss the proxy base in the shell)');
-        assert.match(fn, /db\.ref\('pushTokens\/' \+ uid\)/,
+        // THE PATH IS BUILT IN ONE PLACE NOW (pushTokensPath), because the test
+        // button, the launch refresh and the Register button all write the same
+        // node and three spellings are three chances to write somebody else's.
+        assert.match(fn, /db\.ref\(pushTokensPath\(uid\)\)/,
             "it reads tokens from somewhere other than this account's own node");
+        assert.match(read('admin.html'), /function pushTokensPath\(uid\) \{ return 'pushTokens\/' \+ uid; \}/,
+            'the path builder is gone, so each caller spells it itself');
         assert.ok(!/fcm\.googleapis|oauth2\.googleapis/.test(fn),
             'the page talks to Google directly - the credential belongs to the Function');
         // THE REASON IS THE FUNCTION'S OWN. not_configured means the Cloudflare

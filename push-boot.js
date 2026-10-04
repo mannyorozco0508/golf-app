@@ -60,13 +60,28 @@ async function pushRegisterToken(deps) {
     var push = plugins.push;
     if (!push) return { registered: false, reason: 'no-plugin' };
     if (!d.uid) return { registered: false, reason: 'no-uid' };
-    if (!d.playerId) return { registered: false, reason: 'no-player' };
     if (typeof d.save !== 'function') return { registered: false, reason: 'no-writer' };
+    // THE PLAYER ID IS OPTIONAL NOW (2026-10-04). It used to be required, on the
+    // grounds that a token is worth nothing without it - which is true of the
+    // notifications that address a golfer, and NOT true of the token itself. An
+    // organizer holding the card has a phone that can be pushed to, and so does a
+    // golfer who has not picked a name yet; who RECEIVES what is decided when the
+    // notification is sent, not when the device registers. Registering only the
+    // golfers who had already answered "Who am I?" is why Manny's own phone had
+    // no token at all.
+    var playerId = String(d.playerId === undefined || d.playerId === null ? '' : d.playerId);
 
     try {
         var perm = await push.checkPermissions();
         if (perm && perm.receive === 'denied') return { registered: false, reason: 'denied' };
         if (!perm || perm.receive !== 'granted') {
+            // ASKING IS A CHOICE THE CALLER MAKES. A launch-time refresh must
+            // NEVER raise the iOS prompt: permission is granted once, and a
+            // second prompt is not shown by the system anyway - the failure this
+            // fixes is a phone that said yes last night, before the rules were
+            // published, and was never asked again because iOS had nothing left
+            // to ask.
+            if (d.ask === false) return { registered: false, reason: 'not-granted' };
             var asked = await push.requestPermissions();
             if (!asked || asked.receive !== 'granted') return { registered: false, reason: 'declined' };
         }
@@ -92,9 +107,37 @@ async function pushRegisterToken(deps) {
 
     if (!token) return { registered: false, reason: 'no-token' };
     try {
-        await d.save({ token: token, playerId: String(d.playerId), roundCode: String(d.roundCode || ''), at: d.now || Date.now() });
+        // IDEMPOTENT BY CONSTRUCTION: the row key is the token's own fingerprint,
+        // so re-saving the same phone rewrites one row rather than adding another,
+        // and a token that has rotated writes a new row for the new token. The
+        // save is attempted on EVERY launch for exactly that reason - a token is
+        // not a permanent address.
+        await d.save({ token: token, playerId: playerId, roundCode: String(d.roundCode || ''), at: d.now || Date.now() });
     } catch (e) { return { registered: false, reason: 'write-failed' }; }
     return { registered: true, reason: 'ok', token: token };
+}
+
+// REGISTER ONLY IF THE PHONE HAS ALREADY SAID YES. Called on every launch and
+// after a sign-in: it never prompts, it never needs a round, and it never needs a
+// name. If permission was granted at any point in the past - which iOS will not
+// ask about twice - this is the only thing that can put the token back.
+function pushRegisterIfGranted(deps) {
+    var d = deps || {};
+    var opts = {};
+    Object.keys(d).forEach(function (k) { opts[k] = d[k]; });
+    opts.ask = false;
+    return pushRegisterToken(opts);
+}
+
+// A STABLE SHORT KEY FROM THE TOKEN, and not the token itself: an FCM token runs
+// to about 400 characters and a database key may not contain '/', which they do.
+// Shared, because two pages write this row now and a second copy of the hash is a
+// second row for one phone.
+function pushDeviceKey(token) {
+    var s = String(token || '');
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return 'd' + Math.abs(h).toString(36);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +210,7 @@ function pushPrefsForSave(prefs) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        pushPlugins, pushRegisterToken, pushPrefsForSave, pushActionHref
+        pushPlugins, pushRegisterToken, pushRegisterIfGranted, pushDeviceKey,
+        pushPrefsForSave, pushActionHref
     };
 }

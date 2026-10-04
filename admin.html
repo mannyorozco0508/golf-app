@@ -6304,6 +6304,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         db.ref('app_settings/pushTestUid').once('value').then(function (snap) {
             notifyTestVisible(uid, snap.val());
         }).catch(function () { notifyTestVisible(uid, null); });
+        // EVERY TIME THIS CARD SYNCS, which is on load and whenever the account
+        // changes. Silent: it cannot prompt and it cannot fail loudly.
+        refreshPushRegistration();
     }
 
 // ---- THE TEST NOTIFICATION (Wave 39, 2026-10-04) ----
@@ -6323,6 +6326,68 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         row.style.display = (uid && testUid && String(uid) === String(testUid)) ? 'block' : 'none';
     }
 
+// ---- REGISTER THIS PHONE (2026-10-04) ----
+    //
+    // Manny granted the iOS permission the night before the push rules were
+    // published: the write was refused, nothing retried, and iOS never shows that
+    // prompt a second time - so the phone had permission and no token, and the
+    // test button could only say so.
+    //
+    // THE FIX IS A LAUNCH-TIME REFRESH that asks nothing: if permission is
+    // already granted, the token is fetched and saved under the signed-in uid,
+    // every launch, idempotently. It needs no round and no name, because who
+    // RECEIVES a notification is decided when one is sent.
+    let pushRefreshed = false;
+    function pushTokensPath(uid) { return 'pushTokens/' + uid; }
+
+    function refreshPushRegistration(force) {
+        if (typeof pushRegisterIfGranted !== 'function') return Promise.resolve(null);
+        const uid = notifyUid();
+        if (!uid) return Promise.resolve(null);
+        if (pushRefreshed && !force) return Promise.resolve(null);
+        pushRefreshed = true;
+        try {
+            return pushRegisterIfGranted({
+                uid: uid, playerId: '', roundCode: '',
+                save: (rec) => {
+                    const key = (typeof pushDeviceKey === 'function') ? pushDeviceKey(rec.token) : null;
+                    return key ? db.ref(pushTokensPath(uid) + '/' + key).set(rec) : Promise.resolve();
+                }
+            }).catch(() => null);
+        } catch (e) { return Promise.resolve(null); }
+    }
+
+    // THE BUTTON ON THE DEAD END. When there is no token, the test card offers the
+    // one thing that can produce one - and this one MAY prompt, because a golfer
+    // who never granted permission has to be asked.
+    async function registerThisPhone() {
+        const note = document.getElementById('notify-test-note');
+        const say = (t) => { if (note) note.textContent = t; };
+        const uid = notifyUid();
+        if (!uid) return say('Sign in first.');
+        if (typeof pushRegisterToken !== 'function') return say('The notification plugin did not load.');
+        say('Registering this phone\u2026');
+        try {
+            const out = await pushRegisterToken({
+                uid: uid, playerId: '', roundCode: '',
+                save: (rec) => {
+                    const key = (typeof pushDeviceKey === 'function') ? pushDeviceKey(rec.token) : null;
+                    return key ? db.ref(pushTokensPath(uid) + '/' + key).set(rec) : Promise.resolve();
+                }
+            });
+            if (out && out.registered) {
+                say('This phone is registered. Tap "Send me a test notification".');
+            } else {
+                // THE REASON, NOT A PARAPHRASE. "denied" is a trip to iOS
+                // Settings; "no-token" is an APNs problem; "write-failed" is the
+                // rules. They need different things done about them.
+                say('Not registered: ' + ((out && out.reason) || 'no answer') + '.');
+            }
+        } catch (e) {
+            say('Could not register: ' + (e && e.message ? e.message : 'no answer') + '.');
+        }
+    }
+
     async function sendTestNotification() {
         var note = document.getElementById('notify-test-note');
         var btn = document.getElementById('notify-test-btn');
@@ -6333,15 +6398,38 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (btn) btn.disabled = true;
         say('Sending\u2026');
         try {
-            var snap = await db.ref('pushTokens/' + uid).once('value');
+            var snap = await db.ref(pushTokensPath(uid)).once('value');
             var raw = snap.val() || {};
             // THE SHAPE THE RULES ALLOW: pushTokens/<uid>/<deviceId> = { token, playerId, at }.
-            var tokens = Object.keys(raw).map(function (k) {
+            let tokens = Object.keys(raw).map(function (k) {
                 return raw[k] && raw[k].token;
             }).filter(function (t) { return typeof t === 'string' && t; });
             if (!tokens.length) {
-                say('This phone has not registered for notifications yet \u2014 open a round and say yes to the permission, then come back.');
-                return;
+                // NOT A DEAD END. One more try at a silent refresh first - the
+                // common case is a phone that already has permission - and if
+                // that produces nothing, the button that can ask.
+                const again = await refreshPushRegistration(true);
+                if (!(again && again.registered)) {
+                    say('This phone is not registered yet.');
+                    const row = document.getElementById('notify-test-row');
+                    if (row && !document.getElementById('notify-register-btn')) {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.id = 'notify-register-btn';
+                        b.className = 'btn-outline';
+                        b.style.marginTop = '8px';
+                        b.textContent = '\ud83d\udcf2 Register this phone';
+                        b.onclick = registerThisPhone;
+                        row.appendChild(b);
+                    }
+                    return;
+                }
+                // The refresh wrote a row; read it back rather than guessing.
+                const snap2 = await db.ref(pushTokensPath(uid)).once('value');
+                const raw2 = snap2.val() || {};
+                tokens = Object.keys(raw2).map(function (k) { return raw2[k] && raw2[k].token; })
+                    .filter(function (t) { return typeof t === 'string' && t; });
+                if (!tokens.length) { say('This phone is not registered yet.'); return; }
             }
             // A REAL DECISION, from the real decider, so a refusal here is the
             // same refusal a live notification would get.
