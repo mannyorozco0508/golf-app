@@ -3285,6 +3285,56 @@ codeload tarball and live.
     Pages Functions do not support scheduled handlers - a cron needs a separate
     Worker.
 
+## Wave 39 is merged, and push works end to end (2026-10-04, MERGED `c143857`)
+
+Cache `golfapp-v290-preflight` / consumer `v130`. Everything that waited on
+Manny's setup is now live: side-bet challenges with their group scoping,
+following along as a player, the Players-step tidy, My Groups released, the
+tee-time field removed, and PUSH.
+
+- **THREE FAULTS STOOD BETWEEN A GRANTED PERMISSION AND A NOTIFICATION, and each
+  one hid the next.**
+  1. **REGISTRATION ONLY RAN FOR A GOLFER WHO HAD PICKED A NAME IN A ROUND.**
+     Manny granted the iOS permission the night before the rules were published,
+     the write was refused, and **iOS never shows that prompt twice** - so the
+     phone had permission and no token, for good. Every launch now re-registers
+     silently when permission is already granted: no prompt, no round, no name,
+     idempotent (the row key is the token's own fingerprint).
+  2. **THE AppDelegate FORWARDED NOTHING.** iOS hands the device token to
+     `didRegisterForRemoteNotificationsWithDeviceToken:`, and the Capacitor plugin
+     sees it only through `NotificationCenter`. Neither method existed, so
+     `register()` asked, iOS answered, nobody listened, and every caller timed out
+     into `no-token` - with nothing on screen pointing at a Swift file.
+  3. **AND THE TOKEN WOULD HAVE BEEN THE WRONG KIND.**
+     `@capacitor/push-notifications` returns the APNs device token; the sender is
+     FCM HTTP v1, where `message.token` must be an FCM **registration** token.
+     `@capacitor-firebase/messaging` joins for one call, `getToken()`, with the
+     APNs listener as the fallback. Verified in the database: 142 characters with
+     a colon, which is the FCM shape.
+- **AND THEN "Load failed", WHICH WAS A PREFLIGHT NOBODY ANSWERED.** A POST
+  carrying `content-type: application/json` is not a simple request: the browser
+  sends OPTIONS first and will not send the POST unless that answer allows the
+  method and the header. Nothing exported `onRequestOptions`, the preflight fell
+  to the catch-all and came back 405, and **fetch() gives a failed preflight no
+  status and no body** - "Load failed" was all the app could honestly say.
+  `/api/push-send` answers it now (204) and carries the CORS header on **every**
+  answer including refusals, because `not_configured` and `no_device` are exactly
+  the ones the app needs to read.
+- **MEASURED IN PRODUCTION after the merge:** sw.js serves
+  `golfapp-v290-preflight`; `OPTIONS /api/push-send` from `capacitor://localhost`
+  answers **204** with allow-methods `POST, OPTIONS`; and a POST answers
+  **`nothing_to_send`** - not `no_such_route`, so the route is deployed, and not
+  `not_configured`, so **the Function can read FCM_SERVICE_ACCOUNT**. Nothing was
+  sent to anybody: the probe's decision said `send: false`.
+- **THE ENTITLEMENT PAIR:** Debug signs `aps-environment development`, Release
+  signs **production** (`App/AppRelease.entitlements`). One file for both is how a
+  TestFlight build registers on the development gateway and silently never
+  receives.
+- **THE TEST BUTTON** is Account -> Notifications, visible only to the account
+  named in `app_settings/pushTestUid`, and it sends to that account's own tokens
+  through the real route. When there is no token it offers **Register this phone**
+  rather than reporting a dead end.
+
 ## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, MERGED `277a093`)
 
 STRICT. Two optional pots, both OFF until an organizer switches them on. Cache
