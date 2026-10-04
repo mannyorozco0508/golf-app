@@ -55,39 +55,21 @@ const SHARED_SHELL = [
     // valid card is, the canonical tee, every refusal sentence. admin.html and
     // tournament.html both load it (2026-09-17); one builder, two entry points.
     'course-import-rules.js',
+    'roster-paste.js',
+    'trip-pots.js',
     // course-index.js: the shared course list, read cheaply. admin.html,
     // tournament.html and trip.html all call courseIndexLoader UNGUARDED, so a
     // cached shell without it throws on load and the setup page never draws.
     'course-index.js',
-    // NO SINGLE QUOTES IN THESE COMMENTS - not in an apostrophe, and not in a
-    // quoted regex either. build-shell.js reads this array by matching
-    // single-quoted strings, so one stray quote pairs with the next real one and
-    // swallows the entries between them. Measured twice in five minutes: first an
-    // apostrophe in Manny-possessive, then the very comment explaining it, which
-    // quoted the pattern. CLAUDE.md records this trap under its own heading.
-    //
-    // tee-time.js: the one formatter for a round tee time. admin.html writes one,
-    // index.html, game.html and trip.html display it, and all four call it
-    // UNGUARDED where a tee time is shown - a cached shell without it throws
-    // inside a renderer.
-    'tee-time.js',
-    // push-notify.js / push-boot.js: WHAT to say and WHEN (pure), and the device
-    // half that talks to the plugins. index.html and admin.html reach both
-    // through typeof guards - the feature is inert until the APNs key and the
-    // Cloudflare secret exist - so a cached shell without them is a scorecard
-    // with no reminder rather than a broken page. Precached anyway, because the
-    // reminder is the half that works first and it must survive going offline.
-    'push-notify.js',
-    'push-boot.js',
-    // round-role.js: the three ways into a round - keep score, play, watch.
-    // index.html calls it UNGUARDED from the arrival sheet, so a cached shell
-    // without it throws before a golfer can choose anything.
-    'round-role.js',
-    // challenges.js: a pending side-bet offer, and the ONE payload builder a side
-    // match is created from. sidematches.html calls both UNGUARDED - saveSideMatch
-    // goes through sideMatchPayloadFromTerms - so a cached shell without it cannot
-    // create a side bet at all.
-    'challenges.js',
+    // trip-itinerary.js: the paste-an-itinerary parser. trip.html calls
+    // tripItinPlan UNGUARDED from the review button, so a cached shell without it
+    // throws when the button is tapped.
+    'tee-time.js', 'push-notify.js', 'push-boot.js', 'round-role.js', 'challenges.js',
+    'trip-itinerary.js',
+    // trip-roster.js: which rounds a roster change may touch. trip.html calls
+    // tripRosterPlan UNGUARDED, so a cached shell without it throws when the
+    // Golfers section renders.
+    'trip-roster.js',
     // code-issuer.js issues every round, trip and tournament code and checks it is
     // free before handing it out. admin.html, trip.html and tournament.html all
     // load it, so without it here the native bundle 404s and none of them can

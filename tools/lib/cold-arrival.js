@@ -43,7 +43,8 @@ const CHROME = process.env.CHROME_PATH
 // STEPS (the `steps` array of arriveCold): { expression } evaluates and pushes
 // the value; { cdp: { method, params } } a raw DevTools command; { tap: selector,
 // nth } a real tap at the element's centre; { sleep: ms }; { media } emulated
-// media (pushes nothing); { deliver: { path, value } } a SECOND SNAPSHOT to every
+// media (pushes nothing); { shot: <path> } a full-page PNG written to that path;
+// { deliver: { path, value } } a SECOND SNAPSHOT to every
 // value listener on that path (2026-09-18) - pushes { path, listeners, threw }.
 // One snapshot proves the first paint, not the page: a check on a live page
 // delivers at least two on the listener it measures, and bails when the
@@ -103,8 +104,33 @@ function firebaseStub(dbJson, auth) {
         });
         return { path: key, listeners: hits.length, threw: threw };
       };
+      // Walks the fixture to the given path and puts the value there. replace=true
+      // for a set or a remove; a merge for an update, which is what the SDK does.
+      // (No backticks in this comment: the whole stub is a template literal, and
+      // one in a comment ends it - "Unexpected identifier" at load, nothing else.)
+      function applyWrite(parts, value, replace) {
+        if (!parts.length) return;
+        var node = DB;
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (node[parts[i]] == null || typeof node[parts[i]] !== 'object') node[parts[i]] = {};
+          node = node[parts[i]];
+        }
+        var last = parts[parts.length - 1];
+        if (value === null || value === undefined) { delete node[last]; return; }
+        if (!replace && node[last] && typeof node[last] === 'object' && !Array.isArray(node[last])
+            && typeof value === 'object' && !Array.isArray(value)) {
+          Object.keys(value).forEach(function (k) { node[last][k] = value[k]; });
+          return;
+        }
+        node[last] = value;
+      }
+
       function refFor(pathStr) {
-        var parts = String(pathStr).split('/').filter(Boolean);
+        // db.ref() WITH NO PATH IS THE ROOT, and String(undefined) is the word
+        // "undefined" - so the root ref used to resolve to a path called
+        // "undefined", which is where every multi-path update() in this app would
+        // have landed. Normalised here, once, so the root is an EMPTY path.
+        var parts = String(pathStr == null ? '' : pathStr).split('/').filter(Boolean);
         function resolve() {
           // ANY path, walked against the fixture. This resolved only events/<CODE>
           // before, which was enough while every check was about a single round.
@@ -132,10 +158,26 @@ function firebaseStub(dbJson, auth) {
                                      exists: function () { return resolve() != null; } });
           },
           // Writes are RECORDED (v193) - window.__coldWrites, {op, path, value} -
-          // so a check can prove what a real tap wrote; they still re-fire nothing.
-          set: function (v) { window.__coldWrites.push({ op: 'set', path: pathStr, value: v }); return Promise.resolve(); },
-          update: function (v) { window.__coldWrites.push({ op: 'update', path: pathStr, value: v }); return Promise.resolve(); },
-          remove: function () { window.__coldWrites.push({ op: 'remove', path: pathStr }); return Promise.resolve(); },
+          // so a check can prove what a real tap wrote.
+          //
+          // AND THEY LAND IN THE FIXTURE (2026-10-04), so a page that reads the
+          // node again sees what it just wrote. Recording alone could not tell a
+          // write that never happened from a SCREEN THAT NEVER RE-READ - and the
+          // second is a real bug this harness missed: a trip roster paste wrote
+          // 24 golfers and left Player 1..4 on the page, because every round's
+          // players come from a one-shot read nothing repeated. Listeners still
+          // re-fire nothing; delivery stays opt-in through __coldDeliver.
+          set: function (v) { window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v }); applyWrite(parts, v, true); return Promise.resolve(); },
+          update: function (v) {
+            window.__coldWrites.push({ op: 'update', path: parts.join('/'), value: v });
+            // A ROOT update() IS A MULTI-PATH WRITE: its keys are paths, which is
+            // how every batched write in this app is made.
+            if (!parts.length && v && typeof v === 'object' && !Array.isArray(v)) {
+              Object.keys(v).forEach(function (k) { applyWrite(String(k).split('/').filter(Boolean), v[k], true); });
+            } else { applyWrite(parts, v, false); }
+            return Promise.resolve();
+          },
+          remove: function () { window.__coldWrites.push({ op: 'remove', path: parts.join('/') }); applyWrite(parts, null, true); return Promise.resolve(); },
           push: function () { return api; }
         };
         return api;
@@ -366,6 +408,32 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 if (step.cdp) {
                     const r = await rpc(ws, id++, step.cdp.method, step.cdp.params || {});
                     value.push(r && r.error ? 'cdp error: ' + JSON.stringify(r.error) : 'ok');
+                    continue;
+                }
+                // { shot: <path> } - a FULL-PAGE PNG, written to disk, so a change to
+                // a screen can be looked at rather than described. The page is
+                // measured first and the viewport resized to its full height, then
+                // put back: a screenshot of the first 844px of a trip page shows
+                // the header and nothing anybody asked about. Pushes the path and
+                // the byte count, so a check can fail when nothing was captured.
+                if (step.shot) {
+                    const metrics = await rpc(ws, id++, 'Page.getLayoutMetrics', {});
+                    const css = (metrics.result && (metrics.result.cssContentSize || metrics.result.contentSize)) || {};
+                    const full = { width: Math.ceil(css.width || 390), height: Math.min(Math.ceil(css.height || 844), 16000) };
+                    await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
+                        { width: full.width, height: full.height, deviceScaleFactor: 2, mobile: true });
+                    const shot = await rpc(ws, id++, 'Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+                    await rpc(ws, id++, 'Emulation.clearDeviceMetricsOverride', {});
+                    if (viewport) {
+                        await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
+                            { width: viewport.width, height: viewport.height, deviceScaleFactor: 2, mobile: true });
+                    }
+                    const data = shot.result && shot.result.data;
+                    if (!data) { value.push('no screenshot: ' + JSON.stringify(shot.error || {})); continue; }
+                    const buf = Buffer.from(data, 'base64');
+                    const out = path.isAbsolute(step.shot) ? step.shot : path.join(REPO_ROOT, step.shot);
+                    fs.writeFileSync(out, buf);
+                    value.push('shot ' + out + ' ' + buf.length + ' bytes ' + full.width + 'x' + full.height);
                     continue;
                 }
                 if (step.sleep !== undefined) {

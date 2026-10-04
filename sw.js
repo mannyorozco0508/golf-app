@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v121-challenges. The tournament product cache
+// The consumer product cache is consumer-v125-push. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -3909,6 +3909,102 @@
 // leaderboard.html and side-match-lines.js all moved, and leaderboard.html now loads
 // side-match-lines.js, so a device on v277 keeps a card that cannot answer the
 // question a group asks at the end of a round.
+// Moved to v279 FOR THE ROAD TRIP: a round with no course yet, a pasted itinerary,
+// and golfers added or removed on a trip.
+//
+// A trip round could not be saved without a course, so Friday being "Prestwick or
+// Man O' War (not chosen)" meant waiting on a decision or inventing one - and an
+// invented course is an invented par and stroke-index card, which is invented money.
+// A round with no course is now a saved round with no courseData, which the app
+// already handles, and the organizer picks the course when the group decides.
+//
+// trip-itinerary.js and trip-roster.js are new and PRECACHED: trip.html calls both
+// unguarded, so a device on v278 told it already had this version would throw when
+// the Golfers section renders.
+//
+// A ROSTER CHANGE APPLIES ONLY TO ROUNDS WITH NO SCORES. A round with one posted
+// score has a settled money position - handicaps off its roster, side matches naming
+// its ids, a pool charging per golfer - so it keeps the roster it was played with,
+// and the organizer is told by name which rounds were left alone.
+// Moved to v280 BECAUSE THE BUILD BUTTON IGNORED THE ITINERARY IT WAS SHOWN.
+//
+// Manny pasted seven Myrtle rounds, the review read all seven, and Build Trip said
+// "Set up at least one day above" - the planner rebuilds every round on screen from
+// the day-count box, that box was empty, and the rebuild threw the seven rounds away
+// the moment they were made. An accepted itinerary is now kept, the day count is
+// written from it, two lines on one date are one 36-hole day rather than two days,
+// and a line near the button says what Build is about to use.
+//
+// Also the nines in brackets: "Thistle Golf Club (NC - 27 Hole) (mackay/cameron)" is
+// how a golfer copying the app's own course name writes the loops, and they were
+// dropped silently - Thistle then played Cameron/MacKay, a different stroke index and
+// different money. A device left on v279 keeps a planner that refuses a pasted
+// itinerary and a parser that mis-orders those two nines.
+// Moved to v281 BECAUSE A PASTED COURSE WENT NOWHERE.
+//
+// Manny's review read "Myrtlewood PineHills - will look up online" and "2 online
+// lookups"; the round came out BLANK with no message. Two faults. His course was
+// already saved as "Myrtlewood - Pine Hills" - one space apart after
+// normalisation - so the matcher missed and a free match became a paid search.
+// And nothing performed that search: the review priced a lookup the apply step
+// never made. Now a saved course matches space-free for nothing, an unsaved one
+// is looked up and imported through the same rules and onto the same
+// global_courses/<key> as admin.html, a multi-course facility asks which course
+// rather than guessing, and a round that still has none says "Needs a course:
+// <name>" with the search pre-filled instead of showing an empty box.
+//
+// course-import-rules.js gains the record builder, its key chooser and the proxy
+// base - one implementation, shared with trip.html, which precaches it already.
+// A device left on v280 keeps a planner that silently drops any course it does
+// not already hold.
+// Moved to v282 FOR THE PASTED TRIP ROSTER, a trip that can be renamed, and a
+// round picker that reads like a calendar.
+//
+// roster-paste.js is NEW AND PRECACHED: trip.html calls parsePlayerPasteText
+// unguarded, so a device told it already had this version would throw when the
+// Golfers section renders. The parser moved out of admin.html, which had the only
+// copy - two pages read that same pasted list now, and handicaps are money.
+//
+// A trip's name was typed once at creation and never again (Manny's Myrtle week
+// went in as "Myrtle Beach 2006"), and the name is on the recap, the share text
+// and the itinerary print. The pasted roster replaces the "Player 1..N"
+// placeholders in order, keeping each seat's id, then adds - and it touches only
+// rounds with NO scores, because a played round's roster is where its handicaps,
+// its side-match ids and its pool charges come from. "Add a round to this trip"
+// is collapsed behind one line now that the itinerary paste builds every round,
+// and "Start From" lists rounds in date order naming the course.
+// Moved to v283 FOR THE ROAD TRIP TIDY-UP, and one of these is money.
+//
+// A "Group 4" line in a pasted roster was read as a GOLFER called Group with a
+// handicap of 4 - so Manny's 24-man list reviewed as 30 golfers, and six phantom
+// players with handicaps would have gone into every round. A header, a bare tee
+// time and a blank line are all group separators now. A device left on v282 keeps
+// the parser that invents those six.
+//
+// And the rest of what he hit: the paste wrote and the screen still showed
+// Player 1..4, because every round's players come from a one-shot read nothing
+// repeated; the confirm counted writes rather than people ("28 placeholders
+// replaced, 147 golfers added" for 24 golfers); the rounds list was in map-key
+// order with no date or course on any row; and the same placeholder paragraph was
+// printed per golfer per round in three places until the page could not be read.
+//
+// A new trip is four things on one screen now - name, the rounds, the golfers,
+// Build - and the trip page reads name, rounds, golfers, then the numbers, with
+// the golfers shown in their groups.
+// Moved to v284 FOR THE TRIP'S OWN MONEY: a pot on the points race, and a pot in
+// every round. Both are OFF until an organizer switches them on, and with both
+// off the trip settles byte for byte as it did - asserted against a golden taken
+// from the page before this existed.
+//
+// trip-pots.js is NEW AND PRECACHED: trip.html calls tripPotConfig unguarded when
+// it draws the money, so a device told it already had this version would throw on
+// the settlement rather than merely miss a feature.
+//
+// THE POINTS SCALE CHANGED with it: 1st is worth the whole trip's field size (24
+// in a 24-man trip), not however many posted that day, so a thin Thursday is
+// worth the same as a full Monday for the same finish. No money was ever attached
+// to those points before this wave; now there can be, which is why the scale had
+// to stop moving.
 // Moved to v279 FOR THE TEE TIME AND THE NOTIFICATIONS. Three new precached files -
 // tee-time.js, push-notify.js, push-boot.js - and four pages changed around them:
 // admin.html sets a tee time and carries the notification switches, index.html shows
@@ -3956,7 +4052,21 @@
 // A DEVICE ON v280 has no Challenge button, cannot see or answer a pending one, and
 // has no challenges.js - which saveSideMatch now calls unguarded, so a cached shell
 // told it already had this version could not create a side bet at all.
-const CACHE_VERSION = 'golfapp-v281-challenges';
+// Moved to v285 FOR THE PUSH NOTIFICATIONS THEMSELVES, and the three waves above
+// carried across the Road Trip merges: the tee time, following along as a player,
+// and side-bet challenges all land on a device for the first time here, beside
+// the trip work that shipped while they waited.
+//
+// THE PUSH HALF IS NO LONGER INERT. The APNs key is uploaded to Firebase Cloud
+// Messaging for development AND production (com.rattlegolf.app), the service
+// account is a Cloudflare Production secret, and the app now carries the Push
+// Notifications capability - aps-environment, development in Debug and
+// PRODUCTION in Release, which is the pair a TestFlight or App Store build needs.
+//
+// A DEVICE ON v284 has no tee time, no way to follow a round as a player, no
+// challenges and no push at all; every one of those pages calls its file
+// unguarded, so the key has to move.
+const CACHE_VERSION = 'golfapp-v285-push';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4110,25 +4220,20 @@ const SHELL_FILES = [
     './live-skins.js',
     './course-data.js',
     './course-import-rules.js',
+    './roster-paste.js',
+    './trip-pots.js',
     // The shared course list, read cheaply - the probe, the name index and the
     // per-course fetch. admin.html, tournament.html and trip.html call
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
     // before the setup page draws anything. That is why it is precached.
     './course-index.js',
-    // NO SINGLE QUOTES IN THESE COMMENTS. This list is read by matching
-    // single-quoted strings, so one stray quote - an apostrophe, or a quoted
-    // pattern - pairs with the next real one and swallows the entries between
-    // them. Measured three times in one wave: here, and twice in
-    // sync-mobile-web.js. CLAUDE.md records the trap under its own heading.
-    //
     // THE TEE TIME, formatted in the zone it was set in rather than the zone of
     // whoever is reading. Four pages load it and the display calls are
     // unguarded, so it is precached.
     './tee-time.js',
     // Notifications: the pure decider and the device half. Every call site is
-    // typeof-guarded, so these are precached for the sake of the tee-time
-    // reminder - it is local, it works with no signal, and a golfer driving to a
-    // course is exactly who it is for.
+    // typeof-guarded, so these are precached so that a device that has them can
+    // answer a push the moment it arrives.
     './push-notify.js',
     './push-boot.js',
     // The three ways into a round. index.html calls it unguarded from the arrival
@@ -4138,6 +4243,12 @@ const SHELL_FILES = [
     // created from. sidematches.html calls it unguarded, so a cached shell
     // without it cannot create a side bet.
     './challenges.js',
+    // The paste-an-itinerary parser. trip.html calls it unguarded from the review
+    // button, so it is precached.
+    './trip-itinerary.js',
+    // Which rounds a roster change may touch - a round with scores keeps the
+    // roster it was played with. trip.html calls it unguarded.
+    './trip-roster.js',
     // Both tournament pages load this; a cached page without its engine renders a
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.

@@ -326,9 +326,15 @@ describe('THE EMPTY ROW ON ARRIVAL is dropped by the paste', () => {
 });
 
 describe('THE SEAM (source)', () => {
-    const fn = ADMIN.slice(ADMIN.indexOf('function parsePlayerPasteText('), ADMIN.indexOf('\n    function ', ADMIN.indexOf('function parsePlayerPasteText(') + 30));
+    // THE PARSER MOVED to roster-paste.js on 2026-10-03, shared with trip.html's
+    // trip-wide roster paste. The commit that writes group overrides is still
+    // admin.html's, and still checked below.
+    const RP = fs.readFileSync(path.join(__dirname, 'roster-paste.js'), 'utf8');
+    const fn = RP.slice(RP.indexOf('function parsePlayerPasteText('), RP.indexOf('\nfunction ', RP.indexOf('function parsePlayerPasteText(') + 30));
     test('one parser, returning groups beside validPlayers; the commit writes overrides only when there was a boundary', () => {
         assert.ok(fn.length > 500, 'the parser was found');
+        assert.ok(!/function parsePlayerPasteText\(/.test(ADMIN),
+            'admin.html declares the parser again - two pages reading one pasted list two ways');
         assert.match(fn, /groups/);
         assert.match(fn, /BARE_HCP_RE|trailing/i);
         const commit = ADMIN.slice(ADMIN.indexOf('function commitPastedPlayers('), ADMIN.indexOf('function removePlayerRowAndRefresh('));

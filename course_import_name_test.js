@@ -78,7 +78,11 @@ describe('1. THE COMPOSER - one function, shared', () => {
         assert.ok((ADMIN.match(/courseDisplayName\(/g) || []).length >= 7, 'admin: the row, the typed name (x3), the panel title, the label, the record, the matcher');
         assert.ok((TOURN.match(/courseDisplayName\(/g) || []).length >= 4, 'tournament: the row, the detail, the note, the record');
         assert.match(read('course-import-rules.js'), /function courseDisplayName\(c\)/);
-        assert.match(read('course-import-rules.js'), /courseDisplayName \}/, 'exported for the tests');
+        // Matched with a following comma OR brace: the export list grew on
+        // 2026-10-03 (courseProxyBase, buildImportRecord, importedCourseKeyFor),
+        // and a rule that depends on being LAST in that list is a rule that goes
+        // red every time something is shared.
+        assert.match(read('course-import-rules.js'), /courseDisplayName[,}]/, 'exported for the tests');
     });
 });
 

@@ -460,7 +460,26 @@ describe('6. THE SWEEP IS FINISHED', () => {
     test('the split per page: what refuses, what fails, what floats', () => {
         const n = (src, k) => (codeOf(src).match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
         const rows = {
-            'trip.html':    { refuse: 14, fail: 11, toast: 1, confirm: 1 },
+            // RE-PINNED 2026-10-03 (Road Trip): paste-an-itinerary and add/remove
+            // golfers brought four refusals, two failures, three toasts and one
+            // confirm. The confirm is the one that matters here - removing a
+            // golfer ASKS, because it changes who is in the rounds not yet
+            // played, and this guard exists to make sure such a question is a
+            // dialog rather than a native alert that blocks.
+            // 18 -> 19 refusals: Build Trip now names the tap that is missing
+            // when an itinerary has been read but never accepted, instead of
+            // sending the golfer to the day planner he does not need.
+            // 19 -> 22 refusals, 13 -> 14 fails, 4 -> 6 toasts, 2 -> 3 confirms
+            // (2026-10-03): the pasted trip roster refuses an empty paste and a
+            // trip whose every round has scores, and ASKS before it writes;
+            // renaming a trip refuses an empty name and reports a refused write.
+            // 22 -> 28 refusals, 14 -> 15 fails, 6 -> 9 toasts, 3 -> 4 confirms
+            // (2026-10-04, the trip pot and the daily pot): a pot whose places do
+            // not add up to the buy-ins is REFUSED rather than saved, a pot with no
+            // buy-in and a daily pot with no round to go in are refused, each save
+            // says what it did, and putting a pot into every unplayed round ASKS
+            // first and names the rounds it will not touch.
+            'trip.html':    { refuse: 28, fail: 15, toast: 9, confirm: 4 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

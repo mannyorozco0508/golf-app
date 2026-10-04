@@ -3285,6 +3285,327 @@ codeload tarball and live.
     Pages Functions do not support scheduled handlers - a cron needs a separate
     Worker.
 
+## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, MERGED `277a093`)
+
+STRICT. Two optional pots, both OFF until an organizer switches them on. Cache
+`golfapp-v284-trippots` / consumer `v124`.
+
+**MERGED 2026-10-04 after Manny tested both waves via Cmd+R**: `trip-simplify`
+(`11d9ba7`) and `trip-pots` on top of it (`277a093`). One cache key covers both -
+v284 is later than v283 and sw.js carries BOTH waves' "Moved to" notes, so a
+device on either older version is told what it would otherwise keep serving.
+Production verified: sw.js serves `golfapp-v284-trippots`, trip.html, trip-pots.js
+and roster-paste.js are byte-identical to the repo, and the course proxy Function
+still answers 200. Suite 10,057 tests, 10,055 pass, 0 fail; the money engines,
+payouts.js and the match-engine golden are unchanged by sha.
+
+**`ui-wave39-push` (`4f5f6b4`) IS STILL UNMERGED** and stays that way: the push
+setup (APNs key, Firebase Cloud Messaging, the Xcode capability, the Cloudflare
+secret) and the challenge test are still outstanding.
+
+- **THE TRIP POT** is the points race played for money: every golfer in the trip
+  pays one buy-in, the pot is buy-in x field, and it pays the finishing order
+  through **payouts.js allocatePlacePayouts** - the same place-and-tie rule the
+  prize calculator and the Tournament desk use. It is the only money in this app
+  that belongs to the TRIP rather than to a round, so it is added once, to BOTH
+  trip totals (the daily one and the settle-once one), and the scope sentence
+  gains "and the Trip Pot" **only while it is on**.
+  - **IT BALANCES TO ZERO OR IT IS NOT APPLIED.** The places must add up to the
+    buy-ins before Save will take them, and `tripPotLedger` refuses any pot whose
+    entries do not sum to zero - which is the backstop that caught the real
+    defect below.
+- **THE DAILY POT** is not new money: it is each round's own Weekly Game
+  (`data.moneyPool`), set once on the trip and copied into every round **with no
+  scores**, through `trip-roster.js tripRosterPlan` - the same open/closed split
+  every other trip-wide change uses. A round can still be edited afterwards.
+  - **THE BUCKETS ARE SHARES, NOT DOLLARS, AND THAT WAS FORCED BY MEASUREMENT.** A
+    round's pot is the buy-in times whoever is in THAT round, so a fixed "KP $40,
+    net $60" written into a four-man $80 round is "$20 over budget" and
+    pool-engine.js refuses the whole pool. A percentage is right at every
+    headcount; skins takes the remainder so the last cent always lands.
+- **THE POINTS SCALE CHANGED:** 1st is worth the whole trip's field size (24 in a
+  24-man trip), not however many posted that day, and there is a Net/Gross switch.
+  A thin Thursday used to be worth less than a full Monday for the same finish.
+  **Money did not move:** the re-captured `trip_identity_prev.fixture.json` came
+  back byte-identical on money, board and awards - only the points changed.
+- **A REAL DEFECT, FOUND BY MY OWN CONTROL.** Forcing a pot on changed nothing,
+  and the reason was that `computeTripPointsRace` keyed its totals by golfer and
+  then `Object.values()` threw the key away - so no prize could ever be matched to
+  a payer and the pot refused itself every single time. **Every unit rule can pass
+  with a feature that never runs**; it took rendering the page with a pot switched
+  on to see it, and that test is now in the file.
+- **WITH BOTH OFF, THE TRIP SETTLES BYTE FOR BYTE AS IT DID** - money card, points
+  race, leaderboard and prize calculator - against
+  `helpers/trip-money-no-pots.golden.json`, captured from the page before any of
+  this existed.
+- **Five controls fired behaviourally**, one was inert and is reported as inert
+  (forcing the apply branch while the pot is off changes nothing, because a
+  refused pot carries no entries). Engines frozen by sha, payouts.js included.
+
+## Road Trip, simplified - and a group header that was being paid as a golfer (2026-10-04, MERGED `11d9ba7`)
+
+Manny pasted his real 24-golfer list on the live app. Five things were wrong, and
+the first costs money. Cache `golfapp-v283-tripsimplify` / consumer `v123`.
+
+- **"Group 4" WAS PARSED AS A GOLFER** - name "Group", handicap 4 - so a 24-man
+  list reviewed as **30 golfers**, and six phantom players with handicaps would
+  have gone into every round. A handicap is strokes and strokes are money. A group
+  header, a bare tee time and a blank line are all group separators now. The
+  header words are a closed list (group, grp, flight, foursome, team, tee, tee
+  time) with an optional number or letter and an optional time; **"Group Captain
+  Smith 8" is still a golfer**, because the rule must err toward the name.
+- **THE WRITE LANDED AND THE SCREEN DID NOT CHANGE.** Player 1-4 stayed on the
+  page after Yes: every round's players come from a ONE-SHOT `events/<code>` read,
+  and the `trips/` listener that fires afterwards is for the trip node. All three
+  roster writes re-read now. **The harness could not have caught this** - it
+  recorded writes without applying them, so a page that never re-read looked
+  identical to one that did; `tools/lib/cold-arrival.js` now lands every write in
+  the fixture (and its root ref no longer resolves to a path called "undefined").
+- **THE CONFIRM COUNTED WRITES, NOT PEOPLE:** "28 placeholders replaced, 147
+  golfers added" for 24 golfers over seven rounds. The counts are people now, with
+  the per-round figures kept for the rare trip where rounds differ.
+- **THE ROUNDS LIST WAS IN MAP-KEY ORDER** with the Day label alone, so his week
+  opened on "Day 2 PM". Each row reads **"Tue 10/13 · 8:24 AM · Caledonia"** with
+  Open on the row and Edit tucked inside. **The TIME sorts, not the label:**
+  sorting the finished label put 1:40 PM before 7:50 AM, because "1" is less than
+  "7".
+- **AND THE PLACEHOLDER WARNING WAS PRINTED PER GOLFER PER ROUND**, on three
+  cards - seventy-odd paragraphs for 24 unnamed golfers. One quiet line now, which
+  names the ROUNDS to open and counts the golfers rather than listing them. **A
+  duplicate real name still gets the loud box and its own sentence, every time**:
+  that is the dangerous case, two golfers one balance.
+- **THE REDESIGN.** A new trip is four things on one screen - name, the rounds
+  (paste the itinerary), the golfers (paste the list or give a headcount), Build -
+  with the day planner behind one line that opens itself the moment it holds
+  rounds. A pasted roster goes straight into every round the Build makes, groups
+  and all. The trip page reads name, rounds, golfers, then the numbers, and the
+  golfers are shown **in their groups**, because a group is who you play with and
+  who can see your bets.
+- **`tools/trip-simplify-check.js`** drives his exact list in Chrome at 390x844
+  and writes three full-page screenshots to the Desktop (the harness gained a
+  `{ shot: path }` step). It measured all five bugs and both screens.
+  - **TWO MORE HARNESS TRAPS, worth knowing:** `window.name` does NOT survive a
+    file:// navigation (opaque origin, Chrome clears it) but **localStorage
+    does** - which is how the check reads what Build wrote before the page left;
+    and the Build chain finishes in the SAME task as the click, so ten probes
+    issued back to back after the tap all ran on the next document.
+
+## The pasted trip roster, a trip that can be renamed, and a round picker that reads like a calendar (2026-10-03)
+
+Cache `golfapp-v282-rosterpaste` / consumer `v122`. Four jobs; the first was
+already done.
+
+- **CHALLENGE GROUP SCOPING (Job 1) WAS ALREADY DONE** - `4f5f6b4` on
+  `ui-wave39-push`, still unmerged, waiting on Manny's Cmd+R test.
+- **A TRIP CAN BE RENAMED.** The name was typed once, at creation, and never
+  again: Manny's Myrtle week went in as "Myrtle Beach 2006" and the only way to
+  correct it was to build the whole trip a second time. It is on the recap card,
+  the share text and the itinerary print, so a wrong one is wrong everywhere. The
+  control is organizer-token only at render AND in the handler, refuses an empty
+  name, and writes **`trips/<code>/name` alone** - a `set()` on the trip node
+  would replace the rounds, the organizer token and the pool, and the rules allow
+  that write, so nothing would have stopped it.
+- **"ADD A ROUND TO THIS TRIP" IS ONE LINE NOW.** The itinerary paste builds every
+  round, so Start From and the game-code link-in are the exception rather than the
+  way a trip is made; both sit behind "+ Add another round". Collapsing is not
+  permitting: the section is still inside the organizer-only wrapper.
+- **AND "START FROM" READS LIKE A CALENDAR:** "Tue 10/13 AM · Caledonia", in date
+  order. It listed rounds in the key order of the rounds map with the Day label
+  alone, so a seven-round trip offered "Day 1 AM / Day 3 / Day 1 PM" and nothing
+  said which course - which is how an organizer recognises the round he wants to
+  copy. The date comes from the itinerary paste (stored on the round record now);
+  a round linked by hand has none and keeps its `addedAt` order after the dated
+  ones, because an invented date sorts a trip wrongly with confidence.
+  `tripRoundWhen` reads yyyy-mm-dd as a LOCAL date: `new Date('2026-10-13')` is
+  UTC midnight, which prints as the 12th anywhere west of Greenwich.
+- **THE ROSTER CAN BE PASTED (STRICT).** A trip is built before anybody knows who
+  is coming, so every round starts with "Player 1".."Player 12" - twelve is three
+  groups - and the real list arrives later with handicaps and blank lines between
+  groups.
+  - **ONE PARSER FOR BOTH PAGES.** `parsePlayerPasteText` moved out of admin.html
+    into **`roster-paste.js`** (new shell file, precached: trip.html calls it
+    unguarded). The same list goes into a round and into the trip holding it, and
+    two copies of those rules would be two different sets of strokes. The note
+    stripper stays in my-groups.js, reached by the same typeof guard admin.html
+    always used; trip.html loads both.
+  - **PASTED GOLFERS TAKE THE PLACEHOLDER SEATS IN ORDER, AND THE SEAT KEEPS ITS
+    ID**, so anything in an open round already pointing at a player id still
+    points at the same seat. Then they are appended: twelve placeholders and
+    thirty-two names is eight groups.
+  - **ROUNDS WITH SCORES ARE NEVER TOUCHED**, and the guard is not "the field was
+    not written" - it is the played round settling to the same cent before and
+    after, with a $40 match on it, through the engines in one realm. The untouched
+    rounds are NAMED on the review screen.
+  - **GROUPS ONLY WHEN THEY TILE THE ROSTER EXACTLY.** Group sizes are positional
+    and a group decides who sees which wagers, so a pasted run written over a
+    roster holding leftover placeholders would put somebody in the wrong group.
+    When they cannot tile it, nothing is written and the review says so.
+- **`tools/trip-roster-paste-check.js`** is the user-path proof: a cold trip.html
+  at 390x844 as the organizer, real CDP taps and keystrokes, one played round and
+  two with twelve placeholders. It measured the rename writing one child, the
+  date-ordered picker, the review reading "B Jimmy 11 (captain)" as Jimmy/11/B,
+  and the apply writing only `events/RD2|RD3/players` with the seats keeping ids.
+  - **TWO HARNESS TRAPS IT COST TO FIND, both worth knowing.** The Golfers section
+    **ships open**, so tapping its summary CLOSED it - and every tap afterwards
+    landed on the section underneath while the probes still read plausible rects
+    out of the collapsed card. And `el.scrollIntoView({block:'center'})`, which
+    the tap step uses, **moves nothing on this page**: measured, scrollY stays put
+    with the element 1,110px below the fold, so the check scrolls with
+    `window.scrollTo` before each tap. Neither is a page fault; a thumb scrolls
+    the page itself.
+
+## A pasted course nobody had saved went nowhere (2026-10-03, same day)
+
+Manny's review read **"2026-10-14 14:06 - Myrtlewood PineHills - will look up
+online"** and **"2 online lookups"**. After Use these 7 rounds, Day 2 PM's course
+was blank - "Search / Select Course" - with no message. Cache
+`golfapp-v281-itinlookup` / consumer `v121`.
+
+- **THE EXPENSIVE FAULT FIRST: THAT COURSE WAS ALREADY SAVED.** The directory
+  calls it "Myrtlewood - Pine Hills"; he wrote "Myrtlewood PineHills". Normalised,
+  those are `myrtlewood pine hills` and `myrtlewood pinehills` - **one space
+  apart** - so the matcher missed and a course he already had was sent to a search
+  that costs two of the day's 35 requests. `tripItinTight` compares them
+  space-free for the EXACT test only; containment still runs on the spaced form,
+  where "pinehills" has to stay different from "pine lakes" (both are in the
+  Myrtle group). **Measured on his line now: 0 lookups.**
+- **AND NOTHING LOOKED ANYTHING UP.** The review priced a lookup the apply step
+  never performed - it set `courseId` to `''` and moved on, so a round that said
+  "will look up online" became a blank box **that looks exactly like a choice the
+  golfer made**. Use these N rounds and Build both run the lookups now,
+  sequentially (free tier, two requests per course).
+- **THE IMPORT IS THE ONE THAT ALREADY EXISTED.** `course-import-rules.js` gained
+  `buildImportRecord`, `importedCourseKeyFor` and `courseProxyBase`, and
+  **admin.html no longer declares its own** - it calls the shared ones. So the
+  record a pasted itinerary writes is the record a tap writes: same validator
+  (`importCardOrRefuse`, BEFORE the write), same `global_courses/<key>`, same
+  merge, same `source.siFrom`. `buildImportRecord` also lost its first parameter,
+  which it never read.
+- **AMBIGUITY IS A QUESTION.** A multi-course facility answers a search with its
+  whole family - Myrtlewood is PineHills, Palmetto and Hummingbird - and three
+  different eighteens carry three different stroke indexes, which is three
+  different amounts of money. `tripItinPickOnline` picks only on an exact name or
+  on every word the golfer typed; otherwise the round shows a pick list.
+- **NEVER A SILENT BLANK.** A round with no course after all that says **"Needs a
+  course: Myrtlewood PineHills"**, gives the reason in the shared sentence for
+  that refusal ("Course search is resting for today..." on a 429), pre-fills the
+  box with the pasted name, and offers one tap that searches again. An undecided
+  Friday is NOT in that state - it is a deliberate blank, and pestering about it
+  would make the honest state look like a fault. The planner's picker also lists
+  imported courses now and carries its own online-search row.
+- **A TRAP WORTH REMEMBERING: `renderRoundPlanner` REBUILDS THE CONFIG OBJECTS.**
+  A `cfg` captured before a render is an orphan after it, so the first draft's
+  async handlers wrote the lookup's answer into a dead object and the card read
+  "Searching online..." forever with the answer in hand. Every handler addresses
+  rounds by INDEX now, and `tools/trip-itinerary-lookup-check.js` is what caught
+  it - no source scan would have.
+- **THE CHECK** opens trip.html cold at 390x844 with the proxy replaced by canned
+  payloads and his exact line typed in, in four arrivals: the saved course
+  matching for free (0 API calls), the unsaved one imported and filled (2 calls,
+  the record verified on `global_courses/gca_mw_pine`), a 429 showing "Needs a
+  course" and writing nothing, and an ambiguous name producing a pick list that
+  fills the round when tapped.
+
+## The Build button ignored the itinerary it was shown (2026-10-03, same day)
+
+Manny pasted seven Myrtle rounds on his phone, the review read all seven, and
+"Build Trip & All Rounds" answered **"Set up at least one day above, or use Skip
+planning below."** Cache `golfapp-v280-itinbuild` / consumer `v120`.
+
+- **NOTHING WAS WRONG WITH THE PARSER OR THE REVIEW.** The planner rebuilds every
+  round on screen from the "How Many Days" box; that box was empty, so
+  `renderDayPlanner()` made zero days and `renderRoundPlanner()` threw all seven
+  rounds away in the same tick `applyItinerary()` created them. **And its first
+  act - reading the form back into the configs - was an ERASE, not a capture**,
+  because the form on screen still belonged to the previous render. It now takes
+  `skipCapture`, and the caller that has just set the configs authoritatively uses
+  it.
+- **AN ACCEPTED ITINERARY OUTLIVES THE FORM.** `itinApplied` holds the rows, the
+  day-count box is written from them, and `buildTrip()` rebuilds from them when
+  the planner is empty - so a cleared box or a collapsed paste card cannot delete
+  a plan the golfer was shown. A line above the button says what Build is about to
+  use, and it lives OUTSIDE the paste card, which collapses.
+- **ONE DAY PER DATE, NOT ONE DAY PER LINE** (`tripItinDays`). Two lines on 10/12
+  are one 36-hole day: seven lines over five dates is a **five**-day trip, which is
+  the number every "Day N" label, the trip leaderboard and the round-count
+  invariant read. A third line on one date starts another day slot rather than
+  being dropped - wrong about the calendar, right about the money, and visible on
+  the review first.
+- **AND A SECOND DEFECT THE CHROME CHECK FOUND, which no source scan would have:**
+  the nines in brackets. The app's own name for that course is "Thistle Golf Club
+  (NC - 27 Hole)", so a golfer copying it writes the loops the same way - "...
+  (NC - 27 Hole) (mackay/cameron)" - and the comma-segment rule never saw them.
+  Dropped silently, **Thistle played Cameron/MacKay instead of MacKay/Cameron: two
+  different nines, two different stroke indexes, different money.** A bracket with
+  no slash in it is still left alone.
+- **`tools/trip-itinerary-build-check.js`** is the guard that matters here: a cold
+  `trip.html` at 390x844, seven lines typed with real CDP keystrokes, real taps on
+  Read it / Use these 7 rounds / Build, and nothing the page defines called. It
+  measured the refusal before the fix and, after it, seven rounds, five days, the
+  day box reading 5, Thistle's nines in order, and the navigation to
+  `?trip=...&organizer=...` that proves the trip was written.
+  `trip_itinerary_build_test.js` holds the pure grouping and the wiring; it cannot
+  drive `applyItinerary`, because trip.html's top-level `let` bindings are not
+  mini-dom sandbox properties, and says so.
+- **A NOTE ON THE SUITE'S OWN NUMBER:** this repo has **both** `*_test.js` and
+  `*.test.js` files. `node --test *_test.js` is 9,862 registered and misses 92
+  tests in nine dot-form files; the full suite is **`node --test *_test.js
+  *.test.js` = 9,970**. A report that quotes the smaller number has silently not
+  run the older integration files.
+
+## Road Trip, 2026-10-03: a round with no course, a pasted itinerary, a changeable roster
+
+Built for Manny's Myrtle Beach trip, **12-16 October**. Cache
+`golfapp-v279-roadtrip` / consumer `v119`. FAST lane, merged.
+
+- **A TRIP ROUND CAN BE SAVED WITH NO COURSE.** Friday is "Prestwick or Man O'
+  War (not chosen)", and the planner used to refuse to build until every course
+  was picked - so the choice was wait, or invent one. **An invented course is an
+  invented par and stroke-index card, which is invented money.** A course-less
+  round is saved with `activeCourseKey: null` and `courseData: null`, a state the
+  app already handles, and the organizer picks the course when the group decides.
+  `resolveCourseData()`'s eighteen-par-4s fallback is deliberately NOT used - that
+  is the fictional card admin.html stopped seeding, because saving it poisoned
+  `global_courses` for everyone.
+- **PASTE AN ITINERARY.** `trip-itinerary.js` turns a booking email into one round
+  per line - date, course, optional tee time - and a review screen shows what it
+  made of each line before anything is written.
+  - **Saved courses are matched first and cost nothing.** Only unmatched ones are
+    searched, and the review says how many lookups that is **before** the golfer
+    agrees: the provider is the FREE tier, 35 a day shared by everybody, two calls
+    per course. Measured on Manny's own three lines: **zero lookups** - Caledonia
+    and Thistle are already bundled and Friday is undecided.
+  - **"X or Y (not chosen)" is no course at all**, and both options are kept so the
+    review shows what he actually wrote.
+  - **27-hole combos map to the right nines.** "Thistle, McKay/Cameron" ->
+    `mackay` / `cameron`, in that order. **Manny writes "McKay", the data says
+    "MacKay"** - matched by dropping vowels, applied ONLY to the three nines on one
+    course, never to course names, where it would collide freely.
+  - **A two-digit date carries no year and one is never invented** - inferring it
+    from today is how a December booking for January lands eleven months early. The
+    year is a box on the review screen.
+- **ADD / REMOVE GOLFERS ON A TRIP** (`trip-roster.js`), organizer-token only.
+  **A change applies to rounds with NO SCORES; a round with one posted score keeps
+  the roster it was played with** - handicaps are read off it, side matches name its
+  player ids, the pool charges per golfer, skins and dots are per hole per player.
+  The untouched rounds are **named** in the note, because "some rounds were skipped"
+  is not something an organizer can check. Guarded as money: the same played round
+  settled before and after, to the cent, engines frozen by sha.
+  - Ids are computed **per round** (a trip's rounds are separate events, so one
+    shared counter would collide), a name already present is not added twice, and
+    removing the last golfer from a round is refused - delete the round instead.
+  - `tripRoundHasScores` counts any value **> 0**, so a cleared `0` or `null` is not
+    a score and an untouched round stays editable.
+- **A CROSS-BRANCH NOTE: the tee time parses but cannot be stored yet.** The
+  tee-time field is Wave 39, which is unmerged, so a pasted time is carried on the
+  planner's round configs and ignored here. The moment that wave lands it is what
+  the planner's own date and time boxes read - no further change needed.
+- **AND `baseline_arithmetic_test.js` HAD A LATENT BUG ON MAIN:** it called
+  `lineOf()` without importing it, in a branch that had never executed, so the
+  first real fault it found would have thrown instead of reporting. Now imported
+  (the helper exported it all along), and `filesWithBaselines()` skips `docs/` -
+  which is never staged, so it holds scratch notes that are not part of the record.
+
 ## Where things stand, 2026-10-03
 
 **THE GOLFCOURSEAPI PLAN WAS WRONG EVERYWHERE, AND IT IS CORRECTED.** The account

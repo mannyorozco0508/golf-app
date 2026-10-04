@@ -48,8 +48,22 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <script src="course-import-rules.js"></script>
+    <!-- grouping.js: who is in which group, so the Golfers list and every
+         ?group= link answer that question the same way. -->
+    <script src="grouping.js"></script>
+    <!-- THE PASTED ROSTER, same parser as the weekly game (2026-10-03). my-groups.js
+         is here for its note stripper, which roster-paste.js reaches by the same
+         typeof guard admin.html uses - one implementation, not a second copy. -->
+    <script src="my-groups.js"></script>
+    <script src="roster-paste.js"></script>
     <script src="course-index.js"></script>
     <script src="tee-time.js"></script>
+    <script src="trip-itinerary.js"></script>
+    <script src="trip-roster.js"></script>
+    <!-- The trip's own money: the points-race pot and the daily pot. Pure rules;
+         the page reads the trip, the module says what the money is, the page writes. -->
+    <script src="trip-pots.js"></script>
     <script src="money-engine.js"></script>
 <script src="action-model.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
@@ -316,18 +330,92 @@ html {
             <input type="text" id="trip-name-input" placeholder="e.g. Myrtle Beach 2026">
         </div>
 
-        <div class="form-group">
-            <label>How Many Days?</label>
-            <input type="number" id="trip-days-input" min="1" max="14" placeholder="e.g. 4" oninput="renderDayPlanner()">
-        </div>
+        <!-- PASTE THE ITINERARY (2026-10-03), like pasting players.
+             One round per line. The parser is trip-itinerary.js; this box only
+             collects the text and shows what it made of it. NOTHING IS WRITTEN
+             until the review below is accepted - a parser that writes straight
+             through is a parser whose mistakes end up in the database. -->
+        <details class="settle-card" id="itin-paste-card" style="margin-bottom:12px;" open>
+            <summary style="font-weight:bold; cursor:pointer;">📋 The rounds — paste your itinerary</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                One round per line &mdash; a date, the course, and a tee time if you have one.
+                Courses already saved cost nothing to match; anything else is looked up online,
+                and the review tells you how many lookups that is before you agree to it.
+            </p>
+            <textarea id="itin-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
+                placeholder="Tue 10/13 — Caledonia Golf &amp; Fish Club, Pawleys Island, 8:24 AM&#10;Thu 10/15 — Thistle, McKay/Cameron, Sunset Beach&#10;Fri 10/16 — Prestwick or Man O' War (not chosen)"></textarea>
+            <div class="form-group" style="margin:8px 0;">
+                <label>Year these dates are in</label>
+                <input type="number" id="itin-year" min="2024" max="2099" style="max-width:120px;">
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">A date like 10/13 carries no year, and guessing one is how a trip lands eleven months early.</p>
+            </div>
+            <button type="button" class="btn-outline" onclick="reviewItinerary()">Read it →</button>
+            <div id="itin-review" style="margin-top:10px;"></div>
+        </details>
 
-        <div id="day-planner"></div>
+        <!-- THE GOLFERS, ON THE SAME SCREEN (2026-10-04). A new trip is four
+             things: a name, the rounds, the golfers, and Build. Either the real
+             list is pasted now - names, handicaps and groups as written - or a
+             headcount makes "Player 1".."Player N" to be replaced later. Nothing
+             else belongs here, which is why the day planner below is one line. -->
+        <details class="settle-card" id="golfer-paste-card" style="margin-bottom:12px;" open>
+            <summary style="font-weight:bold; cursor:pointer;">👥 The golfers</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                One golfer per line &mdash; name, then the handicap. A blank line or a
+                &ldquo;Group 2&rdquo; header starts the next group, so a whole tee sheet
+                can go straight in.
+            </p>
+            <!-- THE PLACEHOLDER FITS THE BOX (2026-10-04). It was EIGHT lines in a
+                 six-row textarea - the only difference of any kind between this
+                 field and the itinerary one above, which pastes fine: measured in
+                 Chrome, every computed style, both rects, readOnly, disabled,
+                 tabIndex and the hit test at three points down the box are
+                 identical, and the placeholder line count is not (8 vs 3). A
+                 placeholder taller than its control leaves WebKit scrolled inside
+                 the field before a word is typed, which is where a long-press
+                 Paste and the caret go missing on iOS. The example it was showing
+                 is in the sentence above the box, where it costs nothing. -->
+            <textarea id="setup-golfers-box" rows="6" style="width:100%; font-size:0.84rem;"
+                placeholder="Group 1&#10;Zack Carrano 6&#10;Derrick J Doncaster 15"></textarea>
+            <button type="button" class="btn-outline" data-role="setup-golfers-review"
+                    onclick="reviewSetupGolfers()">Read it →</button>
+            <div id="setup-golfers-review" style="margin-top:10px;"></div>
+            <div class="form-group" style="margin:10px 0 0 0;">
+                <label>Or just a headcount</label>
+                <input type="number" id="setup-golfer-count" min="1" max="40" placeholder="e.g. 12"
+                       style="max-width:120px;" oninput="renderSetupGolferNote()">
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">
+                    12 makes three groups of four, named Player 1 to Player 12. Paste the real
+                    names into the trip whenever you have them.</p>
+            </div>
+            <p id="setup-golfers-note" style="font-size:0.8rem; font-weight:bold; margin:8px 0 0 0; color:var(--brand-green);"></p>
+        </details>
 
-        <div id="round-planner-section" style="display:none; margin-top:8px;">
-            <h3 style="margin-bottom:2px;">🗓️ Set Up Each Round</h3>
-            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Pick the course and a rough headcount now — you'll add real player names later. This just builds the skeleton so nothing's left to remember.</p>
-            <div id="round-planner"></div>
-        </div>
+        <details class="settle-card" id="day-planner-card" style="margin-bottom:12px;">
+            <summary style="font-weight:bold; cursor:pointer;" id="day-planner-summary">🗓️ Set the days up by hand instead</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                Only needed if you are not pasting an itinerary &mdash; one day at a time,
+                18 or 36 holes, and a course each.
+            </p>
+            <div class="form-group">
+                <label>How Many Days?</label>
+                <input type="number" id="trip-days-input" min="1" max="14" placeholder="e.g. 4" oninput="renderDayPlanner()">
+            </div>
+
+            <div id="day-planner"></div>
+
+            <div id="round-planner-section" style="display:none; margin-top:8px;">
+                <h3 style="margin-bottom:2px;">🗓️ Set Up Each Round</h3>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Pick the course and a rough headcount now — you'll add real player names later. This just builds the skeleton so nothing's left to remember.</p>
+                <div id="round-planner"></div>
+            </div>
+        </details>
+
+        <!-- WHAT THE BUILD BUTTON IS ABOUT TO USE. Lives OUT HERE, not inside
+             the paste card, because collapsing that card used to be the last
+             thing a golfer saw of his itinerary before the button denied it
+             existed. -->
+        <p id="itin-ready-note" style="display:none; font-size:0.82rem; font-weight:bold; margin:12px 0 0 0; color:var(--brand-green);"></p>
 
         <button class="btn-primary" id="build-trip-btn" style="margin-top:14px;" onclick="buildTrip()">➕ Build Trip &amp; All Rounds</button>
 
@@ -365,15 +453,90 @@ html {
     </div>
     <h2 id="manage-trip-name" style="text-align:center; font-size:1.3rem;"></h2>
 
+    <!-- RENAME, ORGANIZER ONLY (2026-10-03). A trip's name was typed once, at
+         creation, and never again - Manny's Myrtle week went in as "Myrtle Beach
+         2006" and the only way to correct a typo was to build the whole trip a
+         second time. The name is on the recap card, the share text and the
+         itinerary print, so a wrong one is wrong in every one of them. -->
+    <!-- ONE LINE ABOUT THE TRIP'S OWN MONEY, under the name, where somebody
+         opening the trip will read it. -->
+    <p id="trip-pots-line" style="display:none; text-align:center; font-size:0.8rem; font-weight:bold; color:var(--brand-green); margin:-4px 0 10px 0;"></p>
+
+    <div id="trip-rename-row" style="display:none; text-align:center; margin:-8px 0 12px 0;">
+        <button type="button" class="btn-outline" data-role="trip-rename-open"
+                style="width:auto; padding:4px 12px; font-size:0.76rem;" onclick="openTripRename()">✏️ Rename trip</button>
+    </div>
+    <div id="trip-rename-edit" style="display:none; margin:-4px 0 12px 0;">
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Trip name</label>
+            <input type="text" id="trip-rename-input" maxlength="60" placeholder="e.g. Myrtle Beach 2026">
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-primary" data-role="trip-rename-save"
+                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="saveTripRename()">Save name</button>
+            <button type="button" class="btn-outline" data-role="trip-rename-cancel"
+                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="closeTripRename()">Cancel</button>
+        </div>
+    </div>
+
     <!-- ORGANIZER TOOLS. Withheld from a plain trip link, which is the one that
          gets shared and the one printed on the recap card. Withholding these must
          NOT withhold the trip itself - the rounds, the standings, the money and
          the recap all render for everybody, because watching is the whole point
          of the link. -->
+
+    <hr class="section-divider">
+
+    <details class="trip-section" open>
+        <summary>📅 Rounds in This Trip</summary>
+        <div class="trip-section-body">
+            <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
+            <div id="rounds-list"></div>
+            <!-- THE DAILY POT (2026-10-04). Not new money: it is each round's own
+                 Weekly Game, set once here and copied into every round that has
+                 NOT been played. A round can still be edited on its own afterwards. -->
+            <div id="daily-pot-card" style="display:none; margin:10px 0;">
+                <div class="settle-card" style="padding:10px 12px;">
+                    <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="daily-pot-on" style="width:auto;" onchange="dailyPotTouched(); renderDailyPotRow()">
+                        <span>💵 A pot in every round</span>
+                    </label>
+                    <div id="daily-pot-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="form-group" style="margin:0; flex:0 0 108px;">
+                                <label>Each ($)</label>
+                                <input type="number" id="daily-pot-buyin" min="0" value="0" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 96px;">
+                                <label>KP (%)</label>
+                                <input type="number" id="daily-pot-kp" min="0" max="100" value="0" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 108px;">
+                                <label>Net finish (%)</label>
+                                <input type="number" id="daily-pot-net" min="0" max="100" value="50" inputmode="numeric" oninput="dailyPotTouched(); renderDailyPotRow()">
+                            </div>
+                        </div>
+                        <p id="daily-pot-note" style="font-size:0.8rem; margin:8px 0; white-space:pre-line;"></p>
+                        <button type="button" class="btn-primary" data-role="daily-pot-save"
+                                style="padding:10px; font-size:0.9rem;" onclick="saveDailyPot()">Save &amp; put it in every unplayed round</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
+        </div>
+    </details>
+
     <div id="trip-organizer-tools">
     <hr class="section-divider">
-    <h3>🔗 Add a Round to This Trip</h3>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+    <!-- COLLAPSED (2026-10-03). The itinerary paste builds every round of the trip
+         in one go, so this whole section - Start From, and linking a round in by
+         its game code - is now the exception rather than the way a trip is made.
+         It is one line until it is wanted. -->
+    <details class="trip-section" id="add-round-card">
+        <summary style="font-weight:bold; cursor:pointer;">➕ Add another round</summary>
+        <div class="trip-section-body">
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
 
     <div class="form-group" id="copy-from-round-group" style="display:none; margin-bottom:8px;">
         <label>Start From (optional)</label>
@@ -397,18 +560,9 @@ html {
         </div>
         <button class="btn-outline" onclick="linkRound()">➕ Add This Round</button>
     </div>
-    </div><!-- /trip-organizer-tools -->
-
-    <hr class="section-divider">
-
-    <details class="trip-section" open>
-        <summary>📅 Rounds in This Trip</summary>
-        <div class="trip-section-body">
-            <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
-            <div id="rounds-list"></div>
-            <button class="btn-outline" onclick="printItinerary()">🗺️ Print / Send Itinerary</button>
         </div>
     </details>
+    </div><!-- /trip-organizer-tools -->
 
     <!-- GOLFERS ON THIS TRIP (2026-09-17). One line per golfer: the name and how
          many of the trip's counted rounds they appear in. No data entry, no
@@ -422,6 +576,68 @@ html {
         <summary>👥 Golfers on This Trip</summary>
         <div class="trip-section-body">
             <div id="trip-roster"></div>
+            <!-- ADD / REMOVE A GOLFER (2026-10-03). Applies to rounds with NO
+                 SCORES; a round with scores keeps the roster it was played with,
+                 because handicaps, side matches, the pool and every per-player
+                 game were priced against it. The note above the buttons names the
+                 rounds it will NOT touch, so the organizer can check it against
+                 what they remember playing. -->
+            <div id="trip-roster-edit" style="margin-top:10px; display:none;">
+                <!-- TWO BUTTONS, NOT A FORM (2026-10-04). Pasting the list is what
+                     an organizer does once; adding or dropping one golfer is what
+                     they do afterwards. Both were open at once, so the section was
+                     four controls deep before the golfers were even visible. -->
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button type="button" class="btn-outline" data-role="trip-roster-paste-open"
+                            style="flex:1; padding:10px; font-size:0.84rem;" onclick="openTripRosterPanel('paste')">📋 Paste golfers</button>
+                    <button type="button" class="btn-outline" data-role="trip-roster-edit-open"
+                            style="flex:1; padding:10px; font-size:0.84rem;" onclick="openTripRosterPanel('edit')">➕ Add / remove</button>
+                </div>
+                <div id="trip-roster-manual" style="display:none;">
+                <div class="form-group" style="margin-bottom:6px;">
+                    <label>Add a golfer to this trip</label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <input type="text" id="trip-add-name" placeholder="Name" style="flex:1 1 150px; min-width:140px;">
+                        <input type="text" id="trip-add-hcp" placeholder="HCP" style="flex:0 0 72px;" inputmode="numeric">
+                        <button type="button" class="btn-outline" onclick="tripAddGolfer()">Add</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:6px;">
+                    <label>Remove a golfer</label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <select id="trip-remove-name" style="flex:1 1 170px;"></select>
+                        <button type="button" class="btn-outline" onclick="tripRemoveGolfer()">Remove</button>
+                    </div>
+                </div>
+                </div><!-- /trip-roster-manual -->
+
+                <!-- THE WHOLE LIST AT ONCE (2026-10-03). A trip is built before
+                     anybody knows who is coming, so every round starts with
+                     "Player 1".."Player N"; the real list arrives later, in a note
+                     on the organizer's phone, with handicaps and blank lines
+                     between groups. Same parser as the weekly game's paste
+                     (roster-paste.js), and nothing is written until the review
+                     below is accepted. -->
+                <div class="settle-card" id="trip-roster-paste-card" style="margin:8px 0; display:none;">
+                    <div style="font-weight:bold;">📋 Paste the whole list</div>
+                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
+                        One golfer per line &mdash; name, then the handicap. A blank line starts a new group,
+                        and a leading A or B is a flight. Pasted golfers take the placeholder slots first,
+                        in order, then keep adding.
+                    </p>
+                    <!-- THE SAME RULE AS THE SETUP SCREEN'S BOX: a placeholder has to
+                         fit its control, or the field is scrolled before anybody types
+                         and iOS loses the caret and the long-press Paste with it. This
+                         one was seven lines in a six-row box - found by the guard
+                         written for the other, not by a second bug report. -->
+                    <textarea id="trip-roster-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
+                        placeholder="B Jimmy 11 (captain)&#10;A Paul 3.5&#10;Marty 9"></textarea>
+                    <button type="button" class="btn-outline" data-role="trip-roster-paste-review"
+                            onclick="reviewTripRosterPaste()">Read it →</button>
+                    <div id="trip-roster-paste-review" style="margin-top:10px;"></div>
+                </div>
+                <p id="trip-roster-note" role="status" style="font-size:0.78rem; color:var(--text-muted); margin:0; white-space:pre-line;"></p>
+            </div>
             <div id="trip-identity-questions"></div>
         </div>
     </details>
@@ -473,6 +689,40 @@ html {
             <div id="trip-points-race"></div>
 
             <hr class="section-divider" style="margin:18px 0;">
+
+            <!-- THE TRIP POT (2026-10-04). Off until an organizer switches it on.
+                 One row: a buy-in per golfer, how many places pay, and the amounts -
+                 which must add up to the pot before Save will take them, because a
+                 pot that does not balance is money appearing from nowhere. Saved on
+                 the TRIP, so every golfer sees the same numbers. -->
+            <div id="trip-pot-card" style="display:none; margin:10px 0 14px 0;">
+                <div class="settle-card" style="padding:10px 12px;">
+                    <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="trip-pot-on" style="width:auto;" onchange="tripPotTouched(); renderTripPotRow()">
+                        <span>💰 Play the points race for money</span>
+                    </label>
+                    <div id="trip-pot-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="form-group" style="margin:0; flex:0 0 110px;">
+                                <label>Buy-in ($)</label>
+                                <input type="number" id="trip-pot-buyin" min="0" value="0" inputmode="numeric" oninput="tripPotTouched(); renderTripPotRow()">
+                            </div>
+                            <div class="form-group" style="margin:0; flex:0 0 110px;">
+                                <label>Places paid</label>
+                                <input type="number" id="trip-pot-spots" min="1" max="20" value="3" oninput="tripPotTouched(); renderTripPotSpots(true)">
+                            </div>
+                        </div>
+                        <div id="trip-pot-amounts" style="margin-top:8px;"></div>
+                        <p id="trip-pot-balance" style="font-size:0.8rem; font-weight:bold; margin:8px 0;"></p>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn-primary" data-role="trip-pot-save"
+                                    style="flex:1; padding:10px; font-size:0.9rem;" onclick="saveTripPot()">Save the pot</button>
+                            <button type="button" class="btn-outline" data-role="trip-pot-even"
+                                    style="flex:0 0 auto; padding:10px 12px; font-size:0.84rem;" onclick="evenTripPotSplit()">Split evenly</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <p class="trip-section-sub" style="margin-bottom:8px;"><strong>Prize Payout Calculator</strong> — set the pool and how many spots pay, and it maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
             <div class="form-group" style="margin-bottom:8px;">
@@ -570,8 +820,447 @@ html {
 
 
 
+    // ---- PASTE AN ITINERARY (2026-10-03) ----
+    //
+    // trip-itinerary.js turns text into rows and says what it is confident about;
+    // this reviews them and, only on a second tap, turns them into the planner's
+    // own round configs. Nothing is written here either - the planner's existing
+    // Build Trip does the writing, through the one path it always did.
+    let itinPlan = null;
+
+    function itinKnownCourses() {
+        // THE SAME NAMES THE PICKER OFFERS: the bundled directory plus whatever is
+        // in the shared list. Matching against this is free; everything else costs
+        // a lookup on a 35-a-day key.
+        const known = {};
+        (typeof courseDirectory !== 'undefined' ? courseDirectory : []).forEach(g =>
+            (g.items || []).forEach(i => { known[i.id] = i.name; }));
+        Object.keys(tripCourses || {}).forEach(k => {
+            if (tripCourses[k] && tripCourses[k].name) known[k] = tripCourses[k].name;
+        });
+        return known;
+    }
+
+    function reviewItinerary() {
+        const box = document.getElementById('itin-paste-box');
+        const out = document.getElementById('itin-review');
+        if (!box || !out || typeof tripItinPlan !== 'function') return;
+        const yearEl = document.getElementById('itin-year');
+        const year = yearEl ? parseInt(yearEl.value, 10) : NaN;
+        if (!(year >= 2024 && year <= 2099)) {
+            out.innerHTML = '<p style="color:var(--warn-text); font-weight:bold;">Put the year in first &mdash; a date like 10/13 does not carry one.</p>';
+            return;
+        }
+        itinPlan = tripItinPlan(box.value, {
+            year: year,
+            known: itinKnownCourses(),
+            loops: (typeof nineHoleLoops !== 'undefined') ? nineHoleLoops : {}
+        });
+        const rows = itinPlan.rows;
+        if (!rows.length) {
+            out.innerHTML = '<p style="color:var(--text-muted);">Nothing to read yet.</p>';
+            return;
+        }
+        let html = '<ul style="margin:0 0 10px 18px; padding:0; font-size:0.84rem;">'
+            + rows.map(r => '<li style="margin-bottom:4px;' + (r.ok ? '' : ' color:var(--warn-text);') + '">'
+                + escapeHtml(tripItinRowLabel(r)) + '</li>').join('')
+            + '</ul>';
+        // THE COST, BEFORE THE GOLFER AGREES TO IT. The provider is the free tier:
+        // 35 requests a day shared by everybody, and a course is two - a search
+        // then a detail, because the search returns only a count of tee boxes.
+        html += '<p style="font-size:0.8rem; font-weight:bold;">'
+            + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's')
+            + (itinPlan.problems ? ' \u00B7 ' + itinPlan.problems + ' line'
+                + (itinPlan.problems === 1 ? '' : 's') + ' I could not read' : '')
+            + ' \u00B7 ' + (itinPlan.searches
+                ? itinPlan.searches + ' online lookup' + (itinPlan.searches === 1 ? '' : 's')
+                  + ' (of 35 a day, shared by everyone)'
+                : 'no online lookups needed')
+            + '</p>';
+        html += '<button type="button" class="btn-primary" onclick="applyItinerary()">Use these '
+            + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's') + '</button>';
+        out.innerHTML = html;
+    }
+
+    // APPLY: the rows become the planner's round configs, and the golfer sees them
+    // in the planner they already know - where they can change anything before
+    // Build Trip writes a single thing.
+    //
+    // THE ROWS ARE ALSO KEPT HERE. Everything on screen is rebuilt from the day
+    // count box, so an itinerary that lived only in the form was one blank box
+    // away from being gone - which is exactly what happened to Manny's seven
+    // Myrtle rounds: the review read them, the planner was rebuilt from an
+    // empty "How Many Days", and the button said to set up at least one day.
+    let itinApplied = null;
+
+    function itinRowsToConfigs(rows) {
+        // The planner's own day model, so the labels, the AM/PM split and the
+        // day count are the ones every other surface already reads.
+        const days = tripItinDays(rows);
+        const flat = [];
+        days.forEach((day, dayIdx) => {
+            day.rows.forEach((r, k) => {
+                const subLabel = day.rows.length === 2 ? (k === 0 ? ' AM' : ' PM') : '';
+                flat.push({
+                    label: 'Day ' + (dayIdx + 1) + subLabel,
+                    courseId: r.courseKey || '',
+                    // THE NAME HE TYPED, for the rounds no saved course matched.
+                    // Without it the round is a blank box with nothing to search
+                    // for, which is exactly how "Myrtlewood PineHills" became
+                    // "Search / Select Course" and no message.
+                    wantCourse: (!r.courseKey && !r.undecided) ? (r.courseName || '') : '',
+                    needsCourse: (!r.courseKey && !r.undecided) ? (r.courseName || '') : '',
+                    playerCount: 4,
+                    frontNineKey: r.frontNineKey || '',
+                    backNineKey: r.backNineKey || '',
+                    // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The
+                    // tee-time field is Wave 39 and is not merged yet, so on
+                    // main these two are carried and ignored; the moment that
+                    // wave lands they are what the planner's own date and time
+                    // boxes read. Parsed either way, because re-reading the
+                    // paste later is not something anybody will do.
+                    teeDate: r.date || '',
+                    teeClock: r.time || ''
+                });
+            });
+        });
+        return { days: days, flat: flat };
+    }
+
+// ---- THE ONLINE LOOKUP FOR A COURSE THE ITINERARY NAMES (2026-10-03) ----
+    //
+    // A pasted course that is not already saved USED TO LEAVE THE ROUND BLANK.
+    // The review said "will look up online" and "2 online lookups", and then
+    // nothing looked anything up: applyItinerary set courseId to '' and the card
+    // read "Search / Select Course" with no message, which is the worst of the
+    // three possible outcomes because it looks like a choice the golfer made.
+    //
+    // THE SAME PROXY, THE SAME RULES, THE SAME RECORD as admin.html's import -
+    // course-import-rules.js holds all three, and the write lands on the same
+    // global_courses/<key> with the same key shape. What is different here is
+    // only who starts it: a tap on Use these N rounds rather than a tap on a
+    // search result.
+    let itinLookupInFlight = false;
+
+    function tripCourseApiBase() { return courseProxyBase(document, GOLF_WEB_ORIGIN); }
+
+    function itinDirectoryNames() {
+        const names = {};
+        (typeof courseDirectory !== 'undefined' ? courseDirectory : []).forEach(g =>
+            (g.items || []).forEach(i => { names[i.id] = i.name; }));
+        return names;
+    }
+
+    async function itinFetchJson(url) {
+        // NO fetch AT ALL IS A FAILED LOOKUP, NOT A CRASH. mini-dom provides
+        // none, and a page that cannot ask must still show a round that needs a
+        // course rather than throwing on the way to drawing it.
+        if (typeof fetch !== 'function') return { status: 'unavailable', reason: 'network' };
+        try {
+            const res = await fetch(url);
+            return await res.json();
+        } catch (e) { return { status: 'unavailable', reason: 'network' }; }
+    }
+
+    // { ok, key, name } imported and ready | { choices } a facility answered with
+    // several courses | { error } could not ask, nothing matched, or no card.
+    async function itinLookupCourse(name) {
+        const payload = await itinFetchJson(tripCourseApiBase()
+            + '/api/course-search?q=' + encodeURIComponent(name));
+        if (!payload || payload.status !== 'ok') {
+            return { error: courseImportMessage((payload && payload.reason) || 'upstream_error') };
+        }
+        const cands = (payload.courses || []).map(c => ({ id: c.id, name: courseDisplayName(c) }));
+        const chosen = tripItinPickOnline(name, cands);
+        if (!chosen) return { error: 'Nothing online matched \u201C' + name + '\u201D.' };
+        if (chosen.choices) return { choices: chosen.choices };
+        return itinImportProviderCourse(chosen.pick);
+    }
+
+    async function itinImportProviderCourse(cand) {
+        const payload = await itinFetchJson(tripCourseApiBase()
+            + '/api/course/' + encodeURIComponent(cand.id));
+        if (!payload || payload.status !== 'ok' || !payload.course) {
+            return { error: courseImportMessage((payload && payload.reason) || 'upstream_error') };
+        }
+        const detail = payload.course;
+        const canonical = pickCanonicalTee(detail);
+        // NO CARD, NO RECORD. importCardOrRefuse is the one validator, and a
+        // course whose card it refuses leaves the round needing one - the
+        // alternative is stamping plausible numbers into a par and stroke-index
+        // layout, which is inventing money.
+        const card = canonical ? importCardOrRefuse(canonical.tee)
+            : { ok: false, reason: 'This course has no tee data from the provider.' };
+        if (!card.ok) return { error: courseDisplayName(detail) + ': ' + card.reason };
+        const siFrom = canonical.gender + '/' + canonical.tee.tee_name;
+        const key = importedCourseKeyFor(detail, itinDirectoryNames(), tripCourses);
+        const rec = buildImportRecord(detail, siFrom);
+        const p = db.ref('global_courses/' + key).update(rec);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        try { await p; } catch (e) {
+            return { error: courseDisplayName(detail) + ' was found, but the shared course list refused the write.' };
+        }
+        tripCourses[key] = rec;
+        return { ok: true, key: key, name: rec.name };
+    }
+
+    // EVERY ROUND THE ITINERARY COULD NOT MATCH, ONE AT A TIME. Sequential on
+    // purpose: the provider is the free tier, 35 requests a day shared by
+    // everybody and two per course, so a parallel burst is how a five-course
+    // paste spends ten of them before the first answer arrives.
+    // A SKIPCAPTURE RENDER LOSES WHAT IS IN THE FORM, and the one field a golfer
+    // may have typed while a lookup was in flight is the headcount. The course
+    // boxes must NOT be read back here - that is the erase this whole fix is
+    // about - so only the player counts are taken.
+    function captureRoundPlayerCounts() {
+        roundConfigs.forEach((cfg, i) => {
+            const playersEl = document.getElementById(`round-players-${i}`);
+            if (playersEl && playersEl.value !== '') cfg.playerCount = parseInt(playersEl.value, 10) || cfg.playerCount;
+        });
+    }
+
+    function itinPendingLookups() {
+        return roundConfigs
+            .map((cfg, i) => ({ cfg: cfg, i: i }))
+            .filter(x => !x.cfg.courseId && x.cfg.wantCourse && !x.cfg.lookupTried);
+    }
+
+    // EVERY ROUND REFERRED TO BY INDEX, NEVER BY A HELD OBJECT. renderRoundPlanner
+    // rebuilds roundConfigs into NEW objects and copies the fields across, so a
+    // `cfg` captured before a render is an orphan afterwards - writing to it
+    // updates nothing and the card stays on whatever it last said. That is not
+    // hypothetical: it left this round reading "Searching online..." forever with
+    // the answer already in hand, and the Chrome check caught it.
+    function itinApplyOutcome(i, typedName, out) {
+        const cfg = roundConfigs[i];
+        if (!cfg) return;
+        if (out && out.ok) {
+            cfg.courseId = out.key;
+            cfg.needsCourse = '';
+            cfg.needsWhy = '';
+            cfg.choices = null;
+        } else if (out && out.choices) {
+            // AMBIGUOUS IS A QUESTION, NOT A GUESS. Myrtlewood answers a search
+            // with PineHills, Palmetto and Hummingbird: three different eighteens
+            // with three different stroke indexes, which is three different
+            // amounts of money.
+            cfg.needsCourse = typedName;
+            cfg.needsWhy = 'More than one course matched \u2014 pick the right one.';
+            cfg.choices = out.choices;
+        } else {
+            cfg.needsCourse = typedName;
+            cfg.needsWhy = (out && out.error) || 'The lookup did not answer.';
+            cfg.choices = null;
+        }
+    }
+
+    // One at a time, sequentially: the provider is the free tier, 35 requests a
+    // day shared by everybody and two per course, so a parallel burst is how a
+    // five-course paste spends ten of them before the first answer arrives.
+    async function resolveItinCourses() {
+        if (itinLookupInFlight) return;
+        const pending = itinPendingLookups();
+        if (!pending.length) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        renderItinReadyNote('\ud83c\udf10 Looking up ' + pending.length + ' course'
+            + (pending.length === 1 ? '' : 's') + ' online\u2026');
+        try {
+            for (const item of pending) {
+                const want = item.cfg.wantCourse;
+                if (roundConfigs[item.i]) roundConfigs[item.i].lookupTried = true;
+                const out = await itinLookupCourse(want);
+                itinApplyOutcome(item.i, want, out);
+            }
+        } finally {
+            itinLookupInFlight = false;
+            renderRoundPlanner(true);
+            renderDayPlannerCard();
+            renderItinReadyNote();
+        }
+    }
+
+    // A tap on "Tap to search" - this one round, asked again, with whatever is in
+    // its box now rather than what the itinerary said.
+    async function runRoundOnlineSearch(i) {
+        if (!roundConfigs[i] || itinLookupInFlight) return;
+        const input = document.getElementById(`round-course-input-${i}`);
+        const typed = (input && input.value.trim()) || roundConfigs[i].needsCourse || roundConfigs[i].wantCourse || '';
+        if (!typed) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        roundConfigs[i].needsCourse = typed;
+        roundConfigs[i].needsWhy = '\ud83c\udf10 Searching online\u2026';
+        roundConfigs[i].choices = null;
+        renderRoundPlanner(true);
+        let out;
+        try { out = await itinLookupCourse(typed); }
+        finally { itinLookupInFlight = false; }
+        itinApplyOutcome(i, typed, out);
+        renderRoundPlanner(true);
+    }
+
+    // A tap on one row of the pick list. The id is the provider's, which is not
+    // user text, so it is safe in a handler; the name is read back from the list.
+    async function pickRoundOnlineCourse(i, providerId) {
+        if (!roundConfigs[i] || itinLookupInFlight) return;
+        const cand = (roundConfigs[i].choices || []).filter(c => String(c.id) === String(providerId))[0];
+        if (!cand) return;
+        itinLookupInFlight = true;
+        captureRoundPlayerCounts();
+        roundConfigs[i].needsWhy = '\ud83c\udf10 Fetching the card\u2026';
+        roundConfigs[i].choices = null;
+        renderRoundPlanner(true);
+        let out;
+        try { out = await itinImportProviderCourse(cand); }
+        finally { itinLookupInFlight = false; }
+        itinApplyOutcome(i, cand.name, out);
+        renderRoundPlanner(true);
+    }
+
+// THE DAY PLANNER OPENS WHEN IT HAS SOMETHING IN IT (2026-10-04).
+    //
+    // It is one line on arrival because a trip is normally built from a pasted
+    // itinerary. The moment there are rounds in it - from that paste, or typed by
+    // hand - it holds the only place a round with no course can be fixed, and a
+    // card that hides them is how a blank round reaches Build unseen.
+    function renderDayPlannerCard() {
+        const card = document.getElementById('day-planner-card');
+        const summary = document.getElementById('day-planner-summary');
+        const n = roundConfigs.length;
+        if (summary) {
+            summary.textContent = n
+                ? '\ud83d\uddd3\ufe0f The ' + n + ' round' + (n === 1 ? '' : 's') + ' \u2014 courses and headcounts'
+                : '\ud83d\uddd3\ufe0f Set the days up by hand instead';
+        }
+        if (card && n && !card.open) card.open = true;
+    }
+
+    function renderItinReadyNote(overrideText) {
+        const note = document.getElementById('itin-ready-note');
+        if (!note) return;
+        if (overrideText) { note.style.display = 'block'; note.textContent = overrideText; return; }
+        if (!itinApplied || !itinApplied.length) { note.style.display = 'none'; note.textContent = ''; return; }
+        note.style.display = 'block';
+        note.textContent = '\ud83d\udccb ' + itinApplied.length + ' round'
+            + (itinApplied.length === 1 ? '' : 's') + ' from your itinerary ready \u2014 Build Trip uses '
+            + (itinApplied.length === 1 ? 'it' : 'them') + ', even with the paste box closed.';
+    }
+
+    function applyItinerary() {
+        if (!itinPlan) return;
+        const usable = itinPlan.rows.filter(r => r.ok);
+        if (!usable.length) return;
+        // In date order, so the planner's labels line up with the itinerary
+        // rather than with the order it was typed.
+        const sorted = usable.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))
+            || String(a.time || '').localeCompare(String(b.time || '')));
+        itinApplied = sorted;
+        const plan = itinRowsToConfigs(sorted);
+        // THE DAY COUNT BOX IS PART OF THE STATE, not a decoration. renderDayPlanner
+        // reads it and rebuilds plannedDays from it, so leaving it empty here
+        // rebuilt zero days and renderRoundPlanner then threw every round away.
+        plannedDays = plan.days.map(d => ({ roundsToday: d.rows.length }));
+        const daysInput = document.getElementById('trip-days-input');
+        if (daysInput) daysInput.value = String(plan.days.length);
+        renderDayPlanner();
+        roundConfigs = plan.flat;
+        renderRoundPlanner(true);
+        renderDayPlannerCard();
+        renderItinReadyNote();
+        const card = document.getElementById('itin-paste-card');
+        if (card) card.open = false;
+        // AND THE LOOKUPS THE REVIEW PROMISED ACTUALLY RUN. The review's "2
+        // online lookups" was a statement about what this tap would spend, and
+        // until now it spent nothing and left the round blank.
+        resolveItinCourses();
+        uiToast('\ud83d\udccb ' + usable.length + ' round' + (usable.length === 1 ? '' : 's')
+            + ' loaded into the planner. Change anything you like, then Build Trip.');
+    }
+
+// ---- THE GOLFERS ON THE SETUP SCREEN (2026-10-04) ----
+    //
+    // Either the real list is pasted now - names, handicaps and groups exactly as
+    // written, through the SAME parser the trip page and the weekly game use - or
+    // a headcount makes placeholders. Nothing is written until Build Trip.
+    let setupGolfers = null;
+
+    function setupGolferPlan() {
+        if (setupGolfers && setupGolfers.validPlayers.length) {
+            const sizes = (setupGolfers.groups && setupGolfers.groups.length > 1)
+                ? setupGolfers.groups
+                : ((typeof computeGroupSizes === 'function')
+                    ? computeGroupSizes(setupGolfers.validPlayers.length, {})
+                    : [setupGolfers.validPlayers.length]);
+            return { players: setupGolfers.validPlayers, sizes: sizes, pasted: true };
+        }
+        const el = document.getElementById('setup-golfer-count');
+        const n = el ? parseInt(el.value, 10) : NaN;
+        if (!(n > 0 && n <= 40)) return null;
+        return { count: n, pasted: false };
+    }
+
+    function renderSetupGolferNote() {
+        const note = document.getElementById('setup-golfers-note');
+        if (!note) return;
+        const plan = setupGolferPlan();
+        if (!plan) { note.textContent = ''; return; }
+        if (plan.pasted) {
+            note.textContent = '\ud83d\udc65 ' + plan.players.length + ' golfer'
+                + (plan.players.length === 1 ? '' : 's') + ' in ' + plan.sizes.length + ' group'
+                + (plan.sizes.length === 1 ? '' : 's') + ' go into every round.';
+            return;
+        }
+        const sizes = (typeof computeGroupSizes === 'function') ? computeGroupSizes(plan.count, {}) : [plan.count];
+        note.textContent = '\ud83d\udc65 ' + plan.count + ' placeholder' + (plan.count === 1 ? '' : 's')
+            + ' (Player 1\u2013' + plan.count + ') in ' + sizes.length + ' group'
+            + (sizes.length === 1 ? '' : 's') + '.';
+    }
+
+    function reviewSetupGolfers() {
+        const box = document.getElementById('setup-golfers-box');
+        const out = document.getElementById('setup-golfers-review');
+        if (!box || !out || typeof parsePlayerPasteText !== 'function') return;
+        const parsed = parsePlayerPasteText(box.value);
+        if (!parsed.validPlayers.length) {
+            setupGolfers = null;
+            out.innerHTML = '<p style="color:var(--text-muted);">Nothing to read yet.</p>';
+            renderSetupGolferNote();
+            return;
+        }
+        setupGolfers = parsed;
+        const plan = setupGolferPlan();
+        const groupRows = tripGroupRows(parsed.validPlayers, plan.sizes);
+        let html = '<p style="font-size:0.9rem; font-weight:bold; margin:0 0 8px 0;">'
+            + parsed.validPlayers.length + ' golfer' + (parsed.validPlayers.length === 1 ? '' : 's')
+            + ' in ' + groupRows.length + ' group' + (groupRows.length === 1 ? '' : 's') + '</p>';
+        html += groupRows.map(g =>
+            '<div style="margin-bottom:6px; font-size:0.82rem;">'
+            + '<span style="font-weight:bold; color:var(--brand-green);">Group ' + g.group + ':</span> '
+            + g.players.map(pl => escapeHtml(pl.name)
+                + (String(pl.hcp || '').trim() ? ' ' + escapeHtml(String(pl.hcp)) : ' (no hcp)')).join(', ')
+            + '</div>').join('');
+        if (parsed.flaggedLines.length) {
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">'
+                + parsed.flaggedLines.length + ' line'
+                + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
+                + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.notedLines.length) {
+            html += '<p style="font-size:0.8rem; color:var(--text-muted);">Notes ignored: '
+                + escapeHtml(parsed.notedLines.map(l => l.note).join(', ')) + '</p>';
+        }
+        out.innerHTML = html;
+        renderSetupGolferNote();
+    }
+
     function showCreateTripForm() {
         document.getElementById('create-trip-form').style.display = 'block';
+        // The year box starts on this one - the common case is a trip being
+        // planned in the year it happens - and it is a box rather than an
+        // assumption because the uncommon case is a December booking for January.
+        const yearEl = document.getElementById('itin-year');
+        if (yearEl && !yearEl.value) yearEl.value = String(new Date().getFullYear());
         renderDayPlanner();
         if (!tripIndexStarted) {
             // THE COURSE INDEX, NOT THE WHOLE NODE (Wave 38). This read was
@@ -692,11 +1381,15 @@ html {
         renderDayPlanner();
     }
 
-    function renderRoundPlanner() {
+    // skipCapture: the caller has JUST set roundConfigs authoritatively and the
+    // form on screen still belongs to the previous render. Reading it back then
+    // is not a capture, it is an erase - which is how a pasted itinerary came
+    // out of applyItinerary with seven rounds and reached the button with none.
+    function renderRoundPlanner(skipCapture) {
         // Capture whatever's currently in the round-config form fields before rebuilding,
         // so toggling a day's hole count elsewhere doesn't wipe course/headcount choices
         // already made for other rounds.
-        roundConfigs.forEach((cfg, i) => {
+        if (!skipCapture) roundConfigs.forEach((cfg, i) => {
             const courseEl = document.getElementById(`round-course-${i}`);
             const playersEl = document.getElementById(`round-players-${i}`);
             const frontEl = document.getElementById(`round-frontnine-${i}`);
@@ -717,7 +1410,7 @@ html {
         plannedDays.forEach((d, dayIdx) => {
             for (let r = 0; r < d.roundsToday; r++) {
                 const subLabel = d.roundsToday === 2 ? (r === 0 ? ' AM' : ' PM') : '';
-                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '' });
+                newFlat.push({ label: `Day ${dayIdx + 1}${subLabel}`, courseId: '', playerCount: 4, frontNineKey: '', backNineKey: '', teeDate: '', teeClock: '', wantCourse: '', needsCourse: '', needsWhy: '', choices: null, lookupTried: false });
             }
         });
         // Carry forward previously entered values by position — good enough for the common
@@ -728,11 +1421,25 @@ html {
                 cfg.playerCount = roundConfigs[i].playerCount || 4;
                 cfg.frontNineKey = roundConfigs[i].frontNineKey || '';
                 cfg.backNineKey = roundConfigs[i].backNineKey || '';
+                // CARRIED, not re-derived: these two come from a pasted
+                // itinerary and have no box on screen to read them back from,
+                // so a rebuild that forgot them would lose the tee times
+                // silently the first time a day was toggled 18 to 36.
                 cfg.teeDate = roundConfigs[i].teeDate || '';
                 cfg.teeClock = roundConfigs[i].teeClock || '';
+                // AND THE LOOKUP STATE, for the same reason: none of it has a box
+                // on screen to be read back from, so a rebuild that forgot it
+                // would turn a round that needs a course into a silent blank
+                // again the first time a day was toggled 18 to 36.
+                cfg.wantCourse = roundConfigs[i].wantCourse || '';
+                cfg.needsCourse = roundConfigs[i].needsCourse || '';
+                cfg.needsWhy = roundConfigs[i].needsWhy || '';
+                cfg.choices = roundConfigs[i].choices || null;
+                cfg.lookupTried = !!roundConfigs[i].lookupTried;
             }
         });
         roundConfigs = newFlat;
+        renderDayPlannerCard();
 
         const section = document.getElementById('round-planner-section');
         const container = document.getElementById('round-planner');
@@ -742,7 +1449,12 @@ html {
         let html = '';
         roundConfigs.forEach((cfg, i) => {
             const loops = nineHoleLoops[cfg.courseId];
-            const selectedName = cfg.courseId ? (getCourseNameById(cfg.courseId, {}) || cfg.courseId) : '';
+            // PRE-FILLED WITH THE NAME HE PASTED when nothing is selected yet, so
+            // the box a golfer taps already holds the search instead of being
+            // empty next to a round he thought he had set up.
+            const selectedName = cfg.courseId
+                ? (getCourseNameById(cfg.courseId, {}) || (tripCourses[cfg.courseId] || {}).name || cfg.courseId)
+                : (cfg.needsCourse || '');
             let coursePickerHtml = `
                 <div class="form-group" style="margin-bottom:8px;">
                     <label>Course</label>
@@ -778,6 +1490,26 @@ html {
                 </div>`;
             }
 
+            // NEVER A SILENT BLANK (2026-10-03). A round whose pasted course did
+            // not match a saved one and did not survive the lookup says so, names
+            // the course the itinerary asked for, and gives one tap that searches
+            // for it again - with the box above already holding the name. The
+            // round still BUILDS without a course; what it must not do is look
+            // like a blank the golfer chose.
+            if (!cfg.courseId && cfg.needsCourse) {
+                const pickRows = (cfg.choices || []).map(c =>
+                    `<div class="course-picker-option" style="border-top:1px solid var(--border-faint);"
+                          onclick="pickRoundOnlineCourse(${i}, '${escapeHtml(String(c.id).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(c.name)}</div>`).join('');
+                coursePickerHtml += `
+                <div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:10px; margin-bottom:8px; font-size:0.78rem; color:var(--warn-text);">
+                    <div><strong>Needs a course: ${escapeHtml(cfg.needsCourse)}</strong></div>
+                    ${cfg.needsWhy ? `<div style="margin-top:4px;">${escapeHtml(cfg.needsWhy)}</div>` : ''}
+                    ${pickRows ? `<div style="margin-top:6px; background:var(--card-bg); border-radius:6px;">${pickRows}</div>` : ''}
+                    <button type="button" class="btn-outline" data-role="needs-course-search-${i}"
+                            style="margin-top:8px; font-size:0.78rem;" onclick="runRoundOnlineSearch(${i})">🔍 Tap to search</button>
+                </div>`;
+            }
+
             if (cfg.courseId && !loops && !isCourseMapped(cfg.courseId)) {
                 coursePickerHtml += `
                 <div style="background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:10px; margin-bottom:8px; font-size:0.76rem; color:var(--warn-text);">
@@ -795,7 +1527,8 @@ html {
                 <!-- OPTIONAL, like the single-round version. A trip is exactly where
                      tee times matter - four rounds over three days, each with its own -
                      and exactly where a wrong one costs somebody a morning, which is
-                     why tee-time.js stores the zone it was set in. -->
+                     why tee-time.js stores the zone it was set in. A pasted itinerary
+                     fills these in; typing over them is the same decision. -->
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Tee time <span style="font-weight:normal; color:var(--text-muted);">(optional)</span></label>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -834,7 +1567,33 @@ html {
             }
         });
 
+        // THE SHARED LIST TOO (2026-10-03). This offered the bundled directory
+        // only, so a course somebody imported - including one this page has just
+        // imported from a pasted itinerary - could not be picked here at all.
+        const dirIds = {};
+        courseDirectory.forEach(g => (g.items || []).forEach(item => { dirIds[item.id] = true; }));
+        const shared = Object.keys(tripCourses || {}).filter(k => !dirIds[k]
+            && tripCourses[k] && tripCourses[k].name
+            && String(tripCourses[k].name).toLowerCase().includes(typed));
+        if (shared.length) {
+            html += `<div class="course-picker-group-label">\ud83c\udf10 Imported courses</div>`;
+            shared.forEach(k => {
+                html += `<div class="course-picker-option" onclick="selectRoundCourseById(${i}, '${escapeHtml(String(k).replace(/[^A-Za-z0-9_-]/g, ''))}')">${escapeHtml(tripCourses[k].name)}</div>`;
+            });
+        }
+
         dropdown.innerHTML = html || `<div class="course-picker-empty">No courses found for "${typed.replace(/</g, '&lt;')}".</div>`;
+        // AND ONE ROW THAT ASKS THE PROVIDER, fired by a tap and nothing else -
+        // two of the day's 35 requests, spent only when a golfer presses it.
+        if (typed.length > 2) {
+            const row = document.createElement('div');
+            row.className = 'course-picker-option';
+            row.style.fontWeight = 'bold';
+            row.setAttribute('data-role', 'round-online-search-' + i);
+            row.textContent = '\ud83c\udf10 Search online for \u201C' + input.value.trim() + '\u201D';
+            row.onclick = () => { runRoundOnlineSearch(i); };
+            dropdown.appendChild(row);
+        }
         dropdown.style.display = 'block';
     }
 
@@ -847,7 +1606,10 @@ html {
         (courseDirectory || []).forEach(g => (g.items || []).forEach(item => {
             if (String(item.id) === String(id)) found = item;
         }));
-        selectRoundCourse(i, id, found ? found.name : '');
+        // An imported course is not in the directory; its name is in the shared
+        // list this page already holds.
+        const sharedName = (tripCourses[id] || {}).name || '';
+        selectRoundCourse(i, id, found ? found.name : sharedName);
     }
 
     function selectRoundCourse(i, id, name) {
@@ -863,6 +1625,9 @@ html {
         roundConfigs[i].courseId = id;
         roundConfigs[i].frontNineKey = '';
         roundConfigs[i].backNineKey = '';
+        roundConfigs[i].needsCourse = '';
+        roundConfigs[i].needsWhy = '';
+        roundConfigs[i].choices = null;
         renderRoundPlanner();
     }
 
@@ -934,20 +1699,77 @@ html {
     function buildTrip() {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
-        if (roundConfigs.length === 0) { uiRefuse('⚠️ Set up at least one day above, or use "Skip planning" below.'); return; }
+        // AN ITINERARY THAT WAS ACCEPTED IS WHAT THIS BUILDS, whatever the form
+        // on screen currently holds. Manny pasted seven rounds, the review read
+        // all seven, and this button told him to "set up at least one day" -
+        // because every round on screen is rebuilt from the day count box and
+        // that box was empty. The planner is a view of the plan now, not the
+        // only copy of it.
+        if (roundConfigs.length === 0 && itinApplied && itinApplied.length) {
+            const plan = itinRowsToConfigs(itinApplied);
+            plannedDays = plan.days.map(d => ({ roundsToday: d.rows.length }));
+            const daysInput = document.getElementById('trip-days-input');
+            if (daysInput) daysInput.value = String(plan.days.length);
+            renderDayPlanner();
+            roundConfigs = plan.flat;
+            renderRoundPlanner(true);
+            renderItinReadyNote();
+        }
+        // THE LOOKUPS RUN ON BUILD TOO, not only on Use these N rounds - a golfer
+        // who tapped Build straight after the review, or whose first attempt hit
+        // a dead network, would otherwise build a round with a blank course and
+        // no explanation. One pass only: lookupTried is set per round, so this
+        // cannot loop, and a round that still has no course after it builds
+        // anyway, carrying the line that says what it needs.
+        if (roundConfigs.length && itinPendingLookups().length) {
+            resolveItinCourses().then(() => buildTrip());
+            return;
+        }
+        if (roundConfigs.length === 0) {
+            // AND THE REFUSAL NAMES THE RIGHT MISSING STEP. A golfer who pasted
+            // an itinerary and read it but never tapped Use these N rounds has
+            // not failed to set up a day; he has one more tap to make, and
+            // telling him otherwise sends him to the wrong part of the screen.
+            if (itinPlan && itinPlan.ready) {
+                uiRefuse('⚠️ Your itinerary is read but not loaded yet — open the paste card and tap "Use these '
+                    + itinPlan.ready + ' round' + (itinPlan.ready === 1 ? '' : 's') + '".');
+                return;
+            }
+            uiRefuse('⚠️ Set up at least one day above, or use "Skip planning" below.');
+            return;
+        }
 
         // Pull one final read of every field in case the last edit didn't fire onchange yet.
+        // GUARDED, because the configs can now come from an accepted itinerary
+        // rather than from the form - and an unrendered round has no boxes to
+        // read, which would have thrown before writing anything.
         roundConfigs.forEach((cfg, i) => {
-            cfg.courseId = document.getElementById(`round-course-${i}`).value;
-            cfg.playerCount = parseInt(document.getElementById(`round-players-${i}`).value, 10) || 0;
+            const courseEl = document.getElementById(`round-course-${i}`);
+            const playersEl = document.getElementById(`round-players-${i}`);
+            if (courseEl) cfg.courseId = courseEl.value;
+            if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
             const frontEl = document.getElementById(`round-frontnine-${i}`);
             const backEl = document.getElementById(`round-backnine-${i}`);
             if (frontEl) cfg.frontNineKey = frontEl.value;
             if (backEl) cfg.backNineKey = backEl.value;
         });
 
-        if (roundConfigs.some(cfg => !cfg.courseId)) {
-            uiRefuse('⚠️ Pick a course for every round before building the trip.');
+        // A ROUND WITH NO COURSE IS ALLOWED NOW (2026-10-03). Friday on Manny's
+        // Myrtle trip is "Prestwick or Man O' War (not chosen)", and refusing to
+        // build the trip until every course is picked meant either waiting on a
+        // decision nobody had made or inventing one - and a round carries a par
+        // and stroke-index card, so an invented course is invented money.
+        //
+        // The round is saved with no activeCourseKey and no courseData, which is
+        // a state the app already handles: index.html shows the course as not
+        // selected, isCourseMapped() reads it as unmapped, and the organizer
+        // opens the round and picks the course when the group decides. The ONE
+        // thing that must not happen is a fabricated card, and that is why
+        // nothing is written rather than a placeholder being written.
+        renderSetupGolferNote();
+        const noCourseCount = roundConfigs.filter(cfg => !cfg.courseId).length;
+        if (noCourseCount === roundConfigs.length) {
+            uiRefuse('\u26A0\uFE0F Pick a course for at least one round, or there is nothing to build.');
             return;
         }
 
@@ -1007,11 +1829,46 @@ html {
             roundConfigs.forEach((cfg, cfgIdx) => {
                 const roundCode = roundCodes[cfgIdx];
 
-                const { courseData, courseName } = resolveCourseDataAndName(cfg, globalCoursesData);
+                // NO COURSE, NO CARD. resolveCourseData() falls back to eighteen
+                // par 4s indexed 1-18, which is a complete, well-formed,
+                // FICTIONAL card - the exact thing admin.html stopped seeding
+                // because saving it poisoned global_courses for everyone. A round
+                // with no course gets courseData: null and the organizer picks
+                // the course later.
+                const undecided = !cfg.courseId;
+                const { courseData, courseName } = undecided
+                    ? { courseData: null, courseName: '' }
+                    : resolveCourseDataAndName(cfg, globalCoursesData);
+                // THE GOLFERS FROM THE SETUP SCREEN (2026-10-04). A pasted list goes
+                // in with its names, its handicaps and its groups exactly as
+                // written; with no paste the headcount makes placeholders, which is
+                // what every trip did before. Ids are per round because a trip's
+                // rounds are separate events.
+                const golferPlan = setupGolferPlan();
                 const players = [];
-                for (let p = 0; p < cfg.playerCount; p++) {
-                    players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
+                if (golferPlan && golferPlan.pasted) {
+                    golferPlan.players.forEach((g, i) => {
+                        const seat = { id: 101 + i, name: String(g.name).trim(),
+                            hcp: String(g.hcp === undefined || g.hcp === null ? '' : g.hcp).trim(),
+                            team: 'Team 1', squad: 'red', playingForMoney: true };
+                        if (g.flight) seat.flight = g.flight;
+                        players.push(seat);
+                    });
+                } else {
+                    const headcount = (golferPlan && golferPlan.count) || cfg.playerCount;
+                    for (let p = 0; p < headcount; p++) {
+                        players.push({ id: 101 + p, name: `Player ${p + 1}`, hcp: '', team: 'Team 1', squad: 'red', playingForMoney: true });
+                    }
                 }
+
+                // GROUPS EXACTLY AS PASTED, when they tile the field. Group sizes are
+                // positional and a group is who sees which bets, so a set of sizes
+                // that does not add up to the roster is not written at all.
+                const groupSizes = (golferPlan && golferPlan.pasted && golferPlan.sizes.length > 1
+                    && golferPlan.sizes.reduce((a, b) => a + b, 0) === players.length)
+                    ? golferPlan.sizes : null;
+                const groupOverrides = {};
+                if (groupSizes) groupSizes.forEach((size, i) => { groupOverrides[i] = size; });
 
                 // TEE TIME PER ROUND. The offset is taken FOR THAT DAY - a trip
                 // spanning a daylight-saving change would otherwise put one round
@@ -1022,15 +1879,27 @@ html {
                     roundDay: cfg.label,
                     teeTimeISO: tee.teeTimeISO,
                     teeTimeZone: tee.teeTimeZone,
+                    groupSizeOverrides: groupOverrides,
                     eventCategory: 'weekend',
                     categoryIcon: '⛳',
-                    activeCourseKey: cfg.courseId,
-                    courseName: courseName,
+                    activeCourseKey: cfg.courseId || null,
+                    courseName: courseName || null,
                     gameFormat: 'stroke',
                     courseData: courseData,
                     players: players
                 };
-                updates[`trips/${tripCode}/rounds/${roundCode}`] = { label: cfg.label, addedAt: Date.now() };
+                // THE DATE, WHEN THE ITINERARY GAVE ONE (2026-10-03). It orders the
+                // round pickers and labels them the way the golfer wrote them
+                // ("Tue 10/13 AM"). A round with no date keeps its addedAt order;
+                // inventing one would sort the trip wrongly with confidence.
+                const roundRow = { label: cfg.label, addedAt: Date.now() };
+                if (cfg.teeDate) roundRow.date = cfg.teeDate;
+                // AND THE TEE TIME (2026-10-04), so a round reads "Tue 10/13 ·
+                // 8:24 AM · Caledonia" everywhere it is listed. This is the trip's
+                // own record of what was pasted; the round's tee-time FIELD is
+                // Wave 39 and separate.
+                if (cfg.teeClock) roundRow.time = cfg.teeClock;
+                updates[`trips/${tripCode}/rounds/${roundCode}`] = roundRow;
             });
 
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js): the token awaited,
@@ -1271,6 +2140,64 @@ html {
         uiFail('⚠️ ' + what + '\n\n' + why + ' ' + consequence);
     }
 
+// ---- RENAME THE TRIP (2026-10-03) ----
+    //
+    // The whole control is withheld from a plain trip link, and the handlers check
+    // the token again: hiding a button is not a gate, which is the rule every
+    // other organizer action on this page already follows.
+    function renderTripRenameControl() {
+        const row = document.getElementById('trip-rename-row');
+        if (!row) return;
+        row.style.display = hasTripOrganizerAuthority() ? 'block' : 'none';
+        if (!hasTripOrganizerAuthority()) closeTripRename();
+    }
+
+    function openTripRename() {
+        if (!hasTripOrganizerAuthority()) return;
+        const box = document.getElementById('trip-rename-input');
+        const edit = document.getElementById('trip-rename-edit');
+        const row = document.getElementById('trip-rename-row');
+        if (!box || !edit || !row) return;
+        box.value = (tripData && tripData.name) || '';
+        edit.style.display = 'block';
+        row.style.display = 'none';
+        try { box.focus(); } catch (e) { /* no focus in a harness */ }
+    }
+
+    function closeTripRename() {
+        const edit = document.getElementById('trip-rename-edit');
+        if (edit) edit.style.display = 'none';
+        const row = document.getElementById('trip-rename-row');
+        if (row) row.style.display = hasTripOrganizerAuthority() ? 'block' : 'none';
+    }
+
+    function saveTripRename() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const box = document.getElementById('trip-rename-input');
+        const name = (box ? box.value : '').trim();
+        if (!name) { uiRefuse('\u26A0\uFE0F A trip needs a name \u2014 type one or tap Cancel.'); return; }
+        if (name === ((tripData && tripData.name) || '')) { closeTripRename(); return; }
+        // ONE CHILD, NOT THE TRIP. A set() on trips/<code> would replace the whole
+        // node - the rounds, the organizer token, the pool, the prize spots - and
+        // the rules allow that write, so nothing would stop it.
+        const p = db.ref(`trips/${currentTripCode}/name`).set(name);
+        if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(p);
+        p.then(() => {
+            // The listener redraws the header on its own; this is for the surfaces
+            // that read tripData.name when they are next rendered.
+            if (tripData) tripData.name = name;
+            const h = document.getElementById('manage-trip-name');
+            if (h) h.textContent = '\ud83d\ude90 ' + name;
+            closeTripRename();
+            uiToast('\u270f\ufe0f Renamed to ' + name + '.');
+            refreshTripComputations();
+        }).catch((err) => {
+            reportTripWriteFailure(err, 'The trip was not renamed.', 'It still reads '
+                + ((tripData && tripData.name) || 'its old name') + '.');
+        });
+    }
+
     function linkRound() {
         // CHECKED IN THE HANDLER, not only at render. Removing the visual state
         // in devtools, or calling this from the console, must achieve nothing -
@@ -1487,8 +2414,23 @@ html {
         } else {
             copyGroup.style.display = 'block';
             const currentSelection = copySelect.value;
+            // IN DATE ORDER, NAMING THE COURSE (2026-10-03). This listed rounds in
+            // the key order of the rounds map and showed the Day label alone, so a
+            // seven-round trip offered "Day 1 AM / Day 3 / Day 1 PM" with nothing
+            // saying which course - and the course is how an organizer recognises
+            // the round he wants to copy. trip-roster.js holds the label and the
+            // order; the course name comes from the round's own event record.
+            const byCode = {};
+            (cachedRoundResults || []).forEach(cr => { byCode[cr.code] = cr.data || {}; });
+            const pickerRows = tripRoundPickerRows(roundCodes.map(code => ({
+                code: code,
+                label: rounds[code].label,
+                date: rounds[code].date || '',
+                addedAt: rounds[code].addedAt || 0,
+                courseName: (byCode[code] || {}).courseName || ''
+            })));
             copySelect.innerHTML = '<option value="">🆕 Blank round</option>' +
-                roundCodes.map(code => `<option value="${code}">${rounds[code].label}</option>`).join('');
+                pickerRows.map(r => `<option value="${r.code}">${escapeHtml(r.label)}</option>`).join('');
             if (roundCodes.includes(currentSelection)) copySelect.value = currentSelection;
         }
 
@@ -1496,26 +2438,49 @@ html {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">No rounds linked yet. Add one above.</div>`;
             return;
         }
-        container.innerHTML = roundCodes.map(code => {
+        // SORTED, AND EACH ROW SAYS WHAT THE ROUND IS (2026-10-04). This listed
+        // rounds in the key order of the trip's rounds map with the Day label
+        // alone, so Manny's Myrtle week opened on "Day 2 PM" and no row said
+        // which course or when. trip-roster.js holds the order and the label;
+        // the course name comes from the round's own event record.
+        const byCode = {};
+        (cachedRoundResults || []).forEach(cr => { byCode[cr.code] = cr.data || {}; });
+        const rows = tripRoundPickerRows(roundCodes.map(code => ({
+            code: code,
+            label: rounds[code].label,
+            date: rounds[code].date || '',
+            time: rounds[code].time || '',
+            addedAt: rounds[code].addedAt || 0,
+            courseName: (byCode[code] || {}).courseName || ''
+        })));
+        container.innerHTML = rows.map(row => {
+            const code = row.code;
             const r = rounds[code];
             const counts = r.countsTowardTrip !== false; // undefined/true = counts, only explicit false excludes
-            return `<div class="round-card">
+            // OPEN IS THE BUTTON; EVERYTHING ELSE IS TUCKED. The row a golfer
+            // wants is "play this round"; the game code, whether it counts, the
+            // setup screen and the delete are all organizer housekeeping, and
+            // having them all on the row is what made this list a wall.
+            return `<div class="round-card" style="align-items:flex-start;">
                 <div class="rc-info">
-                    <div class="rc-label">${r.label}</div>
-                    <div class="rc-sub">Game code: ${code}</div>
-                    ${isOrg
-                        ? `<div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
-                        ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
-                    </div>`
-                        : `<div class="rc-counts-toggle rc-counts-static">
-                        ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
-                    </div>`}
+                    <div class="rc-label">${escapeHtml(row.label)}</div>
+                    <details style="margin-top:4px;">
+                        <summary class="rc-sub" style="cursor:pointer;">⚙️ Edit</summary>
+                        <div style="padding:6px 0 2px;">
+                            <div class="rc-sub">Game code: ${code}</div>
+                            ${isOrg
+                                ? `<div class="rc-counts-toggle ${counts ? '' : 'excluded'}" onclick="toggleRoundCounted('${code}', ${counts})">
+                                ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
+                            </div>`
+                                : `<div class="rc-counts-toggle rc-counts-static">
+                                ${counts ? '✅ Counts toward trip' : '🚫 Excluded from trip totals'}
+                            </div>`}
+                            <a class="rc-link" href="admin.html?game=${code}">⚙️ Round Setup</a>
+                            ${isOrg ? `<span style="color:var(--accent-red); cursor:pointer; font-size:0.95rem; margin-left:10px;" onclick="removeRound('${code}')">✕ Remove from trip</span>` : ''}
+                        </div>
+                    </details>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-                    <a class="rc-link" href="admin.html?game=${code}">⚙️ Edit</a>
-                    <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
-                </div>
-                ${isOrg ? `<span style="color:var(--accent-red); cursor:pointer; font-size:1.1rem;" onclick="removeRound('${code}')">✕</span>` : ''}
+                <a class="rc-link" href="index.html?game=${code}">Open ▶</a>
             </div>`;
         }).join('');
     }
@@ -1665,16 +2630,267 @@ html {
         if (rounds === 1) return 'in ' + count + ' round';
         return 'in ' + count + ' of ' + rounds + ' rounds';
     }
+    // THE ROSTER, IN ITS GROUPS (2026-10-04).
+    //
+    // This was one long list ordered by how many rounds each golfer appears in,
+    // which is not how anybody holds a trip: a trip is groups, and a group is who
+    // you play with and who can see your bets. The groups come from the NEXT
+    // round nobody has played - the one the organizer is about to hand out links
+    // for - and the sizes are grouping.js's own answer, not a second idea about
+    // who is in group 3.
+    //
+    // THE CROSS-ROUND LIST IS STILL HERE, under the groups: it is the only tell
+    // for two different people typed with one exact name, which merges two
+    // golfers into one balance. A golfer who played once reading "in 2 of 2
+    // rounds" is that bug, visible.
     function renderTripRoster() {
+        renderTripRosterEdit();
         const mount = document.getElementById('trip-roster');
         if (!mount) return;
+        const all = cachedRoundResults || [];
+        if (all.length === 0) { mount.innerHTML = '<div class="trip-roster-empty">No rounds yet.</div>'; return; }
+        const next = all.filter(r => !tripRoundIsClosed(r.data))[0] || all[0];
+        const players = ((next.data || {}).players || []);
+        let html = '';
+        if (players.length) {
+            const sizes = (typeof computeGroupSizes === 'function')
+                ? computeGroupSizes(players.length, (next.data || {}).groupSizeOverrides || {})
+                : [players.length];
+            const groups = tripGroupRows(players, sizes);
+            html += '<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">'
+                + players.length + ' golfer' + (players.length === 1 ? '' : 's') + ' in '
+                + groups.length + ' group' + (groups.length === 1 ? '' : 's')
+                + ' \u00B7 ' + escapeHtml(((tripData.rounds || {})[next.code] || {}).label || next.code) + '</div>';
+            html += groups.map(g =>
+                '<div class="settle-card" style="margin-bottom:8px; padding:8px 10px;">'
+                + '<div style="font-weight:bold; font-size:0.8rem; color:var(--brand-green);">Group ' + g.group + '</div>'
+                + g.players.map(p => '<div class="trip-roster-line">'
+                    + '<span class="trip-roster-name">' + escapeHtml(p.name || '(no name)') + '</span>'
+                    + '<span class="trip-roster-count">' + (String(p.hcp || '').trim() === ''
+                        ? 'no handicap' : 'HCP ' + escapeHtml(String(p.hcp))) + '</span></div>').join('')
+                + '</div>').join('');
+        }
         const counted = cachedCountedResults || [];
-        if (counted.length === 0) { mount.innerHTML = '<div class="trip-roster-empty">No rounds yet.</div>'; return; }
-        const lines = tripRosterLines(counted);
-        if (lines.length === 0) { mount.innerHTML = '<div class="trip-roster-empty">No golfers in the counted rounds yet.</div>'; return; }
-        mount.innerHTML = lines.map(r =>
-            '<div class="trip-roster-line"><span class="trip-roster-name">' + escapeHtml(r.name) + '</span>'
-            + '<span class="trip-roster-count">' + escapeHtml(rosterCountText(r.count, r.rounds)) + '</span></div>').join('');
+        const lines = counted.length ? tripRosterLines(counted) : [];
+        if (lines.length) {
+            html += '<details style="margin-top:4px;"><summary style="font-size:0.78rem; color:var(--text-muted); cursor:pointer;">'
+                + 'Across every counted round</summary><div style="padding-top:6px;">'
+                + lines.map(r =>
+                    '<div class="trip-roster-line"><span class="trip-roster-name">' + escapeHtml(r.name) + '</span>'
+                    + '<span class="trip-roster-count">' + escapeHtml(rosterCountText(r.count, r.rounds)) + '</span></div>').join('')
+                + '</div></details>';
+        }
+        mount.innerHTML = html || '<div class="trip-roster-empty">No golfers on this trip yet.</div>';
+    }
+
+    // ---- ADD / REMOVE A GOLFER ON THE TRIP (2026-10-03) ----
+    //
+    // trip-roster.js owns the one rule that makes this safe: a change applies to
+    // rounds with NO SCORES, and a round with scores keeps the roster it was
+    // played with. Handicaps are read off that roster, side matches name its
+    // player ids, the pool charges per golfer and skins and dots are per hole per
+    // player - so editing a played round would change who was in a bet that is
+    // already settled.
+    function tripRosterPlanNow() {
+        // EVERY linked round, not just the counted ones: a round excluded from
+        // trip totals is still a round somebody plays, and its roster still needs
+        // the new golfer.
+        return tripRosterPlan((cachedRoundResults || []).map(cr => ({
+            code: cr.code,
+            label: ((tripData.rounds || {})[cr.code] || {}).label || cr.code,
+            data: cr.data
+        })));
+    }
+
+    function renderTripRosterEdit() {
+        const box = document.getElementById('trip-roster-edit');
+        if (!box || typeof tripRosterPlan !== 'function') return;
+        // Organizer only, like every other write on this page.
+        // THE SAME AUTHORITY EVERY OTHER TRIP WRITE USES - the organizer token,
+        // through the predicate the page already has. A roster change moves who is
+        // in a bet, so it is not a thing the plain share link may do.
+        const may = (typeof hasTripOrganizerAuthority === 'function') && hasTripOrganizerAuthority();
+        box.style.display = (may && (cachedRoundResults || []).length) ? 'block' : 'none';
+        if (box.style.display === 'none') return;
+        const plan = tripRosterPlanNow();
+        const note = document.getElementById('trip-roster-note');
+        if (note) note.textContent = tripRosterPlanNote(plan, 'change');
+        const sel = document.getElementById('trip-remove-name');
+        if (sel) {
+            const names = tripOpenRosterNames(plan);
+            const was = sel.value;
+            sel.innerHTML = names.map(n =>
+                '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>').join('');
+            if (names.indexOf(was) !== -1) sel.value = was;
+        }
+    }
+
+    async function tripAddGolfer() {
+        const el = document.getElementById('trip-add-name');
+        const hcpEl = document.getElementById('trip-add-hcp');
+        const name = el ? el.value.trim() : '';
+        if (!name) return uiRefuse('\u26A0\uFE0F Type a name first.');
+        const plan = tripRosterPlanNow();
+        const built = tripRosterAddUpdates(plan, name, { hcp: hcpEl ? hcpEl.value.trim() : '' });
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse(built.skipped.length
+                ? '\u26A0\uFE0F ' + name + ' is already on every round that has no scores.'
+                : '\u26A0\uFE0F Every round in this trip has scores, so its roster stays as it was played.');
+        }
+        try {
+            await db.ref().update(built.updates);
+            refreshTripComputations();   // see applyTripRosterPaste: the rounds are a one-shot read
+            if (el) el.value = '';
+            if (hcpEl) hcpEl.value = '';
+            uiToast('\u2705 ' + name + ' added to ' + built.added.length + ' round'
+                + (built.added.length === 1 ? '' : 's') + '.'
+                + (plan.closed.length ? ' Rounds with scores were left alone.' : ''));
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+    async function tripRemoveGolfer() {
+        const sel = document.getElementById('trip-remove-name');
+        const name = sel ? sel.value : '';
+        if (!name) return uiRefuse('\u26A0\uFE0F Pick a golfer to remove.');
+        const plan = tripRosterPlanNow();
+        const built = tripRosterRemoveUpdates(plan, name);
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse(built.refused.length
+                ? '\u26A0\uFE0F ' + name + ' is the only golfer on ' + built.refused.join(', ')
+                  + '. Delete the round instead of emptying it.'
+                : '\u26A0\uFE0F Nothing to remove \u2014 every round with ' + name + ' in it has scores.');
+        }
+        const ok = await uiConfirm({
+            title: 'Remove ' + name + '?',
+            body: tripRosterPlanNote(plan, 'remove ' + name + ' from')
+                + ' Their scores and money in played rounds are untouched.'
+        });
+        if (!ok) return;
+        try {
+            await db.ref().update(built.updates);
+            refreshTripComputations();   // see applyTripRosterPaste
+            uiToast('\u2705 ' + name + ' removed from ' + built.removed.length + ' round'
+                + (built.removed.length === 1 ? '' : 's') + '.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+// ---- PASTE THE WHOLE ROSTER (2026-10-03) ----
+    //
+    // The parser is roster-paste.js, the same one the weekly game's paste uses -
+    // handicaps are money, and a list that parsed one way into a round and another
+    // way into the trip holding it would be two different sets of strokes. The
+    // planner is trip-roster.js: it replaces the placeholder slots in order, keeps
+    // their ids, then adds, and it only ever touches rounds with NO SCORES.
+    let tripRosterPasted = null;
+
+// ONE PANEL AT A TIME. Tapping the open one closes it, so the golfers stay in
+    // view - which is the thing this section is for.
+    function openTripRosterPanel(which) {
+        const paste = document.getElementById('trip-roster-paste-card');
+        const manual = document.getElementById('trip-roster-manual');
+        if (!paste || !manual) return;
+        const wantPaste = which === 'paste' && paste.style.display === 'none';
+        const wantManual = which === 'edit' && manual.style.display === 'none';
+        paste.style.display = wantPaste ? 'block' : 'none';
+        manual.style.display = wantManual ? 'block' : 'none';
+    }
+
+    function reviewTripRosterPaste() {
+        const box = document.getElementById('trip-roster-paste-box');
+        const out = document.getElementById('trip-roster-paste-review');
+        if (!box || !out || typeof parsePlayerPasteText !== 'function') return;
+        const parsed = parsePlayerPasteText(box.value);
+        if (!parsed.validPlayers.length) {
+            tripRosterPasted = null;
+            out.innerHTML = '<p style="color:var(--text-muted);">Nothing to read yet.</p>';
+            return;
+        }
+        const plan = tripRosterPlanNow();
+        const built = tripRosterPasteUpdates(plan, parsed);
+        tripRosterPasted = parsed;
+        // EXACTLY WHAT YOU WILL GET, IN GROUPS (2026-10-04). A flat list of 24
+        // names says nothing about the six groups it is about to write, and the
+        // groups are who sees which bets.
+        const sizes = (parsed.groups && parsed.groups.length > 1)
+            ? parsed.groups
+            : ((typeof computeGroupSizes === 'function')
+                ? computeGroupSizes(parsed.validPlayers.length, {}) : [parsed.validPlayers.length]);
+        const groupRows = tripGroupRows(parsed.validPlayers, sizes);
+        let html = '<p style="font-size:0.9rem; font-weight:bold; margin:0 0 8px 0;">'
+            + parsed.validPlayers.length + ' golfer' + (parsed.validPlayers.length === 1 ? '' : 's')
+            + ' in ' + groupRows.length + ' group' + (groupRows.length === 1 ? '' : 's') + '</p>';
+        html += groupRows.map(g =>
+            '<div style="margin-bottom:6px; font-size:0.82rem;">'
+            + '<span style="font-weight:bold; color:var(--brand-green);">Group ' + g.group + ':</span> '
+            + g.players.map(p => escapeHtml(p.name)
+                + (String(p.hcp || '').trim() ? ' ' + escapeHtml(String(p.hcp)) : ' (no hcp)')).join(', ')
+            + '</div>').join('');
+        if (parsed.flaggedLines.length) {
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">'
+                + parsed.flaggedLines.length + ' line'
+                + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
+                + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.notedLines.length) {
+            // Said, not swallowed: the note came off the line so the handicap could
+            // be read, and the organizer is told which words were ignored.
+            html += '<p style="font-size:0.8rem; color:var(--text-muted);">Notes ignored: '
+                + escapeHtml(parsed.notedLines.map(l => l.note).join(', ')) + '</p>';
+        }
+        html += '<p style="font-size:0.8rem; font-weight:bold; white-space:pre-line;">'
+            + escapeHtml(built.note || '') + '</p>';
+        if (Object.keys(built.updates).length) {
+            html += '<button type="button" class="btn-primary" data-role="trip-roster-paste-save"'
+                + ' onclick="applyTripRosterPaste()">Use these ' + parsed.validPlayers.length
+                + ' golfer' + (parsed.validPlayers.length === 1 ? '' : 's') + '</button>';
+        }
+        out.innerHTML = html;
+    }
+
+    async function applyTripRosterPaste() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!tripRosterPasted) return;
+        const plan = tripRosterPlanNow();
+        const built = tripRosterPasteUpdates(plan, tripRosterPasted);
+        const paths = Object.keys(built.updates);
+        if (!paths.length) {
+            return uiRefuse('\u26A0\uFE0F Nothing to change \u2014 every round in this trip has scores, so each keeps the roster it was played with.');
+        }
+        const ok = await uiConfirm({
+            title: 'Use this list on ' + built.changed.length + ' round'
+                + (built.changed.length === 1 ? '' : 's') + '?',
+            body: built.note + '\n\nScores and money in played rounds are untouched.'
+        });
+        if (!ok) return;
+        try {
+            await db.ref().update(built.updates);
+            // RE-READ, OR NOTHING CHANGES ON SCREEN (2026-10-04). The trips/
+            // listener fires for the TRIP node; every round's players come from a
+            // one-shot events/<code> read in refreshTripComputations. Manny tapped
+            // Yes, the write landed, and Player 1..4 were still on the page -
+            // because nothing asked the database again.
+            refreshTripComputations();
+            tripRosterPasted = null;
+            const box = document.getElementById('trip-roster-paste-box');
+            if (box) box.value = '';
+            const out = document.getElementById('trip-roster-paste-review');
+            if (out) out.innerHTML = '';
+            const card = document.getElementById('trip-roster-paste-card');
+            if (card) card.open = false;
+            uiToast('\u2705 ' + built.replaced + ' placeholder'
+                + (built.replaced === 1 ? '' : 's') + ' replaced and ' + built.added + ' golfer'
+                + (built.added === 1 ? '' : 's') + ' added across ' + built.changed.length + ' round'
+                + (built.changed.length === 1 ? '' : 's') + '.'
+                + (plan.closed.length ? ' Rounds with scores were left alone.' : ''));
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
     }
 
     // THE COLLISIONS - the only reasons the app asks. Over the counted rounds'
@@ -1883,6 +3099,7 @@ html {
                 // rather than asking the question again.
                 recomputeTripGate();
                 renderTripRoster();
+                renderTripPotsControls();
                 renderTripIdentityQuestions();
                 renderCumulativeLeaderboard();
                 renderTripMoneySettlement();
@@ -1902,32 +3119,30 @@ html {
     // the same generic name is still sitting in two or more rounds, their scores/money would
     // silently get merged as if they were the same real person. This catches that before it
     // produces a confusing wrong number on the leaderboard or settlement.
+    // ONE QUIET LINE, NOT A SECOND WARNING (2026-10-04).
+    //
+    // This was an orange box telling the organizer to rename the placeholders
+    // before trusting the totals - which is what the leaderboard, the money card,
+    // the points race and the awards card each already say, in their own words,
+    // right next to the number being withheld. Five statements of one fact is how
+    // a page stops being read. The FACT is unchanged and nothing is hidden: the
+    // trip total still waits, and this is the line that says what to do about it.
     function renderPlaceholderNameWarning(results) {
         const banner = document.getElementById('trip-placeholder-warning');
-        const nameToRounds = {};
-        results.forEach(({ label, data }) => {
-            (data.players || []).forEach(p => {
-                // THE SHARED RULE, not a fourth hand-rolled copy. The regex here
-                // demanded a space, so "Player3" slipped straight past it.
-                const key = (typeof normalisePlayerName === 'function')
-                    ? normalisePlayerName(p.name) : (p.name || '').trim().toLowerCase();
+        if (!banner) return;
+        const names = {};
+        (results || []).forEach(({ data }) => {
+            ((data || {}).players || []).forEach(p => {
                 const placeholder = (typeof isPlaceholderPlayerName === 'function')
                     ? isPlaceholderPlayerName(p.name) : false;
-                if (!placeholder) return;
-                if (!nameToRounds[key]) nameToRounds[key] = new Set();
-                nameToRounds[key].add(label);
+                if (placeholder) names[tripNameKey(p.name)] = true;
             });
         });
-
-        const collisions = Object.keys(nameToRounds).filter(key => nameToRounds[key].size > 1);
-        if (collisions.length === 0) {
-            banner.style.display = 'none';
-            return;
-        }
-
-        const exampleRounds = Array.from(nameToRounds[collisions[0]]).join(', ');
-        banner.innerHTML = `⚠️ <strong>Rename placeholder players before trusting the totals below.</strong> "${collisions[0].replace(/^\w/, c => c.toUpperCase())}" appears in more than one round (${exampleRounds}) — since names are matched across rounds, they'll get counted as the same person until renamed. Open each round from Home to swap in real names.`;
-        banner.style.display = 'block';
+        const count = Object.keys(names).length;
+        if (!count) { banner.style.display = 'none'; banner.textContent = ''; return; }
+        banner.style.cssText = 'display:block; background:var(--nav-bg); border:1px solid var(--border-mid);'
+            + ' border-radius:10px; padding:10px 12px; font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;';
+        banner.textContent = tripPlaceholderNote({ placeholders: count });
     }
 
     // Sums gross/net strokes per player (matched by name) across every linked round.
@@ -2103,6 +3318,17 @@ html {
         'the Birdie Pool', 'KPs', 'the Weekly Game'
     ];
 
+    // THE TRIP POT IS NAMED ONLY WHEN IT IS ON. It is not a seventh category of
+    // round money - it is the trip's own pot - and a sentence that listed it on
+    // every trip would be telling most groups about money they do not have. The
+    // daily pot needs no entry: it IS the Weekly Game, already named above.
+    let cachedTripPot = { applied: false, entries: [], reason: 'off' };
+    function tripTotalCategories() {
+        return (cachedTripPot && cachedTripPot.applied)
+            ? TRIP_TOTAL_INCLUDES.concat(['the Trip Pot'])
+            : TRIP_TOTAL_INCLUDES;
+    }
+
     // THE ONLY THING IN THIS FILE THAT MAY PRODUCE A SENTENCE ABOUT WHAT THE
     // TOTAL CONTAINS.
     //
@@ -2129,8 +3355,9 @@ html {
     // carries the sentence, and changing the wording here changes it
     // everywhere at once.
     function tripTotalScopeSentence() {
-        return 'Includes ' + TRIP_TOTAL_INCLUDES.slice(0, -1).join(', ')
-            + ' and ' + TRIP_TOTAL_INCLUDES[TRIP_TOTAL_INCLUDES.length - 1] + '.';
+        const list = tripTotalCategories();
+        return 'Includes ' + list.slice(0, -1).join(', ')
+            + ' and ' + list[list.length - 1] + '.';
     }
 
     // NAMES ARE THE ONLY THING THAT CROSSES ROUNDS, and the trip total is built by
@@ -2246,13 +3473,37 @@ html {
     // The sentence a surface shows. The RULE is single; only the consequence is
     // written per surface, because "your money is merged" on an awards panel makes a
     // golfer think his money is broken too.
+    // A PLACEHOLDER IS QUIET; A DUPLICATE IS LOUD (2026-10-04).
+    //
+    // tripIdentityProblems reports one problem per placeholder PER ROUND: 24
+    // unnamed golfers over three rounds is seventy-two paragraphs, and this card,
+    // the money card and the awards card each printed four to six of them. Every
+    // sentence was true and the page was unreadable - so the warning that matters
+    // was buried under the one that does not.
+    //
+    // A TRIP NOBODY HAS PASTED NAMES INTO IS NOT BROKEN. It is a trip waiting for
+    // names: the total correctly waits, and one line says so. TWO GOLFERS WITH ONE
+    // NAME is the dangerous case - one balance, somebody pays the other man's debts
+    // - and every one of those keeps its own sentence and the loud box.
     function tripBlockedNotice(kindOfThing, extra) {
+        const digest = tripIdentityDigest(cachedIdentityProblems);
+        if (!digest.others.length) {
+            // Quiet: no warning colours, no border, no "Not Shown" in red.
+            return `<div style="background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:10px; padding:12px; font-size:0.82rem; color:var(--text-secondary);">`
+                + `<strong>${kindOfThing} waiting for real names</strong>`
+                + `<div style="padding:6px 0 0;">${escapeHtml(tripPlaceholderNote(digest))}</div>`
+                + `</div>`;
+        }
         let html = `<div style="background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; font-size:0.82rem; color:var(--warn-text);">`
             + `<strong>\u26A0\uFE0F ${kindOfThing} Not Shown</strong>`
             + `<div style="padding:6px 0 2px;">${extra}</div>`;
-        cachedIdentityProblems.slice(0, 4).forEach(p => {
+        digest.others.slice(0, 4).forEach(p => {
             html += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${awardsIdentityMessage(p)}</div>`;
         });
+        if (digest.placeholders) {
+            html += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">`
+                + escapeHtml(tripPlaceholderNote(digest)) + `</div>`;
+        }
         return html + `</div>`;
     }
 
@@ -2411,6 +3662,31 @@ html {
         // (settlement-engine.js roundNetTotalsToWholeDollars), run once over the
         // exact sum, short by exactly the KP money still withheld - the same call
         // each round makes for itself.
+        // ---- THE TRIP POT (2026-10-04) --------------------------------------
+        //
+        // The only money in this app that belongs to the TRIP rather than to a
+        // round, so it is added once, here, to BOTH totals - the daily one and
+        // the settle-once one - because it is the same money under either
+        // agreement. Buy-ins and prizes are whole dollars, so neither total has
+        // to round anything it did not round before.
+        //
+        // NOT BALANCED, NOT APPLIED. trip-pots.js refuses a pot whose places do
+        // not add up to the buy-ins, and the reason is shown instead of a number.
+        const potCfg = tripPotConfig(tripData);
+        const potField = tripFieldKeys(cachedCountedResults);
+        const potLedger = tripPotLedger(potCfg, potField,
+            computeTripPointsRace(cachedCountedResults) || [], allocatePlacePayouts);
+        cachedTripPot = potLedger;
+        if (potLedger.applied) {
+            potLedger.entries.forEach(e => {
+                const dollars = e.netCents / 100;
+                if (!netByName[e.key]) netByName[e.key] = { name: e.name, net: 0 };
+                netByName[e.key].net += dollars;
+                if (!exactByName[e.key]) exactByName[e.key] = { name: e.name, net: 0 };
+                exactByName[e.key].net += dollars;
+            });
+        }
+
         const onceByName = {};
         Object.keys(exactByName).forEach(k => { onceByName[k] = { name: exactByName[k].name, net: exactByName[k].net }; });
         const onceRounded = roundNetTotalsToWholeDollars(onceByName, -unresolvedDollars);
@@ -2476,13 +3752,10 @@ html {
         const blocked = tripAttributionBlocked();
         const idProblems = cachedIdentityProblems;
         if (blocked) {
-            html += `<div class="settle-card" style="background:var(--warn-bg); border:2px solid var(--warn-border);">
-                <div class="settle-header" style="color:var(--warn-text);">\u26A0\uFE0F Trip Total Not Shown</div>
-                <div style="font-size:0.8rem; padding:6px 0 2px;">Two golfers cannot be told apart by name, so a trip-wide total would send money to the wrong person. Each round\u2019s own money is unaffected and is shown below.</div>`;
-            idProblems.slice(0, 6).forEach(p => {
-                html += `<div style="font-size:0.8rem; padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${p.message}</div>`;
-            });
-            html += `</div>`;
+            // THE SAME NOTICE EVERY SURFACE USES, so a placeholder reads as a
+            // trip waiting for names here too rather than as six paragraphs of
+            // warning above the money.
+            html += tripBlockedNotice('Trip Total', 'Two golfers cannot be told apart by name, so a trip-wide total would send money to the wrong person. Each round\u2019s own money is unaffected and is shown below.');
         }
 
         if (!blocked && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
@@ -2800,15 +4073,8 @@ html {
             // READ AFTER ASKING. tripAttributionBlocked() may recompute the gate, and
             // it assigns a NEW array - so a reference taken before the call is the
             // stale empty one, and the refusal renders with no golfer named.
-            const idProblems = cachedIdentityProblems;
             cachedAwards = {};
-            let warn = `<div style="background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; font-size:0.82rem; color:var(--warn-text);">`
-                + `<strong>\u26A0\uFE0F Awards Not Shown</strong>`
-                + `<div style="padding:6px 0 2px;">Two golfers cannot be told apart by name, and awards are matched by name across rounds \u2014 so birdies and blow-ups would be credited to the wrong man.</div>`;
-            idProblems.slice(0, 4).forEach(p => {
-                warn += `<div style="padding:6px 0; border-top:1px dashed var(--border-faint); margin-top:6px;">${awardsIdentityMessage(p)}</div>`;
-            });
-            container.innerHTML = warn + `</div>`;
+            container.innerHTML = tripBlockedNotice('Awards', 'Two golfers cannot be told apart by name, and awards are matched by name across rounds \u2014 so birdies and blow-ups would be credited to the wrong man.');
             return;
         }
 
@@ -2870,8 +4136,27 @@ html {
     // automatically no matter how many played. Ties split the combined points
     // for their tied spots evenly. Totals accumulate across every counted round.
     // ============================================================================
+// THE TRIP'S FIELD: every golfer who appears in any counted round, by the same
+    // key the standings and the money use. A buy-in is for the week, so a man who
+    // misses Tuesday is still in the pot and still on the scale.
+    function tripFieldKeys(results) {
+        const seen = {};
+        (results || []).forEach(({ code, data }) => {
+            ((data || {}).players || []).forEach(p => {
+                const key = tripGolferKey(code, p);
+                if (!key) return;
+                if (!seen[key]) seen[key] = { key: key, name: tripGolferLabel(key, p.name) };
+            });
+        });
+        return Object.values(seen);
+    }
+
     function computeTripPointsRace(results) {
         const totals = {}; // lowercased name -> { name, points, roundsPlayed }
+        const potCfg = tripPotConfig(tripData);
+        // EVERY GOLFER IN THE TRIP, not just today's finishers - the scale below
+        // and the pot's buy-in are both per person for the week.
+        const tripFieldSize = tripFieldKeys(results).length;
 
         results.forEach(({ code, data }) => {
             const courseData = data.courseData || [];
@@ -2884,38 +4169,42 @@ html {
             // sample look artificially good or bad and distort the standings mid-round.
             let roundResults = [];
             players.forEach(p => {
-                let net = 0, holesPlayed = 0;
+                let net = 0, gross = 0, holesPlayed = 0;
                 courseData.forEach(h => {
                     const v = scores[`p${p.id}_h${h.hole}`];
                     if (v > 0) {
+                        gross += parseInt(v, 10);
                         net += (parseInt(v, 10) - getStrokes(h.hcpIndex, parseHcp(p.hcp)));
                         holesPlayed++;
                     }
                 });
-                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net, key: tripGolferKey(code, p) });
+                if (totalHoles > 0 && holesPlayed === totalHoles) roundResults.push({ name: p.name, net, gross, key: tripGolferKey(code, p) });
             });
 
             if (roundResults.length === 0) return; // nobody's finished this round yet
 
-            roundResults.sort((a, b) => a.net - b.net);
-            const fieldSize = roundResults.length;
+            // NET BY DEFAULT, GROSS BY CHOICE. The switch is the trip pot's, because
+            // the pot is this race played for money; with no pot it is still the
+            // organizer's call what the race is scored on.
+            const scoring = potCfg.scoring;
+            roundResults.sort((a, b) => (scoring === 'gross' ? a.gross - b.gross : a.net - b.net));
 
-            let i = 0;
-            while (i < roundResults.length) {
-                let j = i;
-                while (j + 1 < roundResults.length && roundResults[j + 1].net === roundResults[i].net) j++;
-                // positions i+1..j+1 (1-indexed) are tied — split the combined points for those spots evenly
-                let pointsSum = 0;
-                for (let pos = i + 1; pos <= j + 1; pos++) pointsSum += (fieldSize - pos + 1);
-                const avgPoints = pointsSum / (j - i + 1);
-                for (let k = i; k <= j; k++) {
-                    const key = roundResults[k].key;
-                    if (!totals[key]) totals[key] = { name: tripGolferLabel(key, roundResults[k].name), points: 0, roundsPlayed: 0 };
-                    totals[key].points += avgPoints;
-                    totals[key].roundsPlayed += 1;
-                }
-                i = j + 1;
-            }
+            // THE SCALE IS THE WHOLE TRIP'S FIELD, not the number who posted that
+            // day: a win on a thin Thursday is worth the same as a win on a full
+            // Monday, which is what makes a week of them a race. trip-pots.js owns
+            // the award and the tie split.
+            const ranked = roundResults.map(r => ({ key: r.key, name: r.name,
+                score: scoring === 'gross' ? r.gross : r.net }));
+            tripPointsAward(ranked, tripFieldSize).forEach(a => {
+                // THE KEY TRAVELS WITH THE STANDING. The map was keyed by the trip
+                // golfer and Object.values() then threw that key away, so a prize
+                // had a name and nothing to match a payer against - measured: the
+                // pot refused itself with "does not balance to zero" every time,
+                // which is the backstop doing its job over a defect one line up.
+                if (!totals[a.key]) totals[a.key] = { key: a.key, name: tripGolferLabel(a.key, a.name), points: 0, roundsPlayed: 0 };
+                totals[a.key].points += a.points;
+                totals[a.key].roundsPlayed += 1;
+            });
         });
 
         let standings = Object.values(totals).sort((a, b) => b.points - a.points);
@@ -2980,6 +4269,223 @@ html {
 
     // Rebuilds the per-spot $ inputs whenever pool size or paid-spot count changes, preserving
     // whatever the person already typed into any spot that still exists after the change.
+// ---- THE TRIP POT AND THE DAILY POT (2026-10-04) ----
+    //
+    // Both are organizer-only at render AND in every handler, both are saved on
+    // the trip so every golfer sees the same numbers, and both are OFF until
+    // somebody switches them on. The rules are trip-pots.js; this is the screen.
+    function renderTripPotsLine() {
+        const line = document.getElementById('trip-pots-line');
+        if (!line) return;
+        const text = tripPotsLine(tripPotConfig(tripData), dailyPotConfig(tripData),
+            tripFieldKeys(cachedCountedResults).length);
+        line.style.display = text ? 'block' : 'none';
+        line.textContent = text;
+    }
+
+    function tripPotFieldSize() { return tripFieldKeys(cachedCountedResults).length; }
+
+    function readTripPotForm() {
+        const on = !!(document.getElementById('trip-pot-on') || {}).checked;
+        const buyIn = parseFloat((document.getElementById('trip-pot-buyin') || {}).value) || 0;
+        const spots = parseInt((document.getElementById('trip-pot-spots') || {}).value, 10) || 1;
+        const places = [];
+        for (let i = 0; i < spots; i++) {
+            const el = document.getElementById('trip-pot-place-' + i);
+            places.push(el ? (parseFloat(el.value) || 0) : 0);
+        }
+        return tripPotConfig({ tripPot: { on, buyIn, places, scoring: tripPotConfig(tripData).scoring } });
+    }
+
+    function renderTripPotSpots(prefill) {
+        const cfg = readTripPotForm();
+        const spotsEl = document.getElementById('trip-pot-spots');
+        let n = parseInt(spotsEl ? spotsEl.value : '3', 10);
+        if (isNaN(n) || n < 1) n = 1;
+        if (n > 20) { n = 20; if (spotsEl) spotsEl.value = '20'; }
+        const box = document.getElementById('trip-pot-amounts');
+        if (!box) return;
+        const even = tripPotDefaultPlaces(cfg, tripPotFieldSize(), n);
+        let html = '';
+        for (let i = 0; i < n; i++) {
+            const existing = document.getElementById('trip-pot-place-' + i);
+            const value = (prefill || !existing) ? even[i] : existing.value;
+            html += '<div class="form-group" style="margin-bottom:6px; display:flex; gap:8px; align-items:center;">'
+                + '<label style="margin:0; flex:0 0 70px;">' + ordinal(i + 1) + '</label>'
+                + '<input type="number" id="trip-pot-place-' + i + '" min="0" value="' + value
+                + '" inputmode="numeric" oninput="tripPotTouched(); renderTripPotRow()"></div>';
+        }
+        box.innerHTML = html;
+        renderTripPotRow();
+    }
+
+    function evenTripPotSplit() { renderTripPotSpots(true); }
+
+    function renderTripPotRow() {
+        const row = document.getElementById('trip-pot-row');
+        const on = !!(document.getElementById('trip-pot-on') || {}).checked;
+        if (row) row.style.display = on ? 'block' : 'none';
+        const note = document.getElementById('trip-pot-balance');
+        if (!note) return;
+        const cfg = readTripPotForm();
+        const field = tripPotFieldSize();
+        const bal = tripPotBalance(cfg, field);
+        const pot = Math.round(bal.potCents / 100);
+        const paid = Math.round(bal.paidCents / 100);
+        if (!on) { note.textContent = ''; return; }
+        if (bal.potCents <= 0) { note.textContent = 'Set a buy-in to make a pot.'; return; }
+        note.textContent = bal.balanced
+            ? '\u2705 $' + pot + ' pot from ' + field + ' golfer' + (field === 1 ? '' : 's') + ', all of it paid out.'
+            : (paid > pot
+                ? '\u26A0\uFE0F The places add up to $' + paid + ', which is $' + (paid - pot) + ' more than the $' + pot + ' pot.'
+                : '\u26A0\uFE0F The places add up to $' + paid + ', which is $' + (pot - paid) + ' short of the $' + pot + ' pot.');
+    }
+
+    async function saveTripPot() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const cfg = readTripPotForm();
+        if (!cfg.on) {
+            // SWITCHED OFF IS A SAVE TOO, and it must leave nothing behind that a
+            // later render could apply.
+            try {
+                await db.ref(`trips/${currentTripCode}/tripPot`).update({ on: false });
+                refreshTripComputations();
+                uiToast('\u2705 Trip pot is off.');
+            } catch (err) { reportTripWriteFailure(err, 'The trip pot was not saved.', 'It is unchanged.'); }
+            return;
+        }
+        const field = tripPotFieldSize();
+        const bal = tripPotBalance(cfg, field);
+        if (bal.potCents <= 0) { uiRefuse('\u26A0\uFE0F Set a buy-in first.'); return; }
+        // REFUSED RATHER THAN ROUNDED. The pot is the golfers' money; a saved pot
+        // that does not add up would pay somebody a dollar nobody put in.
+        if (!bal.balanced) {
+            uiRefuse('\u26A0\uFE0F The places must add up to the $' + Math.round(bal.potCents / 100)
+                + ' pot \u2014 they come to $' + Math.round(bal.paidCents / 100) + '.');
+            return;
+        }
+        try {
+            await db.ref(`trips/${currentTripCode}/tripPot`).update({
+                on: true, buyIn: cfg.buyIn, places: cfg.places, scoring: cfg.scoring
+            });
+            refreshTripComputations();
+            uiToast('\u2705 Trip pot saved: $' + Math.round(bal.potCents / 100) + ' on the points race.');
+        } catch (err) {
+            reportTripWriteFailure(err, 'The trip pot was not saved.', 'It is unchanged.');
+        }
+    }
+
+    function readDailyPotForm() {
+        return dailyPotConfig({ dailyPot: {
+            on: !!(document.getElementById('daily-pot-on') || {}).checked,
+            buyIn: parseFloat((document.getElementById('daily-pot-buyin') || {}).value) || 0,
+            kpPct: parseFloat((document.getElementById('daily-pot-kp') || {}).value) || 0,
+            netPct: parseFloat((document.getElementById('daily-pot-net') || {}).value) || 0,
+            scoring: dailyPotConfig(tripData).scoring
+        } });
+    }
+
+    function renderDailyPotRow() {
+        const row = document.getElementById('daily-pot-row');
+        const on = !!(document.getElementById('daily-pot-on') || {}).checked;
+        if (row) row.style.display = on ? 'block' : 'none';
+        const note = document.getElementById('daily-pot-note');
+        if (!note) return;
+        if (!on) { note.textContent = ''; return; }
+        const cfg = readDailyPotForm();
+        const built = dailyPotUpdates(tripRosterPlanNow(), cfg, moneyPoolParticipants);
+        if (cfg.buyIn <= 0) { note.textContent = 'Set what each golfer puts in.'; return; }
+        const lines = built.amounts.map(a => a.label + ': ' + a.golfers + ' golfers, $' + a.pot
+            + ' \u2014 KP $' + a.kp + ', net $' + a.net + ', skins $' + a.skins);
+        if (built.skipped.length) lines.push('Untouched (already has scores): ' + built.skipped.join(', ') + '.');
+        if (built.noCard.length) lines.push('No course card yet, so no pot: ' + built.noCard.join(', ') + '.');
+        note.textContent = lines.join('\n') || 'No rounds to put a pot in yet.';
+    }
+
+    async function saveDailyPot() {
+        if (!hasTripOrganizerAuthority()) return;
+        if (!currentTripCode) { uiRefuse('\u26A0\uFE0F Open a trip first.'); return; }
+        const cfg = readDailyPotForm();
+        const updates = {};
+        updates[`trips/${currentTripCode}/dailyPot`] = {
+            on: cfg.on, buyIn: cfg.buyIn, kpPct: cfg.kpPct, netPct: cfg.netPct,
+            netPlaces: cfg.netPlaces, skins: cfg.skins, scoring: cfg.scoring
+        };
+        if (cfg.on) {
+            if (cfg.buyIn <= 0) { uiRefuse('\u26A0\uFE0F Set what each golfer puts in.'); return; }
+            // ONLY ROUNDS WITH NO SCORES. trip-roster.js draws that line for every
+            // trip-wide change, so there is one answer to "may this round be edited".
+            const built = dailyPotUpdates(tripRosterPlanNow(), cfg, moneyPoolParticipants);
+            if (!built.changed.length) {
+                uiRefuse('\u26A0\uFE0F No round to put a pot in \u2014 every round either has scores already or has no course card yet.');
+                return;
+            }
+            const ok = await uiConfirm({
+                title: 'Put a $' + cfg.buyIn + ' pot in ' + built.changed.length + ' round'
+                    + (built.changed.length === 1 ? '' : 's') + '?',
+                body: built.changed.join(', ') + '.'
+                    + (built.skipped.length ? '\n\nUntouched (already has scores): ' + built.skipped.join(', ') + '.' : '')
+                    + '\n\nEach round keeps its own setup afterwards \u2014 edit any of them from its round setup.'
+            });
+            if (!ok) return;
+            Object.keys(built.updates).forEach(k => { updates[k] = built.updates[k]; });
+        }
+        try {
+            await db.ref().update(updates);
+            refreshTripComputations();
+            uiToast(cfg.on ? '\u2705 Daily pot saved into every unplayed round.' : '\u2705 Daily pot is off.');
+        } catch (err) {
+            uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
+        }
+    }
+
+    // THE SWITCHES ARE ORGANIZER-ONLY, and what they hold comes from the trip.
+    function renderTripPotsControls() {
+        const may = (typeof hasTripOrganizerAuthority === 'function') && hasTripOrganizerAuthority();
+        const potCard = document.getElementById('trip-pot-card');
+        const dailyCard = document.getElementById('daily-pot-card');
+        if (potCard) potCard.style.display = may ? 'block' : 'none';
+        if (dailyCard) dailyCard.style.display = may ? 'block' : 'none';
+        renderTripPotsLine();
+        if (!may) return;
+        const pot = tripPotConfig(tripData);
+        const on = document.getElementById('trip-pot-on');
+        const buyIn = document.getElementById('trip-pot-buyin');
+        const spots = document.getElementById('trip-pot-spots');
+        if (on && !tripPotFormTouched) {
+            on.checked = pot.on;
+            if (buyIn) buyIn.value = String(pot.buyIn || 0);
+            if (spots && pot.places.length) spots.value = String(pot.places.length);
+            renderTripPotSpots(false);
+            if (pot.places.length) {
+                pot.places.forEach((v, i) => {
+                    const el = document.getElementById('trip-pot-place-' + i);
+                    if (el) el.value = String(v);
+                });
+            }
+            renderTripPotRow();
+        }
+        const daily = dailyPotConfig(tripData);
+        const dOn = document.getElementById('daily-pot-on');
+        if (dOn && !dailyPotFormTouched) {
+            dOn.checked = daily.on;
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
+            set('daily-pot-buyin', daily.buyIn || 0);
+            set('daily-pot-kp', daily.kpPct || 0);
+            set('daily-pot-net', daily.netPct || 0);
+            renderDailyPotRow();
+        }
+    }
+
+    // A SAVED SETTING IS THE STARTING POINT, NOT AN OVERWRITE. Once the organizer
+    // has typed in these boxes, a refresh must not reach in and replace what they
+    // are in the middle of.
+    let tripPotFormTouched = false;
+    let dailyPotFormTouched = false;
+    function tripPotTouched() { tripPotFormTouched = true; }
+    function dailyPotTouched() { dailyPotFormTouched = true; }
+
     function renderPrizeSpotInputs() {
         const spotsInput = document.getElementById('prize-spots-input');
         let n = parseInt(spotsInput.value, 10);
@@ -3493,6 +4999,7 @@ html {
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-trip-name').textContent = `🚐 ${tripData.name}`;
+            renderTripRenameControl();
             if (!tripLoadedOnce) {
                 tripLoadedOnce = true;
                 renderPrizeSpotInputs(); // build the $ inputs once before points race tries to sync payouts against them
