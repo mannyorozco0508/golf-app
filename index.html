@@ -1499,6 +1499,80 @@ html {
     padding-top: max(12px, env(safe-area-inset-top, 0px));
     padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
 }
+
+/* ============================================================================
+   THE STATUS SHEET (UX wave, 2026-10-04)
+   ----------------------------------------------------------------------------
+   MEASURED FIRST, because the complaint is a ratio and not a bug: on a live
+   round at 390x844, 0% of the first screen was score boxes. 525 of the 844
+   pixels were header, nav, the Playing With card and the group-scores card, and
+   the hole card did not start until y=610 - so a golfer standing on the 7th tee
+   had to scroll to type a number. tools/first-screen-check.js is the measurement
+   and prints the percentage both ways.
+
+   THE SHEET HOLDS EVERYTHING THAT IS NOT THE HOLE. One handle, fixed at the
+   bottom where a thumb already is; the blocks move into it unchanged - same ids,
+   same handlers, same render functions - so nothing that writes to them had to
+   learn a new place to write.
+   ============================================================================ */
+#round-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-mid);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0,0,0,0.18);
+    transform: translateY(calc(100% - var(--sheet-handle-h, 52px)));
+    transition: transform 0.22s ease;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+}
+#round-sheet.open { transform: translateY(0); }
+#round-sheet-handle {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 16px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: var(--brand-green);
+    text-align: center;
+}
+#round-sheet-handle::before {
+    content: '';
+    position: absolute;
+    top: 7px; left: 50%;
+    width: 40px; height: 4px;
+    margin-left: -20px;
+    border-radius: 2px;
+    background: var(--border-mid);
+}
+#round-sheet-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 14px max(16px, env(safe-area-inset-bottom, 0px)) 14px;
+}
+/* The sheet is closed on arrival, so the page needs exactly the handle's worth of
+   room under the last thing on it and not a pixel more. */
+body.has-round-sheet #main-content { padding-bottom: 64px; }
+#round-sheet-scrim {
+    position: fixed; inset: 0; z-index: 59;
+    background: rgba(0,0,0,0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+#round-sheet-scrim.open { opacity: 1; pointer-events: auto; }
+@media print {
+    #round-sheet, #round-sheet-scrim { display: none !important; }
+}
 </style>
 </head>
 <body>
@@ -1506,11 +1580,11 @@ html {
 <div id="print-area"></div>
 
 <div class="container" id="main-content" style="display: none;">
-    <div class="header-controls-row">
+    <div class="header-controls-row" id="header-controls-row">
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
         <button class="history-open-btn" onclick="openHistoryModal()">🕘 History</button>
     </div>
-    <div class="header-box">
+    <div class="header-box" id="header-box">
         <div style="margin-bottom: 6px;">
             <span id="room-code-badge" style="background: var(--brand-navy); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">GAME: ----</span>
         <!-- v191: a retired round (supersededBy) says where the live one is. Filled
@@ -1529,7 +1603,7 @@ html {
     </div>
 
     <!-- Top Navigation Bar -->
-    <div class="app-nav-wrap">
+    <div class="app-nav-wrap" id="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
@@ -1601,7 +1675,7 @@ html {
          "Hole N of 18" label in the Prev/Next row, which sits inside the scorecard
          card and cannot be covered. -->
 
-    <div class="view-mode-toggle">
+    <div class="view-mode-toggle" id="view-mode-toggle">
         <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">Hole View</button>
         <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
     </div>
@@ -1737,6 +1811,28 @@ html {
          console, which is what batch1_safety_test.js:431 already demands of
          Group Links. -->
     <div id="end-round-mount"></div>
+</div>
+
+<!-- THE STATUS SHEET. Empty in the markup ON PURPOSE: buildRoundSheet() moves the
+     real blocks in on arrival, before the page is revealed, so there is exactly one
+     copy of each and every handler that already writes to them keeps working. The
+     list of what moves is ROUND_SHEET_BLOCKS, which is also what the guard reads. -->
+<div id="round-sheet-scrim" onclick="toggleRoundSheet(false)"></div>
+<div id="round-sheet" aria-hidden="false">
+    <button type="button" id="round-sheet-handle" aria-expanded="false"
+            aria-controls="round-sheet-body" onclick="toggleRoundSheet()">
+        <span id="round-sheet-label">Status &amp; everything else</span>
+        <span id="round-sheet-caret" aria-hidden="true">▲</span>
+    </button>
+    <div id="round-sheet-body">
+        <!-- The four reading mounts. They used to be built inside the hole card on
+             every render; here they are written to by the same renderers, by id. -->
+        <div id="live-ticker-mount"></div>
+        <div id="hole-recap-mount"></div>
+        <div id="live-skins-mount"></div>
+        <div id="action-center-mount"></div>
+        <div id="bet-strip-mount"></div>
+    </div>
 </div>
 
 <!-- WHICH GROUP ARE YOU KEEPING SCORE FOR? (2026-09-20). Shown once, on arrival,
@@ -2122,6 +2218,9 @@ html {
         window.location.href = "admin.html";
     } else {
         currentMode = currentMode.toUpperCase();
+        // THE SHEET IS BUILT BEFORE THE PAGE IS REVEALED (UX wave, 2026-10-04), so
+        // nobody sees the old layout flash past on the way to the new one.
+        buildRoundSheet();
         document.getElementById("main-content").style.display = "block";
         document.getElementById("room-code-badge").textContent = "GAME: " + currentMode;
 
@@ -2966,7 +3065,14 @@ html {
         // Live action is context; entering scores is the task. The dashboard now
         // comes first and the hole block stays whole: heading, players, boxes,
         // Prev/Next, uninterrupted.
-        let html = '<div id="live-ticker-mount"></div>';
+        // THE LIVE DASHBOARD MOVED INTO THE STATUS SHEET (UX wave, 2026-10-04).
+        // An earlier wave put it FIRST so that a Nassau press row could not push
+        // the score boxes away from the hole they belong to - "live action is
+        // context; entering scores is the task" - and that reasoning is why it is
+        // now out of the hole card altogether rather than merely reordered. The
+        // mount is a static child of #round-sheet-body and renderLiveTicker finds
+        // it by id, so nothing below changed.
+        let html = '';
 
         // THE MATCH-HANDICAP CONTEXT LINE, CLONED OUT OF THE FULL CARD.
         //
@@ -3122,14 +3228,13 @@ html {
                 : `<button type="button" class="hv-dots-btn" disabled style="opacity:0.5; cursor:not-allowed;">${label}</button>`;
         }
 
-        // Everything below the fold is what a golfer READS rather than acts on: what
-        // just happened, what's at stake, how the side matches stand. The press strip
-        // stays a single scrollable chip row, so it holds a fixed height no matter how
-        // many presses are running.
-        html += '<div id="hole-recap-mount"></div>';
-        html += '<div id="live-skins-mount"></div>';
-        html += '<div id="action-center-mount"></div>';
-        html += '<div id="bet-strip-mount"></div>';
+        // THE FOUR READING MOUNTS MOVED INTO THE STATUS SHEET (UX wave, 2026-10-04).
+        // They are what a golfer READS rather than acts on - what just happened,
+        // what is at stake, how the side matches stand - and the comment that used
+        // to sit here said "everything below the fold", which was the admission
+        // that they were already not part of the hole. They are STATIC children of
+        // #round-sheet-body now; renderCardWidgets() finds them by id exactly as it
+        // did, so every renderer below is unchanged and nothing is rebuilt twice.
 
         html += buildHolePickerHtml(courseData, savedScores, filteredPlayers);
 
@@ -5925,6 +6030,72 @@ html {
             // a banner for the round in front of them and would lose their place.
             go: (href) => { if (href && href !== loc.href) loc.href = href; }
         });
+    }
+
+    // ---- THE STATUS SHEET (UX wave, 2026-10-04) ----------------------------
+    //
+    // WHAT IS WRONG, MEASURED RATHER THAN ARGUED: on a live round at 390x844, 0%
+    // of the first screen was score boxes. 525 of the 844 pixels were the theme
+    // row, the round header, two rows of nav pills, the Playing With card and the
+    // group-scores card, and the hole card did not begin until y=610 - so a golfer
+    // standing on the 7th tee had to scroll before they could type a number.
+    // tools/first-screen-check.js is that measurement.
+    //
+    // WHAT MOVES, AND WHAT DOES NOT. Everything that is not the hole goes into one
+    // sheet behind one handle at the bottom, where a thumb already is. What stays
+    // on the page is the hole: its heading, its score boxes, Prev/Next, and the
+    // two popups that interrupt a hole on purpose - the KP question and "your card
+    // is in" - which are overlays and were never in this list.
+    //
+    // THE BLOCKS ARE MOVED, NOT REBUILT. Each keeps its id, its handlers and the
+    // render function that writes to it, so renderScorecard, renderGapBanner,
+    // renderEndRoundControl and the rest do not know this happened. A COPY would
+    // have been two elements with one id and the renderers would have written to
+    // whichever came first - which is the bug this avoids by construction.
+    //
+    // THE LIST LIVES INSIDE THE FUNCTION, and that is not a style choice: it was a
+    // top-level `var` first, and a `var` HOISTS AS undefined while the function
+    // declaration hoists whole - so the arrival code, which runs hundreds of lines
+    // earlier, called buildRoundSheet() and died on `undefined.forEach`. The page
+    // then never revealed itself at all. Measured in Chrome, not reasoned about.
+    function buildRoundSheet() {
+        var ROUND_SHEET_BLOCKS = [
+            'header-controls-row',      // Dark Mode, History
+            'header-box',               // the game code, the course and the round name
+            'app-nav-wrap',             // Leaderboard, Bets, Results, Matches, Home...
+            'spectator-hint-banner',
+            'round-landing-summary',    // Playing With / Scoring / Action
+            'status-panel',             // live status, group scores, leaderboard, skins
+            'group-filter-container',   // All Players, Edit round setup, Players
+            'view-mode-toggle',         // Hole View / Full Card
+            'scorecard-footer',         // Save & exit, Receipt, the guide
+            'end-round-mount'           // Delete this round (organizer only)
+        ];
+        var body = document.getElementById('round-sheet-body');
+        if (!body) return 0;
+        var moved = 0;
+        ROUND_SHEET_BLOCKS.forEach(function (id) {
+            var el = document.getElementById(id);
+            // A block that is not on this page is not an error: the delete mount is
+            // empty for anyone but the organizer, and a page may drop a card.
+            if (!el || el.parentNode === body) return;
+            body.appendChild(el);
+            moved++;
+        });
+        document.body.classList.add('has-round-sheet');
+        return moved;
+    }
+    function toggleRoundSheet(force) {
+        var sheet = document.getElementById('round-sheet');
+        var scrim = document.getElementById('round-sheet-scrim');
+        var handle = document.getElementById('round-sheet-handle');
+        var caret = document.getElementById('round-sheet-caret');
+        if (!sheet) return;
+        var open = (force === undefined) ? !sheet.classList.contains('open') : !!force;
+        sheet.classList.toggle('open', open);
+        if (scrim) scrim.classList.toggle('open', open);
+        if (handle) handle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (caret) caret.textContent = open ? '\u25BC' : '\u25B2';
     }
 
     function skipWhoAmI() {

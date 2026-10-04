@@ -3349,6 +3349,52 @@ tee-time field removed, and PUSH.
   through the real route. When there is no token it offers **Register this phone**
   rather than reporting a dead end.
 
+## LIVE ACTIVITY on the lock screen - PLAN ONLY, nothing built (2026-10-04)
+
+Asked for as a plan and recorded as one. A card on the iPhone lock screen and in
+the Dynamic Island showing the golfer's score to par, holes thru, and match status.
+
+1. **It is not a Capacitor plugin job, it is a WIDGET EXTENSION.** Live Activities
+   are SwiftUI only: a new `Widget Extension` target in `ios/App`, an
+   `ActivityAttributes` struct (static: round code, course, the golfer's name;
+   dynamic: toPar, thru, matchLine), and a `WidgetBundle`. None of it can be
+   written in JavaScript, and the web app cannot draw a pixel of it.
+2. **The bridge is a small local plugin we would write** - about 120 lines of
+   Swift plus a TS shim: `start(attrs)`, `update(state)`, `end()`. There is a
+   community plugin (`capacitor-live-activity`-style) but the shape is simple
+   enough that owning it beats depending on it, and this repo already keeps an
+   explicit iOS `includePlugins` allowlist.
+3. **LOCAL UPDATES ARE THE RIGHT DEFAULT HERE.** The scorekeeper's phone already
+   has every score the moment it is typed, so `Activity.update()` from the app is
+   free, instant and needs no server. ActivityKit allows roughly one update per
+   second and the system throttles a chatty one; a round posts a score every few
+   minutes, so we are nowhere near it.
+4. **PUSH UPDATES ARE THE SECOND HALF, and the one that matters for the three
+   golfers NOT keeping score.** Their phones learn nothing until they open the
+   app. That needs the activity's own push token (different from the device
+   token), posted to `pushTokens/<uid>/live/<activityId>`, and
+   `apns-push-type: liveactivity` sends from `functions/api/_push.js` - which
+   already holds the FCM/APNs credential and the routing. FCM v1 does NOT carry
+   Live Activity payloads, so this is the first thing in the app that would need
+   APNs directly.
+5. **Effort, honestly:** 2-3 days for the local-only version (target, attributes,
+   the plugin, start/stop at the right moments, the card design at two sizes),
+   and 2-3 more for push updates, because the APNs-direct path is new ground and
+   the token lifecycle (start, stale, ended, phone restarted) is where the bugs
+   live.
+6. **Apple review:** Live Activities must be user-started and user-endable, must
+   not be ads, and must end when the thing they describe ends - a round that
+   finishes has to call `end()` or the card sits on the lock screen for eight
+   hours. The entitlement is `NSSupportsLiveActivities` in Info.plist; no new
+   capability request, no new agreement. Low review risk, but the "ends when the
+   round ends" rule is a real behaviour we would have to own.
+7. **The one design question to settle first:** whose score does it show on a
+   phone that is not keeping score? It has to be the GOLFER's own line, which
+   means the activity can only start once "Who am I?" is answered - the same
+   answer push notifications already depend on.
+8. **Not recommended before the App Store build settles.** It adds a target, a
+   plugin and an APNs path to a binary that is mid-review.
+
 ## THE 10th TEE: a round that plays 10-18, then 1-9 (2026-10-04, MERGED `0ebbf85`)
 
 STRICT. Cache `golfapp-v294-playorder` / consumer `v134`. Three commits on
