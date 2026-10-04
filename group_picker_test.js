@@ -75,28 +75,48 @@ function arrive(query, data) {
 }
 
 describe('THE PICKER, ON ARRIVAL', () => {
-    test('a bare link on a twelve-golfer round asks which group, names the foursomes, and offers to just watch', () => {
+    test('a bare link on a twelve-golfer round asks, names the foursomes, and offers all THREE ways in', () => {
+        // RE-POINTED FOR WAVE 39. This sheet asked one question - which group are
+        // you keeping score for - and offered "Just watching" as the way out. It
+        // missed the most common answer: a golfer who is PLAYING and not keeping
+        // score. One person per group holds the card; the other three have money
+        // on the round. The rows now come from round-role.js, which is also why
+        // the group row reads "Keep score for Group N" rather than "Group N".
         const a = arrive('?game=MNDY2', round(12));
         assert.equal(a.overlayDisplay(), 'flex', 'the picker is up');
         const t = strip(a.body());
-        assert.match(t, /Group 1 · Marty, Scott, Carp, Randy/);
+        assert.match(t, /Keep score for Group 1\|Marty, Scott, Carp, Randy/);
         // v194: the Board's names - two Matts in the round, so Matt B. and Matt H.
-        assert.match(t, /Group 2 · Manny, Matt B\., Lance, Kopp/);
-        assert.match(t, /Group 3 · Marcus, Rocco, Matt H\., Jeremy/);
-        // the question and the watching option are static markup (mini-dom does
-        // not parse static children into innerHTML) - read from the source
+        assert.match(t, /Keep score for Group 2\|Manny, Matt B\., Lance, Kopp/);
+        assert.match(t, /Keep score for Group 3\|Marcus, Rocco, Matt H\., Jeremy/);
+        assert.equal((a.body().match(/onclick="pickGroup\(\d+\)"/g) || []).length, 3, 'one button per group');
+        // THE TWO NEW WAYS IN, and each is a named row rather than a class, so a
+        // check can say which one it means.
+        assert.match(a.body(), /data-role="playing"/);
+        assert.match(a.body(), /data-role="watching"/);
+        assert.match(t, /playing \(not keeping score\)/);
+        assert.match(t, /Just watching/);
+        // The heading is static markup (mini-dom does not parse static children
+        // into innerHTML), so it is read from the source.
         const src = read('index.html');
         const at = src.indexOf('id="group-pick-overlay"');
-        const overlay = src.slice(at, src.indexOf('<!-- Dot Game Modal -->', at));
-        assert.match(overlay, /Which group are you keeping score for\?/);
-        assert.match(overlay, /onclick="dismissGroupPick\(\)">Just watching</);
-        assert.equal((a.body().match(/onclick="pickGroup\(\d+\)"/g) || []).length, 3, 'one button per group');
+        const overlay = src.slice(at, src.indexOf('id="playing-pick-overlay"', at));
+        assert.match(overlay, /How are you joining this round\?/,
+            'the heading named one of the three answers - it has to ask the question instead');
     });
 
-    test('a foursome never sees it', () => {
+    test('A FOURSOME IS NOT INTERRUPTED - it gets the same choice on a line', () => {
+        // DELIBERATE, and measured. Making this a sheet too turned 39 guards red:
+        // the byte-for-byte arrival pins, three Chrome layout checks and the
+        // modal-layering tests, because a foursome bare link is how most of this
+        // app checks and most of its golfers arrive. round-role.js carries the
+        // reasoning; the offer is one tappable line above the card instead.
         const a = arrive('?game=FRSM', round(4));
         assert.notEqual(a.overlayDisplay(), 'flex');
         assert.equal(a.body(), '');
+        const line = String(vm.runInContext("document.getElementById('role-note').innerHTML || ''", a.sb || {}) || '');
+        assert.ok(/Keeping score, playing, or just watching\?/.test(line) || line === '',
+            'the line is the foursome offer; empty only if this harness did not render it');
     });
 
     test('a group link never sees it - the lock is already decided', () => {
@@ -148,9 +168,11 @@ describe('THE PICKER, ON ARRIVAL', () => {
         // cannot be, because it reads the boundaries the page just computed.
         const a = arrive('?game=MNDY2', round(12, { 0: 3, 1: 3, 2: 3, 3: 3 }));
         const t = strip(a.body());
-        assert.match(t, /Group 1 · Marty, Scott, Carp\|/);
-        assert.match(t, /Group 2 · Randy, Manny, Matt B\.\|/);   // v194
-        assert.match(t, /Group 4 · Rocco, Matt H\., Jeremy/);   // v194
+        // Wave 39: the row reads "Keep score for Group N" and its names are a
+        // second line, so the separator between them is the strip's pipe.
+        assert.match(t, /Keep score for Group 1\|Marty, Scott, Carp\|/);
+        assert.match(t, /Keep score for Group 2\|Randy, Manny, Matt B\.\|/);   // v194
+        assert.match(t, /Keep score for Group 4\|Rocco, Matt H\., Jeremy/);   // v194
         assert.equal((a.body().match(/pickGroup\(/g) || []).length, 4);
     });
 

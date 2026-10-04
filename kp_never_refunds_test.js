@@ -227,7 +227,7 @@ describe('CHROME: Finish Round shows the hold; recording the winners makes it fi
     let r;
     before(async () => {
         r = await arriveCold({ url: fileUrl('index.html', 'game=KPX'), db: DB, settleMs: 4000, steps: [
-            { tap: '#group-pick-overlay .btn-outline', nth: 0 }, { sleep: 250 },   // Just watching (the picker on a bare multi-group link)
+            { tap: '#group-pick-overlay [data-role="watching"]', nth: 0 }, { sleep: 250 },   // Just watching (the picker on a bare multi-group link)
             // the page lands on hole 1; Finish Round is the last hole's Next - seventeen real taps on Next
             ...[].concat(...Array.from({ length: 17 }, () => [{ tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 120 }])),
             { expression: "'H:' + String(currentViewedHole)" },

@@ -29,7 +29,40 @@ const config: CapacitorConfig = {
     // the shell a popup has no window to open, so Continue with Apple and Continue
     // with Google need the native Apple and Google SDKs. It is named here
     // deliberately, like the other two.
-    includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication']
+    // @capacitor/push-notifications joins for WAVE 39: you're in, final results, a
+    // bet challenge, a press offered, and hype. Five notifications, all of which
+    // have to come from outside the phone, so all of them need a token and a
+    // sender.
+    //
+    // @capacitor/local-notifications WAS HERE AND IS GONE. It did one job - a
+    // 30-minute tee-time reminder - and that was removed on Manny's call before
+    // it shipped. The plugin came out with it rather than being left linked: an
+    // unused third-party SDK in the binary is exactly what the Facebook trait
+    // exclusion below exists to prevent, and leaving it would mean shipping a
+    // notification permission the app never uses.
+    //
+    // @capacitor-firebase/messaging JOINS ON 2026-10-04, AND IT IS NOT A SECOND
+    // PUSH PLUGIN. It is here for ONE call: getToken().
+    //
+    // THE BUG IT FIXES. @capacitor/push-notifications returns the APNs DEVICE
+    // TOKEN on iOS - a raw hex address for Apple's gateway. The sender is FCM HTTP
+    // v1 (functions/api/_push.js posts to /messages:send), and message.token there
+    // must be an FCM REGISTRATION TOKEN, which is a different string issued by
+    // Firebase after IT has been given the APNs token. Sending one where the other
+    // is expected is an INVALID_ARGUMENT from Google, not a delivery.
+    //
+    // The two together are the whole chain: Apple issues the device token,
+    // FirebaseMessaging exchanges it for a registration token, and the sender
+    // addresses that. push-notifications keeps permission and the tap routing.
+    //
+    // ANDROID DOES NOT GET IT: that side has no google-services.json, which is the
+    // same reason the authentication plugin is iOS-only here.
+    //
+    // THE SETUP NOW EXISTS. The APNs key is uploaded to Firebase Cloud Messaging
+    // for development and production, the service account is a Cloudflare secret,
+    // and the app carries the Push Notifications capability.
+    includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
+                     '@capacitor/push-notifications', '@capacitor-firebase/messaging']
   },
   // ANDROID IS NOW AN ALLOWLIST TOO, AND THE REASON IS THIS WAVE'S PLUGIN.
   //
@@ -46,6 +79,12 @@ const config: CapacitorConfig = {
   // capacitor.settings.gradle byte-identical - measured 2026-09-30, and that is the
   // point of the list. When Android does get one-tap sign-in, it gets google-services
   // .json, the gradle plugin, and a fourth entry here, together, on purpose.
+  // ANDROID DOES NOT GET THE WAVE 39 PLUGINS YET, for the same reason it does not
+  // get the auth plugin: push on Android needs google-services.json and the
+  // com.google.gms.google-services gradle plugin, neither of which this repo has,
+  // so naming them would break the Android build for a feature Android does not
+  // ship. When Android gets push, it gets the json, the gradle plugin and the
+  // entries here together, on purpose.
   android: {
     includePlugins: ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share']
   },

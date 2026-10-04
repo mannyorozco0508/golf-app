@@ -101,7 +101,22 @@ const PROBE = `(function () {
     inMainContent: !!(foot && foot.closest('#main-content')),
     runwayH: (function () { var pad = document.getElementById('hole-landing-runway');
       return pad ? Math.round(pad.getBoundingClientRect().height) : null; })(),
-    docH: document.documentElement.scrollHeight
+    docH: document.documentElement.scrollHeight,
+    // WAVE 39: the role-note line, measured so the accounting below can itemise
+    // it rather than absorb it into a changed total. On this fixture - a bare
+    // link on a single-group round - it is the "Keeping score, playing, or just
+    // watching?" offer, which is a real tappable line and really does take
+    // height.
+    roleNoteH: (function () { var rn = document.getElementById('role-note');
+      if (!rn) return 0;
+      // HEIGHT PLUS MARGINS, because what the document grew by is the space the
+      // element OCCUPIES. getBoundingClientRect() stops at the border: measured,
+      // the note is 44px tall with a 10px bottom margin and the document grew by
+      // 54, so a rect-only reading left 10px unexplained and the equality below
+      // was wrong by exactly that.
+      var cs = getComputedStyle(rn);
+      return Math.round(rn.getBoundingClientRect().height
+        + parseFloat(cs.marginTop || 0) + parseFloat(cs.marginBottom || 0)); })()
   });
 })()`;
 
@@ -247,11 +262,25 @@ describe('THE HEIGHT RECLAIMED, AS A NUMBER', () => {
         // (footer saved - runway added), something moved that this wave did not mean to.
         //     bare    2177 -> 1800   footer 518 -> 92 (426 back)   runway 49    377 net
         //     scored  2366 -> 1989   footer 518 -> 52 (466 back)   runway 89    377 net
-        assert.equal(2177 - S.bare.docH, 377, 'the bare document is ' + S.bare.docH + ', was 2177');
-        assert.equal(2366 - S.scored.docH, 377, 'the scored document is ' + S.scored.docH + ', was 2366');
+        // RE-POINTED IN WAVE 39, AND THE ROLE-NOTE LINE IS ITEMISED RATHER THAN
+        // ABSORBED. The three ways into a round are offered on a single-group
+        // round as one tappable line above the card - this fixture is exactly
+        // that case - and it really does take height. So the equality keeps its
+        // shape and gains one term: the document change is
+        //   (footer saved) - (runway added) - (role note added)
+        // and if any of the three moves by an amount the others do not explain,
+        // this still goes red. Measured: bare 1854, role note 44px + a 10px bottom
+        // margin = 54px occupied.
+        assert.equal(2177 - S.bare.docH, 377 - S.bare.roleNoteH,
+            'the bare document is ' + S.bare.docH + ' with a ' + S.bare.roleNoteH + 'px role note');
+        assert.equal(2366 - S.scored.docH, 377 - S.scored.roleNoteH,
+            'the scored document is ' + S.scored.docH + ' with a ' + S.scored.roleNoteH + 'px role note');
         assert.equal((BEFORE_FOOTER_PX - S.bare.footerH) - S.bare.runwayH, 377,
             'footer saved minus runway added does not account for the document change');
         assert.equal((BEFORE_FOOTER_PX - S.scored.footerH) - S.scored.runwayH, 377);
+        // AND THE LINE IS REALLY THERE, so this is not satisfied by a zero.
+        assert.ok(S.bare.roleNoteH > 20 && S.bare.roleNoteH < 90,
+            'the role note measured ' + S.bare.roleNoteH + 'px - it should be one tappable line');
     });
 });
 

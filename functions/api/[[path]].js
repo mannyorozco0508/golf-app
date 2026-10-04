@@ -21,9 +21,10 @@
 // method it exports. Thin, like the two routes: the rule is in _lib.js.
 // ============================================================================
 
-import { noSuchRoute, methodNotAllowed } from './_lib.js';
+import { noSuchRoute, methodNotAllowed, preflightResponse } from './_lib.js';
 import * as courseSearch from './course-search.js';
 import * as courseDetail from './course/[id].js';
+import * as pushSend from './push-send.js';
 
 // onRequestGet -> 'GET', onRequestPost -> 'POST', ...
 const methodsOf = (mod) => Object.keys(mod)
@@ -37,13 +38,27 @@ export const ROUTES = [
     { file: 'course-search.js', matches: (seg) => seg.length === 1 && seg[0] === 'course-search',
       methods: methodsOf(courseSearch) },
     { file: 'course/[id].js', matches: (seg) => seg.length === 2 && seg[0] === 'course' && seg[1].length > 0,
-      methods: methodsOf(courseDetail) }
+      methods: methodsOf(courseDetail) },
+    // push-send.js exports onRequestPost ONLY, so a GET to /api/push-send falls
+    // through here and gets 405 with Allow: POST rather than Pages' SPA
+    // fallback - which would answer index.html at 200 and tell a caller the
+    // send succeeded.
+    { file: 'push-send.js', matches: (seg) => seg.length === 1 && seg[0] === 'push-send',
+      methods: methodsOf(pushSend) }
 ];
 
 export async function onRequest(context) {
     const seg = Array.isArray(context.params && context.params.path) ? context.params.path
         : String((context.params && context.params.path) || '').split('/').filter(Boolean);
     const route = ROUTES.find((r) => r.matches(seg));
+    // A PREFLIGHT FOR A ROUTE THAT EXISTS IS ANSWERED, not refused (2026-10-04).
+    // A route that exports onRequestOptions answers its own; this catches the
+    // ones that do not, so adding a JSON POST to any route cannot silently
+    // produce "Load failed" in the app again. The methods come from the route's
+    // own exports, as the 405 below does.
+    if (route && context.request && context.request.method === 'OPTIONS') {
+        return preflightResponse(context.request, route.methods);
+    }
     // A real route reached the catch-all only because it does not export this
     // method - Pages would have answered from the module otherwise.
     if (route) return methodNotAllowed(route.methods, context.request);

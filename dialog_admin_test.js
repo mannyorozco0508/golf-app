@@ -417,8 +417,13 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // saveSettings as well as on the disabled button - goToWizardStep resets the
         // label on every step change, a cached shell can hold older markup, and
         // onclick="saveSettings()" is reachable from the console.
-        assert.equal(refuse + fail + toast, 64,
-            'the alerts should still be 64 messages, got '
+        // 62 SINCE MY GROUPS WAS RELEASED (2026-10-04): the per-device beta switch
+        // is gone, and with it the two things only that switch could say - the
+        // toast confirming it was turned on or off, and the failure for a browser
+        // that will not keep the setting. Nothing else lost a message; the feature
+        // itself still speaks exactly as it did.
+        assert.equal(refuse + fail + toast, 62,
+            'the alerts should still be 62 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

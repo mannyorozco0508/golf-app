@@ -169,7 +169,22 @@ describe('ONE BUILDER, TWO ENTRY POINTS', () => {
 
     test('both entry points call it', () => {
         assert.match(read('admin.html'), /buildNassauWagerPayload\(\{/);
-        assert.match(read('sidematches.html'), /buildNassauWagerPayload\(\{/);
+        // RE-POINTED IN WAVE 39, AND THE CHAIN GOT LONGER RATHER THAN BROKEN.
+        // sidematches.html no longer calls buildNassauWagerPayload directly: it
+        // calls sideMatchPayloadFromTerms (challenges.js), which calls it. That
+        // indirection exists because an accepted CHALLENGE has to write a side
+        // match byte-identical to the one the form writes, and the only way to
+        // guarantee that is one payload builder for both. So the claim is
+        // asserted along the chain, each link named.
+        assert.match(read('sidematches.html'), /sideMatchPayloadFromTerms\(terms, \{/,
+            'the form no longer goes through the shared payload builder');
+        assert.match(read('challenges.js'), /buildNassauWagerPayload\(\{/,
+            'and that builder no longer reaches action-model.js for the Nassau fields');
+        // AND NOT A SECOND COPY: challenges.js must not reimplement it.
+        const ch = read('challenges.js');
+        ['frontStake: front', 'autoPressStake: autoPress', "format: 'nassau',\n        scoring:"]
+            .forEach((frag) => assert.ok(!ch.includes(frag),
+                'challenges.js looks like it rebuilt the Nassau payload: ' + frag));
     });
 
     test('it is pure — no DOM, no database', () => {

@@ -3063,6 +3063,228 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
+## Where things stand, 2026-10-03 (Wave 39 challenges, on a branch)
+
+**STILL `ui-wave39-push`, STILL NOT MERGED.** Cache `golfapp-v281-challenges` /
+consumer `v121`. Full suite 10,028 tests, 0 fail.
+
+- **SIDE BET CHALLENGES.** `events/<code>/challenges/<id> = { from, to, terms,
+  status, createdAt }` - a pending offer that holds no money. Any golfer in the
+  round can tap **🤝 CHALLENGE SOMEBODY** on the Matches tab, which opens the
+  SAME side-match form with one side fixed to them and Save replaced by Send.
+  Pending offers list above the live matches as "Pending: Jimmy v Manny $20
+  Nassau" with Accept / Decline.
+- **THE SAFETY MODEL IS A DIFFERENT NODE, NOT A FILTER.** Every engine that counts
+  money reads `sideMatches`; none has ever heard of `challenges` and none is being
+  taught. `challenge_money_test.js` settles the same round twice - once with $1,745
+  of pending offers sitting in the data - and the money is identical, the Receipt
+  rows identical, and `money-engine`, `settlement-engine`, `pool-engine`,
+  `action-model` and `handicap` are frozen by sha.
+- **ACCEPT CREATES NOTHING NEW.** `saveSideMatch()` no longer builds its own
+  payload: it calls `challenges.js sideMatchPayloadFromTerms()`, which is the same
+  function an accepted challenge calls. Byte-identical is true BY CONSTRUCTION
+  rather than asserted against a copy, and a test holds the two surfaces' FIELD
+  LISTS against each other so a field added to one cannot be missed by the other.
+  The accept is ONE atomic `db.ref().update()` - a crash between two writes would
+  leave either a bet nobody agreed to or an accepted challenge with no bet.
+  - **The start hole is where the ACCEPT happens**, not where the offer did:
+    `max(offered, sideMatchStartHole(now))`, or one side walks in already knowing
+    three holes of the result.
+  - A second answer is not an answer - `challengeStatusAfter` returns null for
+    anything not pending, so two taps cannot create two bets.
+- **RULES: `challenges` ADDED TO `database.rules.push.json`** (Desktop updated, 20,774
+  bytes, **not published**). **MEASURED, AND NOT WHAT I EXPECTED: under the file
+  that is LIVE today, all eleven challenge writes are ALLOWED** - including a
+  made-up status, a $100,001 stake and a stray key - because `.write` at
+  `events/$eventCode` governs its whole subtree and an unknown child has no
+  validate. **So this delta is a VALIDATION, not a grant**, and the test's `live`
+  column says so on every row. 12 targaryen tests, 6 controls (3 new: the terms
+  validate, the status vocabulary, the self-challenge check). `events/$eventCode`
+  is asserted child by child now, since the parent legitimately gains one.
+- **ALOHA BY THE PLAYER.** `respondAloha()` widens by exactly one case: a PLAYING
+  golfer may answer an Aloha offered to the side they are ON. Not the offering
+  side (the side that is down offers, the side that is up accepts), not another
+  match, not a spectator. The scorekeeper keeps everything. **No rules change was
+  needed** - the database already permits any write under an existing event, which
+  is how a scorekeeper with no account posts a score; it was the client gate.
+- **THREE MORE PINS RE-POINTED, and one was a real drift:**
+  `ryder_cup_phase3b_test.js` sliced the Cup surface to `function
+  renderSideMatches` - not the end of the Cup, just the next thing in the file - so
+  my challenge functions landed inside it and its "no money field" claim went red
+  for code that is not the Cup's. It now ends at the next section banner, with a
+  positive assertion that the slice is not empty. `setup_nassau_test.js` and
+  `hole_bet_scope_test.js` follow the payload chain instead of the old literal.
+
+## Where things stand, 2026-10-03 (Wave 39 additions, on a branch)
+
+**STILL `ui-wave39-push`, STILL NOT MERGED.** Cache `golfapp-v280-following-along`
+/ consumer `v120`. Full suite 10,011 tests, 0 fail.
+
+- **THE TEE-TIME REMINDER IS GONE**, on Manny's call, before it shipped. The tee-time
+  FIELD stays everywhere it shows. Nothing is dormant:
+  `@capacitor/local-notifications` came out of `package.json`, the iOS allowlist and
+  `Package.swift`; `tee-time.js` lost `teeTimeReminderAt`/`teeTimeChanged`;
+  `push-notify.js` is five kinds, not six. Eleven tests came out with it and four
+  replaced them, asserting the removal left nothing behind.
+- **THREE WAYS INTO A ROUND.** `round-role.js`: keep score for Group N / I'm playing
+  (not keeping score) / Just watching. "I'm playing" is two steps - role, then name -
+  reusing `setMe()` and `golfapp_me_<code>`. **Only a playing golfer is registered
+  for notifications:** a spectator never is (the bare link is what gets forwarded to
+  group chats) and neither is the scorekeeper (they are holding the card).
+  - **THE RECON ANSWER Manny asked for first:** a spectator could ALREADY pick "Who
+    am I?" - `index.html:5797` has no spectator gate, and `setMe()` at `:5681` is
+    reachable - but it is rendered only inside the Action Center body
+    (`index.html:6156`), which is **collapsed by default** and **empty on a round
+    with no bets** (`:5954`, `:5955`). Measured: a spectator on a round with one side
+    bet got 190 bytes, the toggle alone. The machinery was there; the entry point
+    was not.
+  - **THE SHEET IS MULTI-GROUP ONLY; A FOURSOME GETS A LINE.** Making it a sheet
+    everywhere turned **39 guards red** - the byte-for-byte arrival pins, three
+    Chrome layout checks and the modal-layering tests - because a foursome's bare
+    link is how most of this app's checks and most of its golfers arrive. A
+    multi-group round has asked on arrival since 2026-09-20, so two more rows change
+    nothing there. **If Manny wants a foursome interrupted too, that is one line in
+    `roundRoleShouldAsk`.**
+  - **THE OWNER IS NOT EXCLUDED from the multi-group sheet** - caught by
+    `organizer_doors_after_picker_test.js`: on a multi-group round the organizer is
+    one of the golfers and picks their group like anybody else. The exclusion belongs
+    on the single-group line, where they already hold the whole card.
+- **ITEM 3's RECON CHANGES IT: there is exactly ONE accept/decline record in the app.**
+  `sidematches.html:2685` `respondAloha()` writes
+  `events/<code>/sideMatches/<id>/aloha {status, respondedAt}`. **A press has no
+  offer and no answer** - `index.html:4823` `confirmSidePress()` writes it straight
+  to `presses` when the golfer taps, because pressing is a thing you do, not a thing
+  you ask - and a bet challenge has no record either. Inventing one would be a NEW
+  money record, which is STRICT and not approved, so I did not. `?aloha=<matchId>`
+  focuses the card with the EXISTING buttons; the write is `respondAloha()`, same
+  path, same gate. **And money does not move from a URL** - `sidematches.html` has
+  refused that since the `?press=` link was built.
+  - **ONE THING FOR MANNY:** `respondAloha()` is gated on `canPressSideMatch()`,
+    which a following player does not pass. Widening it is a money-write rule change
+    and therefore STRICT. Default is to leave it: the notification tells the playing
+    golfer, the scorekeeper taps - which is how a bet already works for golfers
+    without the app.
+- **ITEM 2 IS PROPOSED, NOT BUILT** (`docs/wave39-push-plan.md`):
+  `organizers/<ownerUid>/groups/<groupId>/members/<memberKey>/devices/<uid> = true`,
+  **written by the GOLFER**, so no sign-in is ever needed, the organizer never writes
+  somebody else's uid, and there is no global name-to-uid index to leak. Needs a
+  rules delta - STRICT. Already true with no new mechanism: `pushDecide` refuses with
+  `no-device`, so a golfer the app has never seen is never sent anything.
+- **FOUR MORE SELF-INFLICTED FAILURES, same class as the last four:** a name of mine
+  colliding with a selector or a literal some guard already owns. The offer line
+  borrowed `.whoami-line-btn` and became the first match for a tap `whoami_line_test.js`
+  aims at the name picker; the sheet's two new outline rows made
+  `.btn-outline` ambiguous for six Chrome checks (fixed by giving every row a
+  `data-role`); a guide sentence used "read-only", which a guard bans because the app
+  once wrongly called a group LINK that; and `baseline_arithmetic_test.js` had a
+  latent `lineOf is not defined` - a branch that had never executed, so the first
+  real fault it found crashed instead of reporting.
+- **AND A REAL DEFECT CAUGHT BY A PIN:** `card_scope_closed_prev.fixture.json` showed
+  the bare link saying "Just watching." underneath a sheet still asking how the golfer
+  was joining. `roundRoleOf()` defaults to watching because a bare link grants
+  nothing - right for permissions, wrong as a sentence. The note now speaks only for
+  a role the golfer chose.
+
+## Where things stand, 2026-10-03 (Wave 39, on a branch)
+
+**WAVE 39 IS BUILT ON `ui-wave39-push` AND NOT MERGED** - awaiting Manny's Cmd+R.
+Cache `golfapp-v279-teetime-notify` / consumer `v119`. Full suite green.
+
+- **A ROUND CAN CARRY A TEE TIME, which it never could.** Optional date + time on
+  the setup screen, editable later, and per round in the trip planner. Shown on the
+  scorecard header, the Game tab's Course card, and the trip itinerary.
+  - **STORED AS `teeTimeISO` + `teeTimeZone`**, and the two fields are not
+    redundant: an instant answers "when do they tee off" (what a reminder is
+    scheduled against) and the ZONE answers "what does the card say". A tee time is
+    a fact about the golf course, not about the reader - a Road Trip round set in
+    Oregon must read 8:40 AM to the organizer on the tee AND to his wife reading
+    the link at home. `tee-time.js` is the only formatter and a test proves the
+    display asks for the round's zone.
+  - **The offset is captured, never re-derived.** A round set in March for August
+    would land an hour out if the offset came from the zone name at save time.
+  - Absent is first class: a pickup round nobody wrote down, and a round carrying a
+    corrupt string, both render as nothing - never an empty row or "Invalid Date".
+- **THE REMINDER IS A LOCAL NOTIFICATION**, scheduled on the device when a golfer
+  opens a round with a tee time and rescheduled when the organizer moves it. No
+  server, no token, no scheduler, no rules - and it fires with the phone in a
+  pocket and no signal. The id is the round's, so a reschedule REPLACES; an
+  unchanged time schedules nothing (this runs on every snapshot of the round).
+- **`database.rules.push.json` IS PREPARED AND NOT PUBLISHED.** Two new top-level
+  nodes, `pushTokens/$uid` and `pushPrefs/$uid`, owner-only read and write;
+  **every pre-existing node is byte-identical** and a test asserts it.
+  `database.rules.rollback-stage2delete.json` is the rollback. Both are on the
+  Desktop as `PUBLISH-THIS-database.rules.push.json` and
+  `ROLLBACK-database.rules.stage2delete.json`. `rules_push_tokens_test.js`: 9
+  targaryen tests including 3 negative controls (world-readable tokens, a dropped
+  uid check, a dropped record validate).
+  - **NOTE: the repo's own `database.rules.json` is NOT what is live.** Live is
+    `database.rules.stage2delete.json` (published 2026-09-30) and that is the base
+    this delta is built on. A test pins it.
+- **THE PUSH HALF IS WIRED AND INERT.** `@capacitor/push-notifications` and
+  `@capacitor/local-notifications`, iOS allowlist only - Android deliberately
+  untouched, because push there needs google-services.json and the gradle plugin.
+  Token registration fires when a golfer answers "Who am I?" (the existing Wave 17
+  `golfapp_me_<code>`), and with no APNs key `register()` fires
+  `registrationError`, a reason is recorded and the app carries on. `POST
+  /api/push-send` (FCM HTTP v1, `FCM_SERVICE_ACCOUNT`) answers `not_configured`
+  until the secret exists. Settings (Essentials / Bets / Hype) are in the account
+  panel, native shell only.
+- **FOUR SELF-INFLICTED FAILURES WORTH RECORDING**, all the same class: a comment
+  or a variable name of mine tripping a guard that searches for a literal. An
+  apostrophe inside `SHARED_SHELL` (the list is parsed by matching single-quoted
+  strings) swallowed two entries; the comment explaining it quoted the pattern and
+  did it again; the same trap in `sw.js`; and a local named `payload` whose
+  `.update` call sits above the round save, which
+  `persistence_contract_test.js` finds by first occurrence. **No single quotes in
+  comments inside those list blocks, and do not spell a banned literal out in the
+  comment that explains the ban.**
+
+## Where things stand, 2026-10-03 (later)
+
+**WAVE 38 AND THE LIVE MATCHES FINAL TOTAL ARE ON MAIN.** `a9fbf8d`, cache
+`golfapp-v278-courseindex` / consumer `v118`. Production verified from a fresh
+codeload tarball and live.
+
+- **Wave 38 - the setup pages stop downloading every course anybody ever added.**
+  MEASURED: `global_courses` is 61,258 bytes for 42 courses and grows about 8 KB
+  per import, and admin.html, tournament.html and trip.html each read ALL of it on
+  every load (a live listener on the first two). `?shallow=true` answers the same
+  node in **941 bytes** - but it is a REST parameter and **the Firebase JS SDK has
+  no shallow read**, which is why the probe is a plain `fetch` and not a `ref`.
+  `course-index.js` is the one builder for all three pages, every dependency
+  injected. Steady state: **941 bytes a load instead of 61 KB**, plus one record
+  for a course added since the last visit and one when a course is picked.
+  **Cards are never cached, only names** - the probe cannot see a record CHANGE,
+  and a stale stroke index pays the wrong golfer.
+  - **No cache means no probe.** Found by `tools/tournament-net-reachable-check.js`,
+    which passed standalone and went red inside the full suite because the probe
+    had not answered when the row was clicked.
+  - A hanging probe is a failed probe after 4s, and a failed probe KEEPS the cache:
+    `null` means "could not ask", never "there are no courses".
+- **The LIVE MATCHES & PRESSES card now says who won what.** One bold line at the
+  bottom of a FINISHED match - "Reese +$80 (won 4 of 4 bets)", "Reese +$40 ·
+  Manny +$40 — All square" - consuming `sideMatchDecidedNet`/`Tally` over the
+  receipt settlement-engine already priced. Nothing recomputes money. And a
+  finished segment now reads **the Receipt's wording**: a bet that closed on the
+  16th is **3&2**, where money-engine's live reading says "3 UP" - true while a
+  match runs, false once it is over. Mid-round there is no total.
+- **WAVE 39 (push notifications) IS RECON + THE PURE HALF, ON `ui-wave39-push`,
+  NOT MERGED.** `docs/wave39-push-plan.md` has the full plan, the proposed rules
+  delta and Manny's numbered checklist (APNs key, Firebase Cloud Messaging, Xcode
+  capability, Cloudflare secret).
+  - **A ROUND HAS NO TEE TIME.** Measured: `teeTime` is in no page and in no rule.
+    A round carries `roundDay` (a LABEL, "Single Round") and `createdAt`. So
+    notifications 1 and 2 cannot exist until round setup asks for one -
+    `pushDecide` refuses them with `reason: 'no-tee-time'` rather than inventing a
+    time. **Manny's decision: add the field, or ship v1 with four of the six.**
+  - **The roster→device mapping already exists**: `golfapp_me_<code>` +
+    `resolvedMeId()` from Wave 17, plus the uid every golfer has from auth-boot.
+    A registration is `{ uid, playerId, token }` and nobody is asked a new question.
+  - **Tee-time reminders should be LOCAL notifications** scheduled on the device at
+    join, not server-side: no scheduler, no token, no rules, and they fire offline.
+    Pages Functions do not support scheduled handlers - a cron needs a separate
+    Worker.
+
 ## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, MERGED `277a093`)
 
 STRICT. Two optional pots, both OFF until an organizer switches them on. Cache

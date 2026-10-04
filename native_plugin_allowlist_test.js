@@ -107,7 +107,43 @@ const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const IOS_PLUGINS = {
     '@capacitor/filesystem': 'CapacitorFilesystem',
     '@capacitor/share': 'CapacitorShare',
-    '@capacitor-firebase/authentication': 'CapacitorFirebaseAuthentication'
+    '@capacitor-firebase/authentication': 'CapacitorFirebaseAuthentication',
+    // WAVE 39: the five notifications that have to come from outside the phone -
+    // you're in, final results, a bet challenge, a press offered, and hype.
+    //
+    // IT STAYS INERT until the APNs key is in Firebase and the Push Notifications
+    // capability is in Xcode: without them register() fires registrationError,
+    // push-boot.js records a reason, and the app carries on.
+    //
+    // @capacitor/local-notifications WAS HERE AND IS GONE. It did one job - a
+    // 30-minute tee-time reminder - removed on Manny's call before it shipped,
+    // and the plugin came out with it rather than being left linked. An unused
+    // third-party SDK in the binary is what the Facebook trait exclusion above
+    // exists to prevent, and leaving it would ship a notification permission the
+    // app never uses.
+    //
+    // NOT ON ANDROID, and that is not an omission - push there needs
+    // google-services.json and the com.google.gms.google-services gradle plugin,
+    // neither of which this repo has, so naming it in the Android allowlist would
+    // break that build for a feature Android does not ship.
+    '@capacitor/push-notifications': 'CapacitorPushNotifications',
+    // 2026-10-04: @capacitor-firebase/messaging, FOR ONE CALL - getToken().
+    //
+    // It is not a second push plugin. push-notifications returns the APNs DEVICE
+    // TOKEN on iOS; the sender is FCM HTTP v1, where message.token must be an FCM
+    // REGISTRATION TOKEN - the string Firebase issues once it has been given the
+    // APNs one. Sending the first where the second is expected is an
+    // INVALID_ARGUMENT from Google rather than a delivery, and nothing on the
+    // phone would say so. The two together are the chain; this one is the half
+    // that makes the token addressable.
+    //
+    // The Firebase iOS SDK is already in this binary for one-tap sign-in, and
+    // GoogleService-Info.plist is already in the app, so what this adds is
+    // FirebaseMessaging rather than Firebase.
+    //
+    // NOT ON ANDROID, for the same reason authentication is not: that side has no
+    // google-services.json.
+    '@capacitor-firebase/messaging': 'CapacitorFirebaseMessaging'
 };
 // SPM package traits, per plugin id. An id absent from here must have NO traits in
 // Package.swift; an id present here must have exactly these. The plugin's own

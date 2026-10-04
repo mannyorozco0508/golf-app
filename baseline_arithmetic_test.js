@@ -130,7 +130,15 @@ describe('baseline arithmetic', () => {
                         && new RegExp(p.groups[0] + '\\s*PASS\\s*/\\s*' + p.groups[1] + '\\s*FAIL')
                             .test(o.text));
                     if (!inSuite) {
-                        faults.push(f.file + ':' + lineOf(f.text, p.index) + ' restates "'
+                        // lineOf() DID NOT EXIST until 2026-10-03. This branch had
+                        // never executed - no prose file had ever restated a pair
+                        // no suite claimed - so the first time one did, the guard
+                        // threw "lineOf is not defined" instead of reporting the
+                        // fault it had correctly found. A guard that cannot report
+                        // is a guard that is not working, and this is the second
+                        // half of the same lesson as an inert assertion.
+                        const line = f.text.slice(0, p.index).split('\n').length;
+                        faults.push(f.file + ':' + line + ' restates "'
                             + p.raw + '", which no suite header claims.');
                     }
                 }

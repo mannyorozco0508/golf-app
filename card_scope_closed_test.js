@@ -203,7 +203,7 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // What arrived: the split "1st $60 · 2nd $40" and "Winners show once every card
         // is in." Every filtered list is identical and display is unchanged but for
         // group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'facec252');
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'cb953314');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);
@@ -228,6 +228,18 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
             assert.equal(display['card-is-in'], 'none',
                 'card-is-in rendered on a link whose round is not complete');
             delete display['card-is-in'];
+            // RE-PINNED (v280, Wave 39): role-note joined the page - the line that
+            // says why a read-only card has no score boxes. ONE ADDED DISPLAY KEY,
+            // 'none' on all three links, handled exactly like card-is-in above.
+            // 'none' on the two group links because a scorekeeper has score boxes
+            // and nothing to explain; 'none' on the bare link because the note
+            // speaks only for a role the golfer CHOSE, and on arrival they have
+            // not. That second part is a defect this fixture caught: the first
+            // version said "Just watching." underneath a sheet still asking how
+            // they were joining.
+            assert.equal(display['role-note'], 'none',
+                'role-note rendered on a link that has not chosen a role');
+            delete display['role-note'];
             assert.deepEqual(display, PREV.links[k].display);
             assert.equal(a.sb.window.__scGroupMissing, false);
         }));

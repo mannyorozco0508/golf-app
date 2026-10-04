@@ -430,6 +430,7 @@ html {
         const players = data.players || [];
         if (players.length === 0) return '<div style="text-align:center; padding:20px; color:var(--text-muted);">Waiting for round setup...</div>';
         const fmt = formatSentence(data);
+        // THE TEE TIME, ON THE CARD THAT ANSWERS "what is this round" (Wave 39).
         let html = '<div class="game-card"><div class="game-head">⛳ Course</div>'
             + '<div class="game-line"><strong>' + escapeHtml(data.courseName || 'Golf Course') + '</strong>'
             + (roundLengthText(data.courseData) ? ' · ' + roundLengthText(data.courseData) : '') + '</div>'

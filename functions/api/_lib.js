@@ -490,12 +490,54 @@ export async function handleDetail(d) {
 // no Origin header and gets exactly the headers it always got; any other
 // origin gets no CORS header and the browser refuses the read, as it does
 // today. Never '*': the budget behind this proxy is the whole reason it exists.
-export const SHELL_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost'];
+//
+// THE CANONICAL WEB ORIGIN JOINS ON 2026-10-04. The shell fetches the proxy BY
+// ITS ORIGIN (product-links.js GOLF_WEB_ORIGIN), so a page served from
+// pages.dev is same-origin and sends no Origin header at all - but a page opened
+// from one Pages URL while the fetch names the other (a preview host, say) is
+// not, and the echo costs nothing: it is this project's own site either way.
+export const SHELL_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost',
+                              'https://golf-app-5a5.pages.dev'];
 export function corsHeadersFor(request) {
     const origin = request && request.headers && typeof request.headers.get === 'function'
         ? request.headers.get('Origin') : null;
     if (!origin || SHELL_ORIGINS.indexOf(origin) === -1) return {};
     return { 'access-control-allow-origin': origin, 'vary': 'Origin' };
+}
+
+// ---------------------------------------------------------------------------
+// THE PREFLIGHT, which is what actually broke (2026-10-04).
+//
+// A POST carrying content-type: application/json is NOT a simple request: the
+// browser - WKWebView included - sends OPTIONS first and will not send the POST
+// at all unless that answer says the method and the header are allowed. Nothing
+// here exported onRequestOptions, so the preflight fell through to the catch-all
+// and came back 405. The app reported what fetch() reports when a preflight
+// fails: "Load failed", with no status and nothing in it to read.
+//
+// A PREFLIGHT IS ONLY EVER ANSWERED FOR AN ORIGIN THE ECHO ABOVE ALLOWS. For any
+// other origin this returns no CORS headers at all and the browser refuses, which
+// is the same answer it gave before.
+export function preflightHeadersFor(request, methods) {
+    const cors = corsHeadersFor(request);
+    if (!cors['access-control-allow-origin']) return {};
+    const asked = request && request.headers && typeof request.headers.get === 'function'
+        ? request.headers.get('Access-Control-Request-Headers') : null;
+    return Object.assign({}, cors, {
+        'access-control-allow-methods': (methods && methods.length ? methods : ['GET', 'POST']).concat(['OPTIONS']).join(', '),
+        // Echo what was asked for rather than guessing a list: the app sends
+        // content-type, and a future caller sending one more header should not
+        // need this file edited.
+        'access-control-allow-headers': asked || 'content-type',
+        'access-control-max-age': '600'
+    });
+}
+
+// 204, because a preflight has no body to read and a JSON one would only invite
+// a caller to read it.
+export function preflightResponse(request, methods) {
+    const headers = preflightHeadersFor(request, methods);
+    return new Response(null, { status: 204, headers: headers });
 }
 
 export function toResponse(out, init) {

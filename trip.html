@@ -912,12 +912,12 @@ html {
                     playerCount: 4,
                     frontNineKey: r.frontNineKey || '',
                     backNineKey: r.backNineKey || '',
-                    // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The
-                    // tee-time field is Wave 39 and is not merged yet, so on
-                    // main these two are carried and ignored; the moment that
-                    // wave lands they are what the planner's own date and time
-                    // boxes read. Parsed either way, because re-reading the
-                    // paste later is not something anybody will do.
+                    // THE PASTED TIME IS KEPT, AND NEVER SHOWN. There is no
+                    // tee-time field anywhere in the app since 2026-10-04 -
+                    // Manny does not use one - but a booking email says 8:24 and
+                    // 1:40, and that is the only thing that can tell the morning
+                    // round from the afternoon one. It orders the trip's rounds
+                    // and nothing else reads it.
                     teeDate: r.date || '',
                     teeClock: r.time || ''
                 });
@@ -1513,7 +1513,7 @@ html {
             html += `<div class="settle-card" style="margin-bottom:10px;">
                 <div style="font-weight:bold; margin-bottom:8px;">${cfg.label}</div>
                 ${coursePickerHtml}
-                <div class="form-group" style="margin-bottom:0;">
+                <div class="form-group" style="margin-bottom:8px;">
                     <label>Players</label>
                     <input type="number" id="round-players-${i}" min="0" max="40" value="${cfg.playerCount}">
                 </div>
@@ -1852,10 +1852,10 @@ html {
                 // inventing one would sort the trip wrongly with confidence.
                 const roundRow = { label: cfg.label, addedAt: Date.now() };
                 if (cfg.teeDate) roundRow.date = cfg.teeDate;
-                // AND THE TEE TIME (2026-10-04), so a round reads "Tue 10/13 ·
-                // 8:24 AM · Caledonia" everywhere it is listed. This is the trip's
-                // own record of what was pasted; the round's tee-time FIELD is
-                // Wave 39 and separate.
+                // AND THE PASTED TIME, which orders the day's rounds and is never
+                // displayed: the row reads "Tue 10/13 AM", not a clock. It is the
+                // trip's own record of what the itinerary said, and no screen in
+                // the app asks for or shows a tee time.
                 if (cfg.teeClock) roundRow.time = cfg.teeClock;
                 updates[`trips/${tripCode}/rounds/${roundCode}`] = roundRow;
             });

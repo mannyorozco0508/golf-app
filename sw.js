@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v124-trippots. The tournament product cache
+// The consumer product cache is consumer-v130-preflight. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4005,7 +4005,158 @@
 // worth the same as a full Monday for the same finish. No money was ever attached
 // to those points before this wave; now there can be, which is why the scale had
 // to stop moving.
-const CACHE_VERSION = 'golfapp-v284-trippots';
+// Moved to v279 FOR THE TEE TIME AND THE NOTIFICATIONS. Three new precached files -
+// tee-time.js, push-notify.js, push-boot.js - and four pages changed around them:
+// admin.html sets a tee time and carries the notification switches, index.html shows
+// it in the header and schedules the LOCAL reminder, game.html shows it on the Course
+// card, trip.html sets one per round and prints it on the itinerary.
+//
+// A DEVICE ON v278 HAS NO TEE TIME AT ALL and no reminder, and - because all three
+// files are new - a cached shell told it already had this version would load four
+// pages whose tee-time calls do not exist. The display calls are UNGUARDED on
+// purpose: a tee time either shows or the page is wrong, and a silently missing
+// formatter is how a round would read "Invalid Date" instead.
+//
+// The push half stays inert until the APNs key and the Cloudflare secret exist, so
+// this bump ships the reminder working and the rest waiting.
+// Moved to v280: FOLLOWING ALONG AS A PLAYER, and the reminder removed.
+//
+// A round had two ways in - the scorekeeper with a ?group= link and the spectator
+// with the bare link - and no way to be the third and most common thing: a golfer who
+// is PLAYING and not keeping score. round-role.js is new and precached, index.html
+// offers all three on arrival, and only a playing golfer is registered for
+// notifications: the bare link is what gets forwarded to group chats, and the
+// scorekeeper is holding the card.
+//
+// AND THE TEE-TIME REMINDER IS GONE from v279, on Manny's call, before it shipped.
+// The tee-time FIELD stays. @capacitor/local-notifications came out of the build with
+// it rather than being left linked, because an unused third-party SDK still ships and
+// still asks for a permission the app never uses.
+//
+// A DEVICE ON v279 keeps a scorecard that offers no way to follow along, and has no
+// round-role.js for the unguarded arrival-sheet call - which is why the key moves.
+// Moved to v281: SIDE BET CHALLENGES, and the Aloha answerable by the golfer whose
+// money it is.
+//
+// A side bet could only be created by somebody holding a scorekeeper link, so the
+// three golfers who can now follow along as players could want a bet and had no way
+// to ask for one. A CHALLENGE is a pending offer that holds no money: it lives at
+// events/<code>/challenges, which NOTHING that counts money reads, and accepting it
+// writes a side match through the SAME payload builder saveSideMatch now uses - so
+// there is no second money path and no second answer to the same terms.
+//
+// AND respondAloha WIDENS BY ONE CASE: a playing golfer may answer an Aloha offered
+// to the side they are ON. It was gated on holding a scorekeeper scope, and an Aloha
+// is offered to a SIDE - the golfer whose money it is could not answer for it.
+//
+// A DEVICE ON v280 has no Challenge button, cannot see or answer a pending one, and
+// has no challenges.js - which saveSideMatch now calls unguarded, so a cached shell
+// told it already had this version could not create a side bet at all.
+// Moved to v285 FOR THE PUSH NOTIFICATIONS THEMSELVES, and the three waves above
+// carried across the Road Trip merges: the tee time, following along as a player,
+// and side-bet challenges all land on a device for the first time here, beside
+// the trip work that shipped while they waited.
+//
+// THE PUSH HALF IS NO LONGER INERT. The APNs key is uploaded to Firebase Cloud
+// Messaging for development AND production (com.rattlegolf.app), the service
+// account is a Cloudflare Production secret, and the app now carries the Push
+// Notifications capability - aps-environment, development in Debug and
+// PRODUCTION in Release, which is the pair a TestFlight or App Store build needs.
+//
+// A DEVICE ON v284 has no tee time, no way to follow a round as a player, no
+// challenges and no push at all; every one of those pages calls its file
+// unguarded, so the key has to move.
+// Moved to v286: THE TEE-TIME FIELD IS GONE, on Manny's call.
+//
+// It came out of round setup, the scorecard header and the Game tab, and the two
+// boxes came out of the trip planner with them - on his iPhone they rendered as
+// empty grey bars, which is moot now. tee-time.js is deleted rather than left
+// unreferenced, and both shell lists lost the entry: a precache list naming a
+// file that is not there is a shell that fails to install.
+//
+// WHAT SURVIVES IS INVISIBLE. A tee time pasted in a trip itinerary is still
+// stored on the trip's own round record and still ORDERS that trip's rounds, AM
+// before PM - it is the only thing that can tell a morning round from an
+// afternoon one. No screen asks for one or shows one.
+//
+// And "You're in" names the round and the date, because a notification cannot
+// quote a time that nothing in the app can set.
+//
+// A DEVICE ON v285 keeps four pages that load a file this build no longer ships.
+// Moved to v287: THE PLAYERS STEP STOPS EXPLAINING ITSELF, and My Groups is for
+// everybody.
+//
+// Step 5 printed a line per golfer - "Randy T: Index 0, no tee rating, used as
+// Playing Handicap" - which on a full field pushed the player boxes off the
+// bottom of a phone, and every line restated a number already in the box beside
+// the name. One line at most now, and on a Strokes round it says Strokes:
+// handicap-labels.js is the only thing that names that box, so the subtitle, the
+// column head, the placeholder and the note cannot say three different things
+// about it again. A paste now lands on the golfers it just added.
+//
+// AND MY GROUPS IS RELEASED. The per-device beta flag, its toggle and the
+// "My Groups (beta)" card are gone; the button is an ordinary control on the
+// Players step, and what it does depends on whether there is an account to save a
+// roster on. A device on v286 keeps the wall of per-golfer lines and a feature
+// nobody can find.
+// Moved to v288: THE PHONE REGISTERS ITSELF.
+//
+// Manny granted the iOS notification permission the night before the push rules
+// were published. The write was refused, nothing retried, and iOS NEVER SHOWS
+// THAT PROMPT TWICE - so the phone had permission and no token, and the only code
+// that could have written one ran solely for a golfer who had already answered
+// "Who am I?" in a round.
+//
+// Every launch now re-registers silently when permission is already granted: no
+// prompt, no round, no name, under the signed-in uid, idempotently - the row key
+// is the token's own fingerprint, so the same phone rewrites one row and a
+// rotated token writes the new one. The organizer and the scorekeeper register
+// too; who RECEIVES what is decided when a notification is sent, not when a
+// device registers. And the test button offers "Register this phone" instead of
+// reporting a dead end.
+//
+// A DEVICE ON v287 keeps a token that can only be written from inside a round, by
+// a golfer who has picked a name.
+// Moved to v289: THE TOKEN IS THE RIGHT KIND, AND THE PHONE CAN GET ONE AT ALL.
+//
+// Both buttons answered "no-token" on a phone with permission granted, and there
+// were two faults behind that one word.
+//
+// THE AppDelegate FORWARDED NOTHING. iOS hands the device token to
+// application(_:didRegisterForRemoteNotificationsWithDeviceToken:), and the
+// Capacitor plugin only ever sees it through NotificationCenter. Without those
+// two methods the 'registration' listener never fires and every caller times out
+// - with nothing on screen pointing at a Swift file.
+//
+// AND THE TOKEN WOULD HAVE BEEN THE WRONG KIND. @capacitor/push-notifications
+// returns the APNs DEVICE TOKEN on iOS; the sender is FCM HTTP v1, where
+// message.token must be an FCM REGISTRATION TOKEN. @capacitor-firebase/messaging
+// joins for one call, getToken(), and push-boot.js asks for that first with the
+// APNs listener as the fallback.
+//
+// The Notifications panel also stopped promising a tee time, a 30-minute reminder
+// and a press offer - the first two were removed before they shipped and the
+// third has no record to answer.
+//
+// A DEVICE ON v288 keeps a page that saves an address the sender cannot use.
+// Moved to v290: THE SENDER ANSWERS A PREFLIGHT.
+//
+// The phone had a real FCM token and the test button still said "Could not reach
+// the sender: Load failed". A POST carrying content-type: application/json is not
+// a simple request - the browser, WKWebView included, sends OPTIONS first and
+// will not send the POST at all unless that answer allows the method and the
+// header. Nothing exported onRequestOptions, so the preflight fell to the
+// catch-all and came back 405, and fetch() gives a failed preflight no status and
+// no body: "Load failed" was all the app could honestly say.
+//
+// /api/push-send answers the preflight now and carries the CORS header on EVERY
+// answer including its refusals - not_configured and no_device are exactly the
+// ones the app needs to read - and the catch-all answers a preflight for any
+// route that does not answer its own.
+//
+// This is a Function change, so the web half of it is only live once the branch
+// is deployed; the cache key moves because admin.html reads those answers.
+const CACHE_VERSION = 'golfapp-v290-preflight';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4166,6 +4317,18 @@ const SHELL_FILES = [
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
     // before the setup page draws anything. That is why it is precached.
     './course-index.js',
+    // Notifications: the pure decider and the device half. Every call site is
+    // typeof-guarded, so these are precached so that a device that has them can
+    // answer a push the moment it arrives.
+    './push-notify.js',
+    './push-boot.js',
+    // The three ways into a round. index.html calls it unguarded from the arrival
+    // sheet, so a cached shell without it throws before a golfer can choose.
+    './round-role.js',
+    // A pending side-bet offer, and the one payload builder every side match is
+    // created from. sidematches.html calls it unguarded, so a cached shell
+    // without it cannot create a side bet.
+    './challenges.js',
     // The paste-an-itinerary parser. trip.html calls it unguarded from the review
     // button, so it is precached.
     './trip-itinerary.js',

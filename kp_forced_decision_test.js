@@ -223,7 +223,12 @@ before(async () => {
     // number from a tap that never reached a button. "Just watching" is the spectator
     // the page itself offers, and dismissing it is what makes this case real.
     S.spectator    = await arrive(LANDS_ON_8, 'game=KPF',
-        [{ tap: '#group-pick-overlay .btn-outline' }, { sleep: 700 }].concat(NEXT));
+    // data-role="watching" NAMES THE ROW (Wave 39). The sheet had one
+    // btn-outline - "Just watching" - and this selected it by class. It now
+    // has three rows, two of them outline, so a class selector picks
+    // whichever comes first: measured, it tapped "I'm playing" and landed on
+    // the name picker instead of the card.
+        [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 700 }].concat(NEXT));
     // A PARTIALLY SCORED KP HOLE, which is what "unscored" has to mean for this gate
     // to be tested at all. My first fixture used group 2 with no scores anywhere: the
     // page landed them on hole 1, Next went to hole 2, and the completeness check was

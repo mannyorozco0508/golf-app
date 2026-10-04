@@ -347,7 +347,9 @@ describe('6. EVERY FEATURE SHIPPED THIS WEEK IS DESCRIBED', () => {
     // Each entry: what the guide must mention, and the app string that proves the
     // feature is really there - so this cannot pass by describing something gone.
     const FEATURES = [
-        ['which group are you keeping score for', 'index.html', 'Which group are you keeping score for?'],
+        // Wave 39: the sheet asks the question rather than naming one of the
+        // answers, because it now offers three - keep score, play, or watch.
+        ['how are you joining this round', 'index.html', 'How are you joining this round?'],
         ['Just watching', 'index.html', 'Just watching'],
         ['Players sheet', 'index.html', 'players-sheet'],
         // "Account" alone passed on the old guide's own phrase "no accounts" -

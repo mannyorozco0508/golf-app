@@ -59,6 +59,9 @@
     <script src="aloha-bet.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
+    <script src="push-notify.js"></script>
+    <script src="push-boot.js"></script>
+    <script src="round-role.js"></script>
     <script src="live-skins.js"></script>
     <!-- Ryder Cup competition layer. MUST load after money-engine.js: it adapts
          calculateMatchEngine for hole arithmetic and does nothing on its own.
@@ -460,6 +463,18 @@
             border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.85rem; cursor: pointer;
         }
         .whoami-line-cue { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.03em; }
+        /* THE ROLE OFFER LINE (Wave 39) HAS ITS OWN CLASS, and that is not
+           cosmetic. It first borrowed .whoami-line-btn, which looks right and
+           broke whoami_line_test.js: that suite taps '.whoami-line-btn' nth 0,
+           and the offer line renders ABOVE the card so it became the first one -
+           the tap opened the role sheet instead of the name picker, and "Skip"
+           was never reached. A shared class is a shared selector. */
+        .role-offer-btn {
+            width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 8px 10px; background: var(--bg-soft); color: var(--text-main);
+            border: 1px solid var(--border-mid); border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+        }
+        .role-offer-cue { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); text-transform: uppercase; letter-spacing: 0.03em; }
         .whoami-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
         .whoami-btn {
             min-height: 44px; padding: 8px 10px; background: var(--bg-card); color: var(--text-main);
@@ -1618,6 +1633,11 @@ html {
          renderGroupMissingNote() from renderScorecard(); static and above both
          view mounts for the same reason #save-state is. -->
     <div class="group-missing-note" id="group-missing-note" role="alert" style="display:none;"></div>
+    <!-- WHY THERE ARE NO SCORE BOXES (Wave 39): a playing golfer or a spectator
+         gets a read-only card, and one with no inputs and no explanation reads as
+         broken. Static, above both view mounts, for the same reason
+         #group-missing-note is - the mounts are rewritten on every snapshot. -->
+    <p id="role-note" role="status" style="display:none; text-align:center; font-size:0.82rem; color:var(--text-muted); margin:0 auto 10px auto; max-width:var(--widget-max);"></p>
     <!-- WHO'S PLAYING WAS HERE, AND THE WHOLE FEATURE IS NOW GONE (Wave 9 took this
          panel; Wave 13 took the rest). It asked each golfer to Confirm or say Can't
          before tee time and measured 504 x 342 with SIXTEEN buttons above score entry.
@@ -1726,9 +1746,22 @@ html {
      renderGroupPicker() fills the body; nothing else on the page changes. -->
 <div class="modal-overlay" id="group-pick-overlay" role="dialog" aria-labelledby="group-pick-title">
     <div class="modal-content">
-        <div class="modal-header"><span id="group-pick-title">Which group are you keeping score for?</span></div>
+        <div class="modal-header"><span id="group-pick-title">How are you joining this round?</span></div>
         <div id="group-pick-body"></div>
-        <button type="button" class="btn-outline" style="margin-top:10px;" onclick="dismissGroupPick()">Just watching</button>
+    </div>
+</div>
+
+<!-- WHICH GOLFER ARE YOU? (Wave 39). The second step of "I'm playing": the role
+     is stored, and now the round needs a name to attach it to - because a role
+     with no name is not addressable, and the bets, the final result and the hype
+     are all per golfer. Reuses setMe() and golfapp_me_<code>, the Wave 17
+     machinery, so nothing new is remembered and a stale id still degrades to
+     nothing. renderPlayingPicker() fills the body. -->
+<div class="modal-overlay" id="playing-pick-overlay" role="dialog" aria-labelledby="playing-pick-title">
+    <div class="modal-content">
+        <div class="modal-header"><span id="playing-pick-title">Which one are you?</span></div>
+        <div id="playing-pick-body"></div>
+        <button type="button" class="btn-outline" style="margin-top:10px;" onclick="skipPlayingPick()">Skip &mdash; just watch</button>
     </div>
 </div>
 
@@ -2180,7 +2213,13 @@ html {
         // slow sign-in cannot hide the button from the organizer or show it to a
         // spectator for good.
         if (window.authReady && typeof window.authReady.then === 'function') {
-            window.authReady.then(() => { if (currentData && currentData.players) { renderScorecard(); maybeOpenPlayersSheetFromLink(); } }, () => {});
+            window.authReady.then(() => {
+                if (currentData && currentData.players) { renderScorecard(); maybeOpenPlayersSheetFromLink(); }
+                // AND THE TOKEN, once there is an account to hang it on. See
+                // refreshPushRegistration: a phone that granted permission before
+                // the rules existed has no other way back.
+                refreshPushRegistration();
+            }, () => {});
         }
     }
     // The Game tab's "Players" pill lands here with ?players=1: the sheet opens on
@@ -3146,6 +3185,8 @@ html {
         }
         renderActionCenter();
         renderBetStrip();
+        renderRoleNote();
+        maybeAskPlayingName();
     }
 
     // ---- Live whole-field skins ---------------------------------------------
@@ -3209,6 +3250,61 @@ html {
     // ONE LINE, above both views, so the golfer holding a stale link is told
     // rather than shown an empty screen. Static markup like #save-state: the
     // view mounts are rewritten on every snapshot and would wipe it.
+    // ONE LINE SAYING WHY THERE ARE NO SCORE BOXES (Wave 39). A playing golfer
+    // and a spectator both get a read-only card, and a card with no inputs and no
+    // explanation reads as broken. round-role.js owns the sentence so this page
+    // and any future surface cannot word it differently.
+    //
+    // Rides the SAME static region as the group-missing note, which is static
+    // because the view mounts are rewritten on every snapshot and would wipe
+    // anything rendered into them.
+    function renderRoleNote() {
+        const el = document.getElementById('role-note');
+        if (!el) return;
+        // THE SINGLE-GROUP OFFER, before the note. A foursome has never been
+        // interrupted on arrival and must not start being - see the reasoning in
+        // round-role.js - so the three choices are one tappable line here, and
+        // tapping it opens the same sheet a multi-group round gets.
+        if (typeof roundRoleOfferLine === 'function' && !scopeMissing()) {
+            const offer = roundRoleOfferLine({
+                hasGroupLock: hasGroupLock, isOrganizer: roundOwnerHere(),
+                superseded: roundSuperseded(), stored: storedRoundRole(),
+                players: currentData.players || [], boundaries: roleBoundaries()
+            });
+            if (offer) {
+                el.innerHTML = '<button type="button" class="role-offer-btn"'
+                    + ' onclick="openRoleSheet()">' + escapeHtml(offer)
+                    + '<span class="role-offer-cue">choose</span></button>';
+                el.style.display = 'block';
+                return;
+            }
+        }
+        const role = currentRoundRole();
+        if (typeof roundRoleNote !== 'function' || role === 'scorekeeper' || scopeMissing()) {
+            el.innerHTML = ''; el.style.display = 'none'; return;
+        }
+        // THE NOTE ONLY SPEAKS FOR A ROLE THE GOLFER CHOSE.
+        //
+        // Caught by card_scope_closed_prev.fixture.json, which captures the bare
+        // link on a 24-golfer round: the arrival sheet was up asking how they are
+        // joining, and underneath it the card already said "Just watching." - an
+        // answer to a question still on screen. roundRoleOf() defaults to
+        // watching because a bare link grants nothing, which is right for
+        // PERMISSIONS and wrong as a sentence.
+        if (!storedRoundRole()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+        // The organizer holds the bare link too and is not "watching" - they can
+        // score anyone, so the sentence would be false for them. Same strict
+        // predicate the sheet uses, for the same reason: on a legacy round
+        // canReachSetup() says yes to everybody.
+        if (roundOwnerHere()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+        const me = resolvedMeId();
+        const mine = me ? (currentData.players || []).find(p => String(p.id) === String(me)) : null;
+        const text = roundRoleNote(role, mine ? golferLabel(mine) : null);
+        if (!text) { el.innerHTML = ''; el.style.display = 'none'; return; }
+        el.textContent = text;
+        el.style.display = 'block';
+    }
+
     function renderGroupMissingNote(missing, group, groupCount) {
         const el = document.getElementById('group-missing-note');
         if (!el) return;
@@ -5682,6 +5778,114 @@ html {
         storeMe(id);
         whoAmIPickerOpen = false;
         renderScorecard();
+        // SAYING WHO YOU ARE IS THE MOMENT A TOKEN BECOMES WORTH ANYTHING
+        // (Wave 39). Before this, a device is anonymous to the sender; after it,
+        // it is Marty's phone and a bet challenge can be addressed to him.
+        //
+        // AND IT IS THE RIGHT MOMENT TO ASK FOR PERMISSION. iOS gives exactly one
+        // chance, and a prompt on first launch is the one a golfer declines
+        // before they know what the app is for.
+        maybeRegisterPushToken();
+    }
+
+    // ---- THE DEVICE HALF (Wave 39). push-boot.js does the work; this supplies
+    // the round, the uid and the writer, and nothing here runs on the web.
+    //
+    // THERE IS NO TEE-TIME ANYTHING HERE ANY MORE. A reminder was built as a local
+    // notification and removed on Manny's call before it shipped; the FIELD itself
+    // followed on 2026-10-04, from round setup, this header and the Game tab,
+    // because he does not use it. What survives is invisible: a time pasted in a
+    // trip itinerary still orders that trip's rounds, AM before PM. Nothing is
+    // left dormant - @capacitor/local-notifications came out of package.json and
+    // the iOS allowlist, and the module went with the field. Unreachable code
+    // still ships, and git history is the right home for code that is not
+    // running. ----
+    // A PLAYING GOLFER WITH NO NAME IS ASKED ONCE THE ROSTER HAS LANDED. The role
+    // can be chosen before the first snapshot arrives - the sheet renders from
+    // whatever players are known - so this catches the case where it was not.
+    let playingAskShown = false;
+    function maybeAskPlayingName() {
+        if (playingAskShown) return;
+        if (currentRoundRole() !== 'playing') return;
+        if (resolvedMeId()) return;
+        if (!(currentData.players || []).length) return;
+        playingAskShown = true;
+        renderPlayingPicker();
+    }
+
+    let pushTokenTried = false;
+    function maybeRegisterPushToken() {
+        if (pushTokenTried || typeof pushRegisterToken !== 'function') return;
+        const playerId = (typeof resolvedMeId === 'function') ? resolvedMeId() : null;
+        // ONLY A PLAYING GOLFER (Wave 39), and round-role.js owns that rule.
+        //
+        // A SPECTATOR MUST NEVER BE REGISTERED. The bare link is what gets
+        // forwarded to wives, friends and group chats; a phone that buzzes
+        // because somebody opened a link once is a phone that deletes the app.
+        // And the SCOREKEEPER is holding the card - they can see everything
+        // already, so a buzz for a bet they just entered themselves is noise.
+        if (typeof roundRoleCanRegister === 'function'
+            && !roundRoleCanRegister(currentRoundRole(), playerId)) return;
+        if (!playerId) return;
+        let uid = null;
+        try { uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null; } catch (e) { uid = null; }
+        if (!uid) return;
+        pushTokenTried = true;
+        try {
+            pushRegisterToken({
+                uid: uid, playerId: playerId, roundCode: currentMode,
+                // ONE DEVICE, ONE ROW. The row key is the token's own fingerprint,
+                // so re-registering the same phone updates its row instead of
+                // adding a second one - and a golfer with a phone and a watch
+                // legitimately has two.
+                save: (rec) => {
+                    const key = pushDeviceRow(rec.token);
+                    return key ? db.ref('pushTokens/' + uid + '/' + key).set(rec) : Promise.resolve();
+                }
+            }).catch(() => {});
+        } catch (e) { /* no token today; the app is unchanged */ }
+    }
+
+    // THE ROW KEY IS push-boot.js's (2026-10-04). It was written out here and
+    // admin.html needs the same answer now: two hashes of one token are two rows
+    // for one phone, and the stale one keeps receiving.
+    function pushDeviceRow(token) {
+        return (typeof pushDeviceKey === 'function') ? pushDeviceKey(token) : null;
+    }
+
+    // ---- REGISTER ON EVERY LAUNCH, IF THE PHONE HAS ALREADY SAID YES --------
+    //
+    // THE BUG THIS FIXES. Manny granted the iOS permission the night before the
+    // push rules were published. The write was refused, nothing retried, and iOS
+    // never shows that prompt twice - so his phone had permission and no token,
+    // and the only code that could have written one ran solely for a golfer who
+    // had chosen "I'm playing" in a round.
+    //
+    // SO THIS ASKS NOTHING AND NEEDS NOTHING. No prompt, no round, no name: if
+    // permission is already granted, the token is fetched and saved under the
+    // signed-in uid. It runs on load and again whenever the account changes,
+    // because a token belongs to a device and a row belongs to an account.
+    let pushRefreshed = false;
+    function refreshPushRegistration() {
+        if (typeof pushRegisterIfGranted !== 'function') return;
+        let uid = null;
+        try { uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null; } catch (e) { uid = null; }
+        if (!uid || pushRefreshed) return;
+        pushRefreshed = true;
+        try {
+            pushRegisterIfGranted({
+                uid: uid,
+                // WHOEVER THIS IS, including nobody in particular. A scorekeeper
+                // and an organizer have phones too; who RECEIVES what is decided
+                // when a notification is sent.
+                playerId: (typeof resolvedMeId === 'function' && resolvedMeId()) || '',
+                roundCode: currentMode || '',
+                save: (rec) => {
+                    const key = pushDeviceRow(rec.token);
+                    return key ? db.ref('pushTokens/' + uid + '/' + key).set(rec) : Promise.resolve();
+                }
+            }).catch(() => {});
+        } catch (e) { /* a launch must never fail on this */ }
     }
     function skipWhoAmI() {
         storeWhoAmISkipped();
@@ -6856,27 +7060,194 @@ html {
         el.style.display = 'block';
     }
 
+    // IS THIS DEVICE THE ROUND'S OWNER? Narrower than canReachSetup() on purpose.
+    //
+    // canReachSetup() answers yes on a LEGACY round that records no ownerUid and
+    // no organizerToken - that arm is deliberate and documented in
+    // organizer-gate.js, because such a round was open to anyone who held the
+    // link. But using it here would mean a golfer on a legacy round is told they
+    // are the organizer and never offered "I'm playing" at all.
+    //
+    // organizerEvidence() is the strict half: a uid that matches ownerUid, or a
+    // held token that matches organizerToken. On a legacy round it is null, the
+    // sheet shows, and the golfer gets the choice.
+    function roundOwnerHere() {
+        if (!window.organizerGate || typeof window.organizerGate.organizerEvidence !== 'function') return false;
+        const uid = (window.authBootState && window.authBootState.uid) || null;
+        const token = window.organizerGate.heldOrganizerToken(currentMode, organizerTokenParam);
+        return !!window.organizerGate.organizerEvidence(currentData, uid, token);
+    }
+
+    // ---- THE ARRIVAL SHEET: THREE WAYS IN (Wave 39) ----
+    //
+    // This asked ONE question - which group are you keeping score for - and
+    // offered "Just watching" as the way out. It missed the most common answer:
+    // a golfer who is PLAYING and not keeping score. One person per group holds
+    // the card; the other three have money on the round and the app had nothing
+    // to say to them.
+    //
+    // round-role.js decides what is offered and whether to ask at all. The rows
+    // come from there so this page cannot disagree with the module about who is
+    // in which role - and so "one group is still a choice" is a rule rather than
+    // a condition buried in a renderer. A single-group round used to offer
+    // nothing and every golfer landed on a writable card, which is how four
+    // people end up typing over each other.
     function renderGroupPicker(players, boundaries) {
         const overlay = document.getElementById('group-pick-overlay');
         const body = document.getElementById('group-pick-body');
         if (!overlay || !body) return;
-        if (hasGroupLock || !boundaries || boundaries.length <= 1 || groupPickDismissed()) {
-            overlay.style.display = 'none'; body.innerHTML = ''; return;
-        }
+        const ask = (typeof roundRoleShouldAsk === 'function') && roundRoleShouldAsk({
+            hasGroupLock: hasGroupLock,
+            isOrganizer: roundOwnerHere(),
+            superseded: roundSuperseded(),
+            dismissed: groupPickDismissed(),
+            stored: storedRoundRole(),
+            players: players || [],
+            // THE GROUPS DECIDE WHETHER THIS IS A SHEET OR A LINE, so they are
+            // not optional here - omitting them made every round look
+            // single-group and the sheet never opened at all.
+            boundaries: boundaries || roleBoundaries()
+        });
         // v191: a retired round has no group to pick - the picker shows the way to
-        // the live round instead (the same sentence as the banner).
-        if (roundSuperseded()) {
+        // the live round instead (the same sentence as the banner). Checked BEFORE
+        // the ask gate, because that banner is the one thing worth showing on a
+        // round that has been replaced.
+        if (roundSuperseded() && !hasGroupLock && !groupPickDismissed()) {
             body.innerHTML = supersededLinkHtml();
             overlay.style.display = 'flex';
             return;
         }
-        body.innerHTML = boundaries.map(b => {
-            const names = players.slice(b.startIdx, b.startIdx + b.size)
-                .map(p => escapeHtml(golferLabel(p))).join(', ');
-            return '<button type="button" class="btn-primary group-pick-btn" onclick="pickGroup(' + b.group + ')">'
-                + 'Group ' + b.group + ' \u00B7 ' + names + '</button>';
-        }).join('');
+        if (!ask) { overlay.style.display = 'none'; body.innerHTML = ''; return; }
+        const rows = roundRoleChoices({
+            hasGroupLock: hasGroupLock, isOrganizer: roundOwnerHere(), superseded: roundSuperseded(),
+            players: players || [], boundaries: boundaries || [], label: golferLabel
+        });
+        body.innerHTML = roleSheetRowsHtml(rows);
         overlay.style.display = 'flex';
+    }
+
+    // ONE BUILDER FOR THE ROWS, because two surfaces open this sheet - the
+    // multi-group arrival and the single-group line - and a hand-written copy in
+    // each is how one of them ends up offering something the other does not.
+    function roleSheetRowsHtml(rows) {
+        return rows.map(r => {
+            const onclick = r.role === 'scorekeeper'
+                ? 'pickGroup(' + r.group + ')'
+                : (r.role === 'playing' ? 'pickPlayingRole()' : 'dismissGroupPick()');
+            const cls = r.role === 'scorekeeper' ? 'btn-primary group-pick-btn' : 'btn-outline group-pick-btn';
+            // data-role NAMES THE ROW. Before this the sheet had one btn-outline -
+            // "Just watching" - and tools/ and the Chrome checks selected it by
+            // class. With three rows, two of them outline, a class selector picks
+            // whichever comes first: hole_view_landing_test.js tapped "I'm
+            // playing" and landed on the name picker instead of the card. A check
+            // should be able to say which row it means.
+            return '<button type="button" class="' + cls + '" data-role="' + r.role + '"'
+                + (r.group ? ' data-group="' + r.group + '"' : '')
+                + ' style="margin-top:8px;" onclick="' + onclick + '">'
+                + escapeHtml(r.title)
+                + (r.sub ? '<span style="display:block; font-weight:normal; font-size:0.76rem; opacity:0.85; margin-top:2px;">'
+                    + escapeHtml(r.sub) + '</span>' : '')
+                + '</button>';
+        }).join('');
+    }
+
+    // THE ROUND'S GROUPS, from the one function that computes them. Asked for here
+    // rather than read off a global, because the only global that holds them is set
+    // by a renderer that may not have run yet - and the role rules branch on
+    // whether there is more than one group.
+    function roleBoundaries() {
+        const players = currentData.players || [];
+        if (!players.length || typeof computeGroupBoundaries !== 'function') return [];
+        try { return computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {}) || []; }
+        catch (e) { return []; }
+    }
+
+    // THE SAME SHEET, OPENED ON DEMAND. A single-group round is offered the
+    // choice on a line rather than in front of the card, and this is what that
+    // line opens - so there is one sheet and one set of rows, not a second copy
+    // worded differently.
+    function openRoleSheet() {
+        const overlay = document.getElementById('group-pick-overlay');
+        const body = document.getElementById('group-pick-body');
+        if (!overlay || !body || typeof roundRoleChoices !== 'function') return;
+        const rows = roundRoleChoices({
+            hasGroupLock: hasGroupLock, isOrganizer: roundOwnerHere(), superseded: roundSuperseded(),
+            players: currentData.players || [], boundaries: roleBoundaries(), label: golferLabel
+        });
+        if (!rows.length) return;
+        body.innerHTML = roleSheetRowsHtml(rows);
+        overlay.style.display = 'flex';
+    }
+
+    // ---- THE ROLE, STORED PER ROUND ----
+    //
+    // localStorage, like golfapp_me_<code>, because a golfer keeps score one week
+    // and plays the next and the answer belongs to the round. Both halves are
+    // wrapped: a private window throws on set AND on get, and the failure mode
+    // has to be "asks again next load", never a page that will not render.
+    // TWO HALVES, THE SAME SHAPE whoAmIDismissed USES, and for the same reason.
+    //
+    // The session value makes a choice act IMMEDIATELY without waiting on a
+    // storage round-trip; the stored value makes it survive the reload. A private
+    // window throws on both set and get, so without the session half a golfer
+    // there would be asked again on every navigation between holes - which is
+    // exactly the defect Wave 17 recorded about the "Skip" answer.
+    let roleThisSession = '';
+    function storedRoundRole() {
+        if (roleThisSession) return roleThisSession;
+        if (typeof roundRoleKey !== 'function') return '';
+        try { return localStorage.getItem(roundRoleKey(currentMode)) || ''; } catch (e) { return ''; }
+    }
+    function storeRoundRole(role) {
+        roleThisSession = String(role);
+        if (typeof roundRoleKey !== 'function') return;
+        try { localStorage.setItem(roundRoleKey(currentMode), String(role)); } catch (e) { /* lasts the session */ }
+    }
+    function currentRoundRole() {
+        if (typeof roundRoleOf !== 'function') return hasGroupLock ? 'scorekeeper' : 'watching';
+        return roundRoleOf({ hasGroupLock: hasGroupLock, stored: storedRoundRole() });
+    }
+
+    // "I'm playing" is TWO steps, and the second one is the point: a role with no
+    // name is not addressable, so there is nothing to attach a bet or a result to.
+    function pickPlayingRole() {
+        storeRoundRole('playing');
+        const overlay = document.getElementById('group-pick-overlay');
+        if (overlay) overlay.style.display = 'none';
+        renderPlayingPicker();
+    }
+
+    function renderPlayingPicker() {
+        const overlay = document.getElementById('playing-pick-overlay');
+        const body = document.getElementById('playing-pick-body');
+        if (!overlay || !body) return;
+        const players = (currentData.players || []);
+        if (!players.length) { overlay.style.display = 'none'; return; }
+        body.innerHTML = players.map(p =>
+            '<button type="button" class="btn-primary group-pick-btn" style="margin-top:8px;" onclick="pickPlayingMe(\'' + p.id + '\')">'
+            + escapeHtml(golferLabel(p)) + '</button>').join('');
+        overlay.style.display = 'flex';
+    }
+
+    // setMe() is the Wave 17 writer - golfapp_me_<code> - so nothing new is
+    // remembered and a stale id still degrades to nothing through resolvedMeId().
+    function pickPlayingMe(id) {
+        const overlay = document.getElementById('playing-pick-overlay');
+        if (overlay) overlay.style.display = 'none';
+        setMe(id);
+        renderScorecard();
+    }
+
+    // SKIPPING THE NAME DROPS BACK TO WATCHING, deliberately. A playing golfer
+    // with no name gets nothing a spectator does not get, so leaving the role at
+    // "playing" would promise notifications that can never be addressed.
+    function skipPlayingRole() { skipPlayingPick(); }
+    function skipPlayingPick() {
+        storeRoundRole('watching');
+        const overlay = document.getElementById('playing-pick-overlay');
+        if (overlay) overlay.style.display = 'none';
+        dismissGroupPick();
+        renderScorecard();
     }
     // The tap: the same URL a group link carries, with everything else in this
     // page's query kept (?me=, ?organizer=). Relative, like every navigation here.
@@ -6888,8 +7259,14 @@ html {
     }
     function dismissGroupPick() {
         try { sessionStorage.setItem(groupPickKey(), '1'); } catch (e) { /* private mode: asks again next load */ }
+        // WAVE 39: the answer is also remembered per round, so "Just watching"
+        // survives a reload rather than being asked again on every navigation
+        // between holes. The session flag stays for the same reason it was added -
+        // it makes the dismissal act immediately without waiting on storage.
+        storeRoundRole('watching');
         const overlay = document.getElementById('group-pick-overlay');
         if (overlay) overlay.style.display = 'none';
+        renderScorecard();
     }
 
     let groupLinksPanelOpen = false;

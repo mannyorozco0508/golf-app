@@ -196,29 +196,19 @@ function tripRoundWhen(date) {
     return TRIP_WEEKDAYS[d.getDay()] + ' ' + Number(m[2]) + '/' + Number(m[3]);
 }
 
-// 24-HOUR IN, A CLOCK OUT. The itinerary stores "08:24"; a golfer reads 8:24 AM.
-function tripRoundClock(time) {
-    var m = /^(\d{1,2}):(\d{2})$/.exec(String(time || '').trim());
-    if (!m) return '';
-    var h = Number(m[1]);
-    if (!(h >= 0 && h <= 23)) return '';
-    var suffix = h < 12 ? 'AM' : 'PM';
-    var h12 = h % 12 === 0 ? 12 : h % 12;
-    return h12 + ':' + m[2] + ' ' + suffix;
-}
-
-// "Tue 10/13 - 8:24 AM - Caledonia", which is what the round IS: a day, a tee
-// time and a course. With no tee time the AM/PM comes off the round's own label,
-// where the planner put it, so a 36-hole day stays legible either way.
+// "Tue 10/13 AM - Caledonia": a day, which half of it, and a course.
+//
+// NO CLOCK (2026-10-04). A pasted itinerary still carries 8:24 and 1:40, and the
+// ORDER below is still built from them - it is the only thing that can tell a
+// morning round from an afternoon one - but no screen in this app shows a tee
+// time or asks for one any more. The AM/PM comes off the round's own label,
+// where the planner put it.
 function tripRoundPickerLabel(round) {
     var r = round || {};
     var when = tripRoundWhen(r.date);
-    var clock = tripRoundClock(r.time);
     var label = String(r.label || r.code || '').trim();
     var half = /\b(AM|PM)\b\s*$/i.exec(label);
-    var left = when
-        ? (when + (clock ? ' \u00B7 ' + clock : (half ? ' ' + half[1].toUpperCase() : '')))
-        : label;
+    var left = when ? (when + (half ? ' ' + half[1].toUpperCase() : '')) : label;
     var course = String(r.courseName || '').trim();
     if (!left) left = label || String(r.code || '');
     return course ? left + ' \u00B7 ' + course : left;
@@ -505,7 +495,7 @@ if (typeof module !== 'undefined' && module.exports) {
         tripRoundHasScores, tripRoundIsClosed, tripRosterPlan, tripRosterPlanNote,
         tripNextPlayerId, tripNameKey, tripRosterAddUpdates, tripRosterRemoveUpdates,
         tripOpenRosterNames, tripIsPlaceholderName, tripRosterPasteUpdates, tripRosterPasteNote,
-        tripRoundWhen, tripRoundClock, tripRoundPickerLabel, tripRoundPickerRows,
+        tripRoundWhen, tripRoundPickerLabel, tripRoundPickerRows,
         tripGroupRows, tripIdentityDigest, tripPlaceholderNote
     };
 }

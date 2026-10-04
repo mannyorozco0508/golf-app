@@ -118,7 +118,12 @@ before(async () => {
         { expression: "document.querySelector('.hole-picker').scrollIntoView({ block: 'center' }); 'picker shown'" }, { expression: rect('.hole-pick-btn', 4) }]);
     assert.ok(pk.ok, 'Chrome did not run: ' + pk.reason);
     S.pick5 = P(pk, 6);
-    const g8 = await arrive('game=LND', [{ tap: '#group-pick-overlay button.btn-outline' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: NAV_BTN(2) }]);
+    // data-role="watching" NAMES THE ROW (Wave 39). The sheet had one
+    // btn-outline - "Just watching" - and this selected it by class. It now
+    // has three rows, two of them outline, so a class selector picks
+    // whichever comes first: measured, it tapped "I'm playing" and landed on
+    // the name picker instead of the card.
+    const g8 = await arrive('game=LND', [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: NAV_BTN(2) }]);
     S.next8 = P(g8, 3);   // the picker dismissed first (2026-09-20), so the geometry is the card's
 
     // 1. NEXT from the 4th golfer, NEXT again from the page top, PREV from the
@@ -137,7 +142,7 @@ before(async () => {
     // heading for Next meets "Just watching" first. Tapped, the way a spectator
     // would, by its own selector (a real tap - no page function); the landing
     // below is then measured on the same spectator view it always was.
-    S.org = await arrive('game=LND', [{ tap: '#group-pick-overlay button.btn-outline' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: STATE }, ...tap(S.next8), { expression: STATE }]);
+    S.org = await arrive('game=LND', [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 300 }, { expression: SCROLL_TO_4TH }, { expression: STATE }, ...tap(S.next8), { expression: STATE }]);
     // 3. The 1-18 jump to hole 5.
     S.jump = await arrive('game=LND&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.next1), ...tap(S.posL),
         { expression: "document.querySelector('.hole-picker').scrollIntoView({ block: 'center' }); 'picker shown'" }, { expression: STATE }, ...tap(S.pick5), { expression: STATE }]);

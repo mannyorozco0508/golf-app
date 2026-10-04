@@ -61,6 +61,8 @@
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="course-index.js"></script>
+    <script src="push-notify.js"></script>
+    <script src="push-boot.js"></script>
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="settlement-engine.js"></script>
@@ -1094,16 +1096,6 @@ html {
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
     </section>
-    <!-- MY GROUPS (BETA). An ordinary account setting, shown only to a signed-in
-         organizer - which is not decoration: the feature stores the roster on the
-         ACCOUNT, so an anonymous browser has nothing to save it to and the switch
-         would promise something that cannot work. Hidden until linked, and the
-         guard asserts that. -->
-    <section id="my-groups-beta" class="email-link-card" aria-labelledby="my-groups-beta-title" style="display:none;">
-        <h2 id="my-groups-beta-title">My Groups (beta)</h2>
-        <p id="my-groups-flag-state">…</p>
-        <button type="button" id="my-groups-beta-btn" class="btn-primary" onclick="toggleMyGroupsFeature()">Turn My Groups on</button>
-    </section>
     <!-- SIGN OUT AND DELETE ACCOUNT (Wave 34). Required by App Review 5.1.1(v):
          an app that lets somebody create an account has to let them delete it from
          inside the app, and Wave 33 made Apple and Google the front door. Shown
@@ -1114,6 +1106,46 @@ html {
          the founder pass. account-exit.js holds the words and the plan; every write
          in here goes through setTextOnce, because this card is inside
          #account-modal and watchAccountStatus observes that subtree. -->
+    <!-- NOTIFICATIONS (Wave 39). Three channels, and only two of them are
+         switches: Essentials cannot be turned off, so the screen SAYS SO rather
+         than offering a control that does nothing. A disabled checkbox a golfer
+         can tap and watch spring back is worse than a sentence.
+         HIDDEN UNTIL THERE IS SOMETHING TO SET - syncNotifyCard() shows it only
+         in the native shell, because a browser has no plugin and the switches
+         would save a preference nothing could ever act on. -->
+    <section id="notify-card" class="email-link-card" aria-labelledby="notify-title" style="display:none;">
+        <h2 id="notify-title">Notifications</h2>
+        <p id="notify-lead">You're asked for permission when you open a round, not before.</p>
+        <!-- THE COPY NAMES WHAT IS ACTUALLY SENT (2026-10-04). It promised a tee
+             time and a 30-minute reminder, both of which were removed before they
+             shipped, and a press offer, which has no record to answer - a press is
+             a thing you do, not a thing you ask. Five notifications exist: you're
+             in, final results, a bet challenge, an Aloha offer, and hype. -->
+        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. You&rsquo;re in a round, and the final results.</p>
+        <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
+            <input type="checkbox" id="notify-bets" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>💰 Bets &mdash; somebody challenges you to a side bet, or offers you an Aloha</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
+            <input type="checkbox" id="notify-hype" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>🔥 Hype &mdash; a hot streak, an eagle, an ace. Never the standings.</span>
+        </label>
+        <p id="notify-note" role="status"></p>
+        <!-- ONE TAP THAT PROVES PUSH WORKS, and it can only ever reach the phone
+             of the account tapping it: the tokens it sends to are read from
+             pushTokens/<my own uid>, so there is no shape of this button that
+             notifies anybody else.
+             WHO SEES IT: nobody, until app_settings/pushTestUid holds a uid, and
+             then only that account. It is a server-side switch rather than a
+             hidden gesture, because a feature reachable by a secret tap in the
+             shell is the Guideline 2.1 problem the master panel is already a
+             native no-op for. -->
+        <div id="notify-test-row" style="display:none; margin-top:12px; border-top:1px solid var(--border-light); padding-top:10px;">
+            <button type="button" id="notify-test-btn" class="btn-outline" onclick="sendTestNotification()">🔔 Send me a test notification</button>
+            <p id="notify-test-note" role="status" style="font-size:0.8rem; margin:8px 0 0 0;"></p>
+        </div>
+    </section>
+
     <section id="account-exit-card" class="email-link-card" aria-labelledby="account-exit-title" style="display:none;">
         <h2 id="account-exit-title">This account</h2>
         <p id="account-exit-lead">Signed in. Sign out to hand this device back to a new organizer, or delete the account entirely.</p>
@@ -1845,8 +1877,14 @@ html {
 
     <div class="wizard-step" id="wizard-step-5" data-step="5">
         <div class="wizard-step-title">👥 Players · <span class="wiz-step-n" id="wiz-n-players">Step 5</span></div>
-        <div class="wizard-step-sub">Add everyone playing today. The number beside each name is a Handicap Index.</div>
-    <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45; white-space:pre-line;">Slope, Course Rating, and Par are missing, so each Handicap Index is used as the Playing Handicap. Nets say so.</p>
+        <!-- THE SUBTITLE NAMES NO MODE. It said "Handicap Index" on every round,
+             including a Strokes round, where the column head says Strokes and the
+             note says "used as entered" - three names for one box on one screen.
+             What the number is called is handicap-labels.js's answer and it is
+             written into the boxes and the line below; this sentence just says
+             what the step is for. -->
+        <div class="wizard-step-sub">Add everyone playing today, with the number beside each name.</div>
+    <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45;"></p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
         ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Weekly Game.
     </div>
@@ -1913,7 +1951,13 @@ html {
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
-    <button class="btn-outline" id="my-groups-btn" style="display:none;" onclick="openMyGroupsModal()">👥 My Groups</button>
+    <!-- MY GROUPS IS FOR EVERYBODY NOW (2026-10-04). It shipped behind a
+         per-device beta switch in the Account panel; the switch is gone and so is
+         the card. The button is an ordinary control on this step, and what it
+         does depends on one thing only: whether there is an account to save a
+         roster on. Signed in, it opens the groups; not signed in, it says so and
+         offers the one screen that fixes that. -->
+    <button class="btn-outline" id="my-groups-btn" onclick="openMyGroupsModal()">👥 My Groups</button>
 
     <div class="modal-overlay" id="my-groups-modal">
         <div class="modal-content">
@@ -6223,6 +6267,251 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     });
 
+    // ---- NOTIFICATION SETTINGS (Wave 39) ----
+    //
+    // Two switches and a sentence. ESSENTIALS IS NOT A CONTROL, because it cannot
+    // be turned off - push-notify.js forces it true whatever is stored, and the
+    // proposed rules refuse the key outright - so offering a checkbox for it
+    // would be offering a control that does nothing.
+    //
+    // THE CARD IS HIDDEN OUTSIDE THE NATIVE SHELL. A browser has no plugin, so
+    // the switches would save a preference nothing could ever act on, and a
+    // golfer would reasonably conclude notifications were on.
+    var notifyPrefsSaving = false;
+
+    function notifyPrefsPath(uid) { return 'pushPrefs/' + uid; }
+
+    function notifyUid() {
+        try {
+            var u = firebase.auth().currentUser;
+            return u && u.uid ? u.uid : null;
+        } catch (e) { return null; }
+    }
+
+    function syncNotifyCard() {
+        var card = document.getElementById('notify-card');
+        if (!card) return;
+        var native = false;
+        try { native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+        catch (e) { native = false; }
+        card.style.display = native ? 'block' : 'none';
+        if (!native) return;
+        var uid = notifyUid();
+        if (!uid) return;
+        // READ ONCE, and a failure leaves the defaults on screen - pushPrefsNormalise
+        // answers "everything on" for an absent record, which is what somebody who
+        // has never opened this screen is asking for.
+        db.ref(notifyPrefsPath(uid)).once('value').then(function (snap) {
+            notifyPrefsApply(snap.val());
+        }).catch(function () { notifyPrefsApply(null); });
+        // THE TEST BUTTON IS OFF UNLESS THE DATABASE NAMES THIS ACCOUNT. A read
+        // that fails leaves it hidden, which is the safe direction.
+        db.ref('app_settings/pushTestUid').once('value').then(function (snap) {
+            notifyTestVisible(uid, snap.val());
+        }).catch(function () { notifyTestVisible(uid, null); });
+        // EVERY TIME THIS CARD SYNCS, which is on load and whenever the account
+        // changes. Silent: it cannot prompt and it cannot fail loudly.
+        refreshPushRegistration();
+    }
+
+// ---- THE TEST NOTIFICATION (Wave 39, 2026-10-04) ----
+    //
+    // THE REAL PATH, NOT A SHORTCUT. It reads this account's own device tokens,
+    // asks push-notify.js to DECIDE in the normal way, and posts that decision to
+    // /api/push-send - the same route every other notification goes through. A
+    // button that called FCM directly, or sent a canned payload, would prove that
+    // the button works and nothing else: the point is to prove the credential,
+    // the token, the capability and the route together, with one phone.
+    //
+    // IT CANNOT REACH ANYBODY ELSE. The tokens come from pushTokens/<my uid>,
+    // which the rules already restrict to that uid.
+    function notifyTestVisible(uid, testUid) {
+        var row = document.getElementById('notify-test-row');
+        if (!row) return;
+        row.style.display = (uid && testUid && String(uid) === String(testUid)) ? 'block' : 'none';
+    }
+
+// ---- REGISTER THIS PHONE (2026-10-04) ----
+    //
+    // Manny granted the iOS permission the night before the push rules were
+    // published: the write was refused, nothing retried, and iOS never shows that
+    // prompt a second time - so the phone had permission and no token, and the
+    // test button could only say so.
+    //
+    // THE FIX IS A LAUNCH-TIME REFRESH that asks nothing: if permission is
+    // already granted, the token is fetched and saved under the signed-in uid,
+    // every launch, idempotently. It needs no round and no name, because who
+    // RECEIVES a notification is decided when one is sent.
+    let pushRefreshed = false;
+    function pushTokensPath(uid) { return 'pushTokens/' + uid; }
+
+    function refreshPushRegistration(force) {
+        if (typeof pushRegisterIfGranted !== 'function') return Promise.resolve(null);
+        const uid = notifyUid();
+        if (!uid) return Promise.resolve(null);
+        if (pushRefreshed && !force) return Promise.resolve(null);
+        pushRefreshed = true;
+        try {
+            return pushRegisterIfGranted({
+                uid: uid, playerId: '', roundCode: '',
+                save: (rec) => {
+                    const key = (typeof pushDeviceKey === 'function') ? pushDeviceKey(rec.token) : null;
+                    return key ? db.ref(pushTokensPath(uid) + '/' + key).set(rec) : Promise.resolve();
+                }
+            }).catch(() => null);
+        } catch (e) { return Promise.resolve(null); }
+    }
+
+    // THE BUTTON ON THE DEAD END. When there is no token, the test card offers the
+    // one thing that can produce one - and this one MAY prompt, because a golfer
+    // who never granted permission has to be asked.
+    async function registerThisPhone() {
+        const note = document.getElementById('notify-test-note');
+        const say = (t) => { if (note) note.textContent = t; };
+        const uid = notifyUid();
+        if (!uid) return say('Sign in first.');
+        if (typeof pushRegisterToken !== 'function') return say('The notification plugin did not load.');
+        say('Registering this phone\u2026');
+        try {
+            const out = await pushRegisterToken({
+                uid: uid, playerId: '', roundCode: '',
+                save: (rec) => {
+                    const key = (typeof pushDeviceKey === 'function') ? pushDeviceKey(rec.token) : null;
+                    return key ? db.ref(pushTokensPath(uid) + '/' + key).set(rec) : Promise.resolve();
+                }
+            });
+            if (out && out.registered) {
+                say('This phone is registered. Tap "Send me a test notification".');
+            } else {
+                // THE REASON, NOT A PARAPHRASE. "denied" is a trip to iOS
+                // Settings; "no-token" is an APNs problem; "write-failed" is the
+                // rules. They need different things done about them.
+                say('Not registered: ' + ((out && out.reason) || 'no answer') + '.');
+            }
+        } catch (e) {
+            say('Could not register: ' + (e && e.message ? e.message : 'no answer') + '.');
+        }
+    }
+
+    async function sendTestNotification() {
+        var note = document.getElementById('notify-test-note');
+        var btn = document.getElementById('notify-test-btn');
+        var say = function (t) { if (note) note.textContent = t; };
+        var uid = notifyUid();
+        if (!uid) return say('Sign in first.');
+        if (typeof pushDecide !== 'function') return say('The notification rules did not load.');
+        if (btn) btn.disabled = true;
+        say('Sending\u2026');
+        try {
+            var snap = await db.ref(pushTokensPath(uid)).once('value');
+            var raw = snap.val() || {};
+            // THE SHAPE THE RULES ALLOW: pushTokens/<uid>/<deviceId> = { token, playerId, at }.
+            let tokens = Object.keys(raw).map(function (k) {
+                return raw[k] && raw[k].token;
+            }).filter(function (t) { return typeof t === 'string' && t; });
+            if (!tokens.length) {
+                // NOT A DEAD END. One more try at a silent refresh first - the
+                // common case is a phone that already has permission - and if
+                // that produces nothing, the button that can ask.
+                const again = await refreshPushRegistration(true);
+                if (!(again && again.registered)) {
+                    say('This phone is not registered yet.');
+                    const row = document.getElementById('notify-test-row');
+                    if (row && !document.getElementById('notify-register-btn')) {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.id = 'notify-register-btn';
+                        b.className = 'btn-outline';
+                        b.style.marginTop = '8px';
+                        b.textContent = '\ud83d\udcf2 Register this phone';
+                        b.onclick = registerThisPhone;
+                        row.appendChild(b);
+                    }
+                    return;
+                }
+                // The refresh wrote a row; read it back rather than guessing.
+                const snap2 = await db.ref(pushTokensPath(uid)).once('value');
+                const raw2 = snap2.val() || {};
+                tokens = Object.keys(raw2).map(function (k) { return raw2[k] && raw2[k].token; })
+                    .filter(function (t) { return typeof t === 'string' && t; });
+                if (!tokens.length) { say('This phone is not registered yet.'); return; }
+            }
+            // A REAL DECISION, from the real decider, so a refusal here is the
+            // same refusal a live notification would get.
+            var decided = pushDecide({
+                kind: 'youre-in',
+                tokens: tokens,
+                prefs: { bets: true, hype: true },
+                facts: { uid: uid, roundName: 'Test notification',
+                         dateText: 'right now',
+                         roundCode: 'TEST' }
+            });
+            if (!decided || !decided.send) {
+                say('Not sent: ' + ((decided && decided.reason) || 'the decider said no') + '.');
+                return;
+            }
+            var res = await fetch(courseApiBase() + '/api/push-send', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ decided: decided, tokens: tokens, extra: { test: '1' } })
+            });
+            var out = null;
+            try { out = await res.json(); } catch (e) { out = null; }
+            if (out && out.status === 'ok') {
+                say('Sent to ' + out.sent + ' device' + (out.sent === 1 ? '' : 's')
+                    + (out.dead && out.dead.length ? ' \u00B7 ' + out.dead.length + ' stale token' + (out.dead.length === 1 ? '' : 's') : '')
+                    + '. It should arrive in a second or two.');
+            } else {
+                // THE FUNCTION'S OWN REASON, not a paraphrase: not_configured means
+                // the Cloudflare secret is not in the deployment yet, and that is a
+                // different job from a token or a capability.
+                say('Not sent: ' + ((out && (out.reason || out.status)) || ('HTTP ' + res.status)) + '.');
+            }
+        } catch (e) {
+            say('Could not reach the sender: ' + (e && e.message ? e.message : 'no answer') + '.');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    function notifyPrefsApply(raw) {
+        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { bets: true, hype: true };
+        var bets = document.getElementById('notify-bets');
+        var hype = document.getElementById('notify-hype');
+        if (bets) bets.checked = !!p.bets;
+        if (hype) hype.checked = !!p.hype;
+    }
+
+    async function notifyPrefsChanged() {
+        var note = document.getElementById('notify-note');
+        var uid = notifyUid();
+        if (!uid) { if (note) note.textContent = 'Sign in to save this on your account.'; return; }
+        if (notifyPrefsSaving) return;
+        notifyPrefsSaving = true;
+        var bets = document.getElementById('notify-bets');
+        var hype = document.getElementById('notify-hype');
+        // DELIBERATELY NOT NAMED payload. persistence_contract_test.js locates the
+        // round save by the first occurrence of the round-save update call in this
+        // file, and checks the settlementMode deletion sits before it - so a
+        // second update with the same argument name three thousand lines earlier
+        // makes a true claim look false. The guard is right; the name was mine to
+        // change. And this comment does not spell the call out, because doing so
+        // trips the same search.
+        var prefsPayload = (typeof pushPrefsForSave === 'function')
+            ? pushPrefsForSave({ bets: bets && bets.checked, hype: hype && hype.checked })
+            : { bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+        try {
+            await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
+            if (note) note.textContent = 'Saved.';
+        } catch (e) {
+            // THE RULES ARE NOT PUBLISHED YET, so this is the expected answer
+            // today and it must read as "not yet", never as a broken screen.
+            if (note) note.textContent = 'Not saved yet \u2014 notifications are still being set up.';
+            notifyPrefsApply(null);
+        }
+        notifyPrefsSaving = false;
+    }
+
     function updateCustomCoursePars() {
         let outPar = 0;
         for(let i=1; i<=9; i++) {
@@ -6493,53 +6782,41 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         el.textContent = one + (trust ? ' ' + trust : '');
     }
 
+    // ONE LINE, NOT ONE PER GOLFER (2026-10-04).
+    //
+    // This printed a line for every golfer on the roster - "Randy T: Index 0 - no
+    // tee rating, used as Playing Handicap" - which on a full field pushed the
+    // player boxes off the bottom of an iPhone. Every one of those lines said the
+    // same thing about a number already visible in the box beside the name.
+    //
+    // WHAT IS LEFT IS THE ONE THING THE BOXES CANNOT SAY: which mode this round
+    // is in, and only when it is worth saying. handicap-labels.js owns the words,
+    // so the sentence, the column head and the placeholder cannot disagree -
+    // which is exactly how a Strokes round came to say "Index" in three places.
     function refreshHandicapNote() {
         const tee = readTeeRatingFromDom();
         const status = (typeof teeRatingStatus === 'function') ? teeRatingStatus(tee) : { complete: false, message: '' };
         const filled = document.getElementById('tee-rating-filled');
         const playerNote = document.getElementById('handicap-index-note');
-        // v212: AS ENTERED means no conversion, so the note must not print a
-        // conversion formula. The tee's own numbers still show above (the card is
-        // still the card); what changes is what happens to the golfers' numbers.
-        const basisEl = document.getElementById('handicap-basis-select');
-        const asEntered = !!(basisEl && basisEl.value === 'as-entered');
-        let head;
-        if (asEntered) {
-            head = (typeof handicapBasisSentence === 'function')
-                ? handicapBasisSentence({ handicapBasis: 'as-entered' })
-                : 'Handicaps are used as entered.';   // a safe degradation, not a second copy of the sentence
-        } else if (status.complete) {
-            head = 'Playing Handicap = Course \u00d7 ' + status.allowance
-                + '% allowance, rounded (.5 up). Course = Index \u00d7 (Slope ' + status.slope
-                + ' / 113) + (' + status.courseRating + ' \u2212 ' + status.par + ').';
-        } else {
-            head = status.message || ((typeof handicapUnconvertedNote === 'function') ? handicapUnconvertedNote() : '');
-        }
         if (filled) {
             filled.textContent = status.complete
                 ? ('Slope ' + status.slope + ' \u00b7 Course Rating ' + status.courseRating + ' \u00b7 Par ' + status.par)
                 : '';
         }
         if (!playerNote) return;
-        const lines = [head];
-        document.querySelectorAll('#player-list .player-row').forEach(row => {
-            const nameEl = row.querySelector('.p-name-input');
-            const hcpEl = row.querySelector('.p-hcp-input');
-            const raw = hcpEl ? String(hcpEl.value || '').trim() : '';
-            if (!raw) return;
-            const name = (nameEl && nameEl.value.trim()) || 'Golfer';
-            if (typeof convertHandicapIndex !== 'function') return;
-            const conv = convertHandicapIndex(raw, tee);
-            if (conv.ok) {
-                lines.push(name + ': Index ' + formatHandicapLabel(conv.indexText)
-                    + ' \u00b7 Course ' + formatCourseLabel(conv.course)
-                    + ' \u00b7 Playing ' + conv.playingText);
-            } else if (conv.unconverted) {
-                lines.push(name + ': Index ' + formatHandicapLabel(conv.indexText)
-                    + ' \u00b7 no tee rating, used as Playing Handicap');
-            }
-        });
-        playerNote.textContent = lines.join('\n');
+        const basisEl = document.getElementById('handicap-basis-select');
+        const basis = (basisEl && basisEl.value === 'ghin-index') ? 'ghin-index' : 'as-entered';
+        const label = handicapSetupBoxLabel();
+        if (basis === 'as-entered') {
+            // STROKES IS THE DEFAULT AND THE COMMON CASE, and it needs no
+            // explanation at all beyond what the box is called.
+            playerNote.textContent = 'The number is each golfer\u2019s ' + label + ' \u2014 used as entered.';
+            return;
+        }
+        playerNote.textContent = status.complete
+            ? (label + ' \u00d7 (Slope ' + status.slope + ' / 113) + (' + status.courseRating
+               + ' \u2212 ' + status.par + '), then ' + status.allowance + '% allowance, rounded.')
+            : (status.message || ((typeof handicapUnconvertedNote === 'function') ? handicapUnconvertedNote() : ''));
     }
 
     function handleCourseChange() {
@@ -7535,6 +7812,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // held-note flush does the same thing for the note above it).
         if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
         if (typeof syncAccountExit === 'function') syncAccountExit();
+        // The notification switches live in this panel, so they repaint with it -
+        // including the moment a sign-in completes without the panel closing.
+        if (typeof syncNotifyCard === 'function') syncNotifyCard();
         const flag = linked ? '1' : '0';
         const link = document.getElementById('account-link');
         setTextOnce(link, linked ? 'Organizer saved' : 'Account');
@@ -7608,61 +7888,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     let myGroupsState = { groups: {}, shared: {}, pickedId: null, pickedOwner: null,
                           query: '', open: {}, sizes: null, usedId: null, usedOwner: null };
 
-    // ===== MY GROUPS IS UNRELEASED, AND OFF =================================
+    // MY GROUPS NEEDS AN ACCOUNT, NOT A SWITCH (2026-10-04).
     //
-    // SHIPPED DARK (2026-09-30). The reason it ships at all rather than waiting on a
-    // preview: a branch host is not one of the project's authorized sign-in domains,
-    // so "Email me a sign-in link" cannot work on a preview - measured, see
-    // preview_signin_domain_test.js - and My Groups is gated on a real sign-in. The
-    // only place it can be tested is the live app, so it goes there switched off.
+    // It shipped dark behind a per-device beta flag because it was unreleased and
+    // because the only place to test it was the live app. It is released now: the
+    // flag, the toggle and the Account card are gone, and the button on the
+    // Players step is always there.
     //
-    // PER DEVICE, IN localStorage, AND NOT IN FIREBASE. A flag in app_settings would
-    // be global - it would turn the feature on for every golfer at once, which is the
-    // opposite of what "hidden" means. The secret master panel (the ⛳ logo, five
-    // taps) is the switch, the same door the whole-dollar settlement switch uses.
-    //
-    // IT CANNOT LEAK. The button ships display:none and nothing else references the
-    // panel, so a device that has never been switched on has no way in - no URL, no
-    // gesture, no stale markup. my_groups_hidden_test.js holds that.
-    const MY_GROUPS_FLAG = 'golfapp_mygroups_on';
-    function myGroupsEnabled() {
-        try { return localStorage.getItem(MY_GROUPS_FLAG) === '1'; } catch (e) { return false; }
-    }
+    // THE ONE REAL CONDITION IS THE ACCOUNT. The feature stores the roster ON THE
+    // ACCOUNT, so an anonymous browser has nothing to save it to - which is a
+    // sentence and a way in, not a hidden button. openMyGroupsModal() says so.
     function syncMyGroupsVisibility() {
-        const on = myGroupsEnabled();
         const btn = document.getElementById('my-groups-btn');
-        const want = on ? '' : 'none';
-        if (btn && btn.style.display !== want) btn.style.display = want;
-        // THE SETTING IS FOR A SIGNED-IN ORGANIZER ONLY. My Groups saves the roster on
-        // the ACCOUNT, so an anonymous browser has nothing to save it to; offering the
-        // switch there would promise something that cannot work.
-        const card = document.getElementById('my-groups-beta');
-        const linked = (typeof accountIsLinked === 'function') ? accountIsLinked() : false;
-        const cardWant = linked ? '' : 'none';
-        if (card && card.style.display !== cardWant) card.style.display = cardWant;
-        // EVERY WRITE IN HERE GOES THROUGH setTextOnce, and that is load-bearing.
-        // This card is INSIDE #account-modal, which watchAccountStatus observes with
-        // subtree + characterData + childList and answers by calling
-        // refreshAccountState - which now calls this. An unconditional textContent
-        // write re-fires the observer, which calls this again, which writes again.
-        //
-        // I DID EXACTLY THAT on the first pass and hung the page: 33.7s to a CDP
-        // timeout in headless Chrome against 3.5s on main, and every Chrome-driven
-        // suite went red - 71 failures and 45 cancelled. mini-dom did not notice,
-        // because it has no observer. The note four screens up in this file describes
-        // the same loop from the last time somebody wrote it, down to the 33s.
-        setTextOnce(document.getElementById('my-groups-flag-state'), on
-            ? 'On for this device. Start a round, then Players \u2192 \uD83D\uDC65 My Groups.'
-            : 'Save the weekly roster once and start every round by ticking who is playing. Off until you turn it on, on this device.');
-        setTextOnce(document.getElementById('my-groups-beta-btn'),
-            on ? 'Turn My Groups off' : 'Turn My Groups on');
-    }
-    function toggleMyGroupsFeature() {
-        const on = !myGroupsEnabled();
-        try { localStorage.setItem(MY_GROUPS_FLAG, on ? '1' : '0'); }
-        catch (e) { return uiFail('This browser will not keep the setting, so the switch cannot hold.'); }
-        syncMyGroupsVisibility();
-        uiToast(on ? 'My Groups is on for this device' : 'My Groups is off again');
+        if (btn && btn.style.display === 'none') btn.style.display = '';
     }
 
     function myGroupsUser() {
@@ -8182,6 +8420,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         document.getElementById('paste-players-textarea').value = '';
         document.getElementById('paste-preview-summary').innerHTML = '';
         closePastePlayersModal();
+        // AND LAND ON THE GOLFERS YOU JUST PASTED (2026-10-04). The modal closes
+        // onto whatever part of the step was last scrolled to - usually the top,
+        // with the boxes somewhere below the fold - so twenty-four names arrived
+        // and the screen showed no sign of them.
+        try {
+            const firstRow = document.querySelector('#player-list .player-row');
+            if (firstRow && firstRow.scrollIntoView) firstRow.scrollIntoView({ block: 'start' });
+        } catch (e) { /* no layout in a harness; the rows are there either way */ }
     }
 
     // Same idea in reverse — removing a player could drop a 1v1 round back to exactly 2
