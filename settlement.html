@@ -22,6 +22,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- pwa-boot.js owns GolfNet.isNative(), which native-export.js asks before
          choosing between window.print() and the iOS share sheet. Build 4 shipped
@@ -2493,7 +2494,19 @@ html {
         let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
 
         const manualMatchPresses = data.matchPresses ? Object.values(data.matchPresses) : [];
-        const matchData = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+        // THE CARD IN PLAY ORDER (2026-10-04). A round that goes off the 10th tee
+        // plays 10..18 then 1..9, and match-engine.js reads the array it is given AS
+        // the play order - status, close-outs, auto-press triggers and
+        // holes-remaining all come from the sequence. Off the 1st tee this returns
+        // the same ascending card, so no settled round moves by a cent.
+        // Guarded: without play-order.js the card's own order is what a 1st-tee
+        // round plays anyway.
+        function mainGamePlayOrder(cd) {
+            const holes = (cd || []).slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+            if (typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return holes;
+            return playOrder(holes, teeStartHole(data || {}, holes));
+        }
+        const matchData = calculateMatchEngine(moneyPlayers, mainGamePlayOrder(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
 
         if (!matchData) {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);

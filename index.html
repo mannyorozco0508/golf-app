@@ -62,6 +62,7 @@
     <script src="push-notify.js"></script>
     <script src="push-boot.js"></script>
     <script src="round-role.js"></script>
+    <script src="play-order.js"></script>
     <script src="live-skins.js"></script>
     <!-- Ryder Cup competition layer. MUST load after money-engine.js: it adapts
          calculateMatchEngine for hole arithmetic and does nothing on its own.
@@ -2831,13 +2832,19 @@ html {
     function goToAdjacentHole(delta) {
         // First, whatever the golfer typed and did not leave (fix 1, above).
         commitPendingScore();
-        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        // IN PLAY ORDER (2026-10-04). Next from the 18th goes to the 1st on a
+        // round that started at the 10th, because the 1st is the next hole THEY
+        // play - the sequence wraps round the card, and the ends of the sequence
+        // are still the ends. Off the 1st tee this is the ascending card it always
+        // was and the boundaries are the same two holes.
+        const courseData = playOrderCourse();
         if (courseData.length === 0) return;
         const holeNumbers = courseData.map(h => h.hole);
         let idx = holeNumbers.indexOf(currentViewedHole);
         if (idx === -1) idx = 0;
         idx = Math.max(0, Math.min(holeNumbers.length - 1, idx + delta));
-        // Boundary behaviour unchanged: clamped, never wrapped.
+        // Boundary behaviour unchanged: clamped at the first and last hole PLAYED,
+        // never wrapped past them.
         if (holeNumbers[idx] === currentViewedHole) return;
         goToHole(holeNumbers[idx]);
     }
@@ -2879,7 +2886,11 @@ html {
         const container = document.getElementById('hole-view-card');
         if (!container) return;
 
-        const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        // IN PLAY ORDER (2026-10-04): off the 1st tee this is the same ascending
+        // sort it has always been. holeNumbers[0] is then the hole the card lands
+        // on and the last entry is the hole Finish Round belongs on - the 9th for
+        // a group that went off the 10th.
+        const courseData = playOrderCourse();
         // FAIL CLOSED (Wave B). A link whose group is not in this round: the note
         // above the card says so; no hole heading, no boxes, no Prev/Next - there is
         // nobody to score and nowhere to go. The widgets still render, and each
@@ -7389,6 +7400,27 @@ html {
             ? g.heldOrganizerToken(currentMode, organizerTokenParam) : null;
         return !!g.organizerEvidence(currentData, uid, token);
     }
+    // ---- THE HOLES IN THE ORDER THIS CARD PLAYS THEM (2026-10-04) ----------
+    //
+    // A round that goes off the 10th tee plays 10..18 then 1..9. The CARD stays
+    // numbered 1-18 - every score key is p<id>_h<number>, the Full Card is a
+    // table of holes, skins and KPs are read by number - and only the SEQUENCE
+    // moves: where the view lands, which hole Next goes to, which hole is last,
+    // and what a match has left to play.
+    //
+    // ON A GROUP LINK IT IS THAT GROUP'S OWN TEE, because a two-tee start sends
+    // two groups out at once and each has its own first hole. On the whole-field
+    // view it is the round's tee.
+    //
+    // GUARDED, and the fallback is the card's own order - which is what a round
+    // off the 1st tee plays anyway, so a shell cached without play-order.js is a
+    // round that behaves exactly as it did before this existed.
+    function playOrderCourse(course) {
+        const cd = (course || (currentData && currentData.courseData) || []).slice()
+            .sort((a, b) => Number(a.hole) - Number(b.hole));
+        if (typeof playOrder !== 'function' || typeof groupStartHole !== 'function') return cd;
+        return playOrder(cd, groupStartHole(currentData || {}, cd, lockedGroup));
+    }
     function setupHref() { return 'admin.html?game=' + currentMode; }
 
     // ---- THE ORGANIZER LINK: SHARED, AND CLAIMED (v200) ----------------------
@@ -10228,7 +10260,12 @@ html {
             let stakeToUse = gameFormat === 'nassau' ? nassauStake : matchStake;
             
             manualMatchPresses = currentData.matchPresses ? Object.values(currentData.matchPresses) : [];
-            matchCalc = calculateMatchEngine(moneyPlayers, courseData, savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
+            // THE CARD IN PLAY ORDER (2026-10-04). match-engine.js reads the array
+            // it is given AS the play order: status, close-outs, auto-press triggers
+            // and holes-remaining all come from the sequence. Off the 1st tee this
+            // argument is the same ascending card it has always been, which is why
+            // every settled round is untouched.
+            matchCalc = calculateMatchEngine(moneyPlayers, playOrderCourse(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
         }
 
         let wolfCalc = null, stablefordCalc = null;
@@ -11094,7 +11131,10 @@ html {
         // On first load, land on the first hole that's missing a score - not always hole 1,
         // so picking back up mid-round drops you right where scoring left off.
         if (currentViewedHole === null) {
-            const sortedHoles = courseData.slice().sort((a, b) => a.hole - b.hole);
+            // IN PLAY ORDER (2026-10-04), so a group that went off the 10th lands
+            // on the 10th and picks up where IT left off - not on hole 1, which it
+            // has not played yet.
+            const sortedHoles = playOrderCourse(courseData);
             const nextUp = sortedHoles.find(h => filteredPlayers.some(p => !savedScores[`p${p.id}_h${h.hole}`]));
             currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
         }

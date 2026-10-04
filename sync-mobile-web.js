@@ -65,6 +65,15 @@ const SHARED_SHELL = [
     // tripItinPlan UNGUARDED from the review button, so a cached shell without it
     // throws when the button is tapped.
     'push-notify.js', 'push-boot.js', 'round-role.js', 'challenges.js',
+    // play-order.js: the order the holes are played in when a round goes off the
+    // 10th tee. Every call site is typeof-guarded and falls back to the order the
+    // card itself carries, which is what a 1st-tee round plays anyway - but
+    // index.html, admin.html, stats.html, settlement.html and sidematches.html all
+    // load it, so a bundle without the file 404s on five pages.
+    // NO APOSTROPHES IN THIS COMMENT. build-shell reads this list by matching
+    // quoted strings and one apostrophe swallows every entry after it - measured,
+    // 2026-10-04: the first draft of this comment emptied the whole shell list.
+    'play-order.js',
     'trip-itinerary.js',
     // trip-roster.js: which rounds a roster change may touch. trip.html calls
     // tripRosterPlan UNGUARDED, so a cached shell without it throws when the

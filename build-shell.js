@@ -112,7 +112,9 @@ const PRODUCTS = {
         // Moved to v132: only the round's organizer sees or can use the delete
         // control. A device on v131 serves the old gate, which a spectator on the
         // bare link satisfied.
-        cacheName: 'consumer-v132-deletegate',
+        // Moved to v133: play-order.js joins SHARED - a round that starts on the
+        // 10th tee. A device on v132 has no such file and plays 1..18.
+        cacheName: 'consumer-v133-teestart',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

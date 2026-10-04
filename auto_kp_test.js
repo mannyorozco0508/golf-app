@@ -296,7 +296,7 @@ describe('AUTO-KP is wired into the wizard', () => {
     });
 
     test('a round-length change triggers it', () => {
-        assert.match(src(), /id="round-length-select" onchange="mpAutoFillKpHoles\(\)"/);
+        assert.match(src(), /id="round-length-select" onchange="mpAutoFillKpHoles\(\); syncTeeStartVisibility\(\);"/);
     });
 
     test('enabling the pool triggers it', () => {

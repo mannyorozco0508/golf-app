@@ -371,8 +371,16 @@ describe('FROZEN — the surfaces that OWN press detail are untouched', () => {
         const code = read('index.html');
         assert.ok(/function pressMatchBet/.test(code));
         assert.ok(/function confirmMatchPress|function openPressPanel/.test(code));
-        assert.ok(/startHole: hNum \+ 1/.test(read('match-engine.js')),
-            'the engine still starts a press on the next hole');
+        // RE-PINNED 2026-10-04: `hNum + 1` -> `nextPlayed`. A press starts on the
+        // next hole PLAYED, which off the 10th tee is the 1st after the 18th and is
+        // never "hole 19". Same rule, read from the sequence instead of arithmetic;
+        // on a card played 1..18 it is the same number it always was, which is why
+        // the thirteen-fixture money corpus in match_engine_parity_test.js holds.
+        const eng = read('match-engine.js');
+        assert.ok(/startHole: nextPlayed/.test(eng),
+            'the engine no longer starts a press on the next hole played');
+        assert.ok(/const nextPlayed = Number\(courseData\[holePos \+ 1\]\.hole\);/.test(eng),
+            'the next hole played is not read from the order being played');
     });
 });
 

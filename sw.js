@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v132-deletegate. The tournament product cache
+// The consumer product cache is consumer-v133-teestart. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4175,7 +4175,14 @@
 // nothing weaker. A device on v291 keeps serving the old gate to every spectator
 // and every "I'm playing" follower it has cached. This hides a control and
 // refuses at the handler; the DB-level lock is Stage 2.
-const CACHE_VERSION = 'golfapp-v292-deletegate';
+// Moved to v293: A ROUND CAN GO OFF THE 10th TEE. play-order.js joins the shell
+// and five pages load it; the scorecard lands on the start hole, Next from the
+// 18th goes to the 1st, Finish Round waits on the 9th, and match-engine.js reads
+// the card it is given AS the play order - so status, close-outs, auto-press
+// triggers and holes-remaining come from the sequence rather than from hole
+// arithmetic. A device on v292 plays every round 1..18 and would close a match
+// "3&2" with eleven holes still to play.
+const CACHE_VERSION = 'golfapp-v293-teestart';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4344,6 +4351,15 @@ const SHELL_FILES = [
     // The three ways into a round. index.html calls it unguarded from the arrival
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
+    // The order the holes are actually played in, for a round that goes off the
+    // 10th tee. Every call site is typeof-guarded and falls back to the order the
+    // card itself carries, so a cached shell without it plays 1..18 - which is what
+    // a round off the 1st tee does anyway. Precached because it decides where the
+    // card lands and what a match has left to play.
+    //
+    // NO APOSTROPHES IN THIS BLOCK. shell_declarations_test.js reads this list by
+    // matching quoted strings, and one apostrophe swallows every entry after it.
+    './play-order.js',
     // A pending side-bet offer, and the one payload builder every side match is
     // created from. sidematches.html calls it unguarded, so a cached shell
     // without it cannot create a side bet.
