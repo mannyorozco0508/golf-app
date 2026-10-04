@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v129-fcmtoken. The tournament product cache
+// The consumer product cache is consumer-v130-preflight. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4139,7 +4139,24 @@
 // third has no record to answer.
 //
 // A DEVICE ON v288 keeps a page that saves an address the sender cannot use.
-const CACHE_VERSION = 'golfapp-v289-fcmtoken';
+// Moved to v290: THE SENDER ANSWERS A PREFLIGHT.
+//
+// The phone had a real FCM token and the test button still said "Could not reach
+// the sender: Load failed". A POST carrying content-type: application/json is not
+// a simple request - the browser, WKWebView included, sends OPTIONS first and
+// will not send the POST at all unless that answer allows the method and the
+// header. Nothing exported onRequestOptions, so the preflight fell to the
+// catch-all and came back 405, and fetch() gives a failed preflight no status and
+// no body: "Load failed" was all the app could honestly say.
+//
+// /api/push-send answers the preflight now and carries the CORS header on EVERY
+// answer including its refusals - not_configured and no_device are exactly the
+// ones the app needs to read - and the catch-all answers a preflight for any
+// route that does not answer its own.
+//
+// This is a Function change, so the web half of it is only live once the branch
+// is deployed; the cache key moves because admin.html reads those answers.
+const CACHE_VERSION = 'golfapp-v290-preflight';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

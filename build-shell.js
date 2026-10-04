@@ -106,7 +106,7 @@ const PRODUCTS = {
         // can carry a tee time, a golfer can follow along as a player, a side bet
         // can be offered, and push is live. A device on v124 has none of them, and
         // every one of those pages calls its file unguarded.
-        cacheName: 'consumer-v129-fcmtoken',
+        cacheName: 'consumer-v130-preflight',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

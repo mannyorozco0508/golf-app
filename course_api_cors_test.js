@@ -23,6 +23,7 @@
 const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
+const fs = require('fs');
 const { pathToFileURL } = require('url');
 
 let LIB = null, SEARCH = null, DETAIL = null, CATCHALL = null, loadError = null;
@@ -45,10 +46,22 @@ const ctx = (url, origin) => ({
 const headersOf = (res) => { const o = {}; res.headers.forEach((v, k) => { o[k] = v; }); return o; };
 
 describe('THE ALLOWLIST', () => {
-    test('SHELL_ORIGINS names the Capacitor origins and nothing on the public web', () => {
+    test('SHELL_ORIGINS names the Capacitor origins and THIS PROJECT\'S OWN SITE', () => {
         loaded();
-        assert.deepEqual(LIB.SHELL_ORIGINS, ['capacitor://localhost', 'http://localhost', 'https://localhost']);
+        // The canonical web origin joined on 2026-10-04 with the push preflight.
+        // Still a closed list of origins this project controls, and still never
+        // '*' - the provider budget behind the proxy is the whole reason.
+        assert.deepEqual(LIB.SHELL_ORIGINS, ['capacitor://localhost', 'http://localhost', 'https://localhost',
+                                             'https://golf-app-5a5.pages.dev']);
         assert.equal(typeof LIB.corsHeadersFor, 'function');
+        assert.equal(typeof LIB.preflightHeadersFor, 'function');
+        assert.equal(typeof LIB.preflightResponse, 'function');
+        // AND THE WEB ORIGIN IS THE ONE THIS PROJECT SERVES, not a lookalike:
+        // product-links.js owns that string and nothing here may invent a second.
+        const links = fs.readFileSync(path.join(__dirname, 'product-links.js'), 'utf8');
+        const canonical = /const GOLF_WEB_ORIGIN = '([^']+)'/.exec(links)[1];
+        assert.ok(LIB.SHELL_ORIGINS.includes(canonical),
+            'the allowlist names an origin the app does not actually use: ' + canonical);
     });
     test('corsHeadersFor: the shell origin is echoed with Vary; no origin and a stranger get nothing', () => {
         loaded();
@@ -57,7 +70,19 @@ describe('THE ALLOWLIST', () => {
         assert.deepEqual(h('http://localhost'), { 'access-control-allow-origin': 'http://localhost', 'vary': 'Origin' });
         assert.deepEqual(h(null), {});
         assert.deepEqual(h('https://evil.test'), {});
-        assert.deepEqual(h('https://golf-app-5a5.pages.dev'), {}, 'the web origin is same-origin to the proxy and never needs it');
+        // 2026-10-04: THE CANONICAL WEB ORIGIN IS ECHOED NOW, on Manny's
+        // instruction with the push preflight. The original reasoning still holds
+        // for the normal case - a page on pages.dev fetching pages.dev is
+        // same-origin and sends no Origin header at all, so this changes nothing
+        // for it. What it covers is a page served from a PREVIEW host while the
+        // fetch names the production origin, which is cross-origin and is how
+        // this branch gets tested. It is still an allowlist of this project's own
+        // origins and still never '*': the budget behind the proxy is the whole
+        // reason that matters.
+        assert.deepEqual(h('https://golf-app-5a5.pages.dev'),
+            { 'access-control-allow-origin': 'https://golf-app-5a5.pages.dev', 'vary': 'Origin' });
+        assert.deepEqual(h('https://golf-app-5a5.pages.dev.evil.test'), {},
+            'a lookalike host must not match - the check is whole-string, not a prefix');
         assert.deepEqual(h('capacitor://localhost.evil.test'), {}, 'exact match, not a prefix');
         assert.deepEqual(h('*'), {});
     });

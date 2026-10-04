@@ -19,6 +19,16 @@
 // ============================================================================
 
 import { handleSend, toResponse } from './_push.js';
+import { corsHeadersFor, preflightResponse } from './_lib.js';
+
+// THE PREFLIGHT, AND IT IS NOT OPTIONAL. This route takes a POST with a JSON
+// content-type, which the browser refuses to send until an OPTIONS has said it
+// may. Without this export the preflight fell to the catch-all, came back 405,
+// and the app could only report "Load failed" - fetch() gives a failed preflight
+// no status and no body to read.
+export async function onRequestOptions(context) {
+    return preflightResponse(context.request, ['POST']);
+}
 
 export async function onRequestPost(context) {
     let body = null;
@@ -26,10 +36,14 @@ export async function onRequestPost(context) {
     // Cloudflare's 1101 at HTTP 500, which is not a shape a caller can read.
     try { body = await context.request.json(); } catch (e) { body = null; }
     const d = body && typeof body === 'object' ? body : {};
+    // ON EVERY ANSWER, INCLUDING THE REFUSALS. not_configured and no_device are
+    // exactly the answers the app most needs to read, and a response a browser
+    // will not let it read is indistinguishable from the network being down.
+    const cors = { headers: corsHeadersFor(context.request) };
     return toResponse(await handleSend({
         env: context.env || {},
         decided: d.decided,
         tokens: Array.isArray(d.tokens) ? d.tokens : [],
         extra: d.extra && typeof d.extra === 'object' ? d.extra : {}
-    }));
+    }), cors);
 }

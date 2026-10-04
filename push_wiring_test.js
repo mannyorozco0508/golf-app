@@ -39,8 +39,8 @@
 // all 16 tests: 4 PASS / 12 FAIL. Both modules were restored by sha from saved
 // copies (c9727474c618ed95 and the _push copy), never with git restore.
 //
-// BASELINE COUNT DELTA: +11 - eleven tests were added on 2026-10-04, after this
-// baseline was measured, in three sittings.
+// BASELINE COUNT DELTA: +14 - fourteen tests were added on 2026-10-04, after
+// this baseline was measured, in four sittings.
 //
 //   TWO FOR THE TEST BUTTON. Measured on their own against the build before that
 //   work: both RED, because admin.html had no sendTestNotification at all.
@@ -69,6 +69,11 @@
 //   tee time, a 30-minute reminder and a press offer - all three removed.
 //   Controls: deleting the AppDelegate methods fires the first; skipping the FCM
 //   token fires the second.
+//
+//   THREE FOR THE PREFLIGHT, after the app reported "Load failed" with a token in
+//   hand: a JSON POST is preflighted, nothing exported onRequestOptions, the
+//   OPTIONS fell to the catch-all and came back 405, and fetch() gives a failed
+//   preflight no status and no body to read. All three were RED before the fix.
 //
 //   THE FOUR PASSES ARE ALL SOURCE SCANS, and three of them scan the REMOVAL -
 //   push-boot.js having no scheduler, the plugin being out of the build,
@@ -525,6 +530,65 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
         assert.match(vis, /String\(uid\) === String\(testUid\)/, 'the comparison is not an identity check');
         assert.match(admin, /notifyTestVisible\(uid, null\)/,
             'a failed read must leave the button hidden, not showing');
+    });
+
+    // ---- THE PREFLIGHT (2026-10-04) --------------------------------------
+    //
+    // The app reported "Could not reach the sender: Load failed" with a token in
+    // hand. A POST carrying content-type: application/json is not a simple
+    // request: the browser - WKWebView included - sends OPTIONS first and will
+    // not send the POST at all unless that answer allows the method and the
+    // header. Nothing exported onRequestOptions, the preflight fell to the
+    // catch-all and came back 405, and fetch() gives a failed preflight no status
+    // and no body - so the app could say nothing more useful than "Load failed".
+    test('the route answers a preflight, and only for an origin we allow', async () => {
+        const route = await import('./functions/api/push-send.js');
+        assert.equal(typeof route.onRequestOptions, 'function', 'the route answers no preflight');
+        const ask = (origin) => ({ method: 'OPTIONS', headers: { get: (k) =>
+            k === 'Origin' ? origin : (k === 'Access-Control-Request-Headers' ? 'content-type' : null) } });
+        const ok = await route.onRequestOptions({ request: ask('capacitor://localhost') });
+        assert.equal(ok.status, 204, 'a preflight with a body invites a caller to read one');
+        assert.equal(ok.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+        assert.match(ok.headers.get('access-control-allow-methods') || '', /POST/);
+        assert.match(ok.headers.get('access-control-allow-headers') || '', /content-type/);
+        // A STRANGER GETS NOTHING, as before. The budget behind this proxy is the
+        // whole reason it is not '*'.
+        const no = await route.onRequestOptions({ request: ask('https://evil.example') });
+        assert.equal(no.headers.get('access-control-allow-origin'), null);
+    });
+
+    test('and EVERY answer carries the header, refusals included', async () => {
+        const route = await import('./functions/api/push-send.js');
+        const post = (origin) => ({
+            method: 'POST',
+            headers: { get: (k) => (k === 'Origin' ? origin : null) },
+            json: async () => ({ decided: { send: false }, tokens: [] })
+        });
+        // No credential in this context, so this is the not_configured path - the
+        // exact answer the app most needs to be allowed to read.
+        const res = await route.onRequestPost({ request: post('capacitor://localhost'), env: {} });
+        assert.equal(res.headers.get('access-control-allow-origin'), 'capacitor://localhost',
+            'a refusal the app cannot read is indistinguishable from the network being down');
+        const body = JSON.parse(await res.text());
+        assert.equal(body.status, 'unavailable');
+        assert.equal(body.reason, 'not_configured');
+    });
+
+    test('the catch-all answers a preflight for any route that exports one later', async () => {
+        const mod = await import('./functions/api/[[path]].js');
+        const res = await mod.onRequest({
+            params: { path: ['course-search'] },
+            request: { method: 'OPTIONS', headers: { get: (k) =>
+                k === 'Origin' ? 'capacitor://localhost' : (k === 'Access-Control-Request-Headers' ? 'content-type' : null) } }
+        });
+        assert.equal(res.status, 204, 'a preflight to a real route is still refused: ' + res.status);
+        assert.match(res.headers.get('access-control-allow-methods') || '', /GET/);
+        // AND AN UNKNOWN PATH IS STILL A 404, preflight or not.
+        const gone = await mod.onRequest({
+            params: { path: ['nope'] },
+            request: { method: 'OPTIONS', headers: { get: () => 'capacitor://localhost' } }
+        });
+        assert.equal(gone.status, 404);
     });
 
     test('the route is thin, POST-only, and the catch-all knows it', async () => {

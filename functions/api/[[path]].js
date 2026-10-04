@@ -21,7 +21,7 @@
 // method it exports. Thin, like the two routes: the rule is in _lib.js.
 // ============================================================================
 
-import { noSuchRoute, methodNotAllowed } from './_lib.js';
+import { noSuchRoute, methodNotAllowed, preflightResponse } from './_lib.js';
 import * as courseSearch from './course-search.js';
 import * as courseDetail from './course/[id].js';
 import * as pushSend from './push-send.js';
@@ -51,6 +51,14 @@ export async function onRequest(context) {
     const seg = Array.isArray(context.params && context.params.path) ? context.params.path
         : String((context.params && context.params.path) || '').split('/').filter(Boolean);
     const route = ROUTES.find((r) => r.matches(seg));
+    // A PREFLIGHT FOR A ROUTE THAT EXISTS IS ANSWERED, not refused (2026-10-04).
+    // A route that exports onRequestOptions answers its own; this catches the
+    // ones that do not, so adding a JSON POST to any route cannot silently
+    // produce "Load failed" in the app again. The methods come from the route's
+    // own exports, as the 405 below does.
+    if (route && context.request && context.request.method === 'OPTIONS') {
+        return preflightResponse(context.request, route.methods);
+    }
     // A real route reached the catch-all only because it does not export this
     // method - Pages would have answered from the module otherwise.
     if (route) return methodNotAllowed(route.methods, context.request);
