@@ -39,6 +39,14 @@
 // all 16 tests: 4 PASS / 12 FAIL. Both modules were restored by sha from saved
 // copies (c9727474c618ed95 and the _push copy), never with git restore.
 //
+// BASELINE COUNT DELTA: +2 - the two TEST BUTTON tests were added on 2026-10-04,
+// after this baseline was measured. Measured on their own against the build
+// before that work: both RED, because admin.html had no sendTestNotification at
+// all. Controls: a canned decision in place of the decider's fires the first
+// (and caught that the first version of that assertion was inert - it proved the
+// CALL was written, not that its answer was used), and showing the row to
+// everybody fires the second.
+//
 //   THE FOUR PASSES ARE ALL SOURCE SCANS, and three of them scan the REMOVAL -
 //   push-boot.js having no scheduler, the plugin being out of the build,
 //   index.html scheduling nothing - which a stub satisfies because the stub has
@@ -258,6 +266,52 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
                 'the sender composes copy (' + phrase + '). What to say is push-notify.js, which is '
                 + 'pure and testable without a credential.');
         });
+    });
+
+    // ---- THE TEST BUTTON (2026-10-04) -----------------------------------
+    //
+    // One tap that proves the credential, the token, the capability and the route
+    // together - with one phone and nobody else's. Guarded because every one of
+    // those words is a way for it to be a lie: a button that posted a canned
+    // payload, or called FCM directly, or read somebody else's tokens would still
+    // light up a phone.
+    test('it goes through the REAL decider and the REAL route, to this account only', () => {
+        const admin = read('admin.html');
+        const at = admin.indexOf('async function sendTestNotification()');
+        assert.ok(at > 0, 'the test button has no handler');
+        const fn = admin.slice(at, admin.indexOf('\n    function ', at + 30));
+        assert.ok(fn.length > 400, 'the slice is empty - the endpoint drifted');
+        // THE ANSWER IS USED, not merely requested. An earlier version of this
+        // assertion only proved the CALL was written: a control that left
+        // "pushDecide({" in place and assigned a canned { send: true } in front of
+        // it passed cleanly. The decision must BE the decider's.
+        assert.match(fn, /var decided = pushDecide\(\{/,
+            'the decision is not the decider\u2019s answer');
+        assert.ok(!/send:\s*true/.test(fn),
+            'the handler builds its own decision - a canned send cannot be refused');
+        assert.match(fn, /if \(!decided \|\| !decided\.send\)/, 'it sends whatever the decider refused');
+        assert.match(fn, /courseApiBase\(\) \+ '\/api\/push-send'/,
+            'it does not post to the real route (or would miss the proxy base in the shell)');
+        assert.match(fn, /db\.ref\('pushTokens\/' \+ uid\)/,
+            "it reads tokens from somewhere other than this account's own node");
+        assert.ok(!/fcm\.googleapis|oauth2\.googleapis/.test(fn),
+            'the page talks to Google directly - the credential belongs to the Function');
+        // THE REASON IS THE FUNCTION'S OWN. not_configured means the Cloudflare
+        // secret is not in the deployment; a paraphrase would send Manny looking
+        // at the phone instead.
+        assert.match(fn, /out\.reason \|\| out\.status/);
+    });
+
+    test('and nobody sees it until the database names an account', () => {
+        const admin = read('admin.html');
+        assert.match(admin, /id="notify-test-row"[^>]*style="display:none/,
+            'the test row ships visible');
+        assert.match(admin, /app_settings\/pushTestUid/, 'nothing decides who may see it');
+        const vis = admin.slice(admin.indexOf('function notifyTestVisible'),
+                                admin.indexOf('async function sendTestNotification'));
+        assert.match(vis, /String\(uid\) === String\(testUid\)/, 'the comparison is not an identity check');
+        assert.match(admin, /notifyTestVisible\(uid, null\)/,
+            'a failed read must leave the button hidden, not showing');
     });
 
     test('the route is thin, POST-only, and the catch-all knows it', async () => {

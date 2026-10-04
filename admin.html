@@ -1137,6 +1137,19 @@ html {
             <span>🔥 Hype &mdash; a hot streak, an eagle, an ace. Never the standings.</span>
         </label>
         <p id="notify-note" role="status"></p>
+        <!-- ONE TAP THAT PROVES PUSH WORKS, and it can only ever reach the phone
+             of the account tapping it: the tokens it sends to are read from
+             pushTokens/<my own uid>, so there is no shape of this button that
+             notifies anybody else.
+             WHO SEES IT: nobody, until app_settings/pushTestUid holds a uid, and
+             then only that account. It is a server-side switch rather than a
+             hidden gesture, because a feature reachable by a secret tap in the
+             shell is the Guideline 2.1 problem the master panel is already a
+             native no-op for. -->
+        <div id="notify-test-row" style="display:none; margin-top:12px; border-top:1px solid var(--border-light); padding-top:10px;">
+            <button type="button" id="notify-test-btn" class="btn-outline" onclick="sendTestNotification()">🔔 Send me a test notification</button>
+            <p id="notify-test-note" role="status" style="font-size:0.8rem; margin:8px 0 0 0;"></p>
+        </div>
     </section>
 
     <section id="account-exit-card" class="email-link-card" aria-labelledby="account-exit-title" style="display:none;">
@@ -6351,6 +6364,86 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         db.ref(notifyPrefsPath(uid)).once('value').then(function (snap) {
             notifyPrefsApply(snap.val());
         }).catch(function () { notifyPrefsApply(null); });
+        // THE TEST BUTTON IS OFF UNLESS THE DATABASE NAMES THIS ACCOUNT. A read
+        // that fails leaves it hidden, which is the safe direction.
+        db.ref('app_settings/pushTestUid').once('value').then(function (snap) {
+            notifyTestVisible(uid, snap.val());
+        }).catch(function () { notifyTestVisible(uid, null); });
+    }
+
+// ---- THE TEST NOTIFICATION (Wave 39, 2026-10-04) ----
+    //
+    // THE REAL PATH, NOT A SHORTCUT. It reads this account's own device tokens,
+    // asks push-notify.js to DECIDE in the normal way, and posts that decision to
+    // /api/push-send - the same route every other notification goes through. A
+    // button that called FCM directly, or sent a canned payload, would prove that
+    // the button works and nothing else: the point is to prove the credential,
+    // the token, the capability and the route together, with one phone.
+    //
+    // IT CANNOT REACH ANYBODY ELSE. The tokens come from pushTokens/<my uid>,
+    // which the rules already restrict to that uid.
+    function notifyTestVisible(uid, testUid) {
+        var row = document.getElementById('notify-test-row');
+        if (!row) return;
+        row.style.display = (uid && testUid && String(uid) === String(testUid)) ? 'block' : 'none';
+    }
+
+    async function sendTestNotification() {
+        var note = document.getElementById('notify-test-note');
+        var btn = document.getElementById('notify-test-btn');
+        var say = function (t) { if (note) note.textContent = t; };
+        var uid = notifyUid();
+        if (!uid) return say('Sign in first.');
+        if (typeof pushDecide !== 'function') return say('The notification rules did not load.');
+        if (btn) btn.disabled = true;
+        say('Sending\u2026');
+        try {
+            var snap = await db.ref('pushTokens/' + uid).once('value');
+            var raw = snap.val() || {};
+            // THE SHAPE THE RULES ALLOW: pushTokens/<uid>/<deviceId> = { token, playerId, at }.
+            var tokens = Object.keys(raw).map(function (k) {
+                return raw[k] && raw[k].token;
+            }).filter(function (t) { return typeof t === 'string' && t; });
+            if (!tokens.length) {
+                say('This phone has not registered for notifications yet \u2014 open a round and say yes to the permission, then come back.');
+                return;
+            }
+            // A REAL DECISION, from the real decider, so a refusal here is the
+            // same refusal a live notification would get.
+            var decided = pushDecide({
+                kind: 'youre-in',
+                tokens: tokens,
+                prefs: { bets: true, hype: true },
+                facts: { uid: uid, roundName: 'Test notification',
+                         dateText: 'right now', teeTimeText: 'from HardPan',
+                         roundCode: 'TEST' }
+            });
+            if (!decided || !decided.send) {
+                say('Not sent: ' + ((decided && decided.reason) || 'the decider said no') + '.');
+                return;
+            }
+            var res = await fetch(courseApiBase() + '/api/push-send', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ decided: decided, tokens: tokens, extra: { test: '1' } })
+            });
+            var out = null;
+            try { out = await res.json(); } catch (e) { out = null; }
+            if (out && out.status === 'ok') {
+                say('Sent to ' + out.sent + ' device' + (out.sent === 1 ? '' : 's')
+                    + (out.dead && out.dead.length ? ' \u00B7 ' + out.dead.length + ' stale token' + (out.dead.length === 1 ? '' : 's') : '')
+                    + '. It should arrive in a second or two.');
+            } else {
+                // THE FUNCTION'S OWN REASON, not a paraphrase: not_configured means
+                // the Cloudflare secret is not in the deployment yet, and that is a
+                // different job from a token or a capability.
+                say('Not sent: ' + ((out && (out.reason || out.status)) || ('HTTP ' + res.status)) + '.');
+            }
+        } catch (e) {
+            say('Could not reach the sender: ' + (e && e.message ? e.message : 'no answer') + '.');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     }
 
     function notifyPrefsApply(raw) {

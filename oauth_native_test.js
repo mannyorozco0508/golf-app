@@ -81,6 +81,14 @@
 //
 //     17 PASS / 18 FAIL
 //
+// BASELINE COUNT DELTA: +2 - the two PUSH CAPABILITY tests were added on
+// 2026-10-04, after this baseline was measured, and they are not part of it.
+// Measured on their own against the build before that work: both RED, because
+// ios/App/App/AppRelease.entitlements did not exist and the Release
+// configuration signed the development entitlement. Controls: pointing Release
+// back at App.entitlements fires the pbxproj test, and dropping Sign in with
+// Apple from the release file fires the entitlements test.
+//
 // The 18 reds: the plugin is not a dependency (1), the iOS/Android allowlists (1),
 // the Google trait in Package.swift (1) and in the config (1), skipNativeAuth in
 // both places (1), the ios/.gitignore note (1), the URL-scheme tool existing (1)
@@ -462,6 +470,53 @@ describe('THE CALLBACK AND THE CAPABILITY', () => {
             found[0] + ' has no com.apple.developer.applesignin key');
         assert.ok(/CODE_SIGN_ENTITLEMENTS/.test(read(PBX)),
             'the entitlements file exists but the pbxproj does not reference it - Xcode would build without it');
+    });
+
+    // ---- PUSH NOTIFICATIONS (Wave 39, 2026-10-04) --------------------------
+    //
+    // The capability was added by hand here rather than in Xcode, because what it
+    // has to produce is not one entitlement but TWO: a device build signs with
+    // aps-environment "development", and anything that goes to TestFlight or the
+    // App Store must sign with "production". One file for both configurations is
+    // how a release build ends up registered against the development APNs
+    // gateway, where Apple's production servers will never deliver to it - and
+    // nothing about that failure is visible until a real tester gets no push.
+    //
+    // SIGN IN WITH APPLE IS IN BOTH FILES, unchanged. Dropping it from the
+    // release entitlement would break native Apple sign-in in exactly the build
+    // nobody can debug.
+    test('Debug signs development APNs and Release signs PRODUCTION', () => {
+        const debugEnt = 'ios/App/App/App.entitlements';
+        const releaseEnt = 'ios/App/App/AppRelease.entitlements';
+        assert.ok(has(debugEnt), 'no debug entitlements file');
+        assert.ok(has(releaseEnt),
+            'no release entitlements file - a TestFlight build would sign development APNs');
+        const dev = read(debugEnt), rel = read(releaseEnt);
+        assert.match(dev, /<key>aps-environment<\/key>\s*<string>development<\/string>/,
+            'the debug entitlement does not request development APNs');
+        assert.match(rel, /<key>aps-environment<\/key>\s*<string>production<\/string>/,
+            'the release entitlement does not request PRODUCTION APNs');
+        [dev, rel].forEach((ent, i) => assert.match(ent, /com\.apple\.developer\.applesignin/,
+            (i ? 'release' : 'debug') + ' entitlement lost Sign in with Apple'));
+    });
+
+    test('and the pbxproj points each configuration at its own file', () => {
+        const pbx = read(PBX);
+        // The App TARGET's two configurations, sliced by their own ids rather than
+        // by order: the project-level pair carries no entitlements at all.
+        const relAt = pbx.indexOf('504EC3181FED79650016851F /* Release */ = {');
+        const dbgAt = pbx.indexOf('504EC3171FED79650016851F /* Debug */ = {');
+        assert.ok(relAt > 0 && dbgAt > 0, 'the App target configurations moved - this check is measuring nothing');
+        const relCfg = pbx.slice(relAt, pbx.indexOf('name = Release;', relAt));
+        const dbgCfg = pbx.slice(dbgAt, pbx.indexOf('name = Debug;', dbgAt));
+        assert.match(relCfg, /CODE_SIGN_ENTITLEMENTS = App\/AppRelease\.entitlements;/,
+            'Release does not use the production entitlement');
+        assert.match(dbgCfg, /CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/,
+            'Debug does not use the development entitlement');
+        assert.match(pbx, /com\.apple\.Push = \{\s*enabled = 1;/, 'the Push capability is not declared');
+        assert.match(pbx, /com\.apple\.SignInWithApple = \{\s*enabled = 1;/, 'Sign in with Apple was disturbed');
+        assert.match(pbx, /AppRelease\.entitlements \*\/ = \{isa = PBXFileReference/,
+            'the release entitlement is not a member of the project, so Xcode cannot show it');
     });
 
     test('the pbxproj and the entitlements file agree in both directions', () => {
