@@ -3063,10 +3063,23 @@ is the case where "one group IS the field" was the deliberate design.
     `captureSkinsInstances`, `captureAdditionalGames`, `describeExistingNassau`,
     `renderSetupNassauPlayers`, `wizardSideMatchLine`. Same shape, same risk.
 
-## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, branch `trip-pots`, NOT merged)
+## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, MERGED `277a093`)
 
 STRICT. Two optional pots, both OFF until an organizer switches them on. Cache
 `golfapp-v284-trippots` / consumer `v124`.
+
+**MERGED 2026-10-04 after Manny tested both waves via Cmd+R**: `trip-simplify`
+(`11d9ba7`) and `trip-pots` on top of it (`277a093`). One cache key covers both -
+v284 is later than v283 and sw.js carries BOTH waves' "Moved to" notes, so a
+device on either older version is told what it would otherwise keep serving.
+Production verified: sw.js serves `golfapp-v284-trippots`, trip.html, trip-pots.js
+and roster-paste.js are byte-identical to the repo, and the course proxy Function
+still answers 200. Suite 10,057 tests, 10,055 pass, 0 fail; the money engines,
+payouts.js and the match-engine golden are unchanged by sha.
+
+**`ui-wave39-push` (`4f5f6b4`) IS STILL UNMERGED** and stays that way: the push
+setup (APNs key, Firebase Cloud Messaging, the Xcode capability, the Cloudflare
+secret) and the challenge test are still outstanding.
 
 - **THE TRIP POT** is the points race played for money: every golfer in the trip
   pays one buy-in, the pot is buy-in x field, and it pays the finishing order
@@ -3107,7 +3120,7 @@ STRICT. Two optional pots, both OFF until an organizer switches them on. Cache
   (forcing the apply branch while the pot is off changes nothing, because a
   refused pot carries no entries). Engines frozen by sha, payouts.js included.
 
-## Road Trip, simplified - and a group header that was being paid as a golfer (2026-10-04, branch `trip-simplify`, NOT merged)
+## Road Trip, simplified - and a group header that was being paid as a golfer (2026-10-04, MERGED `11d9ba7`)
 
 Manny pasted his real 24-golfer list on the live app. Five things were wrong, and
 the first costs money. Cache `golfapp-v283-tripsimplify` / consumer `v123`.
