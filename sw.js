@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v130-preflight. The tournament product cache
+// The consumer product cache is consumer-v131-foreground. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4156,7 +4156,18 @@
 //
 // This is a Function change, so the web half of it is only live once the branch
 // is deployed; the cache key moves because admin.html reads those answers.
-const CACHE_VERSION = 'golfapp-v290-preflight';
+//
+// Moved to v291: A NOTIFICATION YOU CAN SEE AND A TAP THAT GOES SOMEWHERE.
+// capacitor.config now names presentationOptions on both push plugins, so a
+// notification that arrives while the app is OPEN draws a banner instead of
+// nothing - that is a native config value and no cache can carry it, but the
+// three web halves can: both pages bind a tap on arrival and route it
+// (pushActionHref existed since Wave 39 and nothing called it, so every tap
+// opened whatever the app was last on), admin.html gains "Send in 10 seconds"
+// and honours ?account=1, and the message now carries kind and roundCode so a
+// tap has something to route on. A device on v290 taps a banner and lands
+// nowhere in particular.
+const CACHE_VERSION = 'golfapp-v291-foreground';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

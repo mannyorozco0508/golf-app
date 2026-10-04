@@ -131,6 +131,12 @@ export function fcmMessage(token, decided, extra) {
     });
     if (decided.dedupeKey) data.dedupeKey = String(decided.dedupeKey);
     if (decided.channel) data.channel = String(decided.channel);
+    // WHAT A TAP ROUTES ON (2026-10-04). pushActionHref has always known which
+    // screen each kind belongs to and the phone was never told either value, so
+    // a tap could only open whatever the app was last on. The decider sets both;
+    // this copies them, and invents nothing.
+    if (decided.kind) data.kind = String(decided.kind);
+    if (decided.roundCode) data.roundCode = String(decided.roundCode);
     // ACTIONS TRAVEL AS DATA, NOT AS A CATEGORY WE INVENT. The app registers its
     // own category for accept/decline; sending an unknown one shows no buttons
     // and loses nothing.

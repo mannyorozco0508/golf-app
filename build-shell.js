@@ -106,7 +106,10 @@ const PRODUCTS = {
         // can carry a tee time, a golfer can follow along as a player, a side bet
         // can be offered, and push is live. A device on v124 has none of them, and
         // every one of those pages calls its file unguarded.
-        cacheName: 'consumer-v130-preflight',
+        // Moved to v131: a tap on a notification now lands on the round or the
+        // Account card it is about, and a notification that arrives while the app
+        // is open draws a banner. A device on v130 has neither listener.
+        cacheName: 'consumer-v131-foreground',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

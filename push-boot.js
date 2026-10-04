@@ -233,6 +233,75 @@ function pushActionHref(origin, dir, roundCode, data) {
     return base + 'index.html?game=' + code;
 }
 
+// THE TEST NOTIFICATION IS THE ONE THAT IS NOT ABOUT A ROUND. It proves the
+// credential, the token, the capability and the route, and it is sent from
+// Account - so that is where tapping it belongs. Everything else is a round, and
+// pushActionHref already knows which screen of it.
+function pushTapHref(origin, dir, data) {
+    var d = data || {};
+    if (String(d.test || '') === '1') {
+        return String(origin || '') + String(dir || '/') + 'admin.html?account=1';
+    }
+    return pushActionHref(origin, dir, d.roundCode, d);
+}
+
+// ---------------------------------------------------------------------------
+// AND SOMETHING HAS TO LISTEN. pushActionHref was built in Wave 39 and NO PAGE
+// CALLED IT: every tap on every notification opened whatever the app was last
+// looking at. A builder nothing listens to is not a feature, so this binds it.
+//
+// BOTH PLUGINS, because either one may own the tap - whichever claimed
+// bridge.notificationRouter.pushNotificationHandler last is the one whose
+// listener fires, and that is plugin load order rather than a decision. Their
+// event names differ: pushNotificationActionPerformed and
+// notificationActionPerformed.
+//
+// ONE TAP, ONE NAVIGATION. If both ever deliver the same tap, the dedupe key -
+// or the notification's own id - makes the second one a no-op. Navigating twice
+// would reload the round out from under the golfer who just arrived on it.
+//
+// AND IT NAVIGATES NOTHING ITSELF. The page supplies `go`, which is what keeps a
+// notification from being able to do anything a link could not.
+function pushBindNotifications(deps) {
+    var d = deps || {};
+    var plugins = d.plugins || pushPlugins();
+    if (!plugins.push && !plugins.messaging) return { bound: false, reason: 'no-plugin' };
+    var seen = {};
+    var dataOf = function (ev) {
+        var e = ev || {};
+        var n = e.notification || e;
+        return (n && n.data) || {};
+    };
+    var onTap = function (ev) {
+        var data = dataOf(ev);
+        var e = ev || {};
+        var n = e.notification || e;
+        var id = String(data.dedupeKey || (n && n.id) || '');
+        if (id) {
+            if (seen[id]) return;
+            seen[id] = true;
+        }
+        var href = pushTapHref(d.origin, d.dir, data);
+        if (typeof d.go === 'function') d.go(href, data);
+    };
+    var onReceive = function (ev) {
+        if (typeof d.onReceive === 'function') d.onReceive(dataOf(ev));
+    };
+    var events = [];
+    var add = function (plugin, name, fn) {
+        if (!plugin || typeof plugin.addListener !== 'function') return;
+        try { plugin.addListener(name, fn); events.push(name); } catch (e) { /* a tap is not worth a crash */ }
+    };
+    add(plugins.push, 'pushNotificationActionPerformed', onTap);
+    // THE FOREGROUND ARRIVAL. iOS draws the banner itself from
+    // presentationOptions; this is how the PAGE finds out, which is what lets the
+    // test card say the notification landed while the app was open.
+    add(plugins.push, 'pushNotificationReceived', onReceive);
+    add(plugins.messaging, 'notificationActionPerformed', onTap);
+    add(plugins.messaging, 'notificationReceived', onReceive);
+    return { bound: events.length > 0, events: events };
+}
+
 // ---------------------------------------------------------------------------
 // THE SETTINGS. Three switches, and only two of them are switches:
 // Essentials cannot be turned off - push-notify.js forces it true whatever is
@@ -247,6 +316,6 @@ function pushPrefsForSave(prefs) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         pushPlugins, pushRegisterToken, pushRegisterIfGranted, pushDeviceKey,
-        pushPrefsForSave, pushActionHref
+        pushPrefsForSave, pushActionHref, pushTapHref, pushBindNotifications
     };
 }

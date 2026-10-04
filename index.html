@@ -1948,6 +1948,10 @@ html {
         if (btn && document.documentElement.classList.contains('dark-mode')) {
             btn.textContent = '☀️ Light Mode';
         }
+        // A TAP ON A NOTIFICATION HAS TO LAND SOMEWHERE. Bound on arrival, before
+        // any sign-in and whether or not this page has a round open - the tap that
+        // opens the app is delivered as soon as the web view is listening.
+        bindPushTaps();
     });
     // ------------------
 
@@ -5887,6 +5891,25 @@ html {
             }).catch(() => {});
         } catch (e) { /* a launch must never fail on this */ }
     }
+    // ---- WHERE A TAPPED NOTIFICATION LANDS (2026-10-04) --------------------
+    //
+    // pushActionHref was built in Wave 39 and NOTHING CALLED IT, so every tap on
+    // every notification opened whatever the app happened to be showing. The
+    // routing lives in push-boot.js, for both plugins and with one navigation per
+    // tap; this supplies where the app is and the one thing a notification is
+    // allowed to do, which is follow a link.
+    function bindPushTaps() {
+        if (typeof pushBindNotifications !== 'function') return;
+        const loc = window.location;
+        pushBindNotifications({
+            origin: loc.origin,
+            dir: loc.pathname.replace(/\/[^\/]*$/, '/'),
+            // A TAP MAY NOT RELOAD THE SCREEN IT IS ALREADY ON: the golfer tapped
+            // a banner for the round in front of them and would lose their place.
+            go: (href) => { if (href && href !== loc.href) loc.href = href; }
+        });
+    }
+
     function skipWhoAmI() {
         storeWhoAmISkipped();
         whoAmIPickerOpen = false;

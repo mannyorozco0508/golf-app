@@ -250,7 +250,7 @@ function pushThrottleKey(roundCode, uid, hole) {
 // THE ONE DECISION FUNCTION. Everything above is read through this, so a caller
 // cannot accidentally skip the throttle or the preference check.
 //
-//   { send, reason, channel, copy, dedupeKey, throttleKey }
+//   { send, reason, channel, kind, roundCode, copy, dedupeKey, throttleKey }
 //
 // `reason` is always set, including on a send, so a log says WHY as well as
 // whether - the thing that is impossible to reconstruct afterwards otherwise.
@@ -288,6 +288,14 @@ function pushDecide(input) {
 
     return {
         send: true, reason: 'ok', channel: pushChannelOf(kind),
+        // THE DECISION SAYS WHAT IT IS ABOUT (2026-10-04). Not for the sending -
+        // the copy is already built - but for the TAP: the phone can only route a
+        // notification to the right screen if the message carries the kind and
+        // the round, and the only place that knows both is here. _push.js copies
+        // these two into the FCM data block, and push-boot.js reads them back on
+        // the other side. Echoing an input is not a decision; nothing above this
+        // line reads either field.
+        kind: kind, roundCode: String(facts.roundCode || ''),
         copy: copy, dedupeKey: dedupeKey, throttleKey: throttleKey
     };
 }

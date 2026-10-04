@@ -1141,7 +1141,17 @@ html {
              shell is the Guideline 2.1 problem the master panel is already a
              native no-op for. -->
         <div id="notify-test-row" style="display:none; margin-top:12px; border-top:1px solid var(--border-light); padding-top:10px;">
-            <button type="button" id="notify-test-btn" class="btn-outline" onclick="sendTestNotification()">🔔 Send me a test notification</button>
+            <!-- TWO BUTTONS, AND AT 390px THEY WRAP RATHER THAN RUN OFF THE CARD. The
+                 row itself cannot be the flex container: notifyTestVisible toggles its
+                 display, so a display:flex there would fight the display:none it ships
+                 with. -->
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <button type="button" id="notify-test-btn" class="btn-outline" onclick="sendTestNotification()">🔔 Send me a test notification</button>
+                <!-- THE LOCK-SCREEN CASE. A banner while the app is open is iOS drawing
+                     presentationOptions; a banner on a locked phone is the other half,
+                     and it cannot be tested while holding the phone that sends it. -->
+                <button type="button" id="notify-test-delay-btn" class="btn-outline" onclick="sendTestNotificationLater(10)">⏱️ Send in 10 seconds</button>
+            </div>
             <p id="notify-test-note" role="status" style="font-size:0.8rem; margin:8px 0 0 0;"></p>
         </div>
     </section>
@@ -3297,6 +3307,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // A device already switched on keeps the button across reloads. The switch
         // lives in localStorage, so this is the only thing that has to run on load.
         if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+        // A TAP ON A NOTIFICATION HAS TO LAND SOMEWHERE (2026-10-04).
+        bindPushTaps();
+        // AND THE TEST NOTIFICATION LANDS HERE, on the card that sent it. Tapped
+        // from another page it arrives as admin.html?account=1, which is a link
+        // and nothing more - the panel it opens is the same one the Account button
+        // opens.
+        if (urlParams.get('account') === '1' && typeof openAccountPanel === 'function') openAccountPanel();
     });
     // ------------------
 
@@ -6472,6 +6489,62 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } finally {
             if (btn) btn.disabled = false;
         }
+    }
+
+    // ---- SEND IN TEN SECONDS (2026-10-04) ----------------------------------
+    //
+    // WHY IT EXISTS. The first real send worked - "Sent to 1 device" - and no
+    // banner appeared, because the app was in the FOREGROUND. The config now
+    // asks iOS for a banner there too, and this is how the OTHER case gets
+    // tested: tap, lock the phone, and watch it arrive on the lock screen.
+    //
+    // ONE SENDER. This waits and then calls sendTestNotification - it does not
+    // build a second, simpler send, because a path that skips the decider would
+    // prove something the real notifications do not do.
+    let notifyTestWait = null;
+    function sendTestNotificationLater(seconds) {
+        const note = document.getElementById('notify-test-note');
+        const say = (t) => { if (note) note.textContent = t; };
+        const btns = ['notify-test-btn', 'notify-test-delay-btn']
+            .map((id) => document.getElementById(id));
+        if (notifyTestWait) return;
+        let left = Math.max(1, Number(seconds) || 10);
+        btns.forEach((b) => { if (b) b.disabled = true; });
+        say('Lock your phone now \u2014 sending in ' + left + 's\u2026');
+        notifyTestWait = setInterval(() => {
+            left -= 1;
+            if (left > 0) { say('Lock your phone now \u2014 sending in ' + left + 's\u2026'); return; }
+            clearInterval(notifyTestWait);
+            notifyTestWait = null;
+            btns.forEach((b) => { if (b) b.disabled = false; });
+            sendTestNotification();
+        }, 1000);
+    }
+
+    // ---- WHERE A TAPPED NOTIFICATION LANDS (2026-10-04) --------------------
+    //
+    // The routing is push-boot.js's, for both plugins and with one navigation per
+    // tap. This page supplies two things it alone knows: the Account panel has no
+    // URL of its own while you are already on it, and a test notification that
+    // arrives while the app is open is worth saying so on the card that sent it.
+    function bindPushTaps() {
+        if (typeof pushBindNotifications !== 'function') return;
+        const loc = window.location;
+        pushBindNotifications({
+            origin: loc.origin,
+            dir: loc.pathname.replace(/\/[^\/]*$/, '/'),
+            go: (href, data) => {
+                const isAccount = String((data || {}).test || '') === '1' || /account=1/.test(String(href || ''));
+                if (isAccount && typeof openAccountPanel === 'function') { openAccountPanel(); return; }
+                if (href && href !== loc.href) loc.href = href;
+            },
+            onReceive: (data) => {
+                if (String((data || {}).test || '') !== '1') return;
+                const note = document.getElementById('notify-test-note');
+                if (note) note.textContent = 'It arrived while the app was open \u2014 iOS draws that banner at the top. '
+                    + 'For a lock-screen one, tap "Send in 10 seconds" and lock the phone.';
+            }
+        });
     }
 
     function notifyPrefsApply(raw) {

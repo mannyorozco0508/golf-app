@@ -3335,6 +3335,57 @@ tee-time field removed, and PUSH.
   through the real route. When there is no token it offers **Register this phone**
   rather than reporting a dead end.
 
+## A notification you can see, and a tap that goes somewhere (2026-10-04)
+
+Cache `golfapp-v291-foreground` / consumer `v131`. Push worked - **"Sent to 1
+device"** - and no banner appeared, because the app was in the FOREGROUND.
+
+- **IT WAS A CONFIG VALUE, NOT A DELIVERY FAILURE, and nothing could have said
+  so.** `PushNotificationsHandler.willPresent` returns an **empty option set**
+  when `presentationOptions` is absent - iOS being told, correctly, to present
+  nothing. The notification arrived, was handed to the app, and the app said show
+  nothing. `capacitor.config.ts` now names `['badge','sound','alert']`.
+- **ON BOTH PLUGINS, DELIBERATELY.** `@capacitor/push-notifications` claims
+  `bridge.notificationRouter.pushNotificationHandler` in its `load()`;
+  `FirebaseMessaging` sets the same property in its init. **Whichever loads last
+  owns `willPresent` and the tap events**, and their defaults disagree - messaging
+  defaults to badge/sound/alert, push-notifications to nothing. Naming both is the
+  only version of this that does not depend on plugin load order.
+- **`pushActionHref` HAD EXISTED SINCE WAVE 39 AND NO PAGE CALLED IT.** The
+  builder was correct and every tap on every notification opened whatever the app
+  was last showing. `pushBindNotifications` binds both plugins' four events, both
+  pages bind on arrival, and one tap navigates once (the dedupe key, or the
+  notification's own id, makes a second delivery a no-op). A test notification
+  lands on **Account** (`admin.html?account=1`, which the page now honours); the
+  five real kinds land on their round, settlement or match card as the builder
+  always said they should.
+- **AND THE PHONE WAS NEVER TOLD WHAT IT HAD RECEIVED.** The FCM `data` block
+  carried the dedupe key, the channel and the actions - never the kind or the
+  round code - so there was nothing to route on even once something listened.
+  `pushDecide` echoes both now and `_push.js` copies them; nothing above that line
+  reads either field.
+- **"Send in 10 seconds"** sits beside the test button so the foreground case and
+  the **lock-screen** case can both be tested with one phone. It waits and then
+  calls the one sender - a second, simpler send would prove something the real
+  notifications do not do.
+- **`tools/push-tap-check.js`** is the proof, and it is the only kind that could
+  be: it arrives cold on `admin.html` and `index.html`, injects a stand-in
+  `window.Capacitor` whose `addListener` **records** what the page asks to hear,
+  then fires that callback the way iOS does. Nothing the page defines is called.
+  Measured: both pages ask for all four events unprompted, the Account panel is
+  closed on arrival and open after a tapped test notification, the card says the
+  notification arrived while the app was open, and a tapped final-results
+  notification makes the page request `settlement.html?game=COLD`. Control:
+  deleting the one `bindPushTaps()` call from `admin.html` turned it into 8
+  problems (restored by sha from a saved copy, not `git restore`).
+- **MY OWN VARIABLE NAME BROKE AN EXISTING GUARD:** `notifyTestCountdown` matched
+  `organizer_gate_test.js`'s "no page shows a trial banner or **countdown**". The
+  guard was right; the name was mine, and is now `notifyTestWait`.
+- **WHAT NO TEST HERE CAN PROVE:** that a banner appears on his phone. That is
+  iOS drawing a notification from a config value. `push_foreground_test.js` says
+  so in its header, and holds the value against the vendored plugin source so the
+  file cannot end up guarding a fix for a bug that was fixed upstream.
+
 ## The trip's own money: a pot on the points race and a pot in every round (2026-10-04, MERGED `277a093`)
 
 STRICT. Two optional pots, both OFF until an organizer switches them on. Cache

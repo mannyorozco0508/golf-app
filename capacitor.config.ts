@@ -125,6 +125,31 @@ const config: CapacitorConfig = {
       // the free trial and a founder pass stay on the same uid. oauth-signin.js also
       // passes skipNativeAuth per call; this is the same decision at config level.
       skipNativeAuth: true
+    },
+    // THE BANNER WHILE THE APP IS OPEN (2026-10-04). Push worked end to end -
+    // "Sent to 1 device" - and nothing appeared on screen, because the app was in
+    // the foreground and presentationOptions was not set.
+    //
+    // IT IS NOT A DELIVERY FAILURE AND NOTHING COULD HAVE SAID SO.
+    // PushNotificationsHandler.willPresent returns an EMPTY option set when this
+    // key is absent, which is iOS being told, correctly, to present nothing. The
+    // notification arrived, was handed to the app, and the app said show nothing.
+    //
+    // BOTH PLUGINS ARE NAMED, AND THAT IS DELIBERATE. push-notifications sets
+    // bridge.notificationRouter.pushNotificationHandler in load(); FirebaseMessaging
+    // sets the same property in its init. Whichever loads last owns willPresent and
+    // the tap events, and their defaults DISAGREE - messaging defaults to
+    // badge/sound/alert, push-notifications to nothing. Naming both is the only
+    // version of this that does not depend on plugin load order.
+    //
+    // 'alert' is banner + list in the plugin's own mapping, so a notification
+    // arriving while the app is open shows a banner and stays in Notification
+    // Centre. push_foreground_test.js holds this against the vendored source.
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert']
+    },
+    FirebaseMessaging: {
+      presentationOptions: ['badge', 'sound', 'alert']
     }
   }
 };

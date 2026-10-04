@@ -186,7 +186,13 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         // the page opens the coach instead of the wizard. It is the lobby's own param in
         // exactly the sense this list means - chosen here, read on arrival, never a
         // golfer's to type.
-        assert.deepEqual([...new Set(reads)].sort(), ['coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
+        // 'account' JOINED 2026-10-04: a TAPPED NOTIFICATION has to land somewhere, and
+        // the test notification is sent from the Account panel, which has no URL of its
+        // own. push-boot.js routes that tap to admin.html?account=1 and this page opens
+        // the panel on arrival. Same sense as 'coach': built by the app, read on
+        // arrival, and it opens a panel the Account button already opens - so there is
+        // nothing behind it a golfer could not reach by tapping Account.
+        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);
