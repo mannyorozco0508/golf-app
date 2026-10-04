@@ -3799,6 +3799,26 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   1.0.6 (3) is **Waiting for Review**. Read from the console by Manny - there is no
   App Store Connect key on this Mac, so nothing here checked it.
 - Android is at 1.0.6 versionCode 2 and is unaffected by any of this.
+- **1.0.6 BUILD 4 IS SET AND READY TO ARCHIVE (2026-10-04, `main`).**
+  `MARKETING_VERSION` 1.0.6 was already on both configurations; `CURRENT_PROJECT_VERSION`
+  moved 3 -> 4 on **Debug and Release**, which is the number the rule above demands -
+  build 3 has been seen by App Store Connect, so 4 is the lowest it will take.
+  **WHAT BUILD 4 CARRIES over build 3:** push notifications end to end (the launch-time
+  registration, the AppDelegate forwarding, the FCM registration token, the answered CORS
+  preflight, the foreground banner and the tap routing), side-bet challenges with their
+  group scoping, following along as a player, the trip pots (points race + daily), the
+  trip roster paste, the Players-step tidy, My Groups released to every signed-in
+  organizer, and the tee-time field removed from the UI.
+  **SIGNING, CONFIRMED BY FILE AND BY TEST:** Release is
+  `CODE_SIGN_ENTITLEMENTS = App/AppRelease.entitlements`, which holds `aps-environment`
+  **production** and `com.apple.developer.applesignin ["Default"]`; Debug is
+  `App/App.entitlements` with **development**. `oauth_native_test.js` holds both files and
+  both pbxproj configurations, so this is not a sentence to be trusted on its own.
+  `npx cap sync ios` run after the bump; `native_bundle_freshness_test.js` green.
+  **TWO THINGS FOR MANNY, NOT FOR THIS FILE TO DECIDE:** 1.0.6 (3) was last read as
+  *Waiting for Review*, so uploading 4 means choosing which build goes to review; and
+  **no spectator-delete fix is on `main` or on any branch in this repo** - if one is
+  still coming it has to merge before the archive to be in build 4.
 
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
