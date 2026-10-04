@@ -213,7 +213,30 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         test(k + ' (' + q + '): ' + what + ', every element\'s text identical, every display state identical but the new note (none)', () => {
             const a = R.arrive(q, one ? R.oneGroupRound() : null);
             assert.deepEqual(a.filtered, PREV.links[k].filtered);
-            assert.deepEqual(a.text, PREV.links[k].text);
+            // RE-PINNED 2026-10-04: ONE KEY, end-round-mount, and ONLY on the bare
+            // link. This golden was captured on a page that offered "Delete round
+            // for everyone" to whoever held the bare link - WAVEB records neither
+            // an ownerUid nor an organizerToken, so nobody can be shown to be its
+            // organizer - and that is the defect Manny hit on round ULDM2A. Both
+            // the renderer and the handler now ask canDeleteRound(), so on a round
+            // that names no organizer the control is drawn for nobody. Handled the
+            // way this file handles every other moved key: asserted in BOTH
+            // directions, then removed from both maps so the rest stays byte-
+            // identical. spectator_delete_test.js is the subject's own guard.
+            const text = Object.assign({}, a.text);
+            const prevText = Object.assign({}, PREV.links[k].text);
+            if (k === 'bare') {
+                assert.match(String(prevText['end-round-mount'] || ''), /Delete round for everyone/,
+                    'the golden no longer holds the control this re-pin is about - re-read it before trusting this line');
+                assert.ok(!/Delete/.test(String(text['end-round-mount'] || '')),
+                    'the bare link still offers the delete: ' + text['end-round-mount']);
+            } else {
+                assert.equal(prevText['end-round-mount'], undefined,
+                    'a group link never had this control, so there is nothing to re-pin here');
+            }
+            delete text['end-round-mount'];
+            delete prevText['end-round-mount'];
+            assert.deepEqual(text, prevText);
             const display = Object.assign({}, a.display);
             assert.equal(display['group-missing-note'], 'none', 'the note is hidden');
             delete display['group-missing-note'];

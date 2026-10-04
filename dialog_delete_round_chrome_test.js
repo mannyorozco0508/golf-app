@@ -34,7 +34,15 @@ const CD = makeCourseData(18);
 // never reach the sheet - and this check is about the question, not the refusal.
 function round() {
     const P = makePlayers(['Ann Alpha', 'Ben Bravo', 'Cal Charlie', 'Dee Delta'], [2, 9, 15, 4], 101);
+    // ownerUid IS THE ORGANIZER'S, AND IT HAS TO BE (2026-10-04). The delete
+    // control came off "no ?group= in the URL" - which a bare-link spectator
+    // satisfied, and which is the bug Manny hit - and onto organizerEvidence():
+    // a matching ownerUid or a matching organizer token. cold-arrival signs this
+    // realm in as the anonymous uid 'anon-cold', so a round OWNED by anon-cold is
+    // this check's organizer and the button renders for the real reason. Without
+    // it there is no button to tap and this file measures an empty mount.
     return { eventName: 'Delete Me', courseName: 'Test', players: P, gameFormat: 'stroke',
+             ownerUid: 'anon-cold',
              courseData: CD, scores: {}, settlementMode: 'whole-dollar' };
 }
 const DB = { events: { DELE1: round() }, global_courses: {}, trips: {}, tournaments: {} };
@@ -175,5 +183,46 @@ describe('DELETE ROUND in real Chrome — the sheet, the focus, and both answers
         assert.match(landed.url, /^admin\.html/,
             'tapping Delete it did not complete the deletion - still on ' + landed.url);
         assert.equal(landed.sheetOpen, false, 'the sheet survived the navigation');
+    });
+
+    // ---- THE SPECTATOR, IN THE SAME BROWSER (2026-10-04) -------------------
+    //
+    // WHAT MANNY SAW on round ULDM2A: he opened the BARE link of a round he did
+    // not organize and the scorecard offered him "Delete round for everyone".
+    // The two tests above cannot see that - their round is owned by this realm,
+    // which is what makes the button appear at all. This one changes exactly one
+    // field: ownerUid belongs to another phone. Same URL, same cold arrival, no
+    // taps, nothing called.
+    test('A SPECTATOR ON THE BARE LINK gets no button at all',
+        { timeout: 90000 }, async () => {
+        const other = round();
+        other.ownerUid = 'some-other-phone';
+        const r = await arriveCold({
+            url: fileUrl('index.html', 'game=DELE1'),
+            db: { events: { DELE1: other }, global_courses: {}, trips: {}, tournaments: {} },
+            settleMs: 2500,
+            viewport: { width: 390, height: 844 },
+            preScript: PRE,
+            steps: [
+                // THE CARD RENDERED, so an empty mount is a decision rather than a
+                // page that never ran. Read from the rendered text of the scorecard.
+                { expression: `(function () { var m = document.getElementById('end-round-mount');
+                    var body = document.getElementById('card-body');
+                    return JSON.stringify({
+                        mountExists: !!m,
+                        buttons: m ? m.querySelectorAll('button').length : -1,
+                        mountText: m ? (m.innerText || '').trim() : null,
+                        rowsRendered: body ? body.querySelectorAll('tr').length : 0
+                    }); })()` }
+            ]
+        });
+        assert.equal(r.ok, true, r.reason);
+        const got = JSON.parse(String((r.value || [])[0]));
+        assert.equal(got.mountExists, true, 'the mount is gone - this check is measuring nothing');
+        assert.ok(got.rowsRendered > 0,
+            'the scorecard rendered nothing at all, so an empty delete mount proves nothing');
+        assert.equal(got.buttons, 0,
+            'a spectator was offered ' + got.buttons + ' delete button(s) on the bare link');
+        assert.equal(got.mountText, '', 'the mount still says: ' + got.mountText);
     });
 });

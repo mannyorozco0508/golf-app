@@ -319,17 +319,22 @@ describe('THE WIZARD (admin.html?game=CODE) on an EXISTING round', () => {
 
 // ---------------------------------------------------------------------------
 describe('HANDOFF says what this is not', () => {
-    test('hides the doors, does not lock them; rules untouched; the ten isOrganizerView gates listed', () => {
+    test('hides the doors, does not lock them; rules untouched; the seven isOrganizerView mentions listed', () => {
         const h = read('HANDOFF.md');
         assert.match(h, /hides the doors; it does not lock them/i);
         assert.match(h, /database\.rules\.json/);
         assert.match(h, /isOrganizerView/);
         const src = read('index.html');
         const uses = (src.match(/isOrganizerView\(\)/g) || []).length;
-        // 10 mentions (comments included) beside the definition and canReachSetup's
-        // comment: 3621, 4283, 4296, 4967 (def), 4976, 6657, 6664, 6672, 6688 + one
-        // more in the older provenance comment. A gate moved onto canReachSetup moves
-        // its comment too, so this count falls and HANDOFF's table has to follow.
-        assert.equal(uses, 10, 'isOrganizerView() mentions in index.html: ' + uses);
+        // RE-PINNED 2026-10-04: 10 -> 7. The delete control came off this predicate
+        // (renderEndRoundControl and endAndClearRound now ask canDeleteRound - a
+        // spectator on the bare link was being offered "Delete round for everyone",
+        // which is the defect this paragraph in HANDOFF had predicted), and the
+        // pre-snapshot render call went with it. What is left is ONE real gate -
+        // canShowInlineActionPanel - the definition, and five comment mentions, one
+        // of them canDeleteRound's own explanation of why the URL shape was the
+        // wrong question. A gate moved onto canReachSetup or canDeleteRound moves
+        // its comment too, so this count falls again and HANDOFF's table follows.
+        assert.equal(uses, 7, 'isOrganizerView() mentions in index.html: ' + uses);
     });
 });

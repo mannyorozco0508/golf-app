@@ -3009,13 +3009,27 @@ in a later wave:
 | where (`index.html`) | what it gates |
 |---|---|
 | `:3621` `canShowInlineActionPanel` (the quick "+ SIDE BETS" panel) | writing a wager with no participants named — single-group rounds only, so a spectator on a foursome's bare link can add a wager |
-| `:6672` `renderEndRoundControl` | whether the "End & Wipe" control is drawn |
-| `:6688` `endAndClearRound` | the wipe itself, checked again at the action |
 | `:3609`, `:4283`, `:4296`, `:4976`, `:6657`, `:6664` | comments that name the predicate — prose only |
 
-`organizer_door_test.js` pins the count of the string (10 now, comments
-included), so a gate moved later has to move its comment too and update the
-table above. Also not on either predicate: the group switcher in
+**THE DELETE CONTROL CAME OFF THIS PREDICATE ON 2026-10-04**, and it came off
+because Manny hit exactly what the paragraph above predicted: he opened the bare
+link of round ULDM2A as a spectator and the scorecard offered him "🗑️ Delete
+round for everyone". Both `renderEndRoundControl` and `endAndClearRound` now ask
+`canDeleteRound()` — `organizerGate.organizerEvidence()`, a matching `ownerUid`
+or a matching organizer token, which is STRICTER than `canReachSetup()` because
+it refuses `isRoundOrganizer`'s legacy "no owner and no token is open" arm. On a
+round that names no organizer the scorecard offers the delete to nobody; the
+organizer still has it on `admin.html?game=CODE`. The control is also no longer
+rendered before the first snapshot (it cannot be: the gate needs the record and
+the uid, and `organizerTokenParam` is a `let` declared further down that script,
+so calling it at init threw before initialization and took the round's own value
+listener with it). `spectator_delete_test.js` holds all of it, both arms of the
+handler included. **The DB-level lock is still Stage 2** — this hides a control
+and refuses at the handler; it does not lock a write.
+
+`organizer_door_test.js` pins the count of the string (7 now, comments
+included — it was 10 until the delete control moved), so a gate moved later has
+to move its comment too and update the table above. Also not on either predicate: the group switcher in
 `renderGroupFilters` (`hasGroupLock` decides, harmless for a spectator) and the
 score-override provenance `verifiedBy` (`hasOrganizerAuthority`, the token only).
 `renderGroupFilters` does now ask `canReachSetup()` on its locked branch, because that
@@ -3815,10 +3829,14 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   `App/App.entitlements` with **development**. `oauth_native_test.js` holds both files and
   both pbxproj configurations, so this is not a sentence to be trusted on its own.
   `npx cap sync ios` run after the bump; `native_bundle_freshness_test.js` green.
-  **TWO THINGS FOR MANNY, NOT FOR THIS FILE TO DECIDE:** 1.0.6 (3) was last read as
-  *Waiting for Review*, so uploading 4 means choosing which build goes to review; and
-  **no spectator-delete fix is on `main` or on any branch in this repo** - if one is
-  still coming it has to merge before the archive to be in build 4.
+  **THE SPECTATOR-DELETE FIX IS IN IT (2026-10-04, later the same day).** When this
+  was first written no such fix existed anywhere in the repo and that was said plainly;
+  it was then built, merged to `main` and re-synced into this bundle BEFORE any archive,
+  which is what Manny asked for. The build number did not move - 1.0.6 build 4 still -
+  because nothing had been uploaded. Cache `golfapp-v292-deletegate` / consumer `v132`.
+  See "THE DELETE CONTROL CAME OFF THIS PREDICATE" above for the fix itself.
+  **ONE THING FOR MANNY, NOT FOR THIS FILE TO DECIDE:** 1.0.6 (3) was last read as
+  *Waiting for Review*, so uploading 4 means choosing which build goes to review.
 
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):

@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v131-foreground. The tournament product cache
+// The consumer product cache is consumer-v132-deletegate. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4167,7 +4167,15 @@
 // and honours ?account=1, and the message now carries kind and roundCode so a
 // tap has something to route on. A device on v290 taps a banner and lands
 // nowhere in particular.
-const CACHE_VERSION = 'golfapp-v291-foreground';
+// Moved to v292: THE SPECTATOR'S DELETE BUTTON IS GONE. On the bare link of a
+// round he did not organize, the scorecard offered Manny "Delete round for
+// everyone" - the control was gated on "no ?group= in this URL", which is the
+// spectator's answer too. Both the renderer and the handler now ask
+// canDeleteRound(): a matching ownerUid or a matching organizer token, and
+// nothing weaker. A device on v291 keeps serving the old gate to every spectator
+// and every "I'm playing" follower it has cached. This hides a control and
+// refuses at the handler; the DB-level lock is Stage 2.
+const CACHE_VERSION = 'golfapp-v292-deletegate';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

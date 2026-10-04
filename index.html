@@ -2130,10 +2130,16 @@ html {
             lockBadge.style.display = "inline-block";
         }
 
-        // Before any data arrives: this depends only on the URL, and a
-        // scorekeeper must never see the control even for the moment between
-        // arrival and the first snapshot.
-        renderEndRoundControl();
+        // NOTHING IS RENDERED HERE ANY MORE (2026-10-04). This used to call
+        // renderEndRoundControl() because the old gate read only the URL, and a
+        // scorekeeper had to be excluded in the moment between arrival and the
+        // first snapshot. The gate now reads the round record and the uid,
+        // neither of which exists yet - and the mount ships EMPTY in the markup,
+        // so that property is kept by the page rather than by a call. (It also
+        // cannot run here: organizerTokenParam is a `let` declared further down
+        // this script, so reading it at init throws before initialization and
+        // took the round's own value listener with it.) renderScorecard() calls
+        // the renderer on every repaint.
 
         document.querySelectorAll('.nav-link').forEach(link => {
             const base = link.getAttribute('href').split('?')[0];
@@ -7347,6 +7353,42 @@ html {
             && !window.organizerGate.organizerEvidence(currentData, uid, token)) return false;
         return window.organizerGate.isRoundOrganizer(currentData, uid, token);
     }
+    // ---- WHO MAY DELETE A ROUND (2026-10-04) --------------------------------
+    //
+    // THE BUG. Manny opened the BARE link of a round he was not the organizer of
+    // and the scorecard offered him "Delete round for everyone". The control was
+    // already gated - on isOrganizerView(), which is `!hasGroupLock`, i.e. "this
+    // URL has no ?group=". That is true of the organizer and equally true of
+    // every spectator and every "I'm playing" follower, because the bare link is
+    // precisely the one that gets forwarded to the group chat. The gate answered
+    // a different question from the one the button needed answered.
+    //
+    // EVIDENCE, AND NOTHING WEAKER. organizerEvidence() is a matching ownerUid or
+    // a matching organizer token - the same predicate the Wave 22 group-lock fix
+    // already uses. This is deliberately STRICTER than canReachSetup(), which
+    // also accepts isRoundOrganizer's third arm: a round recording neither field
+    // is open, as it always was. For Edit round setup that arm is right, because
+    // a legacy round has to stay editable. For the most destructive button in the
+    // app it is not: where nobody can be SHOWN to be the organizer, the scorecard
+    // offers the delete to nobody, and the organizer of such a round still has it
+    // on admin.html?game=CODE, which is where they go to edit it anyway.
+    //
+    // A ROLE DOES NOT DEMOTE THE ORGANIZER. An organizer who taps "I'm playing"
+    // is still the organizer; what hides this button is the absence of evidence,
+    // never the presence of a role.
+    //
+    // THIS HIDES AND REFUSES - IT DOES NOT LOCK. database.rules.json is untouched
+    // (the DB-level lock is Stage 2), so a client holding the code can still
+    // write. What the live rules DO already refuse is deleting a round that has
+    // scores in it, which is the backstop that matters most.
+    function canDeleteRound() {
+        const g = window.organizerGate;
+        if (!g || typeof g.organizerEvidence !== 'function') return false;
+        const uid = (window.authBootState && window.authBootState.uid) || null;
+        const token = (typeof g.heldOrganizerToken === 'function')
+            ? g.heldOrganizerToken(currentMode, organizerTokenParam) : null;
+        return !!g.organizerEvidence(currentData, uid, token);
+    }
     function setupHref() { return 'admin.html?game=' + currentMode; }
 
     // ---- THE ORGANIZER LINK: SHARED, AND CLAIMED (v200) ----------------------
@@ -9164,22 +9206,21 @@ html {
         }).catch(err => uiFail('\u26A0\uFE0F DOTS NOT SAVED\n' + (err && err.message)));
     }
 
-    // ORGANIZER ONLY. Gated on isOrganizerView() - the single definition of
-    // "is this the organizer" that already gates Group Links - and NOT on the
-    // organizer token: the token link renders inside the Group Links panel,
-    // which bails when a round has one group, so the organizer of a four-ball
-    // can never obtain it. Gating on the token would remove this control from
-    // the commonest round in the app with no way to get it back.
+    // ORGANIZER ONLY, and canDeleteRound() is the whole rule - see its own
+    // comment for why the URL shape was the wrong question and what was given up
+    // on a legacy round to stop answering it.
     //
-    // HONEST LIMIT, the same one isOrganizerView() carries everywhere else: it
-    // means "this URL has no ?group=". An organizer who pastes their own
-    // address bar into the group chat hands it back. This is a guardrail
-    // against accidents at the same strength as the ?group= links, not a
-    // security boundary, and database.rules.json is the backstop.
+    // RE-RENDERED ON EVERY REPAINT, because the answer now depends on the round
+    // record and the uid rather than on the URL alone, and both arrive after the
+    // first paint. renderScorecard() calls this; the empty mount is the state
+    // before either lands, which is the safe direction.
+    //
+    // HONEST LIMIT: this hides a control, it does not lock a write.
+    // database.rules.json is the backstop and is untouched this wave.
     function renderEndRoundControl() {
         const mount = document.getElementById('end-round-mount');
         if (!mount) return;
-        if (typeof isOrganizerView === 'function' && !isOrganizerView()) {
+        if (typeof canDeleteRound !== 'function' || !canDeleteRound()) {
             mount.innerHTML = '';
             return;
         }
@@ -9197,8 +9238,8 @@ html {
     async function endAndClearRound() {
         // Checked again here, not only at render: removing the button in
         // devtools must achieve nothing. Same belt-and-braces as filterGroup().
-        if (typeof isOrganizerView === 'function' && !isOrganizerView()) {
-            console.warn('Only the organizer link can delete a round.');
+        if (typeof canDeleteRound !== 'function' || !canDeleteRound()) {
+            console.warn('Only this round\u2019s organizer can delete it.');
             return;
         }
         const golferCount = (currentData.players || []).length;
@@ -10045,6 +10086,13 @@ html {
     function renderScorecard() {
         // Focus survives the rebuild below - see captureScoreFocus / restoreScoreFocus.
         const focusMemo = (typeof captureScoreFocus === 'function') ? captureScoreFocus() : null;
+        // THE DELETE CONTROL IS RE-EVALUATED HERE, not only on arrival: its gate
+        // reads the round record and the uid, and the first paint has neither.
+        // AFTER the focus capture, deliberately: this rewrites a mount's innerHTML,
+        // and score_entry_advance_test.js requires the capture to be the first thing
+        // this function does - which is right, because a DOM write before it can
+        // take the caret out of the box a golfer is typing in.
+        renderEndRoundControl();
         const historyModal = document.getElementById("history-modal-overlay");
         if (historyModal && historyModal.style.display === "flex") {
             renderHistoryList();

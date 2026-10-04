@@ -109,7 +109,10 @@ const PRODUCTS = {
         // Moved to v131: a tap on a notification now lands on the round or the
         // Account card it is about, and a notification that arrives while the app
         // is open draws a banner. A device on v130 has neither listener.
-        cacheName: 'consumer-v131-foreground',
+        // Moved to v132: only the round's organizer sees or can use the delete
+        // control. A device on v131 serves the old gate, which a spectator on the
+        // bare link satisfied.
+        cacheName: 'consumer-v132-deletegate',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

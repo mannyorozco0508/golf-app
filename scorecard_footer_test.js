@@ -107,6 +107,21 @@ const PROBE = `(function () {
     // link on a single-group round - it is the "Keeping score, playing, or just
     // watching?" offer, which is a real tappable line and really does take
     // height.
+    // THE DELETE BOX, measured the same way (2026-10-04). It is present for the
+    // ORGANIZER only now - a matching ownerUid or organizer token - and the
+    // fixture below arrives both ways, so this is a real number on one arrival
+    // and a real zero on the other rather than a constant typed into the sums.
+    deleteBoxH: (function () { var m = document.getElementById('end-round-mount');
+      if (!m || m.getClientRects().length === 0) return 0;
+      // THE CARD INSIDE, with its margins. The mount itself is a bare <div> with
+      // no margins of its own and .end-box-card carries margin-bottom: 10px, so a
+      // reading of the MOUNT's rect left exactly those 10px unexplained - the same
+      // mistake the role-note comment below records, one element deeper.
+      var card = m.querySelector('.end-box-card') || m.firstElementChild;
+      if (!card || card.getClientRects().length === 0) return 0;
+      var ccs = getComputedStyle(card);
+      return Math.round(card.getBoundingClientRect().height
+        + parseFloat(ccs.marginTop || 0) + parseFloat(ccs.marginBottom || 0)); })(),
     roleNoteH: (function () { var rn = document.getElementById('role-note');
       if (!rn) return 0;
       // HEIGHT PLUS MARGINS, because what the document grew by is the space the
@@ -122,9 +137,16 @@ const PROBE = `(function () {
 
 const S = {};
 before(async () => {
-    for (const [key, scored] of [['bare', false], ['scored', true]]) {
+    // THREE ARRIVALS, and the third is why the delete box can be itemised below
+    // rather than guessed at: the same bare URL on a round whose ownerUid is the
+    // uid cold-arrival signs in as, which is the organizer's own arrival. On the
+    // other two nobody can be shown to be the organizer, so the box is absent -
+    // which is the 2026-10-04 fix, and the reason these sums had to move.
+    for (const [key, scored, owner] of [['bare', false, false], ['scored', true, false], ['owner', false, true]]) {
+        const rec = round(scored);
+        if (owner) rec.ownerUid = 'anon-cold';
         const r = await arriveCold({ url: fileUrl('index.html', 'game=FT20'), settleMs: 3000,
-            db: { events: { FT20: round(scored) }, global_courses: {}, trips: {}, tournaments: {} },
+            db: { events: { FT20: rec }, global_courses: {}, trips: {}, tournaments: {} },
             viewport: { width: 390, height: 844 }, steps: [{ expression: PROBE }] });
         S[key] = r.ok ? JSON.parse(r.value[0]) : { error: r.reason };
     }
@@ -275,9 +297,24 @@ describe('THE HEIGHT RECLAIMED, AS A NUMBER', () => {
             'the bare document is ' + S.bare.docH + ' with a ' + S.bare.roleNoteH + 'px role note');
         assert.equal(2366 - S.scored.docH, 377 - S.scored.roleNoteH,
             'the scored document is ' + S.scored.docH + ' with a ' + S.scored.roleNoteH + 'px role note');
-        assert.equal((BEFORE_FOOTER_PX - S.bare.footerH) - S.bare.runwayH, 377,
-            'footer saved minus runway added does not account for the document change');
-        assert.equal((BEFORE_FOOTER_PX - S.scored.footerH) - S.scored.runwayH, 377);
+        // RE-POINTED 2026-10-04, AND THE DELETE BOX IS ITEMISED THE SAME WAY THE
+        // ROLE NOTE WAS. The scorecard's delete control is the organizer's now,
+        // and on this fixture nobody can be shown to be the organizer - so 191px
+        // of card left the page and #hole-landing-runway absorbed every pixel of
+        // it (49 -> 240 bare, 89 -> 280 scored, measured). The DOCUMENT height did
+        // not move at all, which is why the two equalities above still hold
+        // untouched; what moved is how the same height is divided up. The term is
+        // S.owner.deleteBoxH - measured on the organizer's own arrival, not typed
+        // in - so if the box changes size this sum follows, and if it ever stops
+        // rendering for the organizer the next assertion says so.
+        assert.ok(S.owner.deleteBoxH > 150 && S.owner.deleteBoxH < 250,
+            "the organizer's delete box measured " + S.owner.deleteBoxH + 'px - it is a card with a heading, a sentence and a button');
+        assert.equal(S.bare.deleteBoxH, 0,
+            'a spectator on the bare link is still being shown ' + S.bare.deleteBoxH + 'px of delete control');
+        assert.equal(S.scored.deleteBoxH, 0);
+        assert.equal((BEFORE_FOOTER_PX - S.bare.footerH) + S.owner.deleteBoxH - S.bare.runwayH, 377,
+            'footer saved plus the delete box reclaimed, minus runway added, does not account for the document change');
+        assert.equal((BEFORE_FOOTER_PX - S.scored.footerH) + S.owner.deleteBoxH - S.scored.runwayH, 377);
         // AND THE LINE IS REALLY THERE, so this is not satisfied by a zero.
         assert.ok(S.bare.roleNoteH > 20 && S.bare.roleNoteH < 90,
             'the role note measured ' + S.bare.roleNoteH + 'px - it should be one tappable line');

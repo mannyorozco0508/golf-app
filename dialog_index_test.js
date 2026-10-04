@@ -65,6 +65,13 @@ function boot(answer, extra) {
         currentData = ${JSON.stringify({ players, courseData: cd, scores: {}, gameFormat: 'stroke' })};
         courseData = currentData.courseData; savedScores = currentData.scores;
         isOrganizerView = function () { return true; };
+        // THE DELETE GATE, 2026-10-04. The control came off isOrganizerView - which
+        // a bare-link spectator satisfied - and onto canDeleteRound(), which asks
+        // organizerGate.organizerEvidence() of the round record and the uid. This
+        // harness has neither a round owner nor an auth realm, so the gate is
+        // stubbed here exactly as the old one was. WHO may delete is
+        // spectator_delete_test.js's subject; this file's subject is the SHEET.
+        canDeleteRound = function () { return true; };
         hasOrganizerAuthority = function () { return true; };
         requireOnlineForMoney = function () { return true; };
         ${extra || ''}
