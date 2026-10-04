@@ -3349,6 +3349,67 @@ tee-time field removed, and PUSH.
   through the real route. When there is no token it offers **Register this phone**
   rather than reporting a dead end.
 
+## THE 10th TEE: a round that plays 10-18, then 1-9 (2026-10-04, MERGED `0ebbf85`)
+
+STRICT. Cache `golfapp-v294-playorder` / consumer `v134`. Three commits on
+`tee-start-hole-10`, tested on the phone and approved: the module and the engine
+(`3b436a8`), the per-file approved settlement half (`d49efe0`), and the copy
+(`a5358fe`).
+
+- **IT DID NOT EXIST, and the recon is most of the value.** No tee start anywhere:
+  no wizard control, no field on `events/<code>`, and every surface took the play
+  order to be the hole numbers ascending - `goToAdjacentHole` sorted by number and
+  was "clamped, never wrapped", the hole view landed on `holeNumbers[0]` and called
+  the highest number the last hole, and `match-engine.js` computed holes-left as
+  `endHole - hNum`.
+- **`startHole` WAS ALREADY TAKEN, AND IT MEANS SOMETHING ELSE.** Everywhere in this
+  repo it is the hole a BET starts on - a skins game added "from H5", a press, a side
+  match bought on the turn - and `events/<code>/startHole` is READ as the legacy Dots
+  start by `index.html` `kpLiveState`. A round-level reuse of that key would have
+  silently stopped paying dots and KPs on the first nine. The round's tee is
+  **`startingHole`**, the same name the tournament shotgun sheet has always used.
+- **THE FIX IS THAT THE ARRAY ORDER IS THE PLAY ORDER.** `play-order.js` rotates the
+  card; `match-engine.js` reads the array it is given AS the sequence, so holes-left
+  counts the segment's holes still ahead and a press starts on the next hole PLAYED,
+  never "hole 19". A segment is still named by its hole NUMBERS - a Nassau Front 9 is
+  holes 1-9 whichever tee the group went off - so only the Overall spans the sequence.
+- **WHAT ACTUALLY MOVES MONEY, measured over 6,000 random cards: nothing, without a
+  press.** A match segment's final status is the sum of its holes whichever order they
+  are added in. The money case is the AUTO-PRESS: two down on the 18th green off the
+  10th tee leaves NINE holes to play and the press fires, where in number order the
+  18th is the last hole and no press can exist. Worked example in
+  `tee_start_test.js`: Ann wins 1, 3, 6, 13, 16, 18 and Ben wins 2, 4, 5, 7, 14 - $10
+  to Ann off the 1st tee, nobody pays off the 10th, because the press Ben wins only
+  exists there. **A $20 swing was reported mid-wave and it was a MISMATCH** -
+  play-order accumulation against number-order arithmetic - which is the state the
+  wave removed rather than a difference between the two tees.
+- **PER-FILE APPROVED, and only after the gap was named:** `settlement-engine.js` (the
+  two internal `calculateMatchEngine` calls, the first-hole label, and the skins
+  CARRY, which now rolls a tied hole onto the next hole PLAYED - off the 10th tee a
+  birdie on the 1st collects TEN units) and `bet-strip.js` (the main chip's "Started
+  Hole N"). Before that, the main game settled in play order and a side bet on the
+  same round settled by number, so two wagers over the same holes disagreed.
+- **THE SEGMENT LABELS CLAMP BY SEQUENCE, NOT BY NUMBER.** `Math.max`/`Math.min` were
+  right on a card played 1..18 and wrong off the 10th in both directions: they clamped
+  a press starting on the 1st UP to the 10th, and called the Overall's first hole the
+  1st when the group teed off the 10th.
+- **A FIRST-TEE ROUND IS BYTE-IDENTICAL BY CONSTRUCTION.** Both helpers early-return
+  the CALLER'S OWN ARRAY by identity when the tee is the card's first hole, so nothing
+  re-sorts. Every money golden and `*_prev` fixture is the same sha as pre-merge main,
+  and the nine protected files this wave did not touch - `money-engine.js`,
+  `payouts.js`, `pool-engine.js`, `handicap.js`, `action-model.js`, `hole-events.js`,
+  `score-marks.js`, `ryder-cup.js`, `database.rules.json` - are byte-identical.
+- **GUARDS:** `tee_start_test.js`, 22 tests, two declared baselines (11/3 for the
+  engine half, 18/4 for the settlement half, with `BASELINE COUNT DELTA: +8` recorded
+  beside the first). Three controls, each fired behaviourally and each restored by sha
+  from a saved copy. Twenty-one re-pins, every one with its reason, including two
+  slice windows that no longer reached the call they pin.
+- **AND MY OWN APOSTROPHE EMPTIED THE SHELL LIST.** The first draft of the
+  `play-order.js` comment in `sync-mobile-web.js` contained "the card's own order";
+  `build-shell` reads that list by matching quoted strings, so one apostrophe swallowed
+  every entry after it - exactly as the block warns in capitals two lines above. Caught
+  because `build-shell` refused to build, not by a test.
+
 ## A notification you can see, and a tap that goes somewhere (2026-10-04)
 
 Cache `golfapp-v291-foreground` / consumer `v131`. Push worked - **"Sent to 1
@@ -3837,6 +3898,25 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   See "THE DELETE CONTROL CAME OFF THIS PREDICATE" above for the fix itself.
   **ONE THING FOR MANNY, NOT FOR THIS FILE TO DECIDE:** 1.0.6 (3) was last read as
   *Waiting for Review*, so uploading 4 means choosing which build goes to review.
+- **1.0.6 BUILD 5 IS SET AND READY TO ARCHIVE (2026-10-04, `main` `0ebbf85` merged).**
+  `CURRENT_PROJECT_VERSION` 4 -> 5 on **Debug and Release**; `MARKETING_VERSION` stays
+  1.0.6. Nothing was uploaded at build 4, so 5 is simply the next number the console
+  will take. Cache `golfapp-v294-playorder` / consumer `v134`.
+  **BUILD 5 = BUILD 4 + THE 10th-TEE START.** A round can go off the 10th tee, per
+  round and per group for a two-tee start: the card still reads 1-18 and only the
+  SEQUENCE moves - where the scorecard lands, what Next does on the 18th, which hole
+  Finish Round waits on, what a match has left to play, which hole an auto-press
+  starts on, and which hole a tied skin carries onto. The field is `startingHole`,
+  never `startHole` - see "THE 10th TEE" below for why that distinction was the whole
+  point of the recon.
+  **SIGNING, UNCHANGED AND RE-CONFIRMED:** Release is
+  `CODE_SIGN_ENTITLEMENTS = App/AppRelease.entitlements` with `aps-environment`
+  **production** and `com.apple.developer.applesignin ["Default"]`; Debug is
+  `App/App.entitlements` with **development**; Team A2Z95T64UU on both.
+  `oauth_native_test.js` holds all of it. `build-shell` / `sync-mobile-web` /
+  `npx cap sync ios` run after the bump, and the iOS bundle carries v294 and
+  play-order.js. Full suite 10,232 tests / 10,230 pass / 0 fail / 2 todo; every money
+  golden and all nine untouched protected files byte-identical to pre-merge main.
 
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
