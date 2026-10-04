@@ -68,14 +68,13 @@ const path = require('path');
 
 const B = require('./push-boot.js');
 const P = require('./push-notify.js');
-require('./tee-time.js');   // push-boot reads its globals through typeof guards
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 
-// push-boot.js calls teeTimeReminderAt / teeTimeOf / teeTimeShort / pushCopy as
-// GLOBALS, the way a page provides them. In node they are module exports, so the
-// test supplies them the same way the browser does.
-const TEE = require('./tee-time.js');
-Object.assign(global, TEE, P);
+// push-boot.js calls pushCopy and the rest as GLOBALS, the way a page provides
+// them. In node they are module exports, so the test supplies them the same way
+// the browser does. tee-time.js is no longer among them: the field came out of
+// the app on 2026-10-04 and the module went with it.
+Object.assign(global, P);
 
 
 // ===========================================================================
@@ -137,16 +136,26 @@ describe('2. THE TEE-TIME REMINDER IS GONE, AND NOTHING OF IT IS LEFT DORMANT', 
         assert.match(read('ios/App/CapApp-SPM/Package.swift'), /CapacitorPushNotifications/);
     });
 
-    test('index.html schedules nothing, and tee-time.js lost the reminder-only functions', () => {
-        const src = read('index.html').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
-        assert.ok(!/pushScheduleReminder|maybeScheduleTeeReminder/.test(src));
-        const TT = require('./tee-time.js');
-        assert.equal(TT.teeTimeReminderAt, undefined, 'only the reminder used it');
-        assert.equal(TT.teeTimeChanged, undefined, 'and only the reminder used this');
-        // AND THE FIELD IS STILL THERE, which is the point of the removal being
-        // surgical rather than a revert.
-        assert.equal(typeof TT.teeTimeLabel, 'function');
-        assert.match(src, /teeTimeLabel\(currentData\)/, 'the scorecard header still shows it');
+    test('THERE IS NO TEE TIME LEFT IN THE APP, module included', () => {
+        // The reminder came out first, on Manny's call, and the FIELD followed on
+        // 2026-10-04: he does not use one. Nothing half-removed - no input, no
+        // display, no module, and nothing in either shell list pointing at a file
+        // that is not there.
+        assert.ok(!fs.existsSync(path.join(__dirname, 'tee-time.js')), 'the module is still here');
+        ['index.html', 'admin.html', 'game.html', 'trip.html'].forEach((f) => {
+            const src = read(f).replace(/(^|[^:])\/\/[^\n]*/g, '$1 ').replace(/<!--[\s\S]*?-->/g, ' ');
+            assert.ok(!/teeTimeLabel|teeTimeBuild|teeTimeInputs|tee-time\.js/.test(src),
+                f + ' still reads a tee time');
+            assert.ok(!/id="tee-time-date"|round-teedate-/.test(src), f + ' still has a tee-time input');
+        });
+        assert.ok(!/pushScheduleReminder|maybeScheduleTeeReminder/.test(read('index.html')));
+        // THE PRECACHE LIST, not the whole file: sw.js keeps a written record of
+        // every version it has moved through, and one of those notes names the
+        // module by name. History is not a cached file.
+        const shell = read('sw.js');
+        const list = shell.slice(shell.indexOf('SHELL_FILES = ['), shell.indexOf(']', shell.indexOf('SHELL_FILES = [')));
+        assert.ok(!/tee-time\.js/.test(list), 'the shell still precaches a file that is gone');
+        assert.ok(!/tee-time\.js/.test(read('sync-mobile-web.js')), 'the native bundle still lists it');
     });
 });
 
@@ -237,7 +246,7 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
         // /package.json returns 200 - so any file in the tree is a downloadable
         // URL. The credential may only be read by the Function.
         const shipped = /const SHARED_SHELL = \[([\s\S]*?)\];/.exec(read('sync-mobile-web.js'))[1];
-        ['index.html', 'admin.html', 'game.html', 'trip.html', 'push-boot.js', 'push-notify.js', 'tee-time.js']
+        ['index.html', 'admin.html', 'game.html', 'trip.html', 'push-boot.js', 'push-notify.js']
             .forEach((f) => assert.ok(!read(f).includes('FCM_SERVICE_ACCOUNT'),
                 f + ' names the service-account secret and is served publicly'));
         assert.ok(!/_push\.js|push-send\.js/.test(shipped),

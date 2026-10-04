@@ -3,7 +3,7 @@
 //
 // Everything that touches a plugin, a token or the database lives here. The
 // decisions live elsewhere and are pure: push-notify.js says what to send and
-// how often, tee-time.js says when a round tees off. This file is the wiring
+// how often. This file is the wiring
 // between them and a phone, and it is written so that NOTHING HAPPENS AT ALL
 // until the pieces exist.
 //
@@ -16,7 +16,8 @@
 //   - In the SHELL without an APNs key, register() rejects. That is caught, the
 //     reason is recorded, and the app carries on. No alert, no retry loop.
 //   - THERE IS NO TEE-TIME REMINDER. One was built here as a local notification
-//     and REMOVED on Manny's call before it shipped; the tee-time FIELD stays.
+//     and REMOVED on Manny's call before it shipped. The tee-time FIELD went
+//     the same way on 2026-10-04: there is no tee time anywhere in the UI.
 //     Nothing is left dormant - the plugin came out of package.json and the iOS
 //     allowlist with it, because unreachable code still ships and git history is
 //     the right home for code that is not running.

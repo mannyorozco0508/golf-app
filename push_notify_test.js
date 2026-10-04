@@ -106,11 +106,15 @@ describe('1. FIVE NOTIFICATIONS, THREE CHANNELS, AND ESSENTIALS CANNOT BE SILENC
 // ===========================================================================
 describe('2. THE COPY IS THE BRIEF\'S COPY', () => {
 
-    test('"You\'re in" quotes the round, the date and the tee time', () => {
+    test('"You\'re in" quotes the round and the date, and NO TIME', () => {
+        // The tee-time field came out of the whole app on 2026-10-04 - Manny does
+        // not use one - so a notification naming a time would be naming something
+        // no screen can set. A time handed in anyway is ignored rather than
+        // printed: this message is about the round and the day.
         const c = P.pushCopy('youre-in', {
             roundName: 'Saturday at Legacy', dateText: 'Sat 4 Oct', teeTimeText: '8:40 AM'
         });
-        assert.equal(c.body, 'Saturday at Legacy, Sat 4 Oct 8:40 AM');
+        assert.equal(c.body, 'Saturday at Legacy, Sat 4 Oct');
     });
 
     test('the final result is ADDRESSED TO THE READER, and signed', () => {
@@ -271,23 +275,22 @@ describe('5. THE SAME EVENT IS NEVER SENT TWICE', () => {
 // ===========================================================================
 describe('6. THE TEE TIME, AND THE REMINDER THAT IS NOT HERE', () => {
 
-    test('WITHOUT A TEE TIME, "You are in" REFUSES - it never invents one', () => {
-        // A round where the organizer left the tee time blank is normal - a
-        // pickup round nobody wrote down - and it must not produce a notification
-        // naming a time nobody set.
-        const r = P.pushDecide(base({ kind: 'youre-in', facts: { uid: 'u-1', roundCode: 'G', roundName: 'Sat' } }));
+    test('WITHOUT A ROUND NAME, "You are in" REFUSES - it never invents one', () => {
+        // The refusal used to be about a missing tee time. There is no tee time in
+        // this app any more, so what the message cannot do without is the one
+        // thing it is about: which round.
+        const r = P.pushDecide(base({ kind: 'youre-in', facts: { uid: 'u-1', roundCode: 'G', dateText: 'Sun Oct 4' } }));
         assert.equal(r.send, false);
-        assert.equal(r.reason, 'no-tee-time');
+        assert.equal(r.reason, 'no-round-name');
     });
 
-    test('WITH one, it quotes the round, the date and the time', () => {
+    test('WITH one, it quotes the round and the date', () => {
         const r = P.pushDecide(base({
             kind: 'youre-in',
-            facts: { uid: 'u-1', roundCode: 'G', roundName: 'Saturday at Legacy',
-                     dateText: 'Sun Oct 4', teeTimeText: '8:40 AM' }
+            facts: { uid: 'u-1', roundCode: 'G', roundName: 'Saturday at Legacy', dateText: 'Sun Oct 4' }
         }));
         assert.equal(r.send, true, r.reason);
-        assert.equal(r.copy.body, 'Saturday at Legacy, Sun Oct 4 8:40 AM');
+        assert.equal(r.copy.body, 'Saturday at Legacy, Sun Oct 4');
     });
 
     test('THERE IS NO TEE-TIME REMINDER, AND NOTHING OF IT IS LEFT DORMANT', () => {

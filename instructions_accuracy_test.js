@@ -95,7 +95,7 @@ const REAL_PAGES = ['index.html', 'admin.html', 'settlement.html', 'sidematches.
 // Widening this makes the check STRONGER: it can now catch a guide quoting a
 // sentence that no page AND no shared builder contains.
 const SHARED_COPY = ['round-role.js', 'course-import-rules.js', 'side-match-lines.js',
-    'handicap-labels.js', 'card-is-in.js', 'push-notify.js', 'tee-time.js'];
+    'handicap-labels.js', 'card-is-in.js', 'push-notify.js'];
 
 const read = (f) => (fs.existsSync(path.join(__dirname, f))
     ? decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8')) : '');

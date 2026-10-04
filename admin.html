@@ -61,7 +61,6 @@
     <script src="course-data.js"></script>
     <script src="course-import-rules.js"></script>
     <script src="course-index.js"></script>
-    <script src="tee-time.js"></script>
     <script src="push-notify.js"></script>
     <script src="push-boot.js"></script>
     <script src="action-model.js"></script>
@@ -1370,24 +1369,6 @@ html {
             </div>
         </div>
     </div>
-    <!-- TEE TIME, AND IT IS OPTIONAL (Wave 39).
-         A pickup round at 7am that nobody wrote down is normal, so this must never
-         block a save and never show an empty row on the card. What it buys when it
-         IS set: the scorecard header and the Game tab say when the group tees off,
-         and the device schedules its own reminder half an hour before.
-         STORED AS AN INSTANT PLUS THE ZONE IT WAS SET IN - tee-time.js carries the
-         whole argument. The short version: a tee time is a fact about the golf
-         course, not about the reader's phone, so a Road Trip round set in Oregon
-         must read 8:40 AM to the organizer on the tee AND to his wife at home. -->
-    <div class="form-group" id="tee-time-group">
-        <label for="tee-time-date">Tee time <span style="font-weight:normal; color:var(--text-muted);">(optional)</span></label>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input type="date" id="tee-time-date" style="flex:1 1 150px; min-width:140px;" onchange="teeTimeEdited()">
-            <input type="time" id="tee-time-clock" style="flex:1 1 110px; min-width:110px;" onchange="teeTimeEdited()">
-        </div>
-        <p id="tee-time-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">Leave it blank if you don't know yet &mdash; you can add it later.</p>
-    </div>
-
     <!-- Tee ratings come from the course. The golfer picks a tee; Slope, Course
          Rating and Par fill from that tee. There is no hand-typed block. A course
          with no rated tees leaves this hidden and the Index is the Playing
@@ -6279,54 +6260,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     });
 
-    // ---- THE TEE TIME: READ, WRITE, RESTORE (Wave 39) ----
-    //
-    // tee-time.js owns every rule; this page owns the two inputs. The ONE thing
-    // that cannot move out of here is the offset: getTimezoneOffset() has to be
-    // asked about the INSTANT the organizer typed, not about today, or a round
-    // set in March for August lands an hour out when daylight saving moves.
-    function teeTimeFromSetup() {
-        const dateEl = document.getElementById('tee-time-date');
-        const clockEl = document.getElementById('tee-time-clock');
-        const dateText = dateEl ? String(dateEl.value || '').trim() : '';
-        const timeText = clockEl ? String(clockEl.value || '').trim() : '';
-        // BOTH OR NEITHER. A date with no time is not a tee time, and guessing
-        // one is how a reminder fires at midnight.
-        if (!dateText || !timeText) return { teeTimeISO: null, teeTimeZone: null };
-        // The offset FOR THAT DAY, which is the whole reason this line is here.
-        const probe = new Date(dateText + 'T' + timeText + ':00');
-        const off = isNaN(probe.getTime()) ? new Date().getTimezoneOffset() : probe.getTimezoneOffset();
-        let zone = null;
-        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { zone = null; }
-        const built = (typeof teeTimeBuild === 'function') ? teeTimeBuild(dateText, timeText, off, zone) : null;
-        return built || { teeTimeISO: null, teeTimeZone: null };
-    }
-
-    // What the note under the boxes says once there is something to say. Kept
-    // here rather than in the module because it is this screen's sentence, and
-    // the module must not know about a DOM node.
-    function teeTimeEdited() {
-        const note = document.getElementById('tee-time-note');
-        if (!note) return;
-        const built = teeTimeFromSetup();
-        const label = (typeof teeTimeLabel === 'function') ? teeTimeLabel(built) : '';
-        note.textContent = label
-            ? 'Tees off ' + label + '. Everyone in the round gets a reminder 30 minutes before.'
-            : "Leave it blank if you don't know yet \u2014 you can add it later.";
-    }
-
-    // RESTORED FOR EDITING, from the string's own fields rather than from a Date,
-    // so the organizer sees the time they typed wherever they are now.
-    function restoreTeeTimeInputs(data) {
-        const dateEl = document.getElementById('tee-time-date');
-        const clockEl = document.getElementById('tee-time-clock');
-        if (!dateEl || !clockEl) return;
-        const v = (typeof teeTimeInputs === 'function') ? teeTimeInputs(data || {}) : { date: '', time: '' };
-        dateEl.value = v.date;
-        clockEl.value = v.time;
-        teeTimeEdited();
-    }
-
     // ---- NOTIFICATION SETTINGS (Wave 39) ----
     //
     // Two switches and a sentence. ESSENTIALS IS NOT A CONTROL, because it cannot
@@ -6415,7 +6348,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 tokens: tokens,
                 prefs: { bets: true, hype: true },
                 facts: { uid: uid, roundName: 'Test notification',
-                         dateText: 'right now', teeTimeText: 'from HardPan',
+                         dateText: 'right now',
                          roundCode: 'TEST' }
             });
             if (!decided || !decided.send) {
@@ -9097,11 +9030,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
-            // THE ORGANIZER CAN MOVE IT LATER, which is the whole reason this is
-            // restored rather than only written: reopening a saved round puts the
-            // stored tee time back in the boxes, and the next save writes whatever
-            // is in them - including nothing, if it has been cleared.
-            restoreTeeTimeInputs(data);
             if (data.eventCategory) currentCategory = data.eventCategory;
 
             if (data.activeCourseKey) {
@@ -10111,11 +10039,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const payload = {
                 eventName: baseEventName,
                 roundDay: roundDay,
-                // THE TEE TIME, OR NULL (Wave 39). Always written, so clearing the
-                // boxes clears the round's tee time rather than leaving the old one
-                // behind - the one thing worse than no tee time is a stale one that
-                // a group is still being reminded about.
-                ...teeTimeFromSetup(),
                 // SETTLEMENT MODE - new rounds settle in whole dollars.
                 //
                 // Written on creation so it is a property of THIS round, not a global

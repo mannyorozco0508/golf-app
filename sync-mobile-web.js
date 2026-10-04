@@ -64,7 +64,7 @@ const SHARED_SHELL = [
     // trip-itinerary.js: the paste-an-itinerary parser. trip.html calls
     // tripItinPlan UNGUARDED from the review button, so a cached shell without it
     // throws when the button is tapped.
-    'tee-time.js', 'push-notify.js', 'push-boot.js', 'round-role.js', 'challenges.js',
+    'push-notify.js', 'push-boot.js', 'round-role.js', 'challenges.js',
     'trip-itinerary.js',
     // trip-roster.js: which rounds a roster change may touch. trip.html calls
     // tripRosterPlan UNGUARDED, so a cached shell without it throws when the

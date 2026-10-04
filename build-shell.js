@@ -98,12 +98,15 @@ const PRODUCTS = {
         // keeps that read, and has no course-index.js to load.
         // Moved to v117: the free-tier quota sentence in course-import-rules.js
         // (the account is 35 a day, not Pro's 10,000 - corrected 2026-10-03).
+        // Moved to v126: tee-time.js leaves SHARED - the field came out of the
+        // app and the module with it. A device on v125 loads four pages that ask
+        // for a file this build does not ship.
         // Moved to v125: tee-time.js, push-notify.js, push-boot.js, round-role.js and
         // challenges.js join SHARED, carried across the Road Trip merges - a round
         // can carry a tee time, a golfer can follow along as a player, a side bet
         // can be offered, and push is live. A device on v124 has none of them, and
         // every one of those pages calls its file unguarded.
-        cacheName: 'consumer-v125-push',
+        cacheName: 'consumer-v126-noteetime',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

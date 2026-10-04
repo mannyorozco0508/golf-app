@@ -217,14 +217,15 @@ describe('d) THE ROUNDS READ LIKE A CALENDAR', () => {
         { code: 'RD2', label: 'Day 2 AM', date: '2026-10-13', time: '07:50', addedAt: 20, courseName: 'True Blue' }
     ];
 
-    test('"Tue 10/13 · 8:24 AM · Caledonia"', () => {
-        assert.equal(R.tripRoundPickerLabel(ROWS[1]), 'Mon 10/12 · 8:24 AM · Caledonia');
-        assert.equal(R.tripRoundClock('08:24'), '8:24 AM');
-        assert.equal(R.tripRoundClock('13:40'), '1:40 PM');
-        assert.equal(R.tripRoundClock('00:05'), '12:05 AM');
-        assert.equal(R.tripRoundClock('12:00'), '12:00 PM');
-        assert.equal(R.tripRoundClock(''), '');
-        assert.equal(R.tripRoundClock('8:24 AM'), '', 'only 24-hour time is stored, and only that sorts');
+    test('"Tue 10/13 AM · Caledonia" - the day, which half of it, and the course', () => {
+        // NO CLOCK since 2026-10-04: the tee-time field came out of the app, so a
+        // row printing 8:24 AM would be showing a time no screen can set. The
+        // pasted time still exists and is still what ORDERS these rows - the next
+        // test - it is simply never displayed.
+        assert.equal(R.tripRoundPickerLabel(ROWS[1]), 'Mon 10/12 AM \u00B7 Caledonia');
+        assert.equal(R.tripRoundPickerLabel(ROWS[0]), 'Tue 10/13 PM \u00B7 True Blue');
+        assert.equal(typeof R.tripRoundClock, 'undefined', 'the clock formatter went with the field');
+        assert.equal(R.tripRoundWhen('2026-10-13'), 'Tue 10/13', 'the date rule is untouched');
     });
 
     test('THE TIME SORTS, NOT THE LABEL: 7:50 AM before 1:40 PM', () => {

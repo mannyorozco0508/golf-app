@@ -58,7 +58,6 @@
     <script src="my-groups.js"></script>
     <script src="roster-paste.js"></script>
     <script src="course-index.js"></script>
-    <script src="tee-time.js"></script>
     <script src="trip-itinerary.js"></script>
     <script src="trip-roster.js"></script>
     <!-- The trip's own money: the points-race pot and the daily pot. Pure rules;
@@ -913,12 +912,12 @@ html {
                     playerCount: 4,
                     frontNineKey: r.frontNineKey || '',
                     backNineKey: r.backNineKey || '',
-                    // THE TEE TIME RIDES ALONG IF THE APP CAN STORE ONE. The
-                    // tee-time field is Wave 39 and is not merged yet, so on
-                    // main these two are carried and ignored; the moment that
-                    // wave lands they are what the planner's own date and time
-                    // boxes read. Parsed either way, because re-reading the
-                    // paste later is not something anybody will do.
+                    // THE PASTED TIME IS KEPT, AND NEVER SHOWN. There is no
+                    // tee-time field anywhere in the app since 2026-10-04 -
+                    // Manny does not use one - but a booking email says 8:24 and
+                    // 1:40, and that is the only thing that can tell the morning
+                    // round from the afternoon one. It orders the trip's rounds
+                    // and nothing else reads it.
                     teeDate: r.date || '',
                     teeClock: r.time || ''
                 });
@@ -1398,12 +1397,6 @@ html {
             if (playersEl) cfg.playerCount = parseInt(playersEl.value, 10) || 0;
             if (frontEl) cfg.frontNineKey = frontEl.value;
             if (backEl) cfg.backNineKey = backEl.value;
-            // THE TEE TIME, PER ROUND (Wave 39). Captured with everything else so
-            // changing a day's hole count does not wipe a time already typed.
-            const dEl = document.getElementById(`round-teedate-${i}`);
-            const tEl = document.getElementById(`round-teeclock-${i}`);
-            if (dEl) cfg.teeDate = dEl.value;
-            if (tEl) cfg.teeClock = tEl.value;
         });
 
         let newFlat = [];
@@ -1524,18 +1517,6 @@ html {
                     <label>Players</label>
                     <input type="number" id="round-players-${i}" min="0" max="40" value="${cfg.playerCount}">
                 </div>
-                <!-- OPTIONAL, like the single-round version. A trip is exactly where
-                     tee times matter - four rounds over three days, each with its own -
-                     and exactly where a wrong one costs somebody a morning, which is
-                     why tee-time.js stores the zone it was set in. A pasted itinerary
-                     fills these in; typing over them is the same decision. -->
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Tee time <span style="font-weight:normal; color:var(--text-muted);">(optional)</span></label>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <input type="date" id="round-teedate-${i}" value="${cfg.teeDate || ''}" style="flex:1 1 150px; min-width:140px;">
-                        <input type="time" id="round-teeclock-${i}" value="${cfg.teeClock || ''}" style="flex:1 1 110px; min-width:110px;">
-                    </div>
-                </div>
             </div>`;
         });
         container.innerHTML = html;
@@ -1641,23 +1622,6 @@ html {
     // Firebase's global_courses is the live source of truth for a course's real hole data
     // (see the course-data-override note in project memory) - falls back to the local
     // seed data in course-data.js, then a flat placeholder if neither has it yet.
-    // THE PLANNER'S TEE TIME, one row at a time. tee-time.js owns every rule; the
-    // only thing that cannot move out of a page is the offset, which has to be
-    // asked about the INSTANT typed rather than about today.
-    function tripTeeTimeFor(cfg) {
-        const dateText = String((cfg && cfg.teeDate) || '').trim();
-        const timeText = String((cfg && cfg.teeClock) || '').trim();
-        // BOTH OR NEITHER: a date with no time is not a tee time, and guessing one
-        // is how a reminder fires at midnight.
-        if (!dateText || !timeText) return { teeTimeISO: null, teeTimeZone: null };
-        const probe = new Date(dateText + 'T' + timeText + ':00');
-        const off = isNaN(probe.getTime()) ? new Date().getTimezoneOffset() : probe.getTimezoneOffset();
-        let zone = null;
-        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { zone = null; }
-        const built = (typeof teeTimeBuild === 'function') ? teeTimeBuild(dateText, timeText, off, zone) : null;
-        return built || { teeTimeISO: null, teeTimeZone: null };
-    }
-
     function resolveCourseData(courseId, globalCoursesData) {
         if (globalCoursesData[courseId] && globalCoursesData[courseId].data) return globalCoursesData[courseId].data;
         if (coursePresets[courseId]) return coursePresets[courseId].data;
@@ -1870,15 +1834,9 @@ html {
                 const groupOverrides = {};
                 if (groupSizes) groupSizes.forEach((size, i) => { groupOverrides[i] = size; });
 
-                // TEE TIME PER ROUND. The offset is taken FOR THAT DAY - a trip
-                // spanning a daylight-saving change would otherwise put one round
-                // an hour out, which is exactly the trip where it matters.
-                const tee = tripTeeTimeFor(cfg);
                 updates[`events/${roundCode}`] = {
                     eventName: cfg.label,
                     roundDay: cfg.label,
-                    teeTimeISO: tee.teeTimeISO,
-                    teeTimeZone: tee.teeTimeZone,
                     groupSizeOverrides: groupOverrides,
                     eventCategory: 'weekend',
                     categoryIcon: '⛳',
@@ -1894,10 +1852,10 @@ html {
                 // inventing one would sort the trip wrongly with confidence.
                 const roundRow = { label: cfg.label, addedAt: Date.now() };
                 if (cfg.teeDate) roundRow.date = cfg.teeDate;
-                // AND THE TEE TIME (2026-10-04), so a round reads "Tue 10/13 ·
-                // 8:24 AM · Caledonia" everywhere it is listed. This is the trip's
-                // own record of what was pasted; the round's tee-time FIELD is
-                // Wave 39 and separate.
+                // AND THE PASTED TIME, which orders the day's rounds and is never
+                // displayed: the row reads "Tue 10/13 AM", not a clock. It is the
+                // trip's own record of what the itinerary said, and no screen in
+                // the app asks for or shows a tee time.
                 if (cfg.teeClock) roundRow.time = cfg.teeClock;
                 updates[`trips/${tripCode}/rounds/${roundCode}`] = roundRow;
             });
@@ -4591,7 +4549,6 @@ html {
                 html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
                     <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
                     <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
-                    ${(typeof teeTimeLabel === 'function' && teeTimeLabel(data)) ? `<div><strong>Tee time:</strong> ${escapeHtml(teeTimeLabel(data))}</div>` : ''}
                     <div><strong>Format:</strong> ${formatLabel}</div>
                     <div><strong>Players (${players.length}):</strong> ${playerNames}</div>
                 </div>`;

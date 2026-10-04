@@ -232,7 +232,7 @@ describe('3. THE PAGE, REACHED THE WAY A GOLFER REACHES IT', () => {
     // sheet has to appear without anything here naming it.
     const IDX = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js',
                  'settlement-engine.js', 'pool-engine.js', 'bet-strip.js', 'hole-events.js',
-                 'side-match-lines.js', 'tee-time.js', 'push-notify.js', 'push-boot.js',
+                 'side-match-lines.js', 'push-notify.js', 'push-boot.js',
                  'round-role.js'];
     const cd18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
     // EIGHT GOLFERS WHERE A ?group= LINK HAS TO MEAN SOMETHING. On a foursome

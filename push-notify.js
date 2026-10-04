@@ -146,9 +146,10 @@ function pushCopy(kind, facts) {
     var f = facts || {};
     var round = String(f.roundName || '').trim();
     if (kind === 'youre-in') {
-        // The brief's shape exactly: "<round>, <date> <tee time>".
-        var when = [String(f.dateText || '').trim(), String(f.teeTimeText || '').trim()]
-            .filter(Boolean).join(' ');
+        // "<round>, <date>". THE TIME CAME OUT ON 2026-10-04 with the tee-time
+        // field itself: there is no screen that sets one, so a notification that
+        // named a time would be naming something nobody typed.
+        var when = String(f.dateText || '').trim();
         return { title: "You're in", body: round + (when ? ', ' + when : '') };
     }
     if (kind === 'final-results') {
@@ -265,9 +266,10 @@ function pushDecide(input) {
     if (!d.tokens || !d.tokens.length) return no('no-device');
     if (!pushAllowed(kind, d.prefs)) return no('channel-off');
 
-    // THE TEE TIME A ROUND DOES NOT HAVE YET. Refused cleanly rather than
-    // inventing a time - see the recon note at the top of this file.
-    if (kind === 'youre-in' && !facts.teeTimeText) return no('no-tee-time');
+    // A ROUND WITH NO NAME IS NOT AN INVITATION. The refusal used to be about a
+    // missing tee time; the field is gone, so what has to be there now is the one
+    // thing the message is about.
+    if (kind === 'youre-in' && !String(facts.roundName || '').trim()) return no('no-round-name');
 
     var dedupeKey = pushDedupeKey(kind, facts);
     if (d.alreadySent && d.alreadySent[dedupeKey]) return no('already-sent');

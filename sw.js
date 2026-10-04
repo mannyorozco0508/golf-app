@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v125-push. The tournament product cache
+// The consumer product cache is consumer-v126-noteetime. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4066,7 +4066,24 @@
 // A DEVICE ON v284 has no tee time, no way to follow a round as a player, no
 // challenges and no push at all; every one of those pages calls its file
 // unguarded, so the key has to move.
-const CACHE_VERSION = 'golfapp-v285-push';
+// Moved to v286: THE TEE-TIME FIELD IS GONE, on Manny's call.
+//
+// It came out of round setup, the scorecard header and the Game tab, and the two
+// boxes came out of the trip planner with them - on his iPhone they rendered as
+// empty grey bars, which is moot now. tee-time.js is deleted rather than left
+// unreferenced, and both shell lists lost the entry: a precache list naming a
+// file that is not there is a shell that fails to install.
+//
+// WHAT SURVIVES IS INVISIBLE. A tee time pasted in a trip itinerary is still
+// stored on the trip's own round record and still ORDERS that trip's rounds, AM
+// before PM - it is the only thing that can tell a morning round from an
+// afternoon one. No screen asks for one or shows one.
+//
+// And "You're in" names the round and the date, because a notification cannot
+// quote a time that nothing in the app can set.
+//
+// A DEVICE ON v285 keeps four pages that load a file this build no longer ships.
+const CACHE_VERSION = 'golfapp-v286-noteetime';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4227,10 +4244,6 @@ const SHELL_FILES = [
     // courseIndexLoader UNGUARDED, so a cached shell missing this file throws
     // before the setup page draws anything. That is why it is precached.
     './course-index.js',
-    // THE TEE TIME, formatted in the zone it was set in rather than the zone of
-    // whoever is reading. Four pages load it and the display calls are
-    // unguarded, so it is precached.
-    './tee-time.js',
     // Notifications: the pure decider and the device half. Every call site is
     // typeof-guarded, so these are precached so that a device that has them can
     // answer a push the moment it arrives.

@@ -51,7 +51,6 @@
          CORRECT one on a legacy cents round. -->
     <script src="net-finish-line.js"></script>
     <script src="grouping.js"></script>
-    <script src="tee-time.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -432,17 +431,9 @@ html {
         if (players.length === 0) return '<div style="text-align:center; padding:20px; color:var(--text-muted);">Waiting for round setup...</div>';
         const fmt = formatSentence(data);
         // THE TEE TIME, ON THE CARD THAT ANSWERS "what is this round" (Wave 39).
-        // Its own line under the course, because this tab is where a golfer looks
-        // things up rather than scores - and it is absent entirely when the round
-        // has no tee time, never an empty row.
-        //
-        // teeTimeLabel formats in the ROUND's zone, not the reader's: a Road Trip
-        // round set in Oregon reads 8:40 AM at home in Phoenix too.
-        const teeLine = (typeof teeTimeLabel === 'function') ? teeTimeLabel(data) : '';
         let html = '<div class="game-card"><div class="game-head">⛳ Course</div>'
             + '<div class="game-line"><strong>' + escapeHtml(data.courseName || 'Golf Course') + '</strong>'
             + (roundLengthText(data.courseData) ? ' · ' + roundLengthText(data.courseData) : '') + '</div>'
-            + (teeLine ? '<div class="game-line">Tees off <strong>' + escapeHtml(teeLine) + '</strong></div>' : '')
             + (data.eventName ? '<div class="game-sub game-muted">' + escapeHtml(data.eventName) + '</div>' : '')
             + '</div>';
         html += '<div class="game-card"><div class="game-head">📝 Format</div>'

@@ -58,10 +58,15 @@ describe('trip.html — computeTripPointsRace', () => {
         const scoresB = buildScores([players[1]], cd, { B: 72 }, 18);
         const mixed = [{ code: 'Day1', label: 'Day1', data: { players, courseData: cd, scores: { ...scoresA, ...scoresB } } }];
         const standings = computeTripPointsRace(mixed);
-        // Documenting current behavior, not asserting it's correct:
+        // Documenting current behavior, not asserting it's correct. The POINTS
+        // NUMBER moved on 2026-10-04 and this record moved with it: the scale is
+        // the whole trip's field size now (two golfers here), not the number who
+        // posted that day, so the lone finisher is awarded 2 rather than 1. The
+        // open question above is untouched - it was never about the size of the
+        // number, it is about whether a field of one should be ranked at all.
         assert.equal(standings.length, 1, 'CURRENT (undecided) behavior: the lone finisher is ranked alone');
         assert.equal(standings[0].name, 'B');
-        assert.equal(standings[0].points, 1);
+        assert.equal(standings[0].points, 2);
     });
 
     test('a player with zero holes played in a round contributes nothing that round', () => {
