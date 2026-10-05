@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v142-sheetswipe. The tournament product cache
+// The consumer product cache is consumer-v143-matchcard. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4248,7 +4248,16 @@
 // toggles. Only the handle listens, so page scrolling, the sheet's own scrolling
 // body and score-box taps are untouched by construction. A device on v301 opens
 // it by tapping only.
-const CACHE_VERSION = 'golfapp-v302-sheetswipe';
+// Moved to v303: THE MATCH CARD, REDESIGNED. The terms in small type, the two
+// sides in big type with a FINAL tag, and the answer TOP RIGHT in the largest
+// type on the card - "Reese +$380", "won 19 of 19 bets". One row per bet with its
+// result and its money, presses indented under the bet they belong to, and dark
+// readable text on every row (a closed row was drawn at opacity 0.6, which
+// measures 2.1:1 against the card). Mid-round the top right shows the live status
+// and there is not one dollar anywhere on it. Display only: every figure comes
+// out of the builders that already priced the round. A device on v302 has the old
+// card with its faded closed rows and no overall answer.
+const CACHE_VERSION = 'golfapp-v303-matchcard';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

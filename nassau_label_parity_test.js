@@ -194,7 +194,12 @@ describe('EVERY NON-NASSAU LABEL IS BYTE-IDENTICAL TO BEFORE THE WAVE', () => {
     });
 
     test('HOLE VIEW: Match Play is untouched', () => {
-        assert.ok(has('matchPlay.hole', 'Match Play · Dale v Ken · thru 18'),
+        // RE-POINTED 2026-10-05 (the match card redesign): the header is four
+        // lines now - the terms, the two sides, the live status, thru - rather
+        // than one. THIS FILE'S CLAIM IS ABOUT THE WORDS "Match Play", not about
+        // the layout: only Nassau was in scope for the wave this guard was written
+        // for, and a Match Play wager must not have been relabelled. It has not.
+        assert.ok(has('matchPlay.hole', 'Match Play \u00B7 NET'),
             'the Hole View Match Play line changed: ' + dump('matchPlay.hole'));
     });
 

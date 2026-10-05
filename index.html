@@ -1169,7 +1169,32 @@
 
         /* Hole View's own handicap label. Hole View is the DEFAULT view, so a golfer
            who never taps Full Card still sees what they are playing off. */
-        .hv-tee {
+        /* ---- THE MATCH CARD, REDESIGNED (2026-10-05) --------------------------------
+   Manny's mockup: terms small, the two sides big, the answer top right in the
+   largest type on the card, one row per bet with its money in the success
+   colour, and presses indented under the bet they belong to.
+
+   DARK, READABLE TEXT ON EVERY ROW. The old card drew a closed row in a faded
+   green that measured 2.1:1 against the card background - below the 4.5:1 WCAG
+   asks of body text, and the thing Manny said he could not read. A closed row is
+   now distinguished by its FINAL tag and its money, not by being hard to see. */
+.lm-top { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0 6px; }
+.lm-top-left { flex: 1 1 auto; min-width: 0; }
+.lm-terms { font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.02em; }
+.lm-sides { font-size: 1.02rem; font-weight: 800; color: var(--text-main); line-height: 1.2; }
+.lm-final-tag {
+    display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px;
+    background: var(--subtle-bg); color: var(--text-muted);
+    font-size: 0.6rem; font-weight: bold; letter-spacing: 0.06em; vertical-align: middle;
+}
+.lm-top-right { flex: 0 0 auto; text-align: right; max-width: 48%; }
+.lm-top-money { font-size: 1.2rem; font-weight: 800; color: var(--brand-green); line-height: 1.15; }
+.lm-top-live { font-size: 1rem; font-weight: 800; color: var(--text-main); line-height: 1.15; }
+.lm-top-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
+.lm-row-money { font-weight: bold; color: var(--brand-green); white-space: nowrap; }
+.lm-wager-tools:empty { display: none; }
+
+.hv-tee {
             display: inline-block; margin-left: 6px; padding: 0 6px;
             border: 1px solid var(--border-mid); border-radius: 8px;
             font-size: 0.66rem; color: var(--text-muted); white-space: nowrap;
@@ -1312,16 +1337,21 @@
         .lm-seg:last-child { border-bottom: none; }
         .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
         .lm-seg-name { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-secondary); width: 62px; flex-shrink: 0; }
-        .lm-seg-status { font-size: 1rem; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lm-seg-status { font-size: 1rem; font-weight: bold; color: var(--text-main); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.84rem; }
-        .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 62px; }
-        .lm-press-tag { font-size: 0.68rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; }
+        .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 16px; }
+        .lm-press-tag { font-size: 0.68rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
         .lm-stake { font-size: 0.8rem; font-weight: bold; color: var(--accent-teal); white-space: nowrap; margin-left: 6px; }
         .lm-divider { border-top: 1px solid var(--border-mid); margin: 6px 0; }
         .lm-wager-head { font-size: 0.74rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
         .lm-press-link { float: right; font-size: 0.74rem; font-weight: bold; color: var(--brand-navy); text-decoration: none; padding: 6px 8px; margin: -6px -4px 0 0; min-height: 44px; display: inline-flex; align-items: center; }
-        .lm-press-status { font-size: 0.84rem; font-weight: 600; color: var(--text-secondary); }
-        .lm-closed { opacity: 0.6; }
+        .lm-press-status { font-size: 0.84rem; font-weight: 600; color: var(--text-main); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* A CLOSED ROW IS NOT A FADED ROW (2026-10-05). opacity 0.6 measured 2.1:1
+           against the card - below the 4.5:1 WCAG asks of body text, and the
+           thing Manny could not read. A finished bet is distinguished by its
+           result and its money, both of which are the MOST readable things on the
+           row, not by being greyed out. */
+        .lm-closed { opacity: 1; }
         /* THE FINAL TOTAL. Bold, full width, under the last segment of ITS match -
            the one line that answers "so who won what". It renders only on a bet
            that is over (sideMatchLiveFinals), so it cannot be mistaken for a
@@ -4113,100 +4143,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         return html;
     }
 
+    // ONE BUILDER, SHARED (2026-10-05). The card lives in side-match-lines.js
+    // now - this page and leaderboard.html had a copy each, and the redesign
+    // found them when the parity test between the two surfaces went red. What
+    // this page passes is the one thing that differs: where a Press link goes.
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
-        if (typeof buildLiveMatchStates !== 'function') return '';
-        // EVERY wager visible to this viewer, not just the round format. A real
-        // Nassau is created from Action and lives in sideMatches, so reading only
-        // the round format left the supported path invisible on the scorecard.
-        const states = buildLiveMatchStates(data, courseData, savedScores, visibleIds);
-        if (!states || states.length === 0) return '';
-        // FINAL TOTALS, AND THE RECEIPT'S OWN WORDING (Job 2, 2026-10-03).
-        //
-        // THE DEFECT: with presses, this card said who was up in each segment and
-        // the stake beside it, and NEVER said who had won what overall. Manny's
-        // GFLBAM round, group 3: four closed rows and no answer. The card reads
-        // buildLiveMatchState(), a presenter of the match engine, which knows
-        // nothing about money - settlement does, and it is a tab away.
-        //
-        // NOTHING IS RECOMPUTED HERE. sideMatchLiveFinals() joins each live
-        // wager to the receipt settlement-engine.js has already priced, and every
-        // figure comes out of sideMatchDecidedNet()/sideMatchDecidedTally(). If
-        // this and the Receipt ever disagree it is a bug in a string builder.
-        //
-        // MID-ROUND IT IS EMPTY, deliberately: a running total on an unfinished
-        // match is the defect the Receipt itself had, printing "+$30" with twelve
-        // holes unplayed.
-        const finals = (typeof sideMatchLiveFinals === 'function')
-            ? sideMatchLiveFinals(data, courseData, savedScores, states) : {};
-        const finalFor = (st) => finals[(st && st.isSideMatch && st.wagerId) ? st.wagerId : '__main'] || null;
-        // A FINISHED BET READS LIKE THE RECEIPT. money-engine's statusText is a
-        // scoreboard reading - "Reese 3 UP" - which is right while a match runs
-        // and false once it is over: a bet that ended on the 16th is 3&2, and "3
-        // UP" is how golfers describe one that went to the 18th. match-engine
-        // already sets finalResult and the receipt already carries it; this card
-        // simply was not reading it.
-        const finalStatus = (fin, baseId, pressNum, fallback) => {
-            if (!fin || !fin.complete) return fallback;
-            const r = fin.results[sideMatchResultKey(baseId, pressNum)];
-            return r || fallback;
-        };
-        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        // The stake is what DEFINES the bet, so it belongs on screen. Amounts only -
-        // never a running total, which is settlement's job and is not final mid-round.
-        const money = v => (v === undefined || v === null || isNaN(Number(v))) ? '' : '$' + Number(v);
-
-        let html = '<div class="lm-card"><div class="lm-head">'
-            + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
-            + '<span class="lm-sub">' + states.length + ' wager' + (states.length === 1 ? '' : 's')
-            + '</span></div>';
-
-        states.forEach((st, i) => {
-            const fin = finalFor(st);
-            if (i > 0) html += '<div class="lm-divider"></div>';
-            html += '<div class="lm-wager-head">' + esc(st.formatLabel) + ' \u00B7 '
-                 + esc(st.t1Name) + ' v ' + esc(st.t2Name)
-                 + (st.thru ? ' \u00B7 thru ' + st.thru : '');
-            // PRESS, WITHOUT A SECOND WRITE PATH.
-            //
-            // The writer for a side-match press lives in sidematches.html with its
-            // amount prompt, permission gate and offline guard. Porting it here would
-            // mean two implementations of a money write, and a write-side divergence
-            // corrupts data rather than merely displaying it wrong.
-            //
-            // So this is a LINK, not a button: it carries the golfer to the wager on
-            // the Matches tab with the card highlighted, and they press there with the
-            // amount in front of them. One tap more, one write path.
-            if (st.isSideMatch && st.canPress && st.wagerId) {
-                html += '<a class="lm-press-link" href="' + esc(sideMatchPressHref(st.wagerId))
-                     + '">\uD83D\uDD25 Press \u00B7 H' + st.nextPressHole + ' \u203A</a>';
-            }
-            html += '</div>';
-
-            st.segments.forEach(seg => {
-                html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
-                     + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
-                     + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
-                     + esc(finalStatus(fin, seg.id, 0, seg.statusText))
-                     + ((seg.closed || (fin && fin.complete)) ? ' \u00B7 FINAL' : '') + '</span>'
-                     + '<span class="lm-stake">' + money(seg.stake) + '</span></div>';
-                seg.presses.forEach(p => {
-                    html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
-                         + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
-                         + ' PRESS \u00B7 H' + p.startHole + '</span>'
-                         + '<span class="lm-press-status">' + esc(finalStatus(fin, seg.id, p.pressNum, p.statusText))
-                         + ((p.closed || (fin && fin.complete)) ? ' \u00B7 FINAL' : '') + '</span>'
-                         + '<span class="lm-stake">' + money(p.stake) + '</span></div>';
-                });
-                html += '</div>';
-            });
-            // ONE BOLD LINE AT THE BOTTOM OF THIS MATCH, and only when it is over.
-            if (fin && fin.total) {
-                html += '<div class="lm-final-total">' + esc(fin.total) + '</div>';
-            }
-        });
-        return html + '</div>';
+        if (typeof buildLiveMatchCardHtml !== 'function') return '';
+        return buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
+            { pressHref: sideMatchPressHref });
     }
-
     // ONE DASHBOARD, BUILT ONCE. The loose ticker line is gone: leader information
     // lives in exactly one place per view - the pop-up on Hole View, the card at the
     // top of the Full Card - so nothing duplicates it further down the page.

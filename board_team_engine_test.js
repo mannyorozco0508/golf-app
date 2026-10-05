@@ -271,7 +271,8 @@ function assertPairAgrees(view, spec, label) {
     assert.ok(b && w, label + ' could not read a margin. board ' + banners[0] + ' widget ' + picked.status);
     assert.equal(b.margin, w.margin,
         label + ' the two panels disagree. board ' + banners[0] + ' widget ' + picked.status);
-    assert.equal(b.closed, w.closed, label + ' closed flag disagrees');
+    assert.equal(b.closed, w.closed, label + ' closed flag disagrees. board '
+        + JSON.stringify(banners[0]) + ' widget ' + JSON.stringify(picked.status));
     if (b.margin > 0) assert.equal(squashName(b.who), squashName(w.who),
         label + ' leader disagrees. board ' + b.who + ' widget ' + w.who);
     return { banners, board: painted.board, widget: painted.widget };

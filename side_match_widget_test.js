@@ -96,7 +96,7 @@ describe('THE BUG: an Action Nassau on a Stroke round', () => {
 
     test('the 2-down auto press appears', () => {
         const t = strip(scorecard(roundData({ wins: { 1:101, 2:101 } })));
-        assert.match(t, /AUTO PRESS · H3/, 'the press the caddie could not see');
+        assert.match(t, /Auto press · hole 3/, 'the press the caddie could not see');
     });
 
     test('a round with no wagers grows no widget', () => {
@@ -113,8 +113,8 @@ describe('PER-SEGMENT STAKES ARE VISIBLE', () => {
         assert.equal(seg(st,'B9').stake, 5);
         assert.equal(seg(st,'18').stake, 10);
         const html = scorecard(roundData({ wins:{1:101} }));
-        assert.match(html, /class="lm-stake">\$5</);
-        assert.match(html, /class="lm-stake">\$10</);
+        assert.match(html, /class="lm-row-money">\$5</);
+        assert.match(html, /class="lm-row-money">\$10</);
     });
 
     test('a $5 front press and a $10 overall press differ on screen', () => {
@@ -226,11 +226,22 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
     });
 
     test('both consume the one shared presenter', () => {
-        ['index.html','leaderboard.html'].forEach(f =>
-            assert.match(read(f), /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\)/, f));
-        const defs = ['index.html','leaderboard.html','money-engine.js']
+        // RE-POINTED 2026-10-05: the match CARD moved into side-match-lines.js -
+        // index.html and leaderboard.html had a copy each, which is what the
+        // redesign uncovered - so the call to the presenter is there now. The
+        // claim is unchanged and is stronger for it: ONE definition of
+        // buildLiveMatchStates, and one caller rather than two.
+        assert.match(read('side-match-lines.js'),
+            /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\)/,
+            'the shared card does not consume the one presenter');
+        ['index.html', 'leaderboard.html'].forEach(f =>
+            assert.match(read(f), /buildLiveMatchCardHtml\(data, courseData, savedScores, visibleIds/, f));
+        const defs = ['index.html', 'leaderboard.html', 'side-match-lines.js', 'money-engine.js']
             .filter(f => /function buildLiveMatchStates\(/.test(read(f)));
         assert.deepEqual(defs, ['money-engine.js']);
+        const cards = ['index.html', 'leaderboard.html', 'side-match-lines.js']
+            .filter(f => /function buildLiveMatchCardHtml\(/.test(read(f)));
+        assert.deepEqual(cards, ['side-match-lines.js'], 'the card is written more than once again');
     });
 
     test('the presenter settles no money', () => {

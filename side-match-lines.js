@@ -276,6 +276,36 @@ function sideMatchResultByKey(receipt) {
     return out;
 }
 
+// ONE BET'S MONEY, BY THE SAME KEY ITS RESULT USES (2026-10-05).
+//
+// The redesigned match card prints a dollar line on every ROW - "Reese +$20"
+// beside "Front 9 - Reese 2&1" - and the header prints the overall. Both come
+// off the receipt settlement-engine.js has already priced: this reads seg.money,
+// seg.winner and seg.toSideA and formats them. NOTHING IS SUMMED HERE and
+// nothing is decided here; a segment with no winner has no money line at all,
+// which is what keeps the mid-round rule - no dollars until a bet is decided -
+// true by construction rather than by a caller remembering it.
+function sideMatchMoneyByKey(receipt) {
+    const out = {};
+    if (!receipt || !receipt.segments) return out;
+    const nameA = receipt.nameA || 'Side A';
+    const nameB = receipt.nameB || 'Side B';
+    receipt.segments.forEach(function (seg) {
+        if (!seg) return;
+        const key = sideMatchResultKey(seg.baseId, seg.pressNum);
+        const money = Math.abs(Number(seg.money) || 0);
+        if (!seg.winner && money === 0 && seg.result) {
+            // A HALVED BET IS NEWS, and it is not the same news as an open one:
+            // it has a result and no money. An open bet has neither.
+            out[key] = 'Halved';
+            return;
+        }
+        if (!seg.winner || money <= 0) { out[key] = ''; return; }
+        out[key] = (seg.toSideA ? nameA : nameB) + ' +$' + smlMoney(money);
+    });
+    return out;
+}
+
 function sideMatchResultKey(baseId, pressNum) {
     return String(baseId === undefined || baseId === null ? '' : baseId) + '|' + Number(pressNum || 0);
 }
@@ -332,6 +362,14 @@ function sideMatchLiveFinals(data, courseData, savedScores, states, opts) {
         out[matchId] = {
             complete: complete,
             total: sideMatchFinalTotal(receipt, { complete: complete }),
+            // THE REDESIGNED CARD'S HEADER AND ROWS, from the same receipt and
+            // only when the bet is over. net/tally are what the header prints
+            // (who won, how much, how many bets); money is one line per row.
+            net: complete ? sideMatchDecidedNet(receipt) : 0,
+            tally: complete ? sideMatchDecidedTally(receipt) : null,
+            money: complete ? sideMatchMoneyByKey(receipt) : {},
+            nameA: receipt.nameA || '',
+            nameB: receipt.nameB || '',
             // THE RECEIPT'S WORDING, AND ONLY WHEN THE BET IS OVER. Mid-round the
             // scoreboard reading is the right one - "Reese 3 UP" is what is true
             // while it is being played.
@@ -384,4 +422,209 @@ function sideMatchNetLine(receipt, opts) {
     }
     return 'All square — ' + nameA + ' won ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + '), '
         + nameB + ' ' + bets(t.bBets) + ' ($' + smlMoney(t.bMoney) + ')';
+}
+
+// ===========================================================================
+// THE LIVE MATCH CARD — ONE BUILDER, EVERY SURFACE (2026-10-05)
+//
+// THIS WAS TWO COPIES. index.html's scorecard and leaderboard.html each held
+// their own buildLiveMatchHtml, and the redesign found them the way this repo
+// always finds a duplicate: one was changed, and the parity test that compares
+// the two surfaces went red. CLAUDE.md has a rule for exactly this - two entry
+// points means one builder - and a card about MONEY is the worst possible place
+// to keep two.
+//
+// The two things that genuinely differ between the pages are passed in:
+//   pressHref(wagerId)   where the Press link goes
+//   maySee(wagerId)      the leaderboard's group-link filter; the scorecard's
+//                        states are already scoped, so it passes nothing
+//
+// EVERYTHING ELSE IS THE SAME CARD, which is the point: the terms, the sides,
+// the answer top right, one row per bet and the presses under it. No figure is
+// computed here - sideMatchLiveFinals joins each wager to the receipt
+// settlement-engine.js already priced, and the money map is EMPTY until the bet
+// is over, which is what makes "no dollars mid-round" true by construction.
+// ===========================================================================
+function buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds, opts) {
+var o = opts || {};
+var pressHref = o.pressHref || function () { return ""; };
+var maySee = o.maySee || function () { return true; };
+    if (typeof buildLiveMatchStates !== 'function') return '';
+    // EVERY wager visible to this viewer, not just the round format. A real
+    // Nassau is created from Action and lives in sideMatches, so reading only
+    // the round format left the supported path invisible on the scorecard.
+    const states = (buildLiveMatchStates(data, courseData, savedScores, visibleIds) || [])
+    .filter(st => !st.isSideMatch || maySee(st.wagerId));
+    if (!states || states.length === 0) return '';
+    // FINAL TOTALS, AND THE RECEIPT'S OWN WORDING (Job 2, 2026-10-03).
+    //
+    // THE DEFECT: with presses, this card said who was up in each segment and
+    // the stake beside it, and NEVER said who had won what overall. Manny's
+    // GFLBAM round, group 3: four closed rows and no answer. The card reads
+    // buildLiveMatchState(), a presenter of the match engine, which knows
+    // nothing about money - settlement does, and it is a tab away.
+    //
+    // NOTHING IS RECOMPUTED HERE. sideMatchLiveFinals() joins each live
+    // wager to the receipt settlement-engine.js has already priced, and every
+    // figure comes out of sideMatchDecidedNet()/sideMatchDecidedTally(). If
+    // this and the Receipt ever disagree it is a bug in a string builder.
+    //
+    // MID-ROUND IT IS EMPTY, deliberately: a running total on an unfinished
+    // match is the defect the Receipt itself had, printing "+$30" with twelve
+    // holes unplayed.
+    const finals = (typeof sideMatchLiveFinals === 'function')
+        ? sideMatchLiveFinals(data, courseData, savedScores, states) : {};
+    const finalFor = (st) => finals[(st && st.isSideMatch && st.wagerId) ? st.wagerId : '__main'] || null;
+    // A FINISHED BET READS LIKE THE RECEIPT. money-engine's statusText is a
+    // scoreboard reading - "Reese 3 UP" - which is right while a match runs
+    // and false once it is over: a bet that ended on the 16th is 3&2, and "3
+    // UP" is how golfers describe one that went to the 18th. match-engine
+    // already sets finalResult and the receipt already carries it; this card
+    // simply was not reading it.
+    const finalStatus = (fin, baseId, pressNum, fallback) => {
+        if (!fin || !fin.complete) return fallback;
+        const r = fin.results[sideMatchResultKey(baseId, pressNum)];
+        return r || fallback;
+    };
+    const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    // The stake is what DEFINES the bet, so it belongs on screen. Amounts only -
+    // never a running total, which is settlement's job and is not final mid-round.
+    const money = v => (v === undefined || v === null || isNaN(Number(v))) ? '' : '$' + Number(v);
+
+    // ---- THE CARD MANNY APPROVED (2026-10-05) --------------------------
+    //
+    // DISPLAY ONLY. Every figure on it comes out of the builders that already
+    // priced the round - sideMatchDecidedNet, sideMatchDecidedTally,
+    // sideMatchMoneyByKey and the receipt's own finalResult. Nothing is
+    // summed here and nothing is decided here, so this card and the Receipt
+    // cannot disagree about a dollar.
+    //
+    // THE SHAPE: a terms line in small type ("Nassau - NET - $20 - auto press
+    // 2 down"), the two sides in big type with a FINAL tag, and the overall
+    // money TOP RIGHT in the largest type on the card with "won 5 of 5 bets"
+    // under it. Then one row per bet, and presses indented under the bet they
+    // belong to.
+    //
+    // MID-ROUND THERE ARE NO DOLLARS ANYWHERE ON IT. The top right shows the
+    // live status instead ("Reese 2 UP") and the rows show their status. That
+    // is the Receipt's rule and it is held by construction: the money map is
+    // EMPTY until sideMatchRangeComplete says the bet is over.
+    const liveTop = (st) => {
+        const segs = (st.segments || []).filter(g => g.started);
+        const seg = segs.find(g => !g.closed) || segs[segs.length - 1];
+        return seg ? ((st.formatLabel === 'Nassau' ? (seg.label + ' ') : '') + seg.statusText) : '';
+    };
+    // THE TERMS, FROM THE ROUND'S OWN RECORD. The live state carries the
+    // format, the scoring and the stakes; the press RULE is a property of the
+    // wager, so it is read off the wager rather than added to money-engine.js
+    // - a protected file that should not grow a field for a label.
+    const PRESS_WORDS = { '2down': 'auto press 2 down', '1down': 'auto press 1 down',
+                          'anytime': 'press any hole', 'none': '' };
+    const pressWords = (st) => {
+        const sm = (st.isSideMatch && st.wagerId) ? ((data.sideMatches || {})[st.wagerId] || {}) : {};
+        const rule = sm.pressRule
+            || (st.formatLabel === 'Nassau' ? data.nassauPressRule : data.matchPressRule);
+        return PRESS_WORDS[rule] || '';
+    };
+    const termsLine = (st) => {
+        const bits = [st.formatLabel];
+        if (st.scoring) bits.push(String(st.scoring).toUpperCase());
+        const stake = (st.segments || []).map(g => Number(g.stake) || 0).filter(v => v > 0)[0];
+        if (stake) bits.push('$' + stake);
+        const pw = pressWords(st);
+        if (pw) bits.push(pw);
+        return bits.join(' \u00B7 ');
+    };
+
+    let html = '<div class="lm-card"><div class="lm-head">'
+        + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
+        + '<span class="lm-sub">' + states.length + ' wager' + (states.length === 1 ? '' : 's')
+        + '</span></div>';
+
+    states.forEach((st, i) => {
+        const fin = finalFor(st);
+        const done = !!(fin && fin.complete);
+        if (i > 0) html += '<div class="lm-divider"></div>';
+        // THE HEADER BLOCK: terms, the two sides, and the answer top right.
+        html += '<div class="lm-top">'
+             + '<div class="lm-top-left">'
+             + '<div class="lm-terms">' + esc(termsLine(st)) + '</div>'
+             + '<div class="lm-sides">' + esc(st.t1Name) + ' v ' + esc(st.t2Name)
+             + (done ? '<span class="lm-final-tag">FINAL</span>' : '')
+             + '</div></div>'
+             + '<div class="lm-top-right">';
+        if (done) {
+            const t = fin.tally || {};
+            const net = Number(fin.net || 0);
+            const who = net > 0 ? fin.nameA : (net < 0 ? fin.nameB : '');
+            html += '<div class="lm-top-money">'
+                 + (net === 0 ? 'All square' : esc(who) + ' +$' + Math.abs(net))
+                 + '</div><div class="lm-top-sub">'
+                 + esc(net === 0
+                    ? ((t.aBets === t.bBets && t.aMoney === t.bMoney && t.aBets > 0)
+                        ? ('each won ' + t.aBets + ' bet' + (t.aBets === 1 ? '' : 's') + ' ($' + t.aMoney + ')')
+                        : (t.halvedBets === t.total ? 'every bet halved' : 'nobody pays'))
+                    : ('won ' + (net > 0 ? t.aBets : t.bBets) + ' of ' + t.total
+                       + ' bet' + (t.total === 1 ? '' : 's')))
+                 + '</div>';
+        } else {
+            // NO DOLLARS MID-ROUND. The status is what is true right now.
+            html += '<div class="lm-top-live">' + esc(liveTop(st)) + '</div>'
+                 + (st.thru ? '<div class="lm-top-sub">thru ' + st.thru + '</div>' : '');
+        }
+        html += '</div></div>';
+        html += '<div class="lm-wager-head lm-wager-tools">'
+        // PRESS, WITHOUT A SECOND WRITE PATH.
+        //
+        // The writer for a side-match press lives in sidematches.html with its
+        // amount prompt, permission gate and offline guard. Porting it here would
+        // mean two implementations of a money write, and a write-side divergence
+        // corrupts data rather than merely displaying it wrong.
+        //
+        // So this is a LINK, not a button: it carries the golfer to the wager on
+        // the Matches tab with the card highlighted, and they press there with the
+        // amount in front of them. One tap more, one write path.
+        if (st.isSideMatch && st.canPress && st.wagerId) {
+            html += '<a class="lm-press-link" href="' + esc(pressHref(st.wagerId))
+                 + '">\uD83D\uDD25 Press \u00B7 H' + st.nextPressHole + ' \u203A</a>';
+        }
+        html += '</div>';
+
+        // ONE ROW PER BET. Left: the bet's name and its result. Right: the
+        // money, in the success colour, and ONLY when the bet is decided -
+        // fin.money is empty until then, so a mid-round row carries a status
+        // and nothing else.
+        const moneyFor = (baseId, pressNum) =>
+            (fin && fin.money) ? (fin.money[sideMatchResultKey(baseId, pressNum)] || '') : '';
+        st.segments.forEach(seg => {
+            const m = moneyFor(seg.id, 0);
+            html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
+                 + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
+                 + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
+                 + esc(finalStatus(fin, seg.id, 0, seg.statusText))
+                 // A ROW SAYS WHEN ITS OWN BET IS OVER, which is NOT the same fact
+                 // as the header's FINAL tag. A Nassau's Front can be 8&6 - beyond
+                 // catching - while the Back is still being played and the MATCH is
+                 // not settled: the tag speaks for the match, this speaks for the
+                 // bet. Keyed on seg.closed, which is the match engine's own answer.
+                 + (seg.closed ? ' \u00B7 FINAL' : '') + '</span>'
+                 + '<span class="lm-row-money">' + (m ? esc(m) : money(seg.stake)) + '</span></div>';
+            seg.presses.forEach(p => {
+                const pm = moneyFor(seg.id, p.pressNum);
+                html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
+                     // AUTO OR MANUAL STAYS ON THE TAG. The mockup shows one
+                     // press and does not distinguish them; two earlier waves
+                     // added that word because a caddie could not see an
+                     // AUTOMATIC press had been created on their behalf, and
+                     // dropping it to match a drawing would take back a fix.
+                     + '<span class="lm-press-tag">\u21B3 ' + (p.auto ? 'Auto press' : 'Press')
+                     + ' \u00B7 hole ' + p.startHole + '</span>'
+                     + '<span class="lm-press-status">' + esc(finalStatus(fin, seg.id, p.pressNum, p.statusText))
+                     + (p.closed ? ' \u00B7 FINAL' : '') + '</span>'
+                     + '<span class="lm-row-money">' + (pm ? esc(pm) : money(p.stake)) + '</span></div>';
+            });
+            html += '</div>';
+        });
+    });
+    return html + '</div>';
 }

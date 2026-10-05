@@ -131,6 +131,15 @@ describe('STATS — the Side Matches section follows the same rule', () => {
 // ---------------------------------------------------------------------------
 describe('ONLY WAGERS MOVED — the standings, the skins ledger, the flight cards and every other card are the pre-change text', () => {
     const PREV = JSON.parse(read('board_stats_scope_prev.fixture.json')).links;
+    // RE-CAPTURED 2026-10-05 (the match card redesign). The wager cards' HEADER
+    // changed - one line became four: the terms, the two sides, the live status
+    // and thru - so the three `board.matches` strings were re-captured. They are
+    // still the PRE-CHANGE CAPTURE in the sense this file means it: all three
+    // links carry the SAME two wagers, which is what the Board did before it was
+    // scoped, and the scoping is what the tests above measure against them.
+    // Nothing else in the fixture moved: the standings, the skins ledger and the
+    // flight cards are the original capture and their own shas below still pin
+    // them.
     test('the previous capture is pinned, so the proof cannot drift with the fixture', () => {
         assert.equal(sha(PREV.bare.board.standings).slice(0, 8), '068796ae');
         assert.equal(sha(PREV.bare.stats.beforeSideMatches).slice(0, 8), 'c453152a');
@@ -185,7 +194,11 @@ describe('THE SEAM — one rule, from grouping.js, on both pages; Results untouc
         const s = read('leaderboard.html');
         assert.match(s, /function boardLinkMaySee\(wagerId\)/);
         assert.match(s, /return canLinkSeeWager\(\(sm\.teamAIds \|\| \[\]\)\.concat\(sm\.teamBIds \|\| \[\]\), lockedGroup, groupOf\);/);
-        assert.match(s, /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\) \|\| \[\]\)\s*\.filter\(st => !st\.isSideMatch \|\| boardLinkMaySee\(st\.wagerId\)\)/);
+        // RE-POINTED 2026-10-05: the match card moved into side-match-lines.js -
+        // this page and index.html had a copy each - so the filter is HANDED to
+        // the shared builder rather than written here. The claim is unchanged:
+        // this page's wager cards go through boardLinkMaySee.
+        assert.match(s, /maySee: boardLinkMaySee/);
         assert.match(s, /buildLiveStrokeBetStates\(data, courseData, savedScores, visibleIds\) \|\| \[\]\)\s*\.filter\(st => boardLinkMaySee\(st\.wagerId\)\)/);
         const board = s.slice(s.indexOf('function renderBoard()'), s.indexOf('\n    function ', s.indexOf('function renderBoard()') + 30));
         assert.ok(board.length > 200);

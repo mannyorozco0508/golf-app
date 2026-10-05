@@ -5,7 +5,7 @@
 // boxes. With a Nassau running that is not a thin strip: several press rows can
 // appear at once -
 //
-//     AUTO PRESS · H3    AUTO PRESS · H5    AUTO PRESS · H7    AUTO PRESS · H9
+//     Auto press · hole 3    Auto press · hole 5    Auto press · hole 7    Auto press · hole 9
 //
 // - and they pushed the inputs away from the hole they belong to. On a phone
 // "Hole 9 · Par 3" and Paul's score box stopped looking like one thing.
@@ -187,7 +187,11 @@ describe('A PRESS-HEAVY NASSAU DOES NOT CHANGE THE ORDER', () => {
     test('several auto presses render, and the order still holds', () => {
         const r = renderHole(round(), 9);
         const t = strip(r.ticker);
-        assert.ok((t.match(/AUTO PRESS/g) || []).length >= 3,
+        // RE-PINNED 2026-10-05 (the match card redesign): the tag reads
+        // "Auto press · hole 3" rather than "AUTO PRESS · H3". The word AUTO is
+        // still on it - two earlier waves put it there because a caddie could not
+        // see a press had been created for them - and the claim is unchanged.
+        assert.ok((t.match(/Auto press/g) || []).length >= 3,
             'this fixture must actually be press-heavy, or it proves nothing');
         dashboardIsOutOfTheHoleBlock(holeViewSource());
     });
@@ -196,13 +200,13 @@ describe('A PRESS-HEAVY NASSAU DOES NOT CHANGE THE ORDER', () => {
         // The layout change must not have simplified the information.
         const r = renderHole(round(), 9);
         const t = strip(r.ticker);
-        ['LIVE LEADERBOARD','LIVE MATCHES','FRONT 9','BACK 9','TOTAL','AUTO PRESS']
+        ['LIVE LEADERBOARD','LIVE MATCHES','FRONT 9','BACK 9','TOTAL','Auto press']
             .forEach(k => assert.ok(t.includes(k), k + ' disappeared'));
         // AND HOLE VIEW KEEPS EVERYTHING BUT THE BOARD. Without this, re-pointing
         // the line above to the other mount would hide a Hole View that had lost
         // the wager panel as well.
         const hv = strip(r.hv);
-        ['LIVE MATCHES','FRONT 9','BACK 9','TOTAL','AUTO PRESS']
+        ['LIVE MATCHES','FRONT 9','BACK 9','TOTAL','Auto press']
             .forEach(k => assert.ok(hv.includes(k), k + ' disappeared from Hole View'));
         assert.ok(!hv.includes('LIVE LEADERBOARD'),
             'the duplicate board card is back under the compact lines');
