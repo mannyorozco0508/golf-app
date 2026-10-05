@@ -138,8 +138,8 @@ describe('DELETE ROUND — the most destructive path in the app', () => {
         // sheet is the same invisible outcome as none at all, which is the defect
         // this wave was reported for.
         const page = read('index.html');
-        const fn = page.slice(page.indexOf('async function endAndClearRound'),
-                              page.indexOf('async function endAndClearRound') + 2600);
+        const at = page.indexOf('async function endAndClearRound');
+        const fn = page.slice(at, page.indexOf('\n    // ', page.indexOf('uiFail(', at)));
         assert.match(fn, /toggleRoundSheet\(false\)/, 'the sheet is left open over the result');
         assert.match(fn, /closeLiveBoard\(\)/, 'the leaderboard pop-up is left open over the result');
         assert.ok(fn.indexOf('toggleRoundSheet(false)') > fn.indexOf('const ok = await uiConfirm'),
@@ -159,28 +159,44 @@ describe('DELETE ROUND — the most destructive path in the app', () => {
         assert.ok(!/yes\.focus\(\)/.test(body), 'the destructive button must never be focused');
         // And the page asks for the danger styling on this one.
         const page = read('index.html');
-        const fn = page.slice(page.indexOf('async function endAndClearRound'),
-                              page.indexOf('async function endAndClearRound') + 1600);
+        // THE WHOLE FUNCTION, found by its end rather than by a byte count: a
+        // hand-picked window silently stops covering what it asserts the moment
+        // the function grows, and this one did.
+        const at = page.indexOf('async function endAndClearRound');
+        const fn = page.slice(at, page.indexOf('\n    // ', page.indexOf('uiFail(', at)));
         assert.match(fn, /danger: true/, 'Delete round must render as destructive');
         assert.match(fn, /cancelText: 'Keep the round'/, 'and Cancel must say what it keeps');
     });
 
     test('a REFUSED delete is a persistent note, and still tells the two causes apart', () => {
-        // I had this wrong first time. Unlike admin.html, the SCORECARD does not
-        // pre-check for scores - it attempts the delete and the rules refuse it.
-        // The catch arm then has to tell "this round has scores" apart from a
-        // dropped connection, because saying the first for a network failure
-        // would be false half the time. That distinction predates this wave; what
-        // this wave must not have done is turn either into something that floats
-        // away, since both mean the round is still there.
+        // RE-POINTED 2026-10-05. The note on this test used to say the scorecard
+        // does NOT pre-check for scores and only learns from the server. It does
+        // now, as admin.html's twin has since September - and the line it was
+        // matching on, an inlined "scores in it", is gone because both arms share
+        // SCORED_ROUND_SENTENCE. The claims worth keeping are about ORDER and about
+        // the kind of note, and they are asserted directly:
+        //
+        //   the pre-check refuses BEFORE the question, so nobody is asked to
+        //   confirm something the database will not do;
+        //   the catch is the server's answer, so it comes AFTER it, and still
+        //   tells "this round has scores" apart from a dropped connection,
+        //   because saying the first for a network failure would be false half
+        //   the time;
+        //   and neither floats away, since both mean the round is still there.
         const page = read('index.html');
         const at = page.indexOf('async function endAndClearRound');
-        const fn = page.slice(at, at + 2600);
-        assert.ok(fn.indexOf('uiConfirm') < fn.indexOf('scores in it'),
-            'the refusal is the server\'s answer, so it comes after the question');
-        assert.match(fn, /uiRefuse\(|uiFail\(/, 'the refusal must be a note');
-        const tail = fn.slice(fn.indexOf('.catch'));
-        assert.ok(!/uiToast\(/.test(tail),
+        const fn = page.slice(at, page.indexOf('\n    // ', page.indexOf('uiFail(', at)));
+        assert.ok(fn.length > 800, 'the slice is empty - the endpoint drifted');
+        const precheck = fn.indexOf('uiRefuse(SCORED_ROUND_SENTENCE)');
+        const ask = fn.indexOf('uiConfirm');
+        const serverSaid = fn.indexOf('.catch');
+        assert.ok(precheck > -1 && ask > -1 && serverSaid > -1, 'one of the three is gone');
+        assert.ok(precheck < ask, 'the pre-check must refuse before the question is asked');
+        assert.ok(ask < serverSaid, 'the server\'s answer must come after the question');
+        assert.match(fn.slice(serverSaid), /PERMISSION_DENIED/,
+            'the two causes are no longer told apart');
+        assert.match(fn.slice(serverSaid), /uiRefuse\(|uiFail\(/, 'the refusal must be a note');
+        assert.ok(!/uiToast\(/.test(fn.slice(serverSaid)),
             'a refused delete must not be a toast - the round is still there and the '
             + 'golfer needs to know why');
     });

@@ -221,7 +221,15 @@ describe('4. THE LABEL, THE HELPER LINE, THE SOURCE', () => {
         // instead. delete_refusal_test.js holds the behaviour on a real device.
         assert.ok(idx.includes('SCORED_ROUND_SENTENCE'),
             'the scorecard still has no check before the write');
-        assert.match(idx, /Object\.keys\(\(currentData && currentData\.scores\) \|\| \{\}\)\.length > 0/);
+        // RE-POINTED 2026-10-05 (rules branch): the scorecard's pre-check narrowed
+        // from "any score at all" to "any score, and this device is not the uid the
+        // database will accept" - database.rules.ownerdelete.json lets the OWNER
+        // delete their own played round, and a confirm that named the golfers with
+        // scores on the card replaces the refusal for them. A second device holding
+        // the organizer token is still refused, which is what this twin is about.
+        assert.match(idx, /const scored = scoredGolferCount\(\);/);
+        assert.match(idx, /if \(scored > 0 && !ownerByUid\) \{/);
+        assert.match(idx, /function scoredGolferCount\(\)/, 'the count has no builder');
         assert.ok(!/Round deleted\. The scorecard is now clear\./.test(idx),
             'the unreadable toast is back on the way out of the page');
     });
