@@ -83,6 +83,14 @@
         'font-size:0.82rem;line-height:1.45;white-space:pre-line;text-align:left;border:1px solid}',
         '.ui-note-refuse{background:var(--warn-bg,#fff4e5);border-color:var(--warn-border,#e08a00);color:var(--warn-text,#7a4a00)}',
         '.ui-note-fail{background:var(--danger-box-bg,#fff0f0);border-color:var(--accent-red,#e63946);color:var(--accent-red,#e63946);font-weight:bold}',
+        // The fallback form, used only when the tapped control has left the
+        // document. 4200 clears .ui-sheet (4100) so a refusal raised while a
+        // second sheet is open is still the thing on top.
+        '.ui-note-floating{position:fixed;z-index:4200;left:12px;right:12px;',
+        'top:calc(12px + env(safe-area-inset-top,0px));margin:0;max-width:420px;',
+        'margin-left:auto;margin-right:auto;cursor:pointer;',
+        'box-shadow:0 8px 24px rgba(0,0,0,0.28);padding-right:34px}',
+        '.ui-note-x{position:absolute;top:6px;right:8px;font-size:1rem;line-height:1;opacity:0.7;padding:4px}',
         '.ui-toast-wrap{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));',
         'z-index:4000;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px}',
         '.ui-toast{max-width:420px;width:100%;box-sizing:border-box;background:var(--brand-green,#0f4c3a);color:#F2EDE4;',
@@ -159,6 +167,28 @@
         }
     }
 
+    // THE ANCHOR MAY HAVE LEFT THE DOCUMENT (2026-10-05). This is what made
+    // "Delete it" look dead on Manny's phone, and it is not specific to deleting:
+    // every refusal raised by the handler of a uiConfirm / uiAmount / uiPrompt has
+    // the same shape. The last control tapped is the sheet's own button, and the
+    // first thing the promise does on the way out is closeSheet(), which empties
+    // the sheet with innerHTML = ''. The button still has a parentNode - the
+    // detached row it was in - so the insert SUCCEEDS and lands in a subtree that
+    // is no longer in the document. Measured on a cold arrival
+    // (tools/delete-refusal-check.js): document.querySelectorAll('.ui-note')
+    // returned NOTHING after a refused delete, because the note was not in the
+    // document to be found. The write was refused, the reason existed, and no
+    // screen anywhere carried it.
+    function inDocument(el) {
+        if (!el || typeof document === 'undefined' || !document.body) return false;
+        if (typeof document.body.contains === 'function') {
+            try { return document.body.contains(el); } catch (e) { /* fall through */ }
+        }
+        var n = el;
+        while (n) { if (n === document.body) return true; n = n.parentNode; }
+        return false;
+    }
+
     function placeNote(kind, message) {
         ensureStyle();
         clearNotes();
@@ -167,12 +197,24 @@
         note.className = NOTE_CLASS + ' ' + NOTE_CLASS + '-' + kind;
         note.setAttribute('role', kind === 'fail' ? 'alert' : 'status');
         note.textContent = String(message == null ? '' : message);
-        var anchor = lastTapped;
+        var anchor = inDocument(lastTapped) ? lastTapped : null;
         var host = (anchor && anchor.parentNode) ? anchor.parentNode : null;
         if (host && host.insertBefore) {
             if (anchor.nextSibling) host.insertBefore(note, anchor.nextSibling);
             else host.appendChild(note);
         } else if (document.body && document.body.appendChild) {
+            // NO ANCHOR LEFT TO BE INLINE BESIDE, so it stops pretending to be
+            // inline: fixed, above the sheet layer, and on screen wherever the
+            // page happens to be scrolled. It is still persistent - a refusal
+            // that floats away is the thing uiToast is for - so it carries its
+            // own way out, because a banner with no dismiss is its own trap.
+            note.className += ' ' + NOTE_CLASS + '-floating';
+            var x = document.createElement('span');
+            x.className = 'ui-note-x';
+            x.setAttribute('aria-hidden', 'true');
+            x.textContent = '\u2715';
+            if (note.appendChild) note.appendChild(x);
+            note.onclick = function () { if (note.parentNode) note.parentNode.removeChild(note); };
             document.body.appendChild(note);
         }
         if (note.scrollIntoView) {

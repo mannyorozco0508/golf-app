@@ -74,7 +74,9 @@ function scorecard(d, lockedGroup) {
         renderLiveTicker();
     `, sb);
     const html = String(vm.runInContext(
-        "document.getElementById('live-ticker-mount').innerHTML", sb));
+        // RE-POINTED 2026-10-05: the board card moved to the pop-up and the Full
+        // Card mount; group scoping is still the claim, read where it renders.
+        "document.getElementById('fc-ticker-mount').innerHTML", sb));
     const text = html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
     const cut = (marker) => {
         const i = text.indexOf(marker);

@@ -318,6 +318,11 @@
         .sm-nassau-stakes label { font-size: 0.68rem; color: var(--text-muted); font-weight: normal; white-space: nowrap; }
         .wizard-step-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
         .wizard-nav-row { display: flex; gap: 10px; margin-top: 20px; }
+        /* SAME AS LAST WEEK (2026-10-05). Full width above the code field, because
+           it is the thing an organizer does every week and the field below it is
+           the general case. */
+        .salw-btn { width: 100%; margin-bottom: 10px; }
+        .salw-note { font-size: 0.76rem; color: var(--text-muted); margin: -4px 0 10px 0; }
 
         /* FORMAT TILES.
            SIBLINGS OF THE HOME WIDGETS. The first cut was full-width rows, which
@@ -1251,6 +1256,17 @@ html {
          placeholder was PREVIOUS ROUND CODE, which needed 196.5px in a 160px field
          and was cut off mid-word on a phone. Shortening it is only honest because
          the heading above it now says which round. -->
+    <!-- SAME AS LAST WEEK (2026-10-05). The code field below is the general case -
+         any round, typed in. This is the one an organizer actually does every week,
+         and it needs no code at all: the last round this device set up is already
+         remembered (lastRoomCode, written on every save), so the whole of setup
+         becomes one tap and a tick list.
+         HIDDEN UNTIL THERE IS ONE. A first-time organizer has no previous round and
+         must not be offered a button that cannot work - syncSameAsLastWeek() shows
+         it only when the code exists. -->
+    <button type="button" class="btn-primary salw-btn" id="same-as-last-week" style="display:none;"
+            onclick="sameAsLastWeek(this)">🔁 Same as last week</button>
+    <div id="same-as-last-week-note" class="salw-note" style="display:none;"></div>
     <h3 class="w-card-title">Start from a previous round</h3>
     <div id="copy-code-row">
         <input type="text" id="copy-code-input" class="join-code-input" maxlength="48"
@@ -1348,7 +1364,7 @@ html {
        font-size:0.82rem; font-weight:bold; color:var(--brand-green); text-align:center;"></p>
 
     <div class="wizard-step" id="wizard-step-1" data-step="1">
-        <div class="wizard-step-title">⛳ Course · <span class="wiz-step-n" id="wiz-n-course">Step 1</span></div>
+        <div class="wizard-step-title">⛳ Course &amp; Round · <span class="wiz-step-n" id="wiz-n-course">Step 1</span></div>
         <div class="wizard-step-sub">Search for your course.</div>
     <input type="hidden" id="round-day-select" value="Single Round">
 
@@ -1529,9 +1545,8 @@ html {
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">📝 What Are We Playing? · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
-        <div class="wizard-step-sub">Choose how scores are kept. Games and bets are added later.</div>
-        <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Skip it if everyone just plays their own ball.</div>
+        <div class="wizard-step-title">📝 Games · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
+        <div class="wizard-step-sub" id="step3-sub">Pick how you&#39;re scoring today.</div>
     <div class="form-group">
         <label id="format-question-label">What are you playing today?</label>
         <!-- FORMAT FIRST.
@@ -2029,7 +2044,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">💰 Games &amp; Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the money options work" onclick="tipMoney()">?</button></div>
+        <div class="wizard-step-title">💰 Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the money options work" onclick="tipMoney()">?</button></div>
         <div class="wizard-step-sub">Choose the games and bets you're playing. Everything here is optional.</div>
         <!-- Three sections, in the order a group actually decides: the main match
              first, then anything stacked on top, then field-wide pools. -->
@@ -2107,7 +2122,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 </div>
             </div>
         </div>
-        <div class="wizard-section-head">ALSO PLAYING</div>
+        <div class="wizard-section-head" id="also-playing-head">ALSO PLAYING</div>
         <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
@@ -2456,7 +2471,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // round reopens exactly as before.
     const WIZARD_STEP_OF = { course: 1, length: 2, format: 3, settings: 4, players: 5, action: 6, review: 7 };
     const WIZARD_SEMANTIC_OF = { 1: 'course', 2: 'length', 3: 'format', 4: 'settings', 5: 'players', 6: 'action', 7: 'review' };
-    const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Format', settings: 'Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
+    // THREE STEPS AND A SAVE (2026-10-05). 'length', 'format' and 'settings' keep
+    // their entries because the DOM panels still exist and are still addressed by
+    // number - they are simply no longer screens the workflow visits.
+    const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Games', settings: 'Settings', players: 'Players', action: 'Money', review: 'Review' };
     const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
     // DOM step ids only. NEVER the length of a workflow.
     const WIZARD_TOTAL_STEPS = 7;
@@ -2500,18 +2518,77 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // and unmoved - wizard-step-3 is still the format screen, it is simply the first
     // one the workflow visits. Nothing about persistence, validation or the settings
     // panels moved with it.
+    // ---- FOUR SCREENS AND A SAVE (2026-10-05) ------------------------------
+    //
+    // The wizard was seven screens: Format, Course, Round Length, Format Settings,
+    // Players, Games & Money, Review. Every field and every id below is unchanged -
+    // what moved is which SCREEN they are printed on, and buildCompactWizard()
+    // does that by moving the existing blocks, so saveSettings() reads exactly the
+    // same inputs in exactly the same order and a round saves byte-identical data.
+    //
+    //   Course   the course, the round length, the start hole, handicaps
+    //   Players  the roster, the paste, My Groups, flights
+    //   Games    the format gallery and that format's own settings
+    //   Money    every priced thing: Also Playing, Extras, the stakes, the pot
+    //   Review   a last look, and Save
+    //
+    // THE CUP IS STILL ITS OWN SHAPE. It carries no wizard money and picks its
+    // format from the entry card, so it skips both Games and Money; side action is
+    // added from Matches afterwards, exactly as before.
+    // GAMES AND MONEY ARE TWO DECISIONS (2026-10-05). They were one screen for a
+    // week and Manny asked for them back apart: what you are playing is a choice
+    // about the round, what it is worth is a choice about the wallet, and the
+    // second one is the one an organizer wants to look at on its own. Same fields,
+    // same ids, same save - this list is the only thing that says how many screens
+    // they are spread across.
     function wizardWorkflow(fmt) {
         const format = (fmt === undefined) ? currentPrimaryFormat() : fmt;
-        // A Cup carries no wizard money - no Format Settings, no Games & Money.
-        // Optional side action is added afterwards from Matches, exactly as it is
-        // for every other round. Course and Round Length stay: saveSettings() refuses
-        // without a course, and the Par/HCP grid for an unmapped course lives on the
-        // Round Length step, so a Cup needs both exactly as any other round does.
-        if (format === RYDER_CUP_FORMAT) return ['format', 'course', 'length', 'players', 'review'];
-        const flow = ['format', 'course', 'length'];
-        if (FORMATS_WITH_SETTINGS.indexOf(format) !== -1) flow.push('settings');
-        flow.push('players', 'action', 'review');
-        return flow;
+        if (format === RYDER_CUP_FORMAT) return ['course', 'players', 'review'];
+        return ['course', 'players', 'format', 'action', 'review'];
+    }
+
+    // THE BLOCKS ARE MOVED, NOT REBUILT - the same technique the scorecard's Status
+    // sheet uses, and for the same reason: every input keeps its id, its handler and
+    // the function that reads it, so nothing that saves or restores a round had to
+    // learn a new place to look. A COPY would have been two elements with one id.
+    //
+    // Runs once, before the wizard is first rendered. A block that is not on the
+    // page is not an error: a format without settings has no panel to move.
+    function buildCompactWizard() {
+        var moved = 0;
+        var isChrome = function (el) {
+            // The step's own title, its subtitle and its Back/Next row belong to the
+            // screen that is going away.
+            return el.classList && (el.classList.contains('wizard-step-title')
+                || el.classList.contains('wizard-step-sub')
+                || el.classList.contains('wizard-nav-row'));
+        };
+        // atTop: the moved blocks land ABOVE whatever the destination already holds.
+        var moveInto = function (fromId, toId, atTop) {
+            var from = document.getElementById(fromId);
+            var to = document.getElementById(toId);
+            if (!from || !to) return;
+            var before = atTop
+                ? Array.prototype.slice.call(to.children).filter(function (el) { return !isChrome(el); })[0]
+                : to.querySelector('.wizard-nav-row');
+            var kids = Array.prototype.slice.call(from.children).filter(function (el) { return !isChrome(el); });
+            kids.forEach(function (el) {
+                if (before) to.insertBefore(el, before); else to.appendChild(el);
+                moved++;
+            });
+        };
+        // Round Length, the Par/HCP grid and the start hole join Course, after it.
+        moveInto('wizard-step-2', 'wizard-step-1', false);
+        // GAMES IS THE GALLERY AND NOTHING ELSE (2026-10-05, second pass). Its own
+        // settings panel joins it underneath - you pick the game, then you set its
+        // options - and that is the whole screen. Also Playing and Extras went to
+        // Games for about an hour and came straight back: skins, dots, 9 Points,
+        // Stableford, the Birdie Game and Aloha are all PRICED, so they are money,
+        // and the organizer who is deciding what the round costs wants them beside
+        // the stakes and the pot rather than two screens away. Nothing is moved out
+        // of step 6 at all now, which is why there is no second mover.
+        moveInto('wizard-step-4', 'wizard-step-3', false);
+        return moved;
     }
 
     // The step the wizard opens on. Never a literal, so this can never drift from
@@ -2621,9 +2698,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (prev !== fmt) clearFormatCarryover(prev, fmt);
         sel.value = fmt;
         handleFormatChange();
-        // handleFormatChange() has just recomputed the workflow for the format that
-        // was tapped, so this advances into THAT format's flow, not the old one's.
-        goToWizardStep(wizardNeighbourStep(WIZARD_STEP_OF.format, 1));
+        // TAPPING A CARD NO LONGER NAVIGATES (2026-10-05). The gallery used to be a
+        // screen of its own, so a tap had to advance or the organizer was left
+        // looking at what they had just chosen. It is now the TOP of Games & Money,
+        // with that format's settings and its money directly below it - so the tap
+        // reveals them in place, which is the whole reason the three screens were
+        // merged. handleFormatChange() has already rebuilt the panels underneath.
+        //
+        // THE CUP IS THE ONE EXCEPTION, because it has no money screen to stay on:
+        // its workflow is Course, Players, Review, and leaving the organizer on a
+        // step the Cup does not have is the strand this file's own guard refuses.
+        if (!wizardStepNumbers().includes(currentWizardStep)) {
+            goToWizardStep(wizardResolveStep(currentWizardStep));
+        }
     }
 
     // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
@@ -3079,14 +3166,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // THE SAME THREE REFUSALS, ON THE SCREENS THAT NOW HOLD THOSE FIELDS (2026-10-05).
+    // Course and the Par/HCP grid are both on step 1, and the format gallery is step 3
+    // - Games - with the money on step 6 behind it. Nothing about what is validated
+    // changed, only which Next button asks.
     function wizardNext(fromStep) {
         if (fromStep === 1) {
             const courseVal = document.getElementById('course-search-input').value.trim();
             if (!courseVal) { uiRefuse('⚠️ Please select a golf course before continuing.'); return; }
-        }
-        // Step 2 owns the Par/HCP grid. Validate the COMPLETED card here, on the way
-        // out - the golfer has finished typing by the time they reach for Next.
-        if (fromStep === 2) {
+            // The Par/HCP grid, validated COMPLETED on the way out - the golfer has
+            // finished typing by the time they reach for Next.
             const customBox = document.getElementById('enable-custom-course');
             if (customBox && customBox.checked) {
                 const check = validateCourseGrid();
@@ -3349,6 +3438,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // A device already switched on keeps the button across reloads. The switch
         // lives in localStorage, so this is the only thing that has to run on load.
         if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+        // SAME AS LAST WEEK is offered only when there IS a last week - the code is
+        // in this device's own storage, so this is the one thing that has to run on
+        // load to know whether the button can work.
+        if (typeof syncSameAsLastWeek === 'function') syncSameAsLastWeek();
         // A TAP ON A NOTIFICATION HAS TO LAND SOMEWHERE (2026-10-04).
         bindPushTaps();
         // AND THE TEST NOTIFICATION LANDS HERE, on the card that sent it. Tapped
@@ -5422,7 +5515,50 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         window.location.href = 'season.html?season=' + code;
     }
 
-    async function startFromPreviousRound(pressedEl) {
+    // ---- SAME AS LAST WEEK (2026-10-05) ------------------------------------
+    //
+    // ONE TAP INSTEAD OF A WHOLE WIZARD. It copies the organizer's most recent
+    // round - course, length, start hole, handicap mode, format, games, money,
+    // roster, flights and groups - into a NEW round with a new code, and lands on
+    // the Players step so the only thing left is ticking who is here.
+    //
+    // IT INVENTS NO COPY PATH. The copy is ?copyFrom=, which the wizard has used
+    // since the lobby's code field was built: a brand-new round pre-filled from
+    // another round's setup, saved only when the organizer taps Save. Scores,
+    // bets, challenges and KP answers cannot come across because the copy carries
+    // SETUP, not a round - and the new code means nothing is shared with the old
+    // one. setup_three_step_test.js holds that byte for byte.
+    //
+    // THE SOURCE IS lastRoomCode, written on every save. It is this device's own
+    // most recent round, which is what "last week" means to the person holding it.
+    function lastWeekCode() {
+        try { return (localStorage.getItem('lastRoomCode') || '').trim().toUpperCase(); }
+        catch (e) { return ''; }
+    }
+    function syncSameAsLastWeek() {
+        const btn = document.getElementById('same-as-last-week');
+        const note = document.getElementById('same-as-last-week-note');
+        if (!btn) return;
+        const code = lastWeekCode();
+        btn.style.display = code ? 'block' : 'none';
+        if (note) {
+            note.style.display = code ? 'block' : 'none';
+            note.textContent = code ? 'Copies round ' + code + ' \u2014 same course, games and money. Pick who is playing.' : '';
+        }
+    }
+    async function sameAsLastWeek(pressedEl) {
+        const code = lastWeekCode();
+        if (!code) return;
+        const input = document.getElementById('copy-code-input');
+        if (!input) return;
+        // THE SAME PATH THE CODE FIELD TAKES, with the code filled in. One copier,
+        // so a fix to either reaches both and they can never disagree about what a
+        // copied round carries.
+        input.value = code;
+        await startFromPreviousRound(pressedEl, { step: 'players' });
+    }
+
+    async function startFromPreviousRound(pressedEl, opts) {
         if (pressedEl && pressedEl.getAttribute('aria-disabled') === 'true') return;
         const code = parseRoundCodeInput(document.getElementById('copy-code-input'));
         if (code.length < 2) {
@@ -5448,6 +5584,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
             const newCode = await issueUniqueCode({ db, root: 'events' });
             let dest = `admin.html?game=${newCode}&eventType=${selectedEventType}&copyFrom=${code}`;
+            // "Same as last week" lands on Players: the course, the games and the
+            // money came with the copy, so the only question left is who is here.
+            if (opts && opts.step) dest += `&step=${encodeURIComponent(opts.step)}`;
             if (tripLinkCode) dest += `&trip=${tripLinkCode}`;
             if (seasonLinkCode) dest += `&season=${encodeURIComponent(seasonLinkCode)}`;
             window.location.href = dest;
@@ -10622,6 +10761,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
 
+    // THE SCREENS ARE BUILT BEFORE ANYTHING IS DRAWN (2026-10-05), so the wizard
+    // never renders the seven-step shape and then rearranges itself.
+    buildCompactWizard();
     syncFormatCards();
     renderWizardProgress();
     // Game Day lands here. The first thing a golfer sees is the format gallery.
@@ -10654,7 +10796,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     if (step3SubEl) {
         step3SubEl.textContent = currentEventType === 'club'
             ? "Common club formats: Stroke Play, Stableford, Best Ball. Every other format below still works too."
-            : "Tap what you're playing. Course, players and any bets come next.";
+            // THE OLD LINE NAMED THE WRONG ORDER. It read "Course, players and any
+            // bets come next" from when the gallery was the FIRST screen; course
+            // and players are both behind this one now.
+            : "Pick how you're scoring today.";
     }
     // THE FRAMING SENTENCE NO LONGER SHOWS ITSELF ON ARRIVAL (UI Wave 7). It read
     // "Game Day - just pick a course, add your group, choose a game, and go." above
@@ -10693,6 +10838,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     loadModeData(copyFromCode);
                     const banner = document.getElementById('copy-from-banner');
                     if (banner) banner.style.display = 'block';
+                    // SAME AS LAST WEEK LANDS ON PLAYERS (2026-10-05). The course,
+                    // the games and the money arrived with the copy; who is playing
+                    // is the only thing left, so that is the screen it opens on.
+                    // Any other value is ignored - this is not a general jump.
+                    if (urlParams.get('step') === 'players') {
+                        goToWizardStep(wizardStepNumber('players'));
+                    }
                 } else {
                     loadModeData(currentMode);
                 }

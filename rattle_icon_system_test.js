@@ -156,11 +156,17 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
     // Ryder Cup must not read "Step 5: Players" while the progress dots say 4. The
     // glyph assignment being tested here is unchanged.
     const STEPS = [
-        ['1', 'course', '\u26f3', 'Course'],
-        ['3', 'format', '\u{1F4DD}', 'What Are We Playing\\?'],
+        // RE-PINNED 2026-10-05: the first screen is "Course & Round" - the length,
+        // the start hole and the Par/HCP grid joined it when the wizard became three
+        // steps. The glyph is unchanged, which is what this file is about.
+        ['1', 'course', '\u26f3', 'Course &amp; Round'],
+        // RE-PINNED 2026-10-05: the step is called "Games" - it holds the format
+        // gallery, that format's settings and Also Playing, with Money behind it.
+        // The GLYPH is unchanged, which is what this file is about.
+        ['3', 'format', '\u{1F4DD}', 'Games'],
         ['4', 'settings', '\u2699\ufe0f', 'Format Settings'],
         ['5', 'players', '\u{1F465}', 'Players'],
-        ['6', 'action', '\u{1F4B0}', 'Games &amp; Money'],
+        ['6', 'action', '\u{1F4B0}', 'Money'],
         ['7', 'review', '\u2705', 'Review &amp; Save'],
     ];
 
@@ -183,7 +189,7 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
     });
 
     test('Step 1 and Step 3 no longer share a glyph', () => {
-        assert.ok(!/wizard-step-title">\u26f3 What Are We Playing/u.test(ADMIN),
+        assert.ok(!/wizard-step-title">\u26f3 Games/u.test(ADMIN),
             'two steps wearing the same flag is what made the wizard unreadable');
     });
 

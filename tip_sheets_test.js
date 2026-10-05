@@ -162,7 +162,9 @@ describe('2. THE THREE "?" CONTROLS EXIST, AND DO NOT DISTURB WHAT IS THERE', ()
         // label, then <span class="wiz-step-n" id="wiz-n-action">Step 6</span>.
         // Appending after the span is allowed; inserting between any of them is not.
         const src = read('admin.html');
-        assert.match(src, /wizard-step-title">💰 Games &amp; Money · <span class="wiz-step-n" id="wiz-n-action">Step 6<\/span>/,
+        // RE-PINNED 2026-10-05: the step is "Money" now; the "?" and its glyph are
+        // what this test is about, and neither moved.
+        assert.match(src, /wizard-step-title">💰 Money · <span class="wiz-step-n" id="wiz-n-action">Step 6<\/span>/,
             'the step 6 title no longer matches the pinned shape');
         // And there are still exactly seven wizard step marks.
         const marks = [...src.matchAll(/wizard-step-title">(\S+?) /gu)].map(m => m[1]);

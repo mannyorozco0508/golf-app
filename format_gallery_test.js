@@ -208,13 +208,19 @@ describe('NOTHING ABOUT BEHAVIOUR MOVED', () => {
         assert.equal(run(sb, "normalizeGameFormatForSave('ryder-cup')"), 'stroke');
     });
 
-    test('tapping a tile still selects and advances in one tap', () => {
+    test('tapping a tile still selects in one tap, and stays with its settings', () => {
+        // RE-POINTED 2026-10-05: three steps and a save. The gallery is the TOP of
+        // Games & Money, with that format's settings and its money directly below
+        // it, so the tap reveals them in place instead of navigating away from what
+        // was just chosen. The claim this test is really about - ONE tap selects,
+        // with no confirming step - is unchanged and is asserted here.
         const sb = wizard('stroke');
-        run(sb, 'goToWizardStep(wizardFirstStep());');
-        assert.equal(run(sb, 'currentWizardStep'), 3);
+        run(sb, 'goToWizardStep(wizardStepNumber("action"));');
+        const on = run(sb, 'currentWizardStep');
         run(sb, "selectFormatCard('hilo');");
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'hilo');
-        assert.equal(run(sb, 'currentWizardStep'), 1);
+        assert.equal(run(sb, 'currentWizardStep'), on,
+            'the tap navigated away from the settings it just revealed');
     });
 
     test('exactly one tile is selected at a time', () => {
@@ -315,7 +321,10 @@ describe('EVERY NATIVE PAGE STARTS BELOW THE STATUS BAR', () => {
     test('the header is inset, not hidden', () => {
         // The fix must never have been "move the header out of the way".
         assert.match(ADMIN, /id="wiz-n-format"/);
-        assert.match(ADMIN, /What Are We Playing\?/);
+        // RE-PINNED 2026-10-05: the screen is called Games now, because it holds
+        // the gallery, that format's settings and Also Playing. The claim is that
+        // the step still HAS a visible title, not what the title says.
+        assert.match(ADMIN, /<div class="wizard-step-title">[^<]*Games [^<]*<span class="wiz-step-n" id="wiz-n-format">/);
         assert.ok(!/\.wizard-step-title \{[^}]*display: none/.test(ADMIN));
     });
 

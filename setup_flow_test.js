@@ -101,13 +101,24 @@ describe('STEP 3 ASKS HOW THE ROUND IS SCORED', () => {
     test('the heading no longer promises to answer "what are we playing?"', () => {
         // FORMAT FIRST. "How We're Scoring" was honest but abstract; the question a
         // golfer on the first tee actually answers is what game they are playing.
-        assert.match(adm(), /What Are We Playing\? \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3<\/span>/);
+        // RE-PINNED 2026-10-05: the screen is simply "Games" now - it holds the
+        // gallery, that format's settings and Also Playing, and the question is the
+        // field label below it rather than the heading.
+        assert.match(adm(), /Games \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3<\/span>/);
         assert.ok(!adm().includes('Step 3: Round Type'), 'the ambiguous heading is gone');
         assert.ok(!adm().includes('Step 3: How We\'re Scoring'), 'the numbered heading is gone');
     });
 
-    test('and the helper line says where games actually live', () => {
-        assert.match(adm(), /Choose how scores are kept\. Games and bets are added later\./);
+    test('and the helper line says what the screen covers, in one line', () => {
+        // RE-PINNED 2026-10-05 (second pass). Also Playing came back off this
+        // screen, so "what else you are playing" went with it - and the line it
+        // replaced named the wrong order ("Course, players and any bets come
+        // next", written when the gallery was the FIRST screen). One line now,
+        // and the screen asks one question.
+        assert.match(adm(), /Pick how you&#39;re scoring today\./);
+        assert.ok(!adm().includes('Course, players and any bets come next'),
+            'the old order is still promised');
+        assert.equal((adm().match(/id="step3-sub"/g) || []).length, 1);
     });
 
     test('the field label matches the question', () => {
@@ -190,15 +201,23 @@ describe('A LEGACY ROUND SAYS SO', () => {
 describe('STEP 6 IS WHERE GAMES AND MONEY LIVE', () => {
 
     test('renamed from clubhouse language to what it does', () => {
-        assert.match(adm(), /Games &amp; Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6<\/span>/);
+        // RE-PINNED 2026-10-05: Games and Money are two screens again, so this one
+        // is "Money" - the stakes and the pot.
+        assert.match(adm(), /Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6<\/span>/);
         assert.ok(!adm().includes("Step 6: What's The Action?"));
     });
 
     test('the helper says everything here is optional', () => {
+        // RE-PINNED BACK 2026-10-05: Also Playing and Extras are on this screen
+        // again, so "the games and bets you're playing" is true of it again.
         assert.match(adm(), /Choose the games and bets you're playing\. Everything here is optional\./);
     });
 
-    test('three sections, in the order a group decides', () => {
+    test('its sections are still in the markup, in the order a group decides', () => {
+        // ALSO PLAYING is moved onto Games at build time by buildCompactWizard, as a
+        // NODE - so it is still written here, in this order, and that is deliberate:
+        // the mover reads the page, and a section rebuilt elsewhere would be a
+        // second copy of every id in it.
         ['PRIMARY GAME / MATCHES', 'ALSO PLAYING', 'POOLS &amp; EXTRAS']
             .forEach(h => assert.ok(adm().includes(h), 'missing: ' + h));
     });

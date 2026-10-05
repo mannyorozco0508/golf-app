@@ -202,15 +202,28 @@ describe('4. THE LABEL, THE HELPER LINE, THE SOURCE', () => {
         assert.match(fn, /localStorage\.removeItem\('lastRoomCode'\)/);
         assert.doesNotMatch(fn, /currentData\.scores|snapshot|once\(/, 'the check reads what the page holds, not a fresh read');
     });
-    test('the scorecard\'s own control (index.html) is untouched by this wave', () => {
+    test('the scorecard\'s own control (index.html) now matches this one', () => {
         const idx = read('index.html');
         // Both pages went through the dialog waves (index.html in Wave 2, this one
-        // in Wave 3) and both still say the same thing - which is the point of the
-        // twin. The title is now the sheet's title rather than a confirm() string.
+        // in Wave 3) and both still ask the same question - which is the point of
+        // the twin. The title is the sheet's title rather than a confirm() string.
         assert.ok(idx.includes('Delete round ${currentMode} for everyone?'),
             'the scorecard\'s question changed');
-        assert.match(idx, /Round deleted\. The scorecard is now clear\./);
         assert.match(idx, /await uiConfirm\(/, 'and the scorecard still awaits it');
+        // RE-POINTED 2026-10-05. This file's own subject - CHECK BEFORE WRITING -
+        // was this page only, and the scorecard was the twin that had not had it.
+        // Manny tapped "Delete it" on ZSGZWH (his round, 8 scores) and nothing
+        // happened: the write went, the rules refused it, and the refusal was
+        // posted into the confirm sheet that had just been emptied. The scorecard
+        // now does what this page has done since 2026-09-19, with the SAME
+        // sentence, and the toast it used to fire into a page that was already
+        // leaving for Home is gone - dialog_index_test.js asserts the arrival
+        // instead. delete_refusal_test.js holds the behaviour on a real device.
+        assert.ok(idx.includes('SCORED_ROUND_SENTENCE'),
+            'the scorecard still has no check before the write');
+        assert.match(idx, /Object\.keys\(\(currentData && currentData\.scores\) \|\| \{\}\)\.length > 0/);
+        assert.ok(!/Round deleted\. The scorecard is now clear\./.test(idx),
+            'the unreadable toast is back on the way out of the page');
     });
     test('sw.js moved for this wave (v178) and has not moved back', () => {
         assert.match(read('sw.js'), /Moved to v178:/);

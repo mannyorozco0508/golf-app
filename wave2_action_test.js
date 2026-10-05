@@ -284,7 +284,10 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
         // Renamed to "Games & Money": "What's The Action?" is clubhouse language that
         // did not tell a golfer this is where every bet is configured.
         // The number moved out of the heading and into a span the workflow renumbers.
-        assert.ok(adm.includes('Games &amp; Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6</span>'));
+        // RE-PINNED 2026-10-05: Games and Money are two screens again - this one is
+        // Money, and it holds every priced thing: Also Playing, Extras, the stakes
+        // and the pot. Only the format gallery and its own settings went to Games.
+        assert.ok(adm.includes('Money \u00b7 <span class="wiz-step-n" id="wiz-n-action">Step 6</span>'));
         assert.ok(adm.includes("Choose the games and bets you're playing. Everything here is optional."));
         assert.ok(!adm.includes("Step 6: What's The Action?"), 'the vaguer heading is gone');
         assert.ok(!adm.includes('Step 6: More Action'), 'the old undifferentiated wording is gone');
@@ -307,9 +310,13 @@ describe('SETUP — stacking games is reachable from the wizard', () => {
         // FORMAT FIRST: the heading now asks the question a golfer actually answers.
         // The helper line below still says where games live, which is what this
         // test was really protecting.
-        assert.ok(adm.includes('What Are We Playing? \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3</span>'));
-        assert.ok(adm.includes('Choose how scores are kept. Games and bets are added later.'),
-            'the helper line must say where games actually live');
+        // RE-PINNED 2026-10-05: the screen is "Games"; the question a golfer answers
+        // is the field label below the heading, which is asserted elsewhere in this
+        // file and is unchanged. Its helper line is one sentence, and it no longer
+        // claims course and players come after it.
+        assert.ok(adm.includes('Games \u00b7 <span class="wiz-step-n" id="wiz-n-format">Step 3</span>'));
+        assert.ok(adm.includes('Pick how you&#39;re scoring today.'),
+            'the helper line must say what the screen covers');
         assert.ok(!adm.includes('Step 3: Round Type'), 'the ambiguous heading is gone');
         assert.ok(!adm.includes('Step 3: Game Format'), 'the original conflated heading is gone');
         // The stored key is STILL gameFormat - wording and options changed, schema did not.

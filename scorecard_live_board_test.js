@@ -28,6 +28,14 @@
 // back onto the page, into #round-reading below Prev/Next - a fresh round behind
 // a handle said nothing about what the group was playing for. The sheet keeps
 // settings and admin. Same claim, read where they now live.
+//
+// RE-POINTED 2026-10-05: THE BOARD CARD LEFT HOLE VIEW. The compact top five
+// under Prev/Next now opens the full leaderboard as a pop-up, so the bordered
+// "LIVE LEADERBOARD" card six pixels below it was the same five names twice and
+// is gone from #live-ticker-mount. It is NOT gone from the app: the Full Card
+// view keeps it (it has no compact lines of its own), and #live-board-overlay is
+// the pop-up. The claims below are about the board, so they read it where it now
+// lives - #fc-ticker-mount - rather than being deleted.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -84,7 +92,10 @@ function scorecard(opts) {
     `, sb);
     return {
         sb, run: c => vm.runInContext(c, sb),
-        ticker: () => sb.document.getElementById('live-ticker-mount').innerHTML,
+        // RE-POINTED 2026-10-05: the board card left Hole View for the pop-up (see
+        // the note at the top of this file). The Full Card mount is where the
+        // bordered card still renders, and it holds every other widget too.
+        ticker: () => sb.document.getElementById('fc-ticker-mount').innerHTML,
         board:  () => sb.document.getElementById('live-board-body').innerHTML,
     };
 }
@@ -690,7 +701,10 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         `, sb);
         return {
             sb, run: c => vm.runInContext(c, sb),
-            ticker: () => sb.document.getElementById('live-ticker-mount').innerHTML,
+            // RE-POINTED 2026-10-05: the board card left Hole View for the pop-up (see
+        // the note at the top of this file). The Full Card mount is where the
+        // bordered card still renders, and it holds every other widget too.
+        ticker: () => sb.document.getElementById('fc-ticker-mount').innerHTML,
         };
     }
 

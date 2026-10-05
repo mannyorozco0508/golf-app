@@ -15,6 +15,30 @@
 // simply the first one visited.
 // ============================================================================
 
+// ============================================================================
+// RE-POINTED 2026-10-05: THREE STEPS, AND THE GALLERY IS THE TOP OF ONE.
+//
+// This file's subject was WHEN the format is asked for. Patch 1 had made the
+// wizard's shape depend on the format; this file moved the question to the
+// front, so Game Day opened on the gallery and a tap both selected and advanced.
+//
+// Manny's instruction of 2026-10-05 is three screens and a save: Course (the
+// course, the round length, the start hole, the handicap mode), Players, then
+// Games & Money - and the format gallery is the TOP of Games & Money, directly
+// above that format's settings and its money. That is not the old filing-cabinet
+// order the header below describes: there is nothing between the gallery and the
+// stakes it prices, which is what the merge bought.
+//
+// SO TWO OF THIS FILE'S THREE CLAIMS SURVIVE WHOLE and are asserted below:
+//   - every format is a WIDGET, one each, and the dropdown stays hidden;
+//   - the widget IS the selection - no confirming Next, and the panels underneath
+//     rebuild on the tap.
+// The third - that the gallery comes FIRST - is superseded, and a tap no longer
+// navigates at all: the settings it reveals are on the same screen, which is the
+// whole reason the screens were merged. setup_three_step_test.js holds the new
+// shape and that the SAVE is unchanged.
+// ============================================================================
+
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,39 +81,44 @@ describe('GAME DAY LANDS ON THE FORMAT WIDGETS', () => {
             'no literal opening step may remain — it would drift from the workflow');
     });
 
-    test('the first step of every workflow is Format', () => {
+    test('the first step of every workflow is Course', () => {
         WIDGET_FORMATS.forEach((f) => {
-            assert.equal(flow(wizard('stroke'), f)[0], 'format', f);
+            assert.equal(flow(wizard('stroke'), f)[0], 'course', f);
         });
     });
 
-    test('and wizardFirstStep resolves to the format screen', () => {
+    test('and wizardFirstStep resolves to it', () => {
         WIDGET_FORMATS.forEach((f) => {
-            assert.equal(run(wizard(f), 'wizardFirstStep()'), STEP.format, f);
+            assert.equal(run(wizard(f), 'wizardFirstStep()'), STEP.course, f);
         });
     });
 
-    test('Course is NOT the first screen', () => {
+    test('the gallery is GAMES, and the screens that were folded away stay away', () => {
+        // RE-POINTED 2026-10-05 (the same day, after Manny asked for Games and
+        // Money apart again): the gallery IS a screen once more - Games - and it
+        // carries the settings panel and Also Playing with it. What must stay
+        // folded away is Round Length (now on Course) and Format Settings (now
+        // part of Games), and a format must never arrive on the gallery FIRST:
+        // the entry card already chose the format, which is this file's subject.
         WIDGET_FORMATS.forEach((f) => {
             const w = flow(wizard('stroke'), f);
-            assert.notEqual(w[0], 'course', f);
-            assert.ok(w.indexOf('course') > w.indexOf('format'), f + ': course follows format');
+            assert.equal(w[0], 'course', f + ': the wizard no longer opens on Course');
+            // The Cup is the one format that skips Games: the entry card chose it
+            // and there is nothing else to pick.
+            if (f !== 'ryder-cup') assert.ok(w.includes('format'), f + ': Games is not a screen at all');
+            assert.ok(!w.includes('length'), f + ': Round Length is a screen of its own again');
+            assert.ok(!w.includes('settings'), f + ': Format Settings is a screen of its own again');
         });
     });
 
-    test('Round Length is NOT the first screen', () => {
+    test('and the round length lives with the course, which is the step before Players', () => {
         WIDGET_FORMATS.forEach((f) => {
             const w = flow(wizard('stroke'), f);
-            assert.notEqual(w[0], 'length', f);
-            assert.ok(w.indexOf('length') > w.indexOf('format'), f + ': length follows format');
+            assert.equal(w[0], 'course', f);
+            assert.equal(w[1], 'players', f);
         });
-    });
-
-    test('Course and Round Length keep their order relative to each other', () => {
-        WIDGET_FORMATS.forEach((f) => {
-            const w = flow(wizard('stroke'), f);
-            assert.ok(w.indexOf('length') === w.indexOf('course') + 1, f);
-        });
+        // The fields themselves are on that screen - the panel was moved, not rebuilt.
+        assert.match(ADMIN, /moveInto\('wizard-step-2', 'wizard-step-1', false\);/);
     });
 });
 
@@ -132,34 +161,36 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
     test('tapping a widget both selects and advances', () => {
         const sb = wizard('stroke');
         run(sb, 'goToWizardStep(wizardFirstStep());');
-        assert.equal(run(sb, 'currentWizardStep'), STEP.format);
+        // RE-POINTED 2026-10-05: the tap SELECTS and stays, because the settings it
+        // reveals are directly below the gallery on the same screen. Navigating away
+        // from them is what the merge removed.
+        run(sb, 'goToWizardStep(wizardStepNumber("action"));');
         run(sb, "selectFormatCard('scramble');");
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'scramble');
-        assert.notEqual(run(sb, 'currentWizardStep'), STEP.format,
-            'the golfer must not still be sitting on the gallery');
-        assert.equal(run(sb, 'currentWizardStep'), STEP.course);
+        assert.equal(run(sb, 'currentWizardStep'), STEP.action,
+            'the tap navigated away from the settings it just revealed');
     });
 
     test('tapping Stroke Play enters the Stroke Play workflow', () => {
         const sb = wizard('bestball');
         run(sb, "selectFormatCard('stroke');");
-        assert.deepEqual(flow(sb), ['format', 'course', 'length', 'players', 'action', 'review']);
+        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'stroke');
     });
 
     test('tapping Best Ball enters the Best Ball workflow', () => {
         const sb = wizard('stroke');
         run(sb, "selectFormatCard('bestball');");
-        assert.deepEqual(flow(sb),
-            ['format', 'course', 'length', 'settings', 'players', 'action', 'review']);
+        // Its settings are on Games with the gallery, not a screen of their own.
+        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
     });
 
     test('tapping Ryder Cup enters the NEW Ryder workflow', () => {
         const sb = wizard('stroke');
         run(sb, "selectFormatCard('ryder-cup');");
-        assert.deepEqual(flow(sb), ['format', 'course', 'length', 'players', 'review']);
+        assert.deepEqual(flow(sb), ['course', 'players', 'review']);
         assert.ok(!flow(sb).includes('settings'));
-        assert.ok(!flow(sb).includes('action'));
+        assert.ok(!flow(sb).includes('action'), 'a Cup must never be asked for money');
     });
 
     test('the Ryder Cup widget never maps to the legacy money format', () => {
@@ -177,53 +208,74 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
         assert.equal(run(sb, "normalizeGameFormatForSave('ryder')"), 'ryder');
     });
 
-    test('re-tapping the format already chosen still advances', () => {
-        // Otherwise the one widget already showing as selected is the only one that
-        // does nothing, which reads as a broken button.
+    test('re-tapping the format already chosen is not a broken button', () => {
+        // RE-POINTED 2026-10-05: nothing advances now, so what must be true is that
+        // the tap still RE-RENDERS the panels underneath - the same thing it does
+        // for any other card - rather than being a no-op on the one already chosen.
         const sb = wizard('stroke');
-        run(sb, 'goToWizardStep(wizardFirstStep());');
+        run(sb, 'goToWizardStep(wizardStepNumber("action"));');
+        run(sb, "window.__fc = 0; handleFormatChange = function () { window.__fc++; };");
         run(sb, "selectFormatCard('stroke');");
-        assert.equal(run(sb, 'currentWizardStep'), STEP.course);
+        assert.equal(run(sb, 'window.__fc'), 1, 'the already-chosen widget did nothing at all');
+        assert.equal(run(sb, 'currentWizardStep'), STEP.action);
     });
 
-    test('no extra Next tap sits between the widget and the next step', () => {
+    test('no confirming tap sits between the widget and its settings', () => {
         const fn = ADMIN.slice(ADMIN.indexOf('function selectFormatCard('));
         const body = fn.slice(0, fn.indexOf('\n    }'));
-        assert.match(body, /goToWizardStep\(wizardNeighbourStep\(WIZARD_STEP_OF\.format, 1\)\)/);
-        assert.ok(!/confirm|Next/i.test(body), 'the widget must not defer to a confirm step');
+        // The tap IS the selection: it sets the value and rebuilds the panels, and
+        // the only navigation left is the strand-guard for a format whose workflow
+        // does not contain the step the organizer is standing on (the Cup).
+        assert.match(body, /sel\.value = fmt;/);
+        assert.match(body, /handleFormatChange\(\);/);
+        assert.match(body, /if \(!wizardStepNumbers\(\)\.includes\(currentWizardStep\)\)/,
+            'a format that drops this screen could strand the organizer on it');
+        assert.ok(!/confirm/i.test(body), 'the widget must not defer to a confirm step');
     });
 });
 
 // ============================================================================
 describe('BACK RETURNS TO THE GALLERY WITH THE SELECTION INTACT', () => {
 
-    test('Back from Course returns to the format widgets', () => {
-        ['stroke', 'bestball', 'ryder-cup'].forEach((f) => {
+    test('Back from Money returns to Games, then Players, then Course', () => {
+        // RE-POINTED 2026-10-05: there is nothing before Course now, so Back from
+        // it cannot go anywhere - and the whole walk back is asserted rather than
+        // one hop, because that is what an organizer correcting a stake does.
+        ['stroke', 'bestball'].forEach((f) => {
             const sb = wizard(f);
-            run(sb, 'goToWizardStep(' + STEP.course + '); wizardBack(' + STEP.course + ');');
+            run(sb, 'goToWizardStep(' + STEP.action + '); wizardBack(' + STEP.action + ');');
             assert.equal(run(sb, 'currentWizardStep'), STEP.format, f);
+            run(sb, 'wizardBack(' + STEP.format + ');');
+            assert.equal(run(sb, 'currentWizardStep'), STEP.players, f);
+            run(sb, 'wizardBack(' + STEP.players + ');');
+            assert.equal(run(sb, 'currentWizardStep'), STEP.course, f);
         });
     });
 
     test('and the widget that was chosen is still the one marked selected', () => {
         const sb = wizard('stroke');
-        run(sb, "selectFormatCard('wolf'); wizardBack(" + STEP.course + ");");
-        assert.equal(run(sb, 'currentWizardStep'), STEP.format);
+        run(sb, 'goToWizardStep(wizardStepNumber("action"));');
+        run(sb, "selectFormatCard('wolf');");
         assert.equal(run(sb, "document.getElementById('fmt-card-wolf').getAttribute('aria-checked')"), 'true');
         assert.equal(run(sb, "document.getElementById('fmt-card-stroke').getAttribute('aria-checked')"), 'false');
     });
 
-    test('the format step offers no Back, because nothing precedes it', () => {
+    test('the FIRST step offers no Back, because nothing precedes it', () => {
+        // RE-POINTED 2026-10-05: the first screen is Course. The claim is the one it
+        // always was - the first screen of a workflow never offers a way back to
+        // nowhere - read off whichever screen that is.
         const sb = wizard('stroke');
         run(sb, 'goToWizardStep(wizardFirstStep());');
-        assert.equal(run(sb, "document.getElementById('wizard-back-3').style.display"), 'none');
+        const first = run(sb, 'wizardFirstStep()');
+        assert.equal(first, STEP.course);
+        assert.equal(run(sb, "document.getElementById('wizard-back-" + 1 + "').style.display"), 'none');
     });
 
-    test('Course does offer Back, now that something precedes it', () => {
-        assert.match(ADMIN, /id="wizard-back-1"/);
+    test('Players does offer Back, now that something precedes it', () => {
+        assert.match(ADMIN, /id="wizard-back-5"/);
         const sb = wizard('stroke');
-        run(sb, 'goToWizardStep(' + STEP.course + ');');
-        assert.notEqual(run(sb, "document.getElementById('wizard-back-1').style.display"), 'none');
+        run(sb, 'goToWizardStep(' + STEP.players + ');');
+        assert.notEqual(run(sb, "document.getElementById('wizard-back-5').style.display"), 'none');
     });
 
     test('every step in a workflow except the first can go back', () => {
@@ -255,13 +307,17 @@ describe('THE REORDER MOVED NO MARKUP', () => {
     });
 
     test('the progress dots still count the workflow, not the DOM', () => {
-        [['ryder-cup', 5], ['stroke', 6], ['bestball', 7]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05: four screens and a save; a Cup skips Games and
+        // Money both, because its format comes from the entry card.
+            [['ryder-cup', 3], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");
             assert.equal((html.match(/wizard-dot/g) || []).length, n, f);
-            // Dot 1 must jump to the format screen, whatever its DOM id.
-            assert.match(html, /goToWizardStep\(3\)[^>]*>1</, f + ': dot 1 is the format step');
+            // RE-POINTED 2026-10-05: dot 1 jumps to the FIRST screen of the
+            // workflow, whatever its DOM id - which is Course now, as the two
+            // tests at the top of this file assert from the other side.
+            assert.match(html, /goToWizardStep\(1\)[^>]*>1</, f + ': dot 1 is not the first step');
         });
     });
 
@@ -270,6 +326,6 @@ describe('THE REORDER MOVED NO MARKUP', () => {
     });
 
     test('Round Length keeps the Par\/HCP grid gate', () => {
-        assert.match(ADMIN, /if \(fromStep === 2\) \{[\s\S]{0,300}?validateCourseGrid\(\)/);
+        assert.match(ADMIN, /if \(fromStep === 1\) \{[\s\S]{0,600}?validateCourseGrid\(\)/);
     });
 });

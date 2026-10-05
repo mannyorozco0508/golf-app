@@ -140,10 +140,16 @@ function walkWizard(sb, upToStep) {
     const row = sb.document.getElementById('course-dropdown').children.find(c => /Caledonia/.test(c.textContent));
     assert.ok(row, 'the course dropdown offered no Caledonia row');
     row.onclick();
-    while (step(sb) < upToStep) {
+    // FOLLOW THE NEXT BUTTONS, NOT THE NUMBERS (re-pointed 2026-10-05). The
+    // workflow is Course(1), Players(5), Games(3), Money(6), Review(7), so an
+    // organizer walking forward goes 1 -> 5 -> 3, which is BACKWARDS numerically.
+    // A loop that waits for the number to rise never leaves Players.
+    let guard = 0;
+    while (step(sb) !== upToStep) {
         const n = step(sb);
         tap(sb, ADMIN, new RegExp('onclick="(wizardNext\\(' + n + '\\))"'));
-        assert.ok(step(sb) > n, 'Next did not advance from step ' + n);
+        assert.ok(step(sb) !== n, 'Next did not advance from step ' + n);
+        assert.ok(guard++ < 10, 'the walk never reached step ' + upToStep);
     }
 }
 
@@ -447,10 +453,11 @@ describe('admin.html', () => {
         walkWizard(sb, 5);
         assert.equal(step(sb), 5);
         assert.equal(press(sb), 'wizard-step');
-        assert.equal(step(sb), 2, 'stroke play has no Format Settings, so back from Players is Round Length');
-        assert.equal(press(sb), 'wizard-step');
-        assert.equal(step(sb), 1);
-        assert.equal(press(sb), 'wizard-step');
+        // RE-POINTED 2026-10-05: three steps and a save. The round length is ON the
+        // Course screen now, so there is exactly one screen before Players and Back
+        // from it goes there for every format.
+        assert.equal(step(sb), 1, 'stroke play has no Format Settings, so back from Players is Course');
+        // Course IS the first step now, so the next press is the one that stops.
         assert.equal(step(sb), firstStep(sb));
         assert.equal(press(sb), 'none', 'the first step stepped back');
     });
