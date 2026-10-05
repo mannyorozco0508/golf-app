@@ -1419,7 +1419,7 @@ html {
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-1" onclick="wizardBack(1)">◀ Back</button>
-            <button class="wizard-btn-next" id="wizard-next-1" style="flex:1;" onclick="wizardNext(1)">Next: Round Length ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-1" style="flex:1;" onclick="wizardNext(1)">Next: Players ▶</button>
         </div>
     </div>
 
@@ -1706,12 +1706,17 @@ html {
     </div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-3" onclick="wizardBack(3)">◀ Back</button>
-            <button class="wizard-btn-next" id="wizard-next-3" onclick="wizardNext(3)">Next: Format Settings ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-3" onclick="wizardNext(3)">Next: Course ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-4" data-step="4">
         <div class="wizard-step-title">⚙️ Format Settings · <span class="wiz-step-n" id="wiz-n-settings">Step 4</span></div>
+        <!-- MOVED WITH THE PANELS, and first, so it lands at the top of Money above
+             them. Its text is the chosen format's own card name - one source for
+             the names - and it is hidden outright when that format has no panel.
+             See syncFormatSettingsHead(). -->
+        <div class="wizard-section-head" id="format-settings-head" style="display:none;"></div>
         <!-- Shown only when a genuinely old round is loaded. Every legacy field stays
              editable below it; this states what the screen is, nothing more. -->
         <div id="legacy-round-notice" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.78rem; color:var(--text-main); line-height:1.45;"></div>
@@ -2039,7 +2044,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-5" onclick="wizardBack(5)">◀ Back</button>
-            <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Side Games ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Money ▶</button>
         </div>
     </div>
 
@@ -2475,7 +2480,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // their entries because the DOM panels still exist and are still addressed by
     // number - they are simply no longer screens the workflow visits.
     const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Games', settings: 'Settings', players: 'Players', action: 'Money', review: 'Review' };
-    const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games & Money', review: 'Review' };
+    // WHAT A NEXT BUTTON PRINTS. These are STEP NAMES, so they must read the way the
+    // progress dots read - "Next: Games & Money" survived two reshuffles of the thing
+    // it was naming before Manny caught it on the phone.
+    const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Games', settings: 'Format Settings', players: 'Players', action: 'Money', review: 'Review' };
     // DOM step ids only. NEVER the length of a workflow.
     const WIZARD_TOTAL_STEPS = 7;
 
@@ -2526,25 +2534,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // does that by moving the existing blocks, so saveSettings() reads exactly the
     // same inputs in exactly the same order and a round saves byte-identical data.
     //
+    //   Games    the format gallery, and a tap on a card moves on
     //   Course   the course, the round length, the start hole, handicaps
-    //   Players  the roster, the paste, My Groups, flights
-    //   Games    the format gallery and that format's own settings
-    //   Money    every priced thing: Also Playing, Extras, the stakes, the pot
+    //   Players  the roster, the paste, My Groups, flights - and the Team column
+    //            for the formats that need one, which is right the first time now
+    //            that the format was chosen two screens earlier
+    //   Money    that format's own settings at the top, then every priced thing:
+    //            Also Playing, Extras, the stakes, the pot
     //   Review   a last look, and Save
     //
     // THE CUP IS STILL ITS OWN SHAPE. It carries no wizard money and picks its
     // format from the entry card, so it skips both Games and Money; side action is
     // added from Matches afterwards, exactly as before.
-    // GAMES AND MONEY ARE TWO DECISIONS (2026-10-05). They were one screen for a
-    // week and Manny asked for them back apart: what you are playing is a choice
-    // about the round, what it is worth is a choice about the wallet, and the
-    // second one is the one an organizer wants to look at on its own. Same fields,
-    // same ids, same save - this list is the only thing that says how many screens
-    // they are spread across.
+    // GAMES FIRST, AND FIRST MEANS FIRST (2026-10-05, Manny's order). Game Day ->
+    // Games -> Course -> Players -> Money -> Review. On the first tee a group
+    // already knows they are playing a scramble; being asked which course before
+    // being asked what game reads as a filing exercise, and it made the wizard
+    // decide its own shape three screens in. It also fixes a real ordering fault:
+    // the Players step grows a Team column for the formats that need one, and with
+    // the format chosen two screens EARLIER that column is right the first time an
+    // organizer sees the roster, instead of appearing behind them.
+    //
+    // THE CUP SKIPS MONEY and nothing else. It is a format card like any other, so
+    // it is chosen on Games; it carries no wizard money, and its own setup happens
+    // on the Matches page once the roster is frozen.
+    //
+    // Same fields, same ids, same save - this list is the only thing that says what
+    // order the screens are visited in.
     function wizardWorkflow(fmt) {
         const format = (fmt === undefined) ? currentPrimaryFormat() : fmt;
-        if (format === RYDER_CUP_FORMAT) return ['course', 'players', 'review'];
-        return ['course', 'players', 'format', 'action', 'review'];
+        if (format === RYDER_CUP_FORMAT) return ['format', 'course', 'players', 'review'];
+        return ['format', 'course', 'players', 'action', 'review'];
     }
 
     // THE BLOCKS ARE MOVED, NOT REBUILT - the same technique the scorecard's Status
@@ -2579,15 +2599,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         };
         // Round Length, the Par/HCP grid and the start hole join Course, after it.
         moveInto('wizard-step-2', 'wizard-step-1', false);
-        // GAMES IS THE GALLERY AND NOTHING ELSE (2026-10-05, second pass). Its own
-        // settings panel joins it underneath - you pick the game, then you set its
-        // options - and that is the whole screen. Also Playing and Extras went to
-        // Games for about an hour and came straight back: skins, dots, 9 Points,
-        // Stableford, the Birdie Game and Aloha are all PRICED, so they are money,
-        // and the organizer who is deciding what the round costs wants them beside
-        // the stakes and the pot rather than two screens away. Nothing is moved out
-        // of step 6 at all now, which is why there is no second mover.
-        moveInto('wizard-step-4', 'wizard-step-3', false);
+        // GAMES IS THE GALLERY AND NOTHING ELSE (2026-10-05, third pass). A tap on a
+        // card now answers the question and moves on, so there is nothing for the
+        // organizer to stay on that screen FOR - and that format's own settings
+        // (Nassau stakes and presses, Wolf, Best Ball teams) are things the round
+        // COSTS, which is the Money step's question. They go to the TOP of it,
+        // above the side games and the pot, under a heading that names the format.
+        // Formats with no panel show nothing extra: syncFormatSettingsHead hides
+        // the heading when every panel under it is display:none.
+        moveInto('wizard-step-4', 'wizard-step-6', true);
         return moved;
     }
 
@@ -2680,6 +2700,42 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             card.classList.toggle('selected', on);
             card.setAttribute('aria-checked', on ? 'true' : 'false');
         });
+        syncFormatSettingsHead();
+    }
+
+    // "<FORMAT> SETTINGS", at the top of Money, or nothing at all.
+    //
+    // THE NAME COMES OFF THE CARD the organizer tapped, so there is no second list
+    // of format names to drift from the first. THE VISIBILITY COMES OFF THE PANELS
+    // THEMSELVES rather than from a list of which formats have one: handleFormatChange
+    // sets each panel's display explicitly, so asking them is asking the thing that
+    // decides, and a format whose panel is suppressed for another reason (a
+    // multi-group round hides the match stakes) correctly shows no heading either.
+    const FORMAT_SETTING_PANELS = ['hole-bet-settings', 'nassau-settings', 'wolf-settings',
+        'stableford-settings', 'match-settings', 'dot-settings', 'skins-settings'];
+    function syncFormatSettingsHead() {
+        const head = document.getElementById('format-settings-head');
+        if (!head) return;
+        const shown = FORMAT_SETTING_PANELS.some(function (id) {
+            const el = document.getElementById(id);
+            return !!(el && el.style && el.style.display && el.style.display !== 'none');
+        });
+        if (!shown) { head.style.display = 'none'; return; }
+        const fmt = currentPrimaryFormat();
+        const card = document.getElementById('fmt-card-' + fmt);
+        const nameEl = (card && card.querySelector) ? card.querySelector('.fmt-name') : null;
+        // A LEGACY FORMAT HAS NO CARD - 'nassau', 'match', 'skins' and 'dots' are
+        // reachable only by reopening an old round, and the gallery deliberately
+        // does not offer them. Their names are in the hidden select, which is the
+        // other half of the one format model.
+        let name = nameEl && String(nameEl.textContent || '').trim();
+        if (!name) {
+            const sel = document.getElementById('game-format-select');
+            const opt = sel && sel.options ? sel.options[sel.selectedIndex] : null;
+            name = (opt && String(opt.textContent || '').split('(')[0].trim()) || 'Format';
+        }
+        head.textContent = name + ' settings';
+        head.style.display = 'block';
     }
 
     // The cards write to the hidden <select> and then call the SAME handler the
@@ -2691,6 +2747,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     //
     // Re-tapping the format the round is already on advances too, so the widget
     // always does the same thing.
+    //
+    // AND IT ADVANCES AGAIN (2026-10-05). It did until Games and Money were merged,
+    // when a tap had somewhere to stay; Games is the FIRST screen now and a tap goes
+    // straight to Course. BACK FROM COURSE RETURNS HERE WITH THE CARD STILL
+    // SELECTED, which costs nothing to keep: the selection lives in the hidden
+    // <select>, and goToWizardStep calls syncFormatCards on arrival.
     function selectFormatCard(fmt) {
         const sel = document.getElementById('game-format-select');
         if (!sel) return;
@@ -2698,17 +2760,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (prev !== fmt) clearFormatCarryover(prev, fmt);
         sel.value = fmt;
         handleFormatChange();
-        // TAPPING A CARD NO LONGER NAVIGATES (2026-10-05). The gallery used to be a
-        // screen of its own, so a tap had to advance or the organizer was left
-        // looking at what they had just chosen. It is now the TOP of Games & Money,
-        // with that format's settings and its money directly below it - so the tap
-        // reveals them in place, which is the whole reason the three screens were
-        // merged. handleFormatChange() has already rebuilt the panels underneath.
-        //
-        // THE CUP IS THE ONE EXCEPTION, because it has no money screen to stay on:
-        // its workflow is Course, Players, Review, and leaving the organizer on a
-        // step the Cup does not have is the strand this file's own guard refuses.
-        if (!wizardStepNumbers().includes(currentWizardStep)) {
+        // ON TO COURSE - the next step of whatever workflow this format just chose,
+        // never the literal step 1, because the Cup's workflow is its own and a
+        // format with no money screen must not be sent to one. Only from the gallery
+        // itself: selectFormatCard is also how a restored round sets its card, and
+        // that must not march the organizer off the screen they are standing on.
+        if (currentWizardStep === WIZARD_STEP_OF.format) {
+            goToWizardStep(wizardNeighbourStep(WIZARD_STEP_OF.format, 1));
+        } else if (!wizardStepNumbers().includes(currentWizardStep)) {
             goToWizardStep(wizardResolveStep(currentWizardStep));
         }
     }

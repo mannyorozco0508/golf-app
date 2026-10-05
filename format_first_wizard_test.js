@@ -161,9 +161,12 @@ describe('THE NEW RYDER CUP IS NOT THE LEGACY MONEY GAME', () => {
 // ============================================================================
 describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
 
-    test('the Cup workflow is Format, Players, Review — nothing else', () => {
+    test('the Cup workflow is Games, Course, Players, Review — nothing else', () => {
+        // RE-POINTED 2026-10-05 to Manny's order. The Cup is a card on the gallery
+        // like any other, so it is CHOSEN on Games; what it skips is Money, and that
+        // is the whole of its difference.
         assert.deepEqual(JSON.parse(run(wizard('stroke'), "JSON.stringify(wizardWorkflow('ryder-cup'))")),
-            ['course', 'players', 'review']);
+            ['format', 'course', 'players', 'review']);
     });
 
     test('the Cup never reaches Format Settings', () => {
@@ -196,17 +199,17 @@ describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
         });
     });
 
-    test('every non-Cup workflow still ends Players, Games, Money, Review', () => {
+    test('every non-Cup workflow is Games, Course, Players, Money, Review', () => {
         ['stroke', 'stableford', 'nassau-modern', 'bestball', 'scramble', 'hilo', 'wolf', 'ryder']
             .forEach((f) => {
-                assert.deepEqual(flow(wizard(f)).slice(-4), ['players', 'format', 'action', 'review'], f);
+                assert.deepEqual(flow(wizard(f)), ['format', 'course', 'players', 'action', 'review'], f);
             });
     });
 
     test('the progress dots show the workflow, not seven circles', () => {
-        // RE-PINNED 2026-10-05: four screens and a save, and a Cup skips both
-        // Games (its format comes from the entry card) and Money.
-        [['ryder-cup', 3], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05 (Manny's order): five screens, and the Cup skips
+        // only Money.
+        [['ryder-cup', 4], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");
@@ -253,13 +256,13 @@ describe('NO FORMAT SEES CONTROLS THAT ARE NOT ITS OWN', () => {
 // ============================================================================
 describe('BACK AND NEXT WALK THE WORKFLOW', () => {
 
-    test('the wizard opens on Course, whatever the format', () => {
-        // RE-POINTED 2026-10-05: Format is no longer a screen of its own - the
-        // gallery is on Games & Money, above the money, because you pick the game
-        // before you price it. So the first screen is Course for every format, which
-        // is what this test was really protecting: nobody starts on a dead end.
+    test('the wizard opens on GAMES, whatever the format', () => {
+        // RE-POINTED 2026-10-05 to Manny's order: Game Day -> Games -> Course ->
+        // Players -> Money -> Review. What this test was really protecting is
+        // unchanged - nobody starts on a dead end - and the screen it names has now
+        // been the gallery, then Course, then the gallery again.
         ['bestball', 'stroke', 'ryder-cup'].forEach((f) => {
-            assert.equal(run(wizard(f), 'wizardFirstStep()'), 1, f);
+            assert.equal(run(wizard(f), 'wizardFirstStep()'), 3, f);
         });
     });
 
@@ -273,11 +276,14 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
         });
     });
 
-    test('Next from Players skips Games and Money for a Cup only', () => {
+    test('Next from Players skips MONEY for a Cup only', () => {
         assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(5, 1)'), 7);
-        // Everyone else meets Games (step 3) first, and Money (step 6) after it.
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, 1)'), 3);
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(3, 1)'), 6);
+        // Everyone else meets Money (step 6) after Players, then Review.
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, 1)'), 6);
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(6, 1)'), 7);
+        // And Games (step 3) is what Course comes after, for both.
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(3, 1)'), 1);
+        assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(3, 1)'), 1);
     });
 
     test('a step the new format does not have can never be landed on', () => {
@@ -363,7 +369,7 @@ describe('NOTHING LEAKS ACROSS A FORMAT SWITCH', () => {
         assert.ok(!ADMIN.includes('/ryderCup'), 'no Cup is ever written from the wizard');
         const sb = wizard('ryder-cup');
         run(sb, "selectFormatCard('stroke');");
-        assert.deepEqual(flow(sb).slice(-4), ['players', 'format', 'action', 'review']);
+        assert.deepEqual(flow(sb), ['format', 'course', 'players', 'action', 'review']);
     });
 
     test('the selected card follows the format', () => {

@@ -453,12 +453,14 @@ describe('admin.html', () => {
         walkWizard(sb, 5);
         assert.equal(step(sb), 5);
         assert.equal(press(sb), 'wizard-step');
-        // RE-POINTED 2026-10-05: three steps and a save. The round length is ON the
-        // Course screen now, so there is exactly one screen before Players and Back
-        // from it goes there for every format.
+        // RE-POINTED 2026-10-05 to Manny's order: Games, Course, Players, Money,
+        // Review. The round length is ON the Course screen, so Back from Players is
+        // Course for every format - and Back from Course is GAMES, which is the hop
+        // Manny asked for by name and the one that must land on a gallery with the
+        // card still selected.
         assert.equal(step(sb), 1, 'stroke play has no Format Settings, so back from Players is Course');
-        // Course IS the first step now, so the next press is the one that stops.
-        assert.equal(step(sb), firstStep(sb));
+        assert.equal(press(sb), 'wizard-step');
+        assert.equal(step(sb), firstStep(sb), 'back from Course did not reach Games');
         assert.equal(press(sb), 'none', 'the first step stepped back');
     });
 

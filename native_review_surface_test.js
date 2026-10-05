@@ -437,6 +437,16 @@ const SAVE_DRIVER = `
     (function () {
       window.__trace = [];
       var step = 0, tries = 0;
+      function nextOfActive() {
+        var active = document.querySelector('.wizard-step.active');
+        if (!active) return false;
+        var btn = document.getElementById('wizard-next-' + active.id.replace('wizard-step-', ''));
+        if (btn && btn.offsetParent !== null && !btn.disabled) {
+          btn.click(); window.__trace.push('clicked ' + btn.id + ' (on ' + active.id + ')');
+          return true;
+        }
+        return false;
+      }
       var iv = setInterval(function () {
         if (++tries > 300) { window.__trace.push('TIMEOUT at phase ' + step); clearInterval(iv); return; }
         try {
@@ -444,8 +454,11 @@ const SAVE_DRIVER = `
             var box = document.getElementById('enable-custom-course');
             if (!box || (box.offsetParent === null &&
                 (!box.getClientRects || box.getClientRects().length === 0))) {
-              var n1 = document.getElementById('wizard-next-1');
-              if (n1 && !n1.disabled) { n1.click(); }
+              // RE-POINTED 2026-10-05: the wizard opens on GAMES now, not on
+              // Course, so wizard-next-1 is not on screen to be pressed and this
+              // phase span forever. Press whichever step is ACTIVE - the walk
+              // follows the workflow instead of a step number typed here.
+              nextOfActive();
               return;
             }
             if (!box.checked) {
@@ -469,10 +482,9 @@ const SAVE_DRIVER = `
             step = 2; return;
           }
           if (step >= 2 && step <= 7) {
-            var btn = document.getElementById('wizard-next-' + step);
-            if (btn && btn.offsetParent !== null && !btn.disabled) {
-              btn.click(); window.__trace.push('clicked wizard-next-' + step);
-            }
+            // The same change: the Next that matters is the active screen's, and
+            // the workflow decides which that is.
+            nextOfActive();
             step++; return;
           }
           if (step === 8) {

@@ -88,6 +88,7 @@ const WHERE = `(function(){
       alsoPlayingHead: where('also-playing-head'), alsoPlaying: where('stacked-games-box'),
       stackedList: where('stacked-games-list'), skinsInstances: where('skins-instances-list'),
       extras: where('sidegames-settings'), birdie: where('birdie-unit-val-admin'),
+      settingsHead: where('format-settings-head'),
       aloha: where('aloha-blurb'), pot: where('mp-enabled'),
       nassauStakes: where('setup-nassau-box'),
       length: where('round-length-select'), teeStart: where('tee-start-select')
@@ -117,25 +118,35 @@ const run = (sb, e) => vm.runInContext(e, sb);
 
 describe('1. THE WIZARD IS FOUR SCREENS AND A SAVE', () => {
 
-    test('the workflow is Course, Players, Games, Money, Review', () => {
+    test('the workflow is Games, Course, Players, Money, Review', () => {
+        // RE-POINTED 2026-10-05 to Manny's order: Game Day -> Games -> Course ->
+        // Players -> Money -> Review. Games is first because that is the decision a
+        // group has already made on the first tee - and because the Players screen
+        // grows a Team column for the formats that need one, which is only right if
+        // the format was chosen before the roster.
         const sb = loadHtmlInlineScript('admin.html', [], { search: '?fresh=1' });
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('stroke'))")),
-            ['course', 'players', 'format', 'action', 'review']);
-        // A format WITH settings still does not get a screen of its own - the
-        // panel is on Games, under the gallery that chose it.
+            ['format', 'course', 'players', 'action', 'review']);
+        // A format WITH settings still does not get a screen of its own - the panel
+        // is at the TOP of Money, under a heading that names the format.
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('bestball'))")),
-            ['course', 'players', 'format', 'action', 'review']);
-        // And the Cup still never meets the money. It picks its format from the
-        // entry card, so it skips Games too.
+            ['format', 'course', 'players', 'action', 'review']);
+        // And the Cup skips Money, and only Money: it is a card on the gallery.
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('ryder-cup'))")),
-            ['course', 'players', 'review']);
+            ['format', 'course', 'players', 'review']);
     });
 
-    test('the dots a golfer counts read Course, Players, Games, Money, Review', () => {
+    test('the dots a golfer counts read Games, Course, Players, Money, Review', () => {
         const sb = loadHtmlInlineScript('admin.html', [], { search: '?fresh=1' });
         const labels = JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('stroke')"
             + ".map(function(s){ return WIZARD_STEP_LABELS[s]; }))"));
-        assert.deepEqual(labels, ['Course', 'Players', 'Games', 'Money', 'Review']);
+        assert.deepEqual(labels, ['Games', 'Course', 'Players', 'Money', 'Review']);
+        // AND EVERY NEXT NAMES THE STEP IT LEADS TO. "Next: Games & Money" outlived
+        // two reshuffles of the thing it named before Manny caught it on the phone,
+        // so the labels are held against the same list the dots read.
+        const next = JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('stroke')"
+            + ".map(function(s){ return WIZARD_NEXT_LABELS[s]; }))"));
+        assert.deepEqual(next, ['Games', 'Course', 'Players', 'Money', 'Review']);
     });
 
     test('the blocks are MOVED, so every field keeps its id', () => {
@@ -195,18 +206,18 @@ describe('1b. AND ON THE PAGE AN ORGANIZER OPENS, THE BLOCKS ARE WHERE THEY SAY'
 
     test('ran', () => assert.ok(W.ok, W.reason));
 
-    test('GAMES IS THE GALLERY AND THAT FORMAT\'S OWN SETTINGS, AND NOTHING ELSE', () => {
+    test('GAMES IS THE GALLERY AND NOTHING ELSE', () => {
         // Manny, after an hour with Also Playing on this screen: put it back. The
-        // line is PRICE, not category - a game you pay for belongs with the money -
-        // so Games asks one question and the screen after it asks what it costs.
+        // line is PRICE, not category - a game you pay for belongs with the money.
+        // RE-POINTED AGAIN 2026-10-05: the per-format panels went the same way and
+        // for the same reason. A Nassau's stakes and presses, a Wolf's multipliers
+        // and a Best Ball's teams are all things the round COSTS, so they sit at
+        // the TOP of Money under a heading naming the format. Games is one question.
         assert.equal(W.at.gallery, 'wizard-step-3', 'the gallery is not on Games');
         assert.equal(W.at.cards, 'wizard-step-3', 'the format cards are not on Games');
-        // The per-format panels, which are what Step 4 was: each one is hidden
-        // unless that format is the round's format (syncFormatCards toggles them on
-        // `format === ...`), so they are settings for the choice made right above
-        // them rather than a game anyone is being sold.
-        assert.equal(W.at.matchSettings, 'wizard-step-3');
-        assert.equal(W.at.stablefordSettings, 'wizard-step-3');
+        assert.equal(W.at.matchSettings, 'wizard-step-6', 'the format settings are not on Money');
+        assert.equal(W.at.stablefordSettings, 'wizard-step-6');
+        assert.equal(W.at.settingsHead, 'wizard-step-6', 'the format-settings heading is not on Money');
     });
 
     test('EVERY PRICED THING IS ON MONEY, and none of it is on Games', () => {
@@ -251,9 +262,9 @@ describe('1b. AND ON THE PAGE AN ORGANIZER OPENS, THE BLOCKS ARE WHERE THEY SAY'
     });
 
     test('and the progress dots say so, in order, 1 to 5', () => {
-        assert.deepEqual(W.dots, ['Course:1', 'Players:2', 'Games:3', 'Money:4', 'Review:5']);
-        // The organizer opens on Course, as they always did.
-        assert.equal(W.activeStep, 'wizard-step-1');
+        assert.deepEqual(W.dots, ['Games:1', 'Course:2', 'Players:3', 'Money:4', 'Review:5']);
+        // The organizer opens on GAMES (2026-10-05, Manny's order).
+        assert.equal(W.activeStep, 'wizard-step-3');
     });
 });
 

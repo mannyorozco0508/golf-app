@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v138-tapkeypad. The tournament product cache
+// The consumer product cache is consumer-v139-gamesfirst. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4219,7 +4219,15 @@
 // untouched: the box-to-box advance within a hole and the mid-entry restore both
 // move focus the golfer already has. A device on v297 gets the keypad on every
 // hole change, over the panel.
-const CACHE_VERSION = 'golfapp-v298-tapkeypad';
+// Moved to v299: GAME DAY -> GAMES -> COURSE -> PLAYERS -> MONEY -> REVIEW. The
+// format gallery is the first screen again and a tap on a card goes straight to
+// Course; Back on Course returns to it with the card still selected. That
+// format's own settings - Nassau stakes and presses, Wolf, Best Ball - moved to
+// the TOP of Money under a heading naming the format, and a format with no panel
+// shows nothing extra. The Cup skips Money and only Money. A device on v298 asks
+// for the course first, which is also why its Team column on Players appeared
+// behind the organizer rather than in front of them.
+const CACHE_VERSION = 'golfapp-v299-gamesfirst';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

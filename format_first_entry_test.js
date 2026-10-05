@@ -81,31 +81,32 @@ describe('GAME DAY LANDS ON THE FORMAT WIDGETS', () => {
             'no literal opening step may remain — it would drift from the workflow');
     });
 
-    test('the first step of every workflow is Course', () => {
+    test('FORMAT FIRST AGAIN: the first step of every workflow is Games', () => {
+        // RE-POINTED 2026-10-05 to Manny's order: Game Day -> Games -> Course ->
+        // Players -> Money -> Review. This file's whole subject - the entry card
+        // chooses the format - never changed; what changed, twice, is which screen
+        // the wizard opens on. It opened on the gallery, then on Course when the
+        // gallery was folded into Games & Money, and now on the gallery again.
         WIDGET_FORMATS.forEach((f) => {
-            assert.equal(flow(wizard('stroke'), f)[0], 'course', f);
+            assert.equal(flow(wizard('stroke'), f)[0], 'format', f);
         });
     });
 
     test('and wizardFirstStep resolves to it', () => {
         WIDGET_FORMATS.forEach((f) => {
-            assert.equal(run(wizard(f), 'wizardFirstStep()'), STEP.course, f);
+            assert.equal(run(wizard(f), 'wizardFirstStep()'), STEP.format, f);
         });
     });
 
-    test('the gallery is GAMES, and the screens that were folded away stay away', () => {
-        // RE-POINTED 2026-10-05 (the same day, after Manny asked for Games and
-        // Money apart again): the gallery IS a screen once more - Games - and it
-        // carries the settings panel and Also Playing with it. What must stay
-        // folded away is Round Length (now on Course) and Format Settings (now
-        // part of Games), and a format must never arrive on the gallery FIRST:
-        // the entry card already chose the format, which is this file's subject.
+    test('the gallery is GAMES and it is FIRST, and the folded screens stay folded', () => {
+        // RE-POINTED 2026-10-05 to Manny's order. The gallery is the first screen
+        // for every format INCLUDING the Cup - the Cup is a card like any other and
+        // is chosen there. What must stay folded away is Round Length (on Course)
+        // and Format Settings (now at the top of Money, under a heading that names
+        // the format).
         WIDGET_FORMATS.forEach((f) => {
             const w = flow(wizard('stroke'), f);
-            assert.equal(w[0], 'course', f + ': the wizard no longer opens on Course');
-            // The Cup is the one format that skips Games: the entry card chose it
-            // and there is nothing else to pick.
-            if (f !== 'ryder-cup') assert.ok(w.includes('format'), f + ': Games is not a screen at all');
+            assert.equal(w[0], 'format', f + ': the wizard does not open on Games');
             assert.ok(!w.includes('length'), f + ': Round Length is a screen of its own again');
             assert.ok(!w.includes('settings'), f + ': Format Settings is a screen of its own again');
         });
@@ -114,8 +115,8 @@ describe('GAME DAY LANDS ON THE FORMAT WIDGETS', () => {
     test('and the round length lives with the course, which is the step before Players', () => {
         WIDGET_FORMATS.forEach((f) => {
             const w = flow(wizard('stroke'), f);
-            assert.equal(w[0], 'course', f);
-            assert.equal(w[1], 'players', f);
+            assert.equal(w[1], 'course', f);
+            assert.equal(w[2], 'players', f);
         });
         // The fields themselves are on that screen - the panel was moved, not rebuilt.
         assert.match(ADMIN, /moveInto\('wizard-step-2', 'wizard-step-1', false\);/);
@@ -174,21 +175,21 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
     test('tapping Stroke Play enters the Stroke Play workflow', () => {
         const sb = wizard('bestball');
         run(sb, "selectFormatCard('stroke');");
-        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
+        assert.deepEqual(flow(sb), ['format', 'course', 'players', 'action', 'review']);
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'stroke');
     });
 
     test('tapping Best Ball enters the Best Ball workflow', () => {
         const sb = wizard('stroke');
         run(sb, "selectFormatCard('bestball');");
-        // Its settings are on Games with the gallery, not a screen of their own.
-        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
+        // Its settings are at the top of Money, not a screen of their own.
+        assert.deepEqual(flow(sb), ['format', 'course', 'players', 'action', 'review']);
     });
 
     test('tapping Ryder Cup enters the NEW Ryder workflow', () => {
         const sb = wizard('stroke');
         run(sb, "selectFormatCard('ryder-cup');");
-        assert.deepEqual(flow(sb), ['course', 'players', 'review']);
+        assert.deepEqual(flow(sb), ['format', 'course', 'players', 'review']);
         assert.ok(!flow(sb).includes('settings'));
         assert.ok(!flow(sb).includes('action'), 'a Cup must never be asked for money');
     });
@@ -237,18 +238,21 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
 // ============================================================================
 describe('BACK RETURNS TO THE GALLERY WITH THE SELECTION INTACT', () => {
 
-    test('Back from Money returns to Games, then Players, then Course', () => {
-        // RE-POINTED 2026-10-05: there is nothing before Course now, so Back from
-        // it cannot go anywhere - and the whole walk back is asserted rather than
-        // one hop, because that is what an organizer correcting a stake does.
+    test('Back from Money returns to Players, then Course, then GAMES - card intact', () => {
+        // RE-POINTED 2026-10-05 to Manny's order, and the last hop is the one he
+        // asked for by name: Back on Course returns to Games with the card still
+        // selected. The selection lives in the hidden <select>, so walking back
+        // cannot lose it - asserted here rather than assumed.
         ['stroke', 'bestball'].forEach((f) => {
             const sb = wizard(f);
             run(sb, 'goToWizardStep(' + STEP.action + '); wizardBack(' + STEP.action + ');');
-            assert.equal(run(sb, 'currentWizardStep'), STEP.format, f);
-            run(sb, 'wizardBack(' + STEP.format + ');');
             assert.equal(run(sb, 'currentWizardStep'), STEP.players, f);
             run(sb, 'wizardBack(' + STEP.players + ');');
             assert.equal(run(sb, 'currentWizardStep'), STEP.course, f);
+            run(sb, 'wizardBack(' + STEP.course + ');');
+            assert.equal(run(sb, 'currentWizardStep'), STEP.format, f + ': Back on Course did not reach Games');
+            assert.equal(run(sb, "document.getElementById('game-format-select').value"), f,
+                f + ': the card selection did not survive the walk back');
         });
     });
 
@@ -261,14 +265,19 @@ describe('BACK RETURNS TO THE GALLERY WITH THE SELECTION INTACT', () => {
     });
 
     test('the FIRST step offers no Back, because nothing precedes it', () => {
-        // RE-POINTED 2026-10-05: the first screen is Course. The claim is the one it
-        // always was - the first screen of a workflow never offers a way back to
-        // nowhere - read off whichever screen that is.
+        // RE-POINTED 2026-10-05: the first screen is Games again. The claim is the
+        // one it always was - the first screen of a workflow never offers a way back
+        // to nowhere - read off whichever screen that is, by its DOM id rather than
+        // by a number typed here.
         const sb = wizard('stroke');
         run(sb, 'goToWizardStep(wizardFirstStep());');
         const first = run(sb, 'wizardFirstStep()');
-        assert.equal(first, STEP.course);
-        assert.equal(run(sb, "document.getElementById('wizard-back-" + 1 + "').style.display"), 'none');
+        assert.equal(first, STEP.format);
+        assert.equal(run(sb, "document.getElementById('wizard-back-' + wizardFirstStep()).style.display"), 'none');
+        // AND COURSE, WHICH IS NO LONGER FIRST, DOES OFFER ONE - the hop Manny asked
+        // for by name. A test that only ever looked at the first screen would pass on
+        // a wizard that hid every Back button.
+        assert.notEqual(run(sb, "document.getElementById('wizard-back-" + 1 + "').style.display"), 'none');
     });
 
     test('Players does offer Back, now that something precedes it', () => {
@@ -307,17 +316,20 @@ describe('THE REORDER MOVED NO MARKUP', () => {
     });
 
     test('the progress dots still count the workflow, not the DOM', () => {
-        // RE-PINNED 2026-10-05: four screens and a save; a Cup skips Games and
-        // Money both, because its format comes from the entry card.
-            [['ryder-cup', 3], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05 (Manny's order): five screens, and a Cup skips only
+        // Money - it is a card on the gallery like any other.
+            [['ryder-cup', 4], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");
             assert.equal((html.match(/wizard-dot/g) || []).length, n, f);
             // RE-POINTED 2026-10-05: dot 1 jumps to the FIRST screen of the
-            // workflow, whatever its DOM id - which is Course now, as the two
-            // tests at the top of this file assert from the other side.
-            assert.match(html, /goToWizardStep\(1\)[^>]*>1</, f + ': dot 1 is not the first step');
+            // workflow, whatever its DOM id - which is Games (step 3) now, as the
+            // two tests at the top of this file assert from the other side. Read
+            // from the workflow rather than typed, so this cannot drift again.
+            const firstDom = run(sb, 'wizardFirstStep()');
+            assert.match(html, new RegExp('goToWizardStep\\(' + firstDom + '\\)[^>]*>1<'),
+                f + ': dot 1 is not the first step');
         });
     });
 
