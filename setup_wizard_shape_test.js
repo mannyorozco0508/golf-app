@@ -27,18 +27,37 @@
 // costs money. helpers/wizard-saved-round.js already pins the payload's keys IN
 // ORDER against saveSettings; this file holds the VALUES across both changes.
 //
-// BASELINE, re-measured over the FINISHED file against setup-3-steps (4ebe98b,
-// admin.html swapped out and restored by sha), all 15 tests: 9 PASS / 6 FAIL.
-// 9 + 6 = 15. The nine that pass are the claims this split must NOT break, and
+// SECOND PASS, 2026-10-05, same day: Also Playing and Extras were on GAMES for
+// about an hour and Manny asked for them back on MONEY. The line is PRICE, not
+// category - skins, dots, 9 Points, Stableford, the Birdie Game and Aloha are
+// all priced, so they belong beside the stakes and the pot - and Games asks one
+// question: what are you playing. Its helper line is one sentence now, because
+// the old one ("Course, players and any bets come next") named an order from
+// when the gallery was the FIRST screen.
+//   BASELINE for that pass, over the finished file against the build Manny
+//   rejected (admin.html 21df8f76, swapped out and restored by sha), all 17
+//   tests: 15 PASS / 2 FAIL. 15 + 2 = 17. The two reds are the whole fix: every
+//   priced control on Money, and the Games line. The thirteen other passes are
+//   the claims it must not break - and one of them, "GAMES IS THE GALLERY AND
+//   THAT FORMAT'S OWN SETTINGS", passed in BOTH builds: it says what IS on
+//   Games, and the gallery and the settings panel were there before this pass
+//   too. It is the "and nothing else" half, held by the test beside it, that
+//   this pass actually changed.
+//
+// BASELINE, re-measured over the FINISHED 17-test file against setup-3-steps
+// (4ebe98b, admin.html swapped out and restored by sha), all 17 tests:
+// 9 PASS / 8 FAIL.
+// 9 + 8 = 17. The nine that pass are the claims the split must NOT break, and
 // they were green before it because they were green after the three-step wave:
 // the payload's keys, all three halves of Same as last week, what a copy carries
-// and what it must not, the arrival itself, and "MONEY keeps the stakes, and
-// Course keeps the length and the tee" - the blocks that had to stay put.
-//   The six reds are the five-entry workflow, the dot labels, the cold check of
-//   where the Games blocks landed, the validation moving to step 3, and the
-//   mover - that last one goes red partly on the rename (buildThreeStepWizard ->
-//   buildCompactWizard), which is a weaker red than the others and is named as
-//   such rather than counted as proof of behaviour.
+// and what it must not, the arrival itself, and "Course keeps the length and the
+// tee" - the blocks that had to stay put.
+//   The eight reds are the five-entry workflow, the dot labels and their order,
+//   both halves of the Games/Money split, the Games helper line, the validation
+//   moving to step 3, and the mover - that last one goes red partly on the
+//   rename (buildThreeStepWizard -> buildCompactWizard), which is a weaker red
+//   than the others and is named as such rather than counted as proof of
+//   behaviour.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -64,10 +83,17 @@ const WHERE = `(function(){
             .map(function(d){ return d.getAttribute('title')+':'+d.textContent; }),
     activeStep: active ? active.id : '',
     at: {
-      gallery: where('game-format-select'), alsoPlaying: where('stacked-games-box'),
-      sideGames: where('sidegames-settings'), nassauStakes: where('setup-nassau-box'),
+      gallery: where('game-format-select'), cards: where('format-card-grid'),
+      matchSettings: where('match-settings'), stablefordSettings: where('stableford-settings'),
+      alsoPlayingHead: where('also-playing-head'), alsoPlaying: where('stacked-games-box'),
+      stackedList: where('stacked-games-list'), skinsInstances: where('skins-instances-list'),
+      extras: where('sidegames-settings'), birdie: where('birdie-unit-val-admin'),
+      aloha: where('aloha-blurb'), pot: where('mp-enabled'),
+      nassauStakes: where('setup-nassau-box'),
       length: where('round-length-select'), teeStart: where('tee-start-select')
-    }
+    },
+    gamesText: (function () { var g = document.getElementById('wizard-step-3');
+      return g ? String(g.innerText || '').replace(/\\s+/g, ' ').trim() : ''; })()
   });
 })()`;
 
@@ -83,7 +109,7 @@ before(async () => {
     W.ok = r.ok; W.reason = r.reason;
     if (r.ok) {
         const j = JSON.parse((r.value || []).filter(v => typeof v === 'string' && v.charAt(0) === '{').pop());
-        W.dots = j.dots; W.activeStep = j.activeStep; W.at = j.at;
+        W.dots = j.dots; W.activeStep = j.activeStep; W.at = j.at; W.gamesText = j.gamesText;
     }
 });
 const ADMIN = read('admin.html');
@@ -169,16 +195,59 @@ describe('1b. AND ON THE PAGE AN ORGANIZER OPENS, THE BLOCKS ARE WHERE THEY SAY'
 
     test('ran', () => assert.ok(W.ok, W.reason));
 
-    test('GAMES holds the gallery, its settings and Also Playing', () => {
+    test('GAMES IS THE GALLERY AND THAT FORMAT\'S OWN SETTINGS, AND NOTHING ELSE', () => {
+        // Manny, after an hour with Also Playing on this screen: put it back. The
+        // line is PRICE, not category - a game you pay for belongs with the money -
+        // so Games asks one question and the screen after it asks what it costs.
         assert.equal(W.at.gallery, 'wizard-step-3', 'the gallery is not on Games');
-        assert.equal(W.at.alsoPlaying, 'wizard-step-3', 'Also Playing is not on Games');
-        assert.equal(W.at.sideGames, 'wizard-step-3', 'the side games are not on Games');
+        assert.equal(W.at.cards, 'wizard-step-3', 'the format cards are not on Games');
+        // The per-format panels, which are what Step 4 was: each one is hidden
+        // unless that format is the round's format (syncFormatCards toggles them on
+        // `format === ...`), so they are settings for the choice made right above
+        // them rather than a game anyone is being sold.
+        assert.equal(W.at.matchSettings, 'wizard-step-3');
+        assert.equal(W.at.stablefordSettings, 'wizard-step-3');
     });
 
-    test('MONEY keeps the stakes, and Course keeps the length and the tee', () => {
-        assert.equal(W.at.nassauStakes, 'wizard-step-6', 'the stakes left Money');
+    test('EVERY PRICED THING IS ON MONEY, and none of it is on Games', () => {
+        // Manny's list, by the control a thumb lands on rather than by a word that
+        // could appear in either screen's prose.
+        const money = {
+            'the ALSO PLAYING heading': W.at.alsoPlayingHead,
+            'the Also Playing box': W.at.alsoPlaying,
+            'Skins / Dots / 9 Points / Stableford (the stacked-game list)': W.at.stackedList,
+            'Add another Skins': W.at.skinsInstances,
+            'the Extras box': W.at.extras,
+            'the Birdie Game stake': W.at.birdie,
+            'Aloha': W.at.aloha,
+            'the Weekly Game pot': W.at.pot,
+            'the primary wager stakes': W.at.nassauStakes
+        };
+        Object.keys(money).forEach(what => {
+            assert.equal(money[what], 'wizard-step-6', what + ' is on ' + money[what] + ', not Money');
+        });
+        // THE OTHER DIRECTION, said outright: none of it is on Games. The loop
+        // above would pass on a page that had put all nine somewhere else entirely.
+        Object.keys(money).forEach(what => {
+            assert.notEqual(money[what], 'wizard-step-3', what + ' is on Games');
+        });
+    });
+
+    test('and Course keeps the length and the tee', () => {
         assert.equal(W.at.length, 'wizard-step-1');
         assert.equal(W.at.teeStart, 'wizard-step-1');
+    });
+
+    test('Games says one short line, and it does not name the wrong order', () => {
+        // It read "Tap what you're playing. Course, players and any bets come
+        // next" - written when the gallery was the FIRST screen. Course and
+        // Players are both behind it now.
+        const t = W.gamesText;
+        assert.match(t, /Pick how you.re scoring today\./, 'the Games line is: ' + t.slice(0, 120));
+        assert.ok(!/come next/.test(t), 'the old order is still promised: ' + t.slice(0, 160));
+        assert.ok(!/Course, players/.test(t), 'it still says course and players come next');
+        // ONE line, not two stacked helper sentences.
+        assert.equal((W.gamesText.match(/scoring today/g) || []).length, 1);
     });
 
     test('and the progress dots say so, in order, 1 to 5', () => {

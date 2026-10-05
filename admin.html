@@ -1546,8 +1546,7 @@ html {
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
         <div class="wizard-step-title">📝 Games · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
-        <div class="wizard-step-sub">How scores are kept, and what else you are playing.</div>
-        <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Skip it if everyone just plays their own ball.</div>
+        <div class="wizard-step-sub" id="step3-sub">Pick how you&#39;re scoring today.</div>
     <div class="form-group">
         <label id="format-question-label">What are you playing today?</label>
         <!-- FORMAT FIRST.
@@ -2046,7 +2045,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
         <div class="wizard-step-title">💰 Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the money options work" onclick="tipMoney()">?</button></div>
-        <div class="wizard-step-sub">The stakes and the pot. Everything here is optional.</div>
+        <div class="wizard-step-sub">Choose the games and bets you're playing. Everything here is optional.</div>
         <!-- Three sections, in the order a group actually decides: the main match
              first, then anything stacked on top, then field-wide pools. -->
         <div class="wizard-section-head">PRIMARY GAME / MATCHES</div>
@@ -2529,8 +2528,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     //
     //   Course   the course, the round length, the start hole, handicaps
     //   Players  the roster, the paste, My Groups, flights
-    //   Games    the format gallery, that format's settings, Also Playing
-    //   Money    the primary wager's stakes and the Weekly Game pot
+    //   Games    the format gallery and that format's own settings
+    //   Money    every priced thing: Also Playing, Extras, the stakes, the pot
     //   Review   a last look, and Save
     //
     // THE CUP IS STILL ITS OWN SHAPE. It carries no wizard money and picks its
@@ -2578,28 +2577,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 moved++;
             });
         };
-        // ONE BLOCK AT A TIME, by id, for the parts of a screen that move without
-        // the rest of it. Same rule as moveInto: nodes, never markup.
-        var moveBlocks = function (ids, toId) {
-            var to = document.getElementById(toId);
-            if (!to) return;
-            var before = to.querySelector('.wizard-nav-row');
-            ids.forEach(function (id) {
-                var el = document.getElementById(id);
-                if (!el) return;
-                if (before) to.insertBefore(el, before); else to.appendChild(el);
-                moved++;
-            });
-        };
         // Round Length, the Par/HCP grid and the start hole join Course, after it.
         moveInto('wizard-step-2', 'wizard-step-1', false);
-        // GAMES: the format gallery is already step 3, so its settings join it
-        // underneath - you pick the game, then you set its options.
+        // GAMES IS THE GALLERY AND NOTHING ELSE (2026-10-05, second pass). Its own
+        // settings panel joins it underneath - you pick the game, then you set its
+        // options - and that is the whole screen. Also Playing and Extras went to
+        // Games for about an hour and came straight back: skins, dots, 9 Points,
+        // Stableford, the Birdie Game and Aloha are all PRICED, so they are money,
+        // and the organizer who is deciding what the round costs wants them beside
+        // the stakes and the pot rather than two screens away. Nothing is moved out
+        // of step 6 at all now, which is why there is no second mover.
         moveInto('wizard-step-4', 'wizard-step-3', false);
-        // ...and so does Also Playing, which is a second GAME rather than a price:
-        // skins, dots, birdies, a side match. What stays behind on Money is the
-        // primary wager's stakes and the Weekly Game pot.
-        moveBlocks(['also-playing-head', 'stacked-games-box', 'sidegames-settings'], 'wizard-step-3');
         return moved;
     }
 
@@ -10808,7 +10796,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     if (step3SubEl) {
         step3SubEl.textContent = currentEventType === 'club'
             ? "Common club formats: Stroke Play, Stableford, Best Ball. Every other format below still works too."
-            : "Tap what you're playing. Course, players and any bets come next.";
+            // THE OLD LINE NAMED THE WRONG ORDER. It read "Course, players and any
+            // bets come next" from when the gallery was the FIRST screen; course
+            // and players are both behind this one now.
+            : "Pick how you're scoring today.";
     }
     // THE FRAMING SENTENCE NO LONGER SHOWS ITSELF ON ARRIVAL (UI Wave 7). It read
     // "Game Day - just pick a course, add your group, choose a game, and go." above

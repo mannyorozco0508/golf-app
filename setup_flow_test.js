@@ -109,11 +109,16 @@ describe('STEP 3 ASKS HOW THE ROUND IS SCORED', () => {
         assert.ok(!adm().includes('Step 3: How We\'re Scoring'), 'the numbered heading is gone');
     });
 
-    test('and the helper line says what the screen covers', () => {
-        // RE-PINNED 2026-10-05: "games and bets are added later" stopped being true
-        // when Also Playing moved onto this screen. What is still later is the
-        // money, which is the screen after it.
-        assert.match(adm(), /How scores are kept, and what else you are playing\./);
+    test('and the helper line says what the screen covers, in one line', () => {
+        // RE-PINNED 2026-10-05 (second pass). Also Playing came back off this
+        // screen, so "what else you are playing" went with it - and the line it
+        // replaced named the wrong order ("Course, players and any bets come
+        // next", written when the gallery was the FIRST screen). One line now,
+        // and the screen asks one question.
+        assert.match(adm(), /Pick how you&#39;re scoring today\./);
+        assert.ok(!adm().includes('Course, players and any bets come next'),
+            'the old order is still promised');
+        assert.equal((adm().match(/id="step3-sub"/g) || []).length, 1);
     });
 
     test('the field label matches the question', () => {
@@ -203,7 +208,9 @@ describe('STEP 6 IS WHERE GAMES AND MONEY LIVE', () => {
     });
 
     test('the helper says everything here is optional', () => {
-        assert.match(adm(), /The stakes and the pot\. Everything here is optional\./);
+        // RE-PINNED BACK 2026-10-05: Also Playing and Extras are on this screen
+        // again, so "the games and bets you're playing" is true of it again.
+        assert.match(adm(), /Choose the games and bets you're playing\. Everything here is optional\./);
     });
 
     test('its sections are still in the markup, in the order a group decides', () => {
