@@ -4020,6 +4020,35 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   `npx cap sync ios` run after the bump, and the iOS bundle carries v294 and
   play-order.js. Full suite 10,232 tests / 10,230 pass / 0 fail / 2 todo; every money
   golden and all nine untouched protected files byte-identical to pre-merge main.
+- **1.0.6 BUILD 6 WAS SET, THEN CANCELLED (2026-10-05, `main` `a488b2c`).**
+  `CURRENT_PROJECT_VERSION` 5 -> 6 on Debug and Release. It was superseded the same
+  day and **cancelled in App Store Connect** rather than reviewed; nothing about it
+  shipped. Its contents are a subset of build 7's.
+- **1.0.6 BUILD 7 IS UPLOADED AND SUBMITTED (2026-10-05, ~11:03 AM PT).** Manual
+  Release is HELD - it does not go to the store on approval; Manny presses it.
+  `CURRENT_PROJECT_VERSION` 7 on Debug and Release, `MARKETING_VERSION` 1.0.6.
+  The build number was stamped at `b2f89a2` and the archive was taken from `main` at
+  **`24bff98`**, so the bundle carries the Games-first wave that landed after the
+  stamp. VERIFIED IN THE TREE RATHER THAN ASSUMED: `ios/App/App/public/admin.html` is
+  byte-identical to the repo's (`7b72eec6`) and carries `format-settings-head`, and
+  the bundled `index.html` contains no `focusFirstEmptyScoreBox`.
+  **BUILD 7 = BUILD 6 PLUS TWO WAVES:**
+  the keypad no longer opens on a landing - no score box is focused after Next, Prev,
+  the 1-18 jump or a KP answer, so it stops covering the leaderboard and live matches
+  under Prev/Next, and it opens when a golfer taps a box (cache `v298`);
+  and the setup order is **Game Day -> Games -> Course -> Players -> Money -> Review**,
+  with a tap on a format card going straight to Course, Back on Course returning to
+  the gallery with the card still selected, and that format's own settings at the top
+  of Money under a heading naming it (cache `v299` / consumer `v139`).
+  **AND BUILD 6 = BUILD 5 PLUS:** the new scorecard (the Round Menu pill, the hole on
+  the first screen, the compact live panel, the leaderboard as a pop-up), setup in
+  five screens with Same as last week, the copy trim, the delete fixes, and the owner
+  delete - whose RULE published the same morning (`database.rules.ownerdelete.json`,
+  live sha `db6cecca`).
+  **SIGNING, UNCHANGED:** Release `App/AppRelease.entitlements` (`aps-environment`
+  **production**, `com.apple.developer.applesignin ["Default"]`), Debug
+  `App/App.entitlements`. Full suite at the archive point 10,336 / 10,334 pass /
+  0 fail / 2 todo.
 
 **A CLOUDFLARE DEPLOY CAN FAIL ON THE FUNCTION AND LEAVE PRODUCTION BEHIND. RETRY IT.**
 First seen 2026-10-02 on the Wave 36 merge (`1b355dd`):
