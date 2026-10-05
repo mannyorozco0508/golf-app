@@ -359,13 +359,22 @@ describe('ONE PRESENTER, AND THE LAYOUT HOLDS', () => {
     });
 
     test('both scorecard views receive it through the Part 3 mounts', () => {
+        // RE-POINTED 2026-10-05: the two mounts no longer get the SAME list. The
+        // to-par board card left Hole View for the pop-up, so Hole View gets
+        // `rest` and the Full Card gets the board on top of it. Dots is in `rest`,
+        // which is what this test is about: BOTH views still receive it.
         assert.match(IDX, /const TICKER_MOUNTS = \['live-ticker-mount', 'fc-ticker-mount'\]/);
-        assert.match(IDX, /'<div class="lw-grid">' \+ board \+ dotsBoard/);
+        assert.match(IDX, /const rest = \[dotsBoard, ryder, skins, matches, points, hilo, strokeBets\];/);
+        assert.match(IDX, /'live-ticker-mount': grid\(rest\)/);
+        assert.match(IDX, /'fc-ticker-mount': grid\(\[board\]\.concat\(rest\)\)/);
     });
 
     test('it does not replace the to-par board', () => {
+        // Still built, still once, and still beside dots on the view that has it.
         assert.match(IDX, /const board = renderLeaderWidgetHtml\(\)/);
-        assert.match(IDX, /board \|\| skins \|\| matches \|\| points \|\| hilo \|\| strokeBets \|\| dotsBoard/);
+        assert.equal((IDX.match(/renderLeaderWidgetHtml\(\)/g) || []).length, 2,
+            'the board is built somewhere else as well as in renderLiveTicker');
+        assert.match(IDX, /grid\(\[board\]\.concat\(rest\)\)/);
     });
 
     test('the card lives outside the score table, so cells cannot move', () => {

@@ -69,7 +69,10 @@ function dots({ thru = 6, events = null } = {}) {
 function scorecard(d) {
     const sb = loadHtmlInlineScript('index.html', IDX);
     vm.runInContext(`currentMode='A'; currentData=${JSON.stringify(d)}; renderLiveTicker();`, sb);
-    return sb.document.getElementById('live-ticker-mount').innerHTML;
+    // RE-POINTED 2026-10-05: the Full Card mount, because the to-par board card
+    // left Hole View for the pop-up and these tests assert this widget sits
+    // BESIDE it. Every other card renders identically in both mounts.
+    return sb.document.getElementById('fc-ticker-mount').innerHTML;
 }
 function leaderboard(d) {
     const sb = loadHtmlInlineScript('leaderboard.html', LB);

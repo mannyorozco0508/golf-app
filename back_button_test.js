@@ -140,10 +140,16 @@ function walkWizard(sb, upToStep) {
     const row = sb.document.getElementById('course-dropdown').children.find(c => /Caledonia/.test(c.textContent));
     assert.ok(row, 'the course dropdown offered no Caledonia row');
     row.onclick();
-    while (step(sb) < upToStep) {
+    // FOLLOW THE NEXT BUTTONS, NOT THE NUMBERS (re-pointed 2026-10-05). The
+    // workflow is Course(1), Players(5), Games(3), Money(6), Review(7), so an
+    // organizer walking forward goes 1 -> 5 -> 3, which is BACKWARDS numerically.
+    // A loop that waits for the number to rise never leaves Players.
+    let guard = 0;
+    while (step(sb) !== upToStep) {
         const n = step(sb);
         tap(sb, ADMIN, new RegExp('onclick="(wizardNext\\(' + n + '\\))"'));
-        assert.ok(step(sb) > n, 'Next did not advance from step ' + n);
+        assert.ok(step(sb) !== n, 'Next did not advance from step ' + n);
+        assert.ok(guard++ < 10, 'the walk never reached step ' + upToStep);
     }
 }
 

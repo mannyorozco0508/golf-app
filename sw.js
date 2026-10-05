@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v135-scorecard. The tournament product cache
+// The consumer product cache is consumer-v136-roundmenu. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4196,7 +4196,17 @@
 // matches, Today's Games, the skins card, Playing With - are on the page below
 // it. The sheet keeps settings and admin. 49 helper sentences became one line
 // each. A device on v294 has the old layout and the old landing.
-const CACHE_VERSION = 'golfapp-v295-scorecard';
+// Moved to v296: A ROUND MENU YOU CAN SEE, A BOARD THAT POPS UP, AND A DELETE
+// THAT SAYS WHY. The sheet handle is a pill reading "Round Menu" at heading size
+// instead of a caption; the compact top five under Prev/Next is now the way into
+// the full leaderboard, which opens over the scorecard, and the duplicate
+// leaderboard card below it is gone; the setup wizard asks Games and Money as
+// two screens again; and a delete the database will refuse says so BEFORE the
+// confirm rather than after it, with ui-dialogs.js no longer posting refusals
+// into a sheet it has just emptied. A device on v295 has the old handle, two
+// leaderboards, one Games & Money screen, and a "Delete it" that does nothing
+// visible on a round that has been played.
+const CACHE_VERSION = 'golfapp-v296-roundmenu';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -87,15 +87,24 @@ describe('1. THE PAGE SAYS WHAT THE ROUND IS', () => {
 
     test('the leaderboard is there before a single score, with everyone level', () => {
         const v = S.v;
-        assert.match(String(v.board), /LIVE LEADERBOARD/, 'no board on a fresh round: ' + v.board);
-        // Every golfer, and all of them at E. "Nobody has started" is a fact about
-        // the round, not a reason to show nothing.
-        NAMES.forEach(n => assert.ok(String(v.board).indexOf(n.split(' ')[0]) > -1,
-            n + ' is not on the board: ' + v.board));
-        assert.equal((String(v.board).match(/\bE\b/g) || []).length >= 4, true,
-            'the four golfers are not all level: ' + v.board);
+        // RE-POINTED 2026-10-05: THE STANDINGS A FRESH ROUND SHOWS ARE THE COMPACT
+        // LINES. The bordered card below them was the same five names a second
+        // time and is now behind the pop-up those lines open. The CLAIM is
+        // unchanged and is the one Manny asked for - a round nobody has started
+        // still names every golfer, level - so it is read where it is now shown.
+        NAMES.forEach(n => assert.ok(String(v.live).indexOf(n.split(' ')[0]) > -1,
+            n + ' is not on the board: ' + v.live));
+        assert.ok((String(v.live).match(/\bE\b/g) || []).length >= 4,
+            'the four golfers are not all level: ' + v.live);
         // thru 0, said outright, on the compact line under Prev/Next.
         assert.match(String(v.live), /thru 0/, 'the compact line does not say thru 0: ' + v.live);
+        // AND THE WAY TO THE FULL BOARD IS ON IT. Without this, "the leaderboard
+        // is there" would be satisfied by five names and no way to the rest.
+        assert.match(String(v.live), /Full board/, 'no way to the full field: ' + v.live);
+        // The mount still holds the OTHER dashboard cards - skins, dots, matches.
+        // What must not be there is a second copy of the standings.
+        assert.ok(!/LIVE LEADERBOARD/.test(String(v.board)),
+            'the duplicate board card is back under the compact lines: ' + v.board);
     });
 
     test("Today's games lists what was set up, in the builders' own words", () => {

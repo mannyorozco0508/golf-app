@@ -93,10 +93,19 @@ describe('GAME DAY LANDS ON THE FORMAT WIDGETS', () => {
         });
     });
 
-    test('the gallery is reached as part of Games & Money, not as a screen', () => {
+    test('the gallery is GAMES, and the screens that were folded away stay away', () => {
+        // RE-POINTED 2026-10-05 (the same day, after Manny asked for Games and
+        // Money apart again): the gallery IS a screen once more - Games - and it
+        // carries the settings panel and Also Playing with it. What must stay
+        // folded away is Round Length (now on Course) and Format Settings (now
+        // part of Games), and a format must never arrive on the gallery FIRST:
+        // the entry card already chose the format, which is this file's subject.
         WIDGET_FORMATS.forEach((f) => {
             const w = flow(wizard('stroke'), f);
-            assert.ok(!w.includes('format'), f + ': the format is a screen of its own again');
+            assert.equal(w[0], 'course', f + ': the wizard no longer opens on Course');
+            // The Cup is the one format that skips Games: the entry card chose it
+            // and there is nothing else to pick.
+            if (f !== 'ryder-cup') assert.ok(w.includes('format'), f + ': Games is not a screen at all');
             assert.ok(!w.includes('length'), f + ': Round Length is a screen of its own again');
             assert.ok(!w.includes('settings'), f + ': Format Settings is a screen of its own again');
         });
@@ -165,15 +174,15 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
     test('tapping Stroke Play enters the Stroke Play workflow', () => {
         const sb = wizard('bestball');
         run(sb, "selectFormatCard('stroke');");
-        assert.deepEqual(flow(sb), ['course', 'players', 'action', 'review']);
+        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'stroke');
     });
 
     test('tapping Best Ball enters the Best Ball workflow', () => {
         const sb = wizard('stroke');
         run(sb, "selectFormatCard('bestball');");
-        // Its settings are on Games & Money with the gallery, not a screen of their own.
-        assert.deepEqual(flow(sb), ['course', 'players', 'action', 'review']);
+        // Its settings are on Games with the gallery, not a screen of their own.
+        assert.deepEqual(flow(sb), ['course', 'players', 'format', 'action', 'review']);
     });
 
     test('tapping Ryder Cup enters the NEW Ryder workflow', () => {
@@ -228,13 +237,15 @@ describe('THE WIDGET IS THE SELECTION — NO CONFIRMING TAP', () => {
 // ============================================================================
 describe('BACK RETURNS TO THE GALLERY WITH THE SELECTION INTACT', () => {
 
-    test('Back from Games & Money returns to Players, and Course is the first screen', () => {
-        // RE-POINTED 2026-10-05: there is nothing before Course now, so Back from it
-        // cannot go anywhere - and the gallery is reached by walking forward to
-        // Games & Money rather than backwards to a screen of its own.
+    test('Back from Money returns to Games, then Players, then Course', () => {
+        // RE-POINTED 2026-10-05: there is nothing before Course now, so Back from
+        // it cannot go anywhere - and the whole walk back is asserted rather than
+        // one hop, because that is what an organizer correcting a stake does.
         ['stroke', 'bestball'].forEach((f) => {
             const sb = wizard(f);
             run(sb, 'goToWizardStep(' + STEP.action + '); wizardBack(' + STEP.action + ');');
+            assert.equal(run(sb, 'currentWizardStep'), STEP.format, f);
+            run(sb, 'wizardBack(' + STEP.format + ');');
             assert.equal(run(sb, 'currentWizardStep'), STEP.players, f);
             run(sb, 'wizardBack(' + STEP.players + ');');
             assert.equal(run(sb, 'currentWizardStep'), STEP.course, f);
@@ -296,8 +307,9 @@ describe('THE REORDER MOVED NO MARKUP', () => {
     });
 
     test('the progress dots still count the workflow, not the DOM', () => {
-        // RE-PINNED 2026-10-05: three steps and a save; a Cup skips the money.
-            [['ryder-cup', 3], ['stroke', 4], ['bestball', 4]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05: four screens and a save; a Cup skips Games and
+        // Money both, because its format comes from the entry card.
+            [['ryder-cup', 3], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");

@@ -1,12 +1,17 @@
 // ============================================================================
-// THREE STEPS AND A SAVE, AND A ROUND THAT COPIES ITSELF (2026-10-05, STRICT)
+// THE WIZARD'S SHAPE, AND A ROUND THAT COPIES ITSELF (2026-10-05, STRICT)
+//
+// RENAMED from setup_three_step_test.js on the day it was written. The wizard
+// was three steps and a save for about six hours; Manny asked for Games and
+// Money back apart, so it is four and a save. A file name that counts the
+// screens goes stale, and the claim was never the number.
 //
 // TWO CLAIMS, and both are about data rather than screens:
 //
 //   1. THE SHAPE CHANGED AND THE SAVE DID NOT. The wizard was seven screens -
 //      Format, Course, Round Length, Format Settings, Players, Games & Money,
-//      Review - and is now Course / Players / Games & Money / Review. Not one
-//      field moved file: buildThreeStepWizard() moves the existing BLOCKS as
+//      Review - and is now Course / Players / Games / Money / Review. Not one
+//      field moved file: buildCompactWizard() moves the existing BLOCKS as
 //      nodes, so every input keeps its id, its handler and the function that
 //      reads it, and saveSettings() reads exactly what it always read.
 //
@@ -22,19 +27,21 @@
 // costs money. helpers/wizard-saved-round.js already pins the payload's keys IN
 // ORDER against saveSettings; this file holds the VALUES across both changes.
 //
-// BASELINE, measured over the FINISHED file against main (2410272, admin.html
-// swapped out and restored by sha), all 10 tests: 4 PASS / 6 FAIL. 4 + 6 = 10.
-//   The four that pass describe what was already true and is deliberately kept
-//   that way: the payload's keys are unchanged (it is the same save), a copied
-//   round has always been a new code with the source left untouched, the copy has
-//   always been pre-filled rather than written on arrival, and the round-scoped
-//   records were never in the payload for a copy to carry. Those four are in this
-//   file precisely because they are the claims a restructure would break quietly.
-//   The six reds are the three-step workflow, the mover, the validation that
-//   followed the fields, and all three halves of Same as last week.
+// BASELINE, re-measured over the FINISHED file against setup-3-steps (4ebe98b,
+// admin.html swapped out and restored by sha), all 15 tests: 9 PASS / 6 FAIL.
+// 9 + 6 = 15. The nine that pass are the claims this split must NOT break, and
+// they were green before it because they were green after the three-step wave:
+// the payload's keys, all three halves of Same as last week, what a copy carries
+// and what it must not, the arrival itself, and "MONEY keeps the stakes, and
+// Course keeps the length and the tee" - the blocks that had to stay put.
+//   The six reds are the five-entry workflow, the dot labels, the cold check of
+//   where the Games blocks landed, the validation moving to step 3, and the
+//   mover - that last one goes red partly on the rename (buildThreeStepWizard ->
+//   buildCompactWizard), which is a weaker red than the others and is named as
+//   such rather than counted as proof of behaviour.
 // ============================================================================
 
-const { test, describe } = require('node:test');
+const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -42,23 +49,67 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const { PAYLOAD_KEYS } = require('./helpers/wizard-saved-round.js');
 
+const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
+
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+
+// WHERE EVERY BLOCK ENDED UP, read off the page an organizer actually opens.
+const WHERE = `(function(){
+  function where(id){ var el=document.getElementById(id); if(!el) return 'MISSING';
+    var n=el; while(n){ if(n.id && /^wizard-step-\\d$/.test(n.id)) return n.id; n=n.parentNode; }
+    return 'loose'; }
+  var active=document.querySelector('.wizard-step.active');
+  return JSON.stringify({
+    dots: Array.prototype.slice.call(document.querySelectorAll('#wizard-progress .wizard-dot'))
+            .map(function(d){ return d.getAttribute('title')+':'+d.textContent; }),
+    activeStep: active ? active.id : '',
+    at: {
+      gallery: where('game-format-select'), alsoPlaying: where('stacked-games-box'),
+      sideGames: where('sidegames-settings'), nassauStakes: where('setup-nassau-box'),
+      length: where('round-length-select'), teeStart: where('tee-start-select')
+    }
+  });
+})()`;
+
+const W = {};
+before(async () => {
+    const r = await arriveCold({
+        url: fileUrl('admin.html', 'fresh=1'),
+        db: { events: {}, trips: {}, global_courses: {}, tournaments: {} },
+        auth: { uid: 'organizer-cold', email: 'o@example.com', isAnonymous: false },
+        viewport: { width: 390, height: 844 }, settleMs: 2800,
+        steps: [{ expression: WHERE }]
+    });
+    W.ok = r.ok; W.reason = r.reason;
+    if (r.ok) {
+        const j = JSON.parse((r.value || []).filter(v => typeof v === 'string' && v.charAt(0) === '{').pop());
+        W.dots = j.dots; W.activeStep = j.activeStep; W.at = j.at;
+    }
+});
 const ADMIN = read('admin.html');
 const run = (sb, e) => vm.runInContext(e, sb);
 
-describe('1. THE WIZARD IS THREE STEPS AND A SAVE', () => {
+describe('1. THE WIZARD IS FOUR SCREENS AND A SAVE', () => {
 
-    test('the workflow is Course, Players, Games & Money, Review', () => {
+    test('the workflow is Course, Players, Games, Money, Review', () => {
         const sb = loadHtmlInlineScript('admin.html', [], { search: '?fresh=1' });
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('stroke'))")),
-            ['course', 'players', 'action', 'review']);
-        // A format WITH settings does not get a fourth screen for them any more -
-        // the panel is on Games & Money, above the money.
+            ['course', 'players', 'format', 'action', 'review']);
+        // A format WITH settings still does not get a screen of its own - the
+        // panel is on Games, under the gallery that chose it.
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('bestball'))")),
-            ['course', 'players', 'action', 'review']);
-        // And the Cup still never meets the money.
+            ['course', 'players', 'format', 'action', 'review']);
+        // And the Cup still never meets the money. It picks its format from the
+        // entry card, so it skips Games too.
         assert.deepEqual(JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('ryder-cup'))")),
             ['course', 'players', 'review']);
+    });
+
+    test('the dots a golfer counts read Course, Players, Games, Money, Review', () => {
+        const sb = loadHtmlInlineScript('admin.html', [], { search: '?fresh=1' });
+        const labels = JSON.parse(run(sb, "JSON.stringify(wizardWorkflow('stroke')"
+            + ".map(function(s){ return WIZARD_STEP_LABELS[s]; }))"));
+        assert.deepEqual(labels, ['Course', 'Players', 'Games', 'Money', 'Review']);
     });
 
     test('the blocks are MOVED, so every field keeps its id', () => {
@@ -70,12 +121,12 @@ describe('1. THE WIZARD IS THREE STEPS AND A SAVE', () => {
             assert.equal((ADMIN.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1,
                 id + ' appears more than once');
         });
-        const fn = ADMIN.slice(ADMIN.indexOf('function buildThreeStepWizard()'),
-                               ADMIN.indexOf('\n    function ', ADMIN.indexOf('function buildThreeStepWizard()') + 10));
+        const fn = ADMIN.slice(ADMIN.indexOf('function buildCompactWizard()'),
+                               ADMIN.indexOf('\n    function ', ADMIN.indexOf('function buildCompactWizard()') + 10));
         assert.ok(fn.length > 400, 'the slice is empty - the endpoint drifted');
         assert.match(fn, /insertBefore\(el, before\)/, 'it rebuilds markup instead of moving nodes');
         assert.ok(!/innerHTML/.test(fn), 'it rebuilds markup instead of moving nodes');
-        assert.match(ADMIN, /buildThreeStepWizard\(\);\s*\n\s*syncFormatCards\(\);/,
+        assert.match(ADMIN, /buildCompactWizard\(\);\s*\n\s*syncFormatCards\(\);/,
             'the move does not run before the first render');
     });
 
@@ -87,10 +138,10 @@ describe('1. THE WIZARD IS THREE STEPS AND A SAVE', () => {
         assert.match(fn, /if \(fromStep === 1\)/);
         assert.match(fn, /course-search-input/);
         assert.match(fn, /validateCourseGrid\(\)/);
-        // The format gallery is on Games & Money, which is step 6.
-        assert.match(fn, /if \(fromStep === 6\)[\s\S]{0,200}game-format-select/);
-        assert.ok(!/fromStep === 2|fromStep === 3/.test(fn),
-            'a refusal is still asked for on a screen that no longer exists');
+        // The format gallery is Games, which is step 3 - the refusal moved with it.
+        assert.match(fn, /if \(fromStep === 3\)[\s\S]{0,200}game-format-select/);
+        assert.ok(!/fromStep === 2\b|fromStep === 6\b/.test(fn),
+            'a refusal is still asked for on a screen that no longer leads anywhere');
     });
 
     test('THE SAVE IS THE SAME SAVE: the payload keys, in order, are untouched', () => {
@@ -104,6 +155,36 @@ describe('1. THE WIZARD IS THREE STEPS AND A SAVE', () => {
         PAYLOAD_KEYS.forEach(k => assert.ok(keys.includes(k) || payload.includes(k + ':'),
             k + ' left the payload with the three-step wizard'));
         assert.ok(keys.length >= 30, 'the payload shrank to ' + keys.length + ' keys');
+    });
+});
+
+describe('1b. AND ON THE PAGE AN ORGANIZER OPENS, THE BLOCKS ARE WHERE THEY SAY', () => {
+
+    // WHY THIS IS NOT mini-dom. The mover is the claim, and the harness has no
+    // real tree to move anything in: walking parentNode up from the format
+    // gallery returns 'loose' there whether buildCompactWizard ran or not, so a
+    // mini-dom version of this test would pass against a wizard that never moved
+    // a single block. A cold arrival loads admin.html, lets it build itself and
+    // touches nothing.
+
+    test('ran', () => assert.ok(W.ok, W.reason));
+
+    test('GAMES holds the gallery, its settings and Also Playing', () => {
+        assert.equal(W.at.gallery, 'wizard-step-3', 'the gallery is not on Games');
+        assert.equal(W.at.alsoPlaying, 'wizard-step-3', 'Also Playing is not on Games');
+        assert.equal(W.at.sideGames, 'wizard-step-3', 'the side games are not on Games');
+    });
+
+    test('MONEY keeps the stakes, and Course keeps the length and the tee', () => {
+        assert.equal(W.at.nassauStakes, 'wizard-step-6', 'the stakes left Money');
+        assert.equal(W.at.length, 'wizard-step-1');
+        assert.equal(W.at.teeStart, 'wizard-step-1');
+    });
+
+    test('and the progress dots say so, in order, 1 to 5', () => {
+        assert.deepEqual(W.dots, ['Course:1', 'Players:2', 'Games:3', 'Money:4', 'Review:5']);
+        // The organizer opens on Course, as they always did.
+        assert.equal(W.activeStep, 'wizard-step-1');
     });
 });
 

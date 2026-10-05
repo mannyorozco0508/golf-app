@@ -102,6 +102,16 @@ describe('?group=7 ON A SIX-GROUP ROUND: nobody', () => {
 describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
     test('the baseline is pinned (6ff9332)', () => {
         assert.equal(PREV.capturedAt, '6ff9332');
+        // RE-PINNED 2026-10-05 (was cb953314): the leaderboard CARD left Hole View.
+        // The compact top five under Prev/Next and a bordered LIVE LEADERBOARD card
+        // six pixels below it were the same five names twice; the compact lines now
+        // OPEN the full board as a pop-up and the card is gone from
+        // #live-ticker-mount. It is not gone from the app - the Full Card view's
+        // #fc-ticker-mount still renders it, built exactly once as before.
+        // DIFFED BEFORE RE-PINNING: across the three links, 1 text key CHANGED
+        // (live-ticker-mount, which loses its leading board segment and keeps every
+        // other card), 0 added, 0 removed, display untouched. The fixture's own
+        // "repinned" array carries the same record.
         // RE-PINNED 2026-09-19 (was a1b40a09): the KP entry block moved out of the
         // Action Center into #kp-entry-mount under the Prev/Next row and its head
         // reads "Weekly Game KP"; exactly those substrings moved in the fixture (its
@@ -203,7 +213,7 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // What arrived: the split "1st $60 · 2nd $40" and "Winners show once every card
         // is in." Every filtered list is identical and display is unchanged but for
         // group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), 'cb953314');
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '1a7fb418');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

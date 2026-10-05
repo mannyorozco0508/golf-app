@@ -50,6 +50,12 @@ function boot(answer, extra) {
     vm.runInContext(`
         window.__writes = []; window.__removed = []; window.__asked = 0;
         window.__notes = []; window.__toasts = [];
+        // WHERE IT WENT. The success path leaves for Home - that is what a golfer
+        // sees instead of a toast they cannot read on the way out.
+        window.__went = [];
+        try { Object.defineProperty(window, 'location', { configurable: true, enumerable: true,
+            get: function () { return { get href() { return 'index.html'; },
+                                        set href(v) { window.__went.push(String(v)); } }; } }); } catch (e) {}
         uiConfirm = function () { window.__asked++; return Promise.resolve(${JSON.stringify(answer)}); };
         uiRefuse = function (m) { window.__notes.push({ kind: 'refuse', text: String(m) }); };
         uiFail   = function (m) { window.__notes.push({ kind: 'fail', text: String(m) }); };
@@ -86,7 +92,8 @@ function boot(answer, extra) {
         writes: () => JSON.parse(vm.runInContext('JSON.stringify(window.__writes)', sb)),
         asked: () => vm.runInContext('window.__asked', sb),
         notes: () => JSON.parse(vm.runInContext('JSON.stringify(window.__notes)', sb)),
-        toasts: () => JSON.parse(vm.runInContext('JSON.stringify(window.__toasts)', sb))
+        toasts: () => JSON.parse(vm.runInContext('JSON.stringify(window.__toasts)', sb)),
+        went: () => JSON.parse(vm.runInContext('JSON.stringify(window.__went)', sb))
     };
 }
 const settle = () => new Promise(r => setTimeout(r, 30));
@@ -108,7 +115,7 @@ describe('DELETE ROUND — the most destructive path in the app', () => {
         assert.deepEqual(b.toasts(), [], 'and it claimed to have done it');
     });
 
-    test('answering YES deletes the round, and says so', async () => {
+    test('answering YES deletes the round, and goes Home', async () => {
         // The other half: "deletes nothing" is trivially true of a function that
         // never deletes anything.
         const b = boot(true);
@@ -116,8 +123,27 @@ describe('DELETE ROUND — the most destructive path in the app', () => {
         await settle();
         assert.deepEqual(b.removed(), ['events/ABCD'],
             'saying yes did not delete the round: ' + JSON.stringify(b.removed()));
-        assert.ok(b.toasts().some(t => /Round deleted/.test(t)),
-            'the confirmation is a toast, after the write: ' + JSON.stringify(b.toasts()));
+        // RE-POINTED 2026-10-05: the confirmation was a toast fired immediately
+        // before window.location.href = 'admin.html', which is a sentence nobody
+        // can read - the page it is drawn on is already leaving, and Home does not
+        // carry it. Manny asked for "delete it, close everything, go Home", so
+        // ARRIVING is the confirmation and it is asserted as one. Nothing is
+        // claimed before the write: this fires inside remove()'s own .then.
+        assert.deepEqual(b.went(), ['admin.html'],
+            'it did not leave for Home: ' + JSON.stringify(b.went()));
+    });
+
+    test('and it closes the sheet it was tapped from on the way out', () => {
+        // The button lives in the Status sheet. An outcome delivered behind an open
+        // sheet is the same invisible outcome as none at all, which is the defect
+        // this wave was reported for.
+        const page = read('index.html');
+        const fn = page.slice(page.indexOf('async function endAndClearRound'),
+                              page.indexOf('async function endAndClearRound') + 2600);
+        assert.match(fn, /toggleRoundSheet\(false\)/, 'the sheet is left open over the result');
+        assert.match(fn, /closeLiveBoard\(\)/, 'the leaderboard pop-up is left open over the result');
+        assert.ok(fn.indexOf('toggleRoundSheet(false)') > fn.indexOf('const ok = await uiConfirm'),
+            'it closes the sheet before asking, so Cancel tidies the page away too');
     });
 
     test('THE DESTRUCTIVE BUTTON IS NOT THE DEFAULT-FOCUSED CONTROL', () => {

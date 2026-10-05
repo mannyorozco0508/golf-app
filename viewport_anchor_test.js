@@ -76,9 +76,14 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
     });
 
     test('the two mounts share one registry, and one presenter feeds both', () => {
+        // RE-POINTED 2026-10-05: the two mounts no longer get the SAME string. The
+        // board card left Hole View for the pop-up the compact lines open, so each
+        // mount is handed its own LIST of already-built cards. The claim that
+        // matters is unchanged and is asserted below: nothing is built twice.
         assert.match(IDX, /const TICKER_MOUNTS = \['live-ticker-mount', 'fc-ticker-mount'\]/);
-        assert.match(IDX, /TICKER_MOUNTS\.forEach\(id => \{[\s\S]{0,140}el\.innerHTML = html;/,
-            'the same built markup is written to every mount');
+        assert.match(IDX, /TICKER_MOUNTS\.forEach\(id => \{[\s\S]{0,160}el\.innerHTML = HTML_FOR\[id\] \|\| '';/,
+            'the mounts are not fed from the one built map');
+        assert.match(IDX, /const rest = \[dotsBoard, ryder, skins, matches, points, hilo, strokeBets\];/);
     });
 
     test('NEGATIVE CONTROL — there is exactly one of each moving part', () => {
@@ -112,7 +117,12 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
             'the standalone Leaderboard is the whole-field view and must stay that way');
     });
 
-    test('both mounts receive identical markup for one round state', () => {
+    test('the two mounts differ by the board card and by NOTHING else', () => {
+        // RE-POINTED 2026-10-05, and made stronger rather than weaker. "Byte
+        // identical" stopped being true when the board card left Hole View for the
+        // pop-up; what must still be true is that the difference is EXACTLY that
+        // one card. Deleting the board from the Full Card, or letting any other
+        // widget diverge between the two views, fails here.
         const sb = loadHtmlInlineScript('index.html', DEPS);
         vm.runInContext(`
             currentMode = 'A';
@@ -122,11 +132,21 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
             document.__mount(document.getElementById('live-ticker-mount'));
             document.__mount(document.getElementById('fc-ticker-mount'));
             renderLiveTicker();
+            window.__board = renderLeaderWidgetHtml();
             window.__hv = document.getElementById('live-ticker-mount').innerHTML;
             window.__fc = document.getElementById('fc-ticker-mount').innerHTML;
         `, sb);
-        assert.equal(sb.window.__fc, sb.window.__hv,
-            'Hole View and Full Card must show byte-identical standings');
+        const board = sb.window.__board, hv = sb.window.__hv, fc = sb.window.__fc;
+        assert.ok(board && board.length > 50, 'this fixture builds no board, so it proves nothing');
+        assert.ok(fc.indexOf(board) > -1, 'the Full Card lost the standings card');
+        assert.equal(hv.indexOf(board), -1, 'the duplicate board is back on Hole View');
+        // COMPARE THE CARDS, not the wrapper: on a round whose only card IS the
+        // board, Hole View renders nothing at all rather than an empty grid, which
+        // is right - the compact lines under Prev/Next are its standings.
+        const OPEN = '<div class="lw-grid">', CLOSE = '</div>';
+        const cards = h => h ? h.slice(OPEN.length, h.length - CLOSE.length) : '';
+        assert.equal(cards(fc), board + cards(hv),
+            'the two mounts differ by more than the board card');
     });
 
     test('ties and net semantics are the presenter\'s, not the mount\'s', () => {

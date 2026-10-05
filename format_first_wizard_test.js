@@ -137,17 +137,22 @@ describe('THE NEW RYDER CUP IS NOT THE LEGACY MONEY GAME', () => {
 });
 
 // ============================================================================
-// RE-POINTED 2026-10-05: THREE STEPS AND A SAVE.
+// RE-POINTED 2026-10-05: FOUR SCREENS AND A SAVE.
 //
 // This file's subject was a SEVEN-screen workflow derived from the format -
 // Format, Course, Round Length, Format Settings, Players, Games & Money, Review -
 // and every assertion below about which screens a format visits was written
-// against it. The wizard is now Course / Players / Games & Money / Review, and
-// the three screens that went away did not lose a single field: the round length
-// and the Par/HCP grid are on Course, the format gallery and its settings are on
-// Games & Money, moved by buildThreeStepWizard() as NODES so every id, handler
-// and reader is untouched. setup_three_step_test.js holds that a round saves
-// byte-identical data through the new shape.
+// against it. The wizard is now Course / Players / Games / Money / Review, and
+// the screens that went away did not lose a single field: the round length and
+// the Par/HCP grid are on Course, the format gallery and its settings are on
+// Games along with Also Playing, and Money keeps the stakes and the pot - all
+// moved by buildCompactWizard() as NODES so every id, handler and reader is
+// untouched. setup_wizard_shape_test.js holds that a round saves byte-identical
+// data through the new shape.
+//
+// RE-POINTED AGAIN the same day: Games and Money were ONE screen for six hours
+// and Manny asked for them back apart. The format gallery is step 3 again, which
+// is why the tails below read players/format/action/review.
 //
 // So the claims here are re-pointed rather than deleted: a format that HAS
 // settings must still reach them, and the Cup must still not be asked for money.
@@ -191,16 +196,17 @@ describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
         });
     });
 
-    test('every non-Cup workflow still ends Players, Games & Money, Review', () => {
+    test('every non-Cup workflow still ends Players, Games, Money, Review', () => {
         ['stroke', 'stableford', 'nassau-modern', 'bestball', 'scramble', 'hilo', 'wolf', 'ryder']
             .forEach((f) => {
-                assert.deepEqual(flow(wizard(f)).slice(-3), ['players', 'action', 'review'], f);
+                assert.deepEqual(flow(wizard(f)).slice(-4), ['players', 'format', 'action', 'review'], f);
             });
     });
 
     test('the progress dots show the workflow, not seven circles', () => {
-        // RE-PINNED 2026-10-05: three steps and a save, and a Cup skips the money.
-        [['ryder-cup', 3], ['stroke', 4], ['bestball', 4]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05: four screens and a save, and a Cup skips both
+        // Games (its format comes from the entry card) and Money.
+        [['ryder-cup', 3], ['stroke', 5], ['bestball', 5]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");
@@ -267,9 +273,11 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
         });
     });
 
-    test('Next from Players skips Games & Money for a Cup only', () => {
+    test('Next from Players skips Games and Money for a Cup only', () => {
         assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(5, 1)'), 7);
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, 1)'), 6);
+        // Everyone else meets Games (step 3) first, and Money (step 6) after it.
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, 1)'), 3);
+        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(3, 1)'), 6);
     });
 
     test('a step the new format does not have can never be landed on', () => {
@@ -355,7 +363,7 @@ describe('NOTHING LEAKS ACROSS A FORMAT SWITCH', () => {
         assert.ok(!ADMIN.includes('/ryderCup'), 'no Cup is ever written from the wizard');
         const sb = wizard('ryder-cup');
         run(sb, "selectFormatCard('stroke');");
-        assert.deepEqual(flow(sb).slice(-3), ['players', 'action', 'review']);
+        assert.deepEqual(flow(sb).slice(-4), ['players', 'format', 'action', 'review']);
     });
 
     test('the selected card follows the format', () => {

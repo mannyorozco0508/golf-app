@@ -1523,29 +1523,48 @@ html {
     border-top: 1px solid var(--border-mid);
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -6px 24px rgba(0,0,0,0.18);
-    transform: translateY(calc(100% - var(--sheet-handle-h, 52px)));
+    transform: translateY(calc(100% - var(--sheet-handle-h, 62px)));
     transition: transform 0.22s ease;
     max-height: 86vh;
     display: flex;
     flex-direction: column;
 }
 #round-sheet.open { transform: translateY(0); }
+/* IT HAS TO READ AS A BUTTON (2026-10-05). Manny tapped past it: a line of
+   small green text on the card background is a label, and a label does not look
+   like the way into everything else on the round. So the text is the size of a
+   heading and the thing around it is an obvious control - filled pill, border,
+   shadow - and the grab bar above it stays, because the sheet still slides.
+   The handle is the full-width target (nothing shrank); the PILL is what is
+   drawn. --sheet-handle-h below is what the closed sheet leaves on screen and
+   must match min-height here, or the bottom of the pill is off the screen. */
 #round-sheet-handle {
     all: unset;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
     width: 100%;
-    min-height: 52px;
-    padding: 0 16px;
+    min-height: 62px;
+    padding: 14px 16px 10px;
     cursor: pointer;
-    font-weight: bold;
-    font-size: 0.9rem;
-    color: var(--brand-green);
     text-align: center;
 }
+#round-sheet-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    border-radius: 999px;
+    background: var(--brand-green);
+    border: 1px solid var(--brand-green);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.26);
+    color: #F2EDE4;
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.15;
+}
+#round-sheet-caret { font-size: 0.8rem; opacity: 0.85; }
 #round-sheet-handle::before {
     content: '';
     position: absolute;
@@ -1561,8 +1580,9 @@ html {
     padding: 0 14px max(16px, env(safe-area-inset-bottom, 0px)) 14px;
 }
 /* The sheet is closed on arrival, so the page needs exactly the handle's worth of
-   room under the last thing on it and not a pixel more. */
-body.has-round-sheet #main-content { padding-bottom: 64px; }
+   room under the last thing on it and not a pixel more. 62px of handle plus the
+   12px of slack it had at 52. */
+body.has-round-sheet #main-content { padding-bottom: 74px; }
 
 /* THE GAP ABOVE "HOLE N" (2026-10-05). With the header, the nav and every
    reading card in the Status sheet, the page's own chrome - 12px of body
@@ -1608,7 +1628,12 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
 .hl-chip { white-space: nowrap; color: var(--text-muted); }
 .hl-chip b { color: var(--brand-green); }
 .hl-chip i { font-style: normal; opacity: 0.75; }
-.hl-more { all: unset; cursor: pointer; font-size: 0.72rem; font-weight: bold; color: var(--brand-green); margin-left: auto; min-height: 24px; }
+.hl-more { font-size: 0.72rem; font-weight: bold; color: var(--brand-green); margin-left: auto; }
+/* The board row is a <button> so it is tappable and reachable by keyboard, and
+   these undo only what the UA adds - NOT font-size, which .hl-row owns. */
+button.hl-board { appearance: none; -webkit-appearance: none; background: none; border: 0;
+    margin: 0; padding: 0; width: 100%; text-align: left; cursor: pointer;
+    font-family: inherit; font-weight: inherit; color: inherit; }
 .hl-match { color: var(--text-main); }
 .hl-match b { color: var(--brand-green); }
 .hl-hole { color: var(--accent-teal); font-weight: bold; }
@@ -1902,8 +1927,14 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
 <div id="round-sheet" aria-hidden="false">
     <button type="button" id="round-sheet-handle" aria-expanded="false"
             aria-controls="round-sheet-body" onclick="toggleRoundSheet()">
-        <span id="round-sheet-label">Status &amp; everything else</span>
-        <span id="round-sheet-caret" aria-hidden="true">▲</span>
+        <!-- REAL GLYPHS, NOT ESCAPES: a \uXXXX sequence only resolves inside a JS
+             string and prints literally in raw markup. The pill wraps the label and
+             the caret so the two read as ONE button; both keep their ids, because
+             toggleRoundSheet flips the caret by id. -->
+        <span id="round-sheet-pill">
+            <span id="round-sheet-label">&#9776; Round Menu</span>
+            <span id="round-sheet-caret" aria-hidden="true">▲</span>
+        </span>
     </button>
     <div id="round-sheet-body"></div>
 </div>
@@ -3513,14 +3544,20 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
             board = started.length ? started : all;
         } catch (e) { board = []; }
         if (board.length) {
-            rows.push('<div class="hl-row hl-board">'
+            // THE WHOLE ROW IS THE TAP (2026-10-05). Manny: tapping the lines, not
+            // only the link, opens the full board. One handler on one element - the
+            // chip was a nested <button>, which is invalid markup and gave the row
+            // two ways to fire - and the pop-up is #live-board-overlay, which keeps
+            // the scorecard mounted underneath so nothing half-typed is lost.
+            rows.push('<button type="button" class="hl-row hl-board" onclick="openLiveBoard()"'
+                + ' aria-label="Open the full leaderboard">'
                 + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
                     + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
                     // THRU IS ALWAYS PRINTED, 0 included: before anyone has started,
                     // "E thru 0" is the whole truth about the round and reads as one.
                     + ' <i>thru ' + esc(r.thru || 0) + '</i></span>').join('')
-                + '<button type="button" class="hl-more" onclick="openLiveBoard()">Full board \u203A</button>'
-                + '</div>');
+                + '<span class="hl-more">Full board \u203A</span>'
+                + '</button>');
         }
 
         // 2. THIS GOLFER'S MATCHES, one line each. The segment shown is the one
@@ -4195,11 +4232,11 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
         return html + '</div>';
     }
 
-    // TWO WIDGETS, ONE DASHBOARD. The loose ticker line is gone: leader information
-    // now lives in exactly one place, inside a bordered card, so nothing duplicates
-    // it further down the page.
-    // Hole View's mount and the Full Card's. Adding a view means adding an id here,
-    // never a second copy of the widget.
+    // ONE DASHBOARD, BUILT ONCE. The loose ticker line is gone: leader information
+    // lives in exactly one place per view - the pop-up on Hole View, the card at the
+    // top of the Full Card - so nothing duplicates it further down the page.
+    // Hole View's mount and the Full Card's. Adding a view means adding an id here
+    // and a list in HTML_FOR, never a second copy of a widget.
     const TICKER_MOUNTS = ['live-ticker-mount', 'fc-ticker-mount'];
 
     function renderLiveTicker() {
@@ -4234,17 +4271,32 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
         // Ryder Cup rides the same grid and the same two mounts. Placed after the
         // to-par board so the golfer's own score stays first on the phone.
         const ryder = (!closed && typeof renderRyderCupHtml === 'function') ? renderRyderCupHtml() : '';
-        const any = board || skins || matches || points || hilo || strokeBets || dotsBoard || ryder;
-        const html = any ? '<div class="lw-grid">' + board + dotsBoard + ryder + skins + matches + points + hilo + strokeBets + '</div>' : '';
-        // ONE PRESENTER, TWO MOUNTS. The markup is built once, above, from
-        // liveStandings() -> computeNetToParStandings(). Hole View and the Full Card
-        // then receive the same string. Nothing about ranking, ties, net handicaps or
-        // group scoping is decided twice, so the two views cannot disagree about who
-        // is leading - which is the only thing that would make a second board worse
-        // than no board at all.
+        // THE BOARD CARD IS NOT ON THE HOLE VIEW ANY MORE (2026-10-05). Manny: the
+        // compact top-five under Prev/Next and a full "Live Leaderboard" card six
+        // pixels below it were the same information twice. The compact lines stay
+        // (they are the quick reference) and now open the pop-up; the full board is
+        // what the pop-up holds. The FULL CARD view has no compact lines of its own
+        // - #hole-live-mount belongs to the hole card - so its card stays.
+        //
+        // STILL ONE PRESENTER. The board html is built once, above, from
+        // liveStandings(); this chooses which mounts receive it. Nothing is
+        // recomputed, so the two views cannot disagree about who is leading.
+        const grid = cards => cards.filter(Boolean).length ? '<div class="lw-grid">' + cards.join('') + '</div>' : '';
+        const rest = [dotsBoard, ryder, skins, matches, points, hilo, strokeBets];
+        const HTML_FOR = {
+            'live-ticker-mount': grid(rest),
+            'fc-ticker-mount': grid([board].concat(rest))
+        };
+        // ONE PRESENTER, TWO MOUNTS. Every card is built once, above, from
+        // liveStandings() -> computeNetToParStandings() and the other builders.
+        // Nothing about ranking, ties, net handicaps or group scoping is decided
+        // twice - which is the only thing that would make a second board worse
+        // than no board at all. What differs per mount is the LIST of cards, never
+        // a card: Hole View has the compact lines and the pop-up, the Full Card
+        // has neither.
         TICKER_MOUNTS.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = html;
+            if (el) el.innerHTML = HTML_FOR[id] || '';
         });
     }
 
@@ -9749,8 +9801,43 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
             + '</div>';
     }
 
+    // BYTE-IDENTICAL TO admin.html's (2026-10-05). The scorecard and the setup
+    // page are the two controls that delete a round, and they are two inline
+    // scripts, so the sentence exists twice; the guard holds the two copies
+    // identical rather than trusting them to stay that way.
+    const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
+        + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
+        + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';
+
     // ASYNC: the most destructive decision in the app now goes through a sheet
     // whose CANCEL is the focused control. onclick only.
+    //
+    // CHECK BEFORE WRITING, which admin.html's twin has done since 2026-09-19 and
+    // this one never did. Manny, round ZSGZWH, organizer: the confirm appeared, he
+    // tapped "Delete it", and nothing happened. Measured rather than guessed -
+    // straight off the live record, which is world-readable:
+    //
+    //   events/ZSGZWH/ownerUid  "h8Axnef..."  he is the owner
+    //   events/ZSGZWH/scores    8 entries     it has been played
+    //
+    // and database.rules.json's owner clause ends `(newData.exists() ||
+    // !data.hasChild('scores'))`, so deleting a round that has scores is
+    // PERMISSION_DENIED. The write WAS sent and WAS refused. Two things were
+    // wrong with what the golfer saw:
+    //
+    //   1. He was asked to confirm something that could not happen. The round
+    //      record is already on this page, so the answer is known before the
+    //      question - the scores sentence now comes first and no write is sent.
+    //   2. The refusal went nowhere. uiRefuse anchors a note beside the last
+    //      control tapped, which was "Delete it" inside the confirm sheet that
+    //      had just been emptied, so the note was inserted into a detached
+    //      subtree: querySelectorAll('.ui-note') found NOTHING after a refused
+    //      delete (tools/delete-refusal-check.js). ui-dialogs.js now falls back
+    //      to a fixed note when its anchor has left the document, which fixes
+    //      every refusal raised from inside a confirm, not only this one.
+    //
+    // A LATE REFUSAL IS STILL POSSIBLE - a score can land between this check and
+    // the write - so the catch keeps both arms, told apart by the error's text.
     async function endAndClearRound() {
         // Checked again here, not only at render: removing the button in
         // devtools must achieve nothing. Same belt-and-braces as filterGroup().
@@ -9758,9 +9845,14 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
             console.warn('Only this round\u2019s organizer can delete it.');
             return;
         }
+        if (Object.keys((currentData && currentData.scores) || {}).length > 0) {
+            uiRefuse(SCORED_ROUND_SENTENCE);
+            return;
+        }
         const golferCount = (currentData.players || []).length;
-        const msg = `Delete round ${currentMode} for everyone?\n\n`
-            + `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+        // THE TITLE IS NOT REPEATED AS THE FIRST LINE OF THE BODY. It was, and on
+        // a phone the sheet read the same sentence twice before saying anything.
+        const msg = `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
             + `It cannot be undone.\n\n`
             + `You do not need to delete a round when you finish playing.`;
         // AWAIT, and note the shape: this one was `if (confirm(msg))`, so a missed
@@ -9771,24 +9863,25 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
             body: msg,
             confirmText: 'Delete it', cancelText: 'Keep the round', danger: true
         });
-        if (ok) {
-            db.ref(`events/${currentMode}`).remove().then(() => {
-                uiToast("Round deleted. The scorecard is now clear.");
-                window.location.href = "admin.html";
-            }).catch((err) => {
-                // THE SAME CATCH FIRES ON A DROPPED CONNECTION. Saying "this
-                // round has scores in it" for a network failure would be false
-                // half the time, so the two are told apart by the error itself.
-                const m = String((err && err.message) || err || '');
-                if (/PERMISSION_DENIED/i.test(m)) {
-                    uiRefuse('This round has scores in it, so it cannot be deleted.\n\n'
-                        + 'That is deliberate \u2014 it stops a round being wiped by accident '
-                        + 'once anyone has started playing.');
-                } else {
-                    uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
-                }
-            });
-        }
+        if (!ok) return;
+        // CLOSE EVERYTHING, whichever way this goes. The button lives in the
+        // Status sheet, and an outcome delivered behind an open sheet is the same
+        // invisible outcome as none at all.
+        if (typeof toggleRoundSheet === 'function') toggleRoundSheet(false);
+        if (typeof closeLiveBoard === 'function') closeLiveBoard();
+        db.ref(`events/${currentMode}`).remove().then(() => {
+            // STRAIGHT HOME. The round is gone; there is nothing on this page to
+            // come back to, and a toast nobody can read on the way out is not
+            // evidence of anything.
+            window.location.href = "admin.html";
+        }).catch((err) => {
+            // THE SAME CATCH FIRES ON A DROPPED CONNECTION. Saying "this round has
+            // scores in it" for a network failure would be false half the time, so
+            // the two are told apart by the error itself.
+            const m = String((err && err.message) || err || '');
+            if (/PERMISSION_DENIED/i.test(m)) uiRefuse(SCORED_ROUND_SENTENCE);
+            else uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+        });
     }
 
     // Total strokes for the round, low total wins the stake — the simpler alternative to

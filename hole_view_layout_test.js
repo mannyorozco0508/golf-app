@@ -81,7 +81,11 @@ function renderHole(d, hole) {
     `, sb);
     const g = (id) => String(vm.runInContext(
         `(document.getElementById('${id}')||{}).innerHTML || ''`, sb));
-    return { ticker: g('live-ticker-mount'), sb };
+    // RE-POINTED 2026-10-05: the Full Card mount. The to-par board card left Hole
+    // View - the compact top five under Prev/Next opens it as a pop-up instead -
+    // and the tests below assert the dashboard still carries everything. Every
+    // card but the board renders identically into both mounts.
+    return { ticker: g('fc-ticker-mount'), hv: g('live-ticker-mount'), sb };
 }
 const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
@@ -118,13 +122,17 @@ describe('THE LIVE DASHBOARD COMES FIRST', () => {
         dashboardIsOutOfTheHoleBlock(body);
     });
 
-    test('LIVE LEADERBOARD and LIVE MATCHES share that single mount', () => {
-        // Both widgets render into live-ticker-mount, so placing the mount places
-        // both. Asserted so a future split cannot quietly reintroduce the problem.
+    test('the dashboard widgets share that single mount', () => {
+        // One registry, one presenter: placing the mount places every widget in it.
+        // Asserted so a future split cannot quietly reintroduce the problem.
+        // RE-POINTED 2026-10-05: the board card is the one widget that is now
+        // per-view - Hole View has the compact lines and the pop-up instead - so
+        // what is asserted is that BOTH mounts are still fed by this one presenter.
         const src = read('index.html');
         const at = src.indexOf('const TICKER_MOUNTS');
-        const fn = src.slice(at, at + 2000);
+        const fn = src.slice(at, at + 2600);
         assert.match(fn, /'live-ticker-mount'/, 'Hole View mount is still in the registry');
+        assert.match(fn, /'fc-ticker-mount'/, 'the Full Card mount is still in the registry');
         assert.match(fn, /buildLiveMatchHtml/);
         assert.match(fn, /renderLeaderWidgetHtml/);
     });
@@ -186,9 +194,18 @@ describe('A PRESS-HEAVY NASSAU DOES NOT CHANGE THE ORDER', () => {
 
     test('nothing was removed from the wager panel', () => {
         // The layout change must not have simplified the information.
-        const t = strip(renderHole(round(), 9).ticker);
+        const r = renderHole(round(), 9);
+        const t = strip(r.ticker);
         ['LIVE LEADERBOARD','LIVE MATCHES','FRONT 9','BACK 9','TOTAL','AUTO PRESS']
             .forEach(k => assert.ok(t.includes(k), k + ' disappeared'));
+        // AND HOLE VIEW KEEPS EVERYTHING BUT THE BOARD. Without this, re-pointing
+        // the line above to the other mount would hide a Hole View that had lost
+        // the wager panel as well.
+        const hv = strip(r.hv);
+        ['LIVE MATCHES','FRONT 9','BACK 9','TOTAL','AUTO PRESS']
+            .forEach(k => assert.ok(hv.includes(k), k + ' disappeared from Hole View'));
+        assert.ok(!hv.includes('LIVE LEADERBOARD'),
+            'the duplicate board card is back under the compact lines');
     });
 
     test('per-segment stakes are still shown', () => {

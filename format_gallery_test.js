@@ -321,7 +321,10 @@ describe('EVERY NATIVE PAGE STARTS BELOW THE STATUS BAR', () => {
     test('the header is inset, not hidden', () => {
         // The fix must never have been "move the header out of the way".
         assert.match(ADMIN, /id="wiz-n-format"/);
-        assert.match(ADMIN, /What Are We Playing\?/);
+        // RE-PINNED 2026-10-05: the screen is called Games now, because it holds
+        // the gallery, that format's settings and Also Playing. The claim is that
+        // the step still HAS a visible title, not what the title says.
+        assert.match(ADMIN, /<div class="wizard-step-title">[^<]*Games [^<]*<span class="wiz-step-n" id="wiz-n-format">/);
         assert.ok(!/\.wizard-step-title \{[^}]*display: none/.test(ADMIN));
     });
 

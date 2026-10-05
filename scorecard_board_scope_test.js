@@ -98,7 +98,9 @@ function scorecard(lockedGroup) {
         // stripped text would pass on any page at all.
         boardHtml: () => el('live-board-body'),
         cardNames: () => {
-            const t = strip(el('live-ticker-mount'));
+            // RE-POINTED 2026-10-05: the board card renders on the Full Card mount
+            // now - Hole View has the compact lines and the pop-up instead.
+            const t = strip(el('fc-ticker-mount'));
             const start = t.indexOf('LIVE LEADERBOARD');
             if (start === -1) return [];
             const ends = ['SKINS', 'LIVE MATCHES', 'LIVE GAME', 'LIVE DOTS']
