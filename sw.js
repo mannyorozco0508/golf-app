@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v139-gamesfirst. The tournament product cache
+// The consumer product cache is consumer-v140-pergolfertees. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4227,7 +4227,15 @@
 // shows nothing extra. The Cup skips Money and only Money. A device on v298 asks
 // for the course first, which is also why its Team column on Players appeared
 // behind the organizer rather than in front of them.
-const CACHE_VERSION = 'golfapp-v299-gamesfirst';
+// Moved to v300: A TEE PER GOLFER. The Players step takes a tee for each golfer,
+// defaulting to the round's; a GHIN Index is converted from THAT golfer's slope
+// and rating; a Strokes round records the tee and changes nothing unless the
+// organizer ticks "Adjust for different tees", which adds the official
+// course-rating difference. The scorecard prints a tee beside a name only on a
+// round whose golfers are on different ones. player-tees.js joins the shell -
+// admin.html and index.html load it at parse time. A device on v299 converts
+// every Index from the round's single tee.
+const CACHE_VERSION = 'golfapp-v300-pergolfertees';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4277,6 +4285,7 @@ const SHELL_FILES = [
     // call it unguarded, so a cached shell missing this file does not compute a
     // wrong number - it fails to render at all, which is the correct failure.
     './handicap.js',
+    './player-tees.js',
     './handicap-labels.js',
     './aloha-bet.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both

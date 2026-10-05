@@ -36,6 +36,9 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- WHICH TEE a golfer's numbers came from. Display only on this page: the
+         strokes were resolved into p.hcp when the round was saved. -->
+    <script src="player-tees.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
@@ -1166,6 +1169,11 @@
 
         /* Hole View's own handicap label. Hole View is the DEFAULT view, so a golfer
            who never taps Full Card still sees what they are playing off. */
+        .hv-tee {
+            display: inline-block; margin-left: 6px; padding: 0 6px;
+            border: 1px solid var(--border-mid); border-radius: 8px;
+            font-size: 0.66rem; color: var(--text-muted); white-space: nowrap;
+        }
         .hv-hcp {
             display: block; font-size: 0.68rem; font-weight: normal;
             color: var(--text-muted); letter-spacing: 0.2px; margin-top: 1px;
@@ -3266,8 +3274,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // the selected match's relative number: this label answers "what am I?",
             // while the teal dots answer "where do I stroke in this match?".
             const hvPlayer = filteredPlayers[i - 3];
+            // AND THE TEE, BUT ONLY WHEN IT IS NEWS (2026-10-05). On a round where
+            // everyone is on the same tee, four identical chips say nothing and cost
+            // a line of a card that has to fit one screen. On a mixed-tee round the
+            // tee is the reason two golfers with the same number stroke differently,
+            // so it belongs beside the name.
+            const hvTeeHtml = (hvPlayer && window.playerTees
+                               && window.playerTees.hasMixedTees(currentData.players || [], roundTeeRating()))
+                ? (function () {
+                    const label = window.playerTees.teeLabel(
+                        window.playerTees.playerTee(hvPlayer, roundTeeRating()));
+                    return label ? `<span class="hv-tee">${escapeHtml(label)}</span>` : '';
+                })() : '';
             const hvHcpHtml = hvPlayer
-                ? `<div class="hv-hcp">${escapeHtml(holeViewHandicapLabel(hvPlayer))}</div>` : '';
+                ? `<div class="hv-hcp">${escapeHtml(holeViewHandicapLabel(hvPlayer))}${hvTeeHtml}</div>` : '';
             html += `<div class="hv-player-row${hvPlayer && hvPlayer.out === true ? ' golfer-out' : ''}"><div class="hv-player-name">${escapeHtml(name)}${hvHcpHtml}`;
             // DOTS ARE DRAWN ONCE, BY THE CELL ITSELF.
             //
@@ -7902,6 +7922,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // GUARDED, and the fallback is the card's own order - which is what a round
     // off the 1st tee plays anyway, so a shell cached without play-order.js is a
     // round that behaves exactly as it did before this existed.
+    // The round's own tee, as saved. One reader, so a page that starts showing
+    // tees somewhere else cannot invent a second shape for them.
+    function roundTeeRating() {
+        return (currentData && currentData.teeRating) || null;
+    }
+
     function playOrderCourse(course) {
         const cd = (course || (currentData && currentData.courseData) || []).slice()
             .sort((a, b) => Number(a.hole) - Number(b.hole));

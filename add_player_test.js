@@ -147,8 +147,11 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
 
     test('addPlayerRow keeps its defaults so a bare call still works', () => {
         // `flight = undefined` was added as the tenth parameter in the flights
-        // wave (2026-09-13); every default before it is unchanged.
-        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined\)/.test(ADM),
+        // wave (2026-09-13) and `teeKey = undefined` as the eleventh in the
+        // per-golfer tees wave (2026-10-05); every default before them is
+        // unchanged, which is the claim - a bare addPlayerRow() still adds one
+        // row with an immediate refresh.
+        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined\)/.test(ADM),
             'a plain addPlayerRow() must still add one row with an immediate refresh');
     });
 
@@ -195,7 +198,9 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
         assert.ok(at > 0, 'the batch rebuild still goes through appendPlayerFrom');
         const call = ADM.slice(ADM.indexOf('addPlayerRow(', at));
         const args = call.slice(call.indexOf('(') + 1, call.indexOf(')')).split(',').map(a => a.trim());
-        assert.equal(args.length, 10, 'ten arguments: ' + JSON.stringify(args));
+        // ELEVEN since the per-golfer tees wave: the row needs to know which tee
+        // this golfer was saved on, and the eleventh is where it is passed.
+        assert.equal(args.length, 11, 'eleven arguments: ' + JSON.stringify(args));
         assert.equal(args[7], 'true', 'the 8th argument is deferRefresh, and the batch defers: ' + JSON.stringify(args));
         assert.equal(args[8], 'p.id', 'and the row still carries the golfer\'s own id');
         // The signature's 8th parameter really is deferRefresh - so position 8

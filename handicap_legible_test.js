@@ -353,7 +353,11 @@ describe('5. THE ROUND-LEVEL SETTING, default AS ENTERED', () => {
     test('AS ENTERED does not convert: the typed number becomes the handicap and no Index is stored', () => {
         const at = ADMIN.indexOf('const hcpFields =');
         assert.ok(at > 0, 'the save still builds the handicap fields in one place');
-        const block = ADMIN.slice(at, at + 900);
+        // 1500 SINCE THE PER-GOLFER TEES WAVE (was 900). The as-entered arm gained
+        // the optional course-rating adjustment, so the GHIN arm it is paired
+        // against now sits further down - and a window that stops short of what it
+        // asserts is a test that stops testing without saying so.
+        const block = ADMIN.slice(at, at + 1500);
         assert.match(block, /as-entered|handicapBasisForSave|basisForSave/, 'the basis decides: ' + block.slice(0, 300));
         assert.match(block, /playerHandicapFields\(/, 'and the GHIN arm still uses the shared builder');
     });
