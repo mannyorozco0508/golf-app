@@ -373,8 +373,11 @@ describe('NO SILENT DEFAULTS AT CAPTURE', () => {
 describe('THE NEXT / SAVE BOUNDARY', () => {
 
     test('Next blocks on an invalid card and does not advance', () => {
+        // RE-POINTED 2026-10-05: the Par/HCP grid lives on the COURSE screen now -
+        // the wizard is three steps and a save, and the Round Length panel moved onto
+        // Course as nodes. The gate is unchanged; it is asked for by step 1's Next.
         const sb = page();
-        run(sb, `goToWizardStep(2); document.getElementById('enable-custom-course').checked = true;`);
+        run(sb, `goToWizardStep(1); document.getElementById('enable-custom-course').checked = true;`);
         seed(sb, 'Manny Test Links'); fillValid(sb);
         setHcp(sb, 9, 18);
         // UI WAVE 3: the page refuses through uiRefuse now. All four feed the same
@@ -383,24 +386,24 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
             + `window.uiRefuse = m => window.__alerts.push(m);`
             + `window.uiFail = m => window.__alerts.push(m);`
             + `window.uiToast = m => window.__alerts.push(m);`);
-        run(sb, `wizardNext(2);`);
-        assert.equal(val(sb, 'currentWizardStep'), 2, 'must not advance');
+        run(sb, `wizardNext(1);`);
+        assert.equal(val(sb, 'currentWizardStep'), 1, 'must not advance');
         assert.match(sb.window.__alerts[0], /Handicap 18 is used on both hole 9 and hole 18/);
     });
 
     test('Next advances on a valid card and the EDITED values are what capture returns', () => {
         const sb = page();
-        run(sb, `goToWizardStep(2); document.getElementById('enable-custom-course').checked = true;`);
+        run(sb, `goToWizardStep(1); document.getElementById('enable-custom-course').checked = true;`);
         seed(sb, 'Manny Test Links'); fillValid(sb);
         setPar(sb, 1, 5); setPar(sb, 9, 3); setHcp(sb, 18, 2); setHcp(sb, 2, 18);
         run(sb, `window.__alerts = []; window.alert = m => window.__alerts.push(m);`);
-        run(sb, `wizardNext(2);`);
+        run(sb, `wizardNext(1);`);
         assert.equal(sb.window.__alerts.length, 0);
         // Format moved to the front of the workflow, so Round Length no longer leads
         // to it. What this test guards is the GATE and the edited values surviving the
         // transition, so it asks the workflow where Next goes instead of naming a step.
-        assert.notEqual(val(sb, 'currentWizardStep'), 2, 'must advance');
-        assert.equal(val(sb, 'currentWizardStep'), val(sb, 'wizardNeighbourStep(2, 1)'));
+        assert.notEqual(val(sb, 'currentWizardStep'), 1, 'must advance');
+        assert.equal(val(sb, 'currentWizardStep'), val(sb, 'wizardNeighbourStep(1, 1)'));
         const by = {}; capture(sb).forEach(h => { by[h.hole] = h; });
         assert.equal(by[1].par, 5);
         assert.equal(by[9].par, 3);
@@ -409,17 +412,17 @@ describe('THE NEXT / SAVE BOUNDARY', () => {
 
     test('BACK from the next step returns to the same edited values', () => {
         const sb = page();
-        run(sb, `goToWizardStep(2); document.getElementById('enable-custom-course').checked = true;`);
+        run(sb, `goToWizardStep(1); document.getElementById('enable-custom-course').checked = true;`);
         seed(sb, 'Manny Test Links'); fillValid(sb);
         setPar(sb, 1, 5); setHcp(sb, 18, 2); setHcp(sb, 2, 18);
-        run(sb, `wizardNext(2); wizardBack(currentWizardStep);`);
-        assert.equal(val(sb, 'currentWizardStep'), 2);
+        run(sb, `wizardNext(1); wizardBack(currentWizardStep);`);
+        assert.equal(val(sb, 'currentWizardStep'), 1);
         assert.equal(par(sb, 1), '5', 'Back must not reseed');
         assert.equal(hcp(sb, 18), '2');
     });
 
     test('the wizard boundary only fires for the custom grid', () => {
-        assert.match(SRC_CODE, /if \(fromStep === 2\) \{/);
+        assert.match(SRC_CODE, /if \(fromStep === 1\) \{/);
         assert.match(SRC_CODE, /const customBox = document\.getElementById\('enable-custom-course'\);/);
         assert.match(SRC_CODE, /if \(customBox && customBox\.checked\) \{/);
     });

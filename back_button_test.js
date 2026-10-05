@@ -447,10 +447,11 @@ describe('admin.html', () => {
         walkWizard(sb, 5);
         assert.equal(step(sb), 5);
         assert.equal(press(sb), 'wizard-step');
-        assert.equal(step(sb), 2, 'stroke play has no Format Settings, so back from Players is Round Length');
-        assert.equal(press(sb), 'wizard-step');
-        assert.equal(step(sb), 1);
-        assert.equal(press(sb), 'wizard-step');
+        // RE-POINTED 2026-10-05: three steps and a save. The round length is ON the
+        // Course screen now, so there is exactly one screen before Players and Back
+        // from it goes there for every format.
+        assert.equal(step(sb), 1, 'stroke play has no Format Settings, so back from Players is Course');
+        // Course IS the first step now, so the next press is the one that stops.
         assert.equal(step(sb), firstStep(sb));
         assert.equal(press(sb), 'none', 'the first step stepped back');
     });

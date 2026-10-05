@@ -192,7 +192,13 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         // the panel on arrival. Same sense as 'coach': built by the app, read on
         // arrival, and it opens a panel the Account button already opens - so there is
         // nothing behind it a golfer could not reach by tapping Account.
-        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'trip']);
+        // 'step' JOINED 2026-10-05: "Same as last week" copies the organizer's most
+        // recent round and lands on the PLAYERS screen, because the course, the
+        // games and the money came with the copy and who is playing is the only
+        // thing left. Same sense as 'coach' and 'account': built by the app, read on
+        // arrival, and it opens a screen the wizard already has. Only 'players' is
+        // honoured - it is not a general jump.
+        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'step', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

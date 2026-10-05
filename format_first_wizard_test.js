@@ -130,16 +130,35 @@ describe('THE NEW RYDER CUP IS NOT THE LEGACY MONEY GAME', () => {
     test('a legacy ryder round reopens as a legacy ryder round', () => {
         const sb = wizard('ryder');
         assert.equal(run(sb, "document.getElementById('game-format-select').value"), 'ryder');
-        assert.ok(flow(sb).includes('settings'), 'Team Match keeps its own settings step');
+        // The settings PANEL is on the Games & Money screen now, so the workflow
+        // reaches it as 'action'. The panel itself is untouched.
+        assert.ok(flow(sb).includes('action'), 'Team Match can no longer reach its settings');
     });
 });
 
+// ============================================================================
+// RE-POINTED 2026-10-05: THREE STEPS AND A SAVE.
+//
+// This file's subject was a SEVEN-screen workflow derived from the format -
+// Format, Course, Round Length, Format Settings, Players, Games & Money, Review -
+// and every assertion below about which screens a format visits was written
+// against it. The wizard is now Course / Players / Games & Money / Review, and
+// the three screens that went away did not lose a single field: the round length
+// and the Par/HCP grid are on Course, the format gallery and its settings are on
+// Games & Money, moved by buildThreeStepWizard() as NODES so every id, handler
+// and reader is untouched. setup_three_step_test.js holds that a round saves
+// byte-identical data through the new shape.
+//
+// So the claims here are re-pointed rather than deleted: a format that HAS
+// settings must still reach them, and the Cup must still not be asked for money.
+// What changed is the screen they are printed on.
+// ============================================================================
 // ============================================================================
 describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
 
     test('the Cup workflow is Format, Players, Review — nothing else', () => {
         assert.deepEqual(JSON.parse(run(wizard('stroke'), "JSON.stringify(wizardWorkflow('ryder-cup'))")),
-            ['format', 'course', 'length', 'players', 'review']);
+            ['course', 'players', 'review']);
     });
 
     test('the Cup never reaches Format Settings', () => {
@@ -167,7 +186,8 @@ describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
 
     ['stableford', 'wolf', 'bestball', 'scramble', 'ryder'].forEach((f) => {
         test(`${f} keeps its Format Settings step`, () => {
-            assert.ok(flow(wizard(f)).includes('settings'));
+            assert.ok(flow(wizard(f)).includes('action'),
+            'the settings panel is on Games & Money now, and this format cannot reach it');
         });
     });
 
@@ -179,7 +199,8 @@ describe('THE WORKFLOW IS DERIVED FROM THE FORMAT', () => {
     });
 
     test('the progress dots show the workflow, not seven circles', () => {
-        [['ryder-cup', 5], ['stroke', 6], ['bestball', 7]].forEach(([f, n]) => {
+        // RE-PINNED 2026-10-05: three steps and a save, and a Cup skips the money.
+        [['ryder-cup', 3], ['stroke', 4], ['bestball', 4]].forEach(([f, n]) => {
             const sb = wizard(f);
             run(sb, 'renderWizardProgress();');
             const html = run(sb, "document.getElementById('wizard-progress').innerHTML");
@@ -226,18 +247,24 @@ describe('NO FORMAT SEES CONTROLS THAT ARE NOT ITS OWN', () => {
 // ============================================================================
 describe('BACK AND NEXT WALK THE WORKFLOW', () => {
 
-    test('Next from Format always lands on Course, whatever the format', () => {
+    test('the wizard opens on Course, whatever the format', () => {
+        // RE-POINTED 2026-10-05: Format is no longer a screen of its own - the
+        // gallery is on Games & Money, above the money, because you pick the game
+        // before you price it. So the first screen is Course for every format, which
+        // is what this test was really protecting: nobody starts on a dead end.
         ['bestball', 'stroke', 'ryder-cup'].forEach((f) => {
-            assert.equal(run(wizard(f), 'wizardNeighbourStep(3, 1)'), 1, f);
+            assert.equal(run(wizard(f), 'wizardFirstStep()'), 1, f);
         });
     });
 
-    test('Back from Players returns to the step that actually exists', () => {
-        // Best Ball has Format Settings between Round Length and Players; the other
-        // two do not, so Back from Players is Round Length for them.
-        assert.equal(run(wizard('bestball'), 'wizardNeighbourStep(5, -1)'), 4);
-        assert.equal(run(wizard('stroke'), 'wizardNeighbourStep(5, -1)'), 2);
-        assert.equal(run(wizard('ryder-cup'), 'wizardNeighbourStep(5, -1)'), 2);
+    test('Back from Players returns to Course, for every format', () => {
+        // RE-POINTED 2026-10-05: there is one screen before Players now and it holds
+        // the course, the round length, the start hole and the Par/HCP grid. The
+        // claim is the same one - Back never lands on a screen this format does not
+        // have - and with three steps there is only one place it can go.
+        ['bestball', 'stroke', 'ryder-cup'].forEach((f) => {
+            assert.equal(run(wizard(f), 'wizardNeighbourStep(5, -1)'), 1, f);
+        });
     });
 
     test('Next from Players skips Games & Money for a Cup only', () => {
@@ -246,6 +273,9 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
     });
 
     test('a step the new format does not have can never be landed on', () => {
+        // Step 4 is not a screen for anybody now - its panel was moved onto Games &
+        // Money - so this is the strongest version of the claim: a step number the
+        // workflow does not contain can never be landed on.
         const sb = wizard('ryder-cup');
         run(sb, 'goToWizardStep(4);');
         assert.notEqual(run(sb, 'currentWizardStep'), 4);
@@ -253,12 +283,22 @@ describe('BACK AND NEXT WALK THE WORKFLOW', () => {
             .includes(run(sb, 'currentWizardStep')));
     });
 
-    test('switching format while standing on a vanished step moves the organizer', () => {
+    test('switching format can never strand the organizer on a step that is gone', () => {
+        // RE-POINTED 2026-10-05. This stood the organizer on step 4 - Format
+        // Settings - and switched to a format that did not have it. No format has
+        // step 4 any more: its panel moved onto Games & Money, where the gallery
+        // and the settings now sit together, so goToWizardStep(4) cannot even put
+        // them there to begin with. The claim is the one that matters and is now
+        // true of every step number the workflow does not contain: wherever the
+        // organizer ends up, it is a screen this format actually has.
         const sb = wizard('bestball');
         run(sb, 'goToWizardStep(4);');
-        assert.equal(run(sb, 'currentWizardStep'), 4);
+        const landed = run(sb, 'currentWizardStep');
+        assert.notEqual(landed, 4, 'a step with no screen was landed on');
         run(sb, "selectFormatCard('stroke');");
-        assert.notEqual(run(sb, 'currentWizardStep'), 4);
+        const after = run(sb, 'currentWizardStep');
+        assert.ok(JSON.parse(run(sb, 'JSON.stringify(wizardStepNumbers())')).includes(after),
+            'the organizer is on a step this format does not have: ' + after);
     });
 
     test('the Review jump is semantic, not the number seven', () => {

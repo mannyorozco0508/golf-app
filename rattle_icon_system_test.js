@@ -156,7 +156,10 @@ describe('THE GAME DAY WIZARD — SEVEN STEPS, SEVEN DISTINCT MARKS', () => {
     // Ryder Cup must not read "Step 5: Players" while the progress dots say 4. The
     // glyph assignment being tested here is unchanged.
     const STEPS = [
-        ['1', 'course', '\u26f3', 'Course'],
+        // RE-PINNED 2026-10-05: the first screen is "Course & Round" - the length,
+        // the start hole and the Par/HCP grid joined it when the wizard became three
+        // steps. The glyph is unchanged, which is what this file is about.
+        ['1', 'course', '\u26f3', 'Course &amp; Round'],
         ['3', 'format', '\u{1F4DD}', 'What Are We Playing\\?'],
         ['4', 'settings', '\u2699\ufe0f', 'Format Settings'],
         ['5', 'players', '\u{1F465}', 'Players'],
