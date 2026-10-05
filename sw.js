@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v141-loosesearch. The tournament product cache
+// The consumer product cache is consumer-v142-sheetswipe. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4242,7 +4242,13 @@
 // sends the query as typed first and only re-asks with the other spellings when
 // the provider finds nothing - which is what actually failed: the local matcher
 // already handled the hyphen. A device on v300 asks the provider once, literally.
-const CACHE_VERSION = 'golfapp-v301-loosesearch';
+// Moved to v302: THE ROUND MENU FOLLOWS THE FINGER. Swipe up on the pill to open
+// the sheet, swipe down on its top to close it; it moves with the thumb and snaps
+// past halfway or on a quick flick, and a short drag snaps back. Tap still
+// toggles. Only the handle listens, so page scrolling, the sheet's own scrolling
+// body and score-box taps are untouched by construction. A device on v301 opens
+// it by tapping only.
+const CACHE_VERSION = 'golfapp-v302-sheetswipe';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

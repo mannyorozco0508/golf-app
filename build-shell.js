@@ -116,6 +116,7 @@ const PRODUCTS = {
         // 10th tee. A device on v132 has no such file and plays 1..18.
         // Moved to v134: side bets, the Receipt labels and the skins carry follow
         // the order the holes were played. A device on v133 settles them by number.
+        // Moved to v142: the Round Menu sheet drags open and closed. index.html only.
         // Moved to v141: the course search normalises punctuation and retries
         // the other spellings online. admin.html only.
         // Moved to v140: a tee per golfer, and player-tees.js joins the shell.
@@ -131,7 +132,7 @@ const PRODUCTS = {
         // and a device on v135 keeps the caption handle and the duplicate board.
         // Moved to v135: the scorecard wave - the hole on screen, the reading
         // cards on the page under it, the rest behind one handle.
-        cacheName: 'consumer-v141-loosesearch',
+        cacheName: 'consumer-v142-sheetswipe',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

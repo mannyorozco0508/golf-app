@@ -1538,6 +1538,11 @@ html {
     flex-direction: column;
 }
 #round-sheet.open { transform: translateY(0); }
+/* UNDER THE THUMB: no transition while a finger is on it, or every frame of the
+   drag is animated toward where the last one asked for and the sheet lags. The
+   hint is added for the drag and removed with it - a permanent will-change on a
+   fixed element is a layer the compositor keeps for nothing. */
+#round-sheet.dragging { transition: none; will-change: transform; }
 /* IT HAS TO READ AS A BUTTON (2026-10-05). Manny tapped past it: a line of
    small green text on the card background is a label, and a label does not look
    like the way into everything else on the round. So the text is the size of a
@@ -6433,6 +6438,113 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (handle) handle.setAttribute('aria-expanded', open ? 'true' : 'false');
         if (caret) caret.textContent = open ? '\u25BC' : '\u25B2';
     }
+
+    // ---- THE SHEET FOLLOWS THE FINGER (2026-10-05, Manny) -------------------
+    //
+    // Swipe up on the pill to open it, swipe down on the pill or the drag bar to
+    // close it, and in between the sheet is under the thumb: it moves with the
+    // finger and snaps on release, past halfway or on a quick flick.
+    //
+    // ONLY THE HANDLE LISTENS. Not the document, not the sheet, not the page -
+    // the handle is a 62px bar at the bottom of the screen, so normal page
+    // scrolling, a swipe inside the sheet's own scrolling body, and a tap on a
+    // score box are all untouched by construction rather than by a guard that has
+    // to tell them apart. That is the whole reason the listeners live here.
+    //
+    // ONE NON-PASSIVE LISTENER, AND ONLY ONE. touchmove must preventDefault or
+    // iOS scrolls the page under the drag, and a passive listener may not. start
+    // and end are passive, which is what keeps the first touch cheap.
+    //
+    // THE TAP STILL TOGGLES. A finger that moves less than the slop never counts
+    // as a drag, so the click fires and toggleRoundSheet runs as before; a drag
+    // swallows the click that follows it, because a drag that also toggled would
+    // undo itself.
+    var SHEET_SLOP = 8;             // px of movement before a tap becomes a drag
+    var SHEET_FLICK = 0.5;          // px per ms: a quick flick decides on its own
+    var sheetDrag = null;
+
+    function sheetTravel() {
+        var sheet = document.getElementById('round-sheet');
+        var handle = document.getElementById('round-sheet-handle');
+        if (!sheet || !handle) return 0;
+        // How far the sheet moves between closed and open: its own height less
+        // the strip the closed state leaves on screen.
+        return Math.max(0, sheet.offsetHeight - handle.offsetHeight);
+    }
+
+    function beginSheetDrag(ev) {
+        var t = ev.touches && ev.touches[0];
+        var sheet = document.getElementById('round-sheet');
+        if (!t || !sheet) return;
+        sheetDrag = {
+            y: t.clientY, t: Date.now(), moved: false, dragged: false,
+            open: sheet.classList.contains('open'), travel: sheetTravel()
+        };
+    }
+
+    function moveSheetDrag(ev) {
+        if (!sheetDrag) return;
+        var t = ev.touches && ev.touches[0];
+        var sheet = document.getElementById('round-sheet');
+        if (!t || !sheet || !sheetDrag.travel) return;
+        var dy = t.clientY - sheetDrag.y;
+        // A CLOSED SHEET ONLY OPENS UPWARD, an open one only closes downward.
+        // Without this the sheet rubber-bands past its own ends.
+        var offset = sheetDrag.open ? Math.max(0, Math.min(sheetDrag.travel, dy))
+                                    : Math.max(0, Math.min(sheetDrag.travel, sheetDrag.travel + dy));
+        if (!sheetDrag.moved && Math.abs(dy) < SHEET_SLOP) return;   // still a tap
+        if (!sheetDrag.moved) {
+            sheetDrag.moved = true;
+            sheet.classList.add('dragging');
+        }
+        sheetDrag.dragged = true;
+        sheetDrag.offset = offset;
+        if (ev.cancelable) ev.preventDefault();      // the page must not scroll under it
+        sheet.style.transform = 'translateY(' + offset + 'px)';
+    }
+
+    function endSheetDrag() {
+        var sheet = document.getElementById('round-sheet');
+        var handle;
+        var d = sheetDrag;
+        sheetDrag = null;
+        if (!sheet || !d) return;
+        sheet.classList.remove('dragging');
+        sheet.style.transform = '';
+        if (!d.dragged) return;                       // a tap: the click handler has it
+        handle = document.getElementById('round-sheet-handle');
+        // STAMPED, NOT FLAGGED. A boolean here was never cleared when the click
+        // that should have consumed it did not arrive - and the NEXT honest tap
+        // was swallowed instead, measured by this wave's own guard. A timestamp
+        // expires on its own, so the worst case is one lost click inside 400ms
+        // rather than a Round Menu that has silently stopped answering taps.
+        if (handle) handle.__draggedAt = Date.now();
+        // HOW FAR IT ACTUALLY TRAVELLED, from where this drag started. A closed
+        // sheet starts at `travel` and moves toward 0; an open one starts at 0.
+        var from = d.open ? 0 : d.travel;
+        var now = (d.offset === undefined) ? from : d.offset;
+        var distance = Math.abs(now - from);
+        var speed = distance / Math.max(1, Date.now() - d.t);
+        // PAST HALFWAY, OR A QUICK FLICK. Either decides; a short slow drag snaps
+        // back to where it came from, which is what makes a mis-touch harmless.
+        var flip = distance > d.travel / 2 || speed > SHEET_FLICK;
+        toggleRoundSheet(flip ? !d.open : d.open);
+    }
+
+    (function bindSheetDrag() {
+        var handle = document.getElementById('round-sheet-handle');
+        if (!handle || !handle.addEventListener) return;
+        handle.addEventListener('touchstart', beginSheetDrag, { passive: true });
+        handle.addEventListener('touchmove', moveSheetDrag, { passive: false });
+        handle.addEventListener('touchend', endSheetDrag, { passive: true });
+        handle.addEventListener('touchcancel', endSheetDrag, { passive: true });
+        // A DRAG SWALLOWS ITS OWN CLICK. iOS fires one after the touch ends, and
+        // a drag that then toggled would undo itself in front of the golfer.
+        handle.addEventListener('click', function (ev) {
+            var at = handle.__draggedAt || 0;
+            if (Date.now() - at < 400) { ev.preventDefault(); ev.stopPropagation(); }
+        }, true);
+    })();
 
     function skipWhoAmI() {
         storeWhoAmISkipped();
