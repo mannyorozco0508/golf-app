@@ -31,14 +31,20 @@
 // is on screen. The data source is replaced, which is the point: remove() on the
 // event root rejects with PERMISSION_DENIED, exactly as the live rules make it.
 //
-// TWO ARMS, because one of them is what stops the other being meaningless:
+// THREE ARMS, because each one is what stops the others being meaningless:
 //
-//   scored   a round WITH scores. The reason must be readable on screen, and no
-//            write may be sent. `visible` and `wrote`.
-//   clean    the same round with NO scores. The confirm must appear, "Delete it"
-//            must send the remove and leave for admin.html. Without this arm,
-//            "it refuses and says why" is also true of a page that refuses
-//            everything and can never delete anything.
+//   scored   a round WITH scores, opened by somebody who is NOT its owner by uid
+//            (an organizer holding the token on a second device). The reason must
+//            be readable on screen and no write may be sent.
+//   owner    the same played round, opened by the uid that owns it. PREPARED FOR
+//            THE RULES PUBLISH: the confirm appears and names how many golfers
+//            have scores on the card. Until database.rules.ownerdelete.json is
+//            live this arm's write is still refused by the database, which is why
+//            this branch is not merged.
+//   clean    the round with NO scores. The confirm must appear, "Delete it" must
+//            send the remove and leave for admin.html. Without this arm, "it
+//            refuses and says why" is also true of a page that refuses everything
+//            and can never delete anything.
 //
 // EXIT 0 and prints JSON. ok=true needs the refusal visible AND the clean round
 // actually deleted. --shot <path> for a PNG of the refusal.
@@ -139,6 +145,7 @@ const CONFIRM_PROBE = `(function () {
     appeared: !!yes,
     title: title ? String(title.innerText || '') : '',
     firstBodyLine: body ? String(body.innerText || '').split('\\n')[0] : '',
+    body: body ? String(body.innerText || '') : '',
     yesLabel: yes ? String(yes.innerText || '') : ''
   });
 })()`;
@@ -152,10 +159,13 @@ const last = out => JSON.parse((out.value || []).filter(Boolean).pop());
         preScript: DENY, viewport: { width: W, height: H }, settleMs: 3200
     };
 
-    // ARM 1 - A ROUND WITH SCORES. Open the sheet, tap delete, read the screen.
+    // ARM 1 - A ROUND WITH SCORES, and this device is NOT its owner by uid. It
+    // holds the organizer token, which is what the BUTTON asks for; the database
+    // asks for the uid, so this is the arm that must still be told no.
     const scoredOut = await arriveCold(Object.assign({}, common, {
-        url: fileUrl('index.html', 'game=' + CODE),
-        rounds: { [CODE]: ROUND },
+        auth: { uid: 'second-device-uid', email: 'owner@example.com', isAnonymous: false },
+        url: fileUrl('index.html', 'game=' + CODE + '&organizer=tok-' + CODE),
+        rounds: { [CODE]: Object.assign({}, ROUND, { organizerToken: 'tok-' + CODE }) },
         steps: [
             { tap: '#round-sheet-handle' }, { sleep: 400 },
             { tap: '#end-round-mount .btn-danger' }, { sleep: 700 },
@@ -164,7 +174,19 @@ const last = out => JSON.parse((out.value || []).filter(Boolean).pop());
     }));
     const scored = last(scoredOut);
 
-    // ARM 2 - THE SAME ROUND, NO SCORES. The confirm, then "Delete it".
+    // ARM 2 - THE OWNER, on the same played round.
+    const ownerOut = await arriveCold(Object.assign({}, common, {
+        url: fileUrl('index.html', 'game=' + CODE),
+        rounds: { [CODE]: ROUND },
+        steps: [
+            { tap: '#round-sheet-handle' }, { sleep: 400 },
+            { tap: '#end-round-mount .btn-danger' }, { sleep: 700 },
+            { expression: CONFIRM_PROBE }
+        ]
+    }));
+    const owner = last(ownerOut);
+
+    // ARM 3 - THE SAME ROUND, NO SCORES. The confirm, then "Delete it".
     const CLEAN = Object.assign({}, ROUND, { scores: {} });
     const confirmOut = await arriveCold(Object.assign({}, common, {
         url: fileUrl('index.html', 'game=' + CODE),
@@ -193,8 +215,10 @@ const last = out => JSON.parse((out.value || []).filter(Boolean).pop());
 
     const ok = !!(scored.visible && scored.onScreenText && scored.wrote === 0
                   && !scored.confirmAppeared
+                  && owner.appeared && /golfers have scores on this card/.test(owner.body || '')
                   && confirm.appeared && confirm.firstBodyLine
                   && confirm.firstBodyLine.indexOf(confirm.title) === -1
+                  && !/scores on this card/.test(confirm.body || '')
                   && removes.leftForHome);
-    console.log(JSON.stringify({ ok, scored, confirm, deleted }, null, 2));
+    console.log(JSON.stringify({ ok, scored, owner, confirm, deleted }, null, 2));
 })().catch(e => { console.error(String(e && e.message || e)); process.exit(2); });

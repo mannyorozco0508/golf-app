@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v136-roundmenu. The tournament product cache
+// The consumer product cache is consumer-v137-ownerdelete. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4206,7 +4206,16 @@
 // into a sheet it has just emptied. A device on v295 has the old handle, two
 // leaderboards, one Games & Money screen, and a "Delete it" that does nothing
 // visible on a round that has been played.
-const CACHE_VERSION = 'golfapp-v296-roundmenu';
+// Moved to v297: THE OWNER CAN DELETE THEIR OWN PLAYED ROUND, AND IS TOLD WHAT
+// GOES WITH IT. The scorecard's pre-check narrowed from "any score at all" to
+// "any score, and this device is not the uid the database will accept": the
+// round's owner now gets a confirm that names how many golfers have scores on
+// the card, and an organizer on a second device - token but not uid - still gets
+// the sentence, because the rule compares uids and nothing else. PAIRED WITH A
+// RULES PUBLISH (database.rules.ownerdelete.json) and useless without it: on a
+// device at v296 the owner is refused before the confirm, and on v297 before
+// that ruleset is live the delete is refused by the database instead.
+const CACHE_VERSION = 'golfapp-v297-ownerdelete';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

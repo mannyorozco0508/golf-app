@@ -30,7 +30,25 @@
 //      a fixed note when its anchor has left the document, which repairs EVERY
 //      refusal raised from inside a confirm, not only this one.
 //
-// THREE ARMS, and the second and third are what stop the first being worthless:
+// FOUR ARMS NOW (2026-10-05, second pass). database.rules.ownerdelete.json is
+// prepared for Grok: the round's OWNER may delete it even after it has been
+// played, because the guard it relaxes was never a boundary - any code-holder
+// could already delete the scores node and then the scoreless round. So the
+// app's pre-check narrowed from "anyone the button is shown to" to "anyone the
+// DATABASE will refuse", which is everyone except the uid on the record:
+//
+//   ARM 1  an organizer on a SECOND DEVICE, holding the token rather than the
+//          uid. The button is shown to them (canDeleteRound accepts the token)
+//          and the database will refuse them, so they still get the sentence.
+//   ARM 2  the OWNER on the same played round: a confirm that names how many
+//          golfers have scores on the card, because with the rule relaxed the
+//          confirm is the only thing left between them and a round that cannot
+//          come back.
+//
+// UNTIL THAT RULESET IS PUBLISHED, arm 2's write is still refused by the live
+// database - which is why this branch is prepared and not merged.
+//
+// THE OTHER TWO ARMS are what stop the first being worthless:
 // "it refuses and says why" is also true of a page that can never delete
 // anything, and a fallback that never fires is indistinguishable from one that
 // does not work. Arm 3 is the race the catch exists for - a score landing
@@ -41,9 +59,11 @@
 // set by a capture-phase listener that never fires there, so the harness cannot
 // reach the defect at all and would report it fixed either way.
 //
-// BASELINE, measured over the FINISHED file against setup-3-steps (4ebe98b,
-// index.html and ui-dialogs.js swapped out and restored by sha), all 12 tests:
-// 5 PASS / 7 FAIL. 5 + 7 = 12. The five that pass:
+// BASELINE, re-measured over the FINISHED 17-test file against setup-3-steps
+// (4ebe98b, index.html and ui-dialogs.js swapped out and restored by sha),
+// all 17 tests: 8 PASS / 9 FAIL. 8 + 9 = 17. It was first taken at 12, before the owner arm
+// and its three tests existed; a baseline is a statement about the file as it
+// stands, not a record of what happened to be run first. The eight that pass:
 //   - three "ran": the arrivals themselves, which assert nothing about the wave.
 //   - '"Delete it" deletes it ... and goes Home': a clean round could always be
 //     deleted. That is the point of having it - without this arm, arm 1 would
@@ -53,6 +73,12 @@
 //     confirm instead - so "none of the notes is floating" is true of an empty
 //     list. It becomes a real assertion only once arm 1 produces a note, which
 //     is exactly when it matters.
+//   - the three owner-arm passes, which are the same effect from the other side:
+//     at 4ebe98b the owner of a played round was refused before the confirm, so
+//     'the owner gets a confirm' and 'it says how many golfers have scores' are
+//     red there - but 'an UNPLAYED round does not get that sentence' is green,
+//     because no page in that build could emit it, and the arm's 'ran' is green
+//     because an arrival is not an assertion about the wave.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -76,7 +102,7 @@ const ROUND = {
     gameFormat: 'stroke', settlementMode: 'whole-dollar', groupSizeOverrides: { 0: 4 },
     ownerUid: UID
 };
-const SCORED = Object.assign({}, ROUND, { scores: scored });
+const SCORED = Object.assign({}, ROUND, { scores: scored, organizerToken: 'tok-del' });
 const CLEAN = Object.assign({}, ROUND, { scores: {} });
 
 // THE LIVE RULE, IN THE STAND-IN: a whole-round delete is refused. The data
@@ -125,6 +151,7 @@ const SCREEN = `(function () {
     confirmUp: !!document.getElementById('ui-sheet-yes'),
     confirmTitle: sheetTitle ? String(sheetTitle.innerText || '') : '',
     confirmFirstLine: sheetBody ? String(sheetBody.innerText || '').split('\\n')[0] : '',
+    confirmBody: sheetBody ? String(sheetBody.innerText || '') : '',
     writes: (window.__coldWrites || []).filter(function (w) { return w.op === 'remove'; }).length,
     wentHome: /admin\\.html/.test(location.href),
     sheetOpen: /\\bopen\\b/.test(String((document.getElementById('round-sheet') || {}).className || ''))
@@ -145,13 +172,23 @@ before(async () => {
         return j.length ? JSON.parse(j[j.length - 1]) : null;
     };
 
-    // ARM 1 - a round WITH scores. The reason, before any write.
+    // ARM 1 - a round WITH scores, opened by an organizer who holds the TOKEN
+    // and not the uid. The reason, before any write.
     const a = await arriveCold(Object.assign({}, common, {
-        url: fileUrl('index.html', 'game=DELA'),
+        auth: { uid: 'second-device-uid', email: 'owner@example.com', isAnonymous: false },
+        url: fileUrl('index.html', 'game=DELA&organizer=tok-del'),
         db: { events: { DELA: SCORED }, global_courses: {}, trips: {}, tournaments: {} },
         preScript: DENY, steps: TAP_DELETE.concat([{ expression: SCREEN }])
     }));
     S.okA = a.ok; S.reasonA = a.reason; S.scored = a.ok ? pick(a) : null;
+
+    // ARM 1b - THE OWNER, same played round. The confirm, and what it says.
+    const ab = await arriveCold(Object.assign({}, common, {
+        url: fileUrl('index.html', 'game=DELA'),
+        db: { events: { DELA: SCORED }, global_courses: {}, trips: {}, tournaments: {} },
+        preScript: DENY, steps: TAP_DELETE.concat([{ expression: SCREEN }])
+    }));
+    S.okAB = ab.ok; S.reasonAB = ab.reason; S.owner = ab.ok ? pick(ab) : null;
 
     // ARM 2 - a clean round. The confirm, then the delete that actually happens.
     const b = await arriveCold(Object.assign({}, common, {
@@ -180,7 +217,7 @@ before(async () => {
     S.okC = c.ok; S.reasonC = c.reason; S.race = c.ok ? pick(c) : null;
 });
 
-describe('1. A ROUND WITH SCORES IS TOLD SO, BEFORE ANYTHING IS SENT', () => {
+describe('1. A DEVICE THE DATABASE WILL REFUSE IS TOLD SO, BEFORE ANYTHING IS SENT', () => {
 
     test('ran', () => assert.ok(S.okA, S.reasonA));
 
@@ -195,6 +232,18 @@ describe('1. A ROUND WITH SCORES IS TOLD SO, BEFORE ANYTHING IS SENT', () => {
         assert.equal(S.scored.writes, 0, 'it still sends a delete it knows will be refused');
         assert.equal(S.scored.confirmUp, false,
             'the golfer is still asked to confirm something that cannot happen');
+    });
+
+    test('and it is the UID that decides, not the button\'s own gate', () => {
+        // canDeleteRound() shows the control to a token-holding organizer, which
+        // is right - they are the organizer. The RULE compares auth.uid with the
+        // round's ownerUid and nothing else, so the pre-check has to ask the
+        // narrower question or it would promise a delete the database refuses.
+        const fn = IDX.slice(IDX.indexOf('async function endAndClearRound'),
+                             IDX.indexOf('async function endAndClearRound') + 3200);
+        assert.match(fn, /window\.authBootState\.uid === currentData\.ownerUid/,
+            'the pre-check is not asking who the database will accept');
+        assert.match(fn, /if \(scored > 0 && !ownerByUid\)/);
     });
 
     test('this one is INLINE: the button it refuses is still on screen', () => {
@@ -214,6 +263,33 @@ describe('1. A ROUND WITH SCORES IS TOLD SO, BEFORE ANYTHING IS SENT', () => {
         assert.ok(IDX.includes('SCORED_ROUND_SENTENCE'), 'the scorecard has no such sentence');
         assert.equal(grab(IDX), grab(ADM),
             'the scorecard and the setup page now say different things about the same refusal');
+    });
+});
+
+describe('1b. THE OWNER IS ASKED, AND TOLD WHAT IS ON THE CARD', () => {
+
+    test('ran', () => assert.ok(S.okAB, S.reasonAB));
+
+    test('the owner gets a confirm on a played round, not a refusal', () => {
+        assert.ok(S.owner.confirmUp, 'the owner is still refused on their own round');
+        assert.equal(S.owner.notesVisible, 0, 'they get a refusal AND a confirm');
+    });
+
+    test('and it says how many golfers have scores on the card', () => {
+        // "all 4 golfers" is a count of the ROSTER and says nothing about whether
+        // anyone has teed off. With the rule relaxed, this confirm is the only
+        // thing left between an owner and a round that cannot come back.
+        assert.match(S.owner.confirmBody, /4 golfers have scores on this card already/,
+            'the confirm does not say what is on the card: ' + S.owner.confirmBody);
+        assert.ok(S.owner.confirmBody.indexOf(S.owner.confirmTitle) === -1,
+            'the body opens with the title again');
+    });
+
+    test('and an UNPLAYED round does not get that sentence', () => {
+        // Otherwise the line would be decoration rather than a count: a round
+        // nobody has played has nothing to warn about.
+        assert.ok(!/scores on this card/.test(S.confirm.confirmBody),
+            'an unplayed round is being warned about scores it does not have: ' + S.confirm.confirmBody);
     });
 });
 

@@ -9801,6 +9801,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             + '</div>';
     }
 
+    // HOW MANY GOLFERS HAVE ACTUALLY POSTED A SCORE, which is not the roster and
+    // not the number of score keys: four golfers through six holes is 24 keys.
+    // A score key is p<id>_h<number>, so the id is the part before the underscore.
+    function scoredGolferCount() {
+        const scores = (currentData && currentData.scores) || {};
+        const ids = {};
+        Object.keys(scores).forEach(k => {
+            if (!(Number(scores[k]) > 0)) return;
+            const m = /^p(\d+)_h\d+$/.exec(k);
+            if (m) ids[m[1]] = true;
+        });
+        return Object.keys(ids).length;
+    }
+
     // BYTE-IDENTICAL TO admin.html's (2026-10-05). The scorecard and the setup
     // page are the two controls that delete a round, and they are two inline
     // scripts, so the sentence exists twice; the guard holds the two copies
@@ -9845,15 +9859,34 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             console.warn('Only this round\u2019s organizer can delete it.');
             return;
         }
-        if (Object.keys((currentData && currentData.scores) || {}).length > 0) {
+        // WHO THE DATABASE WILL ACTUALLY LET DELETE THIS. canDeleteRound() is the
+        // button's gate and it accepts the organizer TOKEN as well as the uid -
+        // right for showing the control, wrong for predicting the write, because
+        // the rule compares auth.uid with the round's ownerUid and nothing else.
+        // A token-holding organizer on a second device is still refused, so they
+        // still get the sentence rather than a confirm that cannot be honoured.
+        const scored = scoredGolferCount();
+        const ownerByUid = !!(currentData && currentData.ownerUid
+            && window.authBootState && window.authBootState.uid
+            && window.authBootState.uid === currentData.ownerUid);
+        if (scored > 0 && !ownerByUid) {
             uiRefuse(SCORED_ROUND_SENTENCE);
             return;
         }
         const golferCount = (currentData.players || []).length;
         // THE TITLE IS NOT REPEATED AS THE FIRST LINE OF THE BODY. It was, and on
         // a phone the sheet read the same sentence twice before saying anything.
+        //
+        // AND A PLAYED ROUND SAYS WHAT IS ON IT. The database stopped being the
+        // thing that refuses this, so the confirm is now the only thing between an
+        // owner and a round that cannot come back - and "all 4 golfers" is a count
+        // of the roster, which says nothing about whether anyone has teed off.
+        // The number that matters is how many of them have scores on the card.
         const msg = `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
             + `It cannot be undone.\n\n`
+            + (scored > 0
+                ? `${scored} ${scored === 1 ? 'golfer has' : 'golfers have'} scores on this card already, and those scores are erased too.\n\n`
+                : '')
             + `You do not need to delete a round when you finish playing.`;
         // AWAIT, and note the shape: this one was `if (confirm(msg))`, so a missed
         // await makes it ALWAYS TRUE and deletes the round for everyone without
