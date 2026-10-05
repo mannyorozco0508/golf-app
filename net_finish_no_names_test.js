@@ -360,6 +360,13 @@ describe('COLD CHROME: a phone arriving mid-round sees no names', () => {
             // .action-toggle, not .action-center-toggle - my first selector matched
             // nothing, so the tap never landed and the assertion read the COLLAPSED
             // card ("My Round 1 live - tap to see") and blamed the feature.
+            // THE STATUS SHEET OPENS FIRST (2026-10-04). My Round moved into the
+            // slide-up sheet with every other card a golfer reads, so the toggle is
+            // off screen until the handle is tapped - and a tap at the coordinates of
+            // something hidden lands on whatever is actually there. One extra tap,
+            // the same one a golfer makes.
+            // My Round is back on the page (2026-10-05), so the handle tap came
+            // out again: the sheet keeps settings and admin only.
             steps: [{ tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
         v = r.ok ? JSON.parse(r.value[r.value.length - 1]) : { error: r.reason };
     });
@@ -401,6 +408,13 @@ describe('COLD CHROME: a LEGACY CENTS round prints the split exactly, never roun
         const r = await arriveCold({ url: fileUrl('index.html', 'game=NF&group=1'),
             db: { events: { NF: legacy }, global_courses: {}, trips: {}, tournaments: {} },
             settleMs: 3200, viewport: { width: 390, height: 844 },
+            // THE STATUS SHEET OPENS FIRST (2026-10-04). My Round moved into the
+            // slide-up sheet with every other card a golfer reads, so the toggle is
+            // off screen until the handle is tapped - and a tap at the coordinates of
+            // something hidden lands on whatever is actually there. One extra tap,
+            // the same one a golfer makes.
+            // My Round is back on the page (2026-10-05), so the handle tap came
+            // out again: the sheet keeps settings and admin only.
             steps: [{ tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
         v = r.ok ? JSON.parse(r.value[r.value.length - 1]) : { error: r.reason };
     });

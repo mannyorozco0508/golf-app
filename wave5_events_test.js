@@ -1,4 +1,8 @@
 const { test, describe } = require('node:test');
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -566,12 +570,22 @@ describe('SCORECARD RENDER', () => {
 
     // BEHAVIOUR CHANGE: Prev/Next moved above the panels, so the recap now follows it.
     test('the recap sits below Prev/Next, above the action panel', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). These mounts left renderHoleView
+        // entirely - every card a golfer READS rather than acts on is a static child
+        // of #round-sheet-body now, in the same order, written to by the same
+        // renderers. So the relative order is asserted where they live, and their
+        // absence from the hole card is asserted too, because a mount creeping back
+        // into that html is what would put it above Prev/Next again.
+        const sheetOrder = (() => { const src = read('index.html');
+            return src.slice(src.indexOf('<div id="round-reading">'),
+                             src.indexOf('</div>', src.indexOf('id="bet-strip-mount"'))); })();
         const idx = read('index.html');
-        const recap = idx.indexOf(`html += '<div id="hole-recap-mount"></div>'`);
-        const nav = idx.indexOf('html += navRowHtml;');
-        const action = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
-        assert.ok(recap > -1 && recap > nav, 'what just happened is read after moving on');
-        assert.ok(recap < action, 'and still before the action panel');
+        const recap = sheetOrder.indexOf('id="hole-recap-mount"');
+        const action = sheetOrder.indexOf('id="action-center-mount"');
+        assert.ok(recap > -1 && recap < action, 'the recap is still read before the action panel');
+        assert.equal(idx.indexOf(`html += '<div id="hole-recap-mount"></div>'`), -1,
+            'the recap is built inside the hole card again');
+        assert.match(idx, /html \+= navRowHtml;/, 'the hole card lost Prev/Next');
     });
 
     test('the recap is hidden in print/PDF output', () => {

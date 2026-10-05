@@ -94,8 +94,14 @@ async function journey(startPage, query, opts) {
     // has three rows, two of them outline, so a class selector picks
     // whichever comes first: measured, it tapped "I'm playing" and landed on
     // the name picker instead of the card.
+    // THE NAV BAR IS IN THE STATUS SHEET NOW (2026-10-04), so a golfer reaches it
+    // with one tap on the handle - and so does this check. A real fix rather than a
+    // pin: an element inside a closed sheet is off screen, and a tap at its
+    // coordinates lands on whatever is actually there.
+    const OPEN_SHEET = [{ tap: '#round-sheet-handle' }, { sleep: 500 }];
     const steps = (o.dismissPicker ? [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 700 }] : [])
         .concat([{ expression: "'START:' + " + LOOK },
+                   ...OPEN_SHEET,
                    { tap: '.top-nav-item[href^="instructions.html"]' }, { sleep: 1200 },
                    { expression: "'GUIDE:' + " + LOOK }]);
     if (!o.stopAtGuide) steps.push({ tap: '#guide-back' }, { sleep: 1200 }, { expression: "'BACK:' + " + LOOK });

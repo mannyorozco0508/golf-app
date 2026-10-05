@@ -314,7 +314,7 @@ html {
     <button class="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     <div class="lobby-logo">🚐</div>
     <div class="lobby-title">Road Trip</div>
-    <p class="lobby-sub">Tie multiple rounds together into one trip — a running leaderboard across every day, not just one round at a time.</p>
+    <p class="lobby-sub">One leaderboard across every day of a trip, not one round at a time.</p>
 
     <div id="resume-trip-container" style="display:none; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border-light);">
         <span style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px; font-weight:bold; text-transform:uppercase;">Recent Trip Found</span>
@@ -337,16 +337,14 @@ html {
         <details class="settle-card" id="itin-paste-card" style="margin-bottom:12px;" open>
             <summary style="font-weight:bold; cursor:pointer;">📋 The rounds — paste your itinerary</summary>
             <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
-                One round per line &mdash; a date, the course, and a tee time if you have one.
-                Courses already saved cost nothing to match; anything else is looked up online,
-                and the review tells you how many lookups that is before you agree to it.
+                One round per line &mdash; a date, the course, a tee time if you have one.
             </p>
             <textarea id="itin-paste-box" rows="6" style="width:100%; font-size:0.84rem;"
                 placeholder="Tue 10/13 — Caledonia Golf &amp; Fish Club, Pawleys Island, 8:24 AM&#10;Thu 10/15 — Thistle, McKay/Cameron, Sunset Beach&#10;Fri 10/16 — Prestwick or Man O' War (not chosen)"></textarea>
             <div class="form-group" style="margin:8px 0;">
                 <label>Year these dates are in</label>
                 <input type="number" id="itin-year" min="2024" max="2099" style="max-width:120px;">
-                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">A date like 10/13 carries no year, and guessing one is how a trip lands eleven months early.</p>
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">A date like 10/13 carries no year, which is how a trip lands in the wrong month.</p>
             </div>
             <button type="button" class="btn-outline" onclick="reviewItinerary()">Read it →</button>
             <div id="itin-review" style="margin-top:10px;"></div>
@@ -405,7 +403,7 @@ html {
 
             <div id="round-planner-section" style="display:none; margin-top:8px;">
                 <h3 style="margin-bottom:2px;">🗓️ Set Up Each Round</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Pick the course and a rough headcount now — you'll add real player names later. This just builds the skeleton so nothing's left to remember.</p>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0;">Course and headcount now; real names later.</p>
                 <div id="round-planner"></div>
             </div>
         </details>
@@ -489,7 +487,7 @@ html {
     <details class="trip-section" open>
         <summary>📅 Rounds in This Trip</summary>
         <div class="trip-section-body">
-            <p class="trip-section-sub">Tap <strong>⚙️ Edit</strong> on any round anytime — add or drop players, change the format, adjust stakes. Nothing here is locked in until scores start getting entered.</p>
+            <p class="trip-section-sub">Tap ⚙️ Edit on any round to change players, format or stakes.</p>
             <div id="rounds-list"></div>
             <!-- THE DAILY POT (2026-10-04). Not new money: it is each round's own
                  Weekly Game, set once here and copied into every round that has
@@ -535,14 +533,14 @@ html {
     <details class="trip-section" id="add-round-card">
         <summary style="font-weight:bold; cursor:pointer;">➕ Add another round</summary>
         <div class="trip-section-body">
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Set up each day's round like normal — it'll link itself back to this trip automatically once you save it.</p>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Set up the day's round as normal &mdash; it links itself back to this trip.</p>
 
     <div class="form-group" id="copy-from-round-group" style="display:none; margin-bottom:8px;">
         <label>Start From (optional)</label>
         <select id="copy-from-round-select">
             <option value="">🆕 Blank round</option>
         </select>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Copies course/format/side games from that round — handy for a 36-hole day. Players stay editable either way.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;">Copies course, format and side games from that round. Players stay editable.</p>
     </div>
 
     <button class="btn-primary" onclick="createRoundForTrip()">➕ Create New Round for This Trip</button>
@@ -684,7 +682,7 @@ html {
     <details class="trip-section">
         <summary>🏆 Points Race &amp; Prizes</summary>
         <div class="trip-section-body">
-            <p class="trip-section-sub">Every round, players earn points based on where they finished that day (net score) — 1st place earns the most, points scale automatically with however many played. Points post once a round is fully finished — a round still in progress doesn't count yet.</p>
+            <p class="trip-section-sub">Points by finishing place each round, net. A round counts once it is finished.</p>
             <div id="trip-points-race"></div>
 
             <hr class="section-divider" style="margin:18px 0;">
@@ -723,7 +721,7 @@ html {
                 </div>
             </div>
 
-            <p class="trip-section-sub" style="margin-bottom:8px;"><strong>Prize Payout Calculator</strong> — set the pool and how many spots pay, and it maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+            <p class="trip-section-sub" style="margin-bottom:8px;">Set the pool and how many spots pay. Ties split their spots.</p>
             <div class="form-group" style="margin-bottom:8px;">
                 <label>Total Pool ($)</label>
                 <input type="number" id="prize-pool-input" min="0" value="0" oninput="renderPrizeSpotInputs()">

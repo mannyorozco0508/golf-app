@@ -82,6 +82,9 @@ async function tapHome(page, search) {
         viewport: { width: 390, height: 844 },
         steps: [
             { expression: READ },
+            // THE NAV BAR IS IN THE STATUS SHEET NOW (2026-10-04): one tap on the
+            // handle is how a golfer reaches Home, and how this check does too.
+            { tap: '#round-sheet-handle' }, { sleep: 500 },
             { tap: '.top-nav-item.nav-link[href*="admin.html"]' },
             { sleep: 2000 },
             { expression: READ },

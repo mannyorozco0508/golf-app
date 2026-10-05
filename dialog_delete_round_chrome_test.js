@@ -101,6 +101,10 @@ describe('DELETE ROUND in real Chrome — the sheet, the focus, and both answers
                 { expression: `(function(){ var m = document.getElementById('end-round-mount');
                     if (m) m.scrollIntoView(); return JSON.stringify({ stage: 'before',
                     mount: !!m, button: !!(m && m.querySelector('button')) }); })()` },
+                // THE DELETE BOX IS IN THE STATUS SHEET (2026-10-04), with everything
+                // else that is not the hole. One tap on the handle is how an organizer
+                // reaches it, and how this check does.
+                { tap: '#round-sheet-handle' }, { sleep: 500 },
                 { tap: '#end-round-mount button' },
                 { sleep: 400 },
                 { expression: STATE },
@@ -162,6 +166,7 @@ describe('DELETE ROUND in real Chrome — the sheet, the focus, and both answers
             viewport: { width: 390, height: 844 },
             preScript: PRE,
             steps: [
+                { tap: '#round-sheet-handle' }, { sleep: 500 },
                 { tap: '#end-round-mount button' },
                 { sleep: 400 },
                 { expression: STATE },

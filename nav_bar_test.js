@@ -266,7 +266,11 @@ describe('THE ROWS FIT WITH ROOM, and the cost on the scorecard', () => {
 });
 
 describe('THE SEAM (source): all eight pages carry the same bar; tournament.html has its own', () => {
-    const BAR = NAMES.map(f => { const s = read(f); const a = s.indexOf('<div class="app-nav-wrap">'); return s.slice(a, s.indexOf('</div>\n    </div>', a)); });
+    // RE-POINTED 2026-10-04: index.html's wrap carries an id now - the Status sheet
+    // moves the whole bar into itself by getElementById, and a class is not an id.
+    // The slice therefore starts at the opening tag without assuming how it ends, and
+    // the anchors it compares are unchanged on all eight pages.
+    const BAR = NAMES.map(f => { const s = read(f); const a = s.indexOf('<div class="app-nav-wrap"'); return s.slice(s.indexOf('>', a) + 1, s.indexOf('</div>\n    </div>', a)); });
     test('the same nine anchors in the same order on all eight, the active class the only difference', () => {
         const norm = BAR.map(b => b.replace(/ active/g, ''));
         norm.forEach((b, i) => assert.equal(b, norm[0], NAMES[i] + ' differs from index.html'));

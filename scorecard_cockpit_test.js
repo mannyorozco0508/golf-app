@@ -10,6 +10,10 @@
 // information ON the scorecard so it never retreats behind More.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -111,13 +115,22 @@ describe('SCORE -> NEXT: the reading order', () => {
         assert.ok(nav > lastRow, 'navigation must follow the scores');
     });
 
-    test('Prev/Next comes BEFORE every betting panel', () => {
+    test('the betting panels are not on the hole card at all', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). This asserted the panels were
+        // rendered BELOW Prev/Next so score entry came first. They are not rendered
+        // in the hole card any more: everything a golfer reads rather than acts on
+        // is a static child of #round-sheet-body, written to by the same renderers
+        // through the same ids. Same intent, taken further - and a mount creeping
+        // back into this html is exactly what would put it above Prev/Next again.
         const h = html(page(heavy(), 5));
-        const nav = h.indexOf('hole-view-nav-row');
+        assert.ok(h.indexOf('hole-view-nav-row') > -1, 'the hole card lost Prev/Next');
         ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].forEach(m => {
-            const at = h.indexOf(m);
-            assert.ok(at > -1, `${m} missing`);
-            assert.ok(nav < at, `${m} must sit below Prev/Next, not above it`);
+            assert.equal(h.indexOf(m), -1, m + ' is rendered inside the hole card again');
+        });
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-reading">'),
+                                IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
+        ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].forEach(m => {
+            assert.match(sheet, new RegExp('id="' + m + '"'), m + ' is not in the reading area on the page');
         });
     });
 
@@ -138,9 +151,12 @@ describe('SCORE -> NEXT: the reading order', () => {
     test('the hole picker still comes after the panels', () => {
         // buildHolePickerHtml returns '' unless the picker is open, so the ORDER is
         // asserted at the source: the call sits after both mounts.
-        const bs = IDX.indexOf(`html += '<div id="bet-strip-mount"></div>'`);
+        // RE-POINTED 2026-10-04: the bet strip is no longer emitted here, so the
+        // picker's place is measured against the thing that still is - the nav row
+        // it belongs under.
+        const nav = IDX.indexOf('html += navRowHtml;');
         const picker = IDX.indexOf('html += buildHolePickerHtml(');
-        assert.ok(bs > -1 && picker > bs, 'utilities stay last');
+        assert.ok(nav > -1 && picker > nav, 'utilities stay last');
         // And when it IS open it renders below them.
         const sb = page(heavy(), 5);
         run(sb, `holePickerOpen = true; renderHoleView();
@@ -203,7 +219,18 @@ describe('HOLE NAVIGATION', () => {
         const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
         assert.match(fn, /querySelector\('\.hole-view-header'\)/, 'must target the heading');
         assert.match(fn, /- HOLE_LANDING_OFFSET/, 'a small offset keeps the box off the edge');
-        assert.ok(!/scrollTo\(0, 0\)|top: 0/.test(fn), 'scrolling to page top would lose the hole');
+        // RE-POINTED 2026-10-04 (Manny's fit rule). This forbade scrollTo(0, 0)
+        // because on the old scorecard - header, nav, Playing With, group scores,
+        // the live dashboard, all above the hole - the top of the page was nowhere
+        // near the hole and landing there would have lost it. With everything else
+        // in the Status sheet the hole card starts at the top, and on a four-golfer
+        // round the whole of it fits: scrolling then PUSHED the banner above it
+        // under the status bar, which is the bug this rule fixes. So page-top is
+        // allowed exactly when the card fits, and the heading is still the target in
+        // the other arm - which is what the two assertions above hold.
+        assert.match(fn, /const fitsAtTop = cardBottom <= \(window\.innerHeight \|\| 0\);/,
+            'the page-top landing is no longer conditional on the card fitting');
+        assert.ok(!/top: 0/.test(fn), 'a bare top: 0 would lose the hole on a card that does not fit');
     });
 
     test('navigating from deep in the page still lands on the new hole', () => {
@@ -230,10 +257,22 @@ describe('HOLE NAVIGATION', () => {
 
 // ---------------------------------------------------------------------------
 describe('THE BETTING INFORMATION STAYS ON THE SCORECARD', () => {
-    test('a heavy round mounts every status surface', () => {
-        const h = html(page(heavy(), 5));
-        ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].forEach(m =>
-            assert.ok(h.includes(m), `${m} must stay on the scorecard, not behind More`));
+    test('a heavy round mounts every status surface, one tap away', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). "Not behind More" was written
+        // against a wave that had hidden these surfaces behind a More menu, and the
+        // claim it protects is that they stay on the SCORECARD - reachable without
+        // leaving the round - rather than on another page. They are: one handle at
+        // the bottom of the card opens all of them at once. What this refuses is
+        // their disappearance, so it is asserted where they now live.
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-reading">'),
+                                IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
+        ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount',
+         'live-skins-mount', 'live-ticker-mount'].forEach(m =>
+            assert.match(sheet, new RegExp('id="' + m + '"'),
+                m + ' must stay on the scorecard, in the Status sheet'));
+        // AND THE SHEET IS ON THE SCORECARD, not a link to somewhere else.
+        assert.match(IDX, /id="round-sheet-handle"/, 'there is no handle to open it with');
+        assert.match(IDX, /onclick="toggleRoundSheet\(\)"/, 'the handle opens nothing');
     });
 
     test('Side Match status is built for the scorecard, not just the Action page', () => {
@@ -241,6 +280,8 @@ describe('THE BETTING INFORMATION STAYS ON THE SCORECARD', () => {
         const sb = page(d, 5);
         run(sb, `
             meId = '${d.__f.id(0)}';
+            renderActionCenter();
+            document.__mount(document.getElementById('action-center-mount'));
             renderActionCenter();
             window.__ac = document.getElementById('action-center-mount').innerHTML;
         `);
@@ -273,11 +314,17 @@ describe('THE BETTING INFORMATION STAYS ON THE SCORECARD', () => {
     });
 
     test('a heavy round stays bounded — the panels are mounts, not inline walls', () => {
+        // RE-POINTED 2026-10-04: the panels are mounts in the PAGE now rather than in
+        // the hole card's html, so "exactly one" is counted where they live. The claim
+        // is the one that matters either way - one element per id, because two would
+        // mean the renderers write to whichever came first.
         const h = html(page(heavy(), 5));
-        // Each panel is a single mount div; their content renders separately and is
-        // capped by its own builder, so four side matches cannot blow up this markup.
-        ['action-center-mount', 'bet-strip-mount'].forEach(m =>
-            assert.equal((h.match(new RegExp(m, 'g')) || []).length, 1, `${m} duplicated`));
+        ['action-center-mount', 'bet-strip-mount'].forEach(m => {
+            assert.equal((h.match(new RegExp(m, 'g')) || []).length, 0,
+                m + ' is rendered inside the hole card again');
+            assert.equal((IDX.match(new RegExp('id="' + m + '"', 'g')) || []).length, 1,
+                m + ' duplicated');
+        });
     });
 });
 

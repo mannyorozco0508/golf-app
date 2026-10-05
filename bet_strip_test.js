@@ -1,4 +1,8 @@
 const { test, describe } = require('node:test');
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -545,15 +549,19 @@ describe('SCORECARD WIRING — the strip is mounted and prompt() is gone', () =>
     // BEHAVIOUR CHANGE (Scorecard cockpit): Prev/Next moved to sit directly under the
     // score rows, so a golfer can score and move on without scrolling past every wager.
     // Bet status is what you READ afterwards, so it now sits below navigation.
-    test('the strip is mounted below Prev/Next, after score entry', () => {
-        const mount = idx.indexOf(`html += '<div id="bet-strip-mount"></div>'`);
-        const nav = idx.indexOf('html += navRowHtml;');
-        assert.ok(mount > -1, 'no bet strip mount point found');
-        assert.ok(nav > -1, 'no navigation row found');
-        assert.ok(mount > nav, 'scoring and Next come first; bet detail is read afterwards');
-        // Still ABOVE the hole picker, so the reading order stays coherent. Matched on
-        // the CALL, not the function definition further up the file.
-        assert.ok(mount < idx.indexOf('html += buildHolePickerHtml('));
+    test('the strip is mounted in the Status sheet, not on the hole card', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). These mounts are no longer built
+        // inside the hole card at all: everything a golfer READS rather than acts on
+        // moved into one slide-up sheet, so "below Prev/Next" became "not on the hole
+        // card". The claim is stronger and is written as the stronger thing - the
+        // mount must be a static child of #round-sheet-body, and the hole card must
+        // not build it again, which is what would put it back above Prev/Next.
+        assert.ok(!/html \+= '<div id="bet-strip-mount"><\/div>';/.test(idx),
+            'the hole card builds the bet strip mount again');
+        const sheet = idx.slice(idx.indexOf('<div id="round-reading">'),
+                                idx.indexOf('</div>', idx.indexOf('id="bet-strip-mount"')));
+        assert.match(sheet, /id="bet-strip-mount"/, 'the mount is not in the reading area on the page');
+        assert.ok(idx.indexOf('html += navRowHtml;') > -1, 'the hole card lost Prev/Next');
     });
 
     test('REGRESSION: no prompt() anywhere in index.html — it fails silently in an installed PWA', () => {

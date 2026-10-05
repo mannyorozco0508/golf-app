@@ -56,6 +56,11 @@ const { arriveCold, fileUrl, REPO_ROOT } = require('./tools/lib/cold-arrival.js'
 const PAR3 = [3, 7, 12, 16];
 const CD = [];
 for (let i = 1; i <= 18; i++) CD.push({ hole: i, par: PAR3.indexOf(i) >= 0 ? 3 : 4, hcpIndex: i });
+// FOUR GOLFERS, AND IT HAS TO BE FOUR. An eight-golfer card would give this file
+// the scroll room its harness-phantom test wants, and it would also take away the
+// thing it is about: on a round with more than four golfers the KP entry is only
+// offered to a group-locked scorekeeper, so a bare link shows no "Change KP"
+// button at all and every assertion below goes vacuous. Measured 2026-10-04.
 const PLAYERS = [
     { id: 101, name: 'Ann Adams', hcp: '2', playingForMoney: true },
     { id: 102, name: 'Bob Brown', hcp: '6', playingForMoney: true },
@@ -131,7 +136,15 @@ describe('"Change KP" stays at the KP box', () => {
         assert.equal(b.picker, false, 'and not the picker yet');
         assert.ok(b.boxOnScreen > 0 && b.boxOnScreen < 844, 'the box is on screen at ' + b.boxOnScreen);
         assert.ok(S.point.y > 0 && S.point.y < 844, 'and so is the button, at y=' + S.point.y);
-        assert.ok(b.scrollY > 200, 'and the page is scrolled down to it: ' + b.scrollY);
+        // RE-POINTED 2026-10-04 (the Status sheet). This asked for 200px of scroll as
+        // shorthand for "the golfer is standing at the box, down the page". The
+        // scorecard's header, nav and every reading card moved into a slide-up sheet,
+        // so a four-golfer round is one screen and the box is reached without
+        // scrolling at all - which is the improvement, not a lost precondition. What
+        // the line was really asserting is checked on the two above it: the box is on
+        // screen and so is the button.
+        assert.ok(b.scrollY >= 0 && b.scrollY <= b.maxScroll,
+            'the page is scrolled past its own end: ' + b.scrollY + ' of ' + b.maxScroll);
     });
 
     test('a real press does not move the page', () => {
@@ -158,12 +171,20 @@ describe('"Change KP" stays at the KP box', () => {
 
     test('THE HARNESS MOVES THE PAGE, and that is the phantom this file exists to name', () => {
         const [b, a] = S.tapped;
-        // cold-arrival centres an element before every { tap }. On this press that is
-        // worth about 119px, which reproduces the reported bug perfectly and proves
-        // nothing about the product. Asserted so the difference is on record.
-        assert.notEqual(a.scrollY, b.scrollY,
-            'if a { tap } has stopped moving the page, cold-arrival changed and this '
-            + 'file can drop the raw dispatch - check line 397 before believing it');
+        // cold-arrival centres an element before every { tap }. On this press that WAS
+        // worth about 119px, which reproduced the reported bug perfectly and proved
+        // nothing about the product.
+        //
+        // RE-POINTED 2026-10-04: on a one-screen card there is nothing to centre, so
+        // the phantom cannot appear here any more - a four-golfer round is 844px since
+        // the Status sheet took everything else off the page. The phantom is still
+        // real on a card that is taller than the screen, so what is asserted is the
+        // MECHANISM rather than its effect on this fixture: cold-arrival still scrolls
+        // before it taps, which is why the raw dispatch below exists.
+        assert.ok(b.maxScroll === 0 || a.scrollY !== b.scrollY,
+            'the page had room to drift (' + b.maxScroll + 'px) and did not - if a '
+            + '{ tap } has stopped moving the page, cold-arrival changed and this file '
+            + 'can drop the raw dispatch');
         assert.match(fs.readFileSync(path.join(REPO_ROOT, 'tools/lib/cold-arrival.js'), 'utf8'),
             /el\.scrollIntoView\(\{ block: 'center' \}\)/, 'that is where it comes from');
     });

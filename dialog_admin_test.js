@@ -482,7 +482,14 @@ describe('5. THE PAGE\'S OWN OVERLAY IS LEFT ALONE, DELIBERATELY', () => {
         // above is worth re-reading rather than inheriting.
         const top = (f) => Math.max.apply(null, (read(f).match(/z-index: ?(\d+)/g) || [])
             .map(x => Number(x.replace(/\D/g, ''))).filter(n => n < 999).concat([0]));
-        assert.ok(top('index.html') <= 10, 'index.html grew a high z-index: ' + top('index.html'));
+        // RE-POINTED 2026-10-04 (was 10): the Status sheet is a fixed panel that has
+        // to sit over the card it slides out of, at 60, with its scrim at 59. It is
+        // deliberately BELOW every modal on the page - the KP question, card-is-in
+        // and the delete sheet all open over it - and far below admin.html's 1000,
+        // so the reasoning above about 999 is untouched.
+        assert.ok(top('index.html') <= 60, 'index.html grew a high z-index: ' + top('index.html'));
+        assert.match(read('index.html'), /#round-sheet \{[^}]*z-index: 60;/,
+            'the 60 is no longer the Status sheet - find out what grew it');
         assert.ok(top('sidematches.html') <= 10, 'sidematches.html grew one: ' + top('sidematches.html'));
         // (admin.html's own 1000 is asserted directly above; `top` deliberately
         // ignores anything at or over 999 so an overlay cannot answer for itself.)

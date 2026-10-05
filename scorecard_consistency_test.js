@@ -226,12 +226,18 @@ describe('READING ORDER — scores before bets', () => {
 
     // BEHAVIOUR CHANGE: navigation moved up to sit directly under scoring.
     test('hole -> scores -> navigation -> recap -> action', () => {
-        const recap = idx.indexOf(`html += '<div id="hole-recap-mount"></div>'`);
-        const action = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
+        // RE-POINTED 2026-10-04 (the Status sheet): the hole card is hole -> scores
+        // -> navigation, full stop. The panels are not read after Next any more -
+        // they are not on the card at all, and a mount creeping back into this html
+        // is what would put them between the boxes and Prev/Next again. Their order
+        // relative to each other is held in the sheet by wave2/wave5_events_test.
         const nav = idx.indexOf('html += navRowHtml;');
         const rows = idx.indexOf('class="hv-player-row${');   // v195: the row carries golfer-out when the golfer is Out
         assert.ok(rows > -1 && nav > rows, 'navigation must follow the score rows');
-        assert.ok(nav < recap && recap < action, 'panels are read after scoring and Next');
+        ['hole-recap-mount', 'action-center-mount', 'bet-strip-mount',
+         'live-skins-mount', 'live-ticker-mount'].forEach(m =>
+            assert.equal(idx.indexOf(`html += '<div id="${m}"></div>'`), -1,
+                m + ' is built inside the hole card again'));
         assert.equal((idx.match(/html \+= navRowHtml;/g) || []).length, 1, 'exactly one nav row');
     });
 

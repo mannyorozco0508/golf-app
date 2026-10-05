@@ -3569,7 +3569,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v134-playorder. The tournament product cache
+// The consumer product cache is consumer-v135-scorecard. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4188,7 +4188,15 @@
 // CARRY rolls a tied hole onto the next hole PLAYED, and bet-strip.js main chip
 // agrees with the Receipt. A device on v293 settles the main game in play order
 // and the side bets by number - two wagers over the same holes disagreeing.
-const CACHE_VERSION = 'golfapp-v294-playorder';
+// Moved to v295: THE SCORECARD IS THE HOLE, AND THE PAGE UNDER IT SAYS WHERE YOU
+// STAND. Everything that is not the hole went into one slide-up sheet, the hole
+// card lands at the top of the screen when it fits (and never puts a banner under
+// the status bar), a compact live line sits under Prev/Next, and the reading
+// cards - the leaderboard, which now shows before anyone tees off, the live
+// matches, Today's Games, the skins card, Playing With - are on the page below
+// it. The sheet keeps settings and admin. 49 helper sentences became one line
+// each. A device on v294 has the old layout and the old landing.
+const CACHE_VERSION = 'golfapp-v295-scorecard';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

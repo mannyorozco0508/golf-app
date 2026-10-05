@@ -1,4 +1,8 @@
 const { test, describe } = require('node:test');
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -247,13 +251,22 @@ describe('SCORECARD RENDER — the command center in a stubbed DOM', () => {
     });
 
     test('it is mounted above the bet strip and above Prev/Next', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). These mounts left renderHoleView
+        // entirely - every card a golfer READS rather than acts on is a static child
+        // of #round-sheet-body now, in the same order, written to by the same
+        // renderers. So the relative order is asserted where they live, and their
+        // absence from the hole card is asserted too, because a mount creeping back
+        // into that html is what would put it above Prev/Next again.
+        const sheetOrder = (() => { const src = read('index.html');
+            return src.slice(src.indexOf('<div id="round-reading">'),
+                             src.indexOf('</div>', src.indexOf('id="bet-strip-mount"'))); })();
         const idx = read('index.html');
-        const ac = idx.indexOf(`html += '<div id="action-center-mount"></div>'`);
-        const bs = idx.indexOf(`html += '<div id="bet-strip-mount"></div>'`);
-        const nav = idx.indexOf('html += navRowHtml;');
-        // Navigation is now above both panels; their order relative to each other is unchanged.
+        const ac = sheetOrder.indexOf('id="action-center-mount"');
+        const bs = sheetOrder.indexOf('id="bet-strip-mount"');
         assert.ok(ac > -1 && ac < bs, 'reading order must stay action -> bet detail');
-        assert.ok(nav < ac, 'and both sit below Prev/Next');
+        assert.equal(idx.indexOf(`html += '<div id="action-center-mount"></div>'`), -1,
+            'the action centre is built inside the hole card again');
+        assert.match(idx, /html \+= navRowHtml;/, 'the hole card lost Prev/Next');
     });
 });
 

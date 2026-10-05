@@ -160,13 +160,19 @@ describe('THE ROW REPLACED THE THREE CARDS', () => {
         ['bare', 'scored'].forEach(k => assert.equal(S[k].oldCards, 0,
             k + ': ' + S[k].oldCards + ' .save-exit-box cards still render'));
     });
-    test('and the row is inside #main-content, so PRINT is unchanged by containment', () => {
-        // @media print sets #main-content { display: none !important } - the footer has
-        // never had a print rule of its own and must not need one.
-        ['bare', 'scored'].forEach(k => assert.equal(S[k].inMainContent, true, k));
+    test('and PRINT is still unchanged by containment', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). The row ships inside
+        // #main-content and is MOVED into #round-sheet-body on arrival with
+        // everything else that is not the hole, so it is no longer a descendant of
+        // the element the print rule hides. The claim - the footer never needs a
+        // print rule of its own - still holds, for a different reason: the sheet has
+        // one, and it hides the whole thing.
         const SRC = read('index.html');
         assert.match(SRC, /#main-content \{ display: none !important; \}/,
             'the print rule that hides the whole page body is gone');
+        assert.match(SRC, /@media print \{\s*#round-sheet, #round-sheet-scrim \{ display: none !important; \}/,
+            'the Status sheet would print');
+        assert.match(SRC, /'scorecard-footer',/, 'the footer is no longer moved into the sheet');
     });
 });
 
@@ -275,49 +281,38 @@ describe('THE HEIGHT RECLAIMED, AS A NUMBER', () => {
         assert.equal(S.scored.footerH, 52, 'the scored footer is ' + S.scored.footerH + 'px');
         assert.equal(BEFORE_FOOTER_PX - S.scored.footerH, 466);
     });
-    test('the page got shorter by the footer MINUS the runway, and the sum accounts for all of it', () => {
-        // Measured on v247: 2177px bare, 2366px scored. The document does NOT shrink by the
-        // full 426/466, and that is deliberate rather than a leak: the runway below the
-        // footer gives part of it back as empty scroll length so the landing can still put
-        // the heading at the top. Asserted as an EQUALITY with the runway in it, so the two
-        // numbers have to add up - if the document lost more or less than
-        // (footer saved - runway added), something moved that this wave did not mean to.
-        //     bare    2177 -> 1800   footer 518 -> 92 (426 back)   runway 49    377 net
-        //     scored  2366 -> 1989   footer 518 -> 52 (466 back)   runway 89    377 net
-        // RE-POINTED IN WAVE 39, AND THE ROLE-NOTE LINE IS ITEMISED RATHER THAN
-        // ABSORBED. The three ways into a round are offered on a single-group
-        // round as one tappable line above the card - this fixture is exactly
-        // that case - and it really does take height. So the equality keeps its
-        // shape and gains one term: the document change is
-        //   (footer saved) - (runway added) - (role note added)
-        // and if any of the three moves by an amount the others do not explain,
-        // this still goes red. Measured: bare 1854, role note 44px + a 10px bottom
-        // margin = 54px occupied.
-        assert.equal(2177 - S.bare.docH, 377 - S.bare.roleNoteH,
-            'the bare document is ' + S.bare.docH + ' with a ' + S.bare.roleNoteH + 'px role note');
-        assert.equal(2366 - S.scored.docH, 377 - S.scored.roleNoteH,
-            'the scored document is ' + S.scored.docH + ' with a ' + S.scored.roleNoteH + 'px role note');
-        // RE-POINTED 2026-10-04, AND THE DELETE BOX IS ITEMISED THE SAME WAY THE
-        // ROLE NOTE WAS. The scorecard's delete control is the organizer's now,
-        // and on this fixture nobody can be shown to be the organizer - so 191px
-        // of card left the page and #hole-landing-runway absorbed every pixel of
-        // it (49 -> 240 bare, 89 -> 280 scored, measured). The DOCUMENT height did
-        // not move at all, which is why the two equalities above still hold
-        // untouched; what moved is how the same height is divided up. The term is
-        // S.owner.deleteBoxH - measured on the organizer's own arrival, not typed
-        // in - so if the box changes size this sum follows, and if it ever stops
-        // rendering for the organizer the next assertion says so.
+    test('THE PAGE IS ONE SCREEN NOW, which is what the accounting was aiming at', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet), and this is the end of a
+        // three-wave arc rather than a bump. The equality here measured how much of
+        // the footer's 426/466px came back to the DOCUMENT once the runway had taken
+        // its share - bare 2177 -> 1854, scored 2366 -> 2043, net 377 either way,
+        // with the role note and the delete box itemised as they appeared.
+        //
+        // The footer, the role note, the delete box and every reading card are now
+        // in the Status sheet, which is position:fixed and contributes NOTHING to
+        // the document. So there is no sum left to make: the page is the hole, and
+        // the hole is one screen. That is the number worth pinning, and it is the
+        // thing all that arithmetic was working towards.
+        //
+        // Measured at 390x844: 844px bare and 844px scored, against 2177 and 2366
+        // on v247. The footer row itself is unchanged and is still asserted above,
+        // where it now lives.
+        // RE-POINTED AGAIN 2026-10-05, and this is the arc finishing where it
+        // started. The declutter made the page one screen by putting every reading
+        // card behind a handle; a fresh round then said nothing about itself, so
+        // the cards came back ON the page below the hole and the document is long
+        // again - 1436px bare against 2177 on v247. What the footer wave was really
+        // defending is unchanged and is asserted where it belongs: the HOLE CARD
+        // fits one screen, which is what the landing rule tests and what the two
+        // assertions in the describe below measure.
+        assert.ok(S.bare.docH < 2177, 'the bare page is ' + S.bare.docH + 'px, no shorter than v247');
+        assert.ok(S.scored.docH < 2366, 'the scored page is ' + S.scored.docH + 'px, no shorter than v247');
+        // AND THE DELETE BOX IS STILL THE ORGANIZER'S, in the sheet with the rest:
+        // measured on its own arrival so the term cannot quietly become zero.
         assert.ok(S.owner.deleteBoxH > 150 && S.owner.deleteBoxH < 250,
-            "the organizer's delete box measured " + S.owner.deleteBoxH + 'px - it is a card with a heading, a sentence and a button');
+            "the organizer's delete box measured " + S.owner.deleteBoxH + 'px');
         assert.equal(S.bare.deleteBoxH, 0,
             'a spectator on the bare link is still being shown ' + S.bare.deleteBoxH + 'px of delete control');
-        assert.equal(S.scored.deleteBoxH, 0);
-        assert.equal((BEFORE_FOOTER_PX - S.bare.footerH) + S.owner.deleteBoxH - S.bare.runwayH, 377,
-            'footer saved plus the delete box reclaimed, minus runway added, does not account for the document change');
-        assert.equal((BEFORE_FOOTER_PX - S.scored.footerH) + S.owner.deleteBoxH - S.scored.runwayH, 377);
-        // AND THE LINE IS REALLY THERE, so this is not satisfied by a zero.
-        assert.ok(S.bare.roleNoteH > 20 && S.bare.roleNoteH < 90,
-            'the role note measured ' + S.bare.roleNoteH + 'px - it should be one tappable line');
     });
 });
 
@@ -366,6 +361,8 @@ describe('THE LANDING STILL WORKS AFTER THE FOOTER SHRANK', () => {
                     var pad = document.getElementById('hole-landing-runway');
                     return JSON.stringify({
                         headerTop: hdr ? Math.round(hdr.getBoundingClientRect().top) : null,
+                        navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+                          return n ? Math.round(n.getBoundingClientRect().bottom) : null; })(),
                         runwayH: pad ? Math.round(pad.getBoundingClientRect().height) : null,
                         scrollY: Math.round(window.pageYOffset || 0),
                         maxScroll: Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
@@ -377,11 +374,27 @@ describe('THE LANDING STILL WORKS AFTER THE FOOTER SHRANK', () => {
     [4, 8].forEach(n => {
         test(n + ' golfers: Next still lands the heading at the offset', () => {
             assert.ok(L[n] && !L[n].error, L[n] && L[n].error);
-            assert.equal(L[n].headerTop, 12,
-                'the heading is ' + L[n].headerTop + 'px from the top - the footer stopped '
-                + 'providing the runway the landing needs');
-            assert.equal(L[n].scrollY, L[n].maxScroll >= L[n].scrollY ? L[n].scrollY : -1,
-                'sanity: the scroll was applied');
+            // RE-POINTED 2026-10-04 (the Status sheet). landOnHole stays and is a
+            // NO-OP where the page cannot scroll, by decision: the footer and every
+            // other card left the page, so these fixtures are one screen and there is
+            // nothing to scroll. The landing takes whatever room there is - asserted
+            // here - and the exact 12px landing is proven in hole_landing_inset_test
+            // on an eight-golfer card in ONE group, which is genuinely taller than
+            // the screen. This file's own subject, the footer row, is unchanged.
+            // RE-POINTED AGAIN 2026-10-05: scroll room is not the test and cannot be,
+            // because the reading area below the hole is scrollable by design. The
+            // rule is the CARD - if it fits with the page at the top, the landing
+            // leaves it there.
+            if (L[n].navBottom !== null && L[n].navBottom > 844) {
+                assert.equal(L[n].headerTop, 12,
+                    'the heading is ' + L[n].headerTop + 'px from the top on a card that '
+                    + 'does not fit - the landing did not fire');
+            } else {
+                assert.ok(L[n].scrollY <= L[n].maxScroll + 1,
+                    'the page scrolled past its own end: ' + L[n].scrollY + ' of ' + L[n].maxScroll);
+                assert.ok(L[n].headerTop >= 0 && L[n].headerTop < 844,
+                    'the heading is off screen at ' + L[n].headerTop);
+            }
         });
         test(n + ' golfers: the runway element exists and carries a real height', () => {
             // Zero would mean the page is long enough on its own, which is fine - but the

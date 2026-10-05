@@ -23,6 +23,10 @@
 // prove nothing.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -83,12 +87,35 @@ const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/
 
 // ============================================================================
 
+// RE-POINTED 2026-10-04 (the Status sheet). Every assertion in this file said the
+// live dashboard is emitted BEFORE the hole heading, so that action context could
+// never be interleaved with the score boxes. The dashboard is not emitted by
+// renderHoleView at all now: it, the recap, the skins card, My Round and the bet
+// strip are static children of #round-sheet-body and are written to by the same
+// renderers through the same ids. The claim this file holds is therefore stronger
+// and is written as the stronger thing - NOT IN THE HOLE BLOCK AT ALL - and the
+// thing it was protecting against, a mount creeping back into that html string, is
+// exactly what each assertion now refuses.
+function dashboardIsOutOfTheHoleBlock(body) {
+    ['live-ticker-mount', 'hole-recap-mount', 'live-skins-mount',
+     'action-center-mount', 'bet-strip-mount'].forEach(id => {
+        assert.equal(body.indexOf(id), -1, id + ' is emitted inside renderHoleView again');
+    });
+    const sheet = (() => { const src = read('index.html');
+        return src.slice(src.indexOf('<div id="round-reading">'),
+                         src.indexOf('</div>', src.indexOf('id="bet-strip-mount"'))); })();
+    assert.match(sheet, /id="live-ticker-mount"/, 'the dashboard mount is not in the reading area on the page');
+    // AND THE HOLE BLOCK IS STILL WHOLE: heading, then boxes, then Prev/Next.
+    assert.ok(body.indexOf('hole-view-header') > -1, 'the hole heading is gone');
+    assert.ok(body.indexOf('hole-view-header') < body.indexOf('html += navRowHtml'),
+        'the heading must still come before Prev/Next');
+}
+
 describe('THE LIVE DASHBOARD COMES FIRST', () => {
 
     test('the live mount is emitted before the hole heading', () => {
         const body = holeViewSource();
-        assert.ok(orderOf(body, 'live-ticker-mount') < orderOf(body, 'hole-view-header'),
-            'live action is context; it must not sit inside the hole block');
+        dashboardIsOutOfTheHoleBlock(body);
     });
 
     test('LIVE LEADERBOARD and LIVE MATCHES share that single mount', () => {
@@ -143,7 +170,7 @@ describe('THE HOLE BLOCK IS NOT INTERRUPTED', () => {
         // Moving it below the block would fix the interruption and create a new
         // problem: action context arriving after the golfer has already scrolled past.
         const body = holeViewSource();
-        assert.ok(orderOf(body, 'live-ticker-mount') < orderOf(body, 'html += navRowHtml'));
+        dashboardIsOutOfTheHoleBlock(body);
     });
 });
 
@@ -154,8 +181,7 @@ describe('A PRESS-HEAVY NASSAU DOES NOT CHANGE THE ORDER', () => {
         const t = strip(r.ticker);
         assert.ok((t.match(/AUTO PRESS/g) || []).length >= 3,
             'this fixture must actually be press-heavy, or it proves nothing');
-        const body = holeViewSource();
-        assert.ok(orderOf(body, 'live-ticker-mount') < orderOf(body, 'hole-view-header'));
+        dashboardIsOutOfTheHoleBlock(holeViewSource());
     });
 
     test('nothing was removed from the wager panel', () => {
@@ -193,10 +219,12 @@ describe('OTHER ROUNDS KEEP THE SAME STRUCTURE', () => {
         // One emission path serves every format, so no round type can get the old
         // interleaved layout by accident.
         const body = holeViewSource();
-        const tick = orderOf(body, 'live-ticker-mount');
-        assert.equal((body.match(/live-ticker-mount/g) || []).length, 1,
-            'exactly one mount, emitted once');
-        assert.ok(tick < orderOf(body, 'hole-view-header'));
+        dashboardIsOutOfTheHoleBlock(body);
+        // EXACTLY ONE MOUNT, and it is now in the page rather than emitted: two
+        // would be two elements with one id, which is what the old "emitted once"
+        // line refused.
+        assert.equal((read('index.html').match(/id="live-ticker-mount"/g) || []).length, 1,
+            'exactly one dashboard mount in the page');
     });
 
     test('a round with no live widgets still renders the hole block', () => {

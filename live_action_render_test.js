@@ -19,6 +19,10 @@
 // nothing - and a page reimplementing it would drift from the receipt.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -238,13 +242,22 @@ describe('SCORECARD ORDER CONTRACT', () => {
 
     const src = read('index.html');
 
-    test('every live mount sits AFTER Prev/Next in the render', () => {
+    test('every live mount is OUT of the hole card, in the Status sheet', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). This asserted the live mounts
+        // were built AFTER Prev/Next inside the hole card, so that score entry came
+        // first. They are not built there at all now: everything a golfer READS
+        // rather than acts on moved into one slide-up sheet behind a handle, which
+        // is the same claim taken further. The hole card must not build them again -
+        // that is what would put them back above Prev/Next on the next edit.
         const nav = src.indexOf('html += navRowHtml;');
         assert.notEqual(nav, -1, 'the nav row must still be rendered');
-        ['live-skins-mount', 'action-center-mount', 'bet-strip-mount'].forEach(id => {
-            const at = src.indexOf(`html += '<div id="${id}"></div>';`);
-            assert.notEqual(at, -1, `${id} is missing`);
-            assert.ok(at > nav, `${id} renders before Prev/Next — score entry must stay first`);
+        const sheet = src.slice(src.indexOf('<div id="round-reading">'),
+                                src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
+        ['live-ticker-mount', 'hole-recap-mount', 'live-skins-mount',
+         'action-center-mount', 'bet-strip-mount'].forEach(id => {
+            assert.equal(src.indexOf(`html += '<div id="${id}"></div>';`), -1,
+                `${id} is built inside the hole card again`);
+            assert.match(sheet, new RegExp('id="' + id + '"'), `${id} is not in the reading area on the page`);
         });
     });
 
@@ -260,8 +273,10 @@ describe('SCORECARD ORDER CONTRACT', () => {
         const header = fn.indexOf('hole-view-header');
         assert.ok(nav !== -1, 'the hole view must render the nav row');
         assert.ok(header !== -1 && header < nav, 'the hole header must precede Prev/Next');
-        const mount = fn.indexOf('live-skins-mount');
-        assert.ok(mount > nav, 'live action must come after Prev/Next');
+        // RE-POINTED 2026-10-04: live action is not in this function any more, so
+        // "after Prev/Next" is asserted as "not here at all" - see the test above.
+        assert.equal(fn.indexOf('live-skins-mount'), -1,
+            'the hole view builds live action again, which puts it back above Prev/Next');
     });
 
     test('the live cards live inside the existing Main Pool banner, not a new dashboard', () => {

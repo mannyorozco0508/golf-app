@@ -478,6 +478,9 @@ describe('CHROME: real taps - open the sheet, mark Out, Save', () => {
             // the bare link on a multi-group round asks which group first (the picker); the organizer taps Just watching
             { tap: '#group-pick-overlay [data-role="watching"]', nth: 0 }, { sleep: 250 },
             { expression: "'PICK:' + getComputedStyle(document.getElementById('group-pick-overlay')).display" },
+            // THE GROUP STRIP IS IN THE STATUS SHEET (2026-10-04), so the Players
+            // button is one tap on the handle away - the same tap a golfer makes.
+            { tap: '#round-sheet-handle', nth: 0 }, { sleep: 500 },
             { tap: '.group-setup-btn', nth: 1 }, { sleep: 250 },
             { expression: "'OPEN:' + getComputedStyle(document.getElementById('players-sheet')).display" },
             { expression: "'ROWS:' + document.querySelectorAll('#players-sheet-body .ps-row').length" },
@@ -522,6 +525,9 @@ describe('CHROME: real taps - move a golfer with the [Group] selector, Save', ()
     before(async () => {
         r = await arriveCold({ url: fileUrl('index.html', 'game=PS1'), db: DB, settleMs: 4000, steps: [
             { tap: '#group-pick-overlay [data-role="watching"]', nth: 0 }, { sleep: 250 },
+            // THE GROUP STRIP IS IN THE STATUS SHEET (2026-10-04), so the Players
+            // button is one tap on the handle away - the same tap a golfer makes.
+            { tap: '#round-sheet-handle', nth: 0 }, { sleep: 500 },
             { tap: '.group-setup-btn', nth: 1 }, { sleep: 250 },
             { expression: "'SEL0:' + document.querySelector('#players-sheet-body .ps-row[data-idx=\"9\"] .ps-grp').value" },
             // A tap focuses the selector. Two Down keys move G3 -> G5 and fire

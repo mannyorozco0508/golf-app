@@ -1499,6 +1499,138 @@ html {
     padding-top: max(12px, env(safe-area-inset-top, 0px));
     padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
 }
+
+/* ============================================================================
+   THE STATUS SHEET (UX wave, 2026-10-04)
+   ----------------------------------------------------------------------------
+   MEASURED FIRST, because the complaint is a ratio and not a bug: on a live
+   round at 390x844, 0% of the first screen was score boxes. 525 of the 844
+   pixels were header, nav, the Playing With card and the group-scores card, and
+   the hole card did not start until y=610 - so a golfer standing on the 7th tee
+   had to scroll to type a number. tools/first-screen-check.js is the measurement
+   and prints the percentage both ways.
+
+   THE SHEET HOLDS EVERYTHING THAT IS NOT THE HOLE. One handle, fixed at the
+   bottom where a thumb already is; the blocks move into it unchanged - same ids,
+   same handlers, same render functions - so nothing that writes to them had to
+   learn a new place to write.
+   ============================================================================ */
+#round-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-mid);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0,0,0,0.18);
+    transform: translateY(calc(100% - var(--sheet-handle-h, 52px)));
+    transition: transform 0.22s ease;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+}
+#round-sheet.open { transform: translateY(0); }
+#round-sheet-handle {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 16px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: var(--brand-green);
+    text-align: center;
+}
+#round-sheet-handle::before {
+    content: '';
+    position: absolute;
+    top: 7px; left: 50%;
+    width: 40px; height: 4px;
+    margin-left: -20px;
+    border-radius: 2px;
+    background: var(--border-mid);
+}
+#round-sheet-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 14px max(16px, env(safe-area-inset-bottom, 0px)) 14px;
+}
+/* The sheet is closed on arrival, so the page needs exactly the handle's worth of
+   room under the last thing on it and not a pixel more. */
+body.has-round-sheet #main-content { padding-bottom: 64px; }
+
+/* THE GAP ABOVE "HOLE N" (2026-10-05). With the header, the nav and every
+   reading card in the Status sheet, the page's own chrome - 12px of body
+   padding, 12px of container padding and the margins the old blocks left behind
+   - was 58px of nothing above the first thing a golfer looks at. Measured, then
+   cut to what a card needs to not touch the edge. Scoped to the scorecard: this
+   class is only on the body once buildRoundSheet has run. */
+/* The page's own bottom padding was 40px of scroll length under a card that ends
+   well above the fold, and the sheet handle already owns that strip. Zero here,
+   64px on #main-content for the handle, and the document stops being scrollable
+   for no reason - which is what the landing rule asks of a card that fits. */
+body.has-round-sheet { padding-top: 6px; padding-bottom: 0; }
+body.has-round-sheet #main-content { padding-top: 6px; }
+body.has-round-sheet #round-body-layout, body.has-round-sheet #scorecard-main { margin-top: 0; }
+/* #save-state is the one thing left between the top of the page and the hole -
+   18px of "Saved" wrapped in 16px of margin, measured. It stays, because a
+   golfer typing a score wants to see it land; it just stops costing more room
+   than it occupies. */
+body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
+
+/* ============================================================================
+   THE COMPACT LIVE PANEL, under Prev/Next (2026-10-05)
+   ----------------------------------------------------------------------------
+   Manny: "too simple now". A four-golfer card ends at y=471 and the screen is
+   844, so there were 373 pixels of nothing between Prev/Next and the handle.
+   This fills them with what a golfer actually asks between shots - where do I
+   stand, what are my matches doing, and is anything riding on this hole - and
+   with NOTHING ELSE, because the card still has to fit one screen.
+
+   IT COMPUTES NOTHING. Every line is read from the builder that already owns it:
+   liveStandings() for the board, buildLiveMatchStates() for the matches,
+   kpLiveLineHtml() for the KP, and the skins ledger rows for a carry. No money
+   is recomputed here and no mid-round total is printed - the Receipt's rule.
+   ============================================================================ */
+/* SIZED BY THE WORST CASE, not the average: the top five, two wagers, a skins
+   carry and a KP on the same hole measured 863px of card against an 844px
+   screen, and a card that stops fitting starts scrolling the banner under the
+   status bar again (hole_landing_fits_test.js). Every number below was cut
+   until that arrangement fitted, and the test holds it there. */
+.hole-live { margin-top: 6px; border-top: 1px dashed var(--border-light); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.hl-row { font-size: 0.74rem; color: var(--text-main); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; line-height: 1.25; }
+.hl-board { gap: 2px 9px; }
+.hl-chip { white-space: nowrap; color: var(--text-muted); }
+.hl-chip b { color: var(--brand-green); }
+.hl-chip i { font-style: normal; opacity: 0.75; }
+.hl-more { all: unset; cursor: pointer; font-size: 0.72rem; font-weight: bold; color: var(--brand-green); margin-left: auto; min-height: 24px; }
+.hl-match { color: var(--text-main); }
+.hl-match b { color: var(--brand-green); }
+.hl-hole { color: var(--accent-teal); font-weight: bold; }
+
+/* THE READING AREA (2026-10-05): on the page, below the hole, scrollable. It
+   gets a little air above it so the hole card still reads as the thing you are
+   standing on. */
+#round-reading { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+#round-reading:empty { display: none; }
+.tg-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px 12px; }
+.tg-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 6px; }
+.tg-list { margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-main); line-height: 1.5; }
+#round-sheet-scrim {
+    position: fixed; inset: 0; z-index: 59;
+    background: rgba(0,0,0,0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+#round-sheet-scrim.open { opacity: 1; pointer-events: auto; }
+@media print {
+    #round-sheet, #round-sheet-scrim { display: none !important; }
+}
 </style>
 </head>
 <body>
@@ -1506,11 +1638,11 @@ html {
 <div id="print-area"></div>
 
 <div class="container" id="main-content" style="display: none;">
-    <div class="header-controls-row">
+    <div class="header-controls-row" id="header-controls-row">
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
         <button class="history-open-btn" onclick="openHistoryModal()">🕘 History</button>
     </div>
-    <div class="header-box">
+    <div class="header-box" id="header-box">
         <div style="margin-bottom: 6px;">
             <span id="room-code-badge" style="background: var(--brand-navy); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">GAME: ----</span>
         <!-- v191: a retired round (supersededBy) says where the live one is. Filled
@@ -1529,7 +1661,7 @@ html {
     </div>
 
     <!-- Top Navigation Bar -->
-    <div class="app-nav-wrap">
+    <div class="app-nav-wrap" id="app-nav-wrap">
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
@@ -1544,7 +1676,7 @@ html {
     </div>
 
     <div id="spectator-hint-banner" style="display:none; background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; text-align:center; font-size:0.85rem; color: var(--text-main);">
-        👁️ You're viewing read-only. To enter scores, ask whoever set up the round for <strong>your group's link</strong> — they can grab it from the Home tab.
+        👁️ Read-only. Ask the organizer for your group's link to enter scores.
     </div>
 
     <div id="round-landing-summary" style="display:none; background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
@@ -1601,7 +1733,7 @@ html {
          "Hole N of 18" label in the Prev/Next row, which sits inside the scorecard
          card and cannot be covered. -->
 
-    <div class="view-mode-toggle">
+    <div class="view-mode-toggle" id="view-mode-toggle">
         <button id="view-mode-hole-btn" class="view-mode-btn active" onclick="setViewMode('hole')">Hole View</button>
         <button id="view-mode-full-btn" class="view-mode-btn" onclick="setViewMode('full')">📋 Full Card</button>
     </div>
@@ -1723,6 +1855,29 @@ html {
          So the runway is now explicit, sized to exactly what the landing needs and zero
          when the page is long enough on its own. It is empty, it is below everything a
          golfer reads, and it costs nothing but scroll length. -->
+    <!-- THE READING AREA (2026-10-05). On the PAGE, below Prev/Next, scrollable.
+         Manny on a fresh round: "too plain - no leaderboard, no widgets". The
+         declutter had put every reading card behind the Status sheet, which is
+         right for a round in progress and wrong for one that has not started:
+         there is nothing on the first screen to say what you are playing for.
+         So the sheet keeps SETTINGS AND ADMIN only, and everything a golfer
+         READS comes back onto the page under the hole. The first screen is
+         unchanged - the card still fits it, and the landing rule still tests
+         that fit - and this is what you get when you scroll. -->
+    <div id="round-reading">
+        <!-- ORDER IS MANNY'S (2026-10-05): the leaderboard and the live matches
+             come FIRST, directly under the hole, because they are what a group
+             looks at between shots. The compact one-line versions of both are on
+             the first screen under Prev/Next; these are the full ones. Today's
+             games, the skins card and Playing With sit below them. -->
+        <div id="live-ticker-mount"></div>
+        <div id="todays-games-mount"></div>
+        <div id="hole-recap-mount"></div>
+        <div id="live-skins-mount"></div>
+        <div id="action-center-mount"></div>
+        <div id="bet-strip-mount"></div>
+    </div>
+
     <div id="hole-landing-runway" aria-hidden="true"></div>
 
     <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.
@@ -1737,6 +1892,20 @@ html {
          console, which is what batch1_safety_test.js:431 already demands of
          Group Links. -->
     <div id="end-round-mount"></div>
+</div>
+
+<!-- THE STATUS SHEET. Empty in the markup ON PURPOSE: buildRoundSheet() moves the
+     real blocks in on arrival, before the page is revealed, so there is exactly one
+     copy of each and every handler that already writes to them keeps working. The
+     list of what moves is ROUND_SHEET_BLOCKS, which is also what the guard reads. -->
+<div id="round-sheet-scrim" onclick="toggleRoundSheet(false)"></div>
+<div id="round-sheet" aria-hidden="false">
+    <button type="button" id="round-sheet-handle" aria-expanded="false"
+            aria-controls="round-sheet-body" onclick="toggleRoundSheet()">
+        <span id="round-sheet-label">Status &amp; everything else</span>
+        <span id="round-sheet-caret" aria-hidden="true">▲</span>
+    </button>
+    <div id="round-sheet-body"></div>
 </div>
 
 <!-- WHICH GROUP ARE YOU KEEPING SCORE FOR? (2026-09-20). Shown once, on arrival,
@@ -2122,6 +2291,9 @@ html {
         window.location.href = "admin.html";
     } else {
         currentMode = currentMode.toUpperCase();
+        // THE SHEET IS BUILT BEFORE THE PAGE IS REVEALED (UX wave, 2026-10-04), so
+        // nobody sees the old layout flash past on the way to the new one.
+        buildRoundSheet();
         document.getElementById("main-content").style.display = "block";
         document.getElementById("room-code-badge").textContent = "GAME: " + currentMode;
 
@@ -2660,6 +2832,11 @@ html {
         // way out. That the Full Card has no KP entry of its own is a separate backlog
         // item and is deliberately not fixed here.
         if (mode === 'full' && kpGateBefore(currentViewedHole, function () { setViewMode('full'); })) return;
+        // AND THE STATUS SHEET CLOSES BEHIND YOU (2026-10-04). The toggle lives in
+        // the sheet, and switching the view is a decision to go back to the card -
+        // leaving the sheet open would put it straight over the thing just asked
+        // for. Nothing else closes it: the handle and the scrim are the golfer's.
+        if (typeof toggleRoundSheet === 'function') toggleRoundSheet(false);
         currentViewMode = mode;
         document.getElementById('view-mode-hole-btn').classList.toggle('active', mode === 'hole');
         document.getElementById('view-mode-full-btn').classList.toggle('active', mode === 'full');
@@ -2751,7 +2928,24 @@ html {
             if (!(r.height > 0)) return null;                       // not laid out
             const limit = (window.innerHeight || 0) - KEYBOARD_ALLOWANCE;
             if (!(r.bottom <= limit)) return null;                  // would be under the keypad
-            box.focus();
+            // WITHOUT MOVING THE PAGE (2026-10-04). landOnHole scrolls FIRST and
+            // focuses last, on the reasoning that "the box is already clear of the
+            // keypad by the time it is chosen" - true of where the box sits, and not
+            // true of what the browser does with it: focus() scrolls the element into
+            // view on the browser's own terms. That was invisible while the scorecard
+            // carried a thousand pixels of cards below the hole, because there was
+            // slack to absorb it. With everything else in the Status sheet the page
+            // ends just below the runway, and the focus scrolled straight to the
+            // bottom - measured on a notched arrangement: the landing put the heading
+            // at 46 and the focus took it to 93, the maximum, which is 12px from the
+            // top of the screen and 35px UNDER a 47px status bar. That is the exact
+            // defect Wave 19b was built to fix, arriving again by another door.
+            //
+            // preventScroll keeps the keyboard behaviour and drops the scroll. Where
+            // it is not supported the plain focus() still runs, which is the old
+            // behaviour rather than no focus at all.
+            try { box.focus({ preventScroll: true }); }
+            catch (e) { box.focus(); }
             return box;
         } catch (e) { return null; }                                 // fail open, always
     }
@@ -2809,16 +3003,52 @@ html {
         // heading reachable - so it has to be right BEFORE the target is computed, not on
         // the next snapshot. Measured without this: an eight-golfer round asked for exactly
         // its own maxScroll and got 0, because at scroll time the page was still short.
-        sizeHoleLandingRunway();
+        // ---- IF THE CARD FITS, DO NOT SCROLL AT ALL (2026-10-04) ---------------
+        //
+        // WHAT MANNY SAW, on his phone, after the Status sheet took everything else
+        // off the page: Next scrolled, and the "Final results are in" banner ended
+        // up UNDER the clock with the Dots row pushed off the top. The landing was
+        // doing its job - heading at inset + 12 - on a page where there was nothing
+        // to gain by moving at all, because the whole hole was already on screen.
+        //
+        // THE RULE, and it is his: if the hole card from its heading through
+        // Prev/Next FITS with the page at the top, land at scrollY 0 and leave
+        // everything above it - the banner, the Dots row - where it is, below the
+        // status bar. Scroll only when the card would NOT fit, which is five to
+        // eight golfers in one group, and then put the heading at inset + 12 as
+        // before. Nothing is ever placed under the safe-area top.
+        //
+        // THE RUNWAY FOLLOWS THE SAME TEST. It exists so a tall card CAN reach the
+        // landing; on a card that fits it is the only thing making the page
+        // scrollable at all, and a page that can scroll is a page that drifts. So
+        // it is sized only in the branch that scrolls, and zeroed in the one that
+        // does not.
         try {
             if (anchor.getBoundingClientRect && typeof window.scrollTo === 'function') {
                 let inset = 0;
                 if (typeof getComputedStyle === 'function' && document.documentElement) {
                     inset = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
                 }
-                const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0)
-                    - HOLE_LANDING_OFFSET - inset;
-                window.scrollTo(0, Math.max(0, y));
+                const atTop = window.pageYOffset || 0;
+                const headTop = anchor.getBoundingClientRect().top + atTop;
+                // The bottom of the card's own navigation row: "the hole card" is the
+                // heading through Prev/Next, and what is below it (the KP line, the
+                // Dots button) is reachable by scrolling like anything else.
+                const navRow = card.querySelector('.hole-view-nav-row');
+                const cardBottom = ((navRow || anchor).getBoundingClientRect().bottom) + atTop;
+                // Document coordinates ARE viewport coordinates at scroll 0, so this
+                // is the question "would it all be visible with the page at the top".
+                const fitsAtTop = cardBottom <= (window.innerHeight || 0);
+                if (fitsAtTop) {
+                    const pad = document.getElementById('hole-landing-runway');
+                    if (pad && pad.style) pad.style.height = '0px';
+                    window.scrollTo(0, 0);
+                } else {
+                    sizeHoleLandingRunway();
+                    const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0)
+                        - HOLE_LANDING_OFFSET - inset;
+                    window.scrollTo(0, Math.max(0, y));
+                }
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }
         // THE FOCUS IS LAST, AFTER THE SCROLL. Focusing first would let the browser
@@ -2966,7 +3196,14 @@ html {
         // Live action is context; entering scores is the task. The dashboard now
         // comes first and the hole block stays whole: heading, players, boxes,
         // Prev/Next, uninterrupted.
-        let html = '<div id="live-ticker-mount"></div>';
+        // THE LIVE DASHBOARD MOVED INTO THE STATUS SHEET (UX wave, 2026-10-04).
+        // An earlier wave put it FIRST so that a Nassau press row could not push
+        // the score boxes away from the hole they belong to - "live action is
+        // context; entering scores is the task" - and that reasoning is why it is
+        // now out of the hole card altogether rather than merely reordered. The
+        // mount is a static child of #round-sheet-body and renderLiveTicker finds
+        // it by id, so nothing below changed.
+        let html = '';
 
         // THE MATCH-HANDICAP CONTEXT LINE, CLONED OUT OF THE FULL CARD.
         //
@@ -3096,6 +3333,10 @@ html {
         // something to wade through first.
         html += navRowHtml;
 
+        // THE COMPACT LIVE PANEL (2026-10-05). Under Prev/Next, above the KP entry,
+        // because it is what a golfer READS and the KP is something they ANSWER.
+        html += '<div id="hole-live-mount"></div>';
+
         // THE KP ENTRY, DIRECTLY UNDER PREV/NEXT (2026-09-19). It used to sit at the
         // bottom of the Weekly Game panel inside the Action Center - past the recap,
         // the skins panel, the My Round toggle and the panel's own list - which on a
@@ -3122,14 +3363,13 @@ html {
                 : `<button type="button" class="hv-dots-btn" disabled style="opacity:0.5; cursor:not-allowed;">${label}</button>`;
         }
 
-        // Everything below the fold is what a golfer READS rather than acts on: what
-        // just happened, what's at stake, how the side matches stand. The press strip
-        // stays a single scrollable chip row, so it holds a fixed height no matter how
-        // many presses are running.
-        html += '<div id="hole-recap-mount"></div>';
-        html += '<div id="live-skins-mount"></div>';
-        html += '<div id="action-center-mount"></div>';
-        html += '<div id="bet-strip-mount"></div>';
+        // THE FOUR READING MOUNTS MOVED INTO THE STATUS SHEET (UX wave, 2026-10-04).
+        // They are what a golfer READS rather than acts on - what just happened,
+        // what is at stake, how the side matches stand - and the comment that used
+        // to sit here said "everything below the fold", which was the admission
+        // that they were already not part of the hole. They are STATIC children of
+        // #round-sheet-body now; renderCardWidgets() finds them by id exactly as it
+        // did, so every renderer below is unchanged and nothing is rebuilt twice.
 
         html += buildHolePickerHtml(courseData, savedScores, filteredPlayers);
 
@@ -3191,7 +3431,161 @@ html {
         } catch (e) { pad.style.height = '0px'; }
     }
 
+    // ---- THE COMPACT LIVE PANEL (2026-10-05) --------------------------------
+    //
+    // Manny, on the new scorecard: "too simple now". A four-golfer card ends at
+    // y=471 on an 844px screen, so there were 373 pixels of nothing between
+    // Prev/Next and the sheet handle. This fills them with the three things a
+    // golfer asks between shots and stops - the card still has to fit one screen,
+    // and the landing rule depends on it.
+    //
+    // IT COMPUTES NOTHING, AND THAT IS THE WHOLE DESIGN. Every line is read from
+    // the builder that already owns it:
+    //   liveStandings()          the same rows the full board and the sheet use
+    //   buildLiveMatchStates()   money-engine's presenter, the sheet's source too
+    //   kpLiveLineHtml()         the existing KP line, reused whole
+    //   buildSkinsLedgerRows()   live-skins.js, over settlement-engine's ledger
+    // No money is recomputed here. NO MID-ROUND TOTAL is printed either: a stake
+    // is what the wager is worth, which is a fact; "+$30 with twelve to play" is
+    // the defect the Receipt itself had, and the sheet's full card keeps that
+    // rule too.
+    //
+    // THE SHEET KEEPS THE FULL VERSIONS. This is the same data, one line each.
+    // ---- TODAY'S GAMES (2026-10-05) ----------------------------------------
+    //
+    // What this round is set up to play, before anybody has played it. On a fresh
+    // round every other card is empty by design - no scores, no skins, no bets -
+    // and the page said nothing at all about what the group had just agreed.
+    //
+    // IT DESCRIBES NOTHING ITSELF. Every line is a builder's own words:
+    // getRoundGames() and describeGame() from action-model.js - the same pair the
+    // setup review and the Action list use - and buildMoneyPoolBanner() for the
+    // pot, which is computeMoneyPool's figure, not one counted here.
+    function renderTodaysGames() {
+        const mount = document.getElementById('todays-games-mount');
+        if (!mount) return;
+        if (typeof scopeMissing === 'function' && scopeMissing()) { mount.innerHTML = ''; return; }
+        const esc = t => String(t === undefined || t === null ? '' : t)
+            .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        let games = [];
+        try {
+            games = (typeof getRoundGames === 'function' ? getRoundGames(currentData) : []) || [];
+        } catch (e) { games = []; }
+        const lines = [];
+        games.forEach(g => {
+            let text = '';
+            try { text = (typeof describeGame === 'function') ? describeGame(g) : (g && g.label); }
+            catch (e) { text = g && g.label; }
+            if (text) lines.push('<li>' + esc(text) + '</li>');
+        });
+        // The Weekly Game pot, in the engine's own words.
+        let pot = '';
+        try { pot = (typeof buildMoneyPoolBanner === 'function') ? buildMoneyPoolBanner() : ''; }
+        catch (e) { pot = ''; }
+        const sides = Object.keys((currentData && currentData.sideMatches) || {}).length;
+        if (sides > 0) lines.push('<li>\u2694\uFE0F ' + sides + ' side match' + (sides === 1 ? '' : 'es') + '</li>');
+        if (!lines.length && !pot) { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<div class="tg-card">'
+            + '<div class="tg-head">\uD83C\uDFCC\uFE0F TODAY\u2019S GAMES</div>'
+            + (lines.length ? '<ul class="tg-list">' + lines.join('') + '</ul>' : '')
+            + pot
+            + '</div>';
+    }
+
+    function renderHoleLive() {
+        const mount = document.getElementById('hole-live-mount');
+        if (!mount) return;
+        if (typeof scopeMissing === 'function' && scopeMissing()) { mount.innerHTML = ''; return; }
+        const esc = t => String(t === undefined || t === null ? '' : t)
+            .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const first = n => String(n || '').trim().split(' ')[0];
+        const rows = [];
+
+        // 1. THE TOP FIVE, and the way to the rest.
+        // THE SAME ALWAYS-SHOWN RULE AS THE BOARD WIDGET (2026-10-05): before
+        // anyone has started, every golfer is level and the line says so - E, thru
+        // 0 - rather than the panel being blank on the one screen a group looks at
+        // while they are still on the first tee.
+        let board = [];
+        try {
+            const all = (typeof liveStandings === 'function' ? liveStandings() : []);
+            const started = all.filter(r => r.started);
+            board = started.length ? started : all;
+        } catch (e) { board = []; }
+        if (board.length) {
+            rows.push('<div class="hl-row hl-board">'
+                + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
+                    + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
+                    // THRU IS ALWAYS PRINTED, 0 included: before anyone has started,
+                    // "E thru 0" is the whole truth about the round and reads as one.
+                    + ' <i>thru ' + esc(r.thru || 0) + '</i></span>').join('')
+                + '<button type="button" class="hl-more" onclick="openLiveBoard()">Full board \u203A</button>'
+                + '</div>');
+        }
+
+        // 2. THIS GOLFER'S MATCHES, one line each. The segment shown is the one
+        //    still being played - a Nassau names it ("Front AS") because three
+        //    lines for one wager is the panel this is replacing.
+        let states = [];
+        try {
+            const ids = (typeof scopedPlayers === 'function' ? scopedPlayers() : []).map(p => String(p.id));
+            states = (typeof buildLiveMatchStates === 'function')
+                ? (buildLiveMatchStates(currentData, currentData.courseData || [],
+                                        currentData.scores || {}, ids) || []) : [];
+        } catch (e) { states = []; }
+        states.forEach(st => {
+            const segs = (st.segments || []).filter(g => g.started);
+            if (!segs.length) return;
+            const seg = segs.find(g => !g.closed) || segs[segs.length - 1];
+            const who = esc(first(st.t1Name)) + ' v ' + esc(first(st.t2Name));
+            const name = st.formatLabel === 'Nassau' ? ('Nassau \u00B7 ' + who) : who;
+            const where = st.formatLabel === 'Nassau' ? (esc(seg.label) + ' ') : '';
+            // The stake is the wager's own number, straight off the segment. It is
+            // not a running total and never becomes one.
+            const stake = (seg.stake > 0) ? ' \u00B7 $' + esc(seg.stake) : '';
+            rows.push('<div class="hl-row hl-match">' + name + ' \u00B7 <b>' + where + esc(seg.statusText)
+                + '</b>' + stake + '</div>');
+        });
+
+        // 3. THIS HOLE, only when it has something riding on it.
+        const holeNum = Number(currentViewedHole);
+        let hole = '';
+        try {
+            const carry = holeSkinsCarry(holeNum);
+            if (carry > 1) hole += '<span class="hl-hole">\uD83E\uDD69 ' + carry + ' skins on this hole</span>';
+        } catch (e) { /* the ledger is the sheet's problem, not this line's */ }
+        const kp = (typeof kpLiveLineHtml === 'function') ? kpLiveLineHtml(holeNum) : '';
+        if (kp) hole += kp;
+        if (hole) rows.push('<div class="hl-row">' + hole + '</div>');
+
+        mount.innerHTML = rows.length ? '<div class="hole-live">' + rows.join('') + '</div>' : '';
+    }
+
+    // HOW MANY SKINS ARE RIDING ON THIS HOLE, read from the ledger rather than
+    // counted here: live-skins.js builds the carry rows over
+    // settlement-engine.js's own ledger, and a carry row knows which hole it
+    // carried INTO and how many holes made it. Units, never money - what a
+    // carried skin is worth depends on the pot and the pot is the sheet's job.
+    function holeSkinsCarry(holeNum) {
+        if (typeof liveSkinsLedgerEntries !== 'function' || typeof buildSkinsLedgerRows !== 'function') return 0;
+        const entries = liveSkinsLedgerEntries(currentData, currentData.courseData || [],
+                                               currentData.scores || {}, { groupOf: liveSkinsGroupOf }) || [];
+        let most = 0;
+        entries.forEach(entry => {
+            const L = entry && (entry.net || entry.gross || entry.L);
+            if (!L) return;
+            buildSkinsLedgerRows(L, entry.basis || 'Gross').forEach(r => {
+                if (r.kind === 'carry' && Number(r.into) === Number(holeNum)) {
+                    most = Math.max(most, (r.holes || []).length + 1);
+                }
+            });
+        });
+        return most;
+    }
+
     function renderCardWidgets() {
+        renderTodaysGames();
+        renderHoleLive();
         renderKpEntryMount();
         renderFooterRow();
         // renderWhoAmI is gone (Wave 17): the question is one line inside My Round now,
@@ -3914,7 +4308,15 @@ html {
     }
 
     function renderLeaderWidgetHtml() {
-        const rows = liveStandings().filter(r => r.started);
+        // ALWAYS SHOWN (2026-10-05). This returned '' until somebody had posted a
+        // score, so a round that had just been set up had no board at all - which
+        // is the state a group is in when they most want to see that the app knows
+        // who is playing. Before anyone has started, every golfer is level: E, thru
+        // 0, which is the truth and reads as one. liveStandings() already returns
+        // them with started false, toPar 0 and thru 0; nothing is invented here.
+        const all = liveStandings();
+        const started = all.filter(r => r.started);
+        const rows = started.length ? started : all;
         if (rows.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
@@ -5925,6 +6327,88 @@ html {
             // a banner for the round in front of them and would lose their place.
             go: (href) => { if (href && href !== loc.href) loc.href = href; }
         });
+    }
+
+    // ---- THE STATUS SHEET (UX wave, 2026-10-04) ----------------------------
+    //
+    // WHAT IS WRONG, MEASURED RATHER THAN ARGUED: on a live round at 390x844, 0%
+    // of the first screen was score boxes. 525 of the 844 pixels were the theme
+    // row, the round header, two rows of nav pills, the Playing With card and the
+    // group-scores card, and the hole card did not begin until y=610 - so a golfer
+    // standing on the 7th tee had to scroll before they could type a number.
+    // tools/first-screen-check.js is that measurement.
+    //
+    // WHAT MOVES, AND WHAT DOES NOT. Everything that is not the hole goes into one
+    // sheet behind one handle at the bottom, where a thumb already is. What stays
+    // on the page is the hole: its heading, its score boxes, Prev/Next, and the
+    // two popups that interrupt a hole on purpose - the KP question and "your card
+    // is in" - which are overlays and were never in this list.
+    //
+    // THE BLOCKS ARE MOVED, NOT REBUILT. Each keeps its id, its handlers and the
+    // render function that writes to it, so renderScorecard, renderGapBanner,
+    // renderEndRoundControl and the rest do not know this happened. A COPY would
+    // have been two elements with one id and the renderers would have written to
+    // whichever came first - which is the bug this avoids by construction.
+    //
+    // THE LIST LIVES INSIDE THE FUNCTION, and that is not a style choice: it was a
+    // top-level `var` first, and a `var` HOISTS AS undefined while the function
+    // declaration hoists whole - so the arrival code, which runs hundreds of lines
+    // earlier, called buildRoundSheet() and died on `undefined.forEach`. The page
+    // then never revealed itself at all. Measured in Chrome, not reasoned about.
+    function buildRoundSheet() {
+        // SETTINGS AND ADMIN ONLY (2026-10-05). The sheet used to hold everything
+        // that was not the hole, reading cards included, and on a fresh round that
+        // left the page with nothing on it but four empty boxes. What belongs
+        // behind a handle is what a golfer touches once a round: the theme, the
+        // code, the nav, the Dots selector, the way out and the way to delete.
+        var ROUND_SHEET_BLOCKS = [
+            'header-controls-row',      // Dark Mode, History
+            'header-box',               // the game code, the course and the round name
+            'app-nav-wrap',             // Leaderboard, Bets, Results, Matches, Home...
+            'dot-context-row',          // the Dots: selector, on rounds that have one
+            'view-mode-toggle',         // Hole View / Full Card
+            'group-filter-container',   // All Players, Edit round setup, Players
+            'scorecard-footer',         // Save & exit, Receipt, the guide
+            'end-round-mount'           // Delete this round (organizer only)
+        ];
+        // AND EVERYTHING A GOLFER READS GOES ON THE PAGE, under the hole, in the
+        // order they ask for it: what we are playing for, where everyone stands,
+        // what just happened, the skins, my round, the bet detail.
+        var ROUND_READING_BLOCKS = [
+            'spectator-hint-banner',
+            'round-landing-summary',    // Playing With / Scoring / Action
+            'status-panel'              // live status and the group-scores card
+        ];
+        var body = document.getElementById('round-sheet-body');
+        if (!body) return 0;
+        var moved = 0;
+        var move = function (ids, into) {
+            if (!into) return;
+            ids.forEach(function (id) {
+                var el = document.getElementById(id);
+                // A block that is not on this page is not an error: the delete mount
+                // is empty for anyone but the organizer, and a page may drop a card.
+                if (!el || el.parentNode === into) return;
+                into.appendChild(el);
+                moved++;
+            });
+        };
+        move(ROUND_SHEET_BLOCKS, body);
+        move(ROUND_READING_BLOCKS, document.getElementById('round-reading'));
+        document.body.classList.add('has-round-sheet');
+        return moved;
+    }
+    function toggleRoundSheet(force) {
+        var sheet = document.getElementById('round-sheet');
+        var scrim = document.getElementById('round-sheet-scrim');
+        var handle = document.getElementById('round-sheet-handle');
+        var caret = document.getElementById('round-sheet-caret');
+        if (!sheet) return;
+        var open = (force === undefined) ? !sheet.classList.contains('open') : !!force;
+        sheet.classList.toggle('open', open);
+        if (scrim) scrim.classList.toggle('open', open);
+        if (handle) handle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (caret) caret.textContent = open ? '\u25BC' : '\u25B2';
     }
 
     function skipWhoAmI() {

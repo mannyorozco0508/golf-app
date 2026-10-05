@@ -126,6 +126,12 @@ const LOOK = `(function () {
     hole: (typeof currentViewedHole !== 'undefined') ? currentViewedHole : 'n/a',
     inset: inset,
     scrollY: Math.round(window.pageYOffset || 0),
+    // THE LANDING IS A NO-OP ON A PAGE WITH NO ROOM (2026-10-04, the Status sheet):
+    // this is what every heading assertion below branches on.
+    canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+    navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+      return n ? Math.round(n.getBoundingClientRect().bottom + (window.pageYOffset || 0)) : null; })(),
+    scrollRoom: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)),
     headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
     innerHeight: window.innerHeight,
     boxes: boxes.map(function (b) { return { v: b.value || '', disabled: !!b.disabled, rect: r(b) }; }),
@@ -169,7 +175,15 @@ before(async () => {
         return sc;
     })() }), 'game=LF&group=1', NEXT);
     // A SPECTATOR: bare link on an eight-golfer round - every box disabled.
-    S.spectator = await land(round(), 'game=LF', NEXT);
+    // THE SPECTATOR SAYS SO FIRST (2026-10-05). A bare link to a multi-group round
+    // opens the "Keeping score, playing, or just watching?" sheet over the page, and
+    // this arrival used to tap Next straight through it - which worked only as long
+    // as the tap landed on nothing. With the reading area back on the page the
+    // layout moved, the tap reached a picker row, and the fixture quietly became a
+    // scorekeeper with writable boxes. Answering the question is what a spectator
+    // does, and it is what makes this fixture one.
+    S.spectator = await land(round(), 'game=LF',
+        [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 500 }].concat(NEXT));
     // PAST THE KEYBOARD LINE: a short viewport puts the second row under the keypad
     // allowance, so a filled first box must leave nothing focusable.
     S.pastLine = await land(round({ scores: Object.assign(scoresThrough(7, G1), { p101_h9: 4 }) }),
@@ -186,6 +200,31 @@ before(async () => {
         PREV.concat(NEXT, [{ tap: '#kp-force-overlay .kpf-none' }, { sleep: 900 }]));
 });
 
+
+// THE HEADING, UNDER THE RULE THAT NOW APPLIES (2026-10-04). landOnHole stays and
+// is a NO-OP on a page that cannot scroll - a four-golfer card is one screen since
+// the Status sheet took the header, the nav and every reading card off the page.
+// Where there IS room the landing lands, to the pixel, and that is asserted.
+// Either way the focus must not have moved the heading off screen, which is what
+// these lines were protecting: preventScroll on the focus is what keeps that true.
+function headingLanded(v, inset) {
+    const want = (inset || 0) + OFFSET;
+    // RE-POINTED AGAIN 2026-10-04 to Manny's rule as he stated it: the landing
+    // scrolls only when the hole card would NOT FIT with the page at the top.
+    // Having scroll room is a different question and was the wrong test - the
+    // runway could create room on a card that fitted perfectly well, and scrolling
+    // it pushed the banner above the hole under the status bar.
+    if (v.navBottom !== null && v.navBottom > 844) {
+        assert.equal(v.headingTop, want,
+            'heading at ' + v.headingTop + ', expected ' + want + ' with ' + v.scrollRoom + 'px of room');
+    } else {
+        assert.ok(v.headingTop >= (inset || 0),
+            'the heading is behind the status bar at ' + v.headingTop);
+        assert.ok(v.scrollY <= v.scrollRoom + 1,
+            'the page scrolled past its own end: ' + v.scrollY + ' of ' + v.scrollRoom);
+    }
+}
+
 describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
     test('every arrival ran', () => {
         Object.keys(S).forEach(k => assert.ok(S[k] && !S[k].error, k + ': ' + (S[k] && S[k].error)));
@@ -197,7 +236,7 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
         assert.equal(v.focusIsScoreBox, true, 'nothing was focused: ' + v.activeTag);
         assert.equal(v.focusedIndex, 0, 'the wrong box has focus: index ' + v.focusedIndex);
         assert.equal(v.focusedValue, '', 'a FILLED box has focus');
-        assert.equal(v.headingTop, OFFSET, 'the focus moved the heading: top ' + v.headingTop);
+        headingLanded(v);
     });
 
     test('the FIRST EMPTY one, not the first: two scores in means the third box', () => {
@@ -205,14 +244,14 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
         assert.deepEqual(v.boxes.map(b => b.v), ['4', '5', '', ''], 'the fixture is not partly scored');
         assert.equal(v.focusedIndex, 2, 'it focused index ' + v.focusedIndex + ' instead of the first empty');
         assert.equal(v.focusedValue, '');
-        assert.equal(v.headingTop, OFFSET);
+        headingLanded(v);
     });
 
     test('A FULL HOLE focuses nothing', () => {
         const v = S.full;
         assert.ok(v.boxes.every(b => b.v !== ''), 'the fixture left an empty box');
         assert.equal(v.focusIsScoreBox, false, 'a filled hole took focus anyway');
-        assert.equal(v.headingTop, OFFSET);
+        headingLanded(v);
     });
 
     test('A SPECTATOR is never focused - the boxes are disabled by the page own rule', () => {
@@ -245,14 +284,18 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
             'the first empty box is NOT past the line, so this proves nothing: '
             + JSON.stringify(firstEmpty.rect) + ' vs ' + (v.innerHeight - 336));
         assert.equal(v.focusIsScoreBox, false, 'it focused a box under the keyboard');
-        assert.equal(v.headingTop, OFFSET, 'and it moved the heading doing so');
+        // RE-POINTED 2026-10-04 (Manny's fit rule): what this line is for is that the
+        // REFUSAL costs nothing - the page is wherever the landing left it, and the
+        // focus did not drag it. headingLanded() is that claim under the rule that
+        // now applies, which on a card that fits is "the page is at the top".
+        headingLanded(v);
     });
 
     test('PREV and the 1-18 PICKER follow the same rule', () => {
         [['prev', S.prev], ['picker', S.picker]].forEach(([tag, v]) => {
             assert.equal(v.focusIsScoreBox, true, tag + ' focused nothing');
             assert.equal(v.focusedValue, '', tag + ' focused a filled box');
-            assert.equal(v.headingTop, OFFSET, tag + ' moved the heading');
+            headingLanded(v);   // the same rule, whichever control moved the hole
         });
     });
 
@@ -260,8 +303,7 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
         [[47, S.inset47], [59, S.inset59]].forEach(([inset, v]) => {
             assert.equal(v.inset, inset, 'the emulated inset did not take');
             assert.equal(v.focusIsScoreBox, true, 'nothing focused at inset ' + inset);
-            assert.equal(v.headingTop, inset + OFFSET,
-                'heading at ' + v.headingTop + ', expected ' + (inset + OFFSET));
+            headingLanded(v, inset);
         });
     });
 
@@ -270,7 +312,7 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
         // navigation lands on 8 - one hole earlier than the plain-Next cases above.
         const v = S.kpAnswer;
         assert.equal(v.hole, 8, 'the resumed navigation did not land: hole ' + v.hole);
-        assert.equal(v.headingTop, OFFSET, 'the resumed landing is wrong: ' + v.headingTop);
+        headingLanded(v);   // the resumed landing, under the same rule
         assert.equal(v.focusIsScoreBox, true, 'the resumed landing focused nothing');
         assert.equal(v.focusedValue, '');
     });

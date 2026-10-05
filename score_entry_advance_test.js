@@ -247,6 +247,11 @@ describe('THE MISSING-HOLE BANNER: one tap lands focus on the gap box (Chrome, 3
         r = await arriveCold({ url: fileUrl('index.html', 'game=ADVGAP&group=1'), db: GDB, settleMs: 5000, steps: [
             tagged('B0', "document.getElementById('gap-banner').innerText.replace(/\\s+/g, ' ').trim()"),
             tagged('H0', 'String(currentViewedHole)'),
+            // THE STATUS SHEET OPENS FIRST (2026-10-04): the gap banner and the view
+            // toggle both moved into it with everything else that is not the hole, so
+            // a golfer taps the handle and then the control. Without it the tap lands
+            // at the coordinates of something hidden.
+            { tap: '#round-sheet-handle' }, { sleep: 500 },
             { tap: '#gap-banner .gap-banner-line', nth: 0 },
             tagged('W1', WHERE),
             tagged('H1', 'String(currentViewedHole)'),
@@ -288,14 +293,23 @@ describe('THE FULL CARD CURSOR (Chrome, 390x844): the same golfer\'s next hole, 
         // targets are measured in a first arrival and used in the second, the
         // same page at the same size (the pattern the Hole View cases use).
         const probe = await arriveCold({ url: fileUrl('index.html', 'game=ADVFC&group=1'), db: FDB, settleMs: 4000,
-            steps: [{ tap: '#view-mode-full-btn' }, { sleep: 300 }, { expression: fcBox(101, 1) }, { expression: fcBox(102, 3) }] });
+            // ONE tap on the handle - the view toggle is in the Status sheet now
+            // (2026-10-04). Two would close it again.
+            steps: [{ tap: '#round-sheet-handle' }, { sleep: 500 },
+                    { tap: '#view-mode-full-btn' }, { sleep: 300 },
+                    { expression: fcBox(101, 1) }, { expression: fcBox(102, 3) }] });
         assert.ok(probe.ok, 'Chrome did not run: ' + probe.reason);
-        const [, , a1, b3] = probe.value;
+        const a1 = probe.value[probe.value.length - 2];
+        const b3 = probe.value[probe.value.length - 1];
         assert.ok(a1 && b3 && a1.w > 0 && b3.w > 0, 'Full Card boxes measured: ' + JSON.stringify(probe.value));
         const digits = [];
         // Ann's hole 1..17 get a "4" each (17 digits), so the 18th "4" is typed on h18 and moves to Ben h1
         for (let i = 0; i < 18; i++) digits.push(...key('4'));
         r = await arriveCold({ url: fileUrl('index.html', 'game=ADVFC&group=1'), db: FDB, settleMs: 4000, preScript: 'window.__STUBDB = ' + JSON.stringify(FDB) + ';' + TRACE_ONLY, steps: [
+            // The toggle lives in the Status sheet (2026-10-04); the measuring
+            // arrival above opens it the same way, so the boxes are at the same
+            // coordinates in both.
+            { tap: '#round-sheet-handle' }, { sleep: 500 },
             { tap: '#view-mode-full-btn' }, { sleep: 300 },
             { expression: "'MODE:' + currentViewMode" },
             { expression: fcBox(101, 1) }, ...tap(a1.x, a1.y), { expression: "'W0:' + " + FC_WHERE },

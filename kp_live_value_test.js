@@ -184,8 +184,12 @@ describe('BOTH SCORECARD VIEWS USE THE ONE PRESENTER', () => {
         // and counting it made this fail the moment another comment referred to it.
         const code = IDX.replace(/\/\*[\s\S]*?\*\//g, '')
             .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
-        assert.equal((code.match(/kpLiveLineHtml\(/g) || []).length, 3,
-            'one definition plus exactly two call sites');
+        // RE-PINNED 2026-10-05 (the compact live panel; was 3): one definition and
+        // THREE call sites now. The third is renderHoleLive(), which reuses this
+        // line WHOLE for the "this hole" row rather than writing a second sentence
+        // about the same KP - which is the thing this count exists to prevent.
+        assert.equal((code.match(/kpLiveLineHtml\(/g) || []).length, 4,
+            'one definition plus exactly three call sites');
         assert.match(IDX, /html \+= kpLiveLineHtml\(holeNum\);/, 'Hole View');
         assert.match(IDX, /inner \+= kpLiveLineHtml\(o\.hole\);/, 'Full Card');
     });
@@ -315,7 +319,13 @@ describe('NOTHING ELSE MOVED', () => {
         const ov = rule[0].match(/overflow:\s*([a-z-]+)/g) || [];
         assert.match(ov[ov.length - 1], /hidden/, 'and must not spill');
         // The banner is its own block above score entry, never inside a player row.
-        assert.ok(!/hv-player-cell[^`]*kpLiveLineHtml/.test(IDX),
+        // RE-POINTED 2026-10-05: the pattern matched across the whole file once
+        // renderHoleLive gained a call, because [^`]* will happily cross a hundred
+        // lines of markup looking for the second half. Scoped to the hole view's
+        // own player-row builder, which is what the claim was ever about.
+        const hv = IDX.indexOf('function renderHoleView()');
+        const rowFn = IDX.slice(IDX.indexOf('hv-player-row', hv), IDX.indexOf('html += navRowHtml;', hv));
+        assert.ok(!/kpLiveLineHtml/.test(rowFn),
             'the banner must not render inside a score-entry row');
     });
 });

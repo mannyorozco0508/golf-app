@@ -309,7 +309,7 @@ describe('THE SEAMS', () => {
         assert.match(src, /function kpGroupAnswerKey\(\) \{ return 'g' \+ \(hasGroupLock/);
         assert.match(src, /function kpSessionAnswerKey\(hole\) \{ return 'kpAnswer:' \+ currentMode \+ ':h' \+ hole \+ ':' \+ kpGroupAnswerKey\(\); \}/);
         assert.match(src, /u\['kpGroupAnswers\/h' \+ hole \+ '\/' \+ kpGroupAnswerKey\(\)\]/);
-        assert.match(src, /function renderCardWidgets\(\) \{\s*renderKpEntryMount\(\);/);
+        assert.match(src, /function renderCardWidgets\(\) \{\s*renderTodaysGames\(\);\s*renderHoleLive\(\);\s*renderKpEntryMount\(\);/);
     });
     test('pool-engine.js: the pay rule (recording pays) is the one this block writes for; its sha moved 2026-09-22 for KP-never-refunds (approved), not for this block', () => {
         const crypto = require('crypto');

@@ -161,7 +161,11 @@ describe('1. A GOLFER CAN REACH THE GUIDE', () => {
         // regressing. So it asserts a real <a> on every page that has the bar, and it
         // does not care what container holds it.
         const pages = fs.readdirSync(ROOT).filter(f => /\.html$/.test(f) && f !== 'instructions.html');
-        const withBar = pages.filter(f => read(f).includes('<div class="app-nav-wrap">'));
+        // RE-POINTED 2026-10-04: index.html's wrap carries an id as well as the class,
+        // because the Status sheet moves the whole bar into itself by getElementById.
+        // The bar itself is unchanged on all eight pages - nav_bar_test.js compares
+        // the anchors - so the search drops the closing bracket rather than the claim.
+        const withBar = pages.filter(f => read(f).includes('<div class="app-nav-wrap"'));
         assert.equal(withBar.length, 8, 'the shared bar is on ' + withBar.length + ' pages, not 8: ' + withBar.join(', '));
         withBar.forEach(f => assert.match(read(f), /<a href="instructions\.html" class="top-nav-item"/,
             f + ' carries the shared bar and no guide pill in it'));
