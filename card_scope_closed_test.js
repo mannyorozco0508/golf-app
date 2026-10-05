@@ -102,6 +102,12 @@ describe('?group=7 ON A SIX-GROUP ROUND: nobody', () => {
 describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
     test('the baseline is pinned (6ff9332)', () => {
         assert.equal(PREV.capturedAt, '6ff9332');
+        // RE-PINNED 2026-10-05 (was 1a7fb418): the match card redesign Manny
+        // approved. Its header was one line and is now four - the terms, the two
+        // sides, the live status top right, and thru. DIFFED BEFORE RE-PINNING:
+        // 4 text keys CHANGED (the ticker mounts that carry the card), 0 added,
+        // 0 removed, display untouched; the rows and every other element on every
+        // link are the 6ff9332 capture still.
         // RE-PINNED 2026-10-05 (was cb953314): the leaderboard CARD left Hole View.
         // The compact top five under Prev/Next and a bordered LIVE LEADERBOARD card
         // six pixels below it were the same five names twice; the compact lines now
@@ -213,7 +219,7 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // What arrived: the split "1st $60 · 2nd $40" and "Winners show once every card
         // is in." Every filtered list is identical and display is unchanged but for
         // group-missing-note, which this suite deletes explicitly below.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '1a7fb418');
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '9deb0f25');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

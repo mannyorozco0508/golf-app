@@ -123,7 +123,7 @@ describe('THE 2-DOWN AUTO PRESS IS VISIBLE', () => {
 
     test('it appears as soon as a side goes 2 down', () => {
         const t = strip(scorecard(round({ wins:{1:'A',2:'A'} })));
-        assert.match(t, /AUTO PRESS · H3/, 'this is what the caddie could not see');
+        assert.match(t, /Auto press · hole 3/, 'this is what the caddie could not see');
     });
 
     test('it does NOT appear before the trigger', () => {
@@ -182,7 +182,7 @@ describe('MANUAL VS AUTO', () => {
         const d = round({ wins:{1:'A'}, thru:9, pressRule:'none',
                           manual:{ m1:{ baseId:'F9', startHole:5, stake:25 } } });
         const t = strip(scorecard(d));
-        assert.match(t, /MANUAL PRESS · H5/);
+        assert.match(t, /Press · hole 5/);
     });
 
     test('manual and auto coexist and are distinguished', () => {
@@ -253,11 +253,17 @@ describe('SCORECARD AND LEADERBOARD AGREE', () => {
         // The presenter is now buildLiveMatchStates() - plural - because a round can
         // carry several wagers and the supported Nassau lives in sideMatches, not in
         // the round format. Both pages still consume ONE shared implementation.
+        // RE-POINTED 2026-10-05: the CARD moved into side-match-lines.js - this page
+        // and leaderboard.html had a copy each - so the presenter is called there,
+        // once, and both pages reach it through the one builder.
+        assert.match(read('side-match-lines.js'),
+            /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\)/,
+            'the shared card does not call the shared presenter');
         ['index.html','leaderboard.html'].forEach(f =>
-            assert.match(read(f), /buildLiveMatchStates\(data, courseData, savedScores, visibleIds\)/,
-                f + ' must call the shared presenter'));
+            assert.match(read(f), /buildLiveMatchCardHtml\(data, courseData, savedScores, visibleIds/,
+                f + ' must reach the card through the shared builder'));
         ['buildLiveMatchState','buildLiveMatchStates'].forEach(fn => {
-            const defs = ['index.html','leaderboard.html','money-engine.js']
+            const defs = ['index.html','leaderboard.html','side-match-lines.js','money-engine.js']
                 .filter(f => new RegExp('function ' + fn + '\\(').test(read(f)));
             assert.deepEqual(defs, ['money-engine.js'], fn + ': exactly one implementation');
         });
@@ -288,7 +294,7 @@ describe('LIVE MEANS LIVE — NO SETTLEMENT', () => {
         // "$5 front, $10 overall" is the wager itself, not settlement. What stays out
         // is any running total or payout, which is not final mid-round.
         const html = scorecard(round({ wins:{1:'A',2:'A'} }));
-        assert.match(html, /class="lm-stake">\$\d+</, 'the segment stake must be visible');
+        assert.match(html, /class="lm-row-money">\$\d+</, 'the segment stake must be visible');
         assert.match(strip(html), /\$10/, 'the $10 wager in this fixture');
     });
 

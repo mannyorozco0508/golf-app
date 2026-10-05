@@ -117,10 +117,21 @@ function leaderboard(d) {
     `, sb);
     return sb.document.getElementById('live-matches-mount').innerHTML;
 }
-// The total line's own text, scoped to the element whose content is the claim -
-// never the whole card, and never textContent of a page whose scripts are in it.
-const totals = (html) => [...String(html).matchAll(/<div class="lm-final-total">([^<]*)<\/div>/g)]
-    .map((m) => m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"').trim());
+// RE-POINTED 2026-10-05 (the match card redesign, approved by Manny): the
+// overall answer moved from one bold line UNDER the last segment to the TOP
+// RIGHT of the card, in the largest type on it, with the bet count on a second
+// line beneath. The CLAIM is unchanged and is this file's whole subject - a
+// finished match says who won what - so the two halves are read from where they
+// now live and joined back into the one sentence these tests were written
+// against. Scoped to those elements, never the whole card and never
+// textContent of a page whose scripts are in it.
+const totals = (html) => {
+    const money = [...String(html).matchAll(/<div class="lm-top-money">([^<]*)<\/div>/g)]
+        .map((m) => m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"').trim());
+    const subs = [...String(html).matchAll(/<div class="lm-top-sub">([^<]*)<\/div>/g)]
+        .map((m) => m[1].replace(/&amp;/g, '&').trim());
+    return money.map((m, i) => (subs[i] ? m + ' (' + subs[i] + ')' : m));
+};
 // The status text ALONE, with the " · FINAL" mark stripped - that mark has its
 // own test. Decoded, because "3&2" reaches the markup as "3&amp;2" and a regex
 // written with the literal character would never match it.
@@ -151,12 +162,17 @@ describe('1. A FINISHED MATCH SAYS WHO WON WHAT - THE THING THE CARD OWED MANNY'
         // Manny looking for a bug in the first place.
         const t = totals(scorecard(round([1, 2, 3], [10, 11, 12], 18,
             { format: 'nassau', frontStake: 40, backStake: 40, overallStake: 0 })));
-        assert.deepEqual(t, ['Reese +$40 · Manny +$40 — All square']);
+        // RE-POINTED: the header says "All square" and the line under it says what
+        // each side won. Same two facts, same distinction from "nobody paid".
+        assert.deepEqual(t, ['All square (each won 1 bet ($40))']);
     });
 
     test('every bet halved says nobody pays, which is different news again', () => {
         const t = totals(scorecard(round([1], [2], 18)));
-        assert.deepEqual(t, ['All square — nobody pays']);
+        // RE-POINTED: the header says "All square" and the line under it says WHY -
+        // every bet halved, which is the distinction this test exists for and which
+        // the old one-line form made with a dash. Nothing changed hands either way.
+        assert.deepEqual(t, ['All square (every bet halved)']);
     });
 });
 
@@ -175,7 +191,7 @@ describe('2. MID-ROUND THERE IS NO TOTAL', () => {
         // render, so the absence above means nothing without this.
         const html = scorecard(round([1, 2], [], 6));
         assert.match(html, /LIVE MATCHES/);
-        assert.match(html, /lm-stake/);
+        assert.match(html, /lm-row-money/);
         assert.deepEqual(statuses(html), ['Reese 2 UP'],
             'mid-round the scoreboard reading is the RIGHT one - the bet is not over');
     });
@@ -227,7 +243,23 @@ describe('3. THE FINAL WORDING IS THE RECEIPT\'S: 3&2, NOT 3 UP', () => {
         // marked. Completeness is what decides it now.
         const html = scorecard(round([1, 2, 3], [10, 11, 12], 18,
             { format: 'nassau', frontStake: 40, backStake: 40, overallStake: 0 }));
-        assert.equal((html.match(/FINAL/g) || []).length, 3, 'three segments, three FINAL marks');
+        // RE-POINTED 2026-10-05: FINAL is ONE tag in the card's header now, not a
+        // mark on every row - Manny's layout. The defect this test was written for
+        // is unchanged and is still what it measures: a level match at the 18th has
+        // seg.closed false, so a card keyed on `closed` would call it unfinished.
+        // COMPLETENESS is what decides the tag, so a halved Nassau still says FINAL.
+        // TWO DIFFERENT FACTS, TWO MARKS (2026-10-05). The header's FINAL tag says
+        // the MATCH is settled; a row's says that BET is beyond catching. A
+        // Nassau's Front can be 8&6 while the Back is still being played, so the
+        // row mark is not redundant - it was lost for an hour in the redesign and
+        // this suite's own parity check against the Board caught it.
+        //
+        // THE DEFECT THIS TEST WAS WRITTEN FOR IS UNCHANGED: a level match at the
+        // 18th has seg.closed false, so a card keyed only on `closed` would leave
+        // the halved Total unmarked. Completeness is what sets the header tag, so
+        // the match still says FINAL.
+        assert.match(html, /class="lm-final-tag">FINAL</, 'the header tag is gone');
+        assert.ok((html.match(/FINAL/g) || []).length >= 1, 'nothing says the match is over');
     });
 });
 
@@ -266,9 +298,13 @@ describe('5. NOTHING HERE COMPUTES MONEY', () => {
     test('the pages reach it through a typeof guard, so a cached shell without it still draws', () => {
         ['index.html', 'leaderboard.html'].forEach((f) => {
             const src = read(f);
-            assert.match(src, /typeof sideMatchLiveFinals === 'function'/,
-                f + ' calls sideMatchLiveFinals unguarded - a shell cached before side-match-lines.js '
-                + 'shipped to this page would throw inside the renderer and lose the whole card');
+            // RE-POINTED 2026-10-05: the card itself moved into side-match-lines.js,
+            // so what each page guards is the BUILDER rather than the finals helper
+            // it used to call directly. Same claim, one level up: a shell cached
+            // before that file shipped draws no card instead of throwing.
+            assert.match(src, /typeof buildLiveMatchCardHtml !== 'function'/,
+                f + ' calls the shared card builder unguarded - a shell cached before '
+                + 'side-match-lines.js shipped to this page would throw and lose the card');
         });
         assert.match(read('leaderboard.html'), /<script src="side-match-lines\.js"><\/script>/,
             'leaderboard.html must actually load the file it now reads');

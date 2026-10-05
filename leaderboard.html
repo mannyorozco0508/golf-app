@@ -930,104 +930,15 @@ html {
         return html;
     }
 
+    // ONE BUILDER, SHARED (2026-10-05). See index.html's twin: the card itself
+    // is in side-match-lines.js. This page passes its own Press link AND its
+    // group-link filter - a match this link may not see is not a card here, so
+    // its press link is never offered either.
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
-        if (typeof buildLiveMatchStates !== 'function') return '';
-        // EVERY wager visible to this viewer, not just the round format. A real
-        // Nassau is created from Action and lives in sideMatches, so reading only
-        // the round format left the supported path invisible on the scorecard.
-        // Scoped to the link's group AFTER the engine builds every state over the
-        // whole field (visibleIds). A match this link may not see is not a card,
-        // so its press link - which lands on a Matches tab where the card is
-        // hidden - is never offered either.
-        const states = (buildLiveMatchStates(data, courseData, savedScores, visibleIds) || [])
-            .filter(st => !st.isSideMatch || boardLinkMaySee(st.wagerId));
-        if (!states || states.length === 0) return '';
-        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-        // FINAL TOTALS, AND THE RECEIPT'S OWN WORDING (Job 2, 2026-10-03). The
-        // same card on the scorecard and here, so the same builder: with presses
-        // this said who was up in each segment and never who had won what
-        // overall. Every figure comes out of the receipt settlement-engine.js
-        // already priced - nothing here recomputes money - and it is EMPTY until
-        // the bet is over, because a running total on an unfinished match is the
-        // defect the Receipt itself once had.
-        const finals = (typeof sideMatchLiveFinals === 'function')
-            ? sideMatchLiveFinals(data, courseData, savedScores, states) : {};
-        const finalFor = (st) => finals[(st && st.isSideMatch && st.wagerId) ? st.wagerId : '__main'] || null;
-        // A FINISHED BET READS LIKE THE RECEIPT: a bet that ended on the 16th is
-        // 3&2, not "3 UP" - "N up" is how a match that went to the 18th is
-        // described, so printing it on one that closed early is false.
-        const finalStatus = (fin, baseId, pressNum, fallback) => {
-            if (!fin || !fin.complete) return fallback;
-            const r = fin.results[sideMatchResultKey(baseId, pressNum)];
-            return r || fallback;
-        };
-        // The stake is what DEFINES the bet, so it belongs on screen. Amounts only -
-        // never a running total, which is settlement's job and is not final mid-round.
-        const money = v => (v === undefined || v === null || isNaN(Number(v))) ? '' : '$' + Number(v);
-
-        let html = '<div class="lm-card"><div class="lm-head">'
-            + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
-            + '<span class="lm-sub">' + states.length + ' wager' + (states.length === 1 ? '' : 's')
-            + '</span></div>';
-
-        states.forEach((st, i) => {
-            const fin = finalFor(st);
-            if (i > 0) html += '<div class="lm-divider"></div>';
-            html += '<div class="lm-wager-head">' + esc(st.formatLabel) + ' \u00B7 '
-                 + esc(st.t1Name) + ' v ' + esc(st.t2Name)
-                 + (st.thru ? ' \u00B7 thru ' + st.thru : '');
-            // PRESS, WITHOUT A SECOND WRITE PATH.
-            //
-            // The writer for a side-match press lives in sidematches.html with its
-            // amount prompt, permission gate and offline guard. Porting it here would
-            // mean two implementations of a money write, and a write-side divergence
-            // corrupts data rather than merely displaying it wrong.
-            //
-            // So this is a LINK, not a button: it carries the golfer to the wager on
-            // the Matches tab with the card highlighted, and they press there with the
-            // amount in front of them. One tap more, one write path.
-            if (st.isSideMatch && st.canPress && st.wagerId) {
-                html += '<a class="lm-press-link" href="' + esc(sideMatchPressHref(st.wagerId))
-                     + '">\uD83D\uDD25 Press \u00B7 H' + st.nextPressHole + ' \u203A</a>';
-            }
-            html += '</div>';
-
-            st.segments.forEach(seg => {
-                html += '<div class="lm-seg' + (seg.closed ? ' lm-closed' : '') + '">'
-                     + '<div class="lm-seg-row"><span class="lm-seg-name">' + esc(seg.label.toUpperCase()) + '</span>'
-                     + '<span class="lm-seg-status' + (seg.started ? '' : ' lm-quiet') + '">'
-                     + esc(finalStatus(fin, seg.id, 0, seg.statusText))
-                     + ((seg.closed || (fin && fin.complete)) ? ' \u00B7 FINAL' : '') + '</span>'
-                     + '<span class="lm-stake">' + money(seg.stake) + '</span></div>';
-                seg.presses.forEach(p => {
-                    html += '<div class="lm-press' + (p.closed ? ' lm-closed' : '') + '">'
-                         + '<span class="lm-press-tag">' + (p.auto ? 'AUTO' : 'MANUAL')
-                         + ' PRESS \u00B7 H' + p.startHole + '</span>'
-                         + '<span class="lm-press-status">' + esc(finalStatus(fin, seg.id, p.pressNum, p.statusText))
-                         + ((p.closed || (fin && fin.complete)) ? ' \u00B7 FINAL' : '') + '</span>'
-                         + '<span class="lm-stake">' + money(p.stake) + '</span></div>';
-                });
-                html += '</div>';
-            });
-            // ONE BOLD LINE AT THE BOTTOM OF THIS MATCH, and only when it is over.
-            if (fin && fin.total) {
-                html += '<div class="lm-final-total">' + esc(fin.total) + '</div>';
-            }
-        });
-        return html + '</div>';
+        if (typeof buildLiveMatchCardHtml !== 'function') return '';
+        return buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
+            { pressHref: sideMatchPressHref, maySee: boardLinkMaySee });
     }
-
-    // ---- LIVE SKINS ---------------------------------------------------------
-    //
-    // WHO WON WHAT HOLE - never how much it is worth. Until the round finishes the
-    // number of winning skins can still change, so any dollar figure shown now is a
-    // guess that will be contradicted later. Results answers "how much"; this
-    // answers "who", which is the question people ask on the course.
-    //
-    // EVERY FIGURE IS CANONICAL. computeSkinsHoleLedger() in settlement-engine.js is
-    // the same resolver the scorecard uses - it decides low scores, ties, carries and
-    // crucially whether a hole is OFFICIAL, meaning every participant has posted it.
-    // This function reads its rows and writes sentences. It resolves nothing.
     function lbSkinsGroupOf(playerId) {
         const players = (currentBoardData.players || []);
         const idx = players.findIndex(p => String(p.id) === String(playerId));
