@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v140-pergolfertees. The tournament product cache
+// The consumer product cache is consumer-v141-loosesearch. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4235,7 +4235,14 @@
 // round whose golfers are on different ones. player-tees.js joins the shell -
 // admin.html and index.html load it at parse time. A device on v299 converts
 // every Index from the round's single tee.
-const CACHE_VERSION = 'golfapp-v300-pergolfertees';
+// Moved to v301: THE COURSE SEARCH STOPS BEING LITERAL. Hyphens, apostrophes,
+// periods and extra spaces are normalised on BOTH sides, "&" is "and", a closed
+// list of abbreviations is expanded (st/saint, mt/mount, mtn/mountain), and a
+// JOINED form matches "trimountain" against "Tri-Mountain". The ONLINE lookup
+// sends the query as typed first and only re-asks with the other spellings when
+// the provider finds nothing - which is what actually failed: the local matcher
+// already handled the hyphen. A device on v300 asks the provider once, literally.
+const CACHE_VERSION = 'golfapp-v301-loosesearch';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

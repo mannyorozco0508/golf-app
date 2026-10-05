@@ -44,7 +44,12 @@ describe('THE BASE', () => {
         assert.equal(ORIGIN, 'https://golf-app-5a5.pages.dev', 'the canonical origin product-links names');
     });
     test('both fetches go through it, and nothing else in admin.html fetches /api', () => {
-        assert.match(SRC, /fetch\(courseApiBase\(\) \+ '\/api\/course-search\?q=' \+ encodeURIComponent\(query\)\)/);
+        // RE-POINTED 2026-10-05: the search sends the query AS TYPED first and only
+        // re-asks with the other spellings when the provider finds nothing, so the
+        // argument is a variant rather than the literal `query`. The claim here is
+        // unchanged and is the one that matters - the URL is built from
+        // courseApiBase(), so the native shell and the web ask the same proxy.
+        assert.match(SRC, /fetch\(courseApiBase\(\) \+ '\/api\/course-search\?q=' \+ encodeURIComponent\(variants\[i\]\)\)/);
         assert.match(SRC, /fetch\(courseApiBase\(\) \+ '\/api\/course\/' \+ encodeURIComponent\(course\.id\)\)/);
         assert.equal((SRC.match(/fetch\('\/api\//g) || []).length, 0, 'a relative /api fetch is back');
         const fn = SRC.slice(SRC.indexOf('function courseApiBase()'), SRC.indexOf('\n    }', SRC.indexOf('function courseApiBase()')));

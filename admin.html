@@ -5873,22 +5873,146 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // fixed and the other does not. course_picker_match_test.js asserts there
     // are zero remaining .includes(lowerFilter) call sites.
     // ========================================================================
+    // ---- AND THE PUNCTUATION IS NOT THE GOLFER'S PROBLEM (2026-10-05) -------
+    //
+    // Manny typed "Tri Mountain" and got nothing. The course is spelled
+    // "Tri-Mountain" on the sign and in the provider's database, and only the
+    // hyphenated spelling found it. Nobody types a hyphen.
+    //
+    // FOUR THINGS ARE NORMALISED, on BOTH SIDES, before anything is compared:
+    //   PUNCTUATION  hyphens and slashes become spaces; apostrophes and periods
+    //                vanish entirely, so "St. Pete's" is "st petes" and not
+    //                "st pete s". The difference matters: a dropped apostrophe
+    //                must not split a word in two.
+    //   &            becomes "and", so "Rock & Roll" and "Rock and Roll" are one.
+    //   ABBREVIATIONS a short, closed list - st/saint, mt/mount, mtn/mountain and
+    //                a dozen more - expanded on both sides, so "Tri-Mtn" finds
+    //                Tri-Mountain and "St Andrews" finds Saint Andrews. Closed on
+    //                purpose: a general stemmer is how a search starts returning
+    //                courses nobody asked for.
+    //   FILLER       golf, club, course, GC, CC and the rest, dropped from the
+    //                query as before - that is what makes a sign name work.
+    //
+    // AND A THIRD WAY TO MATCH: the JOINED form, every core word run together.
+    // "trimountain" finds "Tri-Mountain" and "Tri Mountain" finds "TriMountain",
+    // which neither the substring nor the token arm can do. It needs five
+    // characters before it is allowed to fire, because a joined two-letter query
+    // would match most of the directory.
     const COURSE_SUFFIX_WORDS = ['golf', 'club', 'course', 'courses', 'resort', 'links',
                                  'country', 'national', 'gc', 'cc', 'the', 'at', 'and'];
 
-    function courseNameNorm(s) {
-        return String(s).toLowerCase().replace(/[^a-z0-9&\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    // CLOSED, AND SHORT. Each entry is a spelling a sign or a scorecard actually
+    // uses. Expanded on both sides, so it can only ever MERGE two spellings of
+    // one name - it never invents a word that was not written.
+    const COURSE_ABBREV = {
+        st: 'saint', ste: 'sainte', mt: 'mount', mtn: 'mountain', mtns: 'mountains',
+        pt: 'point', spgs: 'springs', spg: 'spring', crk: 'creek', lk: 'lake',
+        vly: 'valley', hls: 'hills', rdg: 'ridge', mdws: 'meadows', pk: 'park',
+        cntry: 'country', jr: 'junior', hwy: 'highway'
+    };
+
+    // AN ABBREVIATION ADDS A SPELLING, IT DOES NOT REPLACE ONE. Expanding "st"
+    // to "saint" outright broke typing: "st" is a prefix of Stone Creek, Starfire
+    // and Talking Stick, and five real names stopped being findable mid-word -
+    // caught by course_picker_match_test.js's own prefix sweep, which is exactly
+    // what that sweep is for. So every token carries BOTH forms and a match on
+    // either is a match.
+    // AN APOSTROPHE IS BOTH THINGS AT ONCE, and that is not hedging. Today's rule
+    // turns it into a space, so "O'odham" is "o odham" and a golfer typing
+    // "...o od" finds it mid-word - 40 real prefixes depend on that, measured by
+    // course_picker_match_test.js's typing sweep. Removing it instead gives
+    // "oodham", which is what somebody typing the sign without the punctuation
+    // writes. BOTH forms are produced and either may match; nothing is lost in
+    // exchange for the new spelling.
+    function courseNameClean(s, gluePunctuation) {
+        return String(s === undefined || s === null ? '' : s)
+            .toLowerCase()
+            // "&" IS "and" ONLY WHEN IT IS A WORD. Spaced, it is one: "Rock & Roll"
+            // and "Rock and Roll" are the same course. GLUED, it is punctuation
+            // inside an abbreviation - "G&CC" is one token, and splitting it gave
+            // "g" + "and" + "cc", whose core was the single letter "g" and which
+            // returned 80 of the 141 courses. Measured, by the no-growth sweep.
+            .replace(/\s+&\s+/g, ' and ')
+            .replace(/&/g, '')
+            .replace(/['\u2018\u2019.]/g, gluePunctuation ? '' : ' ')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .split(/\s+/)
+            .filter(Boolean);
+    }
+    // THE SPLIT FORM IS TODAY'S, and it is what every existing pin measures.
+    function courseNameTokens(s) { return courseNameClean(s, false); }
+    function courseNameTokensGlued(s) { return courseNameClean(s, true); }
+    function courseNameAllTokens(s) {
+        const out = courseNameTokens(s).slice();
+        courseNameTokensGlued(s).forEach(t => { if (out.indexOf(t) === -1) out.push(t); });
+        return out;
+    }
+    function courseTokenForms(t) {
+        const long = COURSE_ABBREV[t];
+        return long ? [t, long] : [t];
+    }
+    function courseNameNorm(s) { return courseNameTokens(s).join(' '); }
+    // The same string with every abbreviation written out, for the substring arm:
+    // "st andrews" and "saint andrews" both become "saint andrews".
+    function courseNameNormLong(s) {
+        return courseNameTokens(s).map(t => COURSE_ABBREV[t] || t).join(' ');
+    }
+    function courseCoreTokens(s) {
+        return courseNameTokens(s).filter(t => COURSE_SUFFIX_WORDS.indexOf(t) === -1);
     }
 
     function courseNameMatches(query, name) {
+        const raw = String(query === undefined || query === null ? '' : query);
         const nq = courseNameNorm(query);
-        const nn = courseNameNorm(name);
-        if (nn.includes(nq)) return true;
-        const queryTokens = nq.split(' ').filter(Boolean)
-            .filter(t => COURSE_SUFFIX_WORDS.indexOf(t) === -1);
+        // AN EMPTY BOX LISTS EVERYTHING. A box with PUNCTUATION ONLY in it does
+        // not: "&" normalises to nothing, and treating that as an empty query
+        // returned all 141 courses. It falls back to the literal substring the
+        // old matcher used, so "&" still finds the seven names spelled with one.
+        if (raw.trim() === '') return true;
+        if (nq === '') return String(name).toLowerCase().includes(raw.trim().toLowerCase());
+        if (courseNameNorm(name).includes(nq)) return true;
+        if (courseNameNormLong(name).includes(courseNameNormLong(query))) return true;
+        // The glued form, so "Petes" finds "St. Pete's".
+        if (courseNameTokensGlued(name).join(' ').includes(courseNameTokensGlued(query).join(' '))) return true;
+        const queryTokens = courseCoreTokens(query);
+        // THE EMPTY-QUERY FALLBACK, unchanged: a course named "The Links" has
+        // every word on the filler list, so a query of only filler words has
+        // nothing left to match on and the substring answer above stands.
         if (queryTokens.length === 0) return false;
-        const nameTokens = nn.split(' ').filter(Boolean);
-        return queryTokens.every(qt => nameTokens.some(nt => nt.indexOf(qt) === 0));
+        const nameForms = [];
+        courseNameAllTokens(name).forEach(nt => courseTokenForms(nt).forEach(f => nameForms.push(f)));
+        if (queryTokens.every(qt => courseTokenForms(qt)
+                .some(qf => nameForms.some(nf => nf.indexOf(qf) === 0)))) return true;
+        // THE JOINED FORM, last, and an EXACT match rather than a substring.
+        // "trimountain" is the whole of Tri-Mountain's core words run together,
+        // which is the case this arm exists for - a golfer typing a name without
+        // the separator the sign has. A SUBSTRING here returned "Lake Spanaway"
+        // for the query "lakes" ("lake" + "spanaway" glued starts with "lakes"),
+        // which is the over-return the no-growth sweep in
+        // course_picker_match_test.js caught and is exactly why that sweep exists.
+        // Written out first, so "tri mtn" joins to what "tri mountain" joins to.
+        const jq = queryTokens.map(t => COURSE_ABBREV[t] || t).join('');
+        if (jq.length < 5) return false;
+        return courseCoreTokens(name).map(t => COURSE_ABBREV[t] || t).join('') === jq;
+    }
+
+    // THE SPELLINGS TO TRY ONLINE when the provider finds nothing. The query is
+    // sent AS TYPED first - the provider's own matching is better than ours at
+    // real names - and only then re-asked as the hyphenated, spaced and joined
+    // forms. Deduped, so "Pebble Beach" costs one request, not four.
+    function courseQueryVariants(query) {
+        const raw = String(query === undefined || query === null ? '' : query).trim();
+        const core = courseCoreTokens(raw).map(t => COURSE_ABBREV[t] || t);
+        const out = [raw];
+        const add = v => { const t = String(v || '').trim(); if (t && out.indexOf(t) === -1) out.push(t); };
+        add(raw.replace(/[-\u2013\u2014]/g, ' ').replace(/\s+/g, ' '));
+        add(raw.replace(/\s+/g, '-'));
+        if (core.length > 1) {
+            add(core.join(' '));
+            add(core.join('-'));
+            add(core.join(''));
+        }
+        return out.filter(Boolean);
     }
 
     // ========================================================================
@@ -6014,12 +6138,28 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         onlineSearchInFlight = true;
         if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
 
-        let payload;
-        try {
-            const res = await fetch(courseApiBase() + '/api/course-search?q=' + encodeURIComponent(query));
-            payload = await res.json();
-        } catch (e) {
-            payload = { status: 'unavailable', reason: 'network' };
+        // AS TYPED FIRST, THEN THE OTHER SPELLINGS (2026-10-05). "Tri Mountain"
+        // found nothing online because the provider holds "Tri-Mountain" and
+        // matches it literally. The query is sent as the golfer wrote it - the
+        // provider is better at real names than we are - and only a result-less
+        // answer earns a retry, so a course that is found first time still costs
+        // exactly one request.
+        //
+        // THREE AT MOST, against the daily budget. A network failure or an
+        // upstream error stops the loop outright: retrying a broken proxy four
+        // times would spend the budget on nothing and say the same thing slower.
+        const variants = courseQueryVariants(query).slice(0, 3);
+        let payload = null;
+        for (let i = 0; i < variants.length; i++) {
+            try {
+                const res = await fetch(courseApiBase() + '/api/course-search?q=' + encodeURIComponent(variants[i]));
+                payload = await res.json();
+            } catch (e) {
+                payload = { status: 'unavailable', reason: 'network' };
+                break;
+            }
+            if (!payload || payload.status !== 'ok') break;
+            if ((payload.courses || []).length > 0) break;
         }
         onlineSearchInFlight = false;
         renderOnlineOutcome(payload, query);
