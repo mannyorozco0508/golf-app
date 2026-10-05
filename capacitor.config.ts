@@ -61,6 +61,11 @@ const config: CapacitorConfig = {
     // THE SETUP NOW EXISTS. The APNs key is uploaded to Firebase Cloud Messaging
     // for development and production, the service account is a Cloudflare secret,
     // and the app carries the Push Notifications capability.
+    // HardPanLiveActivity is NOT listed here, and that is correct: it is a LOCAL
+    // plugin compiled into the app target, not an npm package, so there is nothing
+    // for the Capacitor CLI to link. The allowlist governs node_modules plugins
+    // only. The web layer finds it through Capacitor.Plugins at runtime, which is
+    // why live-activity.js looks there rather than importing anything.
     includePlugins: ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
                      '@capacitor/push-notifications', '@capacitor-firebase/messaging']
   },

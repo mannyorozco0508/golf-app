@@ -36,6 +36,9 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- THE LOCK SCREEN CARD (Phase 1). A no-op in a browser and on Android:
+         every entry point looks for the Capacitor plugin first. -->
+    <script src="live-activity.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
@@ -3546,6 +3549,73 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (hole) rows.push('<div class="hl-row">' + hole + '</div>');
 
         mount.innerHTML = rows.length ? '<div class="hole-live">' + rows.join('') + '</div>' : '';
+
+        // AND THE LOCK SCREEN, FROM THE SAME TWO BUILDERS (Phase 1, 2026-10-05).
+        // This function already holds the only two things the Live Activity shows:
+        // the standings row for this golfer and their top match's status. Posting
+        // them from here is what keeps the card and the lock screen from ever
+        // disagreeing - there is no second answer written anywhere.
+        syncLiveActivity(board, states, holeNum);
+    }
+
+    // ---- THE LOCK SCREEN CARD (Phase 1, local) ------------------------------
+    //
+    // WHO IT IS FOR: the golfer this device has said it is - the scorekeeper who
+    // picked themselves, or someone who answered "I'm playing". A spectator has
+    // no score of their own to show and gets nothing, which is also what
+    // resolvedMeId() returning null means.
+    //
+    // WHEN IT STARTS: the first render after that answer exists, which is exactly
+    // "when he opens a round, after Who am I?" - no separate trigger to keep in
+    // step with. WHEN IT ENDS: when the round is finished, or when this device
+    // stops being a golfer.
+    //
+    // NO MONEY ON IT. The match line is a STATUS, never a running total: the
+    // Receipt's rule, and a lock screen is the worst place to break it - the
+    // figure is wrong the moment a press lands and nobody is looking.
+    function syncLiveActivity(board, states, holeNum) {
+        if (!window.liveActivity || !window.liveActivity.available()) return;
+        try {
+            const me = (typeof resolvedMeId === 'function') ? resolvedMeId() : null;
+            // THE ROUND IS OVER WHEN card-is-in.js SAYS SO - the same builder the
+            // banner and settlement.html's Results banner read, so the lock screen
+            // cannot disagree with the page about whether the round has finished.
+            let finished = false;
+            try {
+                const st = window.cardIsIn && window.cardIsIn.cardIsInState(cardIsInInput());
+                finished = !!(st && st.kind === 'final');
+            } catch (e) { finished = false; }
+            if (!me || finished) {
+                if (window.liveActivity.startedRound()) window.liveActivity.end();
+                return;
+            }
+            const row = (board || []).filter(r => String(r.id) === String(me))[0] || null;
+            if (!row) { if (window.liveActivity.startedRound()) window.liveActivity.end(); return; }
+            // THE TOP MATCH IS THE FIRST ONE THE PANEL DREW, so the lock screen
+            // shows what the card shows rather than picking a favourite of its own.
+            let matchText = '';
+            const mine = (states || []).filter(st =>
+                String(st.t1Id) === String(me) || String(st.t2Id) === String(me)
+                || (st.t1Ids || []).map(String).indexOf(String(me)) > -1
+                || (st.t2Ids || []).map(String).indexOf(String(me)) > -1);
+            const top = mine.length ? mine[0] : null;
+            if (top) {
+                const segs = (top.segments || []).filter(g => g.started);
+                const seg = segs.find(g => !g.closed) || segs[segs.length - 1];
+                if (seg) matchText = (top.formatLabel === 'Nassau' ? (seg.label + ' ') : '') + seg.statusText;
+            }
+            const opts = { row: row, matchText: matchText, hole: holeNum };
+            if (window.liveActivity.startedRound() === String(currentMode)) {
+                window.liveActivity.update(opts);
+            } else {
+                const who = (currentData.players || []).filter(p => String(p.id) === String(me))[0];
+                window.liveActivity.start(Object.assign({
+                    roundCode: currentMode,
+                    golferName: who ? String(who.name || 'You').split(' ')[0] : 'You',
+                    courseName: String((currentData && currentData.courseName) || '')
+                }, opts));
+            }
+        } catch (e) { /* a lock screen is a courtesy; the round comes first */ }
     }
 
     // HOW MANY SKINS ARE RIDING ON THIS HOLE, read from the ledger rather than

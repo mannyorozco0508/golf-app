@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v139-gamesfirst. The tournament product cache
+// The consumer product cache is consumer-v140-liveactivity. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4227,7 +4227,14 @@
 // shows nothing extra. The Cup skips Money and only Money. A device on v298 asks
 // for the course first, which is also why its Team column on Players appeared
 // behind the organizer rather than in front of them.
-const CACHE_VERSION = 'golfapp-v299-gamesfirst';
+// Moved to v300: THE LOCK SCREEN CARD (Phase 1, local). The golfer this device
+// has said it is - the scorekeeper, or someone who answered "I'm playing" - gets
+// a Live Activity showing their score to par, holes thru and their top match's
+// STATUS (never money). It starts on the first render after Who am I?, updates
+// on every score, and ends when card-is-in.js says the round is final.
+// live-activity.js joins the shell; index.html loads it at parse time and it is
+// a no-op without the iOS plugin, which needs a widget extension added in Xcode.
+const CACHE_VERSION = 'golfapp-v300-liveactivity';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4277,6 +4284,7 @@ const SHELL_FILES = [
     // call it unguarded, so a cached shell missing this file does not compute a
     // wrong number - it fails to render at all, which is the correct failure.
     './handicap.js',
+    './live-activity.js',
     './handicap-labels.js',
     './aloha-bet.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
