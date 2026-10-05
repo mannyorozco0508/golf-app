@@ -428,8 +428,14 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // Ready screen, which is a live write to events/<code> rather than a form
         // field, so silence there would leave an organizer unsure whether the tee
         // moved.
-        assert.equal(refuse + fail + toast, 64,
-            'the alerts should still be 64 messages, got '
+        // 65 WITH THE STAGE 2 SETUP LOCK (2026-10-05, was 64): a round created from
+        // now on carries ownerLock, and its setup belongs to the account that made
+        // it. A second device signed in as somebody else gets ONE new failure
+        // message saying so, and saying the one thing that fixes it - sign in with
+        // that email - because "Save error: PERMISSION_DENIED" is what it would say
+        // otherwise, on a first tee, with the round typed in.
+        assert.equal(refuse + fail + toast, 65,
+            'the alerts should still be 65 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

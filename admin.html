@@ -10751,6 +10751,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // window has closed and no pass is live - organizer-gate reads the
                 // uid's own node back to say so. Any other refusal keeps the honest
                 // SDK message, so the wall never explains a failure it did not cause.
+                // LOCKED OUT, AND WE KNOW IT WITHOUT ASKING THE SERVER (Stage 2).
+                // This round is owned by a uid that is not this device's, so a
+                // refused save is the setup lock and nothing else - no read, no
+                // guess, and no chance of explaining it as a trial that has not
+                // ended. The sentence says the one thing that fixes it.
+                const myUid = (window.authBootState && window.authBootState.uid) || null;
+                if (window.organizerGate.isPermissionDenied(err)
+                    && loadedOwnerUid && myUid && loadedOwnerUid !== myUid) {
+                    uiFail(SETUP_LOCKED_SENTENCE);
+                    return;
+                }
                 if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
                     window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
                         uiFail(why === 'trial-ended' ? window.organizerGate.WALL : `Save error: ${err.message}`);
@@ -10785,6 +10796,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // is the scores sentence; anything else is the signal. The two-write
     // walk-around - clear the scores on the card, then delete - is neither
     // blocked nor mentioned.
+    // THE SECOND DEVICE, IN WORDS (Stage 2). A round created after the setup lock
+    // ships carries ownerLock, and its setup is the creating ACCOUNT's - not the
+    // round link, which is world-readable and therefore not a credential. The fix
+    // is a sign-in, so the sentence names it; and the half that keeps Monday
+    // working is named too, because "locked" on its own reads as "you cannot use
+    // this round".
+    const SETUP_LOCKED_SENTENCE = '\uD83D\uDD12 This round\u2019s setup belongs to the account that created it.\n\n'
+        + 'This device is signed in as someone else. Sign in with that email on the Account screen and the setup opens.\n\n'
+        + 'Scores, bets, KPs and side matches still save from any device with the round link.';
+
     const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
         + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
         + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';

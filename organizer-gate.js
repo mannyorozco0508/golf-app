@@ -103,6 +103,21 @@
     function stamp(payload, uid, existing) {
         if (existing && existing.exists && !existing.ownerUid) return payload;
         payload.ownerUid = uid;
+        // STAGE 2, AND IT IS BORN WITH THE ROUND OR NOT AT ALL (2026-10-05).
+        //
+        // ownerLock is the flag the rules key setup-lock on, and it is written
+        // EXACTLY ONCE: in the write that creates the round. That is the whole
+        // grandfather design. Adding it to a round that already exists would lock
+        // out whoever has been editing it since - a group whose organizer changed
+        // phones, a legacy round with no owner at all - and the published rule
+        // refuses that write anyway (its .validate allows the key only when the
+        // round itself is being created), so a re-save that tried would fail the
+        // ENTIRE save rather than just the flag.
+        //
+        // A RE-SAVE DOES NOT NEED TO CARRY IT. admin.html saves with update(),
+        // which merges, so a payload without ownerLock leaves the stored one
+        // alone. If that ever becomes set(), this is where it breaks.
+        if (!(existing && existing.exists)) payload.ownerLock = true;
         return payload;
     }
 
@@ -124,12 +139,14 @@
     //      always was - there is nothing to check against. A round with a token
     //      and no ownerUid (2026-08-24 to 09-14) admits only the link.
     //
-    // HIDES THE DOORS. database.rules.json locks SETUP on a round that has
-    // ownerUid (auth.uid must match). The token is not that lock: the round is
-    // world-readable, so the token is too. A second device saves setup by
-    // email-link sign-in, which adopts this uid. Scores and the other play
-    // paths stay open to a code-holder. A legacy round with no ownerUid is
-    // still open. See HANDOFF.md.
+    // HIDES THE DOORS. The published rules lock SETUP on a round that carries
+    // ownerLock AND ownerUid (auth.uid must match). The token is not that lock:
+    // the round is world-readable, so the token is too. A second device saves
+    // setup by email-link sign-in, which adopts this uid. Scores and the other
+    // play paths stay open to a code-holder. A round WITHOUT ownerLock behaves
+    // exactly as it did before Stage 2 - which is every round created before it,
+    // and is why the flag exists rather than keying on ownerUid alone. See
+    // HANDOFF.md.
     var TOKEN_KEY = 'golfapp_organizer_';
     function tokenKey(code) { return TOKEN_KEY + String(code || '').toUpperCase(); }
     function heldOrganizerToken(code, urlToken) {
