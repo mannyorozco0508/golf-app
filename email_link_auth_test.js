@@ -383,8 +383,13 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
 
         const rules = JSON.parse(read('database.rules.json'));
         const write = rules.rules.events.$eventCode['.write'];
-        assert.match(write, /data\.exists\(\) && data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
-        assert.match(write, /data\.exists\(\) && !data\.hasChild\('ownerUid'\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)\)/);
+        // RE-PINNED 2026-10-05: database.rules.json is a mirror of production now.
+        // Production has one clause for every existing round rather than the repo
+        // file's owned/legacy pair, and the owner term inside it is what an
+        // email-link sign-in makes reachable on a second device - which is this
+        // file's subject and is unchanged.
+        assert.match(write, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
+        assert.match(write, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
         assert.equal(rules.rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()");
         assert.equal(rules.rules.events.$eventCode.players, undefined, 'players has no child grant');
         assert.equal(rules.rules.organizers.$uid.pass['.write'], false);

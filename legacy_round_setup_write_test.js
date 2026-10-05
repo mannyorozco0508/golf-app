@@ -236,7 +236,39 @@ describe('THE RULES: the payload the page just built, against database.rules.jso
         assert.deepEqual(r.wrong, [], 'ownerUid can be added to an existing round after all:\n' + r.out.slice(-1400));
     });
 
-    test('an OWNED round: the page\'s payload is the owner\'s alone', async () => {
+    test('an OWNED round: the owner saves it - and so, TODAY, does a code-holder', async () => {
+        // RE-POINTED 2026-10-05, AND THE CHANGE IS THE FINDING. This test asserted
+        // that a code-holder cannot overwrite an owned round's setup. That is true
+        // of database.rules.json as the repo kept it and has NEVER been true of the
+        // database: the live ruleset, read out with the service account that day,
+        // has no owner-only setup clause at all - on a round that exists, any
+        // client may write anything except deleting a played round. The repo file
+        // is now a mirror of production, so this file tests the real thing, and
+        // the owner-only design it used to describe lives in
+        // database.rules.stage2-ownersetup.json where round_delete_rules_test.js
+        // and wave2_rules_test.js hold it.
+        //
+        // DOCUMENTED, NOT ENDORSED. The owner's save is the claim this test is for
+        // and it still holds. The code-holder's is the gap Stage 2 closes, asserted
+        // rather than described so it lives in the suite instead of in a report.
+        const rec = record('anon-stub', true);
+        const { payload } = await saveThrough('OWNED1', rec, { 104: 20 });
+        const merged = mergedSet(rec, payload);
+        const r = targaryen({
+            root: { events: { OWNED1: rec }, organizers: { 'anon-stub': { firstSeenAt: NOW - 2 * DAY } } },
+            users: { nobody: null, stub: anon('anon-stub'), stranger: anon('anon-stranger') },
+            tests: { 'events/OWNED1': {
+                canWrite: [{ auth: 'stub', data: merged },
+                           { auth: 'nobody', data: merged }, { auth: 'stranger', data: merged }]
+            } }
+        });
+        assert.equal(r.rows.length, 3, r.out.slice(-800));
+        assert.deepEqual(r.wrong, [], r.out.slice(-1400));
+    });
+
+    test('and STAGE 2 is the file where a code-holder cannot', async () => {
+        // The other half, so the gap above reads as a decision rather than as a
+        // hole nobody noticed. Same payload, same round, the proposed ruleset.
         const rec = record('anon-stub', true);
         const { payload } = await saveThrough('OWNED1', rec, { 104: 20 });
         const merged = mergedSet(rec, payload);
@@ -247,7 +279,7 @@ describe('THE RULES: the payload the page just built, against database.rules.jso
                 canWrite: [{ auth: 'stub', data: merged }],
                 cannotWrite: [{ auth: 'nobody', data: merged }, { auth: 'stranger', data: merged }]
             } }
-        });
+        }, path.join(REPO_ROOT, 'database.rules.stage2-ownersetup.json'));
         assert.equal(r.rows.length, 3, r.out.slice(-800));
         assert.deepEqual(r.wrong, [], r.out.slice(-1400));
     });

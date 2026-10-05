@@ -48,6 +48,31 @@
 // rows each mutation is supposed to break. Every control fires.
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// RE-POINTED 2026-10-05: THIS FILE DESCRIBES STAGE 2, WHICH IS NOT PUBLISHED.
+//
+// The live ruleset was read out of the database with the service account and
+// compared against every rules file in the repo. It did not match
+// database.rules.json, and had not for some time - the repo file was 13,099
+// bytes against a live 20,774, missing challenges, organizers/groups,
+// pushTokens, pushPrefs and sharedGroups entirely. database.rules.json is now a
+// MIRROR OF PRODUCTION, re-read and replaced on the day the owner-delete wave
+// published, so the suites that run targaryen against it describe the database.
+//
+// The one thing the old repo file had that production does not is OWNER-ONLY
+// SETUP on an existing round - the clause this file's scenarios are about. It
+// was designed, tested here, and never published. So it now lives in
+// database.rules.stage2-ownersetup.json, rebuilt on top of the LIVE file rather
+// than kept as the stale one (publishing the stale one would have wiped five
+// subtrees off the database), and carrying the owner-delete grant that IS live
+// so Stage 2 cannot silently take it back.
+//
+// NOTHING HERE WAS WEAKENED. Every scenario still runs; what changed is which
+// file it runs against, and that file is now honestly labelled as a proposal
+// rather than as production. owner_delete_rules_test.js is the suite that holds
+// the LIVE events rule.
+// ----------------------------------------------------------------------------
+
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,7 +82,7 @@ const { execFileSync } = require('child_process');
 const { REPO_ROOT } = require('./helpers/load-script.js');
 
 const TARGARYEN = path.join(REPO_ROOT, 'node_modules', '.bin', 'targaryen');
-const RULES = path.join(REPO_ROOT, 'database.rules.json');
+const RULES = path.join(REPO_ROOT, 'database.rules.stage2-ownersetup.json');   // PROPOSED, not live
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'wave2-rules-'));
 const NOW = Date.now(), DAY = 86400000;
 const ESC = String.fromCharCode(27);
@@ -132,8 +157,15 @@ function scenario() {
         'events/LEGACYEMPTY': { canWrite: [{ auth: 'nobody', data: null }, { auth: 'nobody', data: { eventName: 'still legacy', createdAt: 1, players: [{ id: 101, name: 'Ann' }], gameFormat: 'stroke' } }] },
         'events/LEGACY1/ownerUid': { cannotWrite: [{ auth: 'stranger', data: 'anon-stranger' }, { auth: 'nobody', data: 'anon-org' }, { auth: 'org', data: 'anon-org' }] },
         // OWNED whole-record writes: the owner re-saves; ownerUid never taken, changed or dropped; deletion as today (unscored only)
-        'events/OWNED1': { canWrite: [{ auth: 'org', data: played({ eventName: 'Owned, re-saved by its owner', ownerUid: 'anon-org', organizerToken: 'tok-owned', gameFormat: 'nassau' }) }],
-            cannotWrite: [{ auth: 'nobody', data: null }, { auth: 'org', data: null },
+        // { auth: 'org', data: null } MOVED TO canWrite ON 2026-10-05, PUBLISHED.
+        // The owner may delete their own round even after it has been played -
+        // Manny met the old refusal on his own round, and the guard was never a
+        // boundary (a code-holder could always delete the scores node and then the
+        // scoreless round). owner_delete_rules_test.js holds it against the live
+        // file; here it keeps Stage 2 from taking it back.
+        'events/OWNED1': { canWrite: [{ auth: 'org', data: played({ eventName: 'Owned, re-saved by its owner', ownerUid: 'anon-org', organizerToken: 'tok-owned', gameFormat: 'nassau' }) },
+                { auth: 'org', data: null }],
+            cannotWrite: [{ auth: 'nobody', data: null },
                 { auth: 'nobody', data: played({ eventName: 'wiped by a code holder', ownerUid: 'anon-org' }) },
                 { auth: 'stranger', data: played({ eventName: 'taken', ownerUid: 'anon-stranger' }) },
                 { auth: 'org', data: played({ eventName: 'owner dropped' }) }] },
@@ -164,7 +196,17 @@ function scenario() {
         'events/LEGACY1/organizerToken': { canWrite: [{ auth: 'nobody', data: 'late-token' }] },
         // ORGANIZERS
         'organizers/anon-new/firstSeenAt': { canWrite: [{ auth: 'newcomer', data: NOW - 1000 }], cannotWrite: [{ auth: 'nobody', data: NOW }, { auth: 'stranger', data: NOW }, { auth: 'newcomer', data: NOW + DAY }, { auth: 'newcomer', data: 'soon' }] },
-        'organizers/anon-org/firstSeenAt': { cannotWrite: [{ auth: 'org', data: NOW }, { auth: 'org', data: NOW - 2 * DAY }, { auth: 'org', data: null }, { auth: 'stranger', data: NOW }] },
+        // { auth: 'org', data: null } MOVED TO canWrite 2026-10-05, and it is not
+        // this wave that moved it. ACCOUNT EXIT is live: organizers/$uid carries
+        // `.write: newData.val() === null && auth != null && auth.uid === $uid`,
+        // so a golfer may delete their own organizer record - and on this fixture
+        // firstSeenAt is anon-org's only child, so nulling it nulls the parent and
+        // the exit grant fires. The write-once rule below is untouched: anon-org
+        // still cannot OVERWRITE firstSeenAt with a new number, which is what the
+        // trial clock depends on. This row only ever looked like a trial-reset
+        // because the repo file predated account exit.
+        'organizers/anon-org/firstSeenAt': { canWrite: [{ auth: 'org', data: null }],
+            cannotWrite: [{ auth: 'org', data: NOW }, { auth: 'org', data: NOW - 2 * DAY }, { auth: 'stranger', data: NOW }] },
         'organizers/anon-new/pass': { cannotWrite: [{ auth: 'newcomer', data: { type: 'season', expiresAt: NOW + 300 * DAY, transactionId: 'fake' } }, { auth: 'nobody', data: { type: 'season', expiresAt: NOW + 300 * DAY } }] },
         'organizers/anon-passed/pass/expiresAt': { cannotWrite: [{ auth: 'passed', data: NOW + 900 * DAY }, { auth: 'nobody', data: NOW + 900 * DAY }] },
         'organizers/anon-lapsed/pass': { cannotWrite: [{ auth: 'lapsed', data: { type: 'season', expiresAt: NOW + 300 * DAY, transactionId: 'fake' } }] },
@@ -288,9 +330,12 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
     // reason a code-holder can score.
     control('a legacy round required to carry an owner', r => { r.events.$eventCode['.validate'] = "newData.val() === null || (newData.hasChildren() && newData.hasChild('ownerUid'))"; },
         [[/^events\/LEGACY1$/, 'null'], [/^events\/LEGACY1\/scores\/p102_h1$/, 'null']]);
-    control('the owner locked out after the trial (existing owned writes gated by the window)', r => { r.events.$eventCode['.write'] = write(r).replace("auth.uid === data.child('ownerUid').val() && (newData.exists()", "auth.uid === data.child('ownerUid').val() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000 && (newData.exists()"); },
+    // RE-POINTED 2026-10-05: the owner clause no longer ends in the scores guard
+    // (the owner-delete publish removed it), so the old search string matched
+    // nothing and this control was silently mutating NOTHING - inert, and green.
+    control('the owner locked out after the trial (existing owned writes gated by the window)', r => { r.events.$eventCode['.write'] = write(r).replace("auth.uid === data.child('ownerUid').val())", "auth.uid === data.child('ownerUid').val() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000)"); },
         [[/^events\/EXPIRED1$/, 'expired'], [/^events\/EXPIRED1\/eventName$/, 'expired']]);
-    control('the owner check dropped from existing owned rounds (setup opens to any code-holder)', r => { r.events.$eventCode['.write'] = write(r).replace("data.hasChild('ownerUid') && auth != null && auth.uid === data.child('ownerUid').val() && ", "data.hasChild('ownerUid') && "); },
+    control('the owner check dropped from existing owned rounds (setup opens to any code-holder)', r => { r.events.$eventCode['.write'] = write(r).replace("data.hasChild('ownerUid') && auth != null && auth.uid === data.child('ownerUid').val()", "data.hasChild('ownerUid')"); },
         [[/^events\/OWNED1\/players$/, 'null'], [/^events\/OWNED1\/organizerToken$/, 'null'], [/^events\/OWNEDEMPTY$/, 'null'], [/^events\/EMAIL1\/players$/, 'null']]);
     control('ownerUid takeable on a legacy round (the immutability clause dropped; an owned round is already refused by the parent write)', r => { r.events.$eventCode.ownerUid['.validate'] = 'auth != null && newData.val() === auth.uid'; },
         [[/^events\/LEGACY1\/ownerUid$/, 'stranger'], [/^events\/LEGACY1\/ownerUid$/, 'org'], [/^events\/LEGACY1$/, 'org']]);
@@ -345,7 +390,14 @@ describe('THE SEAM - two meanings of auth, kept apart', () => {
         const ev = rules.events.$eventCode;
         assert.match(w, /now < root\.child\('organizers\/' \+ auth\.uid \+ '\/firstSeenAt'\)\.val\(\) \+ 1814400000/);
         assert.match(w, /root\.child\('organizers\/' \+ auth\.uid \+ '\/pass\/expiresAt'\)\.val\(\) > now/);
-        assert.match(w, /data\.exists\(\) && data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)\)/);
+        // RE-PINNED 2026-10-05: the owner clause no longer carries the scores guard.
+        // The owner-delete rule published that day, so an owned round is the
+        // owner's whatever it holds - including a delete after it has been played.
+        // The guard it dropped was never a boundary: a code-holder could already
+        // delete the scores node and then the scoreless round.
+        assert.match(w, /data\.exists\(\) && data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\)\)/);
+        assert.ok(!/auth\.uid === data\.child\('ownerUid'\)\.val\(\) && \(newData\.exists/.test(w),
+            'the scores guard is back on the owner clause - that is the refusal Manny met');
         assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"), 'legacy: ' + w.slice(-110));
         assert.ok(!/organizerToken/.test(w), 'the token is world-readable and is not a rules credential');
         const open = "root.child('events/' + $eventCode).exists()";

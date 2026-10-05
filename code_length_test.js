@@ -397,22 +397,51 @@ describe('NOTHING ELSE MOVED', () => {
         })(rules, '', []);
         // Wave 2 (draft, 2026-09-15): the creation gate and the organizer node add
         // four expressions - approved for drafting (wave2_rules_test.js holds them).
+        // RE-POINTED 2026-10-05: this list is now what PRODUCTION contains, which
+        // is why it grew by eleven entries in one edit and none of them are this
+        // wave's. database.rules.json was replaced with the live ruleset, read out
+        // of the database with the service account; the repo copy had drifted
+        // 7,675 bytes behind and was missing account exit, My Groups, My Groups
+        // sharing and the two push nodes entirely - every one of which was
+        // published months-to-weeks ago with its own approval and its own suite.
+        // So the claim this test makes is unchanged and is finally true of the
+        // database: VENDORING THE SDK INTRODUCED NO auth RULE. What changed is
+        // that the file it reads is no longer a parallel fiction.
         assert.deepEqual(authSites.sort(), [
             '/events/$eventCode/.write',
             '/events/$eventCode/ownerUid/.validate',
             '/organizers/$uid/.read',
+            // ACCOUNT EXIT, live: a golfer may delete their own organizer record.
+            '/organizers/$uid/.write',
             '/organizers/$uid/firstSeenAt/.write',
+            // MY GROUPS, live: a roster a golfer keeps, readable and writable by
+            // its owner and by the co-organizers they share it with.
+            '/organizers/$uid/groups/$groupId/.read',
+            '/organizers/$uid/groups/$groupId/coOrganizers/.write',
+            '/organizers/$uid/groups/$groupId/lastRound/.write',
+            '/organizers/$uid/groups/$groupId/members/.write',
+            '/organizers/$uid/groups/$groupId/updatedAt/.write',
+            '/organizers/$uid/groups/.write',
+            // PUSH, live: a token is a capability, so it is owner-read and
+            // owner-write and nobody can enumerate another golfer's phones.
+            '/pushPrefs/$uid/.read',
+            '/pushPrefs/$uid/.write',
+            '/pushTokens/$uid/.read',
+            '/pushTokens/$uid/.write',
             // Wave 2a (2026-09-16, published to the console by hand): the entry's
             // .validate names the owner so the desk may create a paid walk-up while a
             // public create may not carry the desk's fields.
             '/registrations/$code/$entryId/.validate',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
-            // v218 season ledger, in-repo only (not published). Owner writes the
-            // season; the code is the read, same as events. Events rules are not
-            // in this list because they did not change.
+            // v218 season ledger. Owner writes the season; the code is the read,
+            // same as events.
             '/seasons/$seasonCode/.write',
             '/seasons/$seasonCode/ownerUid/.validate',
+            // MY GROUPS sharing, live: the index a co-organizer reads to find the
+            // rosters shared with their email.
+            '/sharedGroups/$emailKey/$ownerUid/$groupId/.write',
+            '/sharedGroups/$emailKey/.read',
             // The narrowing (2026-09-18, published by hand): the parent .write
             // names the owner - a code-holder writes scores and nothing else.
             '/tournaments/$tourneyCode/.write',

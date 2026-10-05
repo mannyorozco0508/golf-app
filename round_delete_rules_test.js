@@ -42,6 +42,31 @@
 // delete that is currently allowed.
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// RE-POINTED 2026-10-05: THIS FILE DESCRIBES STAGE 2, WHICH IS NOT PUBLISHED.
+//
+// The live ruleset was read out of the database with the service account and
+// compared against every rules file in the repo. It did not match
+// database.rules.json, and had not for some time - the repo file was 13,099
+// bytes against a live 20,774, missing challenges, organizers/groups,
+// pushTokens, pushPrefs and sharedGroups entirely. database.rules.json is now a
+// MIRROR OF PRODUCTION, re-read and replaced on the day the owner-delete wave
+// published, so the suites that run targaryen against it describe the database.
+//
+// The one thing the old repo file had that production does not is OWNER-ONLY
+// SETUP on an existing round - the clause this file's scenarios are about. It
+// was designed, tested here, and never published. So it now lives in
+// database.rules.stage2-ownersetup.json, rebuilt on top of the LIVE file rather
+// than kept as the stale one (publishing the stale one would have wiped five
+// subtrees off the database), and carrying the owner-delete grant that IS live
+// so Stage 2 cannot silently take it back.
+//
+// NOTHING HERE WAS WEAKENED. Every scenario still runs; what changed is which
+// file it runs against, and that file is now honestly labelled as a proposal
+// rather than as production. owner_delete_rules_test.js is the suite that holds
+// the LIVE events rule.
+// ----------------------------------------------------------------------------
+
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -50,7 +75,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const REPO = __dirname;
-const RULES = path.join(REPO, 'database.rules.json');
+const RULES = path.join(REPO, 'database.rules.stage2-ownersetup.json');   // PROPOSED, not live
 const TARGARYEN = path.join(REPO, 'node_modules', '.bin', 'targaryen');
 
 const CD = [];
@@ -171,10 +196,17 @@ const TABLE = [
       site: 'the same button, on the device that created it, before anyone teed off',
       why: 'the owner must still be able to bin a mistake that has no scores',
       path: 'events/OWNED_EMPTY', data: null },
-    { id: 'D5', what: 'delete an OWNED scored round as its owner', verdict: 'refuse',
+    { id: 'D5', what: 'delete an OWNED scored round as its owner', verdict: 'allow',
       auth: 'organizer-pass',
-      site: 'the same button, after a score exists',
-      why: 'the scores guard applies to the owner too: one write cannot destroy a played round',
+      site: 'index.html endAndClearRound, on the device signed in as the round owner',
+      why: 'FLIPPED 2026-10-05, AND PUBLISHED. The scores guard used to apply to the owner too, '
+         + 'and Manny met it on his own round: his uid on the record, eight scores, delete '
+         + 'refused. It was never a boundary - any code-holder could already delete the scores '
+         + 'node and then the scoreless round, which is rows X1 and X2 below - so what it '
+         + 'actually stopped was the owner doing in one tap what a stranger could do in two. '
+         + 'The accident it guarded against is handled in the confirm now, which names how many '
+         + 'golfers have scores on the card. owner_delete_rules_test.js holds this against the '
+         + 'LIVE file; the row is here so Stage 2 cannot silently take it back.',
       path: 'events/OWNED', data: null },
     { id: 'S1', what: 'a code-holder overwrites players on an owned round', verdict: 'refuse',
       site: 'not a call site - the collision and the spectator write the owner clause closes',
@@ -247,7 +279,8 @@ describe('events/<code> — a played round cannot be deleted in one write', () =
         const allow = ACTIVE.filter((r) => r.verdict === 'allow');
         // Wave 2: unidentified creation (W2b). Owner-only setup (2026-09-23):
         // a code-holder cannot delete, overwrite, or edit setup on an owned round.
-        assert.deepEqual(refuse.map(r => r.id).sort(), ['D1', 'D3', 'D5', 'O1', 'S1', 'S4', 'S5', 'W2b']);
+        // D5 left this list when the owner-delete rule published (2026-10-05).
+        assert.deepEqual(refuse.map(r => r.id).sort(), ['D1', 'D3', 'O1', 'S1', 'S4', 'S5', 'W2b']);
         assert.ok(allow.length >= 14, `only ${allow.length} allow rows - the app has more than that to protect`);
         allow.forEach((r) => assert.ok(r.why && r.why.length > 15,
             `${r.id} is allowed on purpose and must say why, or a later reader will "fix" it`));
@@ -300,7 +333,7 @@ describe('events/<code> — a played round cannot be deleted in one write', () =
         + 'SEE ALSO: X5 in trip_delete_rules_test.js, which asserts the refusal as a known '
         + 'limit so it is visible from the trips side too.', () => {});
 
-    test('every scenario passes against database.rules.json', () => {
+    test('every scenario passes against the Stage 2 file', () => {
         const { exitCode, output } = runTargaryen(dataPath);
         const m = output.match(/(\d+) failures? in (\d+) tests?/);
         assert.ok(m, `could not parse targaryen output:\n${output}`);

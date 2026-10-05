@@ -327,7 +327,16 @@ describe('FIREBASE RULES — what the server can and cannot enforce', () => {
         // the scores delete guard. A score on an owned round is a child grant with
         // no identity check — shape only, which is what this test is about.
         const w = rules.events.$eventCode['.write'];
-        assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"), 'a legacy round stays open: ' + w.slice(-110));
+        // RE-PINNED 2026-10-05: database.rules.json is a mirror of production now,
+        // and production has never had the repo file's separate legacy clause -
+        // one clause covers every existing round, and the owner term inside it is
+        // what a legacy round cannot satisfy. The CLAIM is unchanged and is
+        // asserted as behaviour rather than as a suffix: a round with no ownerUid
+        // and scores on it cannot be deleted in one write by anyone.
+        assert.match(w, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
+        assert.match(w, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
+        assert.ok(!/!data\.hasChild\('ownerUid'\)/.test(w),
+            'the repo file grew a legacy clause production does not have: ' + w.slice(-110));
         assert.match(w, /auth\.uid === data\.child\('ownerUid'\)\.val\(\)/, 'an owned round is the owner');
         assert.equal(rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()", 'a score is still not an identity check');
         assert.match(w, /^\(!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'creation stays gated');

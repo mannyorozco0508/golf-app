@@ -133,12 +133,26 @@ describe('My Groups', () => {
         assert.equal(g.sharedGroupsPath('a@b.com'), 'sharedGroups/a@b,com');
     });
 
-    test('the rules the next publish must carry are ABSENT, so the note cannot go stale', () => {
+    test('THE TRIPWIRE FIRED: those rules are live, and this file now says so', () => {
+        // THE POINT OF A TRIPWIRE IS THAT IT GOES OFF. This test asserted that
+        // organizers/$uid/groups and sharedGroups were ABSENT, so that the day
+        // either landed it would go red and send a reader to the header and
+        // HANDOFF.md. They landed - and it stayed green, because the repo's
+        // database.rules.json had drifted 7,675 bytes behind production and did
+        // not know. It went red the moment that file was replaced with the live
+        // ruleset (read out of the database with the service account on
+        // 2026-10-05), which is the tripwire doing its job one publish late.
+        //
+        // So it is inverted rather than deleted: the rules must now be PRESENT,
+        // and the shape they were published with is pinned here.
         const rules = JSON.parse(read('database.rules.json'));
-        assert.ok(!rules.rules.organizers.$uid.groups, 'organizers/$uid/groups has no rule yet');
-        assert.ok(!rules.rules.sharedGroups, 'sharedGroups does not exist yet');
-        // The day either one lands, this test goes red and points at the header and
-        // HANDOFF.md, which is the only way a note like that stays true.
+        const groups = rules.rules.organizers.$uid.groups;
+        assert.ok(groups, 'organizers/$uid/groups is gone from production');
+        assert.ok(rules.rules.sharedGroups, 'sharedGroups is gone from production');
+        assert.match(groups['.write'], /auth != null && auth\.uid === \$uid/,
+            'a roster must be writable only by the organizer who keeps it');
+        assert.match(rules.rules.sharedGroups.$emailKey['.read'], /auth/,
+            'the shared index must not be world-readable - it names emails');
         assert.match(read('HANDOFF.md'), /organizers\/\$uid\/groups/);
     });
 

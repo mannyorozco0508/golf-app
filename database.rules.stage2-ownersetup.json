@@ -3,7 +3,7 @@
     "events": {
       "$eventCode": {
         ".read": true,
-        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && (newData.exists() || !data.hasChild('scores') || (auth != null && data.hasChild('ownerUid') && auth.uid === data.child('ownerUid').val())))",
+        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && data.hasChild('ownerUid') && auth != null && auth.uid === data.child('ownerUid').val()) || (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))",
         ".validate": "newData.val() === null || (newData.hasChildren() && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid')))",
         "ownerUid": {
           ".validate": "(!data.parent().exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"

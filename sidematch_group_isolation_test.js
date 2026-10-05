@@ -644,16 +644,29 @@ describe('SECURITY — what this does and does not claim', () => {
     test('a side match on an existing round is still not an identity check; owned setup is the owner', () => {
         const rules = JSON.parse(read('database.rules.json')).rules;
         const w = rules.events.$eventCode['.write'];
-        assert.ok(w.endsWith("|| (data.exists() && !data.hasChild('ownerUid') && (newData.exists() || !data.hasChild('scores')))"),
-            'a legacy round with scores in it cannot be deleted in one write, and a legacy round stays otherwise open: ' + w.slice(-110));
-        assert.match(w, /data\.hasChild\('ownerUid'\) && auth != null && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/,
-            'an owned round\'s parent write is the owner');
+        // RE-PINNED 2026-10-05: database.rules.json is a mirror of production now,
+        // and production has never had the repo file's separate legacy clause -
+        // one clause covers every existing round, and the owner term inside it is
+        // what a legacy round cannot satisfy. The CLAIM is unchanged and is
+        // asserted as behaviour rather than as a suffix: a round with no ownerUid
+        // and scores on it cannot be deleted in one write by anyone.
+        assert.match(w, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
+        assert.match(w, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
+        assert.ok(!/!data\.hasChild\('ownerUid'\)/.test(w),
+            'the repo file grew a legacy clause production does not have: ' + w.slice(-110));
         // A side match written into an existing round meets no identity check.
-        // The parent names auth for the owner; the child grant must not.
+        // The parent names auth for the owner's delete; the child grant must not.
         assert.equal(rules.events.$eventCode.sideMatches['.write'], "root.child('events/' + $eventCode).exists()");
         assert.ok(!/auth/.test(rules.events.$eventCode.sideMatches['.write']), 'a side match is not an identity check');
-        const legacy = w.slice(w.lastIndexOf('|| (data.exists()'));
-        assert.ok(!/auth/.test(legacy), 'the legacy branch names no auth: ' + legacy);
+        // AND THE auth IN THE PARENT IS REACHABLE ONLY BY AN OWNER. It sits inside
+        // the owner term, behind data.hasChild('ownerUid'), so a round that records
+        // no owner meets no identity check at all - which is the claim this test
+        // was making when production still had a separate legacy branch to point at.
+        const term = w.slice(w.indexOf("|| (auth != null && data.hasChild('ownerUid')"));
+        assert.ok(term.length > 40, 'the owner term is gone: ' + w.slice(-140));
+        assert.equal((w.match(/auth/g) || []).length, (w.slice(0, w.indexOf(term)).match(/auth/g) || []).length
+            + (term.match(/auth/g) || []).length,
+            'auth appears somewhere other than creation and the owner term');
     });
 
     test('this is client-side isolation, and the code says so', () => {

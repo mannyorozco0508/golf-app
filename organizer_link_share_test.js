@@ -427,7 +427,7 @@ describe('THE SEAMS: one builder, no second copy, nothing written', () => {
         // required and a rounds/<roundCode> child per linked round. IN-REPO ONLY:
         // still NOT published, so live season writes may refuse until it is, which
         // is expected and is not a defect to chase.
-        assert.equal(sha('database.rules.json'), '62ea83f1');   // RE-PINNED 2026-09-26 (Wave 13; was a78a42c6): the attendance rows came out with the feature, per-file approved. All four of its surfaces were removed, so the node has no writer and no reader; leaving rules for a node nothing touches would be describing a feature that is gone. IN-REPO ONLY, NOT PUBLISHED, as always. Every other in-round write row is asserted still present in attendance_test.js.
+        assert.equal(sha('database.rules.json'), 'db6cecca');   // RE-PINNED 2026-10-05 (was 62ea83f1): database.rules.json is now a MIRROR OF PRODUCTION. The live ruleset was read out of the database with the service account and did not match this file and had not for some time - 13,099 bytes against a live 20,774, missing challenges, organizers/groups, pushTokens, pushPrefs and sharedGroups. It is replaced with exactly what is live (sha db6cecca, verified the day the owner-delete rule published). The one thing the old file had that production does not - owner-only setup on an existing round - moved to database.rules.stage2-ownersetup.json, which is where round_delete_rules_test.js and wave2_rules_test.js now point. NOT A RULES CHANGE BY THIS WAVE: the database did not move, the repo caught up with it.
     });
 });
 

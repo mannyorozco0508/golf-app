@@ -279,8 +279,14 @@ describe('THE SOURCE: ONE SENTENCE, AND NOTHING ELSE MOVED', () => {
         });
     });
 
-    test('database.rules.json is untouched: this wave hides doors and locks nothing', () => {
+    test('database.rules.json is untouched BY THIS WAVE: it hides doors and locks nothing', () => {
+        // RE-PINNED 2026-10-05 (was 62ea83f1), and NOT by this wave. The file was
+        // replaced with the live ruleset, read out of the database with the
+        // service account: the repo copy had drifted 7,675 bytes behind and was
+        // missing account exit, My Groups, My Groups sharing and both push nodes.
+        // The claim here is about THIS wave, so what it pins is the live sha - a
+        // copy-only wave must not move it off production either.
         assert.equal(require('crypto').createHash('sha256').update(read('database.rules.json')).digest('hex').slice(0, 8),
-            '62ea83f1', 'the rules file moved in a copy-only wave');
+            'db6cecca', 'the rules file moved in a copy-only wave');
     });
 });
