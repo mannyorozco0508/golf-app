@@ -3349,6 +3349,63 @@ tee-time field removed, and PUSH.
   through the real route. When there is no token it offers **Register this phone**
   rather than reporting a dead end.
 
+## THE SCORECARD IS THE HOLE (UX wave, 2026-10-05, MERGED `b5fbf18`)
+
+Cache `golfapp-v295-scorecard` / consumer `v135`. Six commits on `ux-simplify`,
+merged after Manny tested them.
+
+- **IT WAS A RATIO, NOT A BUG, so it was measured first.** `tools/first-screen-check.js`
+  arrives cold on a live round at 390x844 and reads what actually PAINTS in the first
+  viewport. Before: **0 score boxes above the fold**, 0% of the first screen scores,
+  the hole card 8.9%, and 525 of the 844 pixels taken by the theme row, the round
+  header, two rows of nav pills, the Playing With card and the group-scores card - the
+  hole card began at y=610 on a 2025px page. After: **all four boxes above the fold**,
+  the hole card 45-52%, and the page one screen.
+- **THE STATUS SHEET** holds what a golfer touches once a round: the theme, the game
+  code, the nav, the Dots selector, the view toggle, the group strip, Save & exit,
+  Delete. One handle, fixed at the bottom. **The blocks are MOVED, not rebuilt** - same
+  ids, same handlers, same renderers - so a copy could never exist with one id.
+- **AND THE READING CARDS CAME BACK ONTO THE PAGE the same week**, because a fresh
+  round behind a handle said nothing about what the group had agreed to play for. The
+  leaderboard and the live matches are compact lines directly under Prev/Next (measured
+  y=455-521, above the fold on a four-golfer card); the full versions, Today's Games,
+  the skins card and Playing With are on the page below them.
+- **THE LEADERBOARD SHOWS BEFORE ANYONE TEES OFF**, every golfer at E, thru 0. It used
+  to render nothing until a score existed. The old guard said "a leaderboard with
+  nobody in it" was worse than none; a board with EVERYONE in it at E is not that board.
+- **THE LANDING RULE IS MANNY'S:** if the hole card from its heading through Prev/Next
+  FITS with the page at the top, `landOnHole` lands at **scrollY 0**; it scrolls only
+  when the card would not fit (5-8 golfers), and then the heading goes to inset + 12.
+  Nothing is ever placed under the safe-area top. He found this the hard way - after
+  Next, the "Final results are in" banner sat under the clock - and it was not a bug in
+  the landing, it was a landing built for a 2000px page running on a one-screen one.
+- **TWO REAL DEFECTS FELL OUT OF THAT, neither a pin.** `box.focus()` scrolls the
+  element into view on the browser's terms, which took the heading 35px under a 47px
+  status bar - the exact thing Wave 19b fixed, by another door; it is
+  `focus({preventScroll:true})` now. And `tools/lib/cold-arrival.js` measured a tap
+  target in the SAME evaluation as the `scrollIntoView` that moves it, then clicked the
+  stale point: harmless while pages were long, and on a one-screen card it tapped empty
+  space and two checks reported a broken landing that was not broken. **Scroll, settle,
+  then measure.**
+- **NOTHING IN THE PANEL COMPUTES.** Every line is the builder's own words -
+  `liveStandings()`, `buildLiveMatchStates()`, `kpLiveLineHtml()` reused whole,
+  `buildSkinsLedgerRows()` over settlement-engine's ledger, `describeGame()` and
+  `buildMoneyPoolBanner()` for Today's Games. The stake is the wager's own figure; **no
+  mid-round total** is printed, and the skins carry is **units, never money**.
+- **49 HELPER SENTENCES OVER 15 WORDS became 8**, all eight a single line of 16-21
+  words. Where a guard pinned a sentence because a silent change would cost something,
+  the short line KEEPS the pinned words rather than the guard being re-pointed.
+  Before/after in `~/Desktop/ux/COPY-TRIM-BEFORE-AFTER.txt`.
+- **GUARDS:** `ux_status_sheet_test.js`, `hole_landing_fits_test.js`,
+  `hole_live_panel_test.js`, `fresh_round_page_test.js`, and
+  `tools/first-screen-check.js` for the measurement. Roughly fifty re-pins across the
+  wave, each with its reason in place; **no money code was touched at any point** -
+  every money golden, `*_prev` fixture and engine file is byte-identical to `cdf6f53`.
+- **AND MY OWN WORDS BROKE TWO GUARDS AGAIN:** a variable called
+  `notifyTestCountdown` matched the trial-banner sweep, and a comment reading "The
+  confirm() in front of it" became visible to the bare-dialog scanner once a trimmed
+  sentence elsewhere moved the file's quote parity. Both were the guard being right.
+
 ## LIVE ACTIVITY on the lock screen - PLAN ONLY, nothing built (2026-10-04)
 
 Asked for as a plan and recorded as one. A card on the iPhone lock screen and in
