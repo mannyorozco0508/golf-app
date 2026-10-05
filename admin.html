@@ -31,6 +31,9 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <!-- WHICH TEE a golfer's numbers come from. After handicap.js, whose builders
+         it hands the chosen tee to; it computes no strokes of its own. -->
+    <script src="player-tees.js"></script>
     <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: the handicap labels and the one basis sentence (display only).
@@ -1939,6 +1942,19 @@ html {
     <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45;"></p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
         ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game, including the Weekly Game.
+    </div>
+    <!-- DIFFERENT TEES, ON A STROKES ROUND. Hidden on a GHIN round, where the
+         tee is already inside the course-handicap formula and adjusting again
+         would pay it twice; hidden when the course offers one tee or none,
+         because there is nothing to differ from. OFF by default: a group that
+         writes "12" means twelve, and the app silently moving it would be
+         arguing with the people playing. -->
+    <div id="tee-adjust-row" style="display:none; margin:0 0 12px 0; font-size:0.8rem; line-height:1.45;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="tee-adjust-strokes" onchange="refreshHandicapNote()">
+            <span>Adjust for different tees</span>
+        </label>
+        <p id="tee-adjust-note" style="margin:4px 0 0 26px; color:var(--text-muted); font-size:0.72rem;">Off: the number you type is the number. On: the official course-rating difference is added.</p>
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <!-- FLIGHTS (A/B). Optional; OFF by default. A property of the roster, so it
@@ -6993,6 +7009,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (slope) slope.value = opt.getAttribute('data-slope') || '';
         if (rating) rating.value = opt.getAttribute('data-rating') || '';
         if (par) par.value = opt.getAttribute('data-par') || '';
+        syncTeeAdjustRow();
         refreshHandicapNote();
     }
 
@@ -7525,6 +7542,79 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Step 4 addendum). Built as a DOM ELEMENT and appended, not written into
     // the row's innerHTML: the tag is read back by captureCurrentPlayerInputs
     // on every rebuild, and an element is what a query can find.
+    // A TEE PER GOLFER, ON ITS OWN LINE (2026-10-05).
+    //
+    // NOT A SIXTH COLUMN. The Step 4 addendum measured that at 390px: a sixth
+    // control leaves 89px for a name. Flights already solved this with an
+    // appended line spanning the row, and this follows it exactly.
+    //
+    // SHOWN ONLY WHEN THERE IS A CHOICE TO MAKE. A course with one rated tee - or
+    // a hand-entered one with none - has nothing to pick, so the line is not
+    // rendered at all and the row is byte-identical to before this existed.
+    // DEFAULT IS THE ROUND'S TEE, which is what makes a same-tee round save
+    // exactly what it saved yesterday: the select matches, so nothing is stored.
+    function appendTeeControl(row, teeKey) {
+        const src = document.getElementById('tee-rating-select');
+        if (!src || !src.options || src.options.length < 2) return;
+        const sel = document.createElement('select');
+        sel.className = 'p-tee-input';
+        for (let i = 0; i < src.options.length; i++) {
+            const o = src.options[i];
+            const opt = document.createElement('option');
+            opt.value = o.value;
+            opt.textContent = o.textContent;
+            ['data-slope', 'data-rating', 'data-par'].forEach(a => {
+                const v = o.getAttribute(a);
+                if (v !== null) opt.setAttribute(a, v);
+            });
+            sel.appendChild(opt);
+        }
+        const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
+            ? teeKey : (src.value || '');
+        sel.value = want;
+        sel.onchange = function () { if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
+        const line = document.createElement('div');
+        line.className = 'p-tee-line';
+        line.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-muted); margin-top:4px;';
+        line.style.gridColumn = '1 / -1';
+        const label = document.createElement('span');
+        label.textContent = 'Tee';
+        line.appendChild(label);
+        line.appendChild(sel);
+        row.appendChild(line);
+    }
+
+    // The tee one row is set to, as the shape handicap.js and player-tees.js read.
+    // The tee names THIS course offers, for the paste parser. Nothing else is a
+    // tee: a trailing word that is not one of these is part of the golfer's name.
+    function roundTeeNames() {
+        const sel = document.getElementById('tee-rating-select');
+        if (!sel || !sel.options) return [];
+        return Array.prototype.map.call(sel.options, o => {
+            const t = String(o.textContent || '');
+            const parts = t.split('\u00b7');
+            return parts[parts.length - 1].trim();
+        }).filter(Boolean);
+    }
+
+    function rowTeeRating(row) {
+        const sel = row && row.querySelector ? row.querySelector('.p-tee-input') : null;
+        if (!sel || !sel.value) return null;
+        const opt = Array.prototype.filter.call(sel.options, o => o.value === sel.value)[0];
+        if (!opt) return null;
+        const n = a => {
+            const v = opt.getAttribute(a);
+            if (v === null || String(v).trim() === '') return null;
+            const x = Number(v);
+            return isFinite(x) ? x : null;
+        };
+        const allowance = document.getElementById('tee-allowance');
+        const av = allowance ? Number(allowance.value) : NaN;
+        return { teeKey: sel.value, teeName: opt.textContent || '',
+                 slope: n('data-slope'), courseRating: n('data-rating'), par: n('data-par'),
+                 allowance: isFinite(av) ? av : 100 };
+    }
+
     function appendFlightControl(row, flight, asLine) {
         const f = flight === 'B' ? 'B' : 'A';
         const btn = document.createElement('button');
@@ -7709,7 +7799,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function appendPlayerFrom(p, fromSaved, total) {
         const shown = (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '')
             ? String(p.handicapIndex) : (p.hcp || '');
-        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight);
+        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey);
         const list = document.getElementById('player-list');
         const row = list ? list.lastElementChild : null;
         if (!row) return;
@@ -8143,7 +8233,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text);
+        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text, roundTeeNames());
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -9845,7 +9935,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -9953,6 +10043,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
         if (flightsOn) appendFlightControl(row, flight, flightAsLine);
+        appendTeeControl(row, teeKey);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -9964,7 +10055,26 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // MOVING THE TOGGLE REPAINTS THE ROWS. Without this the boxes keep the old word
     // until something else happens to re-render them, which is the kind of stale label
     // that gets believed.
+    // The switch belongs to a Strokes round with more than one rated tee, and to
+    // nothing else. Called wherever the basis or the course can change.
+    function syncTeeAdjustRow() {
+        const row = document.getElementById('tee-adjust-row');
+        if (!row) return;
+        const basis = document.getElementById('handicap-basis-select');
+        const teeSel = document.getElementById('tee-rating-select');
+        const asEntered = !!(basis && basis.value === 'as-entered');
+        const choices = !!(teeSel && teeSel.options && teeSel.options.length > 1);
+        row.style.display = (asEntered && choices) ? 'block' : 'none';
+        // AND IT IS TURNED OFF WHEN IT IS HIDDEN, not merely hidden. A checked box
+        // behind a hidden control is a saved setting nobody agreed to.
+        if (!(asEntered && choices)) {
+            const box = document.getElementById('tee-adjust-strokes');
+            if (box) box.checked = false;
+        }
+    }
+
     function handicapBasisChanged() {
+        syncTeeAdjustRow();
         if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
         const list = document.getElementById('player-list');
         if (!list) return;
@@ -10398,6 +10508,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
             const playersList = [];
             const teeForSave = readTeeRatingFromDom();
+            // THE SWITCH, off unless the organizer asked. Only ever consulted on an
+            // as-entered round: a GHIN round carries the tee inside the course
+            // handicap formula already and must not be adjusted twice.
+            const teeAdjustBox = document.getElementById('tee-adjust-strokes');
+            const teeAdjustOn = !!(teeAdjustBox && teeAdjustBox.checked);
             // v212: the round's handicap basis, read once for the whole roster so
             // no two golfers can be saved under different readings. The control
             // ships on GHIN, and a round with no control at all (a legacy save,
@@ -10441,12 +10556,34 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // used for the 54 cap and the plus-index form; it does no
                 // conversion of its own. The GHIN arm is untouched and still goes
                 // through handicap.js's one builder.
+                // THIS GOLFER'S TEE, not the round's (2026-10-05). The round's is
+                // still the default and still what a row with no choice reports, so
+                // a round where everyone plays the same tee computes exactly what it
+                // computed before - asserted by sha in per_golfer_tees_test.js.
+                const rowTee = rowTeeRating(row) || teeForSave;
                 const hcpFields = (basisForSave === 'as-entered')
-                    ? { hcp: (typeof sanitizeHandicapIndex === 'function') ? sanitizeHandicapIndex(hcpRaw) : String(hcpRaw || '').trim() }
+                    // AS ENTERED means the number IS the playing handicap, so there is
+                    // no formula to feed a tee into. The tee is recorded and nothing
+                    // else - unless the round asked for the official course-rating
+                    // difference, which is what teeAdjustOn is.
+                    ? { hcp: (function () {
+                            const clean = (typeof sanitizeHandicapIndex === 'function')
+                                ? sanitizeHandicapIndex(hcpRaw) : String(hcpRaw || '').trim();
+                            return (teeAdjustOn && window.playerTees)
+                                ? window.playerTees.adjustedStrokesText(clean, rowTee, teeForSave, true)
+                                : clean;
+                        })() }
                     : ((typeof playerHandicapFields === 'function')
-                        ? playerHandicapFields(hcpRaw, legacyAttr === null ? null : legacyAttr, teeForSave)
+                        ? playerHandicapFields(hcpRaw, legacyAttr === null ? null : legacyAttr, rowTee)
                         : { hcp: String(hcpRaw || '').trim() });
                 const entry = { id: playerIdOfRow(row), name: nameVal, hcp: hcpFields.hcp, team: teamVal, squad: squadVal, playingForMoney: moneyVal };
+                // STORED ONLY WHEN IT DIFFERS FROM THE ROUND'S. A same-tee round
+                // saves the record it always saved, and the scorecard falls back to
+                // the round tee for anybody without one.
+                if (rowTee && teeForSave && rowTee.teeKey && rowTee.teeKey !== teeForSave.teeKey) {
+                    entry.tee = { teeKey: rowTee.teeKey, teeName: rowTee.teeName,
+                                  slope: rowTee.slope, courseRating: rowTee.courseRating, par: rowTee.par };
+                }
                 if (hcpFields.handicapIndex) entry.handicapIndex = hcpFields.handicapIndex;
                 if (typeof hcpFields.courseHandicap === 'number' && isFinite(hcpFields.courseHandicap)) entry.courseHandicap = hcpFields.courseHandicap;
                 if (hcpFields.handicapUnconverted) entry.handicapUnconverted = true;
@@ -10567,6 +10704,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // played in.
                 startingHole: teeStartValue(),
                 teeRating: teeForSave,
+                // Written only when ON, so an unadjusted round's record is
+                // byte-identical to one saved before this existed.
+                ...(teeAdjustOn ? { teeAdjustStrokes: true } : {}),
                 // v215: does this round allow the Aloha bet on the last hole?
                 // FALSE unless the box is ticked, and absent on every round saved
                 // before this existed - which aloha-bet.js reads as off, so no

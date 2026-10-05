@@ -128,7 +128,50 @@ function rosterPasteSeparator(line) {
     return '';
 }
 
-function parsePlayerPasteText(text) {
+// ---- A TEE AT THE END OF A LINE, AND ONLY A REAL ONE (2026-10-05) --------
+//
+// "Zack Carrano 6 blue" means Zack plays the blue tees. The danger is obvious
+// from this file's own history: "Group 1" once parsed as a golfer called Group
+// with a handicap of 1, and six phantom players nearly went into a round with
+// strokes each. A tee is strokes too, on a round with the adjustment switched
+// on, so the rule here is the narrowest one that can work:
+//
+//   A TRAILING WORD IS A TEE ONLY IF IT NAMES A TEE THIS COURSE ACTUALLY HAS.
+//
+// No vocabulary, no colour list, no guessing. The caller passes the round's own
+// tee names; anything that does not match one of them is part of the golfer's
+// name, exactly as it is today. A paste with no tee names passed in behaves
+// byte-identically to before this existed - which is every existing caller, and
+// a test holds it.
+function splitTrailingTee(text, teeNames) {
+    const names = (teeNames || []).map(n => String(n || '').trim().toLowerCase()).filter(Boolean);
+    if (!names.length) return { tee: undefined, rest: text };
+    const m = /^(.*\S)([\s]*[\u00B7\u2022\u2013\u2014-][\s]*|\s+)([A-Za-z][A-Za-z ]*)$/
+        .exec(String(text || '').trim());
+    if (!m) return { tee: undefined, rest: text };
+    const hit = names.indexOf(m[3].trim().toLowerCase());
+    if (hit === -1) return { tee: undefined, rest: text };
+    // AND THE RULE ERRS TOWARD THE NAME, as everything else in this file does.
+    // "Mary Blue" is a golfer on a course that happens to have blue tees, so a
+    // bare space is not enough: the tee must either follow the HANDICAP, which
+    // is how a tee sheet is written ("Zack Carrano 6 blue"), or be set off by a
+    // dash or a middot ("Mary - blue"). Measured against this file's own
+    // history: six "Group N" lines once became six golfers with handicaps, and
+    // a tee is strokes too on a round with the adjustment on.
+    //
+    // A COMMA IS NOT A SET-OFF HERE, because it already means something else in
+    // this parser: "Mary, 12" is the name/handicap form. Leaving it out keeps
+    // every comma line parsing exactly as it does today.
+    // The greedy name group swallows a trailing dash, so the set-off is looked
+    // for at the END of what is left as well as in the separator itself -
+    // "Mary - blue" splits as "Mary -" + " " + "blue" without this.
+    const trimmed = m[1].replace(/[\s]*[\u00B7\u2022\u2013\u2014-]$/, '').trim();
+    const setOff = (trimmed !== m[1].trim()) || /[\u00B7\u2022\u2013\u2014-]/.test(m[2]);
+    if (!setOff && !BARE_HCP_RE.test(m[1])) return { tee: undefined, rest: text };
+    return { tee: (teeNames || [])[hit], rest: setOff ? trimmed : m[1] };
+}
+
+function parsePlayerPasteText(text, teeNames) {
     const lines = text.split('\n');
     let validPlayers = [];
     let flaggedLines = [];
@@ -157,10 +200,13 @@ function parsePlayerPasteText(text) {
             ? stripTrailingNote(line) : { text: line, note: '' };
         if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
         const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
+        // THE TEE COMES OFF AFTER the flight and the note, and BEFORE the name and
+        // handicap are split - "B Zack 6 blue" is flight B, Zack, 6, blue tees.
+        const teed = splitTrailingTee(rest, teeNames);
         // A not-a-flight line is kept AS TYPED: its comma is part of what was
         // typed ("D, Jim" is not "D" with a handicap of "Jim"), so only the bare
         // trailing number is read off it.
-        const { name, hcp } = notAFlight ? splitNameAndHcp(rest.replace(/,/g, '\u0000')) : splitNameAndHcp(rest);
+        const { name, hcp } = notAFlight ? splitNameAndHcp(teed.rest.replace(/,/g, '\u0000')) : splitNameAndHcp(teed.rest);
 
         if (name === '') {
             flaggedLines.push({ lineNumber: idx + 1, text: rawLine.trim() || '(blank before the comma)' });
@@ -173,6 +219,7 @@ function parsePlayerPasteText(text) {
         // accepted. Stored names are never rewritten; this is the paste only.
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
+        if (teed.tee) player.teeName = teed.tee;
         validPlayers.push(player);
         groups[groups.length - 1]++;
     });
@@ -194,5 +241,5 @@ if (typeof module !== 'undefined' && module.exports) {
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
     module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
-        splitLeadingFlight, rosterPasteSeparator, parsePlayerPasteText };
+        splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText };
 }
