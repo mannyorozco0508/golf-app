@@ -215,7 +215,18 @@ describe('HOLE NAVIGATION', () => {
         const fn = IDX.slice(at, IDX.indexOf('\n    function ', at + 30));
         assert.match(fn, /querySelector\('\.hole-view-header'\)/, 'must target the heading');
         assert.match(fn, /- HOLE_LANDING_OFFSET/, 'a small offset keeps the box off the edge');
-        assert.ok(!/scrollTo\(0, 0\)|top: 0/.test(fn), 'scrolling to page top would lose the hole');
+        // RE-POINTED 2026-10-04 (Manny's fit rule). This forbade scrollTo(0, 0)
+        // because on the old scorecard - header, nav, Playing With, group scores,
+        // the live dashboard, all above the hole - the top of the page was nowhere
+        // near the hole and landing there would have lost it. With everything else
+        // in the Status sheet the hole card starts at the top, and on a four-golfer
+        // round the whole of it fits: scrolling then PUSHED the banner above it
+        // under the status bar, which is the bug this rule fixes. So page-top is
+        // allowed exactly when the card fits, and the heading is still the target in
+        // the other arm - which is what the two assertions above hold.
+        assert.match(fn, /const fitsAtTop = cardBottom <= \(window\.innerHeight \|\| 0\);/,
+            'the page-top landing is no longer conditional on the card fitting');
+        assert.ok(!/top: 0/.test(fn), 'a bare top: 0 would lose the hole on a card that does not fit');
     });
 
     test('navigating from deep in the page still lands on the new hole', () => {

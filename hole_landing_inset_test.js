@@ -101,6 +101,10 @@ const LOOK = `(function () {
     hole: hdr ? (hdr.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 14) : null,
     scrollY: Math.round(window.pageYOffset || 0),
     canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+    // DOES THE HOLE CARD FIT WITH THE PAGE AT THE TOP (2026-10-04)? That is the
+    // whole landing rule now: a card that fits is left where it renders.
+    navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+      return n ? Math.round(n.getBoundingClientRect().bottom + (window.pageYOffset || 0)) : null; })(),
     scrollRoom: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)),
     headerTop: r ? Math.round(r.top) : null,
     // the only question that matters: is the heading BELOW the inset, or behind it?
@@ -141,12 +145,27 @@ INSETS.forEach(inset => {
         ['next', 'prev'].forEach(nav => {
             test(nav.toUpperCase() + ': the hole heading lands ' + OFFSET + 'px BELOW the inset, not below the viewport', () => {
                 const v = S[inset][nav];
-                assert.equal(v.headerTop, inset + OFFSET,
-                    'the heading is at ' + v.headerTop + 'px from the viewport top with a ' + inset
-                    + 'px status bar over it - it should be at ' + (inset + OFFSET));
+                // RE-POINTED 2026-10-04 (Manny's rule): the landing only scrolls when
+                // the hole card would NOT fit with the page at the top. Eight golfers
+                // and the Status sheet is a near thing - with no banner above the hole
+                // this fixture's card ends just inside the screen - so which arm
+                // applies is MEASURED here rather than assumed. The claim this file
+                // exists for is the same in both: the heading is below the status bar,
+                // never behind it.
+                if (v.navBottom !== null && v.navBottom > 844) {
+                    assert.equal(v.headerTop, inset + OFFSET,
+                        'the heading is at ' + v.headerTop + 'px from the viewport top with a ' + inset
+                        + 'px status bar over it - it should be at ' + (inset + OFFSET));
+                } else {
+                    assert.equal(v.scrollY, 0,
+                        'the card fits (nav row ends at ' + v.navBottom + ') and the page scrolled anyway');
+                }
                 assert.equal(v.clearOfInset, true,
                     'the heading is BEHIND the status bar: top ' + v.headerTop + ' against an inset of ' + inset);
-                assert.equal(v.gapBelowInset, OFFSET);
+                // The gap is the landing's own 12px only when the landing fired;
+                // on a card that fits it is wherever the card renders, and the line
+                // above is the claim that matters.
+                if (v.navBottom !== null && v.navBottom > 844) assert.equal(v.gapBelowInset, OFFSET);
             });
         });
 
@@ -164,9 +183,16 @@ describe('THE WEB IS PINNED UNCHANGED', () => {
         // so this wave must not move the web landing by a single pixel. This is the case
         // that says so, and it is why the fix reads the inset rather than adding a
         // constant.
-        assert.equal(S[0].next.headerTop, OFFSET);
-        assert.equal(S[0].prev.headerTop, OFFSET);
+        // RE-POINTED 2026-10-04 (Manny's rule): with no inset the web landing is
+        // unchanged WHERE IT FIRES, and where the card fits the page simply stays at
+        // the top - which on the web is also exactly 0px from the top of the content.
+        // Either way nothing is under anything, which is what this case is for.
         assert.equal(S[0].next.inset, 0);
+        ['next', 'prev'].forEach(k => {
+            const v = S[0][k];
+            if (v.navBottom !== null && v.navBottom > 844) assert.equal(v.headerTop, OFFSET, k);
+            else assert.equal(v.scrollY, 0, k + ': the card fits and the page scrolled anyway');
+        });
     });
 });
 

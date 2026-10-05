@@ -129,6 +129,8 @@ const LOOK = `(function () {
     // THE LANDING IS A NO-OP ON A PAGE WITH NO ROOM (2026-10-04, the Status sheet):
     // this is what every heading assertion below branches on.
     canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+    navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+      return n ? Math.round(n.getBoundingClientRect().bottom + (window.pageYOffset || 0)) : null; })(),
     scrollRoom: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)),
     headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
     innerHeight: window.innerHeight,
@@ -199,7 +201,12 @@ before(async () => {
 // these lines were protecting: preventScroll on the focus is what keeps that true.
 function headingLanded(v, inset) {
     const want = (inset || 0) + OFFSET;
-    if (v.canScroll && v.scrollRoom >= want) {
+    // RE-POINTED AGAIN 2026-10-04 to Manny's rule as he stated it: the landing
+    // scrolls only when the hole card would NOT FIT with the page at the top.
+    // Having scroll room is a different question and was the wrong test - the
+    // runway could create room on a card that fitted perfectly well, and scrolling
+    // it pushed the banner above the hole under the status bar.
+    if (v.navBottom !== null && v.navBottom > 844) {
         assert.equal(v.headingTop, want,
             'heading at ' + v.headingTop + ', expected ' + want + ' with ' + v.scrollRoom + 'px of room');
     } else {
@@ -269,7 +276,11 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
             'the first empty box is NOT past the line, so this proves nothing: '
             + JSON.stringify(firstEmpty.rect) + ' vs ' + (v.innerHeight - 336));
         assert.equal(v.focusIsScoreBox, false, 'it focused a box under the keyboard');
-        assert.equal(v.headingTop, OFFSET, 'and it moved the heading doing so');
+        // RE-POINTED 2026-10-04 (Manny's fit rule): what this line is for is that the
+        // REFUSAL costs nothing - the page is wherever the landing left it, and the
+        // focus did not drag it. headingLanded() is that claim under the rule that
+        // now applies, which on a card that fits is "the page is at the top".
+        headingLanded(v);
     });
 
     test('PREV and the 1-18 PICKER follow the same rule', () => {

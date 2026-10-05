@@ -367,6 +367,8 @@ describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
             inset: parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0,
             headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
             canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+            navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+              return n ? Math.round(n.getBoundingClientRect().bottom + (window.pageYOffset || 0)) : null; })(),
             scrollY: Math.round(window.pageYOffset || 0),
             scrollY: Math.round(window.pageYOffset || 0),
             modal: !!(ov && getComputedStyle(ov).display !== 'none'),
@@ -411,7 +413,10 @@ describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
             // screen. What Back has to restore is the position the golfer left, so
             // that is what is asserted - the same place the page was before the popup,
             // and still the landing wherever there is room to land.
-            if (v.BACK.canScroll) {
+            // RE-POINTED AGAIN 2026-10-04 to Manny's rule: the landing scrolls only
+            // when the hole card would not FIT with the page at the top, which is not
+            // the same question as whether the page can scroll.
+            if (v.BACK.navBottom !== null && v.BACK.navBottom > 844) {
                 assert.equal(v.BACK.headingTop, inset + OFFSET,
                     'Back left the page at ' + v.BACK.headingTop + ', not the landing');
             } else {

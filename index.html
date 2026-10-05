@@ -2930,16 +2930,52 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
         // heading reachable - so it has to be right BEFORE the target is computed, not on
         // the next snapshot. Measured without this: an eight-golfer round asked for exactly
         // its own maxScroll and got 0, because at scroll time the page was still short.
-        sizeHoleLandingRunway();
+        // ---- IF THE CARD FITS, DO NOT SCROLL AT ALL (2026-10-04) ---------------
+        //
+        // WHAT MANNY SAW, on his phone, after the Status sheet took everything else
+        // off the page: Next scrolled, and the "Final results are in" banner ended
+        // up UNDER the clock with the Dots row pushed off the top. The landing was
+        // doing its job - heading at inset + 12 - on a page where there was nothing
+        // to gain by moving at all, because the whole hole was already on screen.
+        //
+        // THE RULE, and it is his: if the hole card from its heading through
+        // Prev/Next FITS with the page at the top, land at scrollY 0 and leave
+        // everything above it - the banner, the Dots row - where it is, below the
+        // status bar. Scroll only when the card would NOT fit, which is five to
+        // eight golfers in one group, and then put the heading at inset + 12 as
+        // before. Nothing is ever placed under the safe-area top.
+        //
+        // THE RUNWAY FOLLOWS THE SAME TEST. It exists so a tall card CAN reach the
+        // landing; on a card that fits it is the only thing making the page
+        // scrollable at all, and a page that can scroll is a page that drifts. So
+        // it is sized only in the branch that scrolls, and zeroed in the one that
+        // does not.
         try {
             if (anchor.getBoundingClientRect && typeof window.scrollTo === 'function') {
                 let inset = 0;
                 if (typeof getComputedStyle === 'function' && document.documentElement) {
                     inset = parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0;
                 }
-                const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0)
-                    - HOLE_LANDING_OFFSET - inset;
-                window.scrollTo(0, Math.max(0, y));
+                const atTop = window.pageYOffset || 0;
+                const headTop = anchor.getBoundingClientRect().top + atTop;
+                // The bottom of the card's own navigation row: "the hole card" is the
+                // heading through Prev/Next, and what is below it (the KP line, the
+                // Dots button) is reachable by scrolling like anything else.
+                const navRow = card.querySelector('.hole-view-nav-row');
+                const cardBottom = ((navRow || anchor).getBoundingClientRect().bottom) + atTop;
+                // Document coordinates ARE viewport coordinates at scroll 0, so this
+                // is the question "would it all be visible with the page at the top".
+                const fitsAtTop = cardBottom <= (window.innerHeight || 0);
+                if (fitsAtTop) {
+                    const pad = document.getElementById('hole-landing-runway');
+                    if (pad && pad.style) pad.style.height = '0px';
+                    window.scrollTo(0, 0);
+                } else {
+                    sizeHoleLandingRunway();
+                    const y = anchor.getBoundingClientRect().top + (window.pageYOffset || 0)
+                        - HOLE_LANDING_OFFSET - inset;
+                    window.scrollTo(0, Math.max(0, y));
+                }
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }
         // THE FOCUS IS LAST, AFTER THE SCROLL. Focusing first would let the browser
