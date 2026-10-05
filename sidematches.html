@@ -401,7 +401,7 @@ html {
     <a class="back-btn" onclick="goBack()">← Back</a>
 
     <div id="sm-bets-pointer" style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
-        Matches are built and pressed here. Live results for your group's matches, Skins, Dots and the Birdie Game are on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a>.
+        Matches are built and pressed here. Live results are on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a>.
     </div>
 
     <h2 class="event-title" id="main-title">💰 Today's Action</h2>
@@ -422,7 +422,7 @@ html {
 
     <div class="action-card" id="sidematches-card">
         <h3 style="margin-bottom:2px;">⚔️ Side Matches (Any Group)</h3>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 players can square off — Match Play, Nassau, or Stroke Play ($/hole and $/overall with presses) — even if they're in different groups, and even if they're already playing their own group's main game. Live status updates as scores come in.</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Any 2 or 4 golfers, in any groups, on top of whatever else they are playing.</div>
         <div id="sm-group-lock-badge" style="display:none; font-size:0.78rem; font-weight:bold; color:var(--brand-green); background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 10px; margin-bottom:10px;"></div>
         <!-- PENDING CHALLENGES (Wave 39). A bet that has been OFFERED and not yet
              answered. Above the live matches, because an unanswered offer is the
@@ -561,7 +561,7 @@ html {
         </div>
 
         <div id="sm-stroke-fields" style="display:none;">
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke Play side action works 1v1 or 2v2 — a 2v2 side uses best ball, the same as every other team format here. Leave a $ field at 0 to skip that bet; presses are added any time from the match card.</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke play, 1v1 or 2v2 (best ball). Leave a field at 0 to skip that bet.</div>
             <div class="control-grid" style="margin-bottom:10px;">
                 <div class="control-group">
                     <label>$ Per Hole</label>
@@ -612,12 +612,12 @@ html {
                     <span class="toggle-label-sm" id="sm-segment-label-frontback" onclick="setSmSegment('frontback')">Reset At 10</span>
                 </div>
                 <input type="hidden" id="sm-segment" value="full">
-                <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Only affects tied holes when Tied Hole is set to Carry. "Reset At 10" starts the carry fresh on the back nine instead of letting it build all round.</p>
+                <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">Only affects tied holes when Tied Hole is set to Carry.</p>
             </div>
         </div>
 
         <div id="sm-picker-box">
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap two golfers for a 1v1, or four for a 2v2. The first half of your taps is one side, the rest are the other. Tap a name again to take it back out.</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:6px;">Tap two for a 1v1, four for a 2v2. First half is one side. Tap again to remove.</div>
         <!-- ONE ROSTER, LISTED ONCE. This was the whole field TWICE - once under
              "Side 1 (green)" and again under "Side 2 (navy)" - so a twelve-golfer
              round offered twenty-four tappable names to set up a bet between two of
@@ -744,7 +744,7 @@ html {
             <span>🏌️ Auto-Pair Whole Field</span>
             <button class="close-modal" onclick="closeAutoPairModal()">&times;</button>
         </div>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Pairs every group against another group for 2v2 (or 1v1 where group sizes don't split evenly) — same Side Match engine, just built for everyone at once instead of one at a time. One shared bet applies to every matchup created here.</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Every group against another, 2v2. One shared bet covers all of them.</div>
 
         <div class="control-group" style="margin-bottom:10px;">
             <label>Format</label>

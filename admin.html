@@ -1077,7 +1077,7 @@ html {
          would use. -->
     <section id="oauth-card" class="email-link-card" aria-labelledby="oauth-title">
         <h2 id="oauth-title">Keep this organizer</h2>
-        <p id="oauth-lead">One tap. Your rounds, the free trial and a founder pass stay on this same account.</p>
+        <p id="oauth-lead">One tap. Your rounds and your trial stay on this account.</p>
         <button type="button" id="oauth-apple" class="btn-primary" onclick="oauthTap('apple')">&#63743;&nbsp; Continue with Apple</button>
         <button type="button" id="oauth-google" class="btn-outline" onclick="oauthTap('google')">Continue with Google</button>
         <p id="oauth-who" role="status" style="display:none; font-weight:bold;"></p>
@@ -1086,7 +1086,7 @@ html {
     </section>
     <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title" style="display:none;">
         <h2 id="email-link-title">Keep this organizer</h2>
-        <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a sign-in link and finish it in this same app. It stays the same account, so the free trial and a founder pass stay with the rounds already set up on it.</p>
+        <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a link &mdash; the free trial and a founder pass stay with the rounds already set up on it.</p>
         <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
             <label for="email-link-input">Email</label>
             <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
@@ -1159,7 +1159,7 @@ html {
 
     <section id="account-exit-card" class="email-link-card" aria-labelledby="account-exit-title" style="display:none;">
         <h2 id="account-exit-title">This account</h2>
-        <p id="account-exit-lead">Signed in. Sign out to hand this device back to a new organizer, or delete the account entirely.</p>
+        <p id="account-exit-lead">Signed in. Sign out to hand this device over, or delete the account.</p>
         <button type="button" id="account-signout" class="btn-outline" onclick="exitTap('signout')">Sign out</button>
         <button type="button" id="account-delete" class="btn-outline" onclick="exitTap('delete')">Delete account</button>
         <p id="account-exit-warn" role="status"></p>
@@ -1287,7 +1287,7 @@ html {
     <div id="season-context-banner" class="lobby-context-banner" style="display:none;">
         <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:bold;">Season</div>
         <div id="season-context-name" style="font-size:1rem; font-weight:bold; color:var(--brand-green); margin-top:2px;"></div>
-        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Game Day will link this round to that season once you finish setup. Start from a previous round below, or tap Game Day for a blank one.</div>
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">This round joins that season when you finish setup.</div>
     </div>
 </div>
 
@@ -1322,7 +1322,7 @@ html {
     </div>
 
     <div id="copy-from-banner" style="display:none; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:8px 12px; margin:10px 0; text-align:center; font-size:0.78rem; color:var(--text-main);">
-        📑 <strong>Copied settings from your other round</strong> — course, format, and side games are pre-filled. Double-check <strong>Step 5: Players</strong> since who's playing today may be different.
+        📑 <strong>Copied settings from your other round.</strong> Check Step 5: Players.
     </div>
 
     <!-- SHARING MOVED TO THE READY SCREEN.
@@ -1365,9 +1365,9 @@ html {
         <div id="new-course-form" style="display:none; margin-top:10px; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:12px;">
             <label style="font-size:0.8rem;">New Course Name</label>
             <input type="text" id="new-course-name-input" placeholder="e.g. Pebble Beach Golf Links" style="margin-bottom:8px;">
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Next you'll type in the pars and handicap indexes from the scorecard — once. After that this course is saved for every future round.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Type the pars and indexes once. After that the course is saved.</p>
             <div style="background:var(--bg-card); border:1px solid var(--brand-green); border-radius:6px; padding:8px 10px; margin-bottom:8px; font-size:0.72rem; color:var(--brand-green); font-weight:bold;">
-                ✅ One-time only — once this course's pars &amp; handicaps are saved, they're stored for good. Every future round at this course (yours or anyone else's) will find it automatically, no re-entry ever needed.
+                ✅ One-time only. Once saved, every future round finds this course.
             </div>
             <div style="display:flex; gap:8px;">
                 <button type="button" class="wizard-btn-back" style="flex:1;" onclick="document.getElementById('new-course-form').style.display='none';">Cancel</button>
@@ -1531,7 +1531,7 @@ html {
     <div class="wizard-step" id="wizard-step-3" data-step="3">
         <div class="wizard-step-title">📝 What Are We Playing? · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
         <div class="wizard-step-sub">Choose how scores are kept. Games and bets are added later.</div>
-        <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Money games are added later, and you can skip this if everyone's just playing their own ball.</div>
+        <div class="wizard-step-sub" id="step3-sub">How the scorecard is organised. Skip it if everyone just plays their own ball.</div>
     <div class="form-group">
         <label id="format-question-label">What are you playing today?</label>
         <!-- FORMAT FIRST.
@@ -1670,7 +1670,7 @@ html {
              can see exactly who is in it. -->
         <div id="multigroup-action-note" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-top:10px;">
             <div style="font-size:0.82rem; font-weight:bold; color:var(--accent-teal); margin-bottom:4px;">⛳ Multi-group round</div>
-            <div style="font-size:0.78rem; color:var(--text-muted);">Set up your players and groups here. You'll add each bet from <strong>Action</strong> once the round is created, so every wager says exactly who's in it.</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">Players and groups here. You'll add each bet from <strong>Action</strong> once the round exists.</div>
         </div>
 
         <div id="hole-bet-settings" class="extra-settings-box">
@@ -1678,7 +1678,7 @@ html {
                 <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
                 <strong>💵 Pay by the hole instead</strong>
             </label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 0 26px;">Off: you win a set amount for winning the match. On: you win that amount times how many holes you finish ahead.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 0 26px;">Off: a set amount for the win. On: that amount per hole you finish ahead.</p>
             <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
                 <div class="grid-2col">
                     <div><label style="font-size: 0.8rem;">Amount ($ per hole)</label><input type="number" id="hole-bet-stake" value="5" min="1" oninput="updateBetExplainers()"></div>
@@ -1718,7 +1718,7 @@ html {
                     <span class="toggle-label-sm" id="match-style-label-stroke" onclick="setMatchScoringStyle('stroke')">Stroke Play</span>
                 </div>
                 <input type="hidden" id="match-scoring-style" value="match">
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 4px 0 0 0;" id="match-style-explainer"><strong>Match Play:</strong> won or lost hole-by-hole — whoever's up the most holes when the round ends wins the bet. Supports presses. <strong>Stroke Play:</strong> total strokes for the round, low total wins — simpler, no presses, exactly 2 players.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 4px 0 0 0;" id="match-style-explainer"><strong>Match Play:</strong> hole by hole, presses allowed. <strong>Stroke Play:</strong> lowest total wins.</p>
             </div>
 
             <div class="grid-2col">
@@ -1754,8 +1754,8 @@ html {
                         <option value="1down">Auto @ 1 Down</option>
                     </select>
                 </div>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press starts a new side match for the same bet amount, from the hole it triggers on.</p>
-                <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;"><strong>🔥 Manual Press:</strong> No matter which rule you pick above, a "Press" button is always available on the scorecard so you can start a press on any hole, any time.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press is a new bet at the same stake, from the hole it starts on.</p>
+                <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;">🔥 A Press button is always on the scorecard, whatever rule you pick.</p>
                 <p style="font-size: 0.72rem; color: var(--brand-navy); margin: 6px 0 0 0;" id="match-bet-explainer"></p>
             </div>
         </div>
@@ -1786,7 +1786,7 @@ html {
                         <option value="3">3x Points</option>
                         <option value="4">4x Points</option>
                     </select>
-                    <p style="font-size:0.65rem; color:var(--text-muted); margin:3px 0 0 0;">Applies if the wolf wins. If the wolf loses a Blind call, the field splits 3 points either way.</p>
+                    <p style="font-size:0.65rem; color:var(--text-muted); margin:3px 0 0 0;">Applies if the wolf wins. A lost Blind call splits 3 points to the field.</p>
                 </div>
                 <div>
                     <label style="font-size: 0.8rem;">Tied Hole Rule</label>
@@ -1815,7 +1815,7 @@ html {
                 </select>
             </div>
             <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-                🙈 Blind Wolf: caller picks lone wolf before anyone tees off. Wolf order rotates through your player list each hole 1-4, repeating.
+                🙈 Blind Wolf: the caller picks before anyone tees off. The order rotates each hole.
             </div>
         </div>
 
@@ -1849,13 +1849,13 @@ html {
                 <div><label style="font-size: 0.8rem;">Albatross</label><input type="number" id="stableford-pts-albatross" value="10" min="0" step="1"></div>
             </div>
             <div style="font-size:0.7rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">
-                Points based on score vs. par on each hole — choose Net (score minus handicap strokes) or Gross (raw score) above. Point defaults shown are our house standard — edit any value to customize for this round.
+                Points for score against par. House defaults &mdash; edit any of them.
             </div>
         </div>
 
         <div id="dot-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🔴 Dot Game Options</label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -2px 0 8px 0;">Every other player pays whoever earns a dot. A Snake works the other way — the golfer who gets it pays everyone else.</p>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -2px 0 8px 0;">Everyone pays whoever earns a dot. A Snake is paid the other way round.</p>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
             </div>
@@ -1864,7 +1864,7 @@ html {
                 <span>Carry over unwon KPs</span>
             </label>
             <p style="font-size: 0.7rem; color: var(--text-muted); margin: 4px 0 0 0; line-height:1.4;">
-                Nobody wins the KP on a par 3 and it rolls to the next par 3, worth double. Keeps rolling until somebody wins it. If the last par 3 goes unwon, it dies unpaid.
+                Nobody wins the KP on a par 3 and it rolls to the next, at double.
             </p>
         </div>
 
@@ -1885,7 +1885,7 @@ html {
                 <option value="gross">Gross Skins Only</option>
                 <option value="net">Net Skins Only</option>
             </select>
-            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;">Split Pot runs two skins games at once — half the pot on gross scores, half on net.</p>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;">Split Pot: half the pot on gross, half on net.</p>
 
             <label style="font-size: 0.75rem; margin-top:10px; display:block;">Ties — what happens when nobody wins a hole outright?</label>
             <div class="toggle-row">
@@ -1918,7 +1918,7 @@ html {
         <div class="wizard-step-sub">Add everyone playing today, with the number beside each name.</div>
     <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45;"></p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-        ⛳ <strong>Just assign players to groups here.</strong> Each group picks its own games and who’s in them from that group’s link — on the first tee, or later in the round. Anyone left out of a group game still scores normally and still plays every whole-field game, including the Weekly Game.
+        ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game, including the Weekly Game.
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
     <!-- FLIGHTS (A/B). Optional; OFF by default. A property of the roster, so it
@@ -1975,7 +1975,7 @@ html {
                 <input type="hidden" id="flights-scope-birdies" value="flight">
                 <input type="hidden" id="flights-skins-split" value="even">
             </div>
-            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer's A/B to move them. Any split is allowed. Side matches and the Weekly Game never use flights.</p>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer&rsquo;s A/B to move them. Side matches and the Weekly Game never use flights.</p>
         </div>
     </div>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
@@ -2008,7 +2008,7 @@ html {
                 <span>📋 Paste Player List</span>
                 <button class="close-modal" onclick="closePastePlayersModal()" aria-label="Close">&times;</button>
             </div>
-            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line. A Handicap Index after the name is optional (&ldquo;Marty 9&rdquo;, &ldquo;Marty, 9&rdquo;, &ldquo;Marty +2&rdquo;). An A or B before the name sets the flight (&ldquo;A &middot; Marty 9&rdquo;). Leave a blank line between groups to set the groups yourself.</label>
+            <label for="paste-players-textarea" style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:8px;">One player per line, handicap after the name, A or B for a flight, blank line between groups.</label>
             <textarea id="paste-players-textarea" rows="8" placeholder="John Smith 8
 Mike Jones, 12
 Robert Garcia
@@ -2121,7 +2121,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
             </label>
-            <p id="birdie-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Automatic — birdies/eagles are read from scores. Every other player pays the achiever per birdie (eagle counts double).</p>
+            <p id="birdie-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Birdies and eagles are read from scores. Everyone pays the achiever; an eagle counts double.</p>
             <p id="birdie-flight-note" style="display:none; font-size:0.72rem; color:var(--brand-green); margin:-4px 0 8px 26px;"></p>
             <div style="margin: 0 0 12px 26px; max-width: 200px;">
                 <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
@@ -2156,7 +2156,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             <label style="color:#b8860b; margin-bottom:4px; font-size:0.95rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
                 <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Weekly Game</strong>
             </label>
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">Everyone playing for money pays one buy-in. You choose what goes to KPs and net finishers; Skins gets the rest. Unwon money is paid back. Group bets stay separate.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">One buy-in each. You split it between KPs and net finishers; Skins takes the rest.</p>
             <div id="mp-panel" style="display:none;">
 
                 <div class="mp-section">
@@ -2257,7 +2257,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     <div class="wizard-step" id="wizard-step-7" data-step="7">
         <div class="wizard-step-title">✅ Review &amp; Save · <span class="wiz-step-n" id="wiz-n-review">Step 7</span></div>
-        <div class="wizard-step-sub">Quick check before you start the round — tap any step above to jump back and change something.</div>
+        <div class="wizard-step-sub">A last look. Tap any step above to change it.</div>
         <div id="wizard-review-summary"></div>
         <!-- THE COACH GATE (UI Wave 35). Only ever filled on a round the Setup Coach
              started: it is the one path where the host has just been asked how many
@@ -2282,8 +2282,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
          does. This was a full-width red button inside a 2px dashed red panel - the
          loudest thing on a page whose actual job is starting a round - and it wipes
          the round permanently. It is now the quietest control here.
-         The confirm() in front of it is untouched: that is the safeguard, and a
-         small button is not a substitute for asking.
+         The question in front of it is untouched: that is the safeguard, and a
+         small button is not a substitute for asking. (That sentence used to name the
+         browser dialog by its function name, and the bare-dialog sweep in
+         dialog_admin_test.js read it as a call - its scanner tracks quote state
+         across the whole file, so a trimmed sentence elsewhere changed where the
+         comment was believed to start. The guard is right; the wording was mine.)
          THE WORDS ARE THE SCORECARD'S (2026-09-19). "End & wipe this round … for a
          fresh start" was the copy 2cb98f3 replaced on index.html and left here; on a
          round with a card filled in it promised a fresh start the rule refuses, and

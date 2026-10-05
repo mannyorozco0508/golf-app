@@ -451,11 +451,19 @@ describe('THE DASHBOARD WIDGETS', () => {
         // assigned rather than appended, because rendering it between the hole
         // heading and the score boxes pushed the inputs away from their hole. The
         // contract - dashboard above score entry - is unchanged and still asserted.
+        // RE-POINTED 2026-10-04 (the Status sheet). The live dashboard is no longer
+        // emitted by renderHoleView at all - it is a static child of
+        // #round-sheet-body, written to by renderLiveTicker through the same id. The
+        // contract this line held was "the dashboard is above score entry, and the
+        // scorecard itself inserts it"; it is now off the hole card entirely, which
+        // is the same intent taken one step further, and the mount must not come back
+        // into that html string or it sits between the heading and the boxes again.
         const src = read('index.html');
-        const mount = src.search(/html \+?= '<div id="live-ticker-mount"><\/div>'/);
-        const boxes = src.indexOf('hv-score-box');
-        assert.notEqual(mount, -1, 'the mount must be emitted');
-        assert.ok(mount < boxes || boxes === -1, 'and it must come before the score boxes');
+        assert.ok(!/html \+?= '<div id="live-ticker-mount"><\/div>'/.test(src),
+            'the hole view emits the dashboard mount again');
+        const sheet = src.slice(src.indexOf('<div id="round-sheet-body">'),
+                                src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
+        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the Status sheet');
     });
 
     test('one layout rule, not a per-device pile', () => {
@@ -754,8 +762,17 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         // Matches either emission form: the mount is now the first assignment in
         // renderHoleView rather than an append. What matters is that the scorecard
         // itself inserts it, not which operator does so.
-        assert.match(src, /html \+?= '<div id="live-ticker-mount"><\/div>'/,
-            'the mount must be inserted by the scorecard itself');
+        // RE-POINTED 2026-10-04 (the Status sheet). The live dashboard is no longer
+        // emitted by renderHoleView at all - it is a static child of
+        // #round-sheet-body, written to by renderLiveTicker through the same id. The
+        // contract this line held was "the dashboard is above score entry, and the
+        // scorecard itself inserts it"; it is now off the hole card entirely, which
+        // is the same intent taken one step further, and the mount must not come back
+        // into that html string or it sits between the heading and the boxes again.
+        const sheetBody = src.slice(src.indexOf('<div id="round-sheet-body">'),
+                                    src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
+        assert.match(sheetBody, /id="live-ticker-mount"/,
+            'the mount must be in the page the scorecard ships, not invented at runtime');
     });
 
     test('detection reads the pool bucket, not a fourth hand-rolled shape', () => {

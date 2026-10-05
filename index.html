@@ -1618,7 +1618,7 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
     </div>
 
     <div id="spectator-hint-banner" style="display:none; background: var(--nassau-box-bg); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; text-align:center; font-size:0.85rem; color: var(--text-main);">
-        👁️ You're viewing read-only. To enter scores, ask whoever set up the round for <strong>your group's link</strong> — they can grab it from the Home tab.
+        👁️ Read-only. Ask the organizer for your group's link to enter scores.
     </div>
 
     <div id="round-landing-summary" style="display:none; background: var(--bg-card); border: 2px solid var(--brand-green); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
@@ -2759,6 +2759,11 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
         // way out. That the Full Card has no KP entry of its own is a separate backlog
         // item and is deliberately not fixed here.
         if (mode === 'full' && kpGateBefore(currentViewedHole, function () { setViewMode('full'); })) return;
+        // AND THE STATUS SHEET CLOSES BEHIND YOU (2026-10-04). The toggle lives in
+        // the sheet, and switching the view is a decision to go back to the card -
+        // leaving the sheet open would put it straight over the thing just asked
+        // for. Nothing else closes it: the handle and the scrim are the golfer's.
+        if (typeof toggleRoundSheet === 'function') toggleRoundSheet(false);
         currentViewMode = mode;
         document.getElementById('view-mode-hole-btn').classList.toggle('active', mode === 'hole');
         document.getElementById('view-mode-full-btn').classList.toggle('active', mode === 'full');
@@ -2850,7 +2855,24 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
             if (!(r.height > 0)) return null;                       // not laid out
             const limit = (window.innerHeight || 0) - KEYBOARD_ALLOWANCE;
             if (!(r.bottom <= limit)) return null;                  // would be under the keypad
-            box.focus();
+            // WITHOUT MOVING THE PAGE (2026-10-04). landOnHole scrolls FIRST and
+            // focuses last, on the reasoning that "the box is already clear of the
+            // keypad by the time it is chosen" - true of where the box sits, and not
+            // true of what the browser does with it: focus() scrolls the element into
+            // view on the browser's own terms. That was invisible while the scorecard
+            // carried a thousand pixels of cards below the hole, because there was
+            // slack to absorb it. With everything else in the Status sheet the page
+            // ends just below the runway, and the focus scrolled straight to the
+            // bottom - measured on a notched arrangement: the landing put the heading
+            // at 46 and the focus took it to 93, the maximum, which is 12px from the
+            // top of the screen and 35px UNDER a 47px status bar. That is the exact
+            // defect Wave 19b was built to fix, arriving again by another door.
+            //
+            // preventScroll keeps the keyboard behaviour and drops the scroll. Where
+            // it is not supported the plain focus() still runs, which is the old
+            // behaviour rather than no focus at all.
+            try { box.focus({ preventScroll: true }); }
+            catch (e) { box.focus(); }
             return box;
         } catch (e) { return null; }                                 // fail open, always
     }

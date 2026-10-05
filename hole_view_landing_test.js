@@ -80,7 +80,9 @@ const STATE = `(function(){ var a = document.activeElement; var card = document.
   var id = (a && a.classList && a.classList.contains('score-input')) ? 'p' + a.getAttribute('data-player-id') + '/h' + a.getAttribute('data-hole') : (a === document.body ? 'BODY' : a.tagName);
   var selected = (a && a.classList && a.classList.contains('score-input')) ? (a.selectionStart === 0 && a.selectionEnd === a.value.length) : null;
   var nav = document.querySelector('.hole-view-nav-row'); var btns = nav ? Array.from(nav.querySelectorAll('button')).map(function (b) { return b.innerText.trim(); }) : [];
-  return JSON.stringify({ hole: (document.querySelector('.hv-hole-num') || {}).innerText, scrollY: Math.round(window.scrollY), firstBoxTop: fr ? Math.round(fr.top * 10) / 10 : null, headingTop: hr ? Math.round(hr.top * 10) / 10 : null, headingBottom: hr ? Math.round(hr.bottom * 10) / 10 : null, headingText: hd ? hd.innerText.replace(/\\s+/g, ' ') : null, boxes: boxes.length, enabled: Array.from(boxes).filter(function (b) { return !b.disabled; }).length,
+  return JSON.stringify({ hole: (document.querySelector('.hv-hole-num') || {}).innerText, scrollY: Math.round(window.scrollY),
+  canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+  scrollRoom: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)), firstBoxTop: fr ? Math.round(fr.top * 10) / 10 : null, headingTop: hr ? Math.round(hr.top * 10) / 10 : null, headingBottom: hr ? Math.round(hr.bottom * 10) / 10 : null, headingText: hd ? hd.innerText.replace(/\\s+/g, ' ') : null, boxes: boxes.length, enabled: Array.from(boxes).filter(function (b) { return !b.disabled; }).length,
     active: id, selected: selected, activeValue: a && a.value !== undefined ? a.value : null,
     activeBottom: (a && a.classList && a.classList.contains('score-input')) ? Math.round(a.getBoundingClientRect().bottom) : null, nav: btns, finishOpen: getComputedStyle(document.getElementById('finish-round-modal-overlay')).display, ui: window.__ui.splice(0), ev: (window.__ev || []).splice(0) }); })()`;
 const rect = (sel, n) => `(function(){ var el = document.querySelectorAll(${JSON.stringify(sel)})[${n || 0}]; if (!el) return 'null'; var r = el.getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`;
@@ -150,9 +152,25 @@ before(async () => {
     S.pending = await arrive('game=LND&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.box4), ...key('1'), { sleep: 50 }, { expression: STATE }, ...tap(S.next1), { expression: STATE },
         { expression: "(document.querySelector('#full-card-container .score-input[data-player-id=\"104\"][data-hole=\"1\"]') || {}).value" }]);
     // 5. Golfer 1 already has hole 2: the first EMPTY box is golfer 2's.
-    S.part = await arrive('game=LNDPART&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.next1), { expression: STATE }]);
+    // A SETTLE BETWEEN THE TAP AND THE READ (2026-10-04). These two sequences read
+    // the state in the step straight after the mouse release, and that was reliable
+    // only because the landing used to perform a real window.scrollTo - a frame the
+    // probe happened to land behind. On a one-screen card the landing is a no-op, so
+    // there is no scroll to wait on and the read raced the click: measured, the hole
+    // had not changed yet. The sleep is the harness waiting for the browser, not a
+    // softened assertion, and it shifts the indices below by one.
+    S.part = await arrive('game=LNDPART&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.next1), { sleep: 150 }, { expression: STATE }]);
     // 6. Every hole scored: the landing scrolls, focuses nothing; a snapshot changes nothing.
-    S.full = await arrive('game=LNDFULL&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(S.next1), { expression: STATE }, { expression: "window.__remote({}); 'remote'" }, { expression: STATE }]);
+    // LNDFULL IS MEASURED ON ITS OWN PAGE (2026-10-04). Every hole is scored here,
+    // so the round is complete and the "Your card is in" card renders above the hole
+    // view - a taller document than LND's. While the page scrolled, the landing put
+    // the nav row in the same place on both and one coordinate served both; on a
+    // page with no scroll room the extra card pushes Next down and LND's coordinate
+    // missed it entirely. So this fixture measures its own button, which is what the
+    // geometry arrival at the top of this block does for the others.
+    const fg = await arrive('game=LNDFULL&group=1', [{ expression: SCROLL_TO_4TH }, { expression: NAV_BTN(2) }]);
+    assert.ok(fg.ok, 'Chrome did not run: ' + fg.reason);
+    S.full = await arrive('game=LNDFULL&group=1', [{ expression: SCROLL_TO_4TH }, ...tap(P(fg, 1)), { sleep: 150 }, { expression: STATE }, { expression: "window.__remote({}); 'remote'" }, { expression: STATE }]);
     // 7. Only 18 open: arrival lands on 18, whose nav ends in Finish Round.
     S.last = await arrive('game=LND17&group=1', [{ expression: STATE }, { expression: NAV_BTN(2) }]);
     if (S.last.ok) { const fin = P(S.last, 1); S.lastTap = await arrive('game=LND17&group=1', [{ expression: "document.querySelector('.hole-view-nav-row').scrollIntoView({ block: 'center' }); 'shown'" }, { expression: NAV_BTN(2) }]); }
@@ -160,9 +178,29 @@ before(async () => {
 
 const landed = (st, hole) => {
     assert.equal(st.hole, 'Hole ' + hole);
-    // Within a device pixel of the offset (fractional layout rounds the scroll);
-    // "identical every time" is asserted as equality between navigations below.
-    assert.ok(Math.abs(st.headingTop - OFFSET) <= 1, 'heading ' + st.headingTop + 'px from the top, expected ' + OFFSET);
+    // RE-POINTED 2026-10-04 (the Status sheet), and the rule is Manny's: landOnHole
+    // STAYS, and it is a NO-OP on a page that cannot scroll.
+    //
+    // WHY IT HAD TO MOVE. The scorecard's header, nav, Playing With card, group
+    // scores and live dashboard went into one slide-up sheet, so a four-golfer
+    // round is now exactly one screen - 844px, measured - and there is no scroll
+    // room left. A scrollTo on such a page does nothing, which is correct: the
+    // heading is already in view with the boxes under it, and the landing's whole
+    // purpose was to put it there.
+    //
+    // THE LANDING STILL LANDS WHERE THERE IS ROOM. Five to eight golfers in one
+    // group is a taller card than the screen, and the eight-golfer case below is
+    // the control: same fixture family, scroll room, heading at the offset. So
+    // this is a branch on the PAGE's height, not a softened assertion.
+    if (st.canScroll) {
+        // Within a device pixel of the offset (fractional layout rounds the scroll);
+        // "identical every time" is asserted as equality between navigations below.
+        assert.ok(Math.abs(st.headingTop - OFFSET) <= 1, 'heading ' + st.headingTop + 'px from the top, expected ' + OFFSET
+            + ' (' + st.scrollRoom + 'px of scroll room)');
+    } else {
+        assert.equal(st.scrollY, 0, 'a page with no scroll room scrolled anyway');
+        assert.ok(st.headingTop >= 0, 'the heading is above the top of the screen with nowhere to scroll');
+    }
     assert.ok(st.headingTop >= 0 && st.headingBottom <= 844, 'the heading is fully on screen');
     assert.match(st.headingText, new RegExp('^Hole ' + hole + ' Par \\d'), 'and it names the hole: ' + st.headingText);
     assert.ok(st.firstBoxTop > st.headingBottom, 'the score boxes sit under the heading');
@@ -228,7 +266,21 @@ describe('EIGHT GOLFERS (organizer link, boxes disabled): the same landing', () 
         const b = P(S.org, 3), s = P(S.org, 6);   // two picker steps precede (tap, sleep)
         assert.equal(b.boxes, 8); assert.equal(b.enabled, 0);
         landed(s, 2);
-        assert.equal(s.headingTop, P(S.nav, 4).headingTop, 'the same offset as the 4-golfer card');
+        // RE-POINTED 2026-10-04: THIS IS THE CONTROL FOR THE NEW RULE, and it is
+        // the reason the rule can be a branch rather than a softened assertion.
+        // Eight golfers in one group is a card TALLER than the screen, so the page
+        // has scroll room and the landing really lands - the heading sits at the
+        // offset, to the pixel. The four-golfer card is now exactly one screen and
+        // its heading rests where it renders. The two numbers USED to be equal and
+        // must not be now: if they ever agree again, either the landing stopped
+        // working here or the four-golfer page grew a scrollbar back.
+        assert.ok(Math.abs(s.headingTop - OFFSET) <= 1,
+            'eight golfers has scroll room, so the heading must be at the landing: ' + s.headingTop);
+        assert.equal(s.canScroll, true, 'the eight-golfer card no longer scrolls, so it proves nothing');
+        const four = P(S.nav, 4);
+        assert.equal(four.canScroll, false, 'the four-golfer card scrolls again - re-read the rule above');
+        assert.notEqual(s.headingTop, four.headingTop,
+            'the tall card and the one-screen card landed identically, which the rule says they cannot');
     });
 });
 
@@ -268,30 +320,38 @@ describe('THE FOCUS FOLLOWS THE BOXES: the first empty one, or nothing at all', 
         // Re-pointed with the describe above: golfer 1's box already holds a score, so
         // the landing must skip it and take golfer 2's. That is the condition this
         // suite now holds; landing_focus_test.js holds the refusals.
-        const s = P(S.part, 3); landed(s, 2); assert.equal(s.enabled, 4);
+        const s = P(S.part, 4); landed(s, 2); assert.equal(s.enabled, 4);
         focusOk(s, 'partly scored hole');
         assert.match(String(s.active), /^p\d+\/h2$/, 'nothing on the landed hole took focus');
         assert.equal(s.activeValue, '', 'it focused a box that already had a score');
     });
     test('every box on hole 2 holds a score: the landing is the same, and NOTHING is focused', () => {
-        const s = P(S.full, 3); landed(s, 2); assert.equal(s.enabled, 4);
+        const s = P(S.full, 4); landed(s, 2); assert.equal(s.enabled, 4);
         assert.equal(s.active, 'BODY', 'a full hole took focus anyway');
-        // RE-PINNED (UI Wave 36, was an exact equality): LNDFULL has every hole scored
-        // for every golfer, so the round is complete and the new "Your card is in" card
-        // renders above the hole view - LNDPART's does not. The landing still puts the
-        // heading in the same place; the two fixtures now differ by 0.3px of sub-pixel
-        // scroll because the documents are different heights. The claim is "the landing
-        // is the same", so the tolerance is this file's own: 1px, as used against
-        // OFFSET in landed().
-        assert.ok(Math.abs(s.headingTop - P(S.part, 3).headingTop) <= 1,
-            'the landing moved: ' + s.headingTop + ' vs ' + P(S.part, 3).headingTop);
+        // RE-POINTED 2026-10-04 (the Status sheet), and the UI Wave 36 note below is
+        // kept because it is still what makes these two fixtures differ.
+        //
+        // LNDFULL has every hole scored, so the round is complete and the "Your card
+        // is in" card renders above the hole view; LNDPART's does not. While the page
+        // scrolled, the landing cancelled that difference out - both headings ended at
+        // the offset, give or take 0.3px of sub-pixel scroll. Neither page scrolls any
+        // more, so the extra card is simply there: 126px against 58px, and the 68px
+        // between them is the card. Comparing the two is now comparing two different
+        // pages, so what is asserted instead is the thing that still has to be true -
+        // on a page with nothing to scroll the landing moves nothing, and the heading
+        // is on screen above its boxes, which landed() has just checked.
+        assert.equal(s.canScroll, false, 'LNDFULL has scroll room again, so the landing should have fired');
+        assert.equal(s.scrollY, 0, 'a page with no scroll room scrolled anyway');
+        assert.ok(s.headingTop > P(S.part, 4).headingTop,
+            'the completed-round card is no longer above the hole view: ' + s.headingTop
+            + ' vs ' + P(S.part, 4).headingTop);
     });
     test('a remote snapshot afterwards does not focus anything either - there was nothing to restore', () => {
         // The clean half of the pair: on a FULL hole the landing focused nothing, so
         // there is no memo, so restoreScoreFocus returns early and the snapshot cannot
         // invent one. This is the case that proves a snapshot never reopens a keyboard
         // the golfer closed.
-        const s = P(S.full, 5);
+        const s = P(S.full, 6);
         assert.ok(s.ev.includes('value->render')); assert.equal(s.active, 'BODY');
     });
 });

@@ -328,9 +328,13 @@ describe('THE WIDGET APPEARS ONLY WHEN THERE IS A MATCH', () => {
         // rendering it between the hole heading and the score boxes pushed the
         // inputs away from their hole. What this test protects is that the mount is
         // emitted at all, not which operator emits it.
-        assert.match(read('index.html'),
-            /html (\+?=) '<div id="live-ticker-mount"><\/div>'/);
-        assert.match(read('leaderboard.html'), /<div id="live-matches-mount"><\/div>/);
+        assert.match(read('index.html').slice(read('index.html').indexOf('<div id="round-sheet-body">')),
+            /id="live-ticker-mount"/,
+            // RE-POINTED 2026-10-04: the dashboard mount is a static child of the
+            // Status sheet now, not emitted by renderHoleView. Same claim - the page
+            // ships the mount - read where it actually lives.
+            'the live dashboard mount is not in the Status sheet');
+       assert.match(read('leaderboard.html'), /<div id="live-matches-mount"><\/div>/);
     });
 
     test('existing widgets survive', () => {

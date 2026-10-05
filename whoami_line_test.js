@@ -68,9 +68,17 @@ const LINE = `(function () {
   });
 })()`;
 
-// Prev to hole 6 (everybody has finished it, so the recap has something to say), then
-// open My Round with a real tap. No page function is called.
+// Prev to hole 6 (everybody has finished it, so the recap has something to say),
+// OPEN THE STATUS SHEET, then open My Round with a real tap. No page function is
+// called.
+//
+// THE SHEET STEP IS NEW (2026-10-04) AND IT IS A REAL FIX, not a pin. My Round,
+// the recap and the live cards moved out of the hole card into one slide-up sheet
+// behind a handle, so on arrival they are off screen - and innerText of a hidden
+// block is '', which is why these reads came back null rather than wrong. A golfer
+// reaches them with one tap on the handle; so does this check.
 const OPEN = [{ tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 450 },
+              { tap: '#round-sheet-handle', nth: 0 }, { sleep: 450 },
               { tap: '.action-toggle', nth: 0 }, { sleep: 450 }];
 
 async function arrive(storage, extra) {

@@ -210,7 +210,12 @@ before(async () => {
         PREV.concat(NEXT, [{ expression: 'String(GolfBack.press({}))' }, { sleep: 500 }]));
     // THE OTHER EXITS. Full Card, and the 1-18 picker.
     S.toFullCard   = await arrive(LANDS_ON_8, 'game=KPF&group=1',
-        PREV.concat([{ tap: '#view-mode-full-btn' }, { sleep: 700 }]));
+        // THE VIEW TOGGLE IS IN THE STATUS SHEET (2026-10-04), so reaching Full Card
+        // is one tap on the handle and then the button - which is what a golfer does.
+        // Without it the tap landed on whatever was at those coordinates and the view
+        // never switched, so the gate looked broken when it was never asked.
+        PREV.concat([{ tap: '#round-sheet-handle' }, { sleep: 500 },
+                     { tap: '#view-mode-full-btn' }, { sleep: 700 }]));
     S.jumpedAway   = await arrive(LANDS_ON_8, 'game=KPF&group=1',
         PREV.concat([{ tap: '.hole-jump-open' }, { sleep: 400 },
                      { tap: '.hole-pick-btn', nth: 2 }, { sleep: 700 }]));
@@ -361,6 +366,8 @@ describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
             hole: (typeof currentViewedHole !== 'undefined') ? currentViewedHole : 'n/a',
             inset: parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0,
             headingTop: head ? Math.round(head.getBoundingClientRect().top) : null,
+            canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+            scrollY: Math.round(window.pageYOffset || 0),
             scrollY: Math.round(window.pageYOffset || 0),
             modal: !!(ov && getComputedStyle(ov).display !== 'none'),
             writes: (window.__coldWrites || []).length
@@ -399,8 +406,19 @@ describe('BACK TO HOLE N RE-LANDS THE HOLE', () => {
                 'the fixture never left the landing, so Back cannot be shown to restore it');
             assert.equal(v.BACK.modal, false, 'Back did not close the popup');
             assert.equal(v.BACK.hole, 7, 'Back changed the hole: ' + v.BACK.hole);
-            assert.equal(v.BACK.headingTop, inset + OFFSET,
-                'Back left the page at ' + v.BACK.headingTop + ', not the landing');
+            // RE-POINTED 2026-10-04 (the Status sheet): landOnHole is a no-op on a page
+            // with no scroll room, by decision, and this four-golfer card is now one
+            // screen. What Back has to restore is the position the golfer left, so
+            // that is what is asserted - the same place the page was before the popup,
+            // and still the landing wherever there is room to land.
+            if (v.BACK.canScroll) {
+                assert.equal(v.BACK.headingTop, inset + OFFSET,
+                    'Back left the page at ' + v.BACK.headingTop + ', not the landing');
+            } else {
+                assert.equal(v.BACK.scrollY, 0, 'a page with nothing to scroll scrolled anyway');
+                assert.ok(v.BACK.headingTop >= inset,
+                    'Back left the heading behind the status bar: ' + v.BACK.headingTop);
+            }
             assert.equal(v.BACK.writes, 0, 'Back wrote something');
         });
     });

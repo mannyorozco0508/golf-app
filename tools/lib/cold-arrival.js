@@ -462,7 +462,28 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // calls nothing the page defines. Pushes the point tapped, or a
                 // 'no element' line so a missed selector fails loudly downstream.
                 if (step.tap) {
-                    const find = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.tap)})[${step.nth || 0}]; if (!el) return null; el.scrollIntoView({ block: 'center' }); var r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width), h: Math.round(r.height) }; })()`;
+                    // SCROLL, SETTLE, THEN MEASURE - IN THAT ORDER (2026-10-04).
+                    //
+                    // This used to scrollIntoView and read getBoundingClientRect in ONE
+                    // evaluation, then wait 60ms and click the point it had read. The
+                    // rect was therefore measured BEFORE the scroll had taken effect,
+                    // and the click landed wherever that element used to be.
+                    //
+                    // It went unnoticed for as long as the pages were long: centring an
+                    // element on a page with a thousand pixels of slack moves it a
+                    // little, and a button is bigger than the error. The scorecard is
+                    // now one screen, so centring the nav row scrolls the page to its
+                    // maximum, the row moves 93px, and the tap landed in empty space -
+                    // measured: "tapped .hole-view-nav-btn[1] at 314,693" and the hole
+                    // never changed. Two checks reported a broken landing that was not
+                    // broken, which is the worst kind of harness fault.
+                    const scroll = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.tap)})[${step.nth || 0}]; if (!el) return false; el.scrollIntoView({ block: 'center' }); return true; })()`;
+                    const ok = await rpc(ws, id++, 'Runtime.evaluate', { expression: scroll, returnByValue: true });
+                    if (!(ok.result && ok.result.result && ok.result.result.value)) {
+                        value.push('no element: ' + step.tap + '[' + (step.nth || 0) + ']'); continue;
+                    }
+                    await new Promise(r => setTimeout(r, 120));
+                    const find = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.tap)})[${step.nth || 0}]; if (!el) return null; var r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width), h: Math.round(r.height) }; })()`;
                     const f = await rpc(ws, id++, 'Runtime.evaluate', { expression: find, returnByValue: true });
                     const pt = f.result && f.result.result && f.result.result.value;
                     if (!pt || !(pt.w > 0 && pt.h > 0)) { value.push('no element: ' + step.tap + '[' + (step.nth || 0) + ']'); continue; }

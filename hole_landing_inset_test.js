@@ -60,14 +60,36 @@ const INSETS = [0, 47, 59];        // web, iPhone 14-class, iPhone 15 Pro Max-cl
 
 // A round whose holes are all scored and mixed, which is the state the report came
 // from - and the one Wave 17's guard could not reach.
-function round() {
-    const names = ['Manny Orozco', 'Kopp Kelly', 'Dalen Drake', 'Vic Vance'];
-    const P = makePlayers(names, [0, 9, 18, 4], 101);
+// RE-POINTED 2026-10-04 (the Status sheet). This was Manny's own four-ball, and
+// the roster is now EIGHT in one group. The reason is not convenience: the
+// scorecard's header, nav, Playing With card, group scores and live dashboard
+// moved into a slide-up sheet, so a four-golfer round is exactly one screen -
+// measured, 844px - and landOnHole is a NO-OP there, by decision. A file about
+// where the landing puts the heading under a notch cannot measure the landing on
+// a page that has nothing to scroll; it would be asserting the absence of the
+// feature it exists to protect.
+//
+// SO THE NOTCH CLAIM IS KEPT WHOLE on a card that still scrolls, and the
+// four-golfer case it came from gets its own test at the bottom of this file,
+// asserting the rule that now applies to it: nothing scrolls, and the heading is
+// still clear of the status bar.
+function round(names) {
+    const roster = names || ['Manny Orozco', 'Kopp Kelly', 'Dalen Drake', 'Vic Vance',
+                             'Eli Echo', 'Fay Foxtrot', 'Gus Golf', 'Hal Hotel'];
+    const P = makePlayers(roster, [0, 9, 18, 4, 2, 11, 7, 20].slice(0, roster.length), 101);
     const scores = {};
     P.forEach((p, i) => { for (let h = 1; h <= 12; h++) scores['p' + p.id + '_h' + h] = 3 + ((h + i) % 4); });
+    // ONE GROUP OF EIGHT, and that override is load-bearing: eight golfers split
+    // into two groups of four, and a two-group round with no ?group= opens the
+    // "Keeping score, playing, or just watching?" sheet over the whole page on
+    // arrival - measured, every tap then landed on the overlay and the hole never
+    // changed. One group is also the arrangement the landing is about: eight
+    // golfers on one card is the tallest the scorecard gets.
     return { eventName: 'Landing', courseName: 'Test', players: P, gameFormat: 'stroke',
+        groupSizeOverrides: { 0: P.length },
         courseData: CD, scores, settlementMode: 'whole-dollar', skinsBuyIn: 5, skinsCarryOver: false };
 }
+const FOUR = ['Manny Orozco', 'Kopp Kelly', 'Dalen Drake', 'Vic Vance'];
 
 const LOOK = `(function () {
   var hdr = document.querySelector('.hole-view-header');
@@ -78,6 +100,8 @@ const LOOK = `(function () {
     inset: inset,
     hole: hdr ? (hdr.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 14) : null,
     scrollY: Math.round(window.pageYOffset || 0),
+    canScroll: (document.documentElement.scrollHeight - window.innerHeight) > 1,
+    scrollRoom: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)),
     headerTop: r ? Math.round(r.top) : null,
     // the only question that matters: is the heading BELOW the inset, or behind it?
     clearOfInset: r ? (Math.round(r.top) >= inset) : null,
@@ -126,9 +150,9 @@ INSETS.forEach(inset => {
             });
         });
 
-        test('and all four score boxes are still fully in view, below the inset', () => {
+        test('and all eight score boxes are still fully in view, below the inset', () => {
             const v = S[inset].next;
-            assert.equal(v.boxCount, 4);
+            assert.equal(v.boxCount, 8);
             assert.equal(v.boxesInView, true, 'a box is behind the inset or off the bottom');
         });
     });
@@ -180,5 +204,57 @@ describe('THE SOURCE: ONE PLACE, AND IT READS THE LIVE INSET', () => {
         assert.ok(!/env\(safe-area-inset-top[^)]*\)\s*[^;]*\)\s*\|\|/.test(fn));
         assert.match(SRC, /padding-top: env\(safe-area-inset-top, 0px\)/,
             'the block that sets the root inset is gone, so nothing sets what this reads');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// AND MANNY'S OWN FOUR-BALL, WHICH IS NOW ONE SCREEN (2026-10-04)
+//
+// The report this file was built from came from a four-golfer round. That card no
+// longer scrolls - the Status sheet took the header, the nav and every reading
+// card off the page - so landOnHole is a NO-OP there, by decision. The notch
+// claim still has to hold, and it holds for a different reason: the page never
+// leaves scroll 0, so the root inset is still above the content where it belongs.
+// Asserted here rather than assumed, because "no scroll" and "correct" are two
+// different statements.
+describe('A FOUR-GOLFER CARD: nothing to scroll, and still clear of the status bar', () => {
+    const F = {};
+    before(async () => {
+        for (const inset of INSETS) {
+            const r = await arriveCold({ url: fileUrl('index.html', 'game=LND19'), settleMs: 3200,
+                db: { events: { LND19: round(FOUR) }, global_courses: {}, trips: {}, tournaments: {} },
+                viewport: { width: 390, height: 844 }, steps: [
+                    { expression: "document.documentElement.style.paddingTop = '" + inset + "px'; 'set'" },
+                    { sleep: 250 },
+                    { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 600 }, { expression: LOOK }
+                ] });
+            F[inset] = r.ok ? JSON.parse(r.value[r.value.length - 1]) : { error: r.reason };
+        }
+    });
+
+    INSETS.forEach(inset => {
+        test('with a ' + inset + 'px inset the page does not move, and the heading is below the bar', () => {
+            const v = F[inset];
+            assert.ok(v && !v.error, v && v.error);
+            assert.equal(v.inset, inset, 'the emulated inset did not take');
+            // WHAT A ONE-SCREEN CARD CAN DO, AND WHAT IT CANNOT. Measured with a
+            // 59px bar: the heading sits 171px down the document, the page has
+            // SEVEN pixels of scroll room, and the landing takes all seven - the
+            // heading ends at 164 rather than the 71 it would reach on a page with
+            // room. That is the no-op rule doing its work: the landing asks, the
+            // page gives what it has, and nothing is pretended.
+            //
+            // THE EXACT LANDING IS PROVEN ABOVE, on the eight-golfer card, which is
+            // where there is room to prove it. Asserting it here would be asserting
+            // that a 844px page can scroll 159px.
+            assert.ok(v.scrollY <= v.scrollRoom + 1,
+                'the page scrolled further than it had room for: ' + v.scrollY + ' of ' + v.scrollRoom);
+            assert.ok(v.scrollRoom < OFFSET + inset + 1,
+                'this card has real scroll room now (' + v.scrollRoom + 'px) - assert the exact landing, as above');
+            assert.equal(v.clearOfInset, true,
+                'the heading is BEHIND the status bar: top ' + v.headerTop + ' against an inset of ' + inset);
+            assert.equal(v.boxCount, 4);
+            assert.equal(v.boxesInView, true, 'a box is behind the inset or off the bottom');
+        });
     });
 });

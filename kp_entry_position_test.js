@@ -72,10 +72,18 @@ describe('1. THE MOUNT IS UNDER THE NAV ROW, BEFORE THE DOTS BLOCK (source)', ()
         const nav = fn.indexOf('html += navRowHtml;');
         const kp = fn.indexOf("html += '<div id=\"kp-entry-mount\"></div>';");
         const dots = fn.indexOf('if (dotsGame) {');
-        const recap = fn.indexOf("html += '<div id=\"hole-recap-mount\"></div>';");
-        const action = fn.indexOf("html += '<div id=\"action-center-mount\"></div>';");
-        assert.ok(nav > 0 && kp > 0 && dots > 0 && recap > 0 && action > 0, 'every mount exists');
-        assert.ok(nav < kp && kp < dots && dots < recap && recap < action, 'order: nav row, KP entry, Dots, recap, …, action center');
+        // RE-POINTED 2026-10-04 (the Status sheet). The recap and the action centre
+        // left this renderer entirely - everything a golfer reads rather than acts on
+        // is a static child of #round-sheet-body now - so the tail of the old order
+        // ("..., recap, action centre") is asserted as their ABSENCE here. What this
+        // file is about is unchanged and still exact: the KP question sits directly
+        // under Prev/Next, before the Dots block, on the one hole it matters.
+        assert.ok(nav > 0 && kp > 0 && dots > 0, 'every mount exists');
+        assert.ok(nav < kp && kp < dots, 'order: nav row, KP entry, Dots');
+        assert.equal(fn.indexOf("html += '<div id=\"hole-recap-mount\"></div>';"), -1,
+            'the recap is built inside the hole card again');
+        assert.equal(fn.indexOf("html += '<div id=\"action-center-mount\"></div>';"), -1,
+            'the action centre is built inside the hole card again');
         // Filled from renderCardWidgets - the one list both the open and the closed
         // hole-view paths call after container.innerHTML, so the two cannot drift.
         const w = SRC.indexOf('function renderCardWidgets()');

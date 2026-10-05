@@ -51,8 +51,17 @@ function round(names, hcps) {
 
 // ---------------------------------------------------------------------------
 describe('PART A — ONE BOARD, TWO MOUNTS', () => {
-    test('the Hole View mount still exists and is still first', () => {
-        assert.match(IDX, /let html = '<div id="live-ticker-mount"><\/div>'/);
+    test('the Hole View mount still exists, in the Status sheet', () => {
+        // RE-POINTED 2026-10-04: the dashboard mount is no longer the first thing
+        // renderHoleView assigns - it is a static child of #round-sheet-body, which
+        // is where everything a golfer reads rather than acts on now lives. The
+        // claim is that the mount EXISTS and there is exactly one of it, because two
+        // would mean the renderer writes to whichever came first.
+        assert.equal((IDX.match(/id="live-ticker-mount"/g) || []).length, 1,
+            'there is not exactly one Hole View dashboard mount');
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-sheet-body">'),
+                                IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
+        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the Status sheet');
     });
 
     test('the Full Card now has its own mount element', () => {

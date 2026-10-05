@@ -798,13 +798,17 @@ describe('SCORECARD CLEANUP — duplication removed, information kept', () => {
 
     test('score entry still comes before any betting panel', () => {
         const idxSrc = read('index.html');
+        // RE-POINTED 2026-10-04 (the Status sheet): hole -> scores -> Prev/Next, and
+        // the betting panels are not on the hole card at all - they are static
+        // children of #round-sheet-body behind one handle. The order claim is kept
+        // for what is still in the card and asserted as absence for what left.
         const scores = idxSrc.indexOf('class="score-input"');
-        const recap = idxSrc.indexOf(`html += '<div id="hole-recap-mount">`);
-        const action = idxSrc.indexOf(`html += '<div id="action-center-mount">`);
         const nav = idxSrc.indexOf('html += navRowHtml;');
-        // Navigation now precedes the panels: hole -> scores -> Prev/Next -> recap -> action.
-        assert.ok(scores > -1 && nav < recap && recap < action,
-            'order must stay hole -> scores -> recap -> action -> navigation');
+        assert.ok(scores > -1 && nav > -1, 'the hole card lost its boxes or its nav row');
+        assert.equal(idxSrc.indexOf(`html += '<div id="hole-recap-mount">`), -1,
+            'the recap is built inside the hole card again');
+        assert.equal(idxSrc.indexOf(`html += '<div id="action-center-mount">`), -1,
+            'the action centre is built inside the hole card again');
     });
 
     test('hole navigation is untouched', () => {

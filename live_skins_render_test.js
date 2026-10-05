@@ -322,11 +322,22 @@ describe('NO DUPLICATE ARITHMETIC', () => {
         assert.match(src.slice(src.indexOf('function renderLiveSkins')), /catch \(e\) \{/);
     });
 
-    test('it sits below score entry and navigation, not above', () => {
+    test('it is OUT of the hole card altogether, in the Status sheet', () => {
+        // RE-POINTED 2026-10-04 (the Status sheet). This asserted that the live
+        // skins card was built AFTER the Prev/Next row in the hole card's html -
+        // "Prev/Next must never be pushed below the live card". The card is not in
+        // the hole card at all any more: everything a golfer READS rather than acts
+        // on moved into one slide-up sheet, so the claim is stronger now and is
+        // written as the stronger thing. If the mount ever goes back into that
+        // html string it will sit above Prev/Next again on the next edit, which is
+        // what the old line was protecting against.
         const src = read('index.html');
-        const nav = src.indexOf('html += navRowHtml;');
-        const mount = src.indexOf("html += '<div id=\"live-skins-mount\"></div>';");
-        assert.ok(nav !== -1 && mount !== -1);
-        assert.ok(mount > nav, 'Prev/Next must never be pushed below the live card.');
+        assert.ok(!/html \+= '<div id="live-skins-mount"><\/div>';/.test(src),
+            'the hole card builds the live skins mount again');
+        const body = src.slice(src.indexOf('<div id="round-sheet-body">'),
+                               src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
+        assert.match(body, /id="live-skins-mount"/, 'the mount is not in the Status sheet');
+        // AND THE HOLE CARD STILL ENDS WITH ITS OWN NAV ROW.
+        assert.match(src, /html \+= navRowHtml;/, 'the hole card lost Prev/Next');
     });
 });
