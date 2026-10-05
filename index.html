@@ -2907,79 +2907,31 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // happens. With no heading (a hole with no data) the first box is the anchor.
     const HOLE_LANDING_OFFSET = 12;
 
-    // AND WHY THE FOCUS IS BACK, CONDITIONALLY (Wave 27). The note above is kept
-    // exactly as it was, because it is still true of what it describes: v128 anchored
-    // the first BOX at the top and focused unconditionally, so the heading was already
-    // off-screen before focus did anything, and on a deep card iOS scrolled the target
-    // out from under the keyboard and took the heading with it.
+    // AND WHY THERE IS NO FOCUS ON LANDING AT ALL (2026-10-05, Manny).
     //
-    // Two things are different now. The landing anchors the HEADING, and the focus only
-    // happens when the box will still be CLEAR OF THE KEYBOARD - so iOS has no reason
-    // to scroll, and the heading stays where landOnHole put it. Measured at 390x844,
-    // rows 73px apart: boxes 0-5 end at or above 482 and are clear of a 336px keypad
-    // starting at 508; box 6 starts at 507 and box 7 at 580, and both are under it. So
-    // a group-locked four-golfer card gets the keypad every time, and a card deep
-    // enough to bury the target focuses nothing rather than losing the heading.
+    // Wave 27 put it back conditionally: after Next, Prev, the 1-18 jump or a KP
+    // answer, the first empty writable box took the keypad if it would still be
+    // clear of it - measured at 390x844, boxes 0-5 clear of a 336px keypad and
+    // boxes 6-7 under it, so a four-golfer card got the keyboard every time.
     //
-    // 336px is an iPhone portrait soft keyboard, the class of device this is for. It is
-    // an ALLOWANCE, not a measurement: the keyboard is not open yet when this runs, and
-    // window.visualViewport cannot tell us how tall it will be. Erring large means the
-    // refusal happens one row early rather than one row late, and one row early costs
-    // a tap while one row late costs the heading.
-    const KEYBOARD_ALLOWANCE = 336;
-
-    // FOUR REFUSALS, and each is the page's own rule rather than a copy of it:
-    //   no card / no boxes      fail open - navigation still happens
-    //   every box filled        nothing to type
-    //   the box is DISABLED     renderScorecard sets that from isLocked (a superseded
-    //                           round, or a multi-group round without a matching
-    //                           ?group=), so a spectator and another foursome are both
-    //                           excluded without this function deciding who is who.
-    //                           BELT AND BRACES, AND MEASURED AS SUCH: removing this
-    //                           filter does NOT let a spectator be focused, because a
-    //                           browser refuses focus() on a disabled input - the
-    //                           control for it is behaviourally inert and the guard
-    //                           says so instead of pretending otherwise. It is kept
-    //                           for two reasons: it states the intent where the rule
-    //                           lives, and it picks the first WRITABLE empty box
-    //                           rather than stalling on a locked one, which is what
-    //                           a card mixing locked and writable rows would need.
-    //   under the keypad        see above
-    // SYNCHRONOUS BY CONSTRUCTION: this is the last thing landOnHole does, and
-    // landOnHole runs inside the click handler, which is the only window iOS gives a
-    // focus() to open the keyboard. Nothing here awaits anything.
-    function focusFirstEmptyScoreBox() {
-        try {
-            const card = document.getElementById('hole-view-card');
-            if (!card || typeof card.querySelectorAll !== 'function') return null;
-            const boxes = Array.from(card.querySelectorAll('.score-input:not([disabled])'));
-            const box = boxes.filter(b => !String(b.value || '').trim())[0];
-            if (!box || typeof box.getBoundingClientRect !== 'function') return null;
-            const r = box.getBoundingClientRect();
-            if (!(r.height > 0)) return null;                       // not laid out
-            const limit = (window.innerHeight || 0) - KEYBOARD_ALLOWANCE;
-            if (!(r.bottom <= limit)) return null;                  // would be under the keypad
-            // WITHOUT MOVING THE PAGE (2026-10-04). landOnHole scrolls FIRST and
-            // focuses last, on the reasoning that "the box is already clear of the
-            // keypad by the time it is chosen" - true of where the box sits, and not
-            // true of what the browser does with it: focus() scrolls the element into
-            // view on the browser's own terms. That was invisible while the scorecard
-            // carried a thousand pixels of cards below the hole, because there was
-            // slack to absorb it. With everything else in the Status sheet the page
-            // ends just below the runway, and the focus scrolled straight to the
-            // bottom - measured on a notched arrangement: the landing put the heading
-            // at 46 and the focus took it to 93, the maximum, which is 12px from the
-            // top of the screen and 35px UNDER a 47px status bar. That is the exact
-            // defect Wave 19b was built to fix, arriving again by another door.
-            //
-            // preventScroll keeps the keyboard behaviour and drops the scroll. Where
-            // it is not supported the plain focus() still runs, which is the old
-            // behaviour rather than no focus at all.
-            try { box.focus({ preventScroll: true }); }
-            catch (e) { box.focus(); }
-            return box;
-        } catch (e) { return null; }                                 // fail open, always
-    }
+    // THAT WAS THE PROBLEM. The scorecard is not four boxes any more: the compact
+    // live panel - the leaderboard top five and this golfer's matches - sits
+    // directly under Prev/Next, and the keypad opened over it on every single
+    // hole change. A golfer who wanted to know where they stood had to dismiss a
+    // keyboard nobody asked for first, on a card that already fits one screen.
+    //
+    // SO THE KEYPAD IS A TAP NOW, which is the rule everywhere else in the app:
+    // it opens when a golfer taps a score box, and at no other time. The
+    // box-to-box advance WITHIN a hole is untouched and is a different mechanism
+    // (advanceToNextScoreBox, which moves focus that the golfer already has);
+    // so is restoreScoreFocus, which puts focus back where it was when a remote
+    // snapshot rebuilds the card mid-entry. Neither opens a keyboard that was
+    // not already open.
+    //
+    // THE KEYPAD ALLOWANCE WENT WITH IT - the 336px constant Wave 27 measured
+    // against. Nothing else read it, and a constant whose only reader is gone is a
+    // question nobody can answer. Named in words here rather than in code, so the
+    // guard that checks it is gone is not looking at this sentence.
 
     // THE TAP THAT WENT NOWHERE (fix 1). A score typed and not yet left - a lone
     // "1", or a corrected number - is still focused when the golfer taps Next. The
@@ -3082,12 +3034,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 }
             }
         } catch (e) { /* the hole changed; the scroll is a comfort */ }
-        // THE FOCUS IS LAST, AFTER THE SCROLL. Focusing first would let the browser
-        // scroll the box into view on its own terms and then have landOnHole fight it -
-        // which is the race the 2026-09-14 note describes. Scroll, then focus, and the
-        // focus is a no-op for the scroll position because the box is already clear of
-        // the keypad by the time it is chosen.
-        focusFirstEmptyScoreBox();
+        // AND IT ENDS THERE. landOnHole scrolls and stops: no box is focused and no
+        // keypad opens, so what the landing puts on screen stays on screen - the
+        // hole, and the live panel under it. The note above the hole-landing
+        // constants says why.
     }
 
     function goToAdjacentHole(delta) {
@@ -5983,9 +5933,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // goToHole performs. No hole change and no write - the question is still unanswered
     // and the gate will ask again on the way out, which is the whole point of Back.
     //
-    // The Wave 27 focus rule rides along for free: landOnHole ends with
-    // focusFirstEmptyScoreBox(), so the first empty writable box takes the keypad if it
-    // is clear of it, and nothing is focused if it is not.
+    // AND NOTHING IS FOCUSED ON THE WAY BACK (2026-10-05). landOnHole used to end
+    // by focusing the first empty writable box; it does not any more, so closing
+    // this question lands the hole and leaves the keypad shut, exactly as Next and
+    // Prev do. The question itself is still unanswered either way.
     function kpForcedBack() {
         closeKpForcedModal();                 // records nothing; the question stands
         if (currentViewMode === 'hole') landOnHole();

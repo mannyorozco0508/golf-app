@@ -150,13 +150,22 @@ describe('baseline arithmetic', () => {
     // --- the counter, which half B depends on -------------------------------
 
     test('the test count is REGISTERED tests, not declarations of test(', () => {
+        // THE FIXTURE NOW BREAKS GREP IN BOTH DIRECTIONS, which is better than it
+        // breaking it in one. A forEach over three insets generates three tests from
+        // one declaration, so grep UNDER-counts; and the file calls
+        // RegExp.prototype.test, so a naive /\btest\(/ OVER-counts. Registration is
+        // the only number that is right either way, and both failure modes are
+        // asserted here rather than described.
         const text = fs.readFileSync(path.join(ROOT, 'landing_focus_test.js'), 'utf8');
-        const declarations = (text.match(/\btest\(/g) || []).length;
+        const declarations = (text.match(/^\s*test\(/gm) || []).length;
+        const naive = (text.match(/\btest\(/g) || []).length;
         const counted = countTests('landing_focus_test.js');
         assert.strictEqual(counted, 16, 'landing_focus_test.js registers 16 tests');
         assert.ok(counted > declarations, 'the count must come from registration, not grep: '
             + declarations + ' declarations, ' + counted + ' registered - a forEach generates '
             + 'three of them, which is exactly why grep cannot be trusted here');
+        assert.ok(naive > counted, 'the naive grep no longer over-counts, so half of what this '
+            + 'test demonstrates is gone: ' + naive + ' matches, ' + counted + ' registered');
     });
 
     test('counting a suite does not RUN it', () => {

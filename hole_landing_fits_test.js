@@ -180,8 +180,12 @@ describe('4. THE RULE IS IN ONE PLACE', () => {
             'a card that fits no longer lands at the top');
         assert.match(fn, /\} else \{\s*sizeHoleLandingRunway\(\);/,
             'the runway is sized on both branches again, which is what makes a fitting page scrollable');
-        // AND THE KEYPAD FOCUS STILL DOES NOT MOVE THE PAGE.
-        assert.match(IDX, /box\.focus\(\{ preventScroll: true \}\);/,
-            'the focus scrolls the page again');
+        // AND NOTHING FOCUSES AFTER THE SCROLL (2026-10-05). This asserted that the
+        // landing focus used preventScroll, which was how a focus stopped dragging
+        // the heading under the status bar. There is no landing focus now - the
+        // keypad was covering the live panel under Prev/Next - so the stronger
+        // version of the same claim is that the landing ends with the scroll.
+        assert.ok(!/\.focus\(/.test(fn), 'the landing focuses something again');
+        assert.ok(!/focusFirstEmptyScoreBox/.test(IDX), 'the landing focuser is back');
     });
 });

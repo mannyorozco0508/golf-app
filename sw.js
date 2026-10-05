@@ -3448,14 +3448,11 @@
 // at all three insets, so the property Manny asked for is held even though it was
 // already true.
 //
-// GUARDED BY landing_focus_test.js (16 tests, real taps): the first empty box focused
-// and the heading still at inset+12 at 0/47/59; the first EMPTY one on a partly scored
-// hole; nothing on a full hole; nothing for a spectator; nothing past the keypad line;
-// Prev and the picker the same; a KP answer the same. Baseline 8 PASS / 7 FAIL,
-// measured at 15 tests (the 16th was added afterwards - see that file), against
-// v254. Four controls, each red behaviourally except the inert one, labelled:
-// focus a filled box (4 red), drop the disabled filter (source only - INERT, and why),
-// drop the allowance test (1 red), make the modal scroll the page (3 red).
+// GUARDED BY landing_focus_test.js (16 tests, real taps). REVERSED 2026-10-05, and
+// the note above is left as the record of what was measured then: no landing
+// focuses anything now, because the keypad was opening over the live panel under
+// Prev/Next on every hole change. That file's own header carries the current
+// baseline and the reason; the keypad opens on a tap and at no other time.
 //
 // RE-POINTED: hole_view_landing_test.js, which banned every focus() on the navigation
 // path to hold v128's decision. The ban is now a CONDITION - the only focus allowed is
@@ -3569,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v137-ownerdelete. The tournament product cache
+// The consumer product cache is consumer-v138-tapkeypad. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4215,7 +4212,14 @@
 // RULES PUBLISH (database.rules.ownerdelete.json) and useless without it: on a
 // device at v296 the owner is refused before the confirm, and on v297 before
 // that ruleset is live the delete is refused by the database instead.
-const CACHE_VERSION = 'golfapp-v297-ownerdelete';
+// Moved to v298: THE KEYPAD OPENS ON A TAP, AND AT NO OTHER TIME. No score box is
+// focused by a landing - not after Next, Prev, the 1-18 jump or a KP answer - so
+// the compact live panel under Prev/Next, the leaderboard and this golfer's
+// matches, is readable without dismissing a keyboard nobody asked for. Typing is
+// untouched: the box-to-box advance within a hole and the mid-entry restore both
+// move focus the golfer already has. A device on v297 gets the keypad on every
+// hole change, over the panel.
+const CACHE_VERSION = 'golfapp-v298-tapkeypad';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

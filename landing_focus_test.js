@@ -1,90 +1,55 @@
 // ============================================================================
-// THE LANDING FOCUSES THE FIRST EMPTY BOX - WHEN IT CAN (Wave 27)
+// NOTHING IS FOCUSED ON LANDING (2026-10-05, Manny)
 //
-// WHAT THIS REVERSES, AND WHY THAT IS SAFE NOW. index.html has carried this note
-// since 2026-09-14, after a real round on v128:
+// RE-POINTED FROM "THE LANDING FOCUSES THE FIRST EMPTY BOX - WHEN IT CAN"
+// (Wave 27), which is now reversed. The Wave 27 reasoning was sound and is kept
+// below because it is the record of what was measured; what changed is the page
+// it was measured on.
 //
-//     "v128 put the FIRST SCORE BOX at the top and focused the first empty one. On
-//      the course that meant the heading was above the fold - a golfer scrolled up to
-//      confirm which hole they were on - and the keyboard opened over the page on
-//      every Next. So the anchor is the heading element itself ... and the focus is
-//      gone."
+// WHAT WAVE 27 ESTABLISHED. v128 anchored the first BOX at the top and focused
+// unconditionally, so the heading went off-screen and the keyboard opened over
+// the page on every Next. Wave 27 brought the focus back CONDITIONALLY: the
+// landing anchors the HEADING, and the box is focused only when it will still be
+// clear of the keypad. Measured at 390x844, rows 73px apart, a 336px keyboard
+// starting at y=508: boxes 0-5 end at or above 482 and are clear, boxes 6 and 7
+// are under it. So a four-golfer card took the keypad on every hole change.
 //
-// Note what v128 proves: THE KEYBOARD DID OPEN. The failure was not a dead focus, it
-// was the keyboard covering the page and the heading leaving the screen. Two things
-// are different now:
-//   1. THE LANDING ANCHORS THE HEADING, not the first box. v128 scrolled the box to
-//      the top, so the heading was already off-screen before focus did anything.
-//   2. THE FOCUS IS CONDITIONAL. It only happens when the box will still be CLEAR OF
-//      THE KEYBOARD, so iOS has no reason to scroll it into view - and the heading
-//      stays where landOnHole put it.
-// Measured at 390x844, heading at inset+12, rows 73px apart, an iPhone portrait
-// keyboard about 336px (so it starts at y=508):
-//     boxes 0-5   top 69..434, bottom <=482   CLEAR
-//     box 6       top 507, bottom 555         UNDER the keyboard
-//     box 7       top 580, bottom 628         UNDER the keyboard
-// So a group-locked four-golfer card focuses every time, and a card deep enough to
-// put the target under the keyboard focuses nothing rather than scrolling the heading
-// away. That is the whole of the new rule.
+// WHY THAT IS NOW WRONG. The scorecard is not four boxes any more. The compact
+// live panel - the leaderboard top five and this golfer's live matches - sits
+// directly under Prev/Next, and the keypad opened over it on every Next, Prev,
+// 1-18 jump and KP answer. A golfer who wanted to know where they stood had to
+// dismiss a keyboard nobody asked for. Manny, 2026-10-05: remove it.
 //
-// FOUR REFUSALS, all of them the point:
-//   a FULL hole            nothing empty to focus
-//   a SPECTATOR            the box is disabled - the page's OWN rule
-//                          (isLocked = roundSuperseded() || multi-group without a
-//                          matching ?group=), not a second copy of it here
-//   PAST THE KEYBOARD LINE the target would be under the keypad
-//   no card / no boxes     fail open, navigation still happens
+// THE RULE NOW. No score box is focused by a landing and no keypad opens; the
+// keypad opens when a golfer TAPS a box, and at no other time. What is untouched:
+//   - the box-to-box advance WITHIN a hole (advanceToNextScoreBox), which moves
+//     focus the golfer already has and never opens a keyboard that was shut;
+//   - restoreScoreFocus, which puts focus back where it was when a remote
+//     snapshot rebuilds the card mid-entry;
+//   - the landing itself, which still scrolls by Manny's fit rule.
+// The first two are this file's negative controls as much as its exclusions: if
+// removing the landing focus had broken typing, they are where it would show.
 //
-// SYNCHRONOUS, INSIDE THE TAP. focus() runs at the end of landOnHole, which runs
-// inside the click handler - the same window advanceToNextScoreInput already uses
-// successfully on iOS. For the KP modal the focus happens on the resumed navigation,
-// and recordKpGroupAnswer's write is fire-and-forget with its session copy written
-// first, so nothing awaits before the focus.
+// WHAT THIS FILE CANNOT PROVE, stated rather than implied: headless Chrome has NO
+// SOFT KEYBOARD. Every assertion here is about which element holds focus. That a
+// keypad does not appear is an iPhone question and Manny tests it there - but
+// "nothing is focused" is the precondition for it, and that IS measurable.
 //
-// WHAT I CANNOT PROVE HERE, stated rather than implied: headless Chrome has NO SOFT
-// KEYBOARD. Every assertion below is about which element holds focus and where the
-// heading and the box sit. Whether the keypad actually appears is an iPhone question,
-// and Manny tests it on a preview before this goes near main. That limit is why the
-// rule is conditional rather than unconditional - a focus that cannot open a keyboard
-// should at least never move the heading.
-//
-// AND THE SCROLL SHIFT I REPORTED LAST TIME WAS MINE, NOT THE PRODUCT'S. I measured
-// the KP modal "shifting the page 39px on open" and offered it as the nearest thing to
-// Manny's landing report. It was my instrument: tools/lib/cold-arrival.js calls
-// el.scrollIntoView({ block: 'center' }) before every tap, so the harness scrolls the
-// Next button to the middle of the screen and the modal path has no landing afterwards
-// to correct it. The tell was that the "shift" tracked the inset exactly - 39, 86, 98
-// at 0, 47, 59 - while document height did not change. Pressed at the button's own
-// coordinates with a raw Input.dispatchMouseEvent and NO scrollIntoView, the page does
-// not move at all. The last describe pins that, using raw dispatch for exactly that
-// reason.
-//
-// THE RED BASELINE, measured against the FINAL file per CLAUDE.md's count rule.
-// Against main 5eeb1f2 (index.html as it stood, sha 72cae6d7...), all tests:
-//
-//     8 PASS / 7 FAIL        (measured at 15 tests; the platform-fact test about a
-//                             disabled input was added afterwards and is green either
-//                             way, because a browser has always refused that focus)
-// BASELINE COUNT DELTA: +1  that platform-fact test, added after the measurement. The
-//   file registers 16; re-measuring for a test that is green with and without the
-//   wave would have been theatre, so the difference is declared instead.
-//
-// THE EIGHT THAT PASS WITHOUT THE FEATURE, and not one of them is coverage:
-//   ONE arrival check - the fixtures reached the card.
-//   THREE REFUSALS, VACUOUS before any focus exists: "a full hole focuses nothing",
-//     "a spectator is never focused" and "past the keyboard line" are all free when
-//     nothing is focused on any landing. They become real the moment focus does.
-//   THREE SCROLL CASES, green because ITEM C WAS NEVER A DEFECT - see the note above.
-//     They pin a property that already held, which is worth having and is not evidence
-//     that this wave did anything.
-//   ONE asserting the v128 note is still in the file - green because it was already
-//     there, and it is the thing this wave must not destroy.
-//   1 + 3 + 3 + 1 = 8.
-//
-// AND I ALMOST SHIPPED THIS HEADER WITHOUT THE BASELINE IN IT. I measured 8/7, wrote
-// it into the commit message, and left the file silent - the third time in this repo,
-// and the reason CLAUDE.md says the guard header is the copy that wins any
-// disagreement. The codeload verify caught it by grepping the tarball for the figure.
+// BASELINE, measured over the FINISHED file against main (a488b2c, index.html
+// swapped out and restored by sha), all 16 tests: 10 PASS / 6 FAIL. 10 + 6 = 16.
+//   The ten that pass are the ones this reversal must not break, and three of
+//   them are weak evidence for it, said plainly rather than counted as coverage:
+//   "a full hole focuses nothing", "a spectator is never focused" and "a short
+//   viewport is no longer a special case" were all TRUE BEFORE - under Wave 27
+//   those were its refusals, and under this wave they are the general rule. The
+//   other seven are the arrival itself, the three KP-modal scroll cases (which
+//   were never a defect - see the note below), the platform fact that a disabled
+//   box refuses focus, "typing still moves itself" (the thing that must not have
+//   gone out with the landing focus, green because it did not), and the v128 note
+//   still being in the file.
+//   The six reds are every landing that used to take the keypad - Next, Prev, the
+//   picker, the partly-scored hole, both insets and the KP answer - plus the
+//   source pin that the focuser and its allowance are gone.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -225,29 +190,29 @@ function headingLanded(v, inset) {
     }
 }
 
-describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
+describe('NO LANDING FOCUSES ANYTHING, AND THE HEADING STILL LANDS', () => {
     test('every arrival ran', () => {
         Object.keys(S).forEach(k => assert.ok(S[k] && !S[k].error, k + ': ' + (S[k] && S[k].error)));
     });
 
-    test('NEXT onto an empty hole: the first box has focus, and the heading is still at the top', () => {
+    test('NEXT onto an empty hole: NOTHING is focused, and the heading still lands', () => {
         const v = S.allEmpty;
         assert.equal(v.hole, 9, 'Next reaches the hole AFTER the landing, not the landing');
-        assert.equal(v.focusIsScoreBox, true, 'nothing was focused: ' + v.activeTag);
-        assert.equal(v.focusedIndex, 0, 'the wrong box has focus: index ' + v.focusedIndex);
-        assert.equal(v.focusedValue, '', 'a FILLED box has focus');
+        assert.ok(v.boxes.some(b => b.v === '' && !b.disabled),
+            'the fixture has no empty writable box, so it proves nothing');
+        assert.equal(v.focusIsScoreBox, false, 'a score box took focus: index ' + v.focusedIndex);
+        assert.equal(v.focusedIndex, -1);
         headingLanded(v);
     });
 
-    test('the FIRST EMPTY one, not the first: two scores in means the third box', () => {
+    test('and a PARTLY scored hole is no different - there is no "first empty" to find', () => {
         const v = S.partly;
         assert.deepEqual(v.boxes.map(b => b.v), ['4', '5', '', ''], 'the fixture is not partly scored');
-        assert.equal(v.focusedIndex, 2, 'it focused index ' + v.focusedIndex + ' instead of the first empty');
-        assert.equal(v.focusedValue, '');
+        assert.equal(v.focusIsScoreBox, false, 'it focused index ' + v.focusedIndex);
         headingLanded(v);
     });
 
-    test('A FULL HOLE focuses nothing', () => {
+    test('A FULL HOLE focuses nothing (true before this wave too, and said so)', () => {
         const v = S.full;
         assert.ok(v.boxes.every(b => b.v !== ''), 'the fixture left an empty box');
         assert.equal(v.focusIsScoreBox, false, 'a filled hole took focus anyway');
@@ -275,15 +240,15 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
             'focus landed somewhere unexpected on a spectator card: ' + v.activeTag);
     });
 
-    test('PAST THE KEYBOARD LINE: a target under the keypad allowance is left alone', () => {
+    test('A SHORT VIEWPORT is no longer a special case, because no case focuses', () => {
+        // KEPT, AND DEMOTED HONESTLY. This fixture was the proof that the keypad
+        // allowance refused a box that would sit under the keyboard. There is no
+        // allowance any more, so what it proves now is narrower and still worth
+        // having: the rule does not have an exception hiding at a small height.
         const v = S.pastLine;
         assert.equal(v.innerHeight, 500, 'the short viewport did not take');
-        const firstEmpty = v.boxes.find(b => b.v === '');
-        assert.ok(firstEmpty, 'the fixture has no empty box');
-        assert.ok(firstEmpty.rect.bottom > (v.innerHeight - 336),
-            'the first empty box is NOT past the line, so this proves nothing: '
-            + JSON.stringify(firstEmpty.rect) + ' vs ' + (v.innerHeight - 336));
-        assert.equal(v.focusIsScoreBox, false, 'it focused a box under the keyboard');
+        assert.ok(v.boxes.some(b => b.v === ''), 'the fixture has no empty box');
+        assert.equal(v.focusIsScoreBox, false, 'it focused a box on a short screen');
         // RE-POINTED 2026-10-04 (Manny's fit rule): what this line is for is that the
         // REFUSAL costs nothing - the page is wherever the landing left it, and the
         // focus did not drag it. headingLanded() is that claim under the rule that
@@ -293,28 +258,26 @@ describe('THE LANDING FOCUSES THE FIRST EMPTY WRITABLE BOX', () => {
 
     test('PREV and the 1-18 PICKER follow the same rule', () => {
         [['prev', S.prev], ['picker', S.picker]].forEach(([tag, v]) => {
-            assert.equal(v.focusIsScoreBox, true, tag + ' focused nothing');
-            assert.equal(v.focusedValue, '', tag + ' focused a filled box');
+            assert.equal(v.focusIsScoreBox, false, tag + ' took the keypad');
             headingLanded(v);   // the same rule, whichever control moved the hole
         });
     });
 
-    test('WITH THE NOTCH the heading still sits at inset + 12, focused', () => {
+    test('WITH THE NOTCH the heading still lands, and still nothing is focused', () => {
         [[47, S.inset47], [59, S.inset59]].forEach(([inset, v]) => {
             assert.equal(v.inset, inset, 'the emulated inset did not take');
-            assert.equal(v.focusIsScoreBox, true, 'nothing focused at inset ' + inset);
+            assert.equal(v.focusIsScoreBox, false, 'a box took focus at inset ' + inset);
             headingLanded(v, inset);
         });
     });
 
-    test('A KP ANSWER resumes the navigation AND focuses, like Next', () => {
+    test('A KP ANSWER resumes the navigation and focuses NOTHING, like Next', () => {
         // Here the sequence is Prev onto the KP hole 7 and then Next, so the resumed
         // navigation lands on 8 - one hole earlier than the plain-Next cases above.
         const v = S.kpAnswer;
         assert.equal(v.hole, 8, 'the resumed navigation did not land: hole ' + v.hole);
         headingLanded(v);   // the resumed landing, under the same rule
-        assert.equal(v.focusIsScoreBox, true, 'the resumed landing focused nothing');
-        assert.equal(v.focusedValue, '');
+        assert.equal(v.focusIsScoreBox, false, 'the resumed landing took the keypad');
     });
 });
 
@@ -370,21 +333,29 @@ describe('OPENING AND CLOSING THE KP MODAL DOES NOT MOVE THE PAGE', () => {
     });
 });
 
-describe('THE SOURCE: THE CONDITION, AND v128 KEPT', () => {
+describe('THE SOURCE: NO FOCUSER AT ALL, AND v128 KEPT', () => {
     const IDX = read('index.html');
     const fn = name => { const at = IDX.indexOf('function ' + name + '('); return at < 0 ? '' : IDX.slice(at, IDX.indexOf('\n    }', at)); };
 
-    test('one focuser, called from landOnHole, and it tests all four refusals', () => {
-        const f = fn('focusFirstEmptyScoreBox');
-        assert.ok(f.length > 150, 'focusFirstEmptyScoreBox could not be sliced');
-        assert.match(f, /:not\(\[disabled\]\)|\.disabled/, 'it does not exclude a locked box');
-        assert.match(f, /value/, 'it does not test for an empty box');
-        assert.match(f, /innerHeight/, 'it does not test the keyboard allowance');
-        assert.match(fn('landOnHole'), /focusFirstEmptyScoreBox\(\)/, 'landOnHole does not focus');
+    test('the landing focuser and its allowance are GONE, not merely unused', () => {
+        // A function nothing calls is a function the next wave calls again by
+        // accident. Both went out with the rule.
+        assert.ok(!/focusFirstEmptyScoreBox/.test(IDX), 'the focuser is still in the page');
+        assert.ok(!/KEYBOARD_ALLOWANCE/.test(IDX), 'the keypad allowance outlived its only reader');
+        const land = fn('landOnHole');
+        assert.ok(land.length > 400, 'landOnHole could not be sliced');
+        assert.ok(!/\.focus\(/.test(land), 'the landing still focuses something');
     });
 
-    test('the keyboard allowance is a named constant, not a number buried in a test', () => {
-        assert.match(IDX, /KEYBOARD_ALLOWANCE = \d+/);
+    test('and TYPING still moves itself, which is the thing that must not have gone with it', () => {
+        // The box-to-box advance within a hole, and the mid-entry restore. Both move
+        // focus the golfer already has; neither opens a keypad that was shut. If
+        // removing the landing focus had taken typing with it, this is where it shows.
+        const adv = IDX.slice(IDX.indexOf('pendingScoreFocus = scoreBoxIdentity(next);'));
+        assert.match(adv.slice(0, 200), /next\.focus\(\); next\.select\(\)/,
+            'the within-hole advance no longer moves focus');
+        assert.match(fn('restoreScoreFocus'), /el\.focus\(\)/,
+            'a rebuild mid-entry no longer puts focus back');
     });
 
     test('the v128 reason is still written where the decision lives', () => {

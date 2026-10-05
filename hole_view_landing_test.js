@@ -66,13 +66,14 @@ const PRE = 'window.__STUBDB = ' + JSON.stringify(DB) + ';' + REFIRE + `
 // only exists when a box was focused before the rebuild. If the golfer closed the
 // keyboard, a snapshot still does not reopen it - which is the sentence the original
 // comment gave for this rule, and it is unchanged.
+// RE-POINTED 2026-10-05 (Manny): NOTHING is focused by a landing any more. The
+// keypad was opening over the compact live panel under Prev/Next on every hole
+// change, so it opens on a TAP now and at no other time. This helper used to
+// allow "a box, as long as it is empty and clear of the keyboard"; the rule it
+// holds is simply that no landing leaves a score box focused.
 const focusOk = (s, why) => {
-    if (s.active === 'BODY') return;
-    assert.ok(/^p\d+\/h\d+$/.test(String(s.active)),
-        why + ': focus is neither a score box nor nothing - ' + s.active);
-    assert.equal(s.activeValue, '', why + ': a box with a score in it holds focus');
-    assert.ok(s.activeBottom !== null && s.activeBottom <= (844 - 336),
-        why + ': the focused box is under the keyboard allowance - ' + s.activeBottom);
+    assert.ok(s.active === 'BODY' || s.active === 'HTML' || s.active === 'none',
+        why + ': a landing left focus on ' + s.active + ' - the keypad opens on a tap now');
 };
 
 // Where the page is, by identity - never by index.
@@ -330,14 +331,12 @@ describe('FIX 1: a score still focused when Next is tapped', () => {
 
 describe('THE FOCUS FOLLOWS THE BOXES: the first empty one, or nothing at all', () => {
     test('ran', () => assert.ok(S.part && S.part.ok && S.full && S.full.ok, (S.part && S.part.reason) || (S.full && S.full.reason)));
-    test('golfer 1 has hole 2 and three boxes are empty: Next lands, and the FIRST EMPTY box takes focus', () => {
-        // Re-pointed with the describe above: golfer 1's box already holds a score, so
-        // the landing must skip it and take golfer 2's. That is the condition this
-        // suite now holds; landing_focus_test.js holds the refusals.
+    test('golfer 1 has hole 2 and three boxes are empty: Next lands, and NOTHING takes focus', () => {
+        // RE-POINTED 2026-10-05. This asserted that the landing skipped golfer 1's
+        // filled box and took golfer 2's. No landing takes a box now, whatever is
+        // in it - landing_focus_test.js holds that rule across every entry point.
         const s = P(S.part, 4); landed(s, 2); assert.equal(s.enabled, 4);
         focusOk(s, 'partly scored hole');
-        assert.match(String(s.active), /^p\d+\/h2$/, 'nothing on the landed hole took focus');
-        assert.equal(s.activeValue, '', 'it focused a box that already had a score');
     });
     test('every box on hole 2 holds a score: the landing is the same, and NOTHING is focused', () => {
         const s = P(S.full, 4); landed(s, 2); assert.equal(s.enabled, 4);
@@ -406,11 +405,12 @@ describe('THE SEAM (source)', () => {
         assert.match(fn('goToAdjacentHole'), /goToHole\(/);
         assert.match(fn('jumpToHole'), /goToHole\(/);
         assert.equal((IDX.match(/\n\s+landOnHole\(\);/g) || []).length, 1, 'exactly one call site');
-        // RE-POINTED IN WAVE 27. This banned every focus() on the navigation path, to
-        // hold v128's decision. The focus is back, so the ban becomes a CONDITION: the
-        // ONLY focus allowed on that path is focusFirstEmptyScoreBox(), called from
-        // landOnHole, and it must test all three of empty, writable and clear of the
-        // keyboard. A bare focus() anywhere else on the path still fails.
+        // RE-POINTED AGAIN 2026-10-05, BACK TO THE BAN. Wave 27 turned this into a
+        // condition - one allowed focuser, called from landOnHole, testing empty,
+        // writable and clear of the keypad. That focuser is gone: it opened the
+        // keyboard over the live panel under Prev/Next on every hole change. So the
+        // navigation path focuses NOTHING again, which is what v128 decided and what
+        // this test asserted before Wave 27 reversed it.
         const navPath = [fn('landOnHole'), fn('goToHole'), fn('goToAdjacentHole'), fn('jumpToHole'), fn('toggleHolePicker')].join('\n').replace(/^\s*\/\/.*$/gm, '');
         assert.ok(!/pendingScoreFocus/.test(navPath),
             'the navigation path is using the auto-advance focus memo, which is for typing');
@@ -418,14 +418,8 @@ describe('THE SEAM (source)', () => {
         assert.equal(focusCalls.length, 0,
             'something on the navigation path focuses directly instead of going through '
             + 'focusFirstEmptyScoreBox: ' + focusCalls.join(', '));
-        assert.match(fn('landOnHole'), /focusFirstEmptyScoreBox\(\)/,
-            'landOnHole no longer focuses the first empty box');
-        const f = fn('focusFirstEmptyScoreBox');
-        assert.ok(f.length > 150, 'focusFirstEmptyScoreBox could not be sliced');
-        assert.match(f, /:not\(\[disabled\]\)/, 'it does not skip a locked box');
-        assert.match(f, /value/, 'it does not require an EMPTY box');
-        assert.match(f, /innerHeight/, 'it does not test the keyboard allowance');
-        assert.match(f, /KEYBOARD_ALLOWANCE/, 'the allowance is not the named constant');
+        assert.ok(!/focusFirstEmptyScoreBox/.test(IDX),
+            'the landing focuser is back in the page');
         // The claim the snapshot re-points rest on: with no memo there is no focus to
         // restore, so a rebuild cannot invent one.
         assert.match(fn('restoreScoreFocus'), /if \(!memo\) return;/,
