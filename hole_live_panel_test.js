@@ -203,13 +203,13 @@ describe('4. IT READS, IT DOES NOT COMPUTE', () => {
             assert.ok(v.navBottom <= 844, when + ': Prev/Next is off the bottom at ' + v.navBottom);
             assert.ok(v.cardBottom <= 844, when + ': the card ends at ' + v.cardBottom);
             assert.equal(v.scrollY, 0, when + ': the page scrolled on a card that fits');
-            // THE DOCUMENT IS A LITTLE TALLER THAN THE SCREEN, AND THAT IS THE
-            // HANDLE'S RESERVE. #main-content keeps 64px of bottom padding so the
-            // last thing on the page is not sitting under the sheet handle; what
-            // must not happen is scrollable CONTENT, which the two lines above are.
-            // Measured: 901px against 844, which is the reserve and nothing else.
-            assert.ok(v.docH <= 844 + 64,
-                when + ': the page is ' + v.docH + 'px - more than the handle reserve');
+            // AND THE PAGE IS DELIBERATELY LONGER THAN THE SCREEN (2026-10-05).
+            // The reading area - the leaderboard, Today's Games, the skins card, My
+            // Round - is back ON the page below the hole, because a fresh round
+            // behind a handle said nothing at all about what the group was playing
+            // for. What must never happen is the CARD not fitting, which is the two
+            // lines above and what the landing rule tests; what is below it is
+            // scrollable by design.
         });
     });
 });

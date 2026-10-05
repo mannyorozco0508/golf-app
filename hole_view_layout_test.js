@@ -23,6 +23,10 @@
 // prove nothing.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -98,9 +102,9 @@ function dashboardIsOutOfTheHoleBlock(body) {
         assert.equal(body.indexOf(id), -1, id + ' is emitted inside renderHoleView again');
     });
     const sheet = (() => { const src = read('index.html');
-        return src.slice(src.indexOf('<div id="round-sheet-body">'),
+        return src.slice(src.indexOf('<div id="round-reading">'),
                          src.indexOf('</div>', src.indexOf('id="bet-strip-mount"'))); })();
-    assert.match(sheet, /id="live-ticker-mount"/, 'the dashboard mount is not in the Status sheet');
+    assert.match(sheet, /id="live-ticker-mount"/, 'the dashboard mount is not in the reading area on the page');
     // AND THE HOLE BLOCK IS STILL WHOLE: heading, then boxes, then Prev/Next.
     assert.ok(body.indexOf('hole-view-header') > -1, 'the hole heading is gone');
     assert.ok(body.indexOf('hole-view-header') < body.indexOf('html += navRowHtml'),

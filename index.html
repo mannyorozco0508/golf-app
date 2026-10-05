@@ -1612,6 +1612,15 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
 .hl-match { color: var(--text-main); }
 .hl-match b { color: var(--brand-green); }
 .hl-hole { color: var(--accent-teal); font-weight: bold; }
+
+/* THE READING AREA (2026-10-05): on the page, below the hole, scrollable. It
+   gets a little air above it so the hole card still reads as the thing you are
+   standing on. */
+#round-reading { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+#round-reading:empty { display: none; }
+.tg-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px 12px; }
+.tg-head { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 6px; }
+.tg-list { margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-main); line-height: 1.5; }
 #round-sheet-scrim {
     position: fixed; inset: 0; z-index: 59;
     background: rgba(0,0,0,0.28);
@@ -1846,6 +1855,29 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
          So the runway is now explicit, sized to exactly what the landing needs and zero
          when the page is long enough on its own. It is empty, it is below everything a
          golfer reads, and it costs nothing but scroll length. -->
+    <!-- THE READING AREA (2026-10-05). On the PAGE, below Prev/Next, scrollable.
+         Manny on a fresh round: "too plain - no leaderboard, no widgets". The
+         declutter had put every reading card behind the Status sheet, which is
+         right for a round in progress and wrong for one that has not started:
+         there is nothing on the first screen to say what you are playing for.
+         So the sheet keeps SETTINGS AND ADMIN only, and everything a golfer
+         READS comes back onto the page under the hole. The first screen is
+         unchanged - the card still fits it, and the landing rule still tests
+         that fit - and this is what you get when you scroll. -->
+    <div id="round-reading">
+        <!-- ORDER IS MANNY'S (2026-10-05): the leaderboard and the live matches
+             come FIRST, directly under the hole, because they are what a group
+             looks at between shots. The compact one-line versions of both are on
+             the first screen under Prev/Next; these are the full ones. Today's
+             games, the skins card and Playing With sit below them. -->
+        <div id="live-ticker-mount"></div>
+        <div id="todays-games-mount"></div>
+        <div id="hole-recap-mount"></div>
+        <div id="live-skins-mount"></div>
+        <div id="action-center-mount"></div>
+        <div id="bet-strip-mount"></div>
+    </div>
+
     <div id="hole-landing-runway" aria-hidden="true"></div>
 
     <!-- ORGANIZER ONLY, AND NOT MERELY HIDDEN.
@@ -1873,15 +1905,7 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
         <span id="round-sheet-label">Status &amp; everything else</span>
         <span id="round-sheet-caret" aria-hidden="true">▲</span>
     </button>
-    <div id="round-sheet-body">
-        <!-- The four reading mounts. They used to be built inside the hole card on
-             every render; here they are written to by the same renderers, by id. -->
-        <div id="live-ticker-mount"></div>
-        <div id="hole-recap-mount"></div>
-        <div id="live-skins-mount"></div>
-        <div id="action-center-mount"></div>
-        <div id="bet-strip-mount"></div>
-    </div>
+    <div id="round-sheet-body"></div>
 </div>
 
 <!-- WHICH GROUP ARE YOU KEEPING SCORE FOR? (2026-09-20). Shown once, on arrival,
@@ -3427,6 +3451,47 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
     // rule too.
     //
     // THE SHEET KEEPS THE FULL VERSIONS. This is the same data, one line each.
+    // ---- TODAY'S GAMES (2026-10-05) ----------------------------------------
+    //
+    // What this round is set up to play, before anybody has played it. On a fresh
+    // round every other card is empty by design - no scores, no skins, no bets -
+    // and the page said nothing at all about what the group had just agreed.
+    //
+    // IT DESCRIBES NOTHING ITSELF. Every line is a builder's own words:
+    // getRoundGames() and describeGame() from action-model.js - the same pair the
+    // setup review and the Action list use - and buildMoneyPoolBanner() for the
+    // pot, which is computeMoneyPool's figure, not one counted here.
+    function renderTodaysGames() {
+        const mount = document.getElementById('todays-games-mount');
+        if (!mount) return;
+        if (typeof scopeMissing === 'function' && scopeMissing()) { mount.innerHTML = ''; return; }
+        const esc = t => String(t === undefined || t === null ? '' : t)
+            .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        let games = [];
+        try {
+            games = (typeof getRoundGames === 'function' ? getRoundGames(currentData) : []) || [];
+        } catch (e) { games = []; }
+        const lines = [];
+        games.forEach(g => {
+            let text = '';
+            try { text = (typeof describeGame === 'function') ? describeGame(g) : (g && g.label); }
+            catch (e) { text = g && g.label; }
+            if (text) lines.push('<li>' + esc(text) + '</li>');
+        });
+        // The Weekly Game pot, in the engine's own words.
+        let pot = '';
+        try { pot = (typeof buildMoneyPoolBanner === 'function') ? buildMoneyPoolBanner() : ''; }
+        catch (e) { pot = ''; }
+        const sides = Object.keys((currentData && currentData.sideMatches) || {}).length;
+        if (sides > 0) lines.push('<li>\u2694\uFE0F ' + sides + ' side match' + (sides === 1 ? '' : 'es') + '</li>');
+        if (!lines.length && !pot) { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<div class="tg-card">'
+            + '<div class="tg-head">\uD83C\uDFCC\uFE0F TODAY\u2019S GAMES</div>'
+            + (lines.length ? '<ul class="tg-list">' + lines.join('') + '</ul>' : '')
+            + pot
+            + '</div>';
+    }
+
     function renderHoleLive() {
         const mount = document.getElementById('hole-live-mount');
         if (!mount) return;
@@ -3437,14 +3502,23 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
         const rows = [];
 
         // 1. THE TOP FIVE, and the way to the rest.
+        // THE SAME ALWAYS-SHOWN RULE AS THE BOARD WIDGET (2026-10-05): before
+        // anyone has started, every golfer is level and the line says so - E, thru
+        // 0 - rather than the panel being blank on the one screen a group looks at
+        // while they are still on the first tee.
         let board = [];
-        try { board = (typeof liveStandings === 'function' ? liveStandings() : []).filter(r => r.started); }
-        catch (e) { board = []; }
+        try {
+            const all = (typeof liveStandings === 'function' ? liveStandings() : []);
+            const started = all.filter(r => r.started);
+            board = started.length ? started : all;
+        } catch (e) { board = []; }
         if (board.length) {
             rows.push('<div class="hl-row hl-board">'
                 + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
                     + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
-                    + (r.thru ? ' <i>thru ' + esc(r.thru) + '</i>' : '') + '</span>').join('')
+                    // THRU IS ALWAYS PRINTED, 0 included: before anyone has started,
+                    // "E thru 0" is the whole truth about the round and reads as one.
+                    + ' <i>thru ' + esc(r.thru || 0) + '</i></span>').join('')
                 + '<button type="button" class="hl-more" onclick="openLiveBoard()">Full board \u203A</button>'
                 + '</div>');
         }
@@ -3510,6 +3584,7 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
     }
 
     function renderCardWidgets() {
+        renderTodaysGames();
         renderHoleLive();
         renderKpEntryMount();
         renderFooterRow();
@@ -4233,7 +4308,15 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
     }
 
     function renderLeaderWidgetHtml() {
-        const rows = liveStandings().filter(r => r.started);
+        // ALWAYS SHOWN (2026-10-05). This returned '' until somebody had posted a
+        // score, so a round that had just been set up had no board at all - which
+        // is the state a group is in when they most want to see that the app knows
+        // who is playing. Before anyone has started, every golfer is level: E, thru
+        // 0, which is the truth and reads as one. liveStandings() already returns
+        // them with started false, toPar 0 and thru 0; nothing is invented here.
+        const all = liveStandings();
+        const started = all.filter(r => r.started);
+        const rows = started.length ? started : all;
         if (rows.length === 0) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
@@ -6273,30 +6356,45 @@ body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
     // earlier, called buildRoundSheet() and died on `undefined.forEach`. The page
     // then never revealed itself at all. Measured in Chrome, not reasoned about.
     function buildRoundSheet() {
+        // SETTINGS AND ADMIN ONLY (2026-10-05). The sheet used to hold everything
+        // that was not the hole, reading cards included, and on a fresh round that
+        // left the page with nothing on it but four empty boxes. What belongs
+        // behind a handle is what a golfer touches once a round: the theme, the
+        // code, the nav, the Dots selector, the way out and the way to delete.
         var ROUND_SHEET_BLOCKS = [
             'header-controls-row',      // Dark Mode, History
             'header-box',               // the game code, the course and the round name
             'app-nav-wrap',             // Leaderboard, Bets, Results, Matches, Home...
-            'spectator-hint-banner',
-            'round-landing-summary',    // Playing With / Scoring / Action
-            'status-panel',             // live status, group scores, leaderboard, skins
-            'group-filter-container',   // All Players, Edit round setup, Players
-            'view-mode-toggle',         // Hole View / Full Card
             'dot-context-row',          // the Dots: selector, on rounds that have one
+            'view-mode-toggle',         // Hole View / Full Card
+            'group-filter-container',   // All Players, Edit round setup, Players
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
+        ];
+        // AND EVERYTHING A GOLFER READS GOES ON THE PAGE, under the hole, in the
+        // order they ask for it: what we are playing for, where everyone stands,
+        // what just happened, the skins, my round, the bet detail.
+        var ROUND_READING_BLOCKS = [
+            'spectator-hint-banner',
+            'round-landing-summary',    // Playing With / Scoring / Action
+            'status-panel'              // live status and the group-scores card
         ];
         var body = document.getElementById('round-sheet-body');
         if (!body) return 0;
         var moved = 0;
-        ROUND_SHEET_BLOCKS.forEach(function (id) {
-            var el = document.getElementById(id);
-            // A block that is not on this page is not an error: the delete mount is
-            // empty for anyone but the organizer, and a page may drop a card.
-            if (!el || el.parentNode === body) return;
-            body.appendChild(el);
-            moved++;
-        });
+        var move = function (ids, into) {
+            if (!into) return;
+            ids.forEach(function (id) {
+                var el = document.getElementById(id);
+                // A block that is not on this page is not an error: the delete mount
+                // is empty for anyone but the organizer, and a page may drop a card.
+                if (!el || el.parentNode === into) return;
+                into.appendChild(el);
+                moved++;
+            });
+        };
+        move(ROUND_SHEET_BLOCKS, body);
+        move(ROUND_READING_BLOCKS, document.getElementById('round-reading'));
         document.body.classList.add('has-round-sheet');
         return moved;
     }

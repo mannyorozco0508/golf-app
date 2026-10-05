@@ -273,10 +273,14 @@ describe('A FOUR-GOLFER CARD: nothing to scroll, and still clear of the status b
             // THE EXACT LANDING IS PROVEN ABOVE, on the eight-golfer card, which is
             // where there is room to prove it. Asserting it here would be asserting
             // that a 844px page can scroll 159px.
-            assert.ok(v.scrollY <= v.scrollRoom + 1,
-                'the page scrolled further than it had room for: ' + v.scrollY + ' of ' + v.scrollRoom);
-            assert.ok(v.scrollRoom < OFFSET + inset + 1,
-                'this card has real scroll room now (' + v.scrollRoom + 'px) - assert the exact landing, as above');
+            // RE-POINTED 2026-10-05: scroll room is no longer the test and cannot be
+            // - the reading area below the hole is scrollable by design. The rule is
+            // the CARD: a four-golfer card fits, so the landing leaves the page at
+            // the top and nothing goes under the status bar.
+            assert.ok(v.navBottom !== null && v.navBottom <= 844,
+                'the four-golfer card stopped fitting (nav row ends at ' + v.navBottom + ')');
+            assert.equal(v.scrollY, 0,
+                'the card fits and the page scrolled to ' + v.scrollY + ' anyway');
             assert.equal(v.clearOfInset, true,
                 'the heading is BEHIND the status bar: top ' + v.headerTop + ' against an inset of ' + inset);
             assert.equal(v.boxCount, 4);

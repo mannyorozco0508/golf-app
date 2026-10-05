@@ -35,6 +35,10 @@
 // did not exist. index.html was restored by sha from a saved copy, not with git.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -70,10 +74,18 @@ describe('1. THE SHEET EXISTS, AND IT IS ONE SHEET', () => {
 
     test('and it names what it holds, in one list, read by the mover', () => {
         const ids = movedIds();
-        ['header-controls-row', 'header-box', 'app-nav-wrap', 'round-landing-summary',
-         'status-panel', 'group-filter-container', 'view-mode-toggle',
+        // RE-POINTED 2026-10-05: the sheet keeps SETTINGS AND ADMIN only. The
+        // reading cards - Playing With, the status panel, the leaderboard, the
+        // skins card - went back onto the page below the hole, because a fresh
+        // round behind a handle said nothing about what the group was playing for.
+        // fresh_round_page_test.js holds that split from the other side.
+        ['header-controls-row', 'header-box', 'app-nav-wrap', 'dot-context-row',
+         'group-filter-container', 'view-mode-toggle',
          'scorecard-footer', 'end-round-mount'].forEach(id => {
             assert.ok(ids.includes(id), id + ' is not in the moved list');
+        });
+        ['round-landing-summary', 'status-panel'].forEach(id => {
+            assert.ok(!ids.includes(id), id + ' is behind the handle again - it is a reading card');
         });
         // THE HOLE DOES NOT MOVE. If any of these ever joins the list, the screen
         // a golfer scores from has gone into a drawer.
@@ -94,7 +106,7 @@ describe('1. THE SHEET EXISTS, AND IT IS ONE SHEET', () => {
     });
 
     test('the five reading mounts are static children of the sheet, not of the hole card', () => {
-        const body = IDX.slice(IDX.indexOf('<div id="round-sheet-body">'),
+        const body = IDX.slice(IDX.indexOf('<div id="round-reading">'),
                                IDX.indexOf('</div>', IDX.indexOf('<div id="bet-strip-mount"></div>')));
         ['live-ticker-mount', 'hole-recap-mount', 'live-skins-mount',
          'action-center-mount', 'bet-strip-mount'].forEach(id => {
@@ -133,10 +145,13 @@ describe('2. THE MOVER RUNS, AND IT RUNS BEFORE THE PAGE IS SEEN', () => {
     test('it moves the nodes it finds and is quiet about the ones it does not', () => {
         const fn = IDX.slice(IDX.indexOf('function buildRoundSheet()'),
                              IDX.indexOf('function toggleRoundSheet('));
-        assert.match(fn, /body\.appendChild\(el\)/, 'it does not move anything');
+        assert.match(fn, /into\.appendChild\(el\)/, 'it does not move anything');
         assert.ok(!/innerHTML/.test(fn), 'it rebuilds markup instead of moving nodes');
-        assert.match(fn, /if \(!el \|\| el\.parentNode === body\) return;/,
+        assert.match(fn, /if \(!el \|\| el\.parentNode === into\) return;/,
             'a missing block or a second call must be a no-op');
+        // TWO DESTINATIONS NOW, one mover: settings to the sheet, reading to the page.
+        assert.match(fn, /move\(ROUND_SHEET_BLOCKS, body\);/);
+        assert.match(fn, /move\(ROUND_READING_BLOCKS, document\.getElementById\('round-reading'\)\);/);
     });
 });
 

@@ -28,6 +28,10 @@
 // in hole_view_landing_test.js (Chrome), not here.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -59,9 +63,9 @@ describe('PART A — ONE BOARD, TWO MOUNTS', () => {
         // would mean the renderer writes to whichever came first.
         assert.equal((IDX.match(/id="live-ticker-mount"/g) || []).length, 1,
             'there is not exactly one Hole View dashboard mount');
-        const sheet = IDX.slice(IDX.indexOf('<div id="round-sheet-body">'),
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-reading">'),
                                 IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
-        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the Status sheet');
+        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the reading area on the page');
     });
 
     test('the Full Card now has its own mount element', () => {

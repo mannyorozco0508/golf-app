@@ -19,6 +19,10 @@
 // nothing - and a page reimplementing it would drift from the receipt.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -247,13 +251,13 @@ describe('SCORECARD ORDER CONTRACT', () => {
         // that is what would put them back above Prev/Next on the next edit.
         const nav = src.indexOf('html += navRowHtml;');
         assert.notEqual(nav, -1, 'the nav row must still be rendered');
-        const sheet = src.slice(src.indexOf('<div id="round-sheet-body">'),
+        const sheet = src.slice(src.indexOf('<div id="round-reading">'),
                                 src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
         ['live-ticker-mount', 'hole-recap-mount', 'live-skins-mount',
          'action-center-mount', 'bet-strip-mount'].forEach(id => {
             assert.equal(src.indexOf(`html += '<div id="${id}"></div>';`), -1,
                 `${id} is built inside the hole card again`);
-            assert.match(sheet, new RegExp('id="' + id + '"'), `${id} is not in the Status sheet`);
+            assert.match(sheet, new RegExp('id="' + id + '"'), `${id} is not in the reading area on the page`);
         });
     });
 

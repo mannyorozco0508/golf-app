@@ -1,4 +1,8 @@
 const { test, describe } = require('node:test');
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -573,7 +577,7 @@ describe('SCORECARD RENDER', () => {
         // absence from the hole card is asserted too, because a mount creeping back
         // into that html is what would put it above Prev/Next again.
         const sheetOrder = (() => { const src = read('index.html');
-            return src.slice(src.indexOf('<div id="round-sheet-body">'),
+            return src.slice(src.indexOf('<div id="round-reading">'),
                              src.indexOf('</div>', src.indexOf('id="bet-strip-mount"'))); })();
         const idx = read('index.html');
         const recap = sheetOrder.indexOf('id="hole-recap-mount"');

@@ -255,6 +255,20 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
             }
             delete text['hole-live-mount'];
             delete prevText['hole-live-mount'];
+            // RE-PINNED 2026-10-05: a second added key, todays-games-mount - what
+            // this round is set up to PLAY, which a fresh round said nothing about
+            // once the reading cards went behind the Status sheet. Same treatment:
+            // asserted in both directions, then removed from both maps. Its words
+            // are action-model's own (getRoundGames + describeGame) and the pot is
+            // buildMoneyPoolBanner's, so a change here is a change in a builder.
+            assert.equal(prevText['todays-games-mount'], undefined,
+                'the golden already had a games card - re-read it before trusting this line');
+            assert.match(String(text['todays-games-mount'] || ''), /TODAY/i,
+                k + ': the games card did not render: ' + text['todays-games-mount']);
+            assert.match(String(text['todays-games-mount'] || ''), /Stroke Play/,
+                k + ': it does not name the format');
+            delete text['todays-games-mount'];
+            delete prevText['todays-games-mount'];
             assert.deepEqual(text, prevText);
             const display = Object.assign({}, a.display);
             assert.equal(display['group-missing-note'], 'none', 'the note is hidden');

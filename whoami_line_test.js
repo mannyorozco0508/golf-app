@@ -77,8 +77,10 @@ const LINE = `(function () {
 // behind a handle, so on arrival they are off screen - and innerText of a hidden
 // block is '', which is why these reads came back null rather than wrong. A golfer
 // reaches them with one tap on the handle; so does this check.
+// THE SHEET STEP CAME OUT AGAIN (2026-10-05). My Round is back ON the page,
+// below Prev/Next, with every other card a golfer reads - the sheet keeps
+// settings and admin only. One tap on the toggle, as it always was.
 const OPEN = [{ tap: '.hole-view-nav-btn', nth: 0 }, { sleep: 450 },
-              { tap: '#round-sheet-handle', nth: 0 }, { sleep: 450 },
               { tap: '.action-toggle', nth: 0 }, { sleep: 450 }];
 
 async function arrive(storage, extra) {

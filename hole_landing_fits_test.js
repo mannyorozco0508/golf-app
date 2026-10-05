@@ -142,10 +142,15 @@ describe('1. A FOUR-GOLFER CARD LANDS AT THE TOP', () => {
 });
 
 describe('2. THE RUNWAY IS NOT ADDED TO A PAGE THAT DOES NOT NEED IT', () => {
-    test('a fitting card has no runway and nothing to drift into', () => {
+    test('a fitting card adds no runway of its own', () => {
+        // RE-POINTED 2026-10-05: the page IS scrollable now, and deliberately - the
+        // leaderboard, the live matches, Today's games and the rest are back on it
+        // below the hole. What must not happen is the LANDING adding scroll length
+        // to a card that already fits, which is what the runway would do and what
+        // made the page drift under the status bar in the first place.
         const v = S.four[0];
         assert.equal(v.runway, 0, 'the runway is ' + v.runway + 'px on a card that fits');
-        assert.equal(v.maxScroll, 0, 'the page can still scroll ' + v.maxScroll + 'px');
+        assert.equal(v.scrollY, 0, 'and the page is still at the top');
     });
 });
 

@@ -10,6 +10,10 @@
 // information ON the scorecard so it never retreats behind More.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -123,10 +127,10 @@ describe('SCORE -> NEXT: the reading order', () => {
         ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].forEach(m => {
             assert.equal(h.indexOf(m), -1, m + ' is rendered inside the hole card again');
         });
-        const sheet = IDX.slice(IDX.indexOf('<div id="round-sheet-body">'),
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-reading">'),
                                 IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
         ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount'].forEach(m => {
-            assert.match(sheet, new RegExp('id="' + m + '"'), m + ' is not in the Status sheet');
+            assert.match(sheet, new RegExp('id="' + m + '"'), m + ' is not in the reading area on the page');
         });
     });
 
@@ -260,7 +264,7 @@ describe('THE BETTING INFORMATION STAYS ON THE SCORECARD', () => {
         // leaving the round - rather than on another page. They are: one handle at
         // the bottom of the card opens all of them at once. What this refuses is
         // their disappearance, so it is asserted where they now live.
-        const sheet = IDX.slice(IDX.indexOf('<div id="round-sheet-body">'),
+        const sheet = IDX.slice(IDX.indexOf('<div id="round-reading">'),
                                 IDX.indexOf('</div>', IDX.indexOf('id="bet-strip-mount"')));
         ['action-center-mount', 'bet-strip-mount', 'hole-recap-mount',
          'live-skins-mount', 'live-ticker-mount'].forEach(m =>

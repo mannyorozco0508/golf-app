@@ -297,10 +297,16 @@ describe('THE HEIGHT RECLAIMED, AS A NUMBER', () => {
         // Measured at 390x844: 844px bare and 844px scored, against 2177 and 2366
         // on v247. The footer row itself is unchanged and is still asserted above,
         // where it now lives.
-        assert.ok(S.bare.docH <= 844, 'the bare round is ' + S.bare.docH + 'px - it scrolls again');
-        assert.ok(S.scored.docH <= 844, 'the scored round is ' + S.scored.docH + 'px - it scrolls again');
-        assert.ok(2177 - S.bare.docH >= 1300, 'the bare page gave back only ' + (2177 - S.bare.docH) + 'px');
-        assert.ok(2366 - S.scored.docH >= 1500, 'the scored page gave back only ' + (2366 - S.scored.docH) + 'px');
+        // RE-POINTED AGAIN 2026-10-05, and this is the arc finishing where it
+        // started. The declutter made the page one screen by putting every reading
+        // card behind a handle; a fresh round then said nothing about itself, so
+        // the cards came back ON the page below the hole and the document is long
+        // again - 1436px bare against 2177 on v247. What the footer wave was really
+        // defending is unchanged and is asserted where it belongs: the HOLE CARD
+        // fits one screen, which is what the landing rule tests and what the two
+        // assertions in the describe below measure.
+        assert.ok(S.bare.docH < 2177, 'the bare page is ' + S.bare.docH + 'px, no shorter than v247');
+        assert.ok(S.scored.docH < 2366, 'the scored page is ' + S.scored.docH + 'px, no shorter than v247');
         // AND THE DELETE BOX IS STILL THE ORGANIZER'S, in the sheet with the rest:
         // measured on its own arrival so the term cannot quietly become zero.
         assert.ok(S.owner.deleteBoxH > 150 && S.owner.deleteBoxH < 250,
@@ -355,6 +361,8 @@ describe('THE LANDING STILL WORKS AFTER THE FOOTER SHRANK', () => {
                     var pad = document.getElementById('hole-landing-runway');
                     return JSON.stringify({
                         headerTop: hdr ? Math.round(hdr.getBoundingClientRect().top) : null,
+                        navBottom: (function () { var n = document.querySelector('.hole-view-nav-row');
+                          return n ? Math.round(n.getBoundingClientRect().bottom) : null; })(),
                         runwayH: pad ? Math.round(pad.getBoundingClientRect().height) : null,
                         scrollY: Math.round(window.pageYOffset || 0),
                         maxScroll: Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
@@ -373,10 +381,14 @@ describe('THE LANDING STILL WORKS AFTER THE FOOTER SHRANK', () => {
             // here - and the exact 12px landing is proven in hole_landing_inset_test
             // on an eight-golfer card in ONE group, which is genuinely taller than
             // the screen. This file's own subject, the footer row, is unchanged.
-            if (L[n].maxScroll >= 12) {
+            // RE-POINTED AGAIN 2026-10-05: scroll room is not the test and cannot be,
+            // because the reading area below the hole is scrollable by design. The
+            // rule is the CARD - if it fits with the page at the top, the landing
+            // leaves it there.
+            if (L[n].navBottom !== null && L[n].navBottom > 844) {
                 assert.equal(L[n].headerTop, 12,
-                    'the heading is ' + L[n].headerTop + 'px from the top with '
-                    + L[n].maxScroll + 'px of room - the landing did not fire');
+                    'the heading is ' + L[n].headerTop + 'px from the top on a card that '
+                    + 'does not fit - the landing did not fire');
             } else {
                 assert.ok(L[n].scrollY <= L[n].maxScroll + 1,
                     'the page scrolled past its own end: ' + L[n].scrollY + ' of ' + L[n].maxScroll);

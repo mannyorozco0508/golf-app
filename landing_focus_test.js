@@ -175,7 +175,15 @@ before(async () => {
         return sc;
     })() }), 'game=LF&group=1', NEXT);
     // A SPECTATOR: bare link on an eight-golfer round - every box disabled.
-    S.spectator = await land(round(), 'game=LF', NEXT);
+    // THE SPECTATOR SAYS SO FIRST (2026-10-05). A bare link to a multi-group round
+    // opens the "Keeping score, playing, or just watching?" sheet over the page, and
+    // this arrival used to tap Next straight through it - which worked only as long
+    // as the tap landed on nothing. With the reading area back on the page the
+    // layout moved, the tap reached a picker row, and the fixture quietly became a
+    // scorekeeper with writable boxes. Answering the question is what a spectator
+    // does, and it is what makes this fixture one.
+    S.spectator = await land(round(), 'game=LF',
+        [{ tap: '#group-pick-overlay [data-role="watching"]' }, { sleep: 500 }].concat(NEXT));
     // PAST THE KEYBOARD LINE: a short viewport puts the second row under the keypad
     // allowance, so a filled first box must leave nothing focusable.
     S.pastLine = await land(round({ scores: Object.assign(scoresThrough(7, G1), { p101_h9: 4 }) }),

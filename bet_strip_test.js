@@ -1,4 +1,8 @@
 const { test, describe } = require('node:test');
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -554,9 +558,9 @@ describe('SCORECARD WIRING — the strip is mounted and prompt() is gone', () =>
         // not build it again, which is what would put it back above Prev/Next.
         assert.ok(!/html \+= '<div id="bet-strip-mount"><\/div>';/.test(idx),
             'the hole card builds the bet strip mount again');
-        const sheet = idx.slice(idx.indexOf('<div id="round-sheet-body">'),
+        const sheet = idx.slice(idx.indexOf('<div id="round-reading">'),
                                 idx.indexOf('</div>', idx.indexOf('id="bet-strip-mount"')));
-        assert.match(sheet, /id="bet-strip-mount"/, 'the mount is not in the Status sheet');
+        assert.match(sheet, /id="bet-strip-mount"/, 'the mount is not in the reading area on the page');
         assert.ok(idx.indexOf('html += navRowHtml;') > -1, 'the hole card lost Prev/Next');
     });
 

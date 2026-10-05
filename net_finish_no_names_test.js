@@ -365,8 +365,9 @@ describe('COLD CHROME: a phone arriving mid-round sees no names', () => {
             // off screen until the handle is tapped - and a tap at the coordinates of
             // something hidden lands on whatever is actually there. One extra tap,
             // the same one a golfer makes.
-            steps: [{ tap: '#round-sheet-handle' }, { sleep: 500 },
-                    { tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
+            // My Round is back on the page (2026-10-05), so the handle tap came
+            // out again: the sheet keeps settings and admin only.
+            steps: [{ tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
         v = r.ok ? JSON.parse(r.value[r.value.length - 1]) : { error: r.reason };
     });
 
@@ -412,8 +413,9 @@ describe('COLD CHROME: a LEGACY CENTS round prints the split exactly, never roun
             // off screen until the handle is tapped - and a tap at the coordinates of
             // something hidden lands on whatever is actually there. One extra tap,
             // the same one a golfer makes.
-            steps: [{ tap: '#round-sheet-handle' }, { sleep: 500 },
-                    { tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
+            // My Round is back on the page (2026-10-05), so the handle tap came
+            // out again: the sheet keeps settings and admin only.
+            steps: [{ tap: '.action-toggle' }, { sleep: 600 }, { expression: LOOK }] });
         v = r.ok ? JSON.parse(r.value[r.value.length - 1]) : { error: r.reason };
     });
 

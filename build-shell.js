@@ -116,7 +116,9 @@ const PRODUCTS = {
         // 10th tee. A device on v132 has no such file and plays 1..18.
         // Moved to v134: side bets, the Receipt labels and the skins carry follow
         // the order the holes were played. A device on v133 settles them by number.
-        cacheName: 'consumer-v134-playorder',
+        // Moved to v135: the scorecard wave - the hole on screen, the reading
+        // cards on the page under it, the rest behind one handle.
+        cacheName: 'consumer-v135-scorecard',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',

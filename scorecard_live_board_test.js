@@ -24,6 +24,10 @@
 // skins. Results answers what anything is worth.
 // ============================================================================
 
+// RE-POINTED 2026-10-05: the reading mounts moved OUT of the Status sheet and
+// back onto the page, into #round-reading below Prev/Next - a fresh round behind
+// a handle said nothing about what the group was playing for. The sheet keeps
+// settings and admin. Same claim, read where they now live.
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -190,12 +194,21 @@ describe('LIVE TICKER ON THE SCORECARD', () => {
         assert.ok(!/\$/.test(scorecard().ticker()));
     });
 
-    test('the standings widget stays away before anybody tees off', () => {
-        // The skins widget may still render its own honest empty state; what must not
-        // appear is a leaderboard with nobody in it.
+    test('the standings widget SHOWS before anybody tees off, with everyone level', () => {
+        // RE-POINTED 2026-10-05 (Manny, on a fresh round: "too plain - no
+        // leaderboard, no widgets"). This asserted the board stayed away until
+        // somebody posted a score, on the reasoning that "a leaderboard with
+        // nobody in it" is worse than none. A board with EVERYONE in it at E is
+        // not that: it is the truth about a round that has not started, and it is
+        // what tells a group on the first tee that the app knows who is playing.
+        // The card the complaint was about had four empty boxes and nothing else.
         const b = scorecard();
         b.run('currentData.scores = {}; renderLiveTicker();');
-        assert.ok(!/LIVE LEADERBOARD/.test(strip(b.ticker())), 'no standings to show yet');
+        const t = strip(b.ticker());
+        assert.match(t, /LIVE LEADERBOARD/, 'the board is missing on a fresh round: ' + t);
+        // AND IT IS LEVEL, not a made-up order: every golfer at E.
+        assert.ok((t.match(/\bE\b/g) || []).length >= 2,
+            'the board invented positions before anyone played: ' + t);
     });
 
     test('it is always NET, whatever the Leaderboard toggle says', () => {
@@ -461,9 +474,9 @@ describe('THE DASHBOARD WIDGETS', () => {
         const src = read('index.html');
         assert.ok(!/html \+?= '<div id="live-ticker-mount"><\/div>'/.test(src),
             'the hole view emits the dashboard mount again');
-        const sheet = src.slice(src.indexOf('<div id="round-sheet-body">'),
+        const sheet = src.slice(src.indexOf('<div id="round-reading">'),
                                 src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
-        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the Status sheet');
+        assert.match(sheet, /id="live-ticker-mount"/, 'the mount is not in the reading area on the page');
     });
 
     test('one layout rule, not a per-device pile', () => {
@@ -769,7 +782,7 @@ describe('THE PRODUCTION SHAPE — MONEY POOL WITH NET SKINS', () => {
         // scorecard itself inserts it"; it is now off the hole card entirely, which
         // is the same intent taken one step further, and the mount must not come back
         // into that html string or it sits between the heading and the boxes again.
-        const sheetBody = src.slice(src.indexOf('<div id="round-sheet-body">'),
+        const sheetBody = src.slice(src.indexOf('<div id="round-reading">'),
                                     src.indexOf('</div>', src.indexOf('id="bet-strip-mount"')));
         assert.match(sheetBody, /id="live-ticker-mount"/,
             'the mount must be in the page the scorecard ships, not invented at runtime');

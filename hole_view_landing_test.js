@@ -354,8 +354,12 @@ describe('THE FOCUS FOLLOWS THE BOXES: the first empty one, or nothing at all', 
         // pages, so what is asserted instead is the thing that still has to be true -
         // on a page with nothing to scroll the landing moves nothing, and the heading
         // is on screen above its boxes, which landed() has just checked.
-        assert.equal(s.canScroll, false, 'LNDFULL has scroll room again, so the landing should have fired');
-        assert.equal(s.scrollY, 0, 'a page with no scroll room scrolled anyway');
+        // RE-POINTED 2026-10-05: the page is scrollable by design now - the reading
+        // area is back on it below the hole - so the test is the CARD, as it is
+        // everywhere else in this file.
+        assert.ok(s.navBottom !== null && s.navBottom <= 844,
+            'LNDFULL stopped fitting (nav row ends at ' + s.navBottom + ')');
+        assert.equal(s.scrollY, 0, 'the card fits and the page scrolled anyway');
         assert.ok(s.headingTop > P(S.part, 4).headingTop,
             'the completed-round card is no longer above the hole view: ' + s.headingTop
             + ' vs ' + P(S.part, 4).headingTop);
