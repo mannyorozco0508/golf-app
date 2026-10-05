@@ -236,6 +236,25 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
             }
             delete text['end-round-mount'];
             delete prevText['end-round-mount'];
+            // RE-PINNED 2026-10-05: ONE ADDED KEY, hole-live-mount - the compact
+            // live panel under Prev/Next. It did not exist when this golden was
+            // captured, so it is asserted in both directions and then removed from
+            // both maps, exactly as end-round-mount is above. On the two group
+            // links it carries the board and that group's own matches; on the bare
+            // link it carries the board and whatever the whole field can see.
+            assert.equal(prevText['hole-live-mount'], undefined,
+                'the golden already had a live panel - re-read it before trusting this line');
+            if (k !== 'one-group-1') {
+                assert.match(String(text['hole-live-mount'] || ''), /Full board/,
+                    k + ': the live panel did not render: ' + text['hole-live-mount']);
+                assert.match(String(text['hole-live-mount'] || ''), /thru \d/,
+                    k + ': the board has no thru');
+                // NO RUNNING TOTAL, mid-round, on any link.
+                assert.ok(!/\+\$|owes/.test(String(text['hole-live-mount'] || '')),
+                    k + ': a mid-round total appeared in the panel');
+            }
+            delete text['hole-live-mount'];
+            delete prevText['hole-live-mount'];
             assert.deepEqual(text, prevText);
             const display = Object.assign({}, a.display);
             assert.equal(display['group-missing-note'], 'none', 'the note is hidden');
@@ -306,7 +325,12 @@ describe('THE SEAM (source, comments stripped)', () => {
         // other direction - v219 re-pinned it upward when the panel arrived, and this
         // wave re-pins it down by one because the panel left. The raw-mention count
         // below stayed at 8, so nothing started touching __scFilteredPlayers directly.
-        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 10);
+        // RE-PINNED 2026-10-05 (the compact live panel, was 10): renderHoleLive is
+        // the eleventh caller, and it is the RIGHT kind of caller - it asks
+        // scopedPlayers() for the ids it hands buildLiveMatchStates, which is the
+        // same scoping rule the sheet's full match card uses. The raw-mention count
+        // below is unchanged, so nothing started touching __scFilteredPlayers.
+        assert.equal((code.match(/scopedPlayers\(\)/g) || []).length, 11);
     });
     test('the surfaces whose builders widen an empty list do not ask them: recap, action center, the ticker\'s match cards', () => {
         assert.match(fn('renderHoleRecap'), /if \(scopeMissing\(\)\) \{ mount\.innerHTML = ''; return; \}/);

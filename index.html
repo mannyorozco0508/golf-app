@@ -1563,6 +1563,55 @@ html {
 /* The sheet is closed on arrival, so the page needs exactly the handle's worth of
    room under the last thing on it and not a pixel more. */
 body.has-round-sheet #main-content { padding-bottom: 64px; }
+
+/* THE GAP ABOVE "HOLE N" (2026-10-05). With the header, the nav and every
+   reading card in the Status sheet, the page's own chrome - 12px of body
+   padding, 12px of container padding and the margins the old blocks left behind
+   - was 58px of nothing above the first thing a golfer looks at. Measured, then
+   cut to what a card needs to not touch the edge. Scoped to the scorecard: this
+   class is only on the body once buildRoundSheet has run. */
+/* The page's own bottom padding was 40px of scroll length under a card that ends
+   well above the fold, and the sheet handle already owns that strip. Zero here,
+   64px on #main-content for the handle, and the document stops being scrollable
+   for no reason - which is what the landing rule asks of a card that fits. */
+body.has-round-sheet { padding-top: 6px; padding-bottom: 0; }
+body.has-round-sheet #main-content { padding-top: 6px; }
+body.has-round-sheet #round-body-layout, body.has-round-sheet #scorecard-main { margin-top: 0; }
+/* #save-state is the one thing left between the top of the page and the hole -
+   18px of "Saved" wrapped in 16px of margin, measured. It stays, because a
+   golfer typing a score wants to see it land; it just stops costing more room
+   than it occupies. */
+body.has-round-sheet #save-state { margin-top: 2px; margin-bottom: 4px; }
+
+/* ============================================================================
+   THE COMPACT LIVE PANEL, under Prev/Next (2026-10-05)
+   ----------------------------------------------------------------------------
+   Manny: "too simple now". A four-golfer card ends at y=471 and the screen is
+   844, so there were 373 pixels of nothing between Prev/Next and the handle.
+   This fills them with what a golfer actually asks between shots - where do I
+   stand, what are my matches doing, and is anything riding on this hole - and
+   with NOTHING ELSE, because the card still has to fit one screen.
+
+   IT COMPUTES NOTHING. Every line is read from the builder that already owns it:
+   liveStandings() for the board, buildLiveMatchStates() for the matches,
+   kpLiveLineHtml() for the KP, and the skins ledger rows for a carry. No money
+   is recomputed here and no mid-round total is printed - the Receipt's rule.
+   ============================================================================ */
+/* SIZED BY THE WORST CASE, not the average: the top five, two wagers, a skins
+   carry and a KP on the same hole measured 863px of card against an 844px
+   screen, and a card that stops fitting starts scrolling the banner under the
+   status bar again (hole_landing_fits_test.js). Every number below was cut
+   until that arrangement fitted, and the test holds it there. */
+.hole-live { margin-top: 6px; border-top: 1px dashed var(--border-light); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.hl-row { font-size: 0.74rem; color: var(--text-main); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; line-height: 1.25; }
+.hl-board { gap: 2px 9px; }
+.hl-chip { white-space: nowrap; color: var(--text-muted); }
+.hl-chip b { color: var(--brand-green); }
+.hl-chip i { font-style: normal; opacity: 0.75; }
+.hl-more { all: unset; cursor: pointer; font-size: 0.72rem; font-weight: bold; color: var(--brand-green); margin-left: auto; min-height: 24px; }
+.hl-match { color: var(--text-main); }
+.hl-match b { color: var(--brand-green); }
+.hl-hole { color: var(--accent-teal); font-weight: bold; }
 #round-sheet-scrim {
     position: fixed; inset: 0; z-index: 59;
     background: rgba(0,0,0,0.28);
@@ -3260,6 +3309,10 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
         // something to wade through first.
         html += navRowHtml;
 
+        // THE COMPACT LIVE PANEL (2026-10-05). Under Prev/Next, above the KP entry,
+        // because it is what a golfer READS and the KP is something they ANSWER.
+        html += '<div id="hole-live-mount"></div>';
+
         // THE KP ENTRY, DIRECTLY UNDER PREV/NEXT (2026-09-19). It used to sit at the
         // bottom of the Weekly Game panel inside the Action Center - past the recap,
         // the skins panel, the My Round toggle and the panel's own list - which on a
@@ -3354,7 +3407,110 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
         } catch (e) { pad.style.height = '0px'; }
     }
 
+    // ---- THE COMPACT LIVE PANEL (2026-10-05) --------------------------------
+    //
+    // Manny, on the new scorecard: "too simple now". A four-golfer card ends at
+    // y=471 on an 844px screen, so there were 373 pixels of nothing between
+    // Prev/Next and the sheet handle. This fills them with the three things a
+    // golfer asks between shots and stops - the card still has to fit one screen,
+    // and the landing rule depends on it.
+    //
+    // IT COMPUTES NOTHING, AND THAT IS THE WHOLE DESIGN. Every line is read from
+    // the builder that already owns it:
+    //   liveStandings()          the same rows the full board and the sheet use
+    //   buildLiveMatchStates()   money-engine's presenter, the sheet's source too
+    //   kpLiveLineHtml()         the existing KP line, reused whole
+    //   buildSkinsLedgerRows()   live-skins.js, over settlement-engine's ledger
+    // No money is recomputed here. NO MID-ROUND TOTAL is printed either: a stake
+    // is what the wager is worth, which is a fact; "+$30 with twelve to play" is
+    // the defect the Receipt itself had, and the sheet's full card keeps that
+    // rule too.
+    //
+    // THE SHEET KEEPS THE FULL VERSIONS. This is the same data, one line each.
+    function renderHoleLive() {
+        const mount = document.getElementById('hole-live-mount');
+        if (!mount) return;
+        if (typeof scopeMissing === 'function' && scopeMissing()) { mount.innerHTML = ''; return; }
+        const esc = t => String(t === undefined || t === null ? '' : t)
+            .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const first = n => String(n || '').trim().split(' ')[0];
+        const rows = [];
+
+        // 1. THE TOP FIVE, and the way to the rest.
+        let board = [];
+        try { board = (typeof liveStandings === 'function' ? liveStandings() : []).filter(r => r.started); }
+        catch (e) { board = []; }
+        if (board.length) {
+            rows.push('<div class="hl-row hl-board">'
+                + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
+                    + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
+                    + (r.thru ? ' <i>thru ' + esc(r.thru) + '</i>' : '') + '</span>').join('')
+                + '<button type="button" class="hl-more" onclick="openLiveBoard()">Full board \u203A</button>'
+                + '</div>');
+        }
+
+        // 2. THIS GOLFER'S MATCHES, one line each. The segment shown is the one
+        //    still being played - a Nassau names it ("Front AS") because three
+        //    lines for one wager is the panel this is replacing.
+        let states = [];
+        try {
+            const ids = (typeof scopedPlayers === 'function' ? scopedPlayers() : []).map(p => String(p.id));
+            states = (typeof buildLiveMatchStates === 'function')
+                ? (buildLiveMatchStates(currentData, currentData.courseData || [],
+                                        currentData.scores || {}, ids) || []) : [];
+        } catch (e) { states = []; }
+        states.forEach(st => {
+            const segs = (st.segments || []).filter(g => g.started);
+            if (!segs.length) return;
+            const seg = segs.find(g => !g.closed) || segs[segs.length - 1];
+            const who = esc(first(st.t1Name)) + ' v ' + esc(first(st.t2Name));
+            const name = st.formatLabel === 'Nassau' ? ('Nassau \u00B7 ' + who) : who;
+            const where = st.formatLabel === 'Nassau' ? (esc(seg.label) + ' ') : '';
+            // The stake is the wager's own number, straight off the segment. It is
+            // not a running total and never becomes one.
+            const stake = (seg.stake > 0) ? ' \u00B7 $' + esc(seg.stake) : '';
+            rows.push('<div class="hl-row hl-match">' + name + ' \u00B7 <b>' + where + esc(seg.statusText)
+                + '</b>' + stake + '</div>');
+        });
+
+        // 3. THIS HOLE, only when it has something riding on it.
+        const holeNum = Number(currentViewedHole);
+        let hole = '';
+        try {
+            const carry = holeSkinsCarry(holeNum);
+            if (carry > 1) hole += '<span class="hl-hole">\uD83E\uDD69 ' + carry + ' skins on this hole</span>';
+        } catch (e) { /* the ledger is the sheet's problem, not this line's */ }
+        const kp = (typeof kpLiveLineHtml === 'function') ? kpLiveLineHtml(holeNum) : '';
+        if (kp) hole += kp;
+        if (hole) rows.push('<div class="hl-row">' + hole + '</div>');
+
+        mount.innerHTML = rows.length ? '<div class="hole-live">' + rows.join('') + '</div>' : '';
+    }
+
+    // HOW MANY SKINS ARE RIDING ON THIS HOLE, read from the ledger rather than
+    // counted here: live-skins.js builds the carry rows over
+    // settlement-engine.js's own ledger, and a carry row knows which hole it
+    // carried INTO and how many holes made it. Units, never money - what a
+    // carried skin is worth depends on the pot and the pot is the sheet's job.
+    function holeSkinsCarry(holeNum) {
+        if (typeof liveSkinsLedgerEntries !== 'function' || typeof buildSkinsLedgerRows !== 'function') return 0;
+        const entries = liveSkinsLedgerEntries(currentData, currentData.courseData || [],
+                                               currentData.scores || {}, { groupOf: liveSkinsGroupOf }) || [];
+        let most = 0;
+        entries.forEach(entry => {
+            const L = entry && (entry.net || entry.gross || entry.L);
+            if (!L) return;
+            buildSkinsLedgerRows(L, entry.basis || 'Gross').forEach(r => {
+                if (r.kind === 'carry' && Number(r.into) === Number(holeNum)) {
+                    most = Math.max(most, (r.holes || []).length + 1);
+                }
+            });
+        });
+        return most;
+    }
+
     function renderCardWidgets() {
+        renderHoleLive();
         renderKpEntryMount();
         renderFooterRow();
         // renderWhoAmI is gone (Wave 17): the question is one line inside My Round now,
@@ -6126,6 +6282,7 @@ body.has-round-sheet #main-content { padding-bottom: 64px; }
             'status-panel',             // live status, group scores, leaderboard, skins
             'group-filter-container',   // All Players, Edit round setup, Players
             'view-mode-toggle',         // Hole View / Full Card
+            'dot-context-row',          // the Dots: selector, on rounds that have one
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
         ];
