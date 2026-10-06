@@ -4275,7 +4275,11 @@
 // prize amounts are saved, approve is one write, the desk names each golfer team.
 // v304 is held by spectator-polish, so this skips it. A device on v303 keeps the
 // unescaped tournament pages offline.
-const CACHE_VERSION = 'golfapp-v305-tournaments';
+// Moved to v306: REMOVE TEAM ON SETUP (Tournaments Wave 2). tournament.html is
+// precached here on the combined deploy and changed: a Setup team row has Remove,
+// refused for a team with any posted score. v304 stays with spectator-polish.
+// A device on v305 has no Remove offline.
+const CACHE_VERSION = 'golfapp-v306-remove-team';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

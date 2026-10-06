@@ -260,7 +260,11 @@ const PRODUCTS = {
         // is one write, and the name and fee can be corrected after save. A
         // device on v55 keeps the unescaped pages and the old board. CONSUMER
         // IS UNTOUCHED, as in v55: the other key does not move.
-        cacheName: 'tournament-v56-missing-links',
+        // Moved to v57 FOR REMOVE TEAM (Wave 2, 2026-10-06). tournament.html
+        // changed: each Setup team row has Remove, refused for a team with any
+        // posted score, and the Desk then flags its golfers. A device on v56
+        // has no way to remove a team.
+        cacheName: 'tournament-v57-remove-team',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

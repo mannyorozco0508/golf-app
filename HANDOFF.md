@@ -1938,10 +1938,7 @@ bundle re-synced with `node sync-mobile-web.js`.
 - Course and format edits after save (they rescore the event).
 - Removing, rather than hiding, the public scoring links.
 - Closing signups / cap / deadline and a richer signup confirmation (A8).
-- **Remove team from Setup.** There is no control that removes a team (phone QA,
-  2026-10-06: the "delete the team" re-test step could not run). Building it must
-  handle the team's scores, its starting hole, the tee sheet and payouts, and the
-  desk entries that point at it (they then read "Needs a team").
+- ~~Remove team from Setup~~ — SHIPPED in Wave 2, see the next section.
 - Individual events on the CREATE form still show the Teams blocks. They are the
   golfer-name input surface there (saveTournament turns each name into a player),
   so hiding them would break creating an individual event; it needs its own
@@ -1955,6 +1952,29 @@ bundle re-synced with `node sync-mobile-web.js`.
 - Team card: `tournament-scorecard.html?tourney=CODE&team=N[&round=RID]`
 - Group card: `tournament-scorecard.html?tourney=CODE&group=GID[&round=RID]`
 - Trip context: `tournament.html?trip=TRIPCODE`
+
+## Tournaments Wave 2 — Remove team on Setup (2026-10-06)
+
+Branch `tournaments-remove-team` from main c62ab77. Draft PR to main; not merged
+until Manny says so. No rules change: the owner's `.write` on `tournaments/$code`
+already covers removing a child (targaryen rows in the test).
+
+- **Where:** each editable Setup team row (`#team-cards-list`, built by
+  `teamRowHtml(t, { editable: true })`) carries **Remove** (`.team-remove`,
+  `removeTeam(num)`). Setup's Teams block is hidden on individual events, so the
+  control is too.
+- **Only with zero posted scores, in any round.** `teamHasScores` reads
+  `scores` and every `rounds/*/scores` for `team<N>_h*` and `team<N>_p*_h*`. A team
+  with a score is refused: "<name> has scores and can't be removed." Nothing written.
+- **Otherwise one removal: `tournaments/<code>/teams/team<N>`.** The team's golfers,
+  handicap, starting hole and flight live in that node; the tee sheet and the
+  shotgun list are built from `teams`, so its hole and tee-sheet slot go with it.
+  Registrations are untouched; the Desk derives "Needs a team" for entries that
+  pointed at it (631b4ef rule). Board and payouts render with the gap closed.
+- **Proof:** `tournament_remove_team_test.js` (UI-driven, both arms, render after
+  removal, rules rows); `tools/tournament-remove-team-check.js` (Chrome Check B:
+  live echo and cold reload both show 2 "Needs a team" and "2 need a team").
+- Cache `tournament-v57-remove-team`, `sw.js` `golfapp-v306-remove-team`.
 
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
