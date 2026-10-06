@@ -35,6 +35,7 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const { flatWrites } = require('./helpers/tournament-write-apply.js');
 const fs = require('fs');
 const path = require('path');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
@@ -407,9 +408,9 @@ describe('5. PAID AND APPROVE STILL WORK FROM THE DESK', () => {
         const sb = ownerWithEntries(teamRecord(), deskEntries('team'));
         sb.approveRegistration('e001');
         await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
-        const team = sb.__dbWrites.find(x => /^tournaments\/DESK1\/teams\/team3$/.test(x.path) && x.op === 'set');
-        assert.ok(team && team.value.players[0] === 'Ben Bsurname1', JSON.stringify(sb.__dbWrites.slice(-3)));
-        const mark = sb.__dbWrites.find(x => x.path === 'registrations/DESK1/e001' && x.op === 'update');
+        const team = flatWrites(sb.__dbWrites).find(x => /^tournaments\/DESK1\/teams\/team3$/.test(x.path) && x.op === 'set');
+        assert.ok(team && team.value.players[0] === 'Ben Bsurname1', JSON.stringify(flatWrites(sb.__dbWrites).slice(-3)));
+        const mark = flatWrites(sb.__dbWrites).find(x => x.path === 'registrations/DESK1/e001' && x.op === 'update');
         assert.ok(mark && mark.value.teamNum === 3 && mark.value.approvedAt);
     });
 });

@@ -17,8 +17,10 @@
 //
 //   node tools/tournament-signin-gate-check.js
 //
-//   exit 0   owned record: no Setup tab, no Setup panel, board and print
-//            buttons and scoring links all have rects, "Signed in as" absent,
+//   exit 0   owned record signed out: no Setup tab, no Setup panel, the board
+//            has a rect and the print buttons and scoring links do NOT (hidden,
+//            still in the tree - Wave 1 A3); the owner sees all three,
+//            "Signed in as" absent,
 //            no lock word on screen; legacy record (no ownerUid): NO Setup tab
 //            or panel since 2026-09-18, the no-organizer line has a rect
 //            exist and the tab has a rect
@@ -114,11 +116,13 @@ async function look(code, auth) {
     const ownedInd = await look('OWNEDI1');
     const anon = await look('OWNED1', 'anonymous');
     const organizer = await look('OWNED1', { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
+    const organizerInd = await look('OWNEDI1', { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
     if (!owned.ran) bail('the owned record did not run: ' + owned.reason);
     if (!legacy.ran) bail('the legacy record did not run: ' + legacy.reason);
     if (!ownedInd.ran) bail('the owned individual record did not run: ' + ownedInd.reason);
     if (!anon.ran) bail('the anonymous arm did not run: ' + anon.reason);
     if (!organizer.ran) bail('the organizer arm did not run: ' + organizer.reason);
+    if (!organizerInd.ran) bail('the organizer individual arm did not run: ' + organizerInd.reason);
     if (!owned.board.visible || !legacy.board.visible) bail('a leaderboard rendered nothing, so tab visibility cannot be held against anything', { owned, legacy });
 
     const failures = [];
@@ -133,8 +137,14 @@ async function look(code, auth) {
     gated(owned, 'owned (signed out)');
     if (!owned.leaderboardTab.visible) failures.push('owned: the Leaderboard tab has no rect');
     if (!/Eagles/.test(owned.board.names)) failures.push('owned: the board does not list the teams');
-    if (!owned.printResults || !owned.printPairings) failures.push('owned: a print button has no rect signed out - printing must stay open');
-    if (!owned.teamLinks.visible || owned.teamLinks.shareButtons < 2) failures.push('owned: the scoring links are not on screen signed out (' + owned.teamLinks.shareButtons + ' share buttons)');
+    // THE POLICY CHANGED (Tournaments Wave 1, A3, Manny 2026-10-06). The public
+    // board is for watching: printing and the scoring links are the organizer's
+    // and are HIDDEN for anyone else - in the tree, no rect (hide, not remove).
+    // This used to require them on screen signed out. The owner arm below
+    // requires them, so a page that rendered none would fail there.
+    if (owned.printResults || owned.printPairings) failures.push('owned: a print button has a rect signed out - printing is the organizer\'s now');
+    if (owned.teamLinks.visible) failures.push('owned: the scoring links are on screen signed out (' + owned.teamLinks.shareButtons + ' share buttons)');
+    if (owned.teamLinks.shareButtons < 2) failures.push('owned: the scoring-link rows were REMOVED for a signed-out visitor (' + owned.teamLinks.shareButtons + ') - hide, do not remove');
     // THE LEAK v109 SHIPPED: the public link rows carried the editable handicap.
     if (owned.teamLinks.editableControls > 0) failures.push('owned: ' + owned.teamLinks.editableControls + ' editable control(s) on the PUBLIC scoring-link rows');
     if (owned.teamCards.visible) failures.push('owned: the team cards (Setup) have a rect for a signed-out visitor');
@@ -146,8 +156,10 @@ async function look(code, auth) {
     if (owned.lockWords.length) failures.push('owned: lock words on screen: ' + JSON.stringify(owned.lockWords));
     // OWNED, INDIVIDUAL, signed out: the group links have rects, the editor does not exist
     gated(ownedInd, 'owned individual (signed out)');
-    if (!ownedInd.groupLinks.visible || ownedInd.groupLinks.links.length < 2) failures.push('owned individual: the group scoring links are not on screen signed out: ' + JSON.stringify(ownedInd.groupLinks));
-    if (!ownedInd.groupLinks.links.every(h => /tourney=OWNEDI1&group=g[12]$/.test(h))) failures.push('owned individual: a group link does not point at its group: ' + JSON.stringify(ownedInd.groupLinks.links));
+    if (ownedInd.groupLinks.visible || ownedInd.groupLinks.links.length) failures.push('owned individual: group scoring links are on screen signed out: ' + JSON.stringify(ownedInd.groupLinks));
+    // ...and the OWNER of that event has them, each pointing at its group.
+    if (!organizerInd.groupLinks.visible || organizerInd.groupLinks.links.length < 2) failures.push('organizer individual: the group scoring links are not on screen for the owner: ' + JSON.stringify(organizerInd.groupLinks));
+    if (!organizerInd.groupLinks.links.every(h => /tourney=OWNEDI1&group=g[12]$/.test(h))) failures.push('organizer individual: a group link does not point at its group: ' + JSON.stringify(organizerInd.groupLinks.links));
     if (ownedInd.editorVisible) failures.push('owned individual: the group EDITOR has a rect signed out');
     if (ownedInd.lockWords.length) failures.push('owned individual: lock words on screen: ' + JSON.stringify(ownedInd.lockWords));
     // LEGACY, signed out - THE GRANDFATHER PROMISE IS WITHDRAWN (2026-09-18): the
@@ -172,10 +184,13 @@ async function look(code, auth) {
     if (!/Signed in as org@example\.com/.test(organizer.signedInAs)) failures.push('organizer: "Signed in as" does not name the owner: ' + organizer.signedInAs);
     if (organizer.signInPanel) failures.push('organizer: the sign-in panel is still on screen for the owner');
     if (organizer.lockWords.length) failures.push('organizer: lock words on screen: ' + JSON.stringify(organizer.lockWords));
+    if (!organizer.printResults || !organizer.printPairings) failures.push('organizer: a print button has no rect for the owner');
+    if (!organizer.teamLinks.visible || organizer.teamLinks.shareButtons < 2) failures.push('organizer: the scoring links are not on screen for the owner (' + organizer.teamLinks.shareButtons + ')');
+    if (organizer.teamLinks.editableControls > 0) failures.push('organizer: ' + organizer.teamLinks.editableControls + ' editable control(s) on the scoring-link rows');
 
     console.log(JSON.stringify({
         verdict: failures.length ? 'FAIL' : 'PASS', failures,
-        measured: { owned, legacy, ownedIndividual: ownedInd, anonymous: anon, organizer }
+        measured: { owned, legacy, ownedIndividual: ownedInd, anonymous: anon, organizer, organizerIndividual: organizerInd }
     }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch((e) => { console.log(JSON.stringify({ verdict: 'COULD NOT RUN', reason: String((e && e.message) || e) }, null, 2)); process.exit(2); });

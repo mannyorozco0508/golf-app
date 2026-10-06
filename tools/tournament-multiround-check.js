@@ -52,9 +52,13 @@ const PROBE_TOGGLE = `
 
 // Builds an event through the page's own controls and returns everything it
 // wrote. Nothing is inferred - the record comes back out of the database.
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
+
 async function createThroughUI(o) {
     const opts = o || {};
-    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} } });
+    // As the OWNER (re-armed Wave 1, A9): Save is refused signed out, so no
+    // record was ever written and every later step measured nothing.
+    const j = await openJourney({ db: { tournaments: {}, trips: {}, global_courses: {} }, auth: OWNER });
     try {
         await j.goto(journeyUrl('tournament.html', ''), 2600);
         if (opts.individual) await j.click('#fmt-individual', null, { settleMs: 300 });
@@ -63,7 +67,10 @@ async function createThroughUI(o) {
             s.value = ${JSON.stringify(COURSE.name)};
             s.dispatchEvent(new Event('input', { bubbles: true }));
             const o = Array.from(document.querySelectorAll('#course-dropdown .custom-select-option'))
-                .find(x => (x.getAttribute('onclick') || '').indexOf("'${COURSE.id}'") !== -1);
+                // By its text (re-armed Wave 1, A9): since a2a74f3 a picker row is a node
+                // with a property handler, not an onclick attribute, so the old lookup
+                // found nothing and Save was refused for want of a course.
+                .find(x => x.textContent.trim() === ${JSON.stringify(COURSE.name)});
             if (o) o.click();
             return !!o;
         })()`);
@@ -244,7 +251,9 @@ if (require.main !== module) return;
         return sels.length;
     })()`);
     const groupLink = await j.evaluate(`(() => {
-        const a = document.querySelector('#scoring-groups-list a');
+        // Re-armed Wave 1 (A9): the links live in #group-links-list now.
+        const all = document.querySelectorAll('#group-links-list a');
+        const a = all[all.length - 1];
         return a ? a.getAttribute('href') : null;
     })()`);
     if (!groupLink) bail('no round-scoped group link was produced - Test 25 cannot score');

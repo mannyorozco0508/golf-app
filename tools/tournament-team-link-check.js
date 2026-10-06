@@ -58,7 +58,10 @@ const db = {
         LINK01: {
             name: 'Charity Scramble', format: 'scramble', courseName: 'Tidewater',
             activeCourseKey: 'tidewater', courseData: course, entryFee: '100',
-            teams: teams, scores: {}, createdAt: 1, courseIndexSynthetic: false
+            teams: teams, scores: {}, createdAt: 1, courseIndexSynthetic: false,
+            // OWNED (re-armed Wave 1, A3): the links block and the sentence beside
+            // it are the organizer handout, hidden for anyone but the owner.
+            ownerUid: 'u-org'
         }
     },
     events: {}, trips: {}, global_courses: {}
@@ -96,8 +99,8 @@ const ORGANIZER_PROBE = `
   });
 })()`;
 
-async function look(page, query, probe) {
-    const r = await arriveCold({ url: fileUrl(page, query), db, expression: probe, settleMs: 7000 });
+async function look(page, query, probe, auth) {
+    const r = await arriveCold({ url: fileUrl(page, query), db, expression: probe, settleMs: 7000, auth });
     if (!r.ok) return { ran: false, reason: r.reason };
     try { return { ran: true, ...JSON.parse(r.value) }; }
     catch (e) { return { ran: false, reason: 'non-JSON: ' + String(r.value).slice(0, 200) }; }
@@ -137,7 +140,7 @@ function grantsToAnyone(sentence) {
 
     const own = await look('tournament-scorecard.html', 'tourney=LINK01&team=1', CARD_PROBE);
     const other = await look('tournament-scorecard.html', 'tourney=LINK01&team=7', CARD_PROBE);
-    const org = await look('tournament.html', 'tourney=LINK01', ORGANIZER_PROBE);
+    const org = await look('tournament.html', 'tourney=LINK01', ORGANIZER_PROBE, { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
     if (!own.ran) bail('team 1 card did not run: ' + own.reason);
     if (!other.ran) bail('team 7 card did not run: ' + other.reason);
     if (!org.ran) bail('the organizer screen did not run: ' + org.reason);

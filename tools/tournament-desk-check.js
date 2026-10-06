@@ -35,6 +35,7 @@
 //
 // EXIT 0 PASS, 1 FAIL, 2 could not run.
 // ============================================================================
+const { flatWrites } = require('../helpers/tournament-write-apply.js');
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 const { deskEntries, deskTeams, TOTALS } = require('../helpers/registration-desk-fixture.js');
 
@@ -138,7 +139,12 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     if (desk.dupMarks !== 4) failures.push('desk: ' + desk.dupMarks + ' duplicate marks, wanted 4');
     if (!desk.e001 || !/Approve into field/.test(desk.e001.text)) failures.push('desk: Ben has no Approve button: ' + JSON.stringify(desk.e001));
 
-    const w1 = (afterApprove && afterApprove.writes) || [];
+    // ONE WRITE SINCE WAVE 1 (A5): approve is a single root multi-path update.
+    // The recorder stringifies the root ref's missing path; flatWrites expands
+    // the update back into the paths it writes, so this still asserts "team3
+    // created with Ben" and "the entry marked", not the number of calls.
+    const flat = (ws) => flatWrites(ws.map(x => (x.path === 'undefined' ? Object.assign({}, x, { path: undefined }) : x)));
+    const w1 = flat((afterApprove && afterApprove.writes) || []);
     const teamSet = w1.find(x => x.op === 'set' && x.path === 'tournaments/OWNED1/teams/team3');
     const mark = w1.find(x => x.op === 'update' && x.path === 'registrations/OWNED1/e001');
     if (!teamSet || !(teamSet.value.players && teamSet.value.players[0] === 'Ben Bsurname1')) failures.push('approve: no team3 set with Ben: ' + JSON.stringify(w1));
@@ -175,7 +181,7 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     if (!/Fees collected \$7,000 · 70 paid × \$100/.test(iDesk.counts || '')) failures.push('individual: fees line: ' + iDesk.counts);
     if (/per team/.test(iDesk.counts || '')) failures.push('individual: the team sentence is on an individual event');
     if (iDesk.rows !== TOTALS.entries) failures.push('individual: rows ' + iDesk.rows);
-    const w3 = (iApprove && iApprove.writes) || [];
+    const w3 = flat((iApprove && iApprove.writes) || []);
     const player = w3.find(x => x.op === 'set' && /^tournaments\/INDIV1\/players\/p/.test(x.path));
     if (!player || player.value.name !== 'Ben Bsurname1') failures.push('individual approve: no player set: ' + JSON.stringify(w3));
 
@@ -254,7 +260,7 @@ const deliver = (val) => ({ expression: `window.__deliver(${JSON.stringify(val)}
     const bgs = ['reg-state-unpaid', 'reg-state-paid', 'reg-state-field', 'reg-state-needs'].map(bgOf);
     if (bgs.some(x => !x || x === 'rgba(0, 0, 0, 0)')) failures.push('badges: a state has no background: ' + JSON.stringify(bgs));
     if (new Set(bgs).size !== 4) failures.push('badges: the four states do not have four backgrounds: ' + JSON.stringify(bgs));
-    if (!bd.e130 || !/Paid/.test(bd.e130.text) || !bd.e130.badges.some(x => x.cls === 'reg-state-field') || !bd.e130.badges.some(x => x.cls === 'reg-state-needs' && x.text === 'Needs a team')) failures.push('badges: e130 (Team 3, alone) does not read Paid + In the field + Needs a team: ' + JSON.stringify(bd.e130));
+    if (!bd.e130 || !/Paid/.test(bd.e130.text) || !bd.e130.badges.some(x => x.cls === 'reg-state-field') || !bd.e130.badges.some(x => x.cls === 'reg-state-needs' && x.text === 'Needs a team')) failures.push('badges: e130 (its team 4 no longer exists) does not read Paid + In the field + Needs a team: ' + JSON.stringify(bd.e130));
     if (!bd.e120 || bd.e120.badges.some(x => x.cls === 'reg-state-needs') || !bd.e120.badges.some(x => x.cls === 'reg-state-field')) failures.push('badges: e120 (the Hawks, a named team of one) must NOT need a team: ' + JSON.stringify(bd.e120));
     if (!bd.e001 || !bd.e001.badges.some(x => x.cls === 'reg-state-unpaid' && x.text === 'Unpaid') || !/Approve into field/.test(bd.e001.text)) failures.push('badges: e001 does not read Unpaid with its Approve button: ' + JSON.stringify(bd.e001));
     if (bd.chips.length !== 6 || !bd.chips[5] || bd.chips[5].text !== 'Needs a team 1' || !bd.chips[5].rect || bd.chips[5].rect.w === 0) failures.push('badges: the sixth chip: ' + JSON.stringify(bd.chips));

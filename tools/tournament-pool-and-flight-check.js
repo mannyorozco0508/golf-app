@@ -301,12 +301,15 @@ if (require.main !== module) return;
         manageHeader_showsNineHundred: /900/.test(poolIND.manageHeaderPool || ''),
         subLine_showsNineHundred: /900/.test(poolIND.payoutSubLine || ''),
         subLine_namesGolfersNotTeams: noun(poolIND.payoutSubLine, 'golfer', 'team'),
-        spotDefaults_sumToNineHundred: Math.abs((poolIND.spotTotal || 0) - 900) < 0.05,
+        // NO INVENTED SPLIT (Wave 1, A4). The boxes used to default to pool / spots,
+        // and this asserted that they summed to $900. They are saved amounts now,
+        // and with nothing saved they are blank; the pool is still $900 (above).
+        spotDefaults_blankNotAnEvenSplit: poolIND.spotCount > 0 && poolIND.spotValues.every(v => v === ''),
         printedSheet_showsPool: /Pool: \$900/.test(poolIND.printSubtitle || ''),
         mismatchBanner_canFire: poolIND.bannerFired === true,
         mismatchBanner_wasQuietBeforeEditing: poolIND.bannerBeforeEditing === false,
         control_teamPoolUnchangedAtNineHundred: /900/.test(poolTEAM.manageHeaderPool || '')
-            && Math.abs((poolTEAM.spotTotal || 0) - 900) < 0.05,
+            && poolTEAM.spotCount > 0 && poolTEAM.spotValues.every(v => v === ''),
         control_teamSubLineStillSaysTeams: noun(poolTEAM.payoutSubLine, 'team', 'golfer'),
         // THE BANNER MECHANISM WORKS - proved on the model whose pool is already
         // real. That is what makes its silence on an individual event
@@ -333,8 +336,9 @@ if (require.main !== module) return;
         nobodyReaches_saysSo: zero.nobodyReaches.rows === 0 && /No paid spots reached yet\./.test(zero.nobodyReaches.text || ''),
         clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see payouts\./.test(zero.clearedAgain.text || ''),
         noBannerWithoutAPool: !/add up to/.test([zero.untyped, zero.firstOnly, zero.nobodyReaches].map(x => x.text).join(' ')),
-        // WITH a pool (the team control at $900, 3 spots of $300): three money
-        // rows and no $0.00 row - the filter is the same one.
+        // WITH a pool (the team control at $900) and nothing typed yet: no $0.00
+        // row and no $0.00-vs-pool banner. Since Wave 1 (A4) there is no even
+        // split, so the boxes are blank and the banner waits for an amount.
         control_teamPool_noZeroDollarRows: !/\$0\.00/.test(poolTEAM.payoutResults || ''),
     };
     Object.keys(t18).forEach(k => { if (!t18[k]) problems.push('TEST 18 ' + k + ': FAILED'); });

@@ -32,6 +32,10 @@
          shipping to this deployment - only the tag was missing. -->
     <script src="handicap.js"></script>
     <script src="payouts.js"></script>
+    <!-- One HTML escaper for every user-supplied name (Tournaments Wave 1, A1).
+         A public signup can carry any text into a team or golfer name, and the
+         Approve button copies it into the field that every page renders. -->
+    <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
     <style>
         :root {
@@ -279,7 +283,7 @@
             const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;"> (tied)</span>' : '';
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''} ${isMe ? 'me' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${r.teamName}${tieTag} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
                 <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
@@ -493,7 +497,7 @@
         document.getElementById('event-sub').textContent =
             `${currentData.courseName} • Individual Stroke Play • ${netMode ? 'Net' : 'Gross'}`;
         document.getElementById('scoring-for').innerHTML =
-            `You're scoring for <strong>${group.name || 'your group'}</strong>`;
+            `You're scoring for <strong>${escapeHtml(group.name || 'your group')}</strong>`;
         // Handicaps are shown because net is derived from them - a golfer needs to see
         // WHY their net differs from their gross without the page explaining allocation.
         //
@@ -508,7 +512,7 @@
         // unnamed slot's name is an empty string, and printing it left a bare
         // "(handicap pending)" floating in the roster with nobody attached to it.
         document.getElementById('team-roster').innerHTML = ids.map(pid =>
-            `${competitorDisplayName(players[pid])}${netMode ? ` <span style="font-weight:normal; color:var(--text-muted);">(${handicapDisplay(players[pid])})</span>` : ''}`
+            `${escapeHtml(competitorDisplayName(players[pid]))}${netMode ? ` <span style="font-weight:normal; color:var(--text-muted);">(${handicapDisplay(players[pid])})</span>` : ''}`
         ).join(' &nbsp;•&nbsp; ') || 'No golfers assigned yet';
 
         if (group.startingHole) {
@@ -548,7 +552,7 @@
                     const dots = strokes > 0 ? '\u2022'.repeat(strokes)
                         : (strokes < 0 ? '+' : '');
                     return `<label style="display:flex; align-items:center; gap:4px; font-size:0.8rem;">
-                        <span style="color:var(--text-muted);">${first}</span>
+                        <span style="color:var(--text-muted);">${escapeHtml(first)}</span>
                         <span class="stroke-dots" aria-hidden="true">${dots}</span>
                         <input type="number" class="hole-score-input" inputmode="numeric" min="1" style="width:52px;"
                             value="${v || ''}" onchange="saveIndividualScore('${pid}', ${h.hole}, this.value)">
@@ -606,8 +610,8 @@
         document.getElementById('event-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
         const teamName = team.name || `Team ${team.num}`;
         document.getElementById('scoring-for').innerHTML =
-            `You're scoring for <strong>${teamName}</strong>`;
-        document.getElementById('team-roster').innerHTML = `${teamName}<br><span style="font-weight:normal; font-size:0.78rem; color:var(--text-muted);">${team.players.join(', ')}</span>`;
+            `You're scoring for <strong>${escapeHtml(teamName)}</strong>`;
+        document.getElementById('team-roster').innerHTML = `${escapeHtml(teamName)}<br><span style="font-weight:normal; font-size:0.78rem; color:var(--text-muted);">${escapeHtml((team.players || []).join(', '))}</span>`;
 
         let thru = 0, total = 0, parPlayed = 0;
         let html = '';

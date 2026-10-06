@@ -158,7 +158,10 @@ describe('INDIVIDUAL MODE - the Setup tab, signed in as the owner', () => {
     test('the Leaderboard tab\'s group-link block is links only: one link per group, NO editable control', () => {
         const sb = arrive(individualRecord(), null);
         const links = html(sb, 'group-links-list');
-        assert.equal(count(links, /group=g[12]/g), 2);
+        // One OPEN LINK per group (since Wave 1 A7 each row also carries a Share
+        // button with the same url in a data attribute, so count the anchors).
+        assert.equal(count(links, /href="[^"]*group=g[12]/g), 2);
+        assert.equal(count(links, /data-share-url="[^"]*group=g[12]/g), 2, 'one Share per group');
         assert.equal(count(links, /<input\b|<select\b/g), 0, 'no editor on the public tab');
     });
 

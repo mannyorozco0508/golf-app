@@ -33,10 +33,12 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const { flatWrites } = require('./helpers/tournament-write-apply.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { runTargaryen: runTargaryenToFile } = require('./helpers/targaryen-run.js');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const PAGE = 'tournament.html';
@@ -142,25 +144,37 @@ describe('THE DESK reads the new shape', () => {
         const list = sb.document.getElementById('registration-list').innerHTML;
         ['Dee Delta', 'dee@example.com', '555-0100', 'GHIN/Hcp 14', 'Shirt L', 'Dinner 2', 'Gus Golf', 'Hole sponsor — Orozco Roofing'].forEach((s) => assert.ok(list.includes(s), 'list lacks ' + s));
         sb.approveRegistration('e1'); await settle();
-        const p1 = sb.__dbWrites.find((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path)); assert.equal(p1.value.name, 'Dee Delta'); assert.equal(p1.value.handicap, '14');
+        const p1 = flatWrites(sb.__dbWrites).find((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path)); assert.equal(p1.value.name, 'Dee Delta'); assert.equal(p1.value.handicap, '14');
         sb.approveRegistration('e2'); await settle();
-        const p2 = sb.__dbWrites.filter((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path))[1]; assert.equal(p2.value.name, 'Gus Golf'); assert.equal(p2.value.handicap, '0', 'a GHIN number is not a handicap');
+        const p2 = flatWrites(sb.__dbWrites).filter((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path))[1]; assert.equal(p2.value.name, 'Gus Golf'); assert.equal(p2.value.handicap, '0', 'a GHIN number is not a handicap');
     });
 });
 
 // ---------------------------------------------------------------------------
 // THE RULE, proved by targaryen - the repo file, then each boundary knocked out
 // of a COPY so the rows that guard it are shown to fire.
-describe('THE RULES BOUNDARY (targaryen): 56 registrations rows, every knockout caught', () => {
+describe('THE RULES BOUNDARY (targaryen): 64 registrations rows, every knockout caught', () => {
     const DATA = path.join(REPO_ROOT, 'security-rules.tests-data.json');
-    function run(rulesPath) { try { execFileSync(TARGARYEN, [rulesPath, DATA], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); return 0; } catch (e) { return e.status; } }
+    // THROUGH helpers/targaryen-run.js (2026-10-06), NOT A PIPE. This read
+    // targaryen's --verbose table with stdio 'pipe', which is the exact fault
+    // that helper was written to fix: on macOS the output stops at ~33 KB
+    // because the process exits before the pipe drains, and rows past the cut
+    // are invisible. It went unnoticed because the table fitted - until the
+    // owner-delete rows were added and it did not.
+    //
+    // MEASURED, which is how it was found rather than guessed: the owner-only
+    // knockout reported 7 red rows on main's data file and 5 on the same rules
+    // with four rows added, and the three that "vanished" (e1/paid twice,
+    // e1/approvedAt once) were present and unchanged in both files. Nothing had
+    // stopped firing; the table had been truncated. Written to a file, stdout is
+    // synchronous and complete.
+    function run(rulesPath) { return runTargaryenToFile(rulesPath, DATA).exitCode; }
     function failures(rulesPath) {
-        try { execFileSync(TARGARYEN, [rulesPath, DATA, '--verbose'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); return []; }
-        catch (e) {
-            const out = (String(e.stdout || '') + String(e.stderr || '')).replace(ANSI, '');
-            // a verdict row where expected and got disagree, on a registrations path
-            return out.split('\n').filter((l) => /registrations/.test(l) && /✓\s*│\s*✖|✖\s*│\s*✓/.test(l));
-        }
+        const r = runTargaryenToFile(rulesPath, DATA);
+        if (r.exitCode === 0) return [];
+        const out = String(r.output || '').replace(ANSI, '');
+        // a verdict row where expected and got disagree, on a registrations path
+        return out.split('\n').filter((l) => /registrations/.test(l) && /✓\s*│\s*✖|✖\s*│\s*✓/.test(l));
     }
     const rules = JSON.parse(read('database.rules.json'));
     test('the repo file: every row green, and there are positive public creates (the block is not a wall)', () => {
@@ -169,6 +183,13 @@ describe('THE RULES BOUNDARY (targaryen): 56 registrations rows, every knockout 
         const e2 = td.tests['registrations/OWNED/e2'];
         assert.ok(e2.canWrite.filter((r) => r.auth === 'nobody').length >= 3, 'nobody can sign up with the right shape');
         assert.equal(Object.keys(td.tests).filter((k) => /^registrations/.test(k)).length, 9);
+        // THE NUMBER IN THIS SUITE'S NAME, pinned so it cannot go stale (it said
+        // 56 while the file held 64 - eight rows added for the owner's removal
+        // and for the no-owner event that takes no signups at all).
+        const rows = Object.keys(td.tests).filter((k) => /^registrations/.test(k))
+            .reduce((n, k) => n + ['canRead', 'cannotRead', 'canWrite', 'cannotWrite']
+                .reduce((m, kind) => m + ((td.tests[k][kind] || []).length), 0), 0);
+        assert.equal(rows, 64, 'this suite is called "64 registrations rows" and the file holds ' + rows);
     });
     function knockout(name, mutate, expectRows) {
         test(name, () => {

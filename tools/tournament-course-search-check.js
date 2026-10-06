@@ -38,6 +38,10 @@ const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const holes = (order) => order.map((si, i) => ({ par: [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5][i], yardage: 380, handicap: si }));
 const SI_BLUE = [7, 13, 17, 1, 5, 11, 15, 9, 3, 8, 14, 18, 2, 6, 12, 16, 10, 4];
 const SI_WHITE = [13, 7, 17, 1, 5, 11, 15, 9, 3, 8, 14, 18, 2, 6, 12, 16, 10, 4];
+// THE NAME THE IMPORTER GIVES IT (re-armed Wave 1, A9). The importer names a
+// course whose club and course names differ as club (course); this check was
+// written when it used the course name alone and failed on the name only.
+const STICK_NAME = 'Talking Stick Golf Club (Talking Stick Piipaash)';
 const STICK = { id: 'a1b2c3d4', club_name: 'Talking Stick Golf Club', course_name: 'Talking Stick Piipaash',
     location: { city: 'Scottsdale', state: 'AZ', address: '9998 E Indian Bend Rd, Scottsdale, AZ 85256' }, tees: { male: 2, female: 1 } };
 const STICK_DETAIL = Object.assign({}, STICK, { tees: {
@@ -93,7 +97,7 @@ const PROBE = `(function () {
   var chips = panel ? Array.from(panel.querySelectorAll('.tee-chip')).map(function (c) { return { text: c.innerText.trim(), active: c.classList.contains('active') }; }) : [];
   var btn = document.getElementById('course-import-confirm-btn');
   return JSON.stringify({
-    rows: rows.map(function (r) { return r.innerText.replace(/\\s+/g, ' ').trim().slice(0, 70); }),
+    rows: rows.map(function (r) { return r.innerText.replace(/\\s+/g, ' ').trim().slice(0, 120); }),
     onlineRect: R(online), onlineIsLast: !!(online && rows[rows.length - 1] === online), ddDisplay: dd ? getComputedStyle(dd).display : null,
     api: window.__api.slice(), courseKey: (document.getElementById('course-key') || {}).value, box: (document.getElementById('course-search-input') || {}).value,
     panelRect: R(panel), panelText: panel ? panel.innerText.replace(/\\s+/g, ' ').trim().slice(0, 900) : null,
@@ -131,7 +135,7 @@ const FILL_TEAM = { expression: `(function(){ document.getElementById('t-name').
     if (!typed.onlineIsLast) failures.push('typed: the online row is not the last row: ' + JSON.stringify(typed.rows));
     if (typed.api.length !== 0) failures.push('typed: keystrokes made a request: ' + JSON.stringify(typed.api));
     if (searched.api.length !== 1 || searched.api[0] !== '/api/course-search?q=talking') failures.push('searched: requests ' + JSON.stringify(searched.api));
-    if (!searched.rows.some(r => /Talking Stick Piipaash Scottsdale, AZ · 3 tee sets/.test(r))) failures.push('searched: the result row is not on screen: ' + JSON.stringify(searched.rows));
+    if (!searched.rows.some(r => /Talking Stick Golf Club \(Talking Stick Piipaash\) Scottsdale, AZ · 3 tee sets/.test(r))) failures.push('searched: the result row is not on screen: ' + JSON.stringify(searched.rows));
     if (searched.courseKey) failures.push('searched: something auto-selected: ' + searched.courseKey);
     if (detail.api.length !== 2 || detail.api[1] !== '/api/course/a1b2c3d4') failures.push('detail: requests ' + JSON.stringify(detail.api));
     if (!detail.panelRect || detail.panelRect.h === 0) failures.push('detail: the confirm panel has no rect');
@@ -139,19 +143,19 @@ const FILL_TEAM = { expression: `(function(){ document.getElementById('t-name').
     if (detail.hole1SI !== '7') failures.push('detail: hole 1 SI is ' + detail.hole1SI + ', wanted 7 (Blue)');
     if (JSON.stringify(detail.chips) !== JSON.stringify([{ text: 'Blue 72.4/131', active: true }, { text: 'White 70.1/125', active: false }, { text: 'Red 69/118', active: false }])) failures.push('detail: chips ' + JSON.stringify(detail.chips));
     if (!/came from this course's Blue tees\. This is the card the event will score on\. It can't be edited on this page/.test(detail.panelText || '')) failures.push('detail: the source sentence: ' + detail.panelText);
-    if (!detail.btn || detail.btn.text !== 'Use Talking Stick Piipaash — Scottsdale, AZ' || detail.btn.disabled || detail.btn.rect.h === 0) failures.push('detail: the button: ' + JSON.stringify(detail.btn));
+    if (!detail.btn || detail.btn.text !== 'Use ' + STICK_NAME + ' — Scottsdale, AZ' || detail.btn.disabled || detail.btn.rect.h === 0) failures.push('detail: the button: ' + JSON.stringify(detail.btn));
     if (detail.courseKey) failures.push('detail: selected before the button: ' + detail.courseKey);
     if (!white || white.hole1SI !== '13' || !white.chips[1].active) failures.push('white: hole 1 SI ' + (white && white.hole1SI) + ', chips ' + JSON.stringify(white && white.chips));
     if (!blue || blue.hole1SI !== '7' || !blue.chips[0].active) failures.push('blue: hole 1 SI ' + (blue && blue.hole1SI));
     if (confirmed.courseKey !== 'gca_a1b2c3d4') failures.push('confirmed: course-key ' + confirmed.courseKey);
-    if (confirmed.box !== 'Talking Stick Piipaash') failures.push('confirmed: the box shows ' + JSON.stringify(confirmed.box));
+    if (confirmed.box !== STICK_NAME) failures.push('confirmed: the box shows ' + JSON.stringify(confirmed.box));
     if (confirmed.panelRect) failures.push('confirmed: the panel is still there');
     if (confirmed.ddDisplay !== 'none') failures.push('confirmed: the dropdown is still open');
     const set = saved.writes.find(w => w.op === 'set' && /^tournaments\/[A-Z0-9]+$/.test(w.path));
     if (!set) failures.push('saved: no creating set: ' + JSON.stringify(saved.writes.map(w => w.path)));
     else {
         const v = set.value;
-        if (v.activeCourseKey !== 'gca_a1b2c3d4' || v.courseName !== 'Talking Stick Piipaash') failures.push('saved: course fields ' + JSON.stringify([v.activeCourseKey, v.courseName]));
+        if (v.activeCourseKey !== 'gca_a1b2c3d4' || v.courseName !== STICK_NAME) failures.push('saved: course fields ' + JSON.stringify([v.activeCourseKey, v.courseName]));
         if (!v.courseData || v.courseData.length !== 18 || v.courseData[0].hcpIndex !== 7) failures.push('saved: courseData is not the Blue card');
         if (v.courseIndexSynthetic !== false) failures.push('saved: courseIndexSynthetic ' + v.courseIndexSynthetic);
         const imp = v.importedCourses && v.importedCourses.gca_a1b2c3d4;

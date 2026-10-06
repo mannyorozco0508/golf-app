@@ -224,7 +224,7 @@
       "$code": {
         ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
         "$entryId": {
-          ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val() && newData.exists()))",
+          ".write": "root.child('tournaments/' + $code + '/ownerUid').exists() && ((!data.exists() && newData.exists()) || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()))",
           ".validate": "newData.hasChildren(['createdAt']) && newData.child('createdAt').isNumber() && (data.exists() || (auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()) || (newData.hasChildren(['fullName', 'email', 'phone']) && !newData.hasChild('paid') && !newData.hasChild('paidAt') && !newData.hasChild('approvedAt') && !newData.hasChild('playerId') && !newData.hasChild('teamNum')))",
           "fullName": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"

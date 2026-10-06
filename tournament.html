@@ -51,6 +51,10 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <!-- One HTML escaper for every user-supplied name (Tournaments Wave 1, A1).
+         A public signup can carry any text into a team or golfer name, and the
+         Approve button copies it into the field that every page renders. -->
+    <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
     <style>
         :root {
@@ -122,6 +126,7 @@
         .reg-state-unpaid { background: #fff3e0; color: #8a4b00; border: 1px solid #f0b060; }
         .reg-state-paid { background: #e6f4ea; color: #1b5e20; border: 1px solid #7fc48a; }
         .reg-state-field { background: #e3eefc; color: #0d3b7a; border: 1px solid #8fb3e8; }
+        .reg-state-team { background: #f1f4f2; color: #1a1a1a; border: 1px solid #d0e1db; }
         .reg-state-needs { background: #fdecea; color: #b00020; border: 1px solid #e57373; }
         .reg-count-line.reg-count-needs { color: #b00020; font-weight: bold; }
         /* The event details under the two headers: up to three short lines. */
@@ -581,7 +586,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the key. The next edit-after-save should copy this block, not invent one. -->
         <div class="team-card" id="event-details-block" style="margin-top:12px;">
             <div class="team-card-header"><span class="team-label">📅 Event details</span></div>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">All optional. Shown under the event name here and on the Leaderboard when set.</p>
+            <!-- NAME AND FEE AFTER SAVE (Wave 1, A6). A typo in the name or a wrong fee
+                 meant rebuilding the event and losing its signups. Same shape as the
+                 four below: each box writes its own key on change. Course and format
+                 are NOT here - they change how the event is scored (Wave 2). -->
+            <div class="form-group" style="margin-bottom:8px;"><label>Event name</label><input type="text" id="ev-name" maxlength="120" onchange="setEventName(this.value)"></div>
+            <div class="form-group" style="margin-bottom:12px;"><label>Entry fee ($)</label><input type="number" id="ev-fee" min="0" step="0.01" onchange="setEntryFee(this.value)"></div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">The rest are optional. Shown under the event name here and on the Leaderboard when set.</p>
             <div class="form-group" style="margin-bottom:8px;"><label>Date</label><input type="date" id="ev-date" onchange="setEventDetail('eventDate', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Start time</label><input type="time" id="ev-time" onchange="setEventDetail('startTime', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Venue</label><input type="text" id="ev-venue" maxlength="120" placeholder="e.g. Camas Meadows Golf Club" onchange="setEventDetail('venue', this.value)"></div>
@@ -667,6 +678,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="scoring-groups-list"></div>
         </div>
 
+        <!-- Hidden on an individual event, in the tree (f0fa56f rule): an event of
+             players has no teams to list or add. -->
+        <div id="setup-teams-block">
         <hr class="section-divider">
         <h3>🏌️ Teams</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team, its golfers and its handicap. The scoring links are on the Leaderboard tab.</p>
@@ -687,6 +701,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <input type="number" id="new-team-handicap" value="0" min="0">
                 <button class="btn-primary" onclick="saveNewTeam()">💾 Save Team &amp; Get Link</button>
             </div>
+        </div>
         </div>
 
         <hr class="section-divider">
@@ -714,7 +729,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="registration-counts"></div>
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
+             box is: the rows are rebuilt on every registrations snapshot, and an
+             editor rebuilt with them would lose a half-typed correction the moment
+             another golfer signed up. It is hidden until a row asks for it, it
+             carries the entry id it is editing, and it writes the three contact
+             keys only - paid, approvedAt, playerId and teamNum are the desk's own
+             state and a typo fix that carried them would re-approve a golfer or
+             wipe a payment. The rules cannot catch that: the owner is allowed to
+             write all of them. -->
+        <div id="registration-edit" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin:8px 0;">
+            <p id="reg-edit-who" style="font-weight:bold; margin:0 0 8px 0; font-size:0.9rem;"></p>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-name">Full name</label>
+                <input type="text" id="reg-edit-name" maxlength="120" autocomplete="off"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-email">Email</label>
+                <input type="email" id="reg-edit-email" maxlength="160" autocomplete="off" inputmode="email"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-phone">Phone</label>
+                <input type="tel" id="reg-edit-phone" maxlength="40" autocomplete="off" inputmode="tel"></div>
+            <p id="reg-edit-refusal" role="alert" style="display:none; font-size:0.8rem; color:var(--accent-red); margin:0 0 8px 0;"></p>
+            <button class="btn-primary" style="width:auto; margin:0 8px 0 0;" onclick="saveRegistrationEdit()">Save</button>
+            <button class="btn-outline" style="width:auto; margin:0;" onclick="closeRegistrationEdit()">Cancel</button>
+        </div>
         <div id="registration-list"></div>
+        <!-- CSV, because the field has to leave the phone: a tee sheet, a cart
+             sign order, the pro shop's own system. Shown only when there is a
+             list to export, and only to the organizer. -->
+        <button class="btn-outline" id="registration-export" style="display:none;" onclick="exportRegistrationsCsv()">⬇️ Export CSV</button>
     </div>
 
     <div id="manage-tab-leaderboard" style="display:none;">
@@ -734,38 +774,55 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
         <div id="leaderboard-list"></div>
 
+        <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
+             clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
+        <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-4px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+
         <hr class="section-divider">
+        <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
+             else, never removed (the f0fa56f rule: hide in the tree). The amounts it
+             sets are SAVED on the record as payoutSpots and everyone reads those. -->
+        <div id="payout-owner-controls" style="display:none;">
         <h3>🏆 Prize Payout Calculator</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
         <div class="form-group" style="margin-bottom:8px;">
             <label>Paid Spots</label>
-            <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()">
+            <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()" onchange="savePayoutSpots()">
         </div>
         <div id="payout-spot-amounts"></div>
+        </div>
+        <h3 id="payout-public-heading">🏆 Prize Payouts</h3>
+        <div id="payout-public-amounts"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
 
-        <!-- MOVED HERE FROM THE SETUP PANEL in the auth wave. The Setup tab is not
-             rendered for anyone but the owner of an owned tournament; printing and
-             the scoring links stay open to everyone, so they live beside the board.
-             The handlers read nothing from the Setup panel - measured before the move. -->
+        <!-- THE ORGANIZER'S HANDOUT, HIDDEN FOR EVERYONE ELSE (Wave 1, A3). The print
+             buttons and the scoring links lived beside the public board, so the page
+             a watcher opened was also the page that handed out every card. Hidden,
+             not removed: applyManageGate shows it to the owner on every snapshot and
+             every sign-in, and the rows are still rendered underneath. -->
+        <div id="lb-owner-tools" style="display:none;">
         <hr class="section-divider">
         <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
         <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
-        <button class="btn-outline" onclick="printTournamentTeeSheet()">🖨️ Print Tee Sheet</button>
+        <button class="btn-outline" id="print-tee-sheet-btn" onclick="printTournamentTeeSheet()">🖨️ Print Tee Sheet</button>
 
         <hr class="section-divider">
         <!-- No padlock. A glyph is a claim too: these links lock nothing - anyone
              holding one can score that card (tournament_claims_test.js). -->
+        <div id="team-links-block">
         <h3>📋 Team Scorecard Links</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Anyone who has a link can score that card. Tap 📤 to get a QR code or copy the link.</p>
         <div id="team-links-list"></div>
+        </div>
         <!-- Individual mode: the group scoring links. The group EDITOR stays in
              Setup; only the links live here, so a signed-out visitor of an owned
              tournament can still send a group its card. -->
         <div id="group-links-block" style="display:none;">
             <h3>📋 Group Scoring Links</h3>
-            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. Send each group only their own. Anyone who has a link can score that card. In a multi-round event every round has its own links.</p>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. Send each group only their own. Anyone who has a link can score that card. In a multi-round event every round has its own links. Tap 📤 to get a QR code or copy the link.</p>
             <div id="group-links-list"></div>
+        </div>
         </div>
     </div>
 
@@ -1387,7 +1444,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         html += `<div style="max-height:200px; overflow-y:auto; margin-top:10px; border:1px solid var(--border-mid); border-radius:8px; padding:8px;">`;
         teamChunks.forEach((team, i) => {
             html += `<div style="margin-bottom:8px; padding-bottom:8px; ${i < teamChunks.length - 1 ? 'border-bottom:1px solid var(--border-faint);' : ''}">
-                <strong>Team ${i + 1}</strong> — ${team.map(p => p.name).join(', ')}
+                <strong>Team ${i + 1}</strong> — ${team.map(p => escapeHtml(p.name)).join(', ')}
             </div>`;
         });
         html += `</div>`;
@@ -1418,7 +1475,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             wrapper.id = `team-block-${teamCount}`;
             const suggestedHcp = suggestTeamHandicap(teamPlayers);
             const playerInputsHtml = [0, 1, 2, 3].map(i =>
-                `<input type="text" value="${teamPlayers[i] ? teamPlayers[i].name : ''}" placeholder="${teamPlayers[i] ? '' : (i < 2 ? `Player ${i + 1}` : `Player ${i + 1} (optional)`)}">`
+                `<input type="text" value="${teamPlayers[i] ? escapeHtml(teamPlayers[i].name) : ''}" placeholder="${teamPlayers[i] ? '' : (i < 2 ? `Player ${i + 1}` : `Player ${i + 1} (optional)`)}">`
             ).join('');
             wrapper.innerHTML = `
                 <div class="team-card-header">
@@ -1612,9 +1669,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 // Records already stored the old way are NOT repaired here. There is no
                 // migration and no background rewrite; renderTripLinkStatus() reads the
                 // forward pointer instead, so they display correctly as they are.
-                return db.ref(`trips/${tripLinkCode}/tournaments/${currentCode}`)
-                    .set({ label: name, addedAt: Date.now() })
-                    .then(() => db.ref(`tournaments/${currentCode}/tripCode`).set(tripLinkCode));
+                // ONE WRITE, BOTH POINTERS (Wave 1, A9): two sequential sets could
+                // leave the forward pointer with no tripCode behind it.
+                return db.ref().update({
+                    [`trips/${tripLinkCode}/tournaments/${currentCode}`]: { label: name, addedAt: Date.now() },
+                    [`tournaments/${currentCode}/tripCode`]: tripLinkCode
+                });
             }
         }).then(() => {
             window.location.href = `tournament.html?tourney=${currentCode}`;
@@ -1628,6 +1688,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return shareBaseUrl() + 'tournament-scorecard.html';
     }
 
+    // A TEAM LINK NAMES ITS ROUND on a multi-round event (Wave 1, A2). The card
+    // refuses a multi-round link with no round in it, and team links never
+    // carried one, so a multi-round team event could not be scored at all.
+    // Teams are event-level (roundView carries them), so each round gets the
+    // same teams with its own round id - built the way group links are.
+    function teamScorecardUrl(t, rid) {
+        const roundPart = rid ? `&round=${rid}` : '';
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${roundPart}`;
+    }
+    // The rounds of a multi-round event in play order, one shape for every list
+    // that needs a set of links per round.
+    function roundsInOrder() {
+        const rounds = currentData.rounds || {};
+        return Object.keys(rounds)
+            .sort((a, b) => ((rounds[a].createdAt || 0) - (rounds[b].createdAt || 0)))
+            .map(rid => ({ rid, label: rounds[rid].name || 'Round' }));
+    }
+
     // ONE ROW BUILDER, TWO LISTS. The same row used to serve as both the Setup
     // tab's per-team card and the public scoring-link list - one <div> in
     // #team-links-list carried the name, the golfers, the hole badge, the
@@ -1639,7 +1717,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function teamRowHtml(t, opts) {
         const editable = !!(opts && opts.editable);
         const isShotgun = currentData.startType === 'shotgun';
-        const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+        const roundId = (opts && opts.roundId) || null;
+        const url = teamScorecardUrl(t, roundId);
         const names = (t.players || []).join(', ');
         const teamName = t.name || `Team ${t.num}`;
         const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
@@ -1651,12 +1730,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Share button so a team can scan straight off the organizer's screen.
         // The box is drawn by renderTeamLinks after the rows land; the editable
         // Setup card carries none - it is for editing, not for scanning.
-        const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}" data-url="${url}" data-fallback="QR unavailable"></span>`;
+        // THE NAME RIDES IN A DATA ATTRIBUTE, NEVER IN THE HANDLER (Wave 1, A1).
+        // A team name can come from a public signup; inside a quoted onclick
+        // string a quote in it closed the string and the rest became code.
+        const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}"${roundId ? ` data-round="${escapeHtml(roundId)}"` : ''} data-url="${escapeHtml(url)}" data-fallback="QR unavailable"></span>`;
         return `<div class="team-link-row" style="flex-wrap:wrap;">
-            <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
+            <span>🏌️ ${escapeHtml(teamName)}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names)}</span></span>
             <span style="display:flex; align-items:center; gap:6px;">
                 ${hcpInput}${qrBox}
-                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
+                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
             </span>
         </div>`;
     }
@@ -1676,7 +1758,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renderTeamLinks() {
         const list = document.getElementById('team-links-list');
         if (!list) return;
-        list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
+        const teams = sortedTeams();
+        if (recordIsMultiRound() && teams.length) {
+            // One set per round, labeled like the group links.
+            const rounds = roundsInOrder();
+            list.innerHTML = rounds.map(r =>
+                `<div class="team-links-round" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${escapeHtml(r.label)}</div>`
+                + teams.map(t => teamRowHtml(t, { editable: false, roundId: r.rid })).join('')).join('')
+                || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">Add a round to get its scoring links.</div>`;
+        } else {
+            list.innerHTML = teams.map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
+        }
         // The inline codes, one per row, at M. Re-drawn on every snapshot with the
         // rows; the URL is read back off the box so the code and the Share button
         // beside it can never disagree about which team this is.
@@ -1738,7 +1830,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             el.innerHTML = h;
             el.style.display = h ? 'block' : 'none';
         });
-        [['ev-date', 'eventDate'], ['ev-time', 'startTime'], ['ev-venue', 'venue'], ['ev-beneficiary', 'beneficiary']].forEach(([id, key]) => {
+        [['ev-name', 'name'], ['ev-fee', 'entryFee'], ['ev-date', 'eventDate'], ['ev-time', 'startTime'], ['ev-venue', 'venue'], ['ev-beneficiary', 'beneficiary']].forEach(([id, key]) => {
             const el = document.getElementById(id);
             if (el && document.activeElement !== el) el.value = data[key] == null ? '' : String(data[key]);
         });
@@ -1751,6 +1843,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const shape = EVENT_DETAIL_KEYS[key];
         if (v && shape && !shape.test(v)) return;
         db.ref(`tournaments/${currentCode}/${key}`).set(v || null).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // The name is required, so an emptied box writes nothing and the next render
+    // puts the stored name back. The fee is a number of dollars, cents at most,
+    // never negative; 0 is a free event and is allowed.
+    function setEventName(value) {
+        if (!currentCode || !canManage()) return;
+        const v = String(value == null ? '' : value).trim();
+        if (!v || v.length > 120) { renderEventDetails(); return; }
+        db.ref(`tournaments/${currentCode}/name`).set(v).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setEntryFee(value) {
+        if (!currentCode || !canManage()) return;
+        const raw = String(value == null ? '' : value).trim();
+        const n = raw === '' ? 0 : Number(raw);
+        if (!isFinite(n) || n < 0 || n > 100000) { renderEventDetails(); return; }
+        db.ref(`tournaments/${currentCode}/entryFee`).set(Math.round(n * 100) / 100).catch(err => alert(`Error: ${err.message}`));
     }
 
     function setStartType(val) {
@@ -1804,7 +1913,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const teamName = t.name || `Team ${t.num}`;
             const startVal = t.startingHole || '';
             return `<div class="team-link-row">
-                <span>🏌️ ${teamName}</span>
+                <span>🏌️ ${escapeHtml(teamName)}</span>
                 <span style="display:flex; align-items:center; gap:6px;">
                     <span style="font-size:0.75rem; color:var(--text-muted);">Hole</span>
                     <input type="text" value="${startVal}" placeholder="—" style="width:52px; padding:6px; font-size:0.85rem; text-align:center;" onchange="updateTeamStartingHole(${t.num}, this.value)">
@@ -1883,7 +1992,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // apps and would leave someone with literally no way to get the link. The modal OPENS
     // whatever the QR does: the link and the Copy button never depend on the library.
     function openShareModal(url, teamName, kind) {
-        const suffix = kind === 'register' ? 'Signup Link' : 'Scorecard Link';
+        const suffix = kind === 'register' ? 'Signup Link' : (kind === 'leaderboard' ? 'Leaderboard Link' : 'Scorecard Link');
         document.getElementById('share-modal-title').textContent = `${teamName} — ${suffix}`;
         document.getElementById('share-link-text').textContent = url;
         drawQrInto(document.getElementById('share-qr-box'), url, 180);
@@ -2011,6 +2120,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const noOwner = document.getElementById('lb-no-owner-note');
         if (noOwner) noOwner.style.display = currentData.ownerUid ? 'none' : 'block';
         const present = GATED_TABS.map((k) => ({ key: k, tab: document.getElementById('tab-btn-' + k), panel: document.getElementById('manage-tab-' + k) }));
+        // The organizer's half of the Leaderboard tab (Wave 1, A3): scoring links
+        // and their QR codes, the print buttons, the payout calculator. Hidden in
+        // the tree for everyone else, shown to the owner - on every call, so a
+        // sign-in or a sign-out moves it without a reload.
+        // A LEGACY RECORD (no ownerUid) KEEPS ITS HANDOUT. Nobody owns it, so
+        // canManage() is false for everyone, and hiding the links there left
+        // the event with no way to hand out a card. It is fully open anyway.
+        // The calculator stays hidden: nobody can save amounts on it.
+        const handout = allowed || !currentData.ownerUid;
+        const tools = document.getElementById('lb-owner-tools');
+        if (tools) tools.style.display = handout ? '' : 'none';
+        const calc = document.getElementById('payout-owner-controls');
+        if (calc) calc.style.display = allowed ? '' : 'none';
+        const pubHead = document.getElementById('payout-public-heading');
+        if (pubHead) pubHead.style.display = allowed ? 'none' : '';
+        renderPayoutResults();
         if (!allowed) {
             // Hidden, in the tree. The pill's inline display goes to none; the
             // panel is parked by showTab('leaderboard'), which sets every
@@ -2124,6 +2249,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // The public board, for watchers. Same page the organizer runs; a visitor
+    // who is not the owner gets the Leaderboard tab and nothing that scores.
+    function leaderboardWatchUrl() {
+        return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode || '');
+    }
+
     function registrationSignupUrl() {
         return shareBaseUrl() + 'tournament.html?register=' + encodeURIComponent(currentCode || registerCode || '');
     }
@@ -2149,7 +2280,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 return;
             }
             title.textContent = data.name || 'Tournament';
-            if (sub) sub.textContent = [data.courseName, formatLabelFor(data.format)].filter(Boolean).join(' \u2022 ');
+            // WHAT A GOLFER DECIDES ON (2026-10-06). This line read course and
+            // format, and left out the two things somebody weighing up whether to
+            // enter actually asks: WHEN is it, and WHAT does it cost. Both are
+            // already on the record - eventDate and entryFee, set on Setup - and
+            // the signup page simply never showed them, so a golfer had to text
+            // the organizer to find out. formatEventDate is the page's own
+            // formatter, so the date here and the date in the header are one
+            // definition; a fee of 0 or absent prints nothing rather than "$0".
+            if (sub) {
+                const fee = Number(data.entryFee) || 0;
+                sub.textContent = [
+                    formatEventDate(data.eventDate),
+                    data.courseName,
+                    formatLabelFor(data.format),
+                    fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry') : ''
+                ].filter(Boolean).join(' \u2022 ');
+            }
             const taking = !!data.ownerUid;
             form.style.display = taking ? 'block' : 'none';
             closed.style.display = taking ? 'none' : 'block';
@@ -2519,7 +2666,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. The Desk tab is where you tick Paid and approve them into the field.</p>`
                 + registrationFieldsHtml()
                 + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
-                + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">📤 Share signup link</button>`;
+                + `<button class="btn-outline" data-share-name="${eventName}" data-share-kind="register" onclick="openShareModal(registrationSignupUrl(), this.dataset.shareName, this.dataset.shareKind)">📤 Share signup link</button>`;
         }
     }
 
@@ -2531,25 +2678,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         { key: 'paid', label: 'Paid', test: (e) => e.paid === true },
         { key: 'approved', label: 'Approved', test: (e) => regInField(e) },
         { key: 'pending', label: 'Not yet approved', test: (e) => !regInField(e) },
-        // Team events only: a golfer approved with no destination became a
-        // one-player "Team N". Individual events have players, not teams.
+        // Team events only: in the field, and the team the entry points at no
+        // longer exists (rule of 2026-10-06). Individual events have no teams.
         { key: 'needsteam', label: 'Needs a team', test: (e) => regNeedsTeam(e), teamOnly: true }
     ];
     // The one test for "in the field", shared by the row, the counts and the chips.
     function regInField(e) { return !!(e && (e.approvedAt || e.playerId || e.teamNum)); }
-    // "NEEDS A TEAM" - DERIVED, NOTHING STORED (2026-09-18): in the field on a team
-    // event, on a team with exactly one golfer, AND that team still wears the
-    // default name /^Team \d+$/ - what approveRegistration writes for a golfer
-    // with no destination. A one-golfer team the organizer NAMED is a team of one
-    // on purpose and does not need one. No key on the signup (the rules' $other is
-    // false there), no marker on the team; the desk says it, Setup fixes it.
+    // "NEEDS A TEAM" - DERIVED, NOTHING STORED. RULE CHANGED 2026-10-06 (phone QA,
+    // event 8HF9WV). It used to fire for any one-golfer team still named "Team N",
+    // which is exactly what a deliberate New-team approve writes, so the desk said
+    // "Needs a team" beside a golfer who had one. Measured identical on 732194e:
+    // the old rule, not the approve write. Now it means the team the entry points
+    // at no longer exists (removed from the record - no Setup control removes a team today (Wave 2)) - a golfer with nowhere to play.
+    function regTeam(e) {
+        if (!e || !regInField(e) || recordIsIndividual() || !e.teamNum) return null;
+        return ((currentData && currentData.teams) || {})['team' + e.teamNum] || null;
+    }
     function regNeedsTeam(e) {
         if (!e || !regInField(e) || recordIsIndividual()) return false;
-        const t = ((currentData && currentData.teams) || {})['team' + e.teamNum];
-        if (!t) return false;
-        const players = Array.isArray(t.players) ? t.players : Object.values(t.players || {});
-        if (!(players.length === 1)) return false;
-        return /^Team \d+$/.test(String(t.name || ('Team ' + t.num)));
+        return !regTeam(e);
     }
     function setRegistrationFilter(key) {
         registrationFilter = REG_FILTERS.some((f) => f.key === key) ? key : 'all';
@@ -2635,6 +2782,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // The search box is wired here, once, and only ever READ: typing re-renders
         // the rows and the chips; nothing re-renders the box.
         if (search && typeof search.oninput !== 'function') search.oninput = function () { renderRegistrationDesk(); };
+        const exportBtn = document.getElementById('registration-export');
+        // SHOWN ONLY WHEN THERE IS A LIST. An Export button on an empty desk
+        // hands over a file with a header row and nothing under it.
+        const showExport = (on) => { if (exportBtn) exportBtn.style.display = on ? 'block' : 'none'; };
+        showExport(false);
         if (!registrationAllowed()) {
             // A legacy event (no ownerUid) has no signups to list - the rules
             // refuse the create and nobody could read it - and the page says so
@@ -2656,6 +2808,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
             return;
         }
+        showExport(true);
         const entriesOnly = all.map((x) => x[1]);
         if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
         if (chipsEl) chipsEl.innerHTML = REG_FILTERS.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
@@ -2705,17 +2858,178 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // team" beside it when regNeedsTeam says so. The checkbox stays the control.
             const payBadge = e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
             const approve = inField
-                ? `<span class="reg-state reg-state-field">In the field</span>${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
+                ? `<span class="reg-state reg-state-field">In the field</span>${regTeam(e) ? `<span class="reg-state reg-state-team">${escReg(regTeam(e).name || ('Team ' + regTeam(e).num))}</span>` : ''}${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
+            // CORRECT AND REMOVE (2026-10-06). Small and last, after the
+            // controls that run the event: an organizer taps Paid and Approve
+            // all day and the destructive one must not sit under the thumb that
+            // is doing it. Remove asks by name before it writes.
+            const fix = `<button class="btn-outline reg-fix" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="editRegistration('${escReg(id)}')">Correct</button>`
+                + `<button class="btn-outline reg-remove" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="removeRegistration('${escReg(id)}')">Remove</button>`;
             return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + payBadge
                 + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
                 + dest
                 + approve
+                + fix
                 + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
                 + `</div>`;
         }).join('');
+    }
+
+    // ===== REMOVE, CORRECT, EXPORT (2026-10-06) ==============================
+    //
+    // THE RULES HAD TO CHANGE FOR THE FIRST ONE, and only for that one. Both
+    // arms of registrations/$code/$entryId .write ended in `newData.exists()`,
+    // so a delete was refused for everybody - the organizer included. Measured
+    // as a red targaryen row before the change ("registrations/OWNED/e1 write
+    // organizer expect OK"), which is how the one-line change is shown to be
+    // what does the work rather than something that merely sits beside it.
+    // Correcting an entry needed NO rules change: the owner arm has always
+    // allowed an update, and there was simply no screen for it.
+    //
+    // A REMOVAL IS NOT A WITHDRAWAL. The golfer cannot take their own entry
+    // back - create-only, by the rules - because an entry that can vanish is an
+    // entry the organizer cannot rely on when they order the carts. This is the
+    // organizer striking somebody off, and it asks first, by name.
+    function removeRegistration(entryId) {
+        if (!currentCode || !canManage()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry) return;
+        const who = String(entry.fullName || entry.name || 'this golfer').trim();
+        const inField = regInField(entry);
+        // WHAT IS LOST, IN THE QUESTION. An approved golfer is already in the
+        // field, and removing the signup does NOT take them out of it - the
+        // player or team record is a separate node the organizer edits on Setup.
+        // Saying so here is the difference between a tidy list and a missing
+        // golfer at the first tee.
+        const warn = inField
+            ? '\n\nThey are already in the field. Removing the signup does not take them out of it — do that on Setup.'
+            : '';
+        if (!confirm('Remove ' + who + ' from the signup list?' + warn
+            + '\n\nThis cannot be undone. They would have to sign up again.')) return;
+        if (registrationEditingId === entryId) closeRegistrationEdit();
+        db.ref(`registrations/${currentCode}/${entryId}`).remove()
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // The entry the editor is open on. Never written anywhere: which row you are
+    // correcting is a way of looking at the list, not a fact about the event.
+    let registrationEditingId = null;
+
+    function editRegistration(entryId) {
+        if (!currentCode || !canManage()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry) return;
+        registrationEditingId = entryId;
+        const panel = document.getElementById('registration-edit');
+        const who = document.getElementById('reg-edit-who');
+        if (who) who.textContent = 'Correcting ' + String(entry.fullName || entry.name || '').trim();
+        // WHAT THE GOLFER TYPED, not a blank form. An organizer fixing "Ann
+        // Alhpa" needs the misspelling in front of them to see what is wrong.
+        document.getElementById('reg-edit-name').value = String(entry.fullName || entry.name || '');
+        document.getElementById('reg-edit-email').value = String(entry.email || '');
+        document.getElementById('reg-edit-phone').value = String(entry.phone || '');
+        const refusal = document.getElementById('reg-edit-refusal');
+        if (refusal) { refusal.style.display = 'none'; refusal.textContent = ''; }
+        if (panel) panel.style.display = 'block';
+    }
+
+    function closeRegistrationEdit() {
+        registrationEditingId = null;
+        const panel = document.getElementById('registration-edit');
+        if (panel) panel.style.display = 'none';
+    }
+
+    function registrationEditRefusal(msg) {
+        const el = document.getElementById('reg-edit-refusal');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+        return null;
+    }
+
+    function saveRegistrationEdit() {
+        if (!currentCode || !canManage() || !registrationEditingId) return;
+        const id = registrationEditingId;
+        const fullName = String((document.getElementById('reg-edit-name') || {}).value || '').trim();
+        const email = String((document.getElementById('reg-edit-email') || {}).value || '').trim();
+        const phone = String((document.getElementById('reg-edit-phone') || {}).value || '').trim();
+        // THE SAME SHAPE THE RULES REQUIRE, checked here so a refusal is a
+        // sentence under the field instead of an SDK error in an alert. The
+        // pattern is the rules' own (REG_EMAIL), one definition for both.
+        if (!fullName) return registrationEditRefusal('Give a name.');
+        if (fullName.length > 120) return registrationEditRefusal('That name is too long.');
+        if (!REG_EMAIL.test(email)) return registrationEditRefusal('That email does not look right.');
+        if (email.length > 160) return registrationEditRefusal('That email is too long.');
+        if (phone.length < 7 || phone.length > 40) return registrationEditRefusal('That phone number does not look right.');
+        // THREE KEYS. Not the whole entry: an update() carrying paid or
+        // approvedAt would re-approve a golfer or wipe a payment, and the rules
+        // let the owner write every one of them.
+        db.ref(`registrations/${currentCode}/${id}`).update({ fullName: fullName, email: email, phone: phone })
+            .then(() => closeRegistrationEdit())
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // ---- CSV -----------------------------------------------------------------
+    // ONE FIELD PER COLUMN, QUOTED WHEN IT HAS TO BE. A name like
+    // Dee "Deets" Delta, Jr is not a hypothetical: a comma or a quote in an
+    // unquoted cell silently shifts every column after it, which is how a tee
+    // sheet ends up with phone numbers in the shirt-size column.
+    function csvCell(v) {
+        const s = (v === undefined || v === null) ? '' : String(v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+    const REG_CSV_COLUMNS = [
+        ['Name', (e) => e.fullName || e.name || ''],
+        ['Email', (e) => e.email || ''],
+        ['Phone', (e) => e.phone || ''],
+        ['GHIN/Handicap', (e) => e.ghinOrHandicap || e.handicap || ''],
+        ['Shirt', (e) => e.shirtSize || ''],
+        ['Dinner', (e) => (e.dinnerCount === undefined || e.dinnerCount === null) ? '' : e.dinnerCount],
+        ['Team preference', (e) => e.teamPreference || ''],
+        ['Hole sponsor', (e) => e.holeSponsorship === true ? 'Yes' : ''],
+        ['Sponsor name', (e) => e.sponsorName || ''],
+        // THE DESK'S OWN STATE, because the sheet the organizer prints is the one
+        // they work from at the first tee: who has paid and who is in the field.
+        ['Paid', (e) => e.paid === true ? 'Yes' : 'No'],
+        ['In field', (e) => regInField(e) ? 'Yes' : 'No'],
+        ['Team', (e) => (e.teamNum === undefined || e.teamNum === null) ? '' : e.teamNum],
+        ['Signed up', (e) => e.createdAt ? new Date(e.createdAt).toISOString().slice(0, 10) : '']
+    ];
+    // IN THE DESK'S ORDER - oldest signup first, the same order the rows are in,
+    // so the sheet and the screen cannot disagree about who is third.
+    function registrationCsv() {
+        const all = Object.keys(registrationData || {})
+            .map((id) => registrationData[id] || {})
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        const head = REG_CSV_COLUMNS.map((c) => csvCell(c[0])).join(',');
+        return [head].concat(all.map((e) => REG_CSV_COLUMNS.map((c) => csvCell(c[1](e))).join(','))).join('\n') + '\n';
+    }
+    function registrationCsvFilename() {
+        const name = String((currentData && currentData.name) || 'event').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return (name || 'event') + '-signups.csv';
+    }
+    function exportRegistrationsCsv() {
+        if (!canManage()) return;
+        const csv = registrationCsv();
+        // A BLOB AND AN ANCHOR, with the sentence as the fallback. This is the
+        // WEB product (tournaments.rattlegolf.com) and a download works here;
+        // product-separation.md keeps these pages out of the native bundle,
+        // where a download would be inert. If the browser refuses it anyway the
+        // organizer is told, rather than given a button that does nothing.
+        try {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = registrationCsvFilename();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) {
+            alert('This browser would not save the file. Open the signup list on a computer to export it.');
+        }
     }
 
     function setRegistrationPaid(entryId, paid) {
@@ -2726,13 +3040,43 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch((err) => alert(`Error: ${err.message}`));
     }
 
+    // ONE WRITE PER APPROVE, AND NEVER TWO AT ONCE (Wave 1, A5).
+    //
+    // An approve was two writes in sequence - the field, then (after the
+    // server answered) the registration entry. On one bar at a desk that gap
+    // is seconds long, and the only guard read the entry, which did not say
+    // "approved" until the second write. A second tap in the gap put the
+    // golfer in the field twice. And "New team" took its number from the
+    // record as last delivered, so two quick approvals both wrote teamN and
+    // the second overwrote the first.
+    //
+    // Now: one multi-path update() carries the field change and the entry's
+    // approvedAt together (both land or neither does, and the SDK raises both
+    // locally at once); an entry with an approve in flight cannot be approved
+    // again; and a new team number is RESERVED from the moment it is chosen
+    // until its write settles, so the next approval counts past it.
+    const approvesInFlight = {};
+    const reservedTeamNums = {};
+
     function approveRegistration(entryId) {
         if (!currentCode || !canManage()) return;
+        if (approvesInFlight[entryId]) return;
         const entry = (registrationData || {})[entryId];
         const entryName = String((entry && (entry.fullName || entry.name)) || '').trim();
         if (!entry || !entryName) return;
         if (entry.approvedAt || entry.playerId || entry.teamNum) return;
         const name = entryName;
+        const regBase = `registrations/${currentCode}/${entryId}`;
+        const tBase = `tournaments/${currentCode}`;
+        const commit = (changes, teamNum) => {
+            approvesInFlight[entryId] = true;
+            const settle = () => {
+                delete approvesInFlight[entryId];
+                if (teamNum !== undefined) delete reservedTeamNums[teamNum];
+            };
+            return db.ref().update(changes)
+                .then(settle, (err) => { settle(); alert(`Error: ${err.message}`); });
+        };
         if (recordIsIndividual()) {
             const pid = newPlayerId();
             const rec = {
@@ -2742,11 +3086,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 handicap: (function () { const raw = String(entry.ghinOrHandicap || entry.handicap || '').trim(); return /^\+?\d{1,2}(\.\d+)?$/.test(raw) ? raw : '0'; })(),
                 addedAt: Date.now()
             };
-            db.ref(`tournaments/${currentCode}/players/${pid}`).set(rec).then(() =>
-                db.ref(`registrations/${currentCode}/${entryId}`).update({
-                    approvedAt: Date.now(), playerId: pid
-                })
-            ).catch((err) => alert(`Error: ${err.message}`));
+            commit({
+                [`${tBase}/players/${pid}`]: rec,
+                [`${regBase}/approvedAt`]: Date.now(),
+                [`${regBase}/playerId`]: pid
+            });
             return;
         }
         const destEl = document.getElementById('reg-dest-' + entryId);
@@ -2761,24 +3105,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const t = (currentData.teams || {})['team' + dest];
             if (t) {
                 const players = (t.players || []).concat([name]);
-                db.ref(`tournaments/${currentCode}/teams/team${t.num}/players`).set(players).then(() =>
-                    db.ref(`registrations/${currentCode}/${entryId}`).update({
-                        approvedAt: Date.now(), teamNum: t.num
-                    })
-                ).catch((err) => alert(`Error: ${err.message}`));
+                commit({
+                    [`${tBase}/teams/team${t.num}/players`]: players,
+                    [`${regBase}/approvedAt`]: Date.now(),
+                    [`${regBase}/teamNum`]: t.num
+                });
                 return;
             }
         }
         const existing = currentData.teams || {};
-        const nextNum = Object.values(existing).reduce((max, t) => Math.max(max, t.num || 0), 0) + 1;
+        const taken = Object.values(existing).map((t) => t.num || 0)
+            .concat(Object.keys(reservedTeamNums).map(Number));
+        const nextNum = taken.reduce((max, n) => Math.max(max, n), 0) + 1;
+        reservedTeamNums[nextNum] = entryId;
         const teamName = String(entry.teamPreference || '').trim() || `Team ${nextNum}`;
-        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({
-            num: nextNum, name: teamName, players: [name], handicap: 0
-        }).then(() =>
-            db.ref(`registrations/${currentCode}/${entryId}`).update({
-                approvedAt: Date.now(), teamNum: nextNum
-            })
-        ).catch((err) => alert(`Error: ${err.message}`));
+        commit({
+            [`${tBase}/teams/team${nextNum}`]: { num: nextNum, name: teamName, players: [name], handicap: 0 },
+            [`${regBase}/approvedAt`]: Date.now(),
+            [`${regBase}/teamNum`]: nextNum
+        }, nextNum);
     }
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
@@ -2858,7 +3203,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
-                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${flights[lbFlightId].name} yet.</div>`
+                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${escapeHtml(flights[lbFlightId].name)} yet.</div>`
                 : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No scores yet.</div>`;
             return;
         }
@@ -2885,7 +3230,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 : (r.hasScores ? r.thru : '-');
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${r.teamName}${tieTag}${partial}${pendingTag}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag}${partial}${pendingTag}</span>
                 <span class="lb-thru">${thru}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
@@ -2896,11 +3241,58 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     let cachedLeaderboardRows = [];
 
-    function renderPayoutSpotInputs() {
+    // THE PRIZE AMOUNTS ARE SAVED (Wave 1, A4). They lived only in the DOM, so
+    // an organizer's typed amounts vanished on reload, and every other phone saw
+    // the default - the pool split evenly over the spots ("$300 / $300 / $300" on
+    // a $900 pool), a payout nobody chose. Now the owner writes
+    // tournaments/<code>/payoutSpots (an array of numbers, at most 20) on every
+    // edit, the way setEventDetail writes a detail, and every screen reads the
+    // record. With nothing saved there is no default: the inputs are blank and
+    // a watcher reads "Payouts not set yet."
+    const MAX_PAYOUT_SPOTS = 20;
+    function savedPayoutSpots() {
+        const raw = currentData && currentData.payoutSpots;
+        const list = Array.isArray(raw) ? raw
+            : (raw && typeof raw === 'object' ? Object.keys(raw).sort((a, b) => a - b).map((k) => raw[k]) : []);
+        return list.slice(0, MAX_PAYOUT_SPOTS).map((v) => {
+            const x = Number(v);
+            return isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : 0;
+        });
+    }
+    const payoutsAreSet = (spots) => spots.some((v) => v > 0);
+
+    function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
         let n = parseInt(spotsInput.value, 10);
         if (isNaN(n) || n < 1) n = 1;
-        if (n > 20) { n = 20; spotsInput.value = 20; }
+        if (n > MAX_PAYOUT_SPOTS) { n = MAX_PAYOUT_SPOTS; spotsInput.value = MAX_PAYOUT_SPOTS; }
+        return n;
+    }
+    // What the owner's boxes say right now. A blank or unreadable box is $0.
+    function typedPayoutSpots() {
+        const n = payoutSpotCount();
+        const out = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`payout-spot-${i}`);
+            const x = el ? parseFloat(el.value) : NaN;
+            out.push(isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : 0);
+        }
+        return out;
+    }
+
+    function savePayoutSpots() {
+        if (!currentCode || !canManage()) return;
+        const spots = typedPayoutSpots();
+        db.ref(`tournaments/${currentCode}/payoutSpots`).set(spots).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function renderPayoutSpotInputs() {
+        const spotsInput = document.getElementById('payout-spots-input');
+        const saved = savedPayoutSpots();
+        // The record decides how many spots pay - unless the organizer is in that
+        // box right now, in which case their half-typed number wins.
+        if (saved.length && document.activeElement !== spotsInput) spotsInput.value = saved.length;
+        const n = payoutSpotCount();
 
         const pool = poolTotal();
         const container = document.getElementById('payout-spot-amounts');
@@ -2909,36 +3301,47 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
             : `No entry fee set for this tournament — set spot amounts manually if you're running a separate pool.`;
 
-        let existing = [];
+        let html = '';
+        let focusedAt = -1, focusedValue = '';
         for (let i = 0; i < n; i++) {
             const el = document.getElementById(`payout-spot-${i}`);
-            existing.push(el ? el.value : null);
-        }
-
-        let html = '';
-        for (let i = 0; i < n; i++) {
-            const defaultVal = existing[i] !== null ? existing[i] : (pool > 0 ? Math.round((pool / n) * 100) / 100 : 0);
+            if (el && el === document.activeElement) { focusedAt = i; focusedValue = el.value; }
+            // Saved amount, or blank. No equal split: an amount nobody typed is
+            // not an amount.
+            const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
                 <label>${ordinal(i + 1)} Place ($)</label>
-                <input type="number" id="payout-spot-${i}" min="0" value="${defaultVal}" oninput="renderPayoutResults()">
+                <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
         container.innerHTML = html;
+        if (focusedAt >= 0) {
+            const el = document.getElementById(`payout-spot-${focusedAt}`);
+            if (el) { el.value = focusedValue; if (el.focus) el.focus(); }
+        }
         renderPayoutResults();
     }
 
     function renderPayoutResults() {
         const resultsContainer = document.getElementById('payout-results');
+        if (!resultsContainer) return;
+        // The owner previews what they are typing; everyone else reads the record.
+        const owner = canManage();
+        const spotAmounts = owner ? typedPayoutSpots() : savedPayoutSpots();
+
+        // A WATCHER SEES THE AMOUNTS, READ-ONLY - the saved ones or a plain
+        // sentence, never an invented split.
+        const pub = document.getElementById('payout-public-amounts');
+        if (pub) {
+            pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
+                : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Payouts not set yet.</div>`);
+        }
+        if (!owner && !payoutsAreSet(spotAmounts)) { resultsContainer.innerHTML = ''; return; }
+
         if (!cachedLeaderboardRows || cachedLeaderboardRows.filter(r => r.hasScores).length === 0) {
             resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — payouts will show once teams start posting.</div>`;
             return;
-        }
-
-        const n = parseInt(document.getElementById('payout-spots-input').value, 10) || 0;
-        let spotAmounts = [];
-        for (let i = 0; i < n; i++) {
-            const el = document.getElementById(`payout-spot-${i}`);
-            spotAmounts.push(el ? parseFloat(el.value) || 0 : 0);
         }
 
         // A PAGE FILTER (2026-09-18): the allocator (payouts.js, PROTECTED, shared
@@ -2951,7 +3354,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pool = poolTotal();
 
         let html = '';
-        if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
+        // Only once an amount is set: blank boxes are "not set yet", not a payout
+        // that disagrees with the pool.
+        if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
                 ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}.
             </div>`;
@@ -2967,7 +3372,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
         } else {
             payouts.forEach(p => {
-                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${p.teamName}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
             });
         }
         resultsContainer.innerHTML = html;
@@ -3121,13 +3526,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const holes = (r.courseData || []).length;
             const scored = Object.keys(r.scores || {}).length;
             return `<div class="flight-row" style="flex-wrap:wrap;">
-                <input class="flight-name-input" type="text" value="${r.name || ''}" onchange="renameRound('${rid}', this.value)">
+                <input class="flight-name-input" type="text" value="${escapeHtml(r.name || '')}" onchange="renameRound('${rid}', this.value)">
                 <span class="flight-count">${label[st]}</span>
                 <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
                 <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', 1)" ${i === ids.length - 1 ? 'disabled' : ''}>▼</button>
                 <button class="flight-del" onclick="deleteRound('${rid}')" ${scored ? 'disabled title="This round has scores"' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
-                    ${r.courseName || 'No course set'} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + (netIsInPlay(r) ? 'Net' : (netWasRefused(r) ? 'Gross — net unavailable on this course' : 'Gross')) : ''} • ${holes} holes
+                    ${escapeHtml(r.courseName || 'No course set')} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + (netIsInPlay(r) ? 'Net' : (netWasRefused(r) ? 'Gross — net unavailable on this course' : 'Gross')) : ''} • ${holes} holes
                 </div>
                 <div style="flex-basis:100%; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
                     <button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="editRound('${rid}')">${editingRoundId === rid ? 'Done' : 'Edit'}</button>
@@ -3155,14 +3560,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         if (locked) {
             el.innerHTML = `<div style="border:1px solid var(--border-faint); border-radius:8px; padding:12px; margin-top:8px; font-size:0.8rem; color:var(--text-muted);">
-                <strong>${r.name}</strong> is ${roundStatus(r) === 'open' ? 'open for scoring' : 'closed'}, so its course, format and scoring can no longer be changed —
+                <strong>${escapeHtml(r.name)}</strong> is ${roundStatus(r) === 'open' ? 'open for scoring' : 'closed'}, so its course, format and scoring can no longer be changed —
                 scores already entered were recorded against them. Put the round back into setup only if nobody has played it.
             </div>`;
             return;
         }
 
         const courseOptions = Object.keys(allCourses()).map(k =>
-            `<option value="${k}" ${r.activeCourseKey === k ? 'selected' : ''}>${allCourses()[k].name}</option>`).join('');
+            `<option value="${k}" ${r.activeCourseKey === k ? 'selected' : ''}>${escapeHtml(allCourses()[k].name)}</option>`).join('');
 
         el.innerHTML = `<div style="border:1px solid var(--brand-green); border-radius:8px; padding:12px; margin-top:8px;">
             <div class="form-group">
@@ -3428,7 +3833,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const flightOptions = (sel) => `<option value="">— No flight —</option>` + fids.map(fid =>
-            `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+            `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${escapeHtml(flights[fid].name || 'Flight')}</option>`).join('');
 
         const withdrawnCount = pids.filter(pid => isWithdrawn(players[pid])).length;
         const unnamedCount = pids.filter(pid => isUnnamed(players[pid])).length;
@@ -3437,7 +3842,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const p = players[pid];
             const sel = flights[p.flightId] ? p.flightId : '';
             return `<div class="fa-row">
-                <input class="fa-team" type="text" value="${p.name || ''}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;"
+                <input class="fa-team" type="text" value="${escapeHtml(p.name || '')}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;"
                     placeholder="${isUnnamed(p) ? 'Paid entry \u2014 name to come' : ''}">
                 <input type="text" value="${handicapIsPending(p) ? '' : (p.handicap !== undefined ? p.handicap : '0')}" onchange="updatePlayerHandicap('${pid}', this.value)" style="width:52px;"
                     placeholder="${handicapIsPending(p) ? 'hcp' : ''}">
@@ -3629,13 +4034,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         sections.forEach(sec => {
             const gids = Object.keys(sec.groups).sort((a, b) => (sec.groups[a].createdAt || 0) - (sec.groups[b].createdAt || 0));
             if (gids.length === 0) return;
-            if (sec.label) html += `<div style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${sec.label}</div>`;
+            if (sec.label) html += `<div style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${escapeHtml(sec.label)}</div>`;
             gids.forEach(gid => {
                 const g = sec.groups[gid];
                 const names = (g.playerIds || []).filter(pid => players[pid]).map(pid => players[pid].name);
                 html += `<div class="team-link-row" style="flex-wrap:wrap;">
-                    <span>🏌️ ${g.name || 'Group'} <span style="font-weight:normal; color:var(--text-muted);">— ${names.join(', ') || 'nobody assigned yet'}</span></span>
-                    <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
+                    <span>🏌️ ${escapeHtml(g.name || 'Group')} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names.join(', ')) || 'nobody assigned yet'}</span></span>
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
+                        <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${groupScorecardUrl(gid, sec.rid)}" data-share-name="${escapeHtml((g.name || 'Group') + (sec.label ? ' \u2014 ' + sec.label : ''))}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
+                    </span>
                 </div>`;
             });
         });
@@ -3679,18 +4087,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const list = document.getElementById('scoring-groups-list');
 
         const groupOptions = (sel) => `<option value="">— Unassigned —</option>` + gids.map(gid =>
-            `<option value="${gid}" ${sel === gid ? 'selected' : ''}>${groups[gid].name || 'Group'}</option>`).join('');
+            `<option value="${gid}" ${sel === gid ? 'selected' : ''}>${escapeHtml(groups[gid].name || 'Group')}</option>`).join('');
 
         let html = gids.map(gid => {
             const g = groups[gid];
             const ids = (g.playerIds || []).filter(pid => players[pid]);
             return `<div class="flight-row" style="flex-wrap:wrap;">
-                <input class="flight-name-input" type="text" value="${g.name || ''}" onchange="renameScoringGroup('${gid}', this.value)">
+                <input class="flight-name-input" type="text" value="${escapeHtml(g.name || '')}" onchange="renameScoringGroup('${gid}', this.value)">
                 <input type="text" value="${g.startingHole || ''}" placeholder="Hole" style="width:58px;" onchange="setGroupStartingHole('${gid}', this.value)">
                 <span class="flight-count">${ids.length} golfer${ids.length === 1 ? '' : 's'}</span>
                 <button class="flight-del" onclick="deleteScoringGroup('${gid}')" ${ids.length ? 'disabled' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
-                    ${ids.length ? ids.map(pid => players[pid].name).join(', ') : 'Nobody assigned yet'}
+                    ${ids.length ? ids.map(pid => escapeHtml(players[pid].name)).join(', ') : 'Nobody assigned yet'}
                 </div>
             </div>`;
         }).join('');
@@ -3698,7 +4106,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (Object.keys(players).length > 0 && gids.length > 0) {
             html += `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">Assign golfers — ${unassigned.length} unassigned</p>`
                 + Object.keys(players).map(pid => `<div class="fa-row">
-                    <span class="fa-team">${players[pid].name}</span>
+                    <span class="fa-team">${escapeHtml(players[pid].name)}</span>
                     <select onchange="assignPlayerToGroup('${pid}', this.value)">${groupOptions(assigned[pid] || '')}</select>
                 </div>`).join('');
         }
@@ -3793,7 +4201,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             : fids.map(fid => {
                 const n = counts[fid] || 0;
                 return `<div class="flight-row">
-                    <input class="flight-name-input" type="text" value="${flights[fid].name || ''}"
+                    <input class="flight-name-input" type="text" value="${escapeHtml(flights[fid].name || '')}"
                         onchange="renameFlight('${fid}', this.value)">
                     <span class="flight-count">${n} ${competitorNoun(currentData, n)}</span>
                     <button class="flight-del" onclick="deleteFlight('${fid}')" ${n > 0 ? 'disabled title="Move its teams out first"' : ''}>✕</button>
@@ -3805,7 +4213,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (fids.length === 0 || teamIds.length === 0) { assignEl.innerHTML = ''; return; }
 
         const options = (selected) => `<option value="">— Unassigned —</option>` + fids.map(fid =>
-            `<option value="${fid}" ${selected === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+            `<option value="${fid}" ${selected === fid ? 'selected' : ''}>${escapeHtml(flights[fid].name || 'Flight')}</option>`).join('');
 
         assignEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">
             Assign teams — ${counts.__unassigned} unassigned</p>` + teamIds.map(tid => {
@@ -3814,7 +4222,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // dropdown rather than showing a blank selection.
             const current = flights[t.flightId] ? t.flightId : '';
             return `<div class="fa-row">
-                <span class="fa-team">${t.name || `Team ${t.num}`}</span>
+                <span class="fa-team">${escapeHtml(t.name || `Team ${t.num}`)}</span>
                 <select onchange="assignTeamToFlight('${tid}', this.value)">${options(current)}</select>
             </div>`;
         }).join('');
@@ -3846,7 +4254,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         el.style.display = 'block';
         el.innerHTML = `<button class="lb-flight-btn ${active === 'event' ? 'active' : ''}" onclick="setLeaderboardRound('event')">Event</button>`
-            + ids.map(rid => `<button class="lb-flight-btn ${active === rid ? 'active' : ''}" onclick="setLeaderboardRound('${rid}')">${rounds[rid].name || 'Round'}</button>`).join('');
+            + ids.map(rid => `<button class="lb-flight-btn ${active === rid ? 'active' : ''}" onclick="setLeaderboardRound('${rid}')">${escapeHtml(rounds[rid].name || 'Round')}</button>`).join('');
     }
 
     // --- LEADERBOARD FLIGHT VIEW ---
@@ -3874,7 +4282,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         el.style.display = 'block';
         el.innerHTML = `<button class="lb-flight-btn ${!lbFlightId ? 'active' : ''}" onclick="setLeaderboardFlight('')">Overall</button>`
-            + fids.map(fid => `<button class="lb-flight-btn ${lbFlightId === fid ? 'active' : ''}" onclick="setLeaderboardFlight('${fid}')">${flights[fid].name || 'Flight'}</button>`).join('');
+            + fids.map(fid => `<button class="lb-flight-btn ${lbFlightId === fid ? 'active' : ''}" onclick="setLeaderboardFlight('${fid}')">${escapeHtml(flights[fid].name || 'Flight')}</button>`).join('');
     }
 
     // --- TRIP LINKING ---
@@ -3883,8 +4291,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!code) { alert('⚠️ Enter the trip code.'); return; }
         db.ref(`trips/${code}`).once('value').then(snap => {
             if (!snap.exists()) { alert("⚠️ No trip found with that code."); return; }
-            return db.ref(`trips/${code}/tournaments/${currentCode}`).set({ label: currentData.name, addedAt: Date.now() }).then(() => {
-                db.ref(`tournaments/${currentCode}/tripCode`).set(code);
+            // ONE WRITE, BOTH POINTERS (Wave 1, A9). The second set used to run
+            // in an unreturned inner promise, so its failure was never reported
+            // and a half-linked pair was possible.
+            return db.ref().update({
+                [`trips/${code}/tournaments/${currentCode}`]: { label: currentData.name, addedAt: Date.now() },
+                [`tournaments/${currentCode}/tripCode`]: code
             });
         }).catch(err => alert(`Error linking to trip: ${err.message}`));
     }
@@ -3936,15 +4348,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // decides where they go.
         const scoringLine = scoringModeLine(currentData);
 
-        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${currentData.name}</h1>
-            <p style="color:#666; margin-top:0;">${currentData.courseName} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${view.title}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${escapeHtml(currentData.name)}</h1>
+            <p style="color:#666; margin-top:0;">${escapeHtml(currentData.courseName)} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${escapeHtml(view.title)}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
             <table style="width:100%; border-collapse:collapse; margin-top:14px;">
                 <tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
                     <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">${entryColumnLabel(currentData)}</th><th style="padding:8px 4px;">${view.kind === 'event' ? 'Rds' : 'Thru'}</th><th style="padding:8px 4px; text-align:right;">To Par</th>
                 </tr>`;
         rows.forEach(r => {
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${r.teamName}</td><td style="padding:8px 4px;">${r.hasScores ? (view.kind === 'event' ? `${r.roundsComplete}/${r.countableRounds}` : r.thru) : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
+            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${escapeHtml(r.teamName)}</td><td style="padding:8px 4px;">${r.hasScores ? (view.kind === 'event' ? `${r.roundsComplete}/${r.countableRounds}` : r.thru) : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
         });
         html += `</table>`;
         container.innerHTML = html;
@@ -4117,12 +4529,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const shotgun = data.startType === 'shotgun';
         const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         let html = `<h2 style="margin:0 0 4px 0; font-size:1.3rem;">${esc(data.name || 'Tournament')}</h2>
-            <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>
-            <div class="tee-grid">`;
+            <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>`;
         const bitmaps = [];
+        // A multi-round event prints one block per round, each QR carrying its
+        // round; a single-round event prints exactly the sheet it always did.
+        const sections = recordIsMultiRound() ? roundsInOrder() : [{ rid: null, label: '' }];
+        if (!sections.length) { alert('\u26A0\uFE0F No rounds yet \u2014 add a round first.'); return false; }
+        let cell = 0;
+        sections.forEach((sec) => {
+        if (sec.label) html += `<h3 class="tee-round" style="margin:12px 0 6px 0;">${esc(sec.label)}</h3>`;
+        html += `<div class="tee-grid">`;
         teams.forEach((t) => {
-            const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+            const url = teamScorecardUrl(t, sec.rid);
             const teamName = t.name || `Team ${t.num}`;
+            const key = cell++;
             const hole = shotgun
                 ? (t.startingHole ? `<div class="tee-hole">Hole ${esc(t.startingHole)}</div>` : `<div class="tee-hole" style="color:#b00020;">HOLE NOT SET</div>`)
                 : '';
@@ -4130,17 +4550,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // to (never serialised) after innerHTML, so the print snapshot has
             // the pixels. No bitmap: the sentence is in the markup, no canvas.
             const bitmap = qrBitmap(url, 132, qrLevelM());
-            if (bitmap) bitmaps.push({ num: t.num, bitmap });
+            if (bitmap) bitmaps.push({ key, bitmap });
             html += `<div class="tee-cell">
                 <div class="tee-name">${esc(teamName)}</div>${hole}
-                <div class="tee-qr" data-team="${esc(t.num)}">${bitmap ? '' : 'QR code unavailable \u2014 open the link.'}</div>
+                <div class="tee-qr" data-team="${esc(t.num)}"${sec.rid ? ` data-round="${esc(sec.rid)}"` : ''} data-cell="${key}">${bitmap ? '' : 'QR code unavailable \u2014 open the link.'}</div>
                 <div class="tee-url">${esc(url)}</div>
             </div>`;
         });
-        html += `</div><p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
+        html += `</div>`;
+        });
+        html += `<p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
         container.innerHTML = html;
-        bitmaps.forEach(({ num, bitmap }) => {
-            const box = container.querySelector(`.tee-qr[data-team="${num}"]`);
+        bitmaps.forEach(({ key, bitmap }) => {
+            const box = container.querySelector(`.tee-qr[data-cell="${key}"]`);
             if (box) box.appendChild(bitmap);
         });
         return true;
@@ -4180,11 +4602,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderPlayerField();
             renderScoringGroups();
             renderScoreCorrector();
-            // Team scorecard links belong to team events only.
-            const teamLinksHeading = document.getElementById('team-links-list');
-            if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
+            // Team scorecard links belong to team events only - the heading and its
+            // paragraph with them (Wave 1, A7: hiding only the list left an orphan
+            // "Team Scorecard Links" heading over an individual event).
+            const teamLinksBlock = document.getElementById('team-links-block');
+            if (teamLinksBlock) teamLinksBlock.style.display = recordIsIndividual() ? 'none' : 'block';
+            // The tee sheet is a sheet of TEAM codes. An individual event has the
+            // group links (with Share and QR) and the pairings sheet instead.
+            const teeBtn = document.getElementById('print-tee-sheet-btn');
+            if (teeBtn) teeBtn.style.display = recordIsIndividual() ? 'none' : '';
             const teamCards = document.getElementById('team-cards-list');
             if (teamCards) teamCards.style.display = recordIsIndividual() ? 'none' : 'block';
+            const setupTeams = document.getElementById('setup-teams-block');
+            if (setupTeams) setupTeams.style.display = recordIsIndividual() ? 'none' : '';
             renderGroupLinks();
             renderLeaderboardRoundFilter();
             renderLeaderboardFlightFilter();

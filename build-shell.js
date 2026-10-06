@@ -235,7 +235,32 @@ const PRODUCTS = {
         // before the ball. A device on v53 still installs the ball and still
         // says the consumer word. The hostname tournaments.rattlegolf.com
         // is unchanged.
-        cacheName: 'tournament-v54-rattle-golf',
+        // Moved to v55 FOR THE REGISTRATION DESK (2026-10-06, Rattle Golf
+        // Tournaments only). tournament.html is a precached shell file and it
+        // changed: the organizer can now correct a typo in a signup, remove an
+        // entry (which needed the one-line rules change allowing the owner to
+        // delete registrations/$code/$entryId), and export the field as CSV -
+        // and the public signup page shows the DATE and the ENTRY FEE, which it
+        // never did. A device on v54 has a desk with no Correct, no Remove and
+        // no Export, and a signup page that does not say when the event is or
+        // what it costs. CONSUMER IS UNTOUCHED: sw.js's CACHE_VERSION does not
+        // move, because nothing in the consumer product changed
+        // (product-separation.md: there are two cache versions and bumping the
+        // wrong one re-downloads the consumer shell for a change that is not in
+        // it). The consumer name is deliberately not written in this block -
+        // rattle_identity_test.js and rattle_consumer_separation_test.js both
+        // assert it never appears here, which is how a rename gets caught.
+        // Moved to v56 FOR TOURNAMENTS WAVE 1 (2026-10-06, Rattle Golf
+        // Tournaments only). tournament.html and tournament-scorecard.html are
+        // precached shell files and both changed: every signup-supplied name is
+        // escaped (both pages now load text-safe.js), a multi-round team event
+        // hands out a link per round, the public board gains a watch link and
+        // hides the scoring links, QR codes, print buttons and calculator from
+        // anyone but the owner, prize amounts are saved on the record, approve
+        // is one write, and the name and fee can be corrected after save. A
+        // device on v55 keeps the unescaped pages and the old board. CONSUMER
+        // IS UNTOUCHED, as in v55: the other key does not move.
+        cacheName: 'tournament-v56-missing-links',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

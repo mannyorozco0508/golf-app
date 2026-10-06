@@ -26,6 +26,7 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const { flatWrites } = require('./helpers/tournament-write-apply.js');
 const fs = require('fs');
 const path = require('path');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
@@ -315,7 +316,7 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const before = sb.__dbWrites.length;
         sb.approveRegistration('e1');
         await settle();
-        const w = sb.__dbWrites.slice(before);
+        const w = flatWrites(sb.__dbWrites.slice(before));
         const player = w.find((x) => /^tournaments\/OWN1\/players\/p/.test(x.path) && x.op === 'set');
         assert.ok(player, 'approve must mint a player under the existing field: ' + JSON.stringify(w));
         assert.equal(player.value.name, 'Dee Delta');
@@ -341,7 +342,7 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const before = sb.__dbWrites.length;
         sb.approveRegistration('e1');
         await settle();
-        const w = sb.__dbWrites.slice(before);
+        const w = flatWrites(sb.__dbWrites.slice(before));
         const team = w.find((x) => x.path === 'tournaments/OWN1/teams/team2/players' && x.op === 'set');
         assert.ok(team, 'preferred team is the destination: ' + JSON.stringify(w));
         assert.deepEqual(team.value, ['Cal Charlie', 'Dee Delta']);
@@ -357,7 +358,7 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const before = sb.__dbWrites.length;
         sb.approveRegistration('e1');
         await settle();
-        const w = sb.__dbWrites.slice(before);
+        const w = flatWrites(sb.__dbWrites.slice(before));
         const team = w.find((x) => /^tournaments\/OWN1\/teams\/team3$/.test(x.path) && x.op === 'set');
         assert.ok(team, 'next team number is 3: ' + JSON.stringify(w));
         assert.equal(team.value.num, 3);

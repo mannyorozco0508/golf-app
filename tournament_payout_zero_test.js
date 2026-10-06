@@ -32,6 +32,7 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -84,8 +85,19 @@ describe('2. WITH A POOL - the same filter; the banner is the pool\'s own rule',
         assert.equal(count(r, /ledger-row/g), 0);
         assert.equal(count(r, /\$0\.00<\/span><\/div>/g), 0, 'no $0.00 ledger amounts');
         assert.match(r, /Enter spot amounts above to see payouts\./);
-        assert.match(r, /add up to \$0\.00, but the pool is \$500\.00/, 'the banner still tells the truth about the pool');
+        // RE-PINNED, Wave 1 (A4). Blank boxes are "not set yet" since the even
+        // split was removed, so an untouched calculator no longer accuses itself
+        // of adding up to $0.00. The banner waits for an amount - next test.
+        assert.doesNotMatch(r, /add up to/, 'a banner over boxes nobody has typed in');
         assert.match(text(sb, 'payout-pool-sub'), /Pool is \$500\.00/);
+    });
+    test('fee 100, 5 scored teams, $50 typed on 1st: the mismatch banner tells the truth about the pool', () => {
+        const sb = arrive(100, 5, true);
+        sb.document.getElementById('payout-spots-input').value = '1';
+        vm.runInContext('renderPayoutSpotInputs()', sb);
+        sb.document.getElementById('payout-spot-0').value = '50';
+        vm.runInContext('renderPayoutResults()', sb);   // the box's oninput
+        assert.match(html(sb, 'payout-results'), /add up to \$50\.00, but the pool is \$500\.00/);
     });
 });
 
