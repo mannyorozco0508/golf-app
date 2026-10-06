@@ -458,8 +458,14 @@ describe('TRIP \u2194 TOURNAMENT — one relationship, two pointers', () => {
         // that one builder to its own end, so a re-ordering cannot empty the slice.
         const at = t.indexOf('function teamRowHtml(');
         assert.ok(at > 0, 'teamRowHtml() is the one builder of a team row');
-        const linkFn = t.slice(at, t.indexOf('\n    function ', at + 30));
-        assert.ok(linkFn.length > 200, 'the builder slice is not empty');
+        const rowFn = t.slice(at, t.indexOf('\n    function ', at + 30));
+        assert.ok(rowFn.length > 200, 'the builder slice is not empty');
+        // Since Wave 1 (A2) the row takes its url from teamScorecardUrl(), which
+        // adds the round on a multi-round event. Same literal, one function down.
+        assert.match(rowFn, /teamScorecardUrl\(t, /);
+        const u = t.indexOf('function teamScorecardUrl(');
+        assert.ok(u > 0, 'teamScorecardUrl() builds every team link');
+        const linkFn = t.slice(u, t.indexOf('\n    function ', u + 30));
         assert.match(linkFn, /\$\{scorecardBaseUrl\(\)\}\?tourney=\$\{currentCode\}&team=\$\{t\.num\}/);
         assert.ok(!/consumerUrl\(`?tournament-scorecard|tournamentUrl\(`?tournament-scorecard/.test(t),
             'a scoring link must never be built through the cross-product seam');
