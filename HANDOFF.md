@@ -1937,6 +1937,11 @@ the next free number (v304 is held by spectator-polish) and re-run
 - Course and format edits after save (they rescore the event).
 - Removing, rather than hiding, the public scoring links.
 - Closing signups / cap / deadline and a richer signup confirmation (A8).
+- Individual events on the CREATE form still show the Teams blocks. They are the
+  golfer-name input surface there (saveTournament turns each name into a player),
+  so hiding them would break creating an individual event; it needs its own
+  golfer-entry surface. Setup's Teams block IS hidden on individual events
+  (`#setup-teams-block`, `tournament_individual_setup_teams_test.js`).
 
 **URL shapes**
 - Create: `tournament.html` (sign-in required to Save)

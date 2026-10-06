@@ -678,6 +678,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="scoring-groups-list"></div>
         </div>
 
+        <!-- Hidden on an individual event, in the tree (f0fa56f rule): an event of
+             players has no teams to list or add. -->
+        <div id="setup-teams-block">
         <hr class="section-divider">
         <h3>🏌️ Teams</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each team, its golfers and its handicap. The scoring links are on the Leaderboard tab.</p>
@@ -698,6 +701,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <input type="number" id="new-team-handicap" value="0" min="0">
                 <button class="btn-primary" onclick="saveNewTeam()">💾 Save Team &amp; Get Link</button>
             </div>
+        </div>
         </div>
 
         <hr class="section-divider">
@@ -4609,6 +4613,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (teeBtn) teeBtn.style.display = recordIsIndividual() ? 'none' : '';
             const teamCards = document.getElementById('team-cards-list');
             if (teamCards) teamCards.style.display = recordIsIndividual() ? 'none' : 'block';
+            const setupTeams = document.getElementById('setup-teams-block');
+            if (setupTeams) setupTeams.style.display = recordIsIndividual() ? 'none' : '';
             renderGroupLinks();
             renderLeaderboardRoundFilter();
             renderLeaderboardFlightFilter();
