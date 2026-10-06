@@ -3569,6 +3569,16 @@
 // The consumer product cache is consumer-v143-matchcard. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
+//
+// AND A TOURNAMENT-ONLY WAVE MOVES THE OTHER KEY, NOT THIS ONE (2026-10-06).
+// The registration desk wave changed tournament.html - the organizer can correct
+// a typo, remove an entry and export the field as CSV, and the signup page shows
+// the date and the entry fee - so the TOURNAMENT product cache moved to
+// tournament-v55-registration-desk in build-shell.js. CACHE_VERSION here is the
+// CONSUMER cache and deliberately does not move: nothing in HardPan changed, and
+// bumping this would re-download the consumer shell on every installed phone for
+// a change that is not in it while leaving tournament devices on the old file.
+// product-separation.md says so; deployment_build_test.js pins both keys.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
 //
 // Manny entered a Match Play side bet AFTER the round - Marty vs Manny, NET,

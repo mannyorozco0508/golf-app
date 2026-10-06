@@ -714,7 +714,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="registration-counts"></div>
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
+             box is: the rows are rebuilt on every registrations snapshot, and an
+             editor rebuilt with them would lose a half-typed correction the moment
+             another golfer signed up. It is hidden until a row asks for it, it
+             carries the entry id it is editing, and it writes the three contact
+             keys only - paid, approvedAt, playerId and teamNum are the desk's own
+             state and a typo fix that carried them would re-approve a golfer or
+             wipe a payment. The rules cannot catch that: the owner is allowed to
+             write all of them. -->
+        <div id="registration-edit" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin:8px 0;">
+            <p id="reg-edit-who" style="font-weight:bold; margin:0 0 8px 0; font-size:0.9rem;"></p>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-name">Full name</label>
+                <input type="text" id="reg-edit-name" maxlength="120" autocomplete="off"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-email">Email</label>
+                <input type="email" id="reg-edit-email" maxlength="160" autocomplete="off" inputmode="email"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label for="reg-edit-phone">Phone</label>
+                <input type="tel" id="reg-edit-phone" maxlength="40" autocomplete="off" inputmode="tel"></div>
+            <p id="reg-edit-refusal" role="alert" style="display:none; font-size:0.8rem; color:var(--accent-red); margin:0 0 8px 0;"></p>
+            <button class="btn-primary" style="width:auto; margin:0 8px 0 0;" onclick="saveRegistrationEdit()">Save</button>
+            <button class="btn-outline" style="width:auto; margin:0;" onclick="closeRegistrationEdit()">Cancel</button>
+        </div>
         <div id="registration-list"></div>
+        <!-- CSV, because the field has to leave the phone: a tee sheet, a cart
+             sign order, the pro shop's own system. Shown only when there is a
+             list to export, and only to the organizer. -->
+        <button class="btn-outline" id="registration-export" style="display:none;" onclick="exportRegistrationsCsv()">⬇️ Export CSV</button>
     </div>
 
     <div id="manage-tab-leaderboard" style="display:none;">
@@ -2149,7 +2174,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 return;
             }
             title.textContent = data.name || 'Tournament';
-            if (sub) sub.textContent = [data.courseName, formatLabelFor(data.format)].filter(Boolean).join(' \u2022 ');
+            // WHAT A GOLFER DECIDES ON (2026-10-06). This line read course and
+            // format, and left out the two things somebody weighing up whether to
+            // enter actually asks: WHEN is it, and WHAT does it cost. Both are
+            // already on the record - eventDate and entryFee, set on Setup - and
+            // the signup page simply never showed them, so a golfer had to text
+            // the organizer to find out. formatEventDate is the page's own
+            // formatter, so the date here and the date in the header are one
+            // definition; a fee of 0 or absent prints nothing rather than "$0".
+            if (sub) {
+                const fee = Number(data.entryFee) || 0;
+                sub.textContent = [
+                    formatEventDate(data.eventDate),
+                    data.courseName,
+                    formatLabelFor(data.format),
+                    fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry') : ''
+                ].filter(Boolean).join(' \u2022 ');
+            }
             const taking = !!data.ownerUid;
             form.style.display = taking ? 'block' : 'none';
             closed.style.display = taking ? 'none' : 'block';
@@ -2635,6 +2676,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // The search box is wired here, once, and only ever READ: typing re-renders
         // the rows and the chips; nothing re-renders the box.
         if (search && typeof search.oninput !== 'function') search.oninput = function () { renderRegistrationDesk(); };
+        const exportBtn = document.getElementById('registration-export');
+        // SHOWN ONLY WHEN THERE IS A LIST. An Export button on an empty desk
+        // hands over a file with a header row and nothing under it.
+        const showExport = (on) => { if (exportBtn) exportBtn.style.display = on ? 'block' : 'none'; };
+        showExport(false);
         if (!registrationAllowed()) {
             // A legacy event (no ownerUid) has no signups to list - the rules
             // refuse the create and nobody could read it - and the page says so
@@ -2656,6 +2702,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
             return;
         }
+        showExport(true);
         const entriesOnly = all.map((x) => x[1]);
         if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
         if (chipsEl) chipsEl.innerHTML = REG_FILTERS.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
@@ -2707,15 +2754,176 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const approve = inField
                 ? `<span class="reg-state reg-state-field">In the field</span>${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
+            // CORRECT AND REMOVE (2026-10-06). Small and last, after the
+            // controls that run the event: an organizer taps Paid and Approve
+            // all day and the destructive one must not sit under the thumb that
+            // is doing it. Remove asks by name before it writes.
+            const fix = `<button class="btn-outline reg-fix" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="editRegistration('${escReg(id)}')">Correct</button>`
+                + `<button class="btn-outline reg-remove" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="removeRegistration('${escReg(id)}')">Remove</button>`;
             return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + payBadge
                 + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
                 + dest
                 + approve
+                + fix
                 + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
                 + `</div>`;
         }).join('');
+    }
+
+    // ===== REMOVE, CORRECT, EXPORT (2026-10-06) ==============================
+    //
+    // THE RULES HAD TO CHANGE FOR THE FIRST ONE, and only for that one. Both
+    // arms of registrations/$code/$entryId .write ended in `newData.exists()`,
+    // so a delete was refused for everybody - the organizer included. Measured
+    // as a red targaryen row before the change ("registrations/OWNED/e1 write
+    // organizer expect OK"), which is how the one-line change is shown to be
+    // what does the work rather than something that merely sits beside it.
+    // Correcting an entry needed NO rules change: the owner arm has always
+    // allowed an update, and there was simply no screen for it.
+    //
+    // A REMOVAL IS NOT A WITHDRAWAL. The golfer cannot take their own entry
+    // back - create-only, by the rules - because an entry that can vanish is an
+    // entry the organizer cannot rely on when they order the carts. This is the
+    // organizer striking somebody off, and it asks first, by name.
+    function removeRegistration(entryId) {
+        if (!currentCode || !canManage()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry) return;
+        const who = String(entry.fullName || entry.name || 'this golfer').trim();
+        const inField = regInField(entry);
+        // WHAT IS LOST, IN THE QUESTION. An approved golfer is already in the
+        // field, and removing the signup does NOT take them out of it - the
+        // player or team record is a separate node the organizer edits on Setup.
+        // Saying so here is the difference between a tidy list and a missing
+        // golfer at the first tee.
+        const warn = inField
+            ? '\n\nThey are already in the field. Removing the signup does not take them out of it — do that on Setup.'
+            : '';
+        if (!confirm('Remove ' + who + ' from the signup list?' + warn
+            + '\n\nThis cannot be undone. They would have to sign up again.')) return;
+        if (registrationEditingId === entryId) closeRegistrationEdit();
+        db.ref(`registrations/${currentCode}/${entryId}`).remove()
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // The entry the editor is open on. Never written anywhere: which row you are
+    // correcting is a way of looking at the list, not a fact about the event.
+    let registrationEditingId = null;
+
+    function editRegistration(entryId) {
+        if (!currentCode || !canManage()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry) return;
+        registrationEditingId = entryId;
+        const panel = document.getElementById('registration-edit');
+        const who = document.getElementById('reg-edit-who');
+        if (who) who.textContent = 'Correcting ' + String(entry.fullName || entry.name || '').trim();
+        // WHAT THE GOLFER TYPED, not a blank form. An organizer fixing "Ann
+        // Alhpa" needs the misspelling in front of them to see what is wrong.
+        document.getElementById('reg-edit-name').value = String(entry.fullName || entry.name || '');
+        document.getElementById('reg-edit-email').value = String(entry.email || '');
+        document.getElementById('reg-edit-phone').value = String(entry.phone || '');
+        const refusal = document.getElementById('reg-edit-refusal');
+        if (refusal) { refusal.style.display = 'none'; refusal.textContent = ''; }
+        if (panel) panel.style.display = 'block';
+    }
+
+    function closeRegistrationEdit() {
+        registrationEditingId = null;
+        const panel = document.getElementById('registration-edit');
+        if (panel) panel.style.display = 'none';
+    }
+
+    function registrationEditRefusal(msg) {
+        const el = document.getElementById('reg-edit-refusal');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+        return null;
+    }
+
+    function saveRegistrationEdit() {
+        if (!currentCode || !canManage() || !registrationEditingId) return;
+        const id = registrationEditingId;
+        const fullName = String((document.getElementById('reg-edit-name') || {}).value || '').trim();
+        const email = String((document.getElementById('reg-edit-email') || {}).value || '').trim();
+        const phone = String((document.getElementById('reg-edit-phone') || {}).value || '').trim();
+        // THE SAME SHAPE THE RULES REQUIRE, checked here so a refusal is a
+        // sentence under the field instead of an SDK error in an alert. The
+        // pattern is the rules' own (REG_EMAIL), one definition for both.
+        if (!fullName) return registrationEditRefusal('Give a name.');
+        if (fullName.length > 120) return registrationEditRefusal('That name is too long.');
+        if (!REG_EMAIL.test(email)) return registrationEditRefusal('That email does not look right.');
+        if (email.length > 160) return registrationEditRefusal('That email is too long.');
+        if (phone.length < 7 || phone.length > 40) return registrationEditRefusal('That phone number does not look right.');
+        // THREE KEYS. Not the whole entry: an update() carrying paid or
+        // approvedAt would re-approve a golfer or wipe a payment, and the rules
+        // let the owner write every one of them.
+        db.ref(`registrations/${currentCode}/${id}`).update({ fullName: fullName, email: email, phone: phone })
+            .then(() => closeRegistrationEdit())
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // ---- CSV -----------------------------------------------------------------
+    // ONE FIELD PER COLUMN, QUOTED WHEN IT HAS TO BE. A name like
+    // Dee "Deets" Delta, Jr is not a hypothetical: a comma or a quote in an
+    // unquoted cell silently shifts every column after it, which is how a tee
+    // sheet ends up with phone numbers in the shirt-size column.
+    function csvCell(v) {
+        const s = (v === undefined || v === null) ? '' : String(v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+    const REG_CSV_COLUMNS = [
+        ['Name', (e) => e.fullName || e.name || ''],
+        ['Email', (e) => e.email || ''],
+        ['Phone', (e) => e.phone || ''],
+        ['GHIN/Handicap', (e) => e.ghinOrHandicap || e.handicap || ''],
+        ['Shirt', (e) => e.shirtSize || ''],
+        ['Dinner', (e) => (e.dinnerCount === undefined || e.dinnerCount === null) ? '' : e.dinnerCount],
+        ['Team preference', (e) => e.teamPreference || ''],
+        ['Hole sponsor', (e) => e.holeSponsorship === true ? 'Yes' : ''],
+        ['Sponsor name', (e) => e.sponsorName || ''],
+        // THE DESK'S OWN STATE, because the sheet the organizer prints is the one
+        // they work from at the first tee: who has paid and who is in the field.
+        ['Paid', (e) => e.paid === true ? 'Yes' : 'No'],
+        ['In field', (e) => regInField(e) ? 'Yes' : 'No'],
+        ['Team', (e) => (e.teamNum === undefined || e.teamNum === null) ? '' : e.teamNum],
+        ['Signed up', (e) => e.createdAt ? new Date(e.createdAt).toISOString().slice(0, 10) : '']
+    ];
+    // IN THE DESK'S ORDER - oldest signup first, the same order the rows are in,
+    // so the sheet and the screen cannot disagree about who is third.
+    function registrationCsv() {
+        const all = Object.keys(registrationData || {})
+            .map((id) => registrationData[id] || {})
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        const head = REG_CSV_COLUMNS.map((c) => csvCell(c[0])).join(',');
+        return [head].concat(all.map((e) => REG_CSV_COLUMNS.map((c) => csvCell(c[1](e))).join(','))).join('\n') + '\n';
+    }
+    function registrationCsvFilename() {
+        const name = String((currentData && currentData.name) || 'event').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return (name || 'event') + '-signups.csv';
+    }
+    function exportRegistrationsCsv() {
+        if (!canManage()) return;
+        const csv = registrationCsv();
+        // A BLOB AND AN ANCHOR, with the sentence as the fallback. This is the
+        // WEB product (tournaments.rattlegolf.com) and a download works here;
+        // product-separation.md keeps these pages out of the native bundle,
+        // where a download would be inert. If the browser refuses it anyway the
+        // organizer is told, rather than given a button that does nothing.
+        try {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = registrationCsvFilename();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) {
+            alert('This browser would not save the file. Open the signup list on a computer to export it.');
+        }
     }
 
     function setRegistrationPaid(entryId, paid) {
