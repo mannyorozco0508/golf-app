@@ -1883,6 +1883,61 @@ Each course costs two requests: search returns only a *count* of tee boxes, so t
 
 **Seeding the directory by region is not achievable, and no subscription tier changes that.** The open item used to read as an admin-SDK script to seed every course in WA, AZ and OR. The API cannot produce that list: `/v1/search` stops at 25 results with no way past (measured six times — see "The API ceiling" below), there is no list endpoint, no geographic query, and ids are opaque 8-character strings from a 32-character alphabet, so the directory cannot be enumerated by any means. The constraint is the API's shape, not quota. **What is achievable is seeding from a list of course names we supply** — two requests each, search then detail. On the free tier that is **17 courses a day**, so a 200-course seed is twelve days of patience or a month of Pro; on Pro (10,000/day) it is one sitting. The list has to come from us. And the seeder does **not** need the admin SDK: `global_courses` is writable under the normal rules, gated by the `gca_` provenance validate, so a seeder should be *subject* to that rule rather than exempt from it.
 
+## Rattle Golf Tournaments Wave 1 — bugs and missing links (2026-10-06)
+
+Branch `tournaments-wave1`, based on `rattle-registration-desk` (732194e). STRICT
+lane: not merged until Manny says so. No rules publish of any kind; the live
+rules already allow the owner to delete a registration (published 2026-10-06).
+Cache `tournament-v56-missing-links`. **Before merge: bump `sw.js` golfapp-v to
+the next free number (v304 is held by spectator-polish) and re-run
+`node sync-mobile-web.js`.**
+
+**Shipped**
+- **A1 stored XSS.** Signup `fullName` / `teamPreference` reached `innerHTML`
+  after Approve on the board, team rows, Setup cards, payouts, rounds, flights,
+  groups, print and both scorecards. Both pages load `text-safe.js`; names reach
+  the Share handler through escaped `data-share-*` attributes, never inside an
+  onclick string. Storage is unchanged. `tournament_signup_xss_test.js`.
+- **A2 round team links.** On a multi-round event every team gets one link and
+  one tee-sheet QR per round (`teamScorecardUrl(t, rid)`), labeled by round.
+  `tournament_round_team_links_test.js`, `tools/tournament-round-team-link-check.js`.
+- **A3 the public board is for watching.** "📣 Share live leaderboard"
+  (`openShareModal(..., 'leaderboard')`) for everyone. On an OWNED event the
+  scoring links + QR codes, print buttons (`#lb-owner-tools`) and the payout
+  calculator (`#payout-owner-controls`) are hidden for anyone but the owner, in
+  the tree (f0fa56f rule), by `applyManageGate`. A LEGACY event (no ownerUid)
+  keeps links, QR codes and print visible to everyone; its calculator stays
+  hidden because nobody can save amounts on it. `tournament_watch_payouts_test.js`,
+  `tournament_legacy_links_test.js`, `tools/tournament-spectator-check.js`.
+- **A4 saved payouts.** The owner writes `tournaments/<code>/payoutSpots` (numbers,
+  max 20) on each edit; everyone renders from it. No even-split default: blank
+  boxes for the owner, "Payouts not set yet." for watchers, and the pool-mismatch
+  banner waits until an amount is typed. `payouts.js` untouched.
+- **A5 atomic approve.** One root multi-path `update()` per approve, an in-flight
+  lock per entry, a reserved team number until the write settles.
+  `tournament_approve_atomic_test.js` (targaryen rows read the rules, nothing
+  published). Older suites read the write through `helpers/tournament-write-apply.js`
+  `flatWrites`.
+- **A6** name and entry fee editable on Setup (`setEventName`, `setEntryFee`).
+- **A7** individual events: the team-links heading block and the team tee-sheet
+  button hide; group link rows carry Share (QR + copy).
+- **A9** trip pointers written in one update; `product-separation.md` corrected;
+  drifted checks re-armed (multiround, multiround-views, payout-rank-seam,
+  course-search); pairings, tee-qr, team-link and desk checks follow A3/A5.
+
+**Deferred (Wave 2)**
+- Course and format edits after save (they rescore the event).
+- Removing, rather than hiding, the public scoring links.
+- Closing signups / cap / deadline and a richer signup confirmation (A8).
+
+**URL shapes**
+- Create: `tournament.html` (sign-in required to Save)
+- Console, public board, watch link: `tournament.html?tourney=CODE`
+- Public signup: `tournament.html?register=CODE`
+- Team card: `tournament-scorecard.html?tourney=CODE&team=N[&round=RID]`
+- Group card: `tournament-scorecard.html?tourney=CODE&group=GID[&round=RID]`
+- Trip context: `tournament.html?trip=TRIPCODE`
+
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
 **What decided it: the shared key.** Both tournament pages read and wrote

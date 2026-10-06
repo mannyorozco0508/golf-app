@@ -2119,10 +2119,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // and their QR codes, the print buttons, the payout calculator. Hidden in
         // the tree for everyone else, shown to the owner - on every call, so a
         // sign-in or a sign-out moves it without a reload.
-        ['lb-owner-tools', 'payout-owner-controls'].forEach((id) => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = allowed ? '' : 'none';
-        });
+        // A LEGACY RECORD (no ownerUid) KEEPS ITS HANDOUT. Nobody owns it, so
+        // canManage() is false for everyone, and hiding the links there left
+        // the event with no way to hand out a card. It is fully open anyway.
+        // The calculator stays hidden: nobody can save amounts on it.
+        const handout = allowed || !currentData.ownerUid;
+        const tools = document.getElementById('lb-owner-tools');
+        if (tools) tools.style.display = handout ? '' : 'none';
+        const calc = document.getElementById('payout-owner-controls');
+        if (calc) calc.style.display = allowed ? '' : 'none';
         const pubHead = document.getElementById('payout-public-heading');
         if (pubHead) pubHead.style.display = allowed ? 'none' : '';
         renderPayoutResults();

@@ -12,7 +12,7 @@
 // counts RENDERED elements - getClientRects().length > 0 - in a real browser,
 // on a cold arrival, touching nothing but the Leaderboard tab pill.
 //
-// FIVE ARRIVALS.
+// SIX ARRIVALS.
 //   signed out          0 scorecard links, 0 QR codes, 0 print buttons, 0 payout
 //                       inputs; the watch control and the board ARE there
 //   signed-in stranger  the same - signed in as somebody else is signed out
@@ -22,6 +22,8 @@
 //                       $300 / $300 / $300 even split of a $900 pool
 //   watcher, saved      the saved amounts, read-only
 //   watcher, unsaved    "Payouts not set yet." and no $300.00 anywhere
+//   legacy, signed out  no ownerUid: links, QR codes and print ARE on screen
+//                       (nobody owns it); no calculator inputs
 //
 //   node tools/tournament-spectator-check.js
 //
@@ -86,6 +88,10 @@ async function look(r, auth) {
     out.owner = await look(rec(), OWNER);
     out.watcherSaved = await look(rec({ payoutSpots: [500, 300, 100] }), 'signed-out');
     out.watcherUnsaved = out.signedOut;
+    // A LEGACY record (no ownerUid), signed out: nobody owns it, so the
+    // handout stays on screen for everyone (follow-up to A3, 2026-10-06).
+    const legacy = rec(); delete legacy.ownerUid;
+    out.legacy = await look(legacy, 'signed-out');
     Object.keys(out).forEach((k) => { if (!out[k].ran) bail(k + ' did not run: ' + out[k].reason); });
 
     // ---- THE GATE: the owner arm must show everything, or the zeros mean nothing ----
@@ -104,6 +110,9 @@ async function look(r, auth) {
         if (m.watchButton !== 1) failures.push(k + ': no "Share live leaderboard" control');
     });
     if (o.watchButton !== 1) failures.push('owner: no "Share live leaderboard" control');
+    const L = out.legacy;
+    if (!(L.scorecardLinks >= 3 && L.qrCodes >= 3 && L.printButtons >= 3)) failures.push('legacy, signed out: the handout is not on screen: ' + JSON.stringify({ links: L.scorecardLinks, qr: L.qrCodes, print: L.printButtons }));
+    if (L.payoutInputs) failures.push('legacy: ' + L.payoutInputs + ' payout input(s) on an event nobody can save amounts on');
     if (o.amountBoxValues.some((v) => v !== '')) failures.push('owner, nothing saved: amount boxes read ' + JSON.stringify(o.amountBoxValues) + ' - an amount nobody typed');
     if (!/1st \$500\.00 · 2nd \$300\.00 · 3rd \$100\.00/.test(out.watcherSaved.publicPayouts || '')) failures.push('watcher, saved: amounts read ' + JSON.stringify(out.watcherSaved.publicPayouts));
     if (!/Payouts not set yet\./.test(out.watcherUnsaved.publicPayouts || '')) failures.push('watcher, unsaved: reads ' + JSON.stringify(out.watcherUnsaved.publicPayouts));
@@ -112,6 +121,6 @@ async function look(r, auth) {
     const brief = (m) => ({ boardRows: m.boardRows, scorecardLinks: m.scorecardLinks, qrCodes: m.qrCodes, printButtons: m.printButtons,
         payoutInputs: m.payoutInputs, watchButton: m.watchButton, amountBoxValues: m.amountBoxValues, publicPayouts: m.publicPayouts });
     console.log(JSON.stringify({ verdict: failures.length ? 'FAIL' : 'PASS', failures,
-        measured: { signedOut: brief(out.signedOut), stranger: brief(out.stranger), owner: brief(o), watcherSaved: brief(out.watcherSaved) } }, null, 2));
+        measured: { signedOut: brief(out.signedOut), stranger: brief(out.stranger), owner: brief(o), watcherSaved: brief(out.watcherSaved), legacySignedOut: brief(out.legacy) } }, null, 2));
     process.exit(failures.length ? 1 : 0);
 })().catch((e) => { console.log(JSON.stringify({ verdict: 'COULD NOT RUN', reason: String((e && e.message) || e) }, null, 2)); process.exit(2); });
