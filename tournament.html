@@ -585,7 +585,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the key. The next edit-after-save should copy this block, not invent one. -->
         <div class="team-card" id="event-details-block" style="margin-top:12px;">
             <div class="team-card-header"><span class="team-label">📅 Event details</span></div>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">All optional. Shown under the event name here and on the Leaderboard when set.</p>
+            <!-- NAME AND FEE AFTER SAVE (Wave 1, A6). A typo in the name or a wrong fee
+                 meant rebuilding the event and losing its signups. Same shape as the
+                 four below: each box writes its own key on change. Course and format
+                 are NOT here - they change how the event is scored (Wave 2). -->
+            <div class="form-group" style="margin-bottom:8px;"><label>Event name</label><input type="text" id="ev-name" maxlength="120" onchange="setEventName(this.value)"></div>
+            <div class="form-group" style="margin-bottom:12px;"><label>Entry fee ($)</label><input type="number" id="ev-fee" min="0" step="0.01" onchange="setEntryFee(this.value)"></div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">The rest are optional. Shown under the event name here and on the Leaderboard when set.</p>
             <div class="form-group" style="margin-bottom:8px;"><label>Date</label><input type="date" id="ev-date" onchange="setEventDetail('eventDate', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Start time</label><input type="time" id="ev-time" onchange="setEventDetail('startTime', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Venue</label><input type="text" id="ev-venue" maxlength="120" placeholder="e.g. Camas Meadows Golf Club" onchange="setEventDetail('venue', this.value)"></div>
@@ -1816,7 +1822,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             el.innerHTML = h;
             el.style.display = h ? 'block' : 'none';
         });
-        [['ev-date', 'eventDate'], ['ev-time', 'startTime'], ['ev-venue', 'venue'], ['ev-beneficiary', 'beneficiary']].forEach(([id, key]) => {
+        [['ev-name', 'name'], ['ev-fee', 'entryFee'], ['ev-date', 'eventDate'], ['ev-time', 'startTime'], ['ev-venue', 'venue'], ['ev-beneficiary', 'beneficiary']].forEach(([id, key]) => {
             const el = document.getElementById(id);
             if (el && document.activeElement !== el) el.value = data[key] == null ? '' : String(data[key]);
         });
@@ -1829,6 +1835,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const shape = EVENT_DETAIL_KEYS[key];
         if (v && shape && !shape.test(v)) return;
         db.ref(`tournaments/${currentCode}/${key}`).set(v || null).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    // The name is required, so an emptied box writes nothing and the next render
+    // puts the stored name back. The fee is a number of dollars, cents at most,
+    // never negative; 0 is a free event and is allowed.
+    function setEventName(value) {
+        if (!currentCode || !canManage()) return;
+        const v = String(value == null ? '' : value).trim();
+        if (!v || v.length > 120) { renderEventDetails(); return; }
+        db.ref(`tournaments/${currentCode}/name`).set(v).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setEntryFee(value) {
+        if (!currentCode || !canManage()) return;
+        const raw = String(value == null ? '' : value).trim();
+        const n = raw === '' ? 0 : Number(raw);
+        if (!isFinite(n) || n < 0 || n > 100000) { renderEventDetails(); return; }
+        db.ref(`tournaments/${currentCode}/entryFee`).set(Math.round(n * 100) / 100).catch(err => alert(`Error: ${err.message}`));
     }
 
     function setStartType(val) {
