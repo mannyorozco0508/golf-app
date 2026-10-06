@@ -238,6 +238,7 @@
         .rc-none { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
         .rc-warn { font-size: 0.72rem; font-weight: bold; color: #ffd97a; margin-top: 4px; }
         .rc-foot { font-size: 0.66rem; opacity: 0.75; text-align: center; margin-top: 10px; font-weight: 600; }
+        .trip-share-sub { font-weight: normal; opacity: 0.85; }
         .trip-share-btn { margin-top: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--subtle-bg); color: var(--brand-green); font-size: 0.82rem; font-weight: bold; cursor: pointer; }
         .trip-org-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-mid); text-align: left; }
         .trip-org-title { font-size: 0.82rem; font-weight: bold; color: var(--accent-teal); }
@@ -442,7 +443,11 @@ html {
         <!-- SHARING A TRIP USED TO MEAN READING FOUR CHARACTERS ALOUD. trip.html?trip=CODE
              already worked; it simply was not surfaced anywhere, so twelve people each
              typed the code by hand. A round has had copyable group links for months. -->
-        <div><button class="trip-share-btn" id="trip-share-btn" onclick="copyTripLink(this)">🔗 Share Trip Link</button></div>
+        <!-- THE FOLLOW LINK (2026-10-06). trip.html?trip=CODE is read-only for
+             everybody who is not the organizer, and the people it is sent to are
+             following the trip rather than running it. The organizer link is a
+             separate button with its own warning; this one says what it is. -->
+        <div><button class="trip-share-btn" id="trip-share-btn" onclick="copyTripLink(this)">🔗 Share Trip Link <span class="trip-share-sub">— anyone can follow</span></button></div>
         <!-- Rendered only when the trip actually carries a token, exactly as
              index.html does it. A legacy trip shows nothing here, which is the
              honest signal that no override exists on it. -->
@@ -3016,6 +3021,67 @@ html {
         p.catch(err => uiFail('\u26A0\uFE0F NOT SAVED\n' + (err && err.message ? err.message : String(err)) + '\nThe change was not recorded \u2014 try again.'));
     }
 
+    // ---- THE LIVE TRIP (2026-10-06) ----------------------------------------
+    //
+    // One listener per linked round, attached once and detached when the round
+    // leaves the trip. The initial once() read above still does the first paint,
+    // because it is what the error branch and the loading copy are written
+    // around; these listeners carry everything after it.
+    var tripRoundRefs = {};        // code -> the ref we are listening on
+    var tripRerenderQueued = false;
+
+    function queueTripRerender() {
+        if (tripRerenderQueued) return;
+        tripRerenderQueued = true;
+        Promise.resolve().then(function () {
+            tripRerenderQueued = false;
+            // EVERY SURFACE THAT READS cachedRoundResults, in the order the
+            // initial load renders them, so a live update and a fresh load
+            // cannot disagree about what the trip looks like.
+            try {
+                renderRoundsList();
+                renderPlaceholderNameWarning(cachedRoundResults);
+                recomputeTripGate();
+                renderTripRoster();
+                renderTripPotsControls();
+                renderTripIdentityQuestions();
+                renderCumulativeLeaderboard();
+                renderTripMoneySettlement();
+                renderTripAwards();
+                renderPointsRace();
+            } catch (e) { /* a live update must never take the page down */ }
+        });
+    }
+
+    function attachRoundListeners(roundCodes, rounds) {
+        // DETACH WHAT IS NO LONGER LINKED, first: a trip can lose a round.
+        Object.keys(tripRoundRefs).forEach(function (code) {
+            if (roundCodes.indexOf(code) !== -1) return;
+            try { tripRoundRefs[code].off('value'); } catch (e) {}
+            delete tripRoundRefs[code];
+        });
+        roundCodes.forEach(function (code) {
+            if (tripRoundRefs[code]) return;              // already listening
+            var ref = db.ref('events/' + code);
+            tripRoundRefs[code] = ref;
+            ref.on('value', function (snap) {
+                var data = (snap && typeof snap.val === 'function' ? snap.val() : null) || {};
+                var row = {
+                    code: code,
+                    label: (rounds[code] || {}).label,
+                    countsTowardTrip: (rounds[code] || {}).countsTowardTrip !== false,
+                    data: data
+                };
+                var at = -1;
+                (cachedRoundResults || []).forEach(function (r, i) { if (r.code === code) at = i; });
+                if (at === -1) cachedRoundResults = (cachedRoundResults || []).concat([row]);
+                else cachedRoundResults[at] = row;
+                cachedCountedResults = (cachedRoundResults || []).filter(function (r) { return r.countsTowardTrip; });
+                queueTripRerender();
+            }, function () { /* a refused or dropped read leaves the last good paint */ });
+        });
+    }
+
     function refreshTripComputations() {
         const scoreContainer = document.getElementById('trip-leaderboard');
         const moneyContainer = document.getElementById('trip-money-settlement');
@@ -3040,6 +3106,25 @@ html {
         awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
         pointsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">⏳ Loading rounds...</div>`;
 
+        // ---- A FOLLOWER'S TRIP WAS FROZEN FROM THE MOMENT IT LOADED ---------
+        //
+        // This read every round with once('value') - ONE SHOT. The trip
+        // leaderboard, the money, the awards and the points race rendered from
+        // whatever had been posted when the page opened and never moved again,
+        // so somebody following the trip from the clubhouse watched a card that
+        // had stopped. Measured with tools/watch-live-check.js before the fix:
+        // zero value listeners on events/<code>, and a second snapshot changed
+        // nothing on the page.
+        //
+        // NOW IT LISTENS. One on('value') per linked round, kept in a registry so
+        // a round removed from the trip is DETACHED rather than leaked - a page
+        // that attaches on every refresh and never lets go ends up re-rendering
+        // the trip once per attachment per score.
+        //
+        // RE-RENDER IS COALESCED. Four rounds landing together in a Myrtle
+        // morning would otherwise rebuild the whole trip four times; a microtask
+        // flag collapses that into one.
+        attachRoundListeners(roundCodes, rounds);
         Promise.all(roundCodes.map(code => db.ref(`events/${code}`).once('value').then(s => ({
             code,
             label: rounds[code].label,

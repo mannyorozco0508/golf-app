@@ -110,8 +110,22 @@ describe('ROUND READY (admin.html)', () => {
         assert.match(r.alerts()[0], /Rocco, Matt/);
     });
     test('a foursome: one group, its link, its four names', async () => {
+        // RE-POINTED 2026-10-06 (Manny: offer a watch link on every round). A
+        // foursome used to get NO round-level link at all - the block was behind
+        // `boundaries.length > 1` - so an organizer of four had nothing to send
+        // anybody except a scorekeeper link. It is offered now, and the COPY is
+        // different on this shape because the link is: measured in Chrome,
+        // index.html?game=CODE is 0 of 152 editable on eight golfers in two
+        // groups and 76 of 76 editable on four in one. The foursome's card
+        // therefore says it carries the scorecard and does NOT claim read-only.
         const r = ready(4);
-        assert.doesNotMatch(r.html, /copyRoundLink/);
+        assert.match(r.html, /copyRoundLink\('https:\/\/golf-app-5a5\.pages\.dev\/index\.html\?game=MNDY2A'\)/,
+            'the foursome has nothing to send anybody');
+        assert.match(r.html, /carries the scorecard/,
+            'the foursome card is silent about what the link permits');
+        assert.doesNotMatch(r.html.slice(r.html.indexOf('rr-round-link'), r.html.indexOf('Scorekeeper Links')),
+            /read-only|Nobody who opens it can enter a score|Anyone can follow/,
+            'a 76-of-76-editable link was called read-only');
         tapButton(r.sb, r.html, /<button class="btn-outline" onclick="(copyGroupLink\([^"]*\))">/);
         await tick(); await tick();
         assert.deepEqual(r.alerts(), ['Copied Group 1’s link — Marty, Mike, Tanner, Glen.']);

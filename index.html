@@ -1194,6 +1194,31 @@
 .lm-row-money { font-weight: bold; color: var(--brand-green); white-space: nowrap; }
 .lm-wager-tools:empty { display: none; }
 
+/* THE ROLE BADGE (2026-10-06). Two words at a glance - which of the three this
+   viewer is - above the sentence that says who is keeping score. The badge is
+   the loud half and the sentence the quiet one, so a card full of numbers does
+   not bury the one thing a watcher needs to know about their own permissions. */
+/* ONE ROW, NOT THREE (measured, 2026-10-06). The first version stacked the
+   badge, the sentence and Change on their own lines and took the note from 32px
+   to 96px - which on EIGHT golfers in one group pushed the hole view's nav row
+   down until the fixed "Round Menu" pill sat on top of the Next button: the tap
+   at Next's own centre hit the pill and opened the sheet instead of advancing
+   the hole. Measured in Chrome both ways, which is the only place it is visible
+   at all, since mini-dom has no layout. It is now one wrapping line and
+   hole_view_landing_test.js re-measures the nav row where a spectator stands. */
+.role-badge {
+    display: inline; padding: 2px 8px; border-radius: 999px;
+    background: var(--subtle-bg); border: 1px solid var(--border-mid);
+    color: var(--text-main); font-size: 0.78rem; font-weight: bold;
+    white-space: nowrap;
+}
+.role-note-text { display: inline; margin-left: 6px; }
+.role-change-btn {
+    all: unset; cursor: pointer; display: inline; margin-left: 6px;
+    color: var(--brand-green); font-size: 0.75rem; font-weight: bold;
+    text-decoration: underline;
+}
+
 .hv-tee {
             display: inline-block; margin-left: 6px; padding: 0 6px;
             border: 1px solid var(--border-mid); border-radius: 8px;
@@ -3758,7 +3783,21 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const mine = me ? (currentData.players || []).find(p => String(p.id) === String(me)) : null;
         const text = roundRoleNote(role, mine ? golferLabel(mine) : null);
         if (!text) { el.innerHTML = ''; el.style.display = 'none'; return; }
-        el.textContent = text;
+        // A BADGE, THEN THE SENTENCE (2026-10-06). The sentence alone is a line of
+        // grey text in the middle of a card full of numbers, and on a phone held
+        // at arm's length a golfer could not tell whether this round was theirs to
+        // score. The badge says WHICH of the three they are in two words; the
+        // sentence under it still says who IS keeping score.
+        //
+        // STICKY COMES FREE. The role is stored per round (golfapp_role_<code>),
+        // so the badge is on the card every time they open it until they change
+        // the answer - which is what the Wave 39 memory was for.
+        const label = role === 'playing'
+            ? (mine ? '\uD83C\uDFCC\uFE0F Playing \u00B7 ' + golferLabel(mine) : '\uD83C\uDFCC\uFE0F Playing')
+            : '\uD83D\uDC40 Just watching';
+        el.innerHTML = '<span id="round-role-badge" class="role-badge">' + escapeHtml(label) + '</span>'
+            + '<span class="role-note-text">' + escapeHtml(text) + '</span>'
+            + '<button type="button" class="role-change-btn" onclick="openRoleSheet()">Change</button>';
         el.style.display = 'block';
     }
 

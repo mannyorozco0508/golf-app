@@ -3148,19 +3148,61 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // organizer who would rather address each card. Its own element, not a
         // .group-link-row: tools/round-share-check.js counts those rows to prove the
         // group links cover the field exactly once, and this link covers all of it.
-        if (boundaries.length > 1) {
+        // THE BARE LINK IS OFFERED ON EVERY ROUND NOW (2026-10-06), AND IT IS NOT
+        // THE SAME THING ON BOTH SHAPES. It was offered only when boundaries.length
+        // > 1, so a foursome had no way to send anybody anything but a scorekeeper
+        // link. That gap is filled; the WORDS are chosen per shape, because:
+        //
+        // WHAT IT PERMITS, MEASURED IN CHROME, NOT ASSUMED. Same URL both times,
+        // index.html?game=CODE, no group:
+        //
+        //   EIGHT GOLFERS, two groups    0 of 152 score inputs editable. A watch
+        //                                link, exactly as the words say.
+        //   FOUR GOLFERS, one group     76 of 76 editable - and STILL 76 of 76
+        //                                after tapping "Just watching" and getting
+        //                                the badge. The card is gated on GROUP
+        //                                SCOPE, and with one group everybody is in
+        //                                scope, so no role revokes anything.
+        //
+        // So "nobody who opens it can enter a score" is true on a multi-group round
+        // and FALSE on a foursome, where that URL IS the scorecard. CLAUDE.md
+        // records this exact defect twice - a confident sentence about a link
+        // nobody re-measured after the shape changed - so the foursome's copy says
+        // what it does instead, and watch_follow_test.js opens BOTH links and
+        // counts the editable boxes. Move the gate in index.html and these words
+        // go red rather than quietly starting to lie.
+        //
+        // A FOURSOME STILL HAS NO READ-ONLY LINK. Giving it one means making an
+        // explicit "Just watching" actually disable entry, which is a change to
+        // the scorecard on the most common round in the app - Manny's to approve,
+        // not a side effect of a copy wave.
+        //
+        // THE MULTI-GROUP SENTENCE IS MAIN'S, VERBATIM. It is pinned by
+        // group_picker_test.js and it is correct; this wave adds the watch framing
+        // above it rather than rewriting a measured line for the sake of a label.
+        {
             const roundUrl = scorecardUrlFor(currentMode);
+            const many = boundaries.length > 1;
             html += '<div class="rr-round-link" style="margin-bottom:12px;">'
-                + '<div class="wr-label" style="margin-bottom:4px;">Send this link to everyone</div>'
+                + '<div class="wr-label" style="margin-bottom:4px;">'
+                + (many ? 'Watch this round · Send this link to everyone' : 'Send this link to everyone')
+                + '</div>'
                 + '<div class="rr-round-link-row">'
-                + '<span>\uD83D\uDCE3 The whole round<br>'
+                + '<span>' + (many ? '👀 Anyone can follow' : '🏌️ The whole round') + '<br>'
                 + '<span style="font-weight:normal; font-size:0.75rem; color:var(--text-muted);">'
-                + escapeHtml(players.length) + ' golfers \u00B7 ' + boundaries.length + ' groups</span></span>'
-                + '<button class="btn-outline" onclick="copyRoundLink(\'' + roundUrl + '\')">\uD83D\uDD17 Copy Link</button>'
+                + escapeHtml(players.length) + ' golfers · ' + boundaries.length + ' group'
+                + (many ? 's · read-only' : ' · carries the scorecard') + '</span></span>'
+                + '<button class="btn-outline" onclick="copyRoundLink(\'' + roundUrl + '\')">🔗 Copy Link</button>'
                 + '</div>'
                 + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
-                + 'One link for the whole round \u2014 each golfer picks their group when they open it. '
-                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, tap Open and pick your group.</div>'
+                + (many
+                    ? 'Scores, bets and the leaderboard, live. Nobody who opens it can enter a score. '
+                      + 'One link for the whole round — each golfer picks their group when they open it. '
+                      + 'Or tell them the code ' + escapeHtml(currentMode)
+                      + ': in the app, tap Open and pick your group.'
+                    : 'Scores, bets and the leaderboard, live. On one group this link also carries the '
+                      + 'scorecard, so whoever opens it can enter scores — send it to the four of you.')
+                + '</div>'
                 + '</div>';
         }
         html += '<div class="wr-label" style="margin-bottom:4px;">' + (boundaries.length > 1 ? 'Or send each group its own link' : 'Scorekeeper Links') + '</div>'

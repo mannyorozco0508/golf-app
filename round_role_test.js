@@ -258,6 +258,17 @@ describe('3. THE PAGE, REACHED THE WAY A GOLFER REACHES IT', () => {
         `, sb);
         return sb;
     }
+    // THE NOTE IS BUILT WITH innerHTML NOW (the badge, the text and the Change
+    // button are three elements), and mini-dom does not parse innerHTML into
+    // child nodes - so textContent on it reads '' however correct the page is.
+    // Read the string here; the RENDERED text of the same note is measured in
+    // Chrome by watch_follow_test.js, which is where a claim about what a
+    // golfer can see belongs.
+    const noteHtml = (sb) => (sb.document.getElementById('role-note').innerHTML || '');
+    const badge = (sb) => {
+        const m = /id="round-role-badge"[^>]*>([^<]*)</.exec(noteHtml(sb));
+        return m ? m[1].trim() : null;
+    };
     const sheet = (sb) => sb.document.getElementById('group-pick-overlay');
     const sheetBody = (sb) => (sb.document.getElementById('group-pick-body').innerHTML || '');
 
@@ -323,9 +334,11 @@ describe('3. THE PAGE, REACHED THE WAY A GOLFER REACHES IT', () => {
         vm.runInContext("pickPlayingRole(); pickPlayingMe('102');", sb);
         assert.equal(vm.runInContext('currentRoundRole()', sb), 'playing');
         assert.equal(vm.runInContext('resolvedMeId()', sb), '102');
-        const note = sb.document.getElementById('role-note');
-        assert.match(note.textContent, /Following along as Dee/);
-        assert.equal(note.style.display, 'block');
+        assert.match(noteHtml(sb), /Following along as Dee/);
+        assert.equal(sb.document.getElementById('role-note').style.display, 'block');
+        // AND IT SAYS WHICH OF THE THREE THEY ARE, with the name on it: a golfer
+        // who answered and a spectator who did not look identical otherwise.
+        assert.match(badge(sb) || '', /Playing \u00b7 Dee/);
     });
 
     test('SKIPPING THE NAME DROPS TO WATCHING - it does not promise notifications', () => {
@@ -334,7 +347,9 @@ describe('3. THE PAGE, REACHED THE WAY A GOLFER REACHES IT', () => {
         assert.equal(vm.runInContext('currentRoundRole()', sb), 'watching',
             'a playing golfer with no name gets nothing a spectator does not get, so leaving '
             + 'the role at "playing" would promise notifications that can never be addressed');
-        assert.match(sb.document.getElementById('role-note').textContent, /Just watching/);
+        assert.match(noteHtml(sb), /Just watching/);
+        assert.match(badge(sb) || '', /Just watching/,
+            'the badge reads: ' + badge(sb));
     });
 
     test('A SCOREKEEPER GETS NO NOTE - they have score boxes, there is nothing to explain', () => {
@@ -357,7 +372,14 @@ describe('3. THE PAGE, REACHED THE WAY A GOLFER REACHES IT', () => {
         assert.notEqual(sheet(again).style.display, 'flex', 'the sheet asked again');
         assert.equal(vm.runInContext('currentRoundRole()', again), 'playing');
         assert.equal(vm.runInContext('resolvedMeId()', again), '103');
-        assert.match(again.document.getElementById('role-note').textContent, /Following along as Reese/);
+        assert.match(noteHtml(again), /Following along as Reese/);
+        // STICKY: the badge is on the SECOND load, from storage alone. A badge that
+        // only appears in the session where the sheet was answered tells a watcher
+        // nothing on the open that matters - the one hours later, mid-round.
+        assert.match(badge(again) || '', /Playing \u00b7 Reese/,
+            'the badge did not survive the reload: ' + badge(again));
+        assert.ok(/role-change-btn/.test(noteHtml(again)),
+            'a sticky badge with no way to change it is a trap');
     });
 
     test('THE TOKEN IS REGISTERED FOR A PLAYING GOLFER AND NOBODY ELSE', () => {

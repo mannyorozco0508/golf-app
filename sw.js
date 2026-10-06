@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v143-matchcard. The tournament product cache
+// The consumer product cache is consumer-v144-watchfollow. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4257,7 +4257,17 @@
 // and there is not one dollar anywhere on it. Display only: every figure comes
 // out of the builders that already priced the round. A device on v302 has the old
 // card with its faded closed rows and no overall answer.
-const CACHE_VERSION = 'golfapp-v303-matchcard';
+// Moved to v304: WATCHING AND FOLLOWING. A trip followed from a shared link was
+// FROZEN - trip.html read every linked round with once('value'), one shot, so the
+// cumulative leaderboard, money, awards and points race stopped at whatever had
+// been posted when the page opened (measured: 0 listeners, board unchanged after
+// a second snapshot). Each round is now listened to live, once per round, and
+// let go when it leaves the trip. A watcher or a playing follower also gets a
+// sticky badge saying which of the three they are, the round's bare link is
+// offered as "Watch this round" on every round rather than only multi-group
+// ones, and the trip's share button says anyone can follow. A device on v303
+// has a trip page that never moves after it loads.
+const CACHE_VERSION = 'golfapp-v304-watchfollow';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

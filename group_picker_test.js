@@ -337,9 +337,21 @@ describe('ROUND READY: ONE LINK IS THE HEADLINE THING TO SEND', () => {
         assert.equal((h.match(/class="group-link-row"/g) || []).length, 3, 'the per-group rows are still there, one each');
         assert.match(h, /game=MNDY2A&group=3/);
     });
-    test('a foursome: unchanged - one group, one link, no headline', () => {
+    test('a foursome: its own link too now, and NOT called read-only', () => {
+        // RE-POINTED 2026-10-06 (Manny: offer a watch link on every round). A
+        // foursome used to get NO round-level link at all - the block was behind
+        // `boundaries.length > 1` - so an organizer of four had nothing to send
+        // anybody except a scorekeeper link. It is offered now, and the COPY is
+        // different on this shape because the link is: measured in Chrome,
+        // index.html?game=CODE is 0 of 152 editable on eight golfers in two
+        // groups and 76 of 76 editable on four in one. The foursome's card
+        // therefore says it carries the scorecard and does NOT claim read-only.
         const h = ready(4);
-        assert.doesNotMatch(h, /rr-round-link|Send this link to everyone/);
+        assert.match(h, /rr-round-link/, 'the foursome has no round link');
+        assert.match(strip(h), /Send this link to everyone/);
+        assert.doesNotMatch(strip(h), /Watch this round|read-only|Anyone can follow/,
+            'the words that are only true above one group');
+        assert.match(strip(h), /On one group this link also carries the scorecard, so whoever opens it can enter scores/);
         assert.equal((h.match(/class="group-link-row"/g) || []).length, 1);
         assert.match(h, /game=MNDY2A&group=1/);
     });

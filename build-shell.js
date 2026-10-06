@@ -133,7 +133,7 @@ const PRODUCTS = {
         // and a device on v135 keeps the caption handle and the duplicate board.
         // Moved to v135: the scorecard wave - the hole on screen, the reading
         // cards on the page under it, the rest behind one handle.
-        cacheName: 'consumer-v143-matchcard',
+        cacheName: 'consumer-v144-watchfollow',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
