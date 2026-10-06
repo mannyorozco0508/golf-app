@@ -763,38 +763,55 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
         <div id="leaderboard-list"></div>
 
+        <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
+             clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
+        <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-4px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+
         <hr class="section-divider">
+        <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
+             else, never removed (the f0fa56f rule: hide in the tree). The amounts it
+             sets are SAVED on the record as payoutSpots and everyone reads those. -->
+        <div id="payout-owner-controls" style="display:none;">
         <h3>🏆 Prize Payout Calculator</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
         <div class="form-group" style="margin-bottom:8px;">
             <label>Paid Spots</label>
-            <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()">
+            <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()" onchange="savePayoutSpots()">
         </div>
         <div id="payout-spot-amounts"></div>
+        </div>
+        <h3 id="payout-public-heading">🏆 Prize Payouts</h3>
+        <div id="payout-public-amounts"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
 
-        <!-- MOVED HERE FROM THE SETUP PANEL in the auth wave. The Setup tab is not
-             rendered for anyone but the owner of an owned tournament; printing and
-             the scoring links stay open to everyone, so they live beside the board.
-             The handlers read nothing from the Setup panel - measured before the move. -->
+        <!-- THE ORGANIZER'S HANDOUT, HIDDEN FOR EVERYONE ELSE (Wave 1, A3). The print
+             buttons and the scoring links lived beside the public board, so the page
+             a watcher opened was also the page that handed out every card. Hidden,
+             not removed: applyManageGate shows it to the owner on every snapshot and
+             every sign-in, and the rows are still rendered underneath. -->
+        <div id="lb-owner-tools" style="display:none;">
         <hr class="section-divider">
         <button class="btn-outline" onclick="printTournamentResults()">🖨️ Print / Send Results</button>
         <button class="btn-outline" onclick="printTournamentPairings()">🖨️ Print Pairings</button>
-        <button class="btn-outline" onclick="printTournamentTeeSheet()">🖨️ Print Tee Sheet</button>
+        <button class="btn-outline" id="print-tee-sheet-btn" onclick="printTournamentTeeSheet()">🖨️ Print Tee Sheet</button>
 
         <hr class="section-divider">
         <!-- No padlock. A glyph is a claim too: these links lock nothing - anyone
              holding one can score that card (tournament_claims_test.js). -->
+        <div id="team-links-block">
         <h3>📋 Team Scorecard Links</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that team's card and nothing else. Send each team only their own. Anyone who has a link can score that card. Tap 📤 to get a QR code or copy the link.</p>
         <div id="team-links-list"></div>
+        </div>
         <!-- Individual mode: the group scoring links. The group EDITOR stays in
              Setup; only the links live here, so a signed-out visitor of an owned
              tournament can still send a group its card. -->
         <div id="group-links-block" style="display:none;">
             <h3>📋 Group Scoring Links</h3>
-            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. Send each group only their own. Anyone who has a link can score that card. In a multi-round event every round has its own links.</p>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each link opens that group's card and nothing else. Send each group only their own. Anyone who has a link can score that card. In a multi-round event every round has its own links. Tap 📤 to get a QR code or copy the link.</p>
             <div id="group-links-list"></div>
+        </div>
         </div>
     </div>
 
@@ -1944,7 +1961,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // apps and would leave someone with literally no way to get the link. The modal OPENS
     // whatever the QR does: the link and the Copy button never depend on the library.
     function openShareModal(url, teamName, kind) {
-        const suffix = kind === 'register' ? 'Signup Link' : 'Scorecard Link';
+        const suffix = kind === 'register' ? 'Signup Link' : (kind === 'leaderboard' ? 'Leaderboard Link' : 'Scorecard Link');
         document.getElementById('share-modal-title').textContent = `${teamName} — ${suffix}`;
         document.getElementById('share-link-text').textContent = url;
         drawQrInto(document.getElementById('share-qr-box'), url, 180);
@@ -2072,6 +2089,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const noOwner = document.getElementById('lb-no-owner-note');
         if (noOwner) noOwner.style.display = currentData.ownerUid ? 'none' : 'block';
         const present = GATED_TABS.map((k) => ({ key: k, tab: document.getElementById('tab-btn-' + k), panel: document.getElementById('manage-tab-' + k) }));
+        // The organizer's half of the Leaderboard tab (Wave 1, A3): scoring links
+        // and their QR codes, the print buttons, the payout calculator. Hidden in
+        // the tree for everyone else, shown to the owner - on every call, so a
+        // sign-in or a sign-out moves it without a reload.
+        ['lb-owner-tools', 'payout-owner-controls'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = allowed ? '' : 'none';
+        });
+        const pubHead = document.getElementById('payout-public-heading');
+        if (pubHead) pubHead.style.display = allowed ? 'none' : '';
+        renderPayoutResults();
         if (!allowed) {
             // Hidden, in the tree. The pill's inline display goes to none; the
             // panel is parked by showTab('leaderboard'), which sets every
@@ -2183,6 +2211,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
             .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // The public board, for watchers. Same page the organizer runs; a visitor
+    // who is not the owner gets the Leaderboard tab and nothing that scores.
+    function leaderboardWatchUrl() {
+        return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode || '');
     }
 
     function registrationSignupUrl() {
@@ -3140,11 +3174,58 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     let cachedLeaderboardRows = [];
 
-    function renderPayoutSpotInputs() {
+    // THE PRIZE AMOUNTS ARE SAVED (Wave 1, A4). They lived only in the DOM, so
+    // an organizer's typed amounts vanished on reload, and every other phone saw
+    // the default - the pool split evenly over the spots ("$300 / $300 / $300" on
+    // a $900 pool), a payout nobody chose. Now the owner writes
+    // tournaments/<code>/payoutSpots (an array of numbers, at most 20) on every
+    // edit, the way setEventDetail writes a detail, and every screen reads the
+    // record. With nothing saved there is no default: the inputs are blank and
+    // a watcher reads "Payouts not set yet."
+    const MAX_PAYOUT_SPOTS = 20;
+    function savedPayoutSpots() {
+        const raw = currentData && currentData.payoutSpots;
+        const list = Array.isArray(raw) ? raw
+            : (raw && typeof raw === 'object' ? Object.keys(raw).sort((a, b) => a - b).map((k) => raw[k]) : []);
+        return list.slice(0, MAX_PAYOUT_SPOTS).map((v) => {
+            const x = Number(v);
+            return isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : 0;
+        });
+    }
+    const payoutsAreSet = (spots) => spots.some((v) => v > 0);
+
+    function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
         let n = parseInt(spotsInput.value, 10);
         if (isNaN(n) || n < 1) n = 1;
-        if (n > 20) { n = 20; spotsInput.value = 20; }
+        if (n > MAX_PAYOUT_SPOTS) { n = MAX_PAYOUT_SPOTS; spotsInput.value = MAX_PAYOUT_SPOTS; }
+        return n;
+    }
+    // What the owner's boxes say right now. A blank or unreadable box is $0.
+    function typedPayoutSpots() {
+        const n = payoutSpotCount();
+        const out = [];
+        for (let i = 0; i < n; i++) {
+            const el = document.getElementById(`payout-spot-${i}`);
+            const x = el ? parseFloat(el.value) : NaN;
+            out.push(isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : 0);
+        }
+        return out;
+    }
+
+    function savePayoutSpots() {
+        if (!currentCode || !canManage()) return;
+        const spots = typedPayoutSpots();
+        db.ref(`tournaments/${currentCode}/payoutSpots`).set(spots).catch(err => alert(`Error: ${err.message}`));
+    }
+
+    function renderPayoutSpotInputs() {
+        const spotsInput = document.getElementById('payout-spots-input');
+        const saved = savedPayoutSpots();
+        // The record decides how many spots pay - unless the organizer is in that
+        // box right now, in which case their half-typed number wins.
+        if (saved.length && document.activeElement !== spotsInput) spotsInput.value = saved.length;
+        const n = payoutSpotCount();
 
         const pool = poolTotal();
         const container = document.getElementById('payout-spot-amounts');
@@ -3153,36 +3234,47 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
             : `No entry fee set for this tournament — set spot amounts manually if you're running a separate pool.`;
 
-        let existing = [];
+        let html = '';
+        let focusedAt = -1, focusedValue = '';
         for (let i = 0; i < n; i++) {
             const el = document.getElementById(`payout-spot-${i}`);
-            existing.push(el ? el.value : null);
-        }
-
-        let html = '';
-        for (let i = 0; i < n; i++) {
-            const defaultVal = existing[i] !== null ? existing[i] : (pool > 0 ? Math.round((pool / n) * 100) / 100 : 0);
+            if (el && el === document.activeElement) { focusedAt = i; focusedValue = el.value; }
+            // Saved amount, or blank. No equal split: an amount nobody typed is
+            // not an amount.
+            const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
                 <label>${ordinal(i + 1)} Place ($)</label>
-                <input type="number" id="payout-spot-${i}" min="0" value="${defaultVal}" oninput="renderPayoutResults()">
+                <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
         container.innerHTML = html;
+        if (focusedAt >= 0) {
+            const el = document.getElementById(`payout-spot-${focusedAt}`);
+            if (el) { el.value = focusedValue; if (el.focus) el.focus(); }
+        }
         renderPayoutResults();
     }
 
     function renderPayoutResults() {
         const resultsContainer = document.getElementById('payout-results');
+        if (!resultsContainer) return;
+        // The owner previews what they are typing; everyone else reads the record.
+        const owner = canManage();
+        const spotAmounts = owner ? typedPayoutSpots() : savedPayoutSpots();
+
+        // A WATCHER SEES THE AMOUNTS, READ-ONLY - the saved ones or a plain
+        // sentence, never an invented split.
+        const pub = document.getElementById('payout-public-amounts');
+        if (pub) {
+            pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
+                : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Payouts not set yet.</div>`);
+        }
+        if (!owner && !payoutsAreSet(spotAmounts)) { resultsContainer.innerHTML = ''; return; }
+
         if (!cachedLeaderboardRows || cachedLeaderboardRows.filter(r => r.hasScores).length === 0) {
             resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — payouts will show once teams start posting.</div>`;
             return;
-        }
-
-        const n = parseInt(document.getElementById('payout-spots-input').value, 10) || 0;
-        let spotAmounts = [];
-        for (let i = 0; i < n; i++) {
-            const el = document.getElementById(`payout-spot-${i}`);
-            spotAmounts.push(el ? parseFloat(el.value) || 0 : 0);
         }
 
         // A PAGE FILTER (2026-09-18): the allocator (payouts.js, PROTECTED, shared
@@ -3195,7 +3287,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pool = poolTotal();
 
         let html = '';
-        if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
+        if (owner && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
                 ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}.
             </div>`;
@@ -3879,7 +3971,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const names = (g.playerIds || []).filter(pid => players[pid]).map(pid => players[pid].name);
                 html += `<div class="team-link-row" style="flex-wrap:wrap;">
                     <span>🏌️ ${escapeHtml(g.name || 'Group')} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names.join(', ')) || 'nobody assigned yet'}</span></span>
-                    <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
+                        <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${groupScorecardUrl(gid, sec.rid)}" data-share-name="${escapeHtml((g.name || 'Group') + (sec.label ? ' \u2014 ' + sec.label : ''))}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
+                    </span>
                 </div>`;
             });
         });
@@ -4434,9 +4529,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderPlayerField();
             renderScoringGroups();
             renderScoreCorrector();
-            // Team scorecard links belong to team events only.
-            const teamLinksHeading = document.getElementById('team-links-list');
-            if (teamLinksHeading) teamLinksHeading.style.display = recordIsIndividual() ? 'none' : 'block';
+            // Team scorecard links belong to team events only - the heading and its
+            // paragraph with them (Wave 1, A7: hiding only the list left an orphan
+            // "Team Scorecard Links" heading over an individual event).
+            const teamLinksBlock = document.getElementById('team-links-block');
+            if (teamLinksBlock) teamLinksBlock.style.display = recordIsIndividual() ? 'none' : 'block';
+            // The tee sheet is a sheet of TEAM codes. An individual event has the
+            // group links (with Share and QR) and the pairings sheet instead.
+            const teeBtn = document.getElementById('print-tee-sheet-btn');
+            if (teeBtn) teeBtn.style.display = recordIsIndividual() ? 'none' : '';
             const teamCards = document.getElementById('team-cards-list');
             if (teamCards) teamCards.style.display = recordIsIndividual() ? 'none' : 'block';
             renderGroupLinks();
