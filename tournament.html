@@ -3004,13 +3004,43 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch((err) => alert(`Error: ${err.message}`));
     }
 
+    // ONE WRITE PER APPROVE, AND NEVER TWO AT ONCE (Wave 1, A5).
+    //
+    // An approve was two writes in sequence - the field, then (after the
+    // server answered) the registration entry. On one bar at a desk that gap
+    // is seconds long, and the only guard read the entry, which did not say
+    // "approved" until the second write. A second tap in the gap put the
+    // golfer in the field twice. And "New team" took its number from the
+    // record as last delivered, so two quick approvals both wrote teamN and
+    // the second overwrote the first.
+    //
+    // Now: one multi-path update() carries the field change and the entry's
+    // approvedAt together (both land or neither does, and the SDK raises both
+    // locally at once); an entry with an approve in flight cannot be approved
+    // again; and a new team number is RESERVED from the moment it is chosen
+    // until its write settles, so the next approval counts past it.
+    const approvesInFlight = {};
+    const reservedTeamNums = {};
+
     function approveRegistration(entryId) {
         if (!currentCode || !canManage()) return;
+        if (approvesInFlight[entryId]) return;
         const entry = (registrationData || {})[entryId];
         const entryName = String((entry && (entry.fullName || entry.name)) || '').trim();
         if (!entry || !entryName) return;
         if (entry.approvedAt || entry.playerId || entry.teamNum) return;
         const name = entryName;
+        const regBase = `registrations/${currentCode}/${entryId}`;
+        const tBase = `tournaments/${currentCode}`;
+        const commit = (changes, teamNum) => {
+            approvesInFlight[entryId] = true;
+            const settle = () => {
+                delete approvesInFlight[entryId];
+                if (teamNum !== undefined) delete reservedTeamNums[teamNum];
+            };
+            return db.ref().update(changes)
+                .then(settle, (err) => { settle(); alert(`Error: ${err.message}`); });
+        };
         if (recordIsIndividual()) {
             const pid = newPlayerId();
             const rec = {
@@ -3020,11 +3050,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 handicap: (function () { const raw = String(entry.ghinOrHandicap || entry.handicap || '').trim(); return /^\+?\d{1,2}(\.\d+)?$/.test(raw) ? raw : '0'; })(),
                 addedAt: Date.now()
             };
-            db.ref(`tournaments/${currentCode}/players/${pid}`).set(rec).then(() =>
-                db.ref(`registrations/${currentCode}/${entryId}`).update({
-                    approvedAt: Date.now(), playerId: pid
-                })
-            ).catch((err) => alert(`Error: ${err.message}`));
+            commit({
+                [`${tBase}/players/${pid}`]: rec,
+                [`${regBase}/approvedAt`]: Date.now(),
+                [`${regBase}/playerId`]: pid
+            });
             return;
         }
         const destEl = document.getElementById('reg-dest-' + entryId);
@@ -3039,24 +3069,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const t = (currentData.teams || {})['team' + dest];
             if (t) {
                 const players = (t.players || []).concat([name]);
-                db.ref(`tournaments/${currentCode}/teams/team${t.num}/players`).set(players).then(() =>
-                    db.ref(`registrations/${currentCode}/${entryId}`).update({
-                        approvedAt: Date.now(), teamNum: t.num
-                    })
-                ).catch((err) => alert(`Error: ${err.message}`));
+                commit({
+                    [`${tBase}/teams/team${t.num}/players`]: players,
+                    [`${regBase}/approvedAt`]: Date.now(),
+                    [`${regBase}/teamNum`]: t.num
+                });
                 return;
             }
         }
         const existing = currentData.teams || {};
-        const nextNum = Object.values(existing).reduce((max, t) => Math.max(max, t.num || 0), 0) + 1;
+        const taken = Object.values(existing).map((t) => t.num || 0)
+            .concat(Object.keys(reservedTeamNums).map(Number));
+        const nextNum = taken.reduce((max, n) => Math.max(max, n), 0) + 1;
+        reservedTeamNums[nextNum] = entryId;
         const teamName = String(entry.teamPreference || '').trim() || `Team ${nextNum}`;
-        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({
-            num: nextNum, name: teamName, players: [name], handicap: 0
-        }).then(() =>
-            db.ref(`registrations/${currentCode}/${entryId}`).update({
-                approvedAt: Date.now(), teamNum: nextNum
-            })
-        ).catch((err) => alert(`Error: ${err.message}`));
+        commit({
+            [`${tBase}/teams/team${nextNum}`]: { num: nextNum, name: teamName, players: [name], handicap: 0 },
+            [`${regBase}/approvedAt`]: Date.now(),
+            [`${regBase}/teamNum`]: nextNum
+        }, nextNum);
     }
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and

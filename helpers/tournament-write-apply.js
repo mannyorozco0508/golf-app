@@ -21,7 +21,8 @@ function setAt(root, parts, value) {
     else node[last] = JSON.parse(JSON.stringify(value));
 }
 
-function splitPath(p) { return String(p).split('/').filter(Boolean); }
+// A root ref (db.ref() with no path) is recorded with an undefined path.
+function splitPath(p) { return (p === undefined || p === null) ? [] : String(p).split('/').filter(Boolean); }
 
 // Applies every captured write whose full path starts with `prefix` to `rec`,
 // which is the object stored AT `prefix`. Returns rec.
@@ -45,3 +46,28 @@ function applyWrites(rec, writes, prefix) {
 }
 
 module.exports = { applyWrites };
+
+// THE ONE MULTI-PATH APPROVE, READ AS THE PATHS IT WRITES (Wave 1, A5).
+// Approve used to be a set on the field and then an update on the entry. It is
+// one root update() now. Suites written against the two-write shape read the
+// same facts through this: every key under tournaments/ becomes a set at its
+// own path, and every registrations/<code>/<id>/<key> is gathered into one
+// update on the entry - so "the team was created" and "the entry was marked"
+// are still asserted as such, and not as an accident of how many calls it took.
+function flatWrites(writes) {
+    const out = [];
+    writes.forEach((w) => {
+        const rootUpdate = (w.path === undefined || w.path === null || w.path === '') && w.op === 'update';
+        if (!rootUpdate) { out.push(w); return; }
+        const marks = {};
+        Object.keys(w.value || {}).forEach((k) => {
+            const m = /^(registrations\/[^/]+\/[^/]+)\/(.+)$/.exec(k);
+            if (m) { (marks[m[1]] = marks[m[1]] || {})[m[2]] = w.value[k]; return; }
+            out.push({ path: k, op: 'set', value: w.value[k], multiPath: true });
+        });
+        Object.keys(marks).forEach((p) => out.push({ path: p, op: 'update', value: marks[p], multiPath: true }));
+    });
+    return out;
+}
+
+module.exports.flatWrites = flatWrites;

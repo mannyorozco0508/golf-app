@@ -33,6 +33,7 @@
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const { flatWrites } = require('./helpers/tournament-write-apply.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -143,9 +144,9 @@ describe('THE DESK reads the new shape', () => {
         const list = sb.document.getElementById('registration-list').innerHTML;
         ['Dee Delta', 'dee@example.com', '555-0100', 'GHIN/Hcp 14', 'Shirt L', 'Dinner 2', 'Gus Golf', 'Hole sponsor — Orozco Roofing'].forEach((s) => assert.ok(list.includes(s), 'list lacks ' + s));
         sb.approveRegistration('e1'); await settle();
-        const p1 = sb.__dbWrites.find((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path)); assert.equal(p1.value.name, 'Dee Delta'); assert.equal(p1.value.handicap, '14');
+        const p1 = flatWrites(sb.__dbWrites).find((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path)); assert.equal(p1.value.name, 'Dee Delta'); assert.equal(p1.value.handicap, '14');
         sb.approveRegistration('e2'); await settle();
-        const p2 = sb.__dbWrites.filter((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path))[1]; assert.equal(p2.value.name, 'Gus Golf'); assert.equal(p2.value.handicap, '0', 'a GHIN number is not a handicap');
+        const p2 = flatWrites(sb.__dbWrites).filter((w) => w.op === 'set' && /^tournaments\/OWN1\/players\//.test(w.path))[1]; assert.equal(p2.value.name, 'Gus Golf'); assert.equal(p2.value.handicap, '0', 'a GHIN number is not a handicap');
     });
 });
 
