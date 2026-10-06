@@ -108,6 +108,19 @@ function firebaseStub(dbJson, auth) {
       // for a set or a remove; a merge for an update, which is what the SDK does.
       // (No backticks in this comment: the whole stub is a template literal, and
       // one in a comment ends it - "Unexpected identifier" at load, nothing else.)
+      // THE OFFLINE FLAG SURVIVES A RELOAD, because airplane mode does. The
+      // stand-in database is re-injected on every document, so a flag set only
+      // on the window object came back FALSE after a reload - and a check
+      // then measured a queue that had quietly drained into a database which was
+      // supposed to be unreachable. It lives in localStorage, which is the same
+      // place the thing under test lives, and it is read here once per document.
+      try { if (localStorage.getItem('__coldOffline') === '1') window.__coldOffline = true; } catch (e) {}
+      window.__coldSetOffline = function (on) {
+        window.__coldOffline = !!on;
+        try { if (on) localStorage.setItem('__coldOffline', '1'); else localStorage.removeItem('__coldOffline'); } catch (e) {}
+        return !!window.__coldOffline;
+      };
+
       function applyWrite(parts, value, replace) {
         if (!parts.length) return;
         var node = DB;
@@ -167,8 +180,23 @@ function firebaseStub(dbJson, auth) {
           // 24 golfers and left Player 1..4 on the page, because every round's
           // players come from a one-shot read nothing repeated. Listeners still
           // re-fire nothing; delivery stays opt-in through __coldDeliver.
-          set: function (v) { window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v }); applyWrite(parts, v, true); return Promise.resolve(); },
+          // window.__coldOffline (2026-10-06) IS WHAT A PHONE WITH NO SIGNAL DOES.
+          //
+          // The stand-in database lives IN THE PAGE, so CDP's offline emulation
+          // does not touch it: every write resolved instantly while the browser
+          // was in airplane mode, which made a durable-queue check measure an
+          // empty queue and report success. Measured in the real SDK first
+          // (tools/offline-durability-audit.js): an offline write neither
+          // resolves nor rejects - 7 of 7 still pending, 0 resolved, 0 rejected.
+          // So that is what this flag reproduces: a promise that never settles,
+          // and the fixture is NOT mutated, because nothing reached a server.
+          //
+          // Opt-in and off by default, so every existing check is untouched.
+          set: function (v) {
+            if (window.__coldOffline) { window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v, offline: true }); return new Promise(function () {}); }
+            window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v }); applyWrite(parts, v, true); return Promise.resolve(); },
           update: function (v) {
+            if (window.__coldOffline) { window.__coldWrites.push({ op: 'update', path: parts.join('/'), value: v, offline: true }); return new Promise(function () {}); }
             window.__coldWrites.push({ op: 'update', path: parts.join('/'), value: v });
             // A ROOT update() IS A MULTI-PATH WRITE: its keys are paths, which is
             // how every batched write in this app is made.
@@ -177,7 +205,9 @@ function firebaseStub(dbJson, auth) {
             } else { applyWrite(parts, v, false); }
             return Promise.resolve();
           },
-          remove: function () { window.__coldWrites.push({ op: 'remove', path: parts.join('/') }); applyWrite(parts, null, true); return Promise.resolve(); },
+          remove: function () {
+            if (window.__coldOffline) { window.__coldWrites.push({ op: 'remove', path: parts.join('/'), offline: true }); return new Promise(function () {}); }
+            window.__coldWrites.push({ op: 'remove', path: parts.join('/') }); applyWrite(parts, null, true); return Promise.resolve(); },
           push: function () { return api; }
         };
         return api;
@@ -291,8 +321,29 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // the page's own button, and nothing else. Introduced for the pairings sheet,
 // whose @media print rules can only be measured with print media emulated
 // AFTER the button that builds the sheet has been pressed.
-async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth }) {
-    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
+// `profileDir` (2026-10-06) IS HOW A PHONE RESTART IS MODELLED. Every arrival
+// gets its own throwaway profile and deletes it, which is right for a cold
+// arrival and makes one thing impossible to measure: whether something SURVIVES
+// the app being gone. A reload in the same process proves very little about
+// disk; a second process over the SAME profile directory is what a restart
+// actually is. Pass a directory to keep it, and the caller owns deleting it.
+// Default behaviour is unchanged: no option, throwaway profile, removed on exit.
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir }) {
+    const keepProfile = !!profileDir;
+    const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
+    if (keepProfile) {
+        try { fs.mkdirSync(profile, { recursive: true }); } catch (e) {}
+        // A REUSED PROFILE CARRIES THE LAST RUN'S FRONT DOOR. DevToolsActivePort
+        // holds the PREVIOUS Chrome's port and the Singleton* files name its
+        // process; the reader below won the race against the new Chrome
+        // rewriting the port file and connected to a port nobody was listening
+        // on - "Chrome exposed no page target", measured, every time. A phone
+        // restart inherits neither, so clearing them is part of the simulation
+        // rather than a workaround.
+        ['DevToolsActivePort', 'SingletonLock', 'SingletonSocket', 'SingletonCookie'].forEach(function (f) {
+            try { fs.rmSync(path.join(profile, f), { force: true, recursive: true }); } catch (e) {}
+        });
+    }
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
     }
@@ -532,7 +583,9 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
         try { if (ws) ws.close(); } catch (e) {}
         registry.release(tracked);
         chrome.kill();
-        try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
+        // A KEPT PROFILE IS THE CALLER'S. Deleting it here would delete the very
+        // thing the next arrival is supposed to find.
+        if (!keepProfile) { try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {} }
     }
 }
 

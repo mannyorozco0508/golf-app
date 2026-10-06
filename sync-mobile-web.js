@@ -64,7 +64,7 @@ const SHARED_SHELL = [
     // trip-itinerary.js: the paste-an-itinerary parser. trip.html calls
     // tripItinPlan UNGUARDED from the review button, so a cached shell without it
     // throws when the button is tapped.
-    'push-notify.js', 'push-boot.js', 'round-role.js', 'challenges.js',
+    'push-notify.js', 'push-boot.js', 'round-role.js', 'offline-queue.js', 'challenges.js',
     // play-order.js: the order the holes are played in when a round goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
     // card itself carries, which is what a 1st-tee round plays anyway - but

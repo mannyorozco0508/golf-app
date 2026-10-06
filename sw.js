@@ -4427,6 +4427,7 @@ const SHELL_FILES = [
     // The three ways into a round. index.html calls it unguarded from the arrival
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
+    './offline-queue.js',
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
     // card itself carries, so a cached shell without it plays 1..18 - which is what
