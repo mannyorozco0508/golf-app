@@ -51,6 +51,10 @@
          which is what lets Consumer and Tournament stop sharing an origin without
          every link between them breaking. -->
     <script src="product-links.js"></script>
+    <!-- One HTML escaper for every user-supplied name (Tournaments Wave 1, A1).
+         A public signup can carry any text into a team or golfer name, and the
+         Approve button copies it into the field that every page renders. -->
+    <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
     <style>
         :root {
@@ -1412,7 +1416,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         html += `<div style="max-height:200px; overflow-y:auto; margin-top:10px; border:1px solid var(--border-mid); border-radius:8px; padding:8px;">`;
         teamChunks.forEach((team, i) => {
             html += `<div style="margin-bottom:8px; padding-bottom:8px; ${i < teamChunks.length - 1 ? 'border-bottom:1px solid var(--border-faint);' : ''}">
-                <strong>Team ${i + 1}</strong> — ${team.map(p => p.name).join(', ')}
+                <strong>Team ${i + 1}</strong> — ${team.map(p => escapeHtml(p.name)).join(', ')}
             </div>`;
         });
         html += `</div>`;
@@ -1443,7 +1447,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             wrapper.id = `team-block-${teamCount}`;
             const suggestedHcp = suggestTeamHandicap(teamPlayers);
             const playerInputsHtml = [0, 1, 2, 3].map(i =>
-                `<input type="text" value="${teamPlayers[i] ? teamPlayers[i].name : ''}" placeholder="${teamPlayers[i] ? '' : (i < 2 ? `Player ${i + 1}` : `Player ${i + 1} (optional)`)}">`
+                `<input type="text" value="${teamPlayers[i] ? escapeHtml(teamPlayers[i].name) : ''}" placeholder="${teamPlayers[i] ? '' : (i < 2 ? `Player ${i + 1}` : `Player ${i + 1} (optional)`)}">`
             ).join('');
             wrapper.innerHTML = `
                 <div class="team-card-header">
@@ -1676,12 +1680,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Share button so a team can scan straight off the organizer's screen.
         // The box is drawn by renderTeamLinks after the rows land; the editable
         // Setup card carries none - it is for editing, not for scanning.
+        // THE NAME RIDES IN A DATA ATTRIBUTE, NEVER IN THE HANDLER (Wave 1, A1).
+        // A team name can come from a public signup; inside a quoted onclick
+        // string a quote in it closed the string and the rest became code.
         const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}" data-url="${url}" data-fallback="QR unavailable"></span>`;
         return `<div class="team-link-row" style="flex-wrap:wrap;">
-            <span>🏌️ ${teamName}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
+            <span>🏌️ ${escapeHtml(teamName)}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names)}</span></span>
             <span style="display:flex; align-items:center; gap:6px;">
                 ${hcpInput}${qrBox}
-                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" onclick="openShareModal('${url}', '${teamName.replace(/'/g, "\\'")}')">📤 Share</button>
+                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
             </span>
         </div>`;
     }
@@ -1829,7 +1836,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const teamName = t.name || `Team ${t.num}`;
             const startVal = t.startingHole || '';
             return `<div class="team-link-row">
-                <span>🏌️ ${teamName}</span>
+                <span>🏌️ ${escapeHtml(teamName)}</span>
                 <span style="display:flex; align-items:center; gap:6px;">
                     <span style="font-size:0.75rem; color:var(--text-muted);">Hole</span>
                     <input type="text" value="${startVal}" placeholder="—" style="width:52px; padding:6px; font-size:0.85rem; text-align:center;" onchange="updateTeamStartingHole(${t.num}, this.value)">
@@ -2560,7 +2567,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. The Desk tab is where you tick Paid and approve them into the field.</p>`
                 + registrationFieldsHtml()
                 + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
-                + `<button class="btn-outline" onclick="openShareModal(registrationSignupUrl(), '${eventName.replace(/'/g, "\\'")}', 'register')">📤 Share signup link</button>`;
+                + `<button class="btn-outline" data-share-name="${eventName}" data-share-kind="register" onclick="openShareModal(registrationSignupUrl(), this.dataset.shareName, this.dataset.shareKind)">📤 Share signup link</button>`;
         }
     }
 
@@ -3066,7 +3073,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
-                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${flights[lbFlightId].name} yet.</div>`
+                ? `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${escapeHtml(flights[lbFlightId].name)} yet.</div>`
                 : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No scores yet.</div>`;
             return;
         }
@@ -3093,7 +3100,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 : (r.hasScores ? r.thru : '-');
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${r.teamName}${tieTag}${partial}${pendingTag}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag}${partial}${pendingTag}</span>
                 <span class="lb-thru">${thru}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
@@ -3175,7 +3182,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
         } else {
             payouts.forEach(p => {
-                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${p.teamName}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
             });
         }
         resultsContainer.innerHTML = html;
@@ -3329,13 +3336,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const holes = (r.courseData || []).length;
             const scored = Object.keys(r.scores || {}).length;
             return `<div class="flight-row" style="flex-wrap:wrap;">
-                <input class="flight-name-input" type="text" value="${r.name || ''}" onchange="renameRound('${rid}', this.value)">
+                <input class="flight-name-input" type="text" value="${escapeHtml(r.name || '')}" onchange="renameRound('${rid}', this.value)">
                 <span class="flight-count">${label[st]}</span>
                 <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
                 <button class="flight-del" style="color:var(--text-muted);" onclick="moveRound('${rid}', 1)" ${i === ids.length - 1 ? 'disabled' : ''}>▼</button>
                 <button class="flight-del" onclick="deleteRound('${rid}')" ${scored ? 'disabled title="This round has scores"' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
-                    ${r.courseName || 'No course set'} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + (netIsInPlay(r) ? 'Net' : (netWasRefused(r) ? 'Gross — net unavailable on this course' : 'Gross')) : ''} • ${holes} holes
+                    ${escapeHtml(r.courseName || 'No course set')} • ${formatLabelFor(r.format)}${r.format === 'individual' ? ' • ' + (netIsInPlay(r) ? 'Net' : (netWasRefused(r) ? 'Gross — net unavailable on this course' : 'Gross')) : ''} • ${holes} holes
                 </div>
                 <div style="flex-basis:100%; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
                     <button class="btn-outline" style="font-size:0.76rem; padding:5px 10px;" onclick="editRound('${rid}')">${editingRoundId === rid ? 'Done' : 'Edit'}</button>
@@ -3363,14 +3370,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         if (locked) {
             el.innerHTML = `<div style="border:1px solid var(--border-faint); border-radius:8px; padding:12px; margin-top:8px; font-size:0.8rem; color:var(--text-muted);">
-                <strong>${r.name}</strong> is ${roundStatus(r) === 'open' ? 'open for scoring' : 'closed'}, so its course, format and scoring can no longer be changed —
+                <strong>${escapeHtml(r.name)}</strong> is ${roundStatus(r) === 'open' ? 'open for scoring' : 'closed'}, so its course, format and scoring can no longer be changed —
                 scores already entered were recorded against them. Put the round back into setup only if nobody has played it.
             </div>`;
             return;
         }
 
         const courseOptions = Object.keys(allCourses()).map(k =>
-            `<option value="${k}" ${r.activeCourseKey === k ? 'selected' : ''}>${allCourses()[k].name}</option>`).join('');
+            `<option value="${k}" ${r.activeCourseKey === k ? 'selected' : ''}>${escapeHtml(allCourses()[k].name)}</option>`).join('');
 
         el.innerHTML = `<div style="border:1px solid var(--brand-green); border-radius:8px; padding:12px; margin-top:8px;">
             <div class="form-group">
@@ -3636,7 +3643,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const flightOptions = (sel) => `<option value="">— No flight —</option>` + fids.map(fid =>
-            `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+            `<option value="${fid}" ${sel === fid ? 'selected' : ''}>${escapeHtml(flights[fid].name || 'Flight')}</option>`).join('');
 
         const withdrawnCount = pids.filter(pid => isWithdrawn(players[pid])).length;
         const unnamedCount = pids.filter(pid => isUnnamed(players[pid])).length;
@@ -3645,7 +3652,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const p = players[pid];
             const sel = flights[p.flightId] ? p.flightId : '';
             return `<div class="fa-row">
-                <input class="fa-team" type="text" value="${p.name || ''}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;"
+                <input class="fa-team" type="text" value="${escapeHtml(p.name || '')}" onchange="updatePlayerName('${pid}', this.value)" style="min-width:0;"
                     placeholder="${isUnnamed(p) ? 'Paid entry \u2014 name to come' : ''}">
                 <input type="text" value="${handicapIsPending(p) ? '' : (p.handicap !== undefined ? p.handicap : '0')}" onchange="updatePlayerHandicap('${pid}', this.value)" style="width:52px;"
                     placeholder="${handicapIsPending(p) ? 'hcp' : ''}">
@@ -3837,12 +3844,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         sections.forEach(sec => {
             const gids = Object.keys(sec.groups).sort((a, b) => (sec.groups[a].createdAt || 0) - (sec.groups[b].createdAt || 0));
             if (gids.length === 0) return;
-            if (sec.label) html += `<div style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${sec.label}</div>`;
+            if (sec.label) html += `<div style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${escapeHtml(sec.label)}</div>`;
             gids.forEach(gid => {
                 const g = sec.groups[gid];
                 const names = (g.playerIds || []).filter(pid => players[pid]).map(pid => players[pid].name);
                 html += `<div class="team-link-row" style="flex-wrap:wrap;">
-                    <span>🏌️ ${g.name || 'Group'} <span style="font-weight:normal; color:var(--text-muted);">— ${names.join(', ') || 'nobody assigned yet'}</span></span>
+                    <span>🏌️ ${escapeHtml(g.name || 'Group')} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names.join(', ')) || 'nobody assigned yet'}</span></span>
                     <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
                 </div>`;
             });
@@ -3887,18 +3894,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const list = document.getElementById('scoring-groups-list');
 
         const groupOptions = (sel) => `<option value="">— Unassigned —</option>` + gids.map(gid =>
-            `<option value="${gid}" ${sel === gid ? 'selected' : ''}>${groups[gid].name || 'Group'}</option>`).join('');
+            `<option value="${gid}" ${sel === gid ? 'selected' : ''}>${escapeHtml(groups[gid].name || 'Group')}</option>`).join('');
 
         let html = gids.map(gid => {
             const g = groups[gid];
             const ids = (g.playerIds || []).filter(pid => players[pid]);
             return `<div class="flight-row" style="flex-wrap:wrap;">
-                <input class="flight-name-input" type="text" value="${g.name || ''}" onchange="renameScoringGroup('${gid}', this.value)">
+                <input class="flight-name-input" type="text" value="${escapeHtml(g.name || '')}" onchange="renameScoringGroup('${gid}', this.value)">
                 <input type="text" value="${g.startingHole || ''}" placeholder="Hole" style="width:58px;" onchange="setGroupStartingHole('${gid}', this.value)">
                 <span class="flight-count">${ids.length} golfer${ids.length === 1 ? '' : 's'}</span>
                 <button class="flight-del" onclick="deleteScoringGroup('${gid}')" ${ids.length ? 'disabled' : ''}>✕</button>
                 <div style="flex-basis:100%; font-size:0.76rem; color:var(--text-muted); margin-top:4px;">
-                    ${ids.length ? ids.map(pid => players[pid].name).join(', ') : 'Nobody assigned yet'}
+                    ${ids.length ? ids.map(pid => escapeHtml(players[pid].name)).join(', ') : 'Nobody assigned yet'}
                 </div>
             </div>`;
         }).join('');
@@ -3906,7 +3913,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (Object.keys(players).length > 0 && gids.length > 0) {
             html += `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">Assign golfers — ${unassigned.length} unassigned</p>`
                 + Object.keys(players).map(pid => `<div class="fa-row">
-                    <span class="fa-team">${players[pid].name}</span>
+                    <span class="fa-team">${escapeHtml(players[pid].name)}</span>
                     <select onchange="assignPlayerToGroup('${pid}', this.value)">${groupOptions(assigned[pid] || '')}</select>
                 </div>`).join('');
         }
@@ -4001,7 +4008,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             : fids.map(fid => {
                 const n = counts[fid] || 0;
                 return `<div class="flight-row">
-                    <input class="flight-name-input" type="text" value="${flights[fid].name || ''}"
+                    <input class="flight-name-input" type="text" value="${escapeHtml(flights[fid].name || '')}"
                         onchange="renameFlight('${fid}', this.value)">
                     <span class="flight-count">${n} ${competitorNoun(currentData, n)}</span>
                     <button class="flight-del" onclick="deleteFlight('${fid}')" ${n > 0 ? 'disabled title="Move its teams out first"' : ''}>✕</button>
@@ -4013,7 +4020,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (fids.length === 0 || teamIds.length === 0) { assignEl.innerHTML = ''; return; }
 
         const options = (selected) => `<option value="">— Unassigned —</option>` + fids.map(fid =>
-            `<option value="${fid}" ${selected === fid ? 'selected' : ''}>${flights[fid].name || 'Flight'}</option>`).join('');
+            `<option value="${fid}" ${selected === fid ? 'selected' : ''}>${escapeHtml(flights[fid].name || 'Flight')}</option>`).join('');
 
         assignEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted); margin:12px 0 4px 0;">
             Assign teams — ${counts.__unassigned} unassigned</p>` + teamIds.map(tid => {
@@ -4022,7 +4029,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // dropdown rather than showing a blank selection.
             const current = flights[t.flightId] ? t.flightId : '';
             return `<div class="fa-row">
-                <span class="fa-team">${t.name || `Team ${t.num}`}</span>
+                <span class="fa-team">${escapeHtml(t.name || `Team ${t.num}`)}</span>
                 <select onchange="assignTeamToFlight('${tid}', this.value)">${options(current)}</select>
             </div>`;
         }).join('');
@@ -4054,7 +4061,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         el.style.display = 'block';
         el.innerHTML = `<button class="lb-flight-btn ${active === 'event' ? 'active' : ''}" onclick="setLeaderboardRound('event')">Event</button>`
-            + ids.map(rid => `<button class="lb-flight-btn ${active === rid ? 'active' : ''}" onclick="setLeaderboardRound('${rid}')">${rounds[rid].name || 'Round'}</button>`).join('');
+            + ids.map(rid => `<button class="lb-flight-btn ${active === rid ? 'active' : ''}" onclick="setLeaderboardRound('${rid}')">${escapeHtml(rounds[rid].name || 'Round')}</button>`).join('');
     }
 
     // --- LEADERBOARD FLIGHT VIEW ---
@@ -4082,7 +4089,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         el.style.display = 'block';
         el.innerHTML = `<button class="lb-flight-btn ${!lbFlightId ? 'active' : ''}" onclick="setLeaderboardFlight('')">Overall</button>`
-            + fids.map(fid => `<button class="lb-flight-btn ${lbFlightId === fid ? 'active' : ''}" onclick="setLeaderboardFlight('${fid}')">${flights[fid].name || 'Flight'}</button>`).join('');
+            + fids.map(fid => `<button class="lb-flight-btn ${lbFlightId === fid ? 'active' : ''}" onclick="setLeaderboardFlight('${fid}')">${escapeHtml(flights[fid].name || 'Flight')}</button>`).join('');
     }
 
     // --- TRIP LINKING ---
@@ -4144,15 +4151,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // decides where they go.
         const scoringLine = scoringModeLine(currentData);
 
-        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${currentData.name}</h1>
-            <p style="color:#666; margin-top:0;">${currentData.courseName} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${view.title}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
+        let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${escapeHtml(currentData.name)}</h1>
+            <p style="color:#666; margin-top:0;">${escapeHtml(currentData.courseName)} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${escapeHtml(view.title)}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
             <table style="width:100%; border-collapse:collapse; margin-top:14px;">
                 <tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
                     <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">${entryColumnLabel(currentData)}</th><th style="padding:8px 4px;">${view.kind === 'event' ? 'Rds' : 'Thru'}</th><th style="padding:8px 4px; text-align:right;">To Par</th>
                 </tr>`;
         rows.forEach(r => {
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${r.teamName}</td><td style="padding:8px 4px;">${r.hasScores ? (view.kind === 'event' ? `${r.roundsComplete}/${r.countableRounds}` : r.thru) : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
+            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px 4px;">${r.rank || '-'}</td><td style="padding:8px 4px;">${escapeHtml(r.teamName)}</td><td style="padding:8px 4px;">${r.hasScores ? (view.kind === 'event' ? `${r.roundsComplete}/${r.countableRounds}` : r.thru) : '-'}</td><td style="padding:8px 4px; text-align:right;">${toParStr}</td></tr>`;
         });
         html += `</table>`;
         container.innerHTML = html;
