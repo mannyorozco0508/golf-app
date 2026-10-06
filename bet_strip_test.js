@@ -696,9 +696,23 @@ describe('SCORECARD — group scorekeeper links are reachable mid-round', () => 
         assert.ok(idx.includes('?game=${currentMode}&group=${b.group}'));
     });
 
-    test('links are only offered when the round actually has multiple groups', () => {
+    test('links are offered on EVERY round, and the panel is never empty', () => {
+        // RE-POINTED 2026-10-06 (Manny's setup-friction wave). "Save & Start Round"
+        // now lands on the SCORECARD instead of Round Ready - measured with
+        // tools/setup-tap-audit.js, START SCORING was a second tap on all three
+        // setup paths - and Round Ready had exactly one entry point, that save, so
+        // it was also the only screen that ever printed the round's links. They are
+        // on the scorecard now, on EVERY round: a foursome had no links button at
+        // all, and leaving the gate would have been a cut that removed sharing from
+        // the most common round in the app.
         const fn = idx.slice(idx.indexOf('function renderGroupLinksPanel'), idx.indexOf('function copyGroupLinkFromScorecard'));
-        assert.ok(/boundaries\.length <= 1/.test(fn), 'a single-group round should show nothing');
+        assert.ok(fn.length > 400, 'the slice is empty, so every assertion here is vacuous');
+        assert.ok(!/boundaries\.length <= 1/.test(fn),
+            'the second gate is back: the button a foursome now has opens an empty panel');
+        // AND THE PANEL SAYS WHICH LINK IT IS HANDING OUT, per shape, because the
+        // same URL is read-only above one group and the scorecard at one.
+        assert.ok(/const many = boundaries\.length > 1;/.test(fn));
+        assert.ok(/On one group this link also carries the scorecard/.test(fn));
     });
 
     test('copying falls back when the clipboard API is unavailable', () => {

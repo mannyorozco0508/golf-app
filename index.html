@@ -8091,7 +8091,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         const players = currentData.players || [];
         const boundaries = computeGroupBoundaries(players.length, currentData.groupSizeOverrides || {});
-        if (boundaries.length <= 1) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+        // NO SECOND GATE ON THE GROUP COUNT (2026-10-06). This returned early on a
+        // single group, so the button this wave puts on a foursome's scorecard
+        // opened an empty panel - a dead control, which is the defect CLAUDE.md
+        // keeps recording: a wire nothing runs, under a green suite. A foursome has
+        // one card and one link to send, and that is exactly what it now prints.
 
         // This page IS the scorecard, so its own URL is the right base. Deliberately not
         // a filename replace - that pattern is what broke the admin links on clean URLs.
@@ -8133,9 +8137,36 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             </div>`;
         }).join('');
 
+        // THE WATCH LINK, SAME AS admin.html's (2026-10-06). The round's bare link
+        // - index.html?game=CODE, no group - is the one that gets forwarded to a
+        // wife at home or the group behind you, and this panel never printed it.
+        // It matters more now that Save & Start lands on the scorecard instead of
+        // Round Ready, which was the only screen that offered it.
+        //
+        // THE WORDS ARE PER SHAPE, because the LINK is per shape - measured in
+        // Chrome, same URL both times: 0 of 152 score inputs editable on eight
+        // golfers in two groups, 76 of 76 on four in one group, and still 76 of 76
+        // after tapping "Just watching" (the card is gated on group scope, and
+        // with one group everybody is in scope). So read-only is claimed only
+        // above one group. watch_follow_test.js holds both numbers.
+        const many = boundaries.length > 1;
+        const watchUrl = `${base}?game=${currentMode}`;
+        const watchRow = '<div class="group-link-row glr-watch">'
+            + '<div class="glr-info">'
+            + '<div class="glr-title">' + (many ? '\uD83D\uDC40 Watch this round' : '\uD83C\uDFCC\uFE0F The whole round')
+            + '</div>'
+            + '<div class="glr-names">' + (many
+                ? 'Anyone can follow \u2014 nobody who opens it can enter a score'
+                : 'On one group this link also carries the scorecard')
+            + '</div></div>'
+            + '<button class="glr-copy" onclick="copyGroupLinkFromScorecard(\'' + watchUrl + '\', 0, this)">\uD83D\uDD17 Copy</button>'
+            + '</div>';
         panel.innerHTML = `<div class="group-links-box">
-            <div class="glb-title">Scorekeeper Links</div>
-            <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
+            <div class="glb-title">${many ? 'Scorekeeper Links' : 'Share this round'}</div>
+            <div class="glb-sub">${many
+                ? 'Send each group their own link — it locks them to just their players.'
+                : 'One group, one card — this is the link your four open.'}</div>
+            ${watchRow}
             ${rows}
             ${organizerRow}
         </div>`;
@@ -8216,15 +8247,19 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             boundaries.forEach(b => {
                 html += `<button class="group-btn ${selectedGroup === b.group ? 'active' : ''}" onclick="filterGroup(${b.group})">Group ${b.group}</button>`;
             });
-            // Organizer only. A scorekeeper opened their group's link precisely so they
-            // could score THEIR foursome; handing them every other group's privileged
-            // URL from inside that page defeats the point of scoping links at all.
-            // Since v189 "organizer" is canReachSetup(), not the bare link: the panel
-            // prints the organizer link, and a spectator on the bare link must not be
-            // able to take the key.
-            if (canReachSetup()) {
-                html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">🔗 Group Links</button>`;
-            }
+        }
+        // THE LINKS, ON EVERY ROUND (2026-10-06). This was inside the multi-group
+        // branch, so a FOURSOME's organizer had no links button on the scorecard at
+        // all - and "Save & Start Round" now lands here instead of on Round Ready,
+        // which was the only screen that ever printed them. Leaving the gate as it
+        // was would have been a cut that quietly removed sharing from the most
+        // common round in the app.
+        //
+        // Organizer only, and "organizer" is canReachSetup(), not the bare link: a
+        // scorekeeper who opened their group's link must not be handed every other
+        // group's privileged URL, and a spectator must not be able to take the key.
+        if (canReachSetup()) {
+            html += `<button class="group-btn group-links-btn" onclick="toggleGroupLinksPanel()">\uD83D\uDD17 ${boundaries.length > 1 ? 'Group Links' : 'Share this round'}</button>`;
         }
         // THE WAY INTO THE SETUP, for the organizer (v189). Beside Group Links on a
         // multi-group round, alone in the row on a foursome. Never on a group link.

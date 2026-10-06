@@ -180,15 +180,34 @@ describe('HONEST BUTTON: Saving..., then Still saving - keep this page open; dis
         assert.notEqual(sb.document.getElementById('round-ready-screen').style.display, 'block', 'no Round Ready');
     });
     test('a fast ack (100 ms) never shows the honest state: restored and Round Ready, and the threshold timer is cleared', { timeout: SLOW_MS + 3000 }, async () => {
+        // RE-POINTED 2026-10-06 (Manny's setup-friction wave). The save no longer
+        // shows Round Ready: "Save & Start Round" goes to the scorecard, because
+        // START SCORING on Round Ready was a second tap after a button that says
+        // Start - measured on all three setup paths with tools/setup-tap-audit.js.
+        // The claim here is unchanged and is about the BUTTON: restored, honest
+        // while it waits, and the page moves on exactly once. The destination is
+        // location.href, which this harness models as a plain property.
         const sb = pageReadyToSave({ ack: 100 });
+        const before = String(sb.location.href);
         save(sb);
         await wait(250);
         assert.equal(S(sb).disabled, false, 'restored on ack');
-        assert.equal(sb.document.getElementById('round-ready-screen').style.display, 'block');
+        assert.notEqual(String(sb.location.href), before, 'the page did not move on');
+        assert.match(String(sb.location.href), /index\.html\?game=SAVE01$/,
+            'it went to ' + sb.location.href);
+        assert.notEqual(sb.document.getElementById('round-ready-screen').style.display, 'block',
+            'Round Ready is back on the save path');
         await wait(SLOW_MS + 200);
         assert.ok(!/Still saving/.test(S(sb).text), 'the threshold timer must not fire after the ack: ' + S(sb).text);
     });
     test('an ack AFTER the threshold still restores the button and shows Round Ready', { timeout: SLOW_MS + 4000 }, async () => {
+        // RE-POINTED 2026-10-06 (Manny's setup-friction wave). The save no longer
+        // shows Round Ready: "Save & Start Round" goes to the scorecard, because
+        // START SCORING on Round Ready was a second tap after a button that says
+        // Start - measured on all three setup paths with tools/setup-tap-audit.js.
+        // The claim here is unchanged and is about the BUTTON: restored, honest
+        // while it waits, and the page moves on exactly once. The destination is
+        // location.href, which this harness models as a plain property.
         const sb = pageReadyToSave({ ack: SLOW_MS + 800 });
         save(sb);
         await wait(SLOW_MS + 300);
@@ -197,7 +216,8 @@ describe('HONEST BUTTON: Saving..., then Still saving - keep this page open; dis
         const s = S(sb);
         assert.equal(s.disabled, false, 'restored on the late ack');
         assert.equal(s.text, '💾 Save & Start Round');
-        assert.equal(sb.document.getElementById('round-ready-screen').style.display, 'block', 'Round Ready');
+        assert.match(String(sb.location.href), /index\.html\?game=SAVE01$/,
+            'a late ack must still start the round: ' + sb.location.href);
         assert.equal(sb.window.GolfNet.state().pending, 0);
         assert.equal(sb.window.__alerts.length, 0);
     });

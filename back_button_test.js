@@ -474,16 +474,34 @@ describe('admin.html', () => {
         assert.equal(step(sb), 5, 'closing the modal also stepped the wizard back');
     });
 
-    test('Round Ready, reached by pressing Save & Start Round, does NOT go back to the wizard', async () => {
+    test('Save & Start Round leaves the wizard for the scorecard, and Back does not undo that', async () => {
+        // RE-POINTED 2026-10-06 (Manny's setup-friction wave). The save used to land
+        // on Round Ready, and this case existed because the hardware Back button
+        // must not drop the organizer back into the wizard from there. The save goes
+        // to the SCORECARD now - START SCORING on Round Ready was a second tap after
+        // a button that says Start, measured on all three setup paths with
+        // tools/setup-tap-audit.js - so what has to hold is the same thing one step
+        // further on: the wizard is left behind and a Back press does not resurrect
+        // it. Round Ready itself is no longer on this path, which is why the
+        // assertion about its display is gone rather than inverted.
         const sb = setup();
         walkWizard(sb, 7);
+        const before = String(sb.location.href);
         tap(sb, ADMIN, /onclick="(saveSettings\(\))"/);
         await new Promise(r => setTimeout(r, 30));
         assert.deepEqual(JSON.parse(run(sb, 'JSON.stringify(window.__alerts || [])')), []);
-        assert.equal(sb.document.getElementById('round-ready-screen').style.display, 'block', 'Save did not land on Round Ready');
-        assert.equal(press(sb), 'none');
-        assert.equal(sb.document.getElementById('round-ready-screen').style.display, 'block');
-        assert.equal(sb.document.getElementById('admin-screen').style.display, 'none', 'the wizard came back');
+        assert.match(String(sb.location.href), /index\.html\?game=/,
+            'the save did not start the round: ' + sb.location.href);
+        assert.notEqual(String(sb.location.href), before);
+        assert.notEqual(sb.document.getElementById('round-ready-screen').style.display, 'block',
+            'Round Ready is back on the save path');
+        // WHAT THIS CANNOT SAY. The old case also asserted the Back press was
+        // claimed by nobody. It cannot now: this harness models location.href as a
+        // plain property, so nothing UNLOADS - the wizard is still on step 7 with
+        // its Back handler registered, and press() answers 'wizard-step'. On a
+        // device the navigation replaces the document and takes the handler with
+        // it. Asserting 'none' here would be asserting the mock; the honest claim
+        // is the one above, that the save leaves for the scorecard.
     });
 
     test('NOT A LAYER: the Nassau and Main Pool checkbox panels stay open and ticked', () => {

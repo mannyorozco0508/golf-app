@@ -122,7 +122,37 @@ const NATIVE_PRESCRIPT = `
 //   - global_courses writes are recorded and resolved, so a round that does
 //     publish still completes and "the round saved" stays measurable.
 // ---------------------------------------------------------------------------
-const INSTRUMENT = `
+// THE RECORDERS HAVE TO SURVIVE A NAVIGATION (2026-10-06).
+//
+// "Save & Start Round" now goes straight to the scorecard - Manny's
+// setup-friction wave; Round Ready was a second tap after a button that says
+// Start. Every recorder in here lives on `window`, and the drivers' trace with
+// them, so the save threw all of it away and the probe read a FRESH page:
+// gcWrites [] for the native arm (trivially true, and therefore worthless as
+// evidence), gcWrites [] for the WEB arm too - which is what went red - and a
+// trace saying "TIMEOUT at phase 0" from the driver starting over on
+// index.html, where there is no wizard to walk.
+//
+// So they are mirrored into sessionStorage, which survives a same-origin
+// navigation, and the probe reads the union. Nothing about what is being
+// measured changed: a write that happens before the navigation is still a write,
+// and this is the only way to see it from after one.
+const CARRY = `
+    (function () {
+      window.__carry = function (key, item) {
+        try {
+          var k = '__nrs_' + key;
+          var a = JSON.parse(sessionStorage.getItem(k) || '[]');
+          a.push(item); sessionStorage.setItem(k, JSON.stringify(a));
+        } catch (e) {}
+      };
+      window.__carried = function (key) {
+        try { return JSON.parse(sessionStorage.getItem('__nrs_' + key) || '[]'); }
+        catch (e) { return []; }
+      };
+    })();`;
+
+const INSTRUMENT = CARRY + `
     window.__fetches = [];
     window.__origFetch = window.fetch;
     window.fetch = function (u) {
@@ -147,8 +177,10 @@ const INSTRUMENT = `
                         ['set', 'update', 'remove', 'push'].forEach(function (meth) {
                             var o = r[meth];
                             r[meth] = function (value) {
-                                window.__gcWrites.push({ path: path, method: meth,
-                                    keys: value ? Object.keys(value).sort() : [] });
+                                var rec = { path: path, method: meth,
+                                    keys: value ? Object.keys(value).sort() : [] };
+                                window.__gcWrites.push(rec);
+                                window.__carry('gc', rec);
                                 return o ? o.apply(r, arguments) : Promise.resolve();
                             };
                         });
@@ -442,7 +474,9 @@ const SAVE_DRIVER = `
         if (!active) return false;
         var btn = document.getElementById('wizard-next-' + active.id.replace('wizard-step-', ''));
         if (btn && btn.offsetParent !== null && !btn.disabled) {
-          btn.click(); window.__trace.push('clicked ' + btn.id + ' (on ' + active.id + ')');
+          btn.click();
+          window.__trace.push('clicked ' + btn.id + ' (on ' + active.id + ')');
+          if (window.__carry) window.__carry('trace', 'clicked ' + btn.id);
           return true;
         }
         return false;
@@ -490,7 +524,11 @@ const SAVE_DRIVER = `
           if (step === 8) {
             var save = document.getElementById('main-save-btn');
             if (save && !save.disabled) {
-              save.click(); window.__trace.push('clicked main-save-btn');
+              save.click();
+              window.__trace.push('clicked main-save-btn');
+              // CARRIED, because this click navigates to the scorecard and takes
+              // window.__trace with it.
+              if (window.__carry) window.__carry('trace', 'clicked main-save-btn');
               step = 9; clearInterval(iv);
             }
             return;
@@ -503,10 +541,13 @@ const SAVE_PROBE = `
 (() => {
   const text = (el) => ((el && (el.innerText || '')) || '').trim();
   return JSON.stringify({
-    trace: window.__trace || [],
+    // THE UNION, because the save navigates: this document's own records plus
+    // everything carried across in sessionStorage.
+    trace: (window.__carried ? window.__carried('trace') : []).concat(window.__trace || []),
     ready: window.__ready || [],
     isNativeClass: document.documentElement.classList.contains('is-native'),
-    gcWrites: window.__gcWrites || [],
+    landedOn: location.pathname.split('/').pop() + location.search,
+    gcWrites: (window.__carried ? window.__carried('gc') : []).concat(window.__gcWrites || []),
     // THE ROUND MUST STILL SAVE. Round Ready is the organizer-visible proof.
     bodyText: (document.body.innerText || '').slice(0, 4000),
     alerts: window.__alerts || []

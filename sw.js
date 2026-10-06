@@ -4267,6 +4267,19 @@
 // offered as "Watch this round" on every round rather than only multi-group
 // ones, and the trip's share button says anyone can follow. A device on v303
 // has a trip page that never moves after it loads.
+//
+// AND SETUP LOST A TAP ON EVERY PATH (same version, second wave on the branch).
+// "Save & Start Round" did not start the round - it showed Round Ready, and
+// "START SCORING" was a second tap after a button that says Start. Measured
+// cold with tools/setup-tap-audit.js, four golfers and one game: Game Day 16
+// taps, "Same as last week" 6, "Help me set this up" 21. They are 15, 4 and 20.
+// The save goes to the scorecard; "Same as last week" is on the home screen
+// instead of inside a closed disclosure called "Open something else"; the
+// scorecard's links button is on every round now (a foursome had none, and
+// Round Ready was the only screen that ever printed them) and its panel carries
+// the round's own watch link. The coach's last button no longer claims it opens
+// Review, because it opens the course picker - the gate stays. A device on v303
+// pays the extra tap and has no links on a foursome's scorecard.
 const CACHE_VERSION = 'golfapp-v304-watchfollow';
 
 // Every file the shell actually needs. The old list predated the shared engine files

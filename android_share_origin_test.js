@@ -159,7 +159,11 @@ describe('THE ANDROID SHELL - https://localhost inside Capacitor', () => {
 
     test('and every link on that panel - all groups and the organizer\'s - is a web link', async () => {
         const r = await scorecard('android', NATIVE);
-        assert.equal(r.all.length, 3, 'two group links and one organizer link expected');
+        // FOUR SINCE 2026-10-06: the round's own watch link (index.html?game=CODE,
+        // no group) is printed above the group rows, as admin.html's panel does.
+        // The claim this test exists for is unchanged and is the line below: every
+        // one of them points at the web app, not capacitor://localhost.
+        assert.equal(r.all.length, 4, 'the watch link, two group links and the organizer link');
         r.all.forEach(u => assert.ok(u.startsWith(WEB + '/'), 'a localhost link is on the panel: ' + u));
         assert.ok(r.all.some(u => /organizer=tok1/.test(u)), 'the organizer link is missing');
     });

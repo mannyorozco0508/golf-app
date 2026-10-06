@@ -1224,6 +1224,22 @@ html {
          floating over the page. Wave 15 removed that menu; this disclosure stays
          CLOSED on arrival, and one_screen_test.js asserts both the absent attribute
          and the measured closed state. -->
+    <!-- SAME AS LAST WEEK, ON THE HOME SCREEN (2026-10-06, Manny's setup-friction
+         wave). MEASURED with tools/setup-tap-audit.js, four golfers, one game, a
+         known course, every tap a real tap on a cold page: this path was 6 taps
+         and one of them was opening a disclosure called "Open something else" to
+         find it. It is 4 now, and the other two paths are 15 and 20.
+         IT IS A BUTTON AND ONE LINE, NOT A CARD. Manny's standing rule for this
+         screen is no tall organizer card on Home, so this is the control itself
+         plus the sentence that names which round it copies - no heading, no box.
+         HIDDEN UNTIL THERE IS ONE. A first-time organizer has no previous round
+         and must not be offered a button that cannot work: syncSameAsLastWeek()
+         shows it only when lastRoomCode exists, which is also why moving it here
+         does not put a dead control on a new install's first screen. -->
+    <button type="button" class="btn-primary salw-btn" id="same-as-last-week" style="display:none;"
+            onclick="sameAsLastWeek(this)">🔁 Same as last week</button>
+    <div id="same-as-last-week-note" class="salw-note" style="display:none;"></div>
+
     <details id="open-else" class="w-disclosure">
     <summary class="w-disclosure-summary">Open something else</summary>
     <div class="w-card" id="open-round-card">
@@ -1267,9 +1283,11 @@ html {
          HIDDEN UNTIL THERE IS ONE. A first-time organizer has no previous round and
          must not be offered a button that cannot work - syncSameAsLastWeek() shows
          it only when the code exists. -->
-    <button type="button" class="btn-primary salw-btn" id="same-as-last-week" style="display:none;"
-            onclick="sameAsLastWeek(this)">🔁 Same as last week</button>
-    <div id="same-as-last-week-note" class="salw-note" style="display:none;"></div>
+    <!-- THE BUTTON MOVED TO THE HOME SCREEN (2026-10-06). It was here, inside a
+         CLOSED <details> labelled "Open something else", and measured with
+         tools/setup-tap-audit.js that cost an extra tap on the shortest path in
+         the app - the one an organizer takes every week. The code field below is
+         still the general case: any round, typed in. -->
     <h3 class="w-card-title">Start from a previous round</h3>
     <div id="copy-code-row">
         <input type="text" id="copy-code-input" class="join-code-input" maxlength="48"
@@ -5145,11 +5163,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         {
             key: 'course',
             q: 'Ready for the course?',
+            // WHERE IT ACTUALLY LANDS (corrected 2026-10-06). This said "the round
+            // opens on its Review page", and it does not: measured with
+            // tools/setup-tap-audit.js, answering all five questions and tapping
+            // through lands on COURSE, step 1 - because the setup gate will not
+            // show Review until a course and the player minimum are filled in, and
+            // Manny's instruction for this wave is that the gate STAYS.
+            //
+            // So the behaviour is right and the sentence was wrong. CLAUDE.md has
+            // this twice over: a screen reported as broken where the code was
+            // correct and the copy describing it was the thing that lied. Fixing
+            // the sentence costs nothing; "fixing" the gate would let a golfer
+            // reach Review with no course on the round.
             sub: 'The last two things are the course and the names, and both have their own '
-               + 'screens. Finish here and the round opens on its Review page with '
-               + 'everything you just chose already set.',
+               + 'screens. Finish here and the round opens with everything you just chose '
+               + 'already set \u2014 the course is the next thing it asks for.',
             options: [
-                { value: 'go', name: 'Take me there', sub: 'Opens the round on Review.' }
+                { value: 'go', name: 'Take me there', sub: 'Opens the round on the course picker.' }
             ]
         }
     ];
@@ -11064,7 +11094,26 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     window.location.href = `sidematches.html?game=${currentMode}&setup=ryder`;
                     return;
                 }
-                showRoundReadyScreen(currentMode);
+                // "SAVE & START ROUND" NOW STARTS THE ROUND (2026-10-06, Manny).
+                //
+                // MEASURED, tools/setup-tap-audit.js, four golfers, one game, a
+                // course already in the directory, every tap a real tap on a cold
+                // page: Game Day 16, "Same as last week" 6, "Help me set this up"
+                // 21 - and the LAST tap on all three was "START SCORING" on a
+                // screen that appeared after the organizer had already pressed a
+                // button that says Save & Start. The round was saved; it just had
+                // not started.
+                //
+                // NOTHING IS LOST BY SKIPPING IT. Round Ready carried the links,
+                // and it had exactly ONE entry point - this save - so leaving it
+                // out would have taken the links with it. They are on the
+                // scorecard instead, under the Round Menu's "Group Links", which
+                // this wave also opens up to a foursome; renderGroupLinksPanel()
+                // there prints the same round-level watch link, the per-group
+                // links and the organizer link.
+                //
+                // THE CUP PATH IS UNTOUCHED, above: it has its own handoff.
+                window.location.href = `index.html?game=${currentMode}`;
             }).catch((err) => { 
                 clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;

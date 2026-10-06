@@ -192,10 +192,22 @@ describe('THE SCORECARD (index.html): the button and the Group Links panel', () 
     test('a legacy round (neither field) on any device: the button, as today', async () => {
         assert.match(strip(await scorecard(LEGACY, '?game=door1')), SETUP);
     });
-    test('a foursome (one group): the button sits alone in the strip', async () => {
+    test('a foursome (one group): the setup door and the new links button', async () => {
+        // RE-POINTED 2026-10-06 (Manny's setup-friction wave). "Save & Start Round"
+        // now lands on the SCORECARD instead of Round Ready - measured with
+        // tools/setup-tap-audit.js, START SCORING was a second tap on all three
+        // setup paths - and Round Ready had exactly one entry point, that save, so
+        // it was also the only screen that ever printed the round's links. They are
+        // on the scorecard now, on EVERY round: a foursome had no links button at
+        // all, and leaving the gate would have been a cut that removed sharing from
+        // the most common round in the app.
         const sb = await scorecard(round({ players: P.slice(0, 4), ownerUid: 'anon-stub' }), '?game=door1');
         assert.match(strip(sb), SETUP);
-        assert.doesNotMatch(strip(sb), /Group 1|toggleGroupLinksPanel/);
+        assert.match(strip(sb), /toggleGroupLinksPanel/, 'the foursome has no way to share the round');
+        assert.match(strip(sb), /Share this round/, 'and it must not be called "Group Links" on one group');
+        // STILL NO GROUP SELECTOR: one group is not a choice, and that is what the
+        // absent "Group 1" filter says. The panel's own row is a different thing.
+        assert.doesNotMatch(strip(sb), /filterGroup\(1\)/);
     });
 });
 
