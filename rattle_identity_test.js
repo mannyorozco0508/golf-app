@@ -577,7 +577,7 @@ describe('THE BRAND MARK ASSET', () => {
     test('the cache moved — the header changed and installed devices must see it', () => {
         assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v303-matchcard';/);
         assert.match(BUILD, /cacheName: 'consumer-v143-matchcard'/);
-        assert.match(BUILD, /cacheName: 'tournament-v55-registration-desk'/,
+        assert.match(BUILD, /cacheName: 'tournament-v56-missing-links'/,
             'Tournament cache moved because the product name is Rattle Golf again');
     });
 });

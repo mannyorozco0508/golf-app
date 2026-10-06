@@ -51,7 +51,7 @@
 // the page; deterministic for the same input.)
 //
 // tournament_tee_qr_test.js drives the rules in mini-dom (no canvas there).
-// This opens tournament.html?tourney=TEEQR cold, signed out, three teams,
+// This opens tournament.html?tourney=TEEQR cold, as its owner, three teams,
 // shotgun:
 //   1. inline codes on the Leaderboard tab (a rect, a drawn PNG, left of Share)
 //   2. the modal with the library (drawn) and without it (opens anyway)
@@ -68,6 +68,9 @@ const TEAMS = {
     team2: { num: 2, name: 'Hawks', players: ['Cal Charlie', 'Dee Delta'], handicap: 3, startingHole: '10A' },
     team3: { num: 3, name: "O'Malley's Mob", players: ['Eli Echo'], handicap: 0, startingHole: '' }
 };
+// THE OWNER (re-armed Wave 1, A3): the inline codes, the Share modal on a team
+// row and the tee sheet are the organizer handout, hidden for anyone else.
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const rec = { name: 'Tee QR Scramble', format: 'scramble', courseName: 'Camas Meadows', courseData: COURSE, entryFee: 0, teams: TEAMS, startType: 'shotgun', createdAt: 1, ownerUid: 'u-org' };
 const db = { tournaments: { TEEQR: rec }, global_courses: {} };
 const MM = 96 / 25.4;   // CSS px per mm
@@ -122,7 +125,7 @@ const findButton = (label, id) => ({ expression: `(function(){ var b = Array.fro
     const J = (r, i) => { try { return JSON.parse(r.value[i]); } catch (e) { return null; } };
 
     // ---- with the library: inline codes, the modal, the tee sheet -----------------
-    const a = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: 'signed-out', viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, steps: [
+    const a = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: OWNER, viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, steps: [
         { tap: '#tab-btn-leaderboard' }, { sleep: 400 }, { expression: PROBE },                                            // 0-2 the list
         { tap: '#team-links-list .team-link-row:nth-child(2) button' }, { sleep: 500 }, { expression: PROBE },             // 3-5 Hawks' Share
         { expression: `document.getElementById('share-link-modal').classList.remove('open'); 'closed'` },                // 6
@@ -191,7 +194,7 @@ const findButton = (label, id) => ({ expression: `(function(){ var b = Array.fro
 
     // ---- the pairings and results sheets at THEIR print instants ---------------
     for (const [label, re] of [['pairings', '/Print Pairings/'], ['results', '/Print \\/ Send Results/']]) {
-        const p = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: 'signed-out', viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, steps: [
+        const p = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: OWNER, viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, steps: [
             { tap: '#tab-btn-leaderboard' }, { sleep: 300 }, findButton(re, 'tmp-' + label), { tap: '#tmp-' + label }, { sleep: 200 }, { expression: `JSON.stringify({ prints: window.__prints, errs: window.__errs })` }
         ] });
         if (!p.ok) bail(label + ': ' + p.reason);
@@ -207,7 +210,7 @@ const findButton = (label, id) => ({ expression: `(function(){ var b = Array.fro
     }
 
     // ---- WITHOUT the library: the modal must still open ---------------------------
-    const b = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: 'signed-out', viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, blockUrls: ['*qrcode.min.js'], steps: [
+    const b = await arriveCold({ url: fileUrl('tournament.html', 'tourney=TEEQR'), db, auth: OWNER, viewport: { width: 390, height: 844 }, preScript: PRE, settleMs: 4500, blockUrls: ['*qrcode.min.js'], steps: [
         { tap: '#tab-btn-leaderboard' }, { sleep: 400 }, { expression: PROBE },
         { tap: '#team-links-list .team-link-row:nth-child(1) button' }, { sleep: 500 }, { expression: PROBE },
         { expression: `document.getElementById('share-link-modal').classList.remove('open'); 'closed'` },

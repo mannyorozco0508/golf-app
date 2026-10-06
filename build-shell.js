@@ -250,7 +250,17 @@ const PRODUCTS = {
         // it). The consumer name is deliberately not written in this block -
         // rattle_identity_test.js and rattle_consumer_separation_test.js both
         // assert it never appears here, which is how a rename gets caught.
-        cacheName: 'tournament-v55-registration-desk',
+        // Moved to v56 FOR TOURNAMENTS WAVE 1 (2026-10-06, Rattle Golf
+        // Tournaments only). tournament.html and tournament-scorecard.html are
+        // precached shell files and both changed: every signup-supplied name is
+        // escaped (both pages now load text-safe.js), a multi-round team event
+        // hands out a link per round, the public board gains a watch link and
+        // hides the scoring links, QR codes, print buttons and calculator from
+        // anyone but the owner, prize amounts are saved on the record, approve
+        // is one write, and the name and fee can be corrected after save. A
+        // device on v55 keeps the unescaped pages and the old board. CONSUMER
+        // IS UNTOUCHED, as in v55: the other key does not move.
+        cacheName: 'tournament-v56-missing-links',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

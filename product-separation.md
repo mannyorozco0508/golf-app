@@ -42,7 +42,7 @@ Consumer bundle: **31 files**, cache `consumer-v34-brand-mark`, `start_url: ./ad
 | `tournament-engine.js` | Tournament scoring and payout engine |
 | `qrcode.min.js` | qrcodejs 1.0.0 (MIT), vendored 2026-09-18 — the share-modal, inline and tee-sheet QR codes; Tournament only |
 
-Tournament bundle: **17 files**, cache `tournament-v32-consumer-ready`, `start_url: ./tournament.html`. Built by the same `build-shell.js`. **Not shipped in the Consumer native bundle** and must never be.
+Tournament bundle: **41 files** (39 copied, 2 generated; `node build-shell.js`, measured 2026-10-06), cache `tournament-v56-missing-links`, `start_url: ./tournament.html`. Built by the same `build-shell.js`. **Not shipped in the Consumer native bundle** and must never be.
 
 ## C. Shared
 
@@ -236,30 +236,25 @@ every installed phone for a change that is not in Consumer, and still leaves
 Tournament devices serving the old file — the worst of both. Check which product
 the changed file belongs to before bumping anything.
 
-### The `#multi-round-toggle` trapdoor
+### The `#multi-round-toggle` trapdoor — CLOSED (status as of 2026-10-06)
 
-The organizer page carries a checkbox reading "This event has more than one
-round". It writes nothing. The flag it sets is read only by the save that creates
-a tournament, and the checkbox lives on the screen that replaces the setup form —
-so it can only be ticked after the only function that reads it can no longer run.
-Multi-round events are therefore not creatable from the UI, and everything built
-for them is correct and unreachable.
+This section used to describe a checkbox that wrote nothing and three bugs it
+would ship once wired. All four are now fixed; it is kept as a record because
+the bugs were invisible until the toggle was reachable.
 
-**Wiring that checkbox is a two-line change that ships three bugs.** Before doing
-it, fix these, because each one is invisible today only because nothing can reach
-it:
-
-1. **Print / Send Results reads the event root.** A multi-round event has no
-   scores there, so the printed sheet lists every golfer with no score at all,
-   while the leaderboard above it — which reads the round — is correct.
-2. **The golfer's own Leaderboard tab reads the event root** for the same reason
-   and is likewise blank on a multi-round event.
-3. **No control produces a round-scoped team link.** Team links are built without
-   a round, and the scorecard correctly refuses them with a message telling the
-   golfer to ask the organizer for today's link — a link the organizer has no way
-   to generate. A multi-round team event would be unscoreable.
-
-The refusal in (3) is right. The way out of it does not exist yet.
+- **The toggle.** Wave 9 moved "This event has more than one round" onto the
+  create form, beside Save, so the save that reads it can still run.
+  `tools/tournament-multiround-check.js` TEST 23 creates an event through the
+  page and reads `eventModel` and `rounds` back out of the database.
+- **1. Print / Send Results** and **2. the golfer's Leaderboard tab** read the
+  event root. Both now go through `resolveLeaderboardView` (scorecard and
+  organizer page), the same resolution the on-screen board uses.
+- **3. No control produced a round-scoped TEAM link** — closed in Tournaments
+  Wave 1 (A2). Team links on the Leaderboard tab and the tee sheet now carry
+  `&round=<rid>`, one set per round, labeled by round like the group links.
+  `tools/tournament-round-team-link-check.js` reads the links off a real
+  screen, opens each, scores, and finds each write under its own round. A link
+  with no round on a multi-round event is still refused, and that is right.
 
 ## Do not
 

@@ -1664,9 +1664,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 // Records already stored the old way are NOT repaired here. There is no
                 // migration and no background rewrite; renderTripLinkStatus() reads the
                 // forward pointer instead, so they display correctly as they are.
-                return db.ref(`trips/${tripLinkCode}/tournaments/${currentCode}`)
-                    .set({ label: name, addedAt: Date.now() })
-                    .then(() => db.ref(`tournaments/${currentCode}/tripCode`).set(tripLinkCode));
+                // ONE WRITE, BOTH POINTERS (Wave 1, A9): two sequential sets could
+                // leave the forward pointer with no tripCode behind it.
+                return db.ref().update({
+                    [`trips/${tripLinkCode}/tournaments/${currentCode}`]: { label: name, addedAt: Date.now() },
+                    [`tournaments/${currentCode}/tripCode`]: tripLinkCode
+                });
             }
         }).then(() => {
             window.location.href = `tournament.html?tourney=${currentCode}`;
@@ -3341,7 +3344,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pool = poolTotal();
 
         let html = '';
-        if (owner && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
+        // Only once an amount is set: blank boxes are "not set yet", not a payout
+        // that disagrees with the pool.
+        if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
                 ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}.
             </div>`;
@@ -4276,8 +4281,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!code) { alert('⚠️ Enter the trip code.'); return; }
         db.ref(`trips/${code}`).once('value').then(snap => {
             if (!snap.exists()) { alert("⚠️ No trip found with that code."); return; }
-            return db.ref(`trips/${code}/tournaments/${currentCode}`).set({ label: currentData.name, addedAt: Date.now() }).then(() => {
-                db.ref(`tournaments/${currentCode}/tripCode`).set(code);
+            // ONE WRITE, BOTH POINTERS (Wave 1, A9). The second set used to run
+            // in an unreturned inner promise, so its failure was never reported
+            // and a half-linked pair was possible.
+            return db.ref().update({
+                [`trips/${code}/tournaments/${currentCode}`]: { label: currentData.name, addedAt: Date.now() },
+                [`tournaments/${currentCode}/tripCode`]: code
             });
         }).catch(err => alert(`Error linking to trip: ${err.message}`));
     }

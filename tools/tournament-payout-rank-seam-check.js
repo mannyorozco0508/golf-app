@@ -69,7 +69,10 @@ const db = {
         [CODE]: {
             name: 'Seam Scramble', format: 'scramble', courseName: 'Tidewater',
             activeCourseKey: 'tidewater', courseData: course, entryFee: '100',   // 100 x 6 = 600
-            teams, scores, createdAt: 1, courseIndexSynthetic: false
+            teams, scores, createdAt: 1, courseIndexSynthetic: false,
+            // OWNED, and the check arrives as the owner (Wave 1, A3): the calculator
+            // is the organizer's and is hidden for everyone else.
+            ownerUid: 'u-org'
         }
     },
     events: {}, trips: {}, global_courses: {}
@@ -125,7 +128,8 @@ const PROBE = `
         ? 'file://' + path.resolve(process.env.TPRS_PAGE) + '?tourney=' + CODE
         : fileUrl('tournament.html', 'tourney=' + CODE);
 
-    const r = await arriveCold({ url: pageUrl, db, expression: PROBE, settleMs: 7000 });
+    const r = await arriveCold({ url: pageUrl, db, expression: PROBE, settleMs: 7000,
+        auth: { uid: 'u-org', email: 'org@example.com', isAnonymous: false } });
     if (!r.ok) bail('the page did not run: ' + r.reason);
     let m; try { m = JSON.parse(r.value); } catch (e) { bail('non-JSON from the page', r.value); }
     if (!m.tab) bail('no Leaderboard tab to tap');
@@ -150,9 +154,12 @@ const PROBE = `
             failures.push(`board position ${i + 1} (${team}) is paid ${paid(team)}, expected ${AMOUNTS[i]}`);
         }
     }
+    // UNPAID PLACES HAVE NO ROW. Since the zero-filter (2026-09-18) the page
+    // prints only rows with money; a $0.00 row for 4th and 5th was the
+    // finished-looking table that filter removed. This expected the old rows.
     for (let i = 3; i < 5; i++) {
         const team = scoredBoard[i] && scoredBoard[i].team;
-        if (paid(team) !== 0) failures.push(`board position ${i + 1} (${team}) is paid ${paid(team)}, expected 0`);
+        if (paid(team) !== null) failures.push(`board position ${i + 1} (${team}) has a payout row of ${paid(team)} - unpaid places print no row`);
     }
     if (m.payouts.some(p => p.team === UNSCORED.name)) {
         failures.push('the unscored team ' + UNSCORED.name + ' appears on a payout row');

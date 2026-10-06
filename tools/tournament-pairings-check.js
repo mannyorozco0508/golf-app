@@ -60,7 +60,10 @@ const db = {
         [CODE]: {
             name: 'Shotgun Scramble', format: 'scramble', courseName: 'Tidewater',
             activeCourseKey: 'tidewater', courseData: course, entryFee: '0',
-            teams, scores: {}, createdAt: 1, courseIndexSynthetic: false, startType: 'shotgun'
+            teams, scores: {}, createdAt: 1, courseIndexSynthetic: false, startType: 'shotgun',
+            // OWNED, and the starter is the owner (re-armed Wave 1, A3): the print
+            // buttons are hidden for anyone else since the board became public-only.
+            ownerUid: 'u-org'
         }
     },
     events: {}, trips: {}, global_courses: {}
@@ -123,6 +126,7 @@ const MEASURE = `
 
     const r = await arriveCold({
         url: fileUrl('tournament.html', 'tourney=' + CODE), db, preScript: PRE, settleMs: 7000,
+        auth: { uid: 'u-org', email: 'org@example.com', isAnonymous: false },
         steps: [{ expression: CLICK }, { media: 'print' }, { expression: MEASURE }, { media: '' }]
     });
     if (!r.ok) bail('the page did not run: ' + r.reason);

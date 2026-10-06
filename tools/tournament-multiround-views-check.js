@@ -119,7 +119,10 @@ async function openRoundAndBuildGroup(j, code, rid) {
         return sels.length;
     })()`);
     const link = await j.evaluate(
-        "(() => { const a = document.querySelector('#scoring-groups-list a');"
+        // The group links moved off the editor to #group-links-list on the
+        // Leaderboard tab (re-armed Wave 1, A9), which lists EVERY round - so
+        // pick this round's link by its round id.
+        "(() => { const a = document.querySelector('#group-links-list a[href*=\"round=" + rid + "\"]');"
         + " return a ? a.getAttribute('href') : null; })()");
     return { rid, link, opened, workaroundNeeded, editTapped: tap.tapped };
 }
@@ -230,7 +233,7 @@ function bail(msg) {
             return sels.length;
         })()`);
         const singleLink = await j.evaluate(
-            "(() => { const a = document.querySelector('#scoring-groups-list a');"
+            "(() => { const a = document.querySelector('#group-links-list a');"
             + " return a ? a.getAttribute('href') : null; })()");
         if (!singleLink) bail('the single-round control produced no group link');
         const singleCard = await scoreCard(j, singleLink, 5);
