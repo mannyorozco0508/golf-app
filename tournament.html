@@ -2689,7 +2689,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // which is exactly what a deliberate New-team approve writes, so the desk said
     // "Needs a team" beside a golfer who had one. Measured identical on 732194e:
     // the old rule, not the approve write. Now it means the team the entry points
-    // at no longer exists (deleted in Setup) - a golfer with nowhere to play.
+    // at no longer exists (removed from the record - no Setup control removes a team today (Wave 2)) - a golfer with nowhere to play.
     function regTeam(e) {
         if (!e || !regInField(e) || recordIsIndividual() || !e.teamNum) return null;
         return ((currentData && currentData.teams) || {})['team' + e.teamNum] || null;

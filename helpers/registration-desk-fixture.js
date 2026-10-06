@@ -11,7 +11,7 @@
 //              playerId (individual) depending on `mode`. On a team event 12 of
 //              them sit on team 1 (Eagles, two golfers), e120 on team 2 (Hawks,
 //              a team of one the organizer NAMED) and e130 on team 4, WHICH DOES NOT EXIST
-//              (deleted in Setup - the one golfer who needs a team under the
+//              (removed from the record; no Setup control does that yet - the one golfer who needs a team under the
 //              2026-10-06 rule). "Team 3" (one golfer, default name, added in
 //              Setup) is NOT flagged any more. Was: e130 on team 3 ("Team 3",
 //              a team of one with the default name - the singleton an approval

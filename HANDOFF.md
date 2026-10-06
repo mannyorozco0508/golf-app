@@ -966,7 +966,7 @@ tee sheet printed blank QR cells", where the pattern lives.
 ## Desk state badges — Unpaid / Paid / In the field / Needs a team (polish wave, 2026-09-18)
 
 **RULE CHANGED 2026-10-06 (phone QA, event 8HF9WV).** "Needs a team" now means the
-team the entry points at no longer exists (deleted in Setup). The rule below - one
+team the entry points at no longer exists (removed from the record - no Setup control removes a team today (Wave 2)). The rule below - one
 golfer, default name /^Team \d+$/ - flagged every New-team approve, so the desk said
 "Needs a team" beside a golfer who had one; measured identical on 732194e, so it was
 the rule and not the Wave 1 approve write. The desk row now names the team
@@ -1896,9 +1896,10 @@ Each course costs two requests: search returns only a *count* of tee boxes, so t
 Branch `tournaments-wave1`, based on `rattle-registration-desk` (732194e). STRICT
 lane: not merged until Manny says so. No rules publish of any kind; the live
 rules already allow the owner to delete a registration (published 2026-10-06).
-Cache `tournament-v56-missing-links`. **Before merge: bump `sw.js` golfapp-v to
-the next free number (v304 is held by spectator-polish) and re-run
-`node sync-mobile-web.js`.**
+Cache `tournament-v56-missing-links`, and `sw.js` CACHE_VERSION
+`golfapp-v305-tournaments` (v304 is held by spectator-polish; v305 was
+free on main, every remote branch and the local worktrees on 2026-10-06),
+bundle re-synced with `node sync-mobile-web.js`.
 
 **Shipped**
 - **A1 stored XSS.** Signup `fullName` / `teamPreference` reached `innerHTML`
@@ -1937,6 +1938,10 @@ the next free number (v304 is held by spectator-polish) and re-run
 - Course and format edits after save (they rescore the event).
 - Removing, rather than hiding, the public scoring links.
 - Closing signups / cap / deadline and a richer signup confirmation (A8).
+- **Remove team from Setup.** There is no control that removes a team (phone QA,
+  2026-10-06: the "delete the team" re-test step could not run). Building it must
+  handle the team's scores, its starting hole, the tee sheet and payouts, and the
+  desk entries that point at it (they then read "Needs a team").
 - Individual events on the CREATE form still show the Teams blocks. They are the
   golfer-name input surface there (saveTournament turns each name into a player),
   so hiding them would break creating an individual event; it needs its own

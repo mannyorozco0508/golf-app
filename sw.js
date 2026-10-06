@@ -4267,7 +4267,15 @@
 // and there is not one dollar anywhere on it. Display only: every figure comes
 // out of the builders that already priced the round. A device on v302 has the old
 // card with its faded closed rows and no overall answer.
-const CACHE_VERSION = 'golfapp-v303-matchcard';
+// Moved to v305: TOURNAMENTS WAVE 1. The live combined deploy precaches
+// tournament.html, tournament-scorecard.html and tournament-engine.js from this
+// list, and both pages changed: signup names are escaped (both now load
+// text-safe.js), multi-round team events hand out a link per round, the public
+// board hides the scoring links from anyone but the owner and gains a watch link,
+// prize amounts are saved, approve is one write, the desk names each golfer team.
+// v304 is held by spectator-polish, so this skips it. A device on v303 keeps the
+// unescaped tournament pages offline.
+const CACHE_VERSION = 'golfapp-v305-tournaments';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

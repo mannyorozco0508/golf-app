@@ -11,7 +11,7 @@
 // what a deliberate New-team approve produces, so the flag fired on every one.
 //
 // THE RULE NOW: the row names the golfer's team, and "Needs a team" means the
-// team the entry points at no longer exists (deleted in Setup) - a golfer who
+// team the entry points at no longer exists (removed from the record - no Setup control removes a team today (Wave 2)) - a golfer who
 // really has nowhere to play. Still derived, still nothing stored.
 //
 // THE PATH IS THE USER'S: the desk's own listeners, the row's Approve, the
@@ -86,7 +86,7 @@ test('after a reload (existing team): the same', () => {
     const { r2, g2 } = approve('1');
     assertSettled(desk(page(r2, g2)), 'Eagles');
 });
-test('POSITIVE CONTROL: the team was deleted in Setup - now it needs a team', () => {
+test('POSITIVE CONTROL: the team is gone from the record (no UI does this yet; modelled in data) - now it needs a team', () => {
     const { r2, g2 } = approve('new');
     delete r2.teams.team3;
     const d = desk(page(r2, g2));
