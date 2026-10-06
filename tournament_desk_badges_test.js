@@ -9,6 +9,12 @@
 // that looked exactly like a finished foursome everywhere - the desk said "In
 // the field" and nothing more.
 //
+// RULE CHANGED 2026-10-06 (phone QA, event 8HF9WV): "Needs a team" now means
+// the team the entry points at no longer exists. The 09-18 rule below flagged
+// every New-team approve, so the desk said it beside a golfer who had a team.
+// The row also names the team (.reg-state-team). Re-pinned here; the 09-18
+// text is kept as the record of what it was.
+//
 // "NEEDS A TEAM", DERIVED AND NARROWED (definition (a), narrowed): the entry
 // is in the field on a TEAM event, its teamNum names a team with exactly one
 // golfer, AND that team's name is the default /^Team \d+$/. A one-golfer team
@@ -61,9 +67,9 @@ const count = (s, re) => (String(s || '').match(re) || []).length;
 const rowOf = (list, id) => { const a = list.indexOf('data-entry-id="' + id + '"'); const b = list.indexOf('class="reg-row"', a + 1); return list.slice(a, b > 0 ? b : undefined); };
 
 describe('1. THE FIXTURE has a real singleton-from-approval record', () => {
-    test('e130 sits on "Team 3" (one golfer, default name); e120 on the Hawks (one golfer, named); the rest on the Eagles', () => {
+    test('e130 points at team 4, which does not exist; "Team 3" is one golfer with the default name; e120 on the Hawks; the rest on the Eagles', () => {
         const e = deskEntries('team'), t = deskTeams();
-        assert.equal(e.e130.teamNum, 3); assert.equal(t.team3.name, 'Team 3'); assert.deepEqual(t.team3.players, [e.e130.fullName]);
+        assert.equal(e.e130.teamNum, 4); assert.equal(t.team4, undefined); assert.equal(t.team3.name, 'Team 3'); assert.equal(t.team3.players.length, 1);
         assert.equal(e.e120.teamNum, 2); assert.equal(t.team2.name, 'Hawks'); assert.equal(t.team2.players.length, 1);
         assert.equal(Object.values(e).filter((x) => x.teamNum === 1).length, 12);
         assert.equal(Object.values(e).filter((x) => x.teamNum).length, TOTALS.inField);
@@ -72,27 +78,24 @@ describe('1. THE FIXTURE has a real singleton-from-approval record', () => {
 });
 
 describe('2. regNeedsTeam - derived, narrowed', () => {
-    test('true only for an in-field entry on a one-golfer team with the default name', () => {
+    test('true only for an in-field entry whose team does not exist (2026-10-06)', () => {
         const sb = arrive(teamRecord(), deskEntries('team'));
         const e = deskEntries('team');
-        assert.equal(sb.regNeedsTeam(e.e130), true, 'Team 3, one golfer, default name');
-        assert.equal(sb.regNeedsTeam(e.e120), false, 'the Hawks: a named team of one is on purpose');
-        assert.equal(sb.regNeedsTeam(e.e000), false, 'the Eagles have two');
+        assert.equal(sb.regNeedsTeam(e.e130), true, 'team 4 does not exist');
+        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 3 }), false, 'Team 3, one golfer, default name - a New-team approve - HAS a team');
+        assert.equal(sb.regNeedsTeam(e.e120), false, 'the Hawks');
+        assert.equal(sb.regNeedsTeam(e.e000), false, 'the Eagles');
         assert.equal(sb.regNeedsTeam(e.e001), false, 'not in the field');
-        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 9 }), false, 'a team that does not exist');
+        assert.equal(sb.regNeedsTeam({ approvedAt: 1 }), true, 'in the field with no team number at all');
         assert.equal(sb.regNeedsTeam(null), false);
     });
-    test('the default-name test is /^Team \\d+$/ exactly: "Team 3" yes, "Team 3 " and "team 3" and "The Team 3" no', () => {
+    test('the name no longer matters: default, odd or empty, a team that exists is a team', () => {
         const t = deskTeams();
-        t.team4 = { num: 4, name: 'Team 3 ', players: ['x'], handicap: 0 };
         t.team5 = { num: 5, name: 'team 5', players: ['y'], handicap: 0 };
-        t.team6 = { num: 6, name: 'The Team 6', players: ['z'], handicap: 0 };
         t.team7 = { num: 7, name: '', players: ['w'], handicap: 0 };
         const sb = arrive(teamRecord(t), {});
-        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 4 }), false);
         assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 5 }), false);
-        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 6 }), false);
-        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 7 }), true, 'no name at all renders as "Team 7" everywhere - the default');
+        assert.equal(sb.regNeedsTeam({ approvedAt: 1, teamNum: 7 }), false);
     });
     test('never on an individual event', () => {
         const sb = arrive(individualRecord(), deskEntries('individual'));
@@ -114,12 +117,13 @@ describe('3. THE ROWS - a badge per state, the words "In the field" once per app
         assert.equal(count(list, /Needs a team/g), TOTALS.needsTeam);
         assert.equal(count(list, /Approve into field/g), TOTALS.pending, 'the Approve button is unchanged');
     });
-    test('e130 carries Paid + In the field + Needs a team; e120 (Hawks) carries no Needs badge; e001 carries Unpaid and the Approve button', () => {
+    test('e130 carries Paid + In the field + Needs a team; e120 (Hawks) carries no Needs badge and names its team; e001 carries Unpaid and the Approve button', () => {
         const sb = arrive(teamRecord(), deskEntries('team'));
         const list = html(sb, 'registration-list');
         const r130 = rowOf(list, 'e130'), r120 = rowOf(list, 'e120'), r001 = rowOf(list, 'e001');
         assert.match(r130, /reg-state-paid/); assert.match(r130, /reg-state-field/); assert.match(r130, /reg-state-needs">Needs a team</);
         assert.match(r120, /reg-state-paid/); assert.match(r120, /reg-state-field/); assert.doesNotMatch(r120, /reg-state-needs/);
+        assert.match(r120, /reg-state-team">Hawks</);
         assert.match(r001, /reg-state-unpaid">Unpaid</); assert.doesNotMatch(r001, /reg-state-field|reg-state-needs/); assert.match(r001, /Approve into field/);
         assert.match(r001, /type="checkbox"/, 'the Paid checkbox is still the control');
     });
@@ -154,7 +158,7 @@ describe('4. THE CHIPS AND THE COUNTS', () => {
         const c = html(sb, 'registration-counts');
         assert.match(c, /142 signups · 70 paid · 14 in the field<\/div>/, 'the main line ends where it did');
         assert.match(c, /<div class="reg-count-line reg-count-needs">1 needs a team<\/div>/);
-        const none = deskTeams(); none.team3.name = 'Owls';
+        const none = deskTeams(); none.team4 = { num: 4, name: 'Team 4', players: ['Kim Asurname130'], handicap: 0 };
         const sb2 = arrive(teamRecord(none), deskEntries('team'));
         assert.doesNotMatch(html(sb2, 'registration-counts'), /needs a team/);
         assert.match(html(sb2, 'registration-chips'), /Needs a team 0/, 'the chip stays, at zero, on a team event');
@@ -178,8 +182,7 @@ describe('5. THE SOURCE AND THE SEAMS', () => {
     test('regNeedsTeam is the one test, used by the row, the chip and the count', () => {
         assert.match(SRC, /function regNeedsTeam\(e\)/);
         const fn = SRC.slice(SRC.indexOf('function regNeedsTeam(e)'), SRC.indexOf('\n    }', SRC.indexOf('function regNeedsTeam(e)')));
-        assert.match(fn, /\/\^Team \\d\+\$\//, 'the default-name narrowing');
-        assert.match(fn, /players[^;]*length === 1/);
+        assert.match(fn, /!regTeam\(e\)/, 'the 2026-10-06 rule: no team that exists');
         assert.match(fn, /recordIsIndividual\(\)/);
         assert.ok(count(SRC, /regNeedsTeam\(/g) >= 4, 'row + chip + count + definition');
         assert.doesNotMatch(SRC, /db\.ref\([^)]*needsTeam|needsTeam: true|\/needsTeam/, 'nothing stored: no key on the signup, no marker on the team');

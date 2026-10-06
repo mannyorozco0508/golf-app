@@ -965,6 +965,14 @@ tee sheet printed blank QR cells", where the pattern lives.
 
 ## Desk state badges — Unpaid / Paid / In the field / Needs a team (polish wave, 2026-09-18)
 
+**RULE CHANGED 2026-10-06 (phone QA, event 8HF9WV).** "Needs a team" now means the
+team the entry points at no longer exists (deleted in Setup). The rule below - one
+golfer, default name /^Team \d+$/ - flagged every New-team approve, so the desk said
+"Needs a team" beside a golfer who had one; measured identical on 732194e, so it was
+the rule and not the Wave 1 approve write. The desk row now names the team
+(`.reg-state-team`). `tournament_desk_team_after_approve_test.js`. What follows is
+the 09-18 record.
+
 **Before.** Paid was an unlabelled checkbox state; Approved was "In the field" in plain
 muted text; and a golfer approved with no destination became a one-player team named
 "Team N" (`approveRegistration`) that looked like a finished foursome on every surface
