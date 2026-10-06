@@ -1657,6 +1657,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return shareBaseUrl() + 'tournament-scorecard.html';
     }
 
+    // A TEAM LINK NAMES ITS ROUND on a multi-round event (Wave 1, A2). The card
+    // refuses a multi-round link with no round in it, and team links never
+    // carried one, so a multi-round team event could not be scored at all.
+    // Teams are event-level (roundView carries them), so each round gets the
+    // same teams with its own round id - built the way group links are.
+    function teamScorecardUrl(t, rid) {
+        const roundPart = rid ? `&round=${rid}` : '';
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${roundPart}`;
+    }
+    // The rounds of a multi-round event in play order, one shape for every list
+    // that needs a set of links per round.
+    function roundsInOrder() {
+        const rounds = currentData.rounds || {};
+        return Object.keys(rounds)
+            .sort((a, b) => ((rounds[a].createdAt || 0) - (rounds[b].createdAt || 0)))
+            .map(rid => ({ rid, label: rounds[rid].name || 'Round' }));
+    }
+
     // ONE ROW BUILDER, TWO LISTS. The same row used to serve as both the Setup
     // tab's per-team card and the public scoring-link list - one <div> in
     // #team-links-list carried the name, the golfers, the hole badge, the
@@ -1668,7 +1686,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function teamRowHtml(t, opts) {
         const editable = !!(opts && opts.editable);
         const isShotgun = currentData.startType === 'shotgun';
-        const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+        const roundId = (opts && opts.roundId) || null;
+        const url = teamScorecardUrl(t, roundId);
         const names = (t.players || []).join(', ');
         const teamName = t.name || `Team ${t.num}`;
         const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
@@ -1683,7 +1702,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // THE NAME RIDES IN A DATA ATTRIBUTE, NEVER IN THE HANDLER (Wave 1, A1).
         // A team name can come from a public signup; inside a quoted onclick
         // string a quote in it closed the string and the rest became code.
-        const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}" data-url="${url}" data-fallback="QR unavailable"></span>`;
+        const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}"${roundId ? ` data-round="${escapeHtml(roundId)}"` : ''} data-url="${escapeHtml(url)}" data-fallback="QR unavailable"></span>`;
         return `<div class="team-link-row" style="flex-wrap:wrap;">
             <span>🏌️ ${escapeHtml(teamName)}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names)}</span></span>
             <span style="display:flex; align-items:center; gap:6px;">
@@ -1708,7 +1727,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renderTeamLinks() {
         const list = document.getElementById('team-links-list');
         if (!list) return;
-        list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
+        const teams = sortedTeams();
+        if (recordIsMultiRound() && teams.length) {
+            // One set per round, labeled like the group links.
+            const rounds = roundsInOrder();
+            list.innerHTML = rounds.map(r =>
+                `<div class="team-links-round" style="font-size:0.78rem; font-weight:bold; color:var(--text-muted); margin:10px 0 4px 0;">${escapeHtml(r.label)}</div>`
+                + teams.map(t => teamRowHtml(t, { editable: false, roundId: r.rid })).join('')).join('')
+                || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">Add a round to get its scoring links.</div>`;
+        } else {
+            list.innerHTML = teams.map(t => teamRowHtml(t, { editable: false })).join('') || NO_TEAMS;
+        }
         // The inline codes, one per row, at M. Re-drawn on every snapshot with the
         // rows; the URL is read back off the box so the code and the Share button
         // beside it can never disagree about which team this is.
@@ -4332,12 +4361,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const shotgun = data.startType === 'shotgun';
         const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         let html = `<h2 style="margin:0 0 4px 0; font-size:1.3rem;">${esc(data.name || 'Tournament')}</h2>
-            <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>
-            <div class="tee-grid">`;
+            <p style="margin:0 0 12px 0; color:#555; font-size:0.9rem;">Scan to open your team's scorecard. ${shotgun ? 'Shotgun start \u2014 your hole is on your card.' : ''}</p>`;
         const bitmaps = [];
+        // A multi-round event prints one block per round, each QR carrying its
+        // round; a single-round event prints exactly the sheet it always did.
+        const sections = recordIsMultiRound() ? roundsInOrder() : [{ rid: null, label: '' }];
+        if (!sections.length) { alert('\u26A0\uFE0F No rounds yet \u2014 add a round first.'); return false; }
+        let cell = 0;
+        sections.forEach((sec) => {
+        if (sec.label) html += `<h3 class="tee-round" style="margin:12px 0 6px 0;">${esc(sec.label)}</h3>`;
+        html += `<div class="tee-grid">`;
         teams.forEach((t) => {
-            const url = `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}`;
+            const url = teamScorecardUrl(t, sec.rid);
             const teamName = t.name || `Team ${t.num}`;
+            const key = cell++;
             const hole = shotgun
                 ? (t.startingHole ? `<div class="tee-hole">Hole ${esc(t.startingHole)}</div>` : `<div class="tee-hole" style="color:#b00020;">HOLE NOT SET</div>`)
                 : '';
@@ -4345,17 +4382,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // to (never serialised) after innerHTML, so the print snapshot has
             // the pixels. No bitmap: the sentence is in the markup, no canvas.
             const bitmap = qrBitmap(url, 132, qrLevelM());
-            if (bitmap) bitmaps.push({ num: t.num, bitmap });
+            if (bitmap) bitmaps.push({ key, bitmap });
             html += `<div class="tee-cell">
                 <div class="tee-name">${esc(teamName)}</div>${hole}
-                <div class="tee-qr" data-team="${esc(t.num)}">${bitmap ? '' : 'QR code unavailable \u2014 open the link.'}</div>
+                <div class="tee-qr" data-team="${esc(t.num)}"${sec.rid ? ` data-round="${esc(sec.rid)}"` : ''} data-cell="${key}">${bitmap ? '' : 'QR code unavailable \u2014 open the link.'}</div>
                 <div class="tee-url">${esc(url)}</div>
             </div>`;
         });
-        html += `</div><p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
+        html += `</div>`;
+        });
+        html += `<p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
         container.innerHTML = html;
-        bitmaps.forEach(({ num, bitmap }) => {
-            const box = container.querySelector(`.tee-qr[data-team="${num}"]`);
+        bitmaps.forEach(({ key, bitmap }) => {
+            const box = container.querySelector(`.tee-qr[data-cell="${key}"]`);
             if (box) box.appendChild(bitmap);
         });
         return true;
