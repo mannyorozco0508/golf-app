@@ -1725,6 +1725,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const startBadge = (isShotgun && t.startingHole) ? `<span style="background:var(--nassau-box-bg); color:var(--brand-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:bold; margin-left:6px;">🚀 Hole ${t.startingHole}</span>` : '';
         const hcpInput = editable
             ? `<input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">`
+              // REMOVE TEAM (Wave 2, 2026-10-06). Setup only - the editable row.
+              + `<button class="btn-outline team-remove" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-team="${t.num}" onclick="removeTeam(${t.num})">Remove</button>`
             : '';
         // THE INLINE QR (public rows only, 2026-09-18): a small code beside the
         // Share button so a team can scan straight off the organizer's screen.
@@ -1742,6 +1744,35 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             </span>
         </div>`;
     }
+    // REMOVE A TEAM FROM SETUP (Wave 2, 2026-10-06).
+    //
+    // ONLY A TEAM WITH NO POSTED SCORE, IN ANY ROUND. A score is a result; taking
+    // the team away would take it off the board and re-rank everybody below it,
+    // and its keys would be orphaned under scores/. So a team with a score is
+    // refused with one sentence and nothing is written.
+    //
+    // ONE NODE. Everything that is the team's own - its golfers, handicap,
+    // starting hole, flight - lives inside teams/teamN, and the tee sheet and the
+    // shotgun list are built from teams, so removing that node clears its hole
+    // and its tee-sheet slot. Registrations are left alone: an entry that pointed
+    // at the team now reads "Needs a team" on the Desk (regNeedsTeam, derived).
+    function teamHasScores(num) {
+        const re = new RegExp('^team' + num + '(_p\\d+)?_h\\d+$');
+        const has = (scores) => Object.keys(scores || {}).some((k) => re.test(k) && scores[k] !== null && scores[k] !== undefined && scores[k] !== '');
+        if (has(currentData.scores)) return true;
+        return Object.values(currentData.rounds || {}).some((r) => has(r && r.scores));
+    }
+    function removeTeam(num) {
+        if (!currentCode || !canManage() || recordIsIndividual()) return;
+        const t = (currentData.teams || {})['team' + num];
+        if (!t) return;
+        const label = t.name || `Team ${t.num}`;
+        if (teamHasScores(t.num)) { alert(`${label} has scores and can't be removed.`); return; }
+        if (!confirm(`Remove ${label}? Golfers on it will need a new team on the Desk.`)) return;
+        db.ref(`tournaments/${currentCode}/teams/team${t.num}`).remove()
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
     function sortedTeams() {
         const teams = currentData.teams || {};
         return Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num).map(tid => teams[tid]);
