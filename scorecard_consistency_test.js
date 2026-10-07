@@ -312,12 +312,24 @@ describe('SERVICE WORKER — the actual cause of the stale iPad build', () => {
         assert.ok(firstRead === -1 || firstFetch < firstRead,
             'the cache must remain a fallback, never the first choice - respondWith reaches for the cache before the network');
 
-        const catchAt = body.indexOf('.catch(');
+        // RE-POINTED 2026-10-06, TO THE CONTRACT RATHER THAN THE SYNTAX. The
+        // handler is an async function now - it has to await a body to rebuild
+        // a redirected response, because WebKit refuses to serve one to a
+        // navigation and a Safari reopen offline failed on a phone because of
+        // it. So the failure path is a try/catch rather than .catch(), and the
+        // online return is `return response` rather than a .then callback. The
+        // ordering guarantee above is untouched and is what this test is for.
+        const catchAt = Math.max(body.indexOf('.catch('), body.indexOf('} catch ('));
         assert.ok(catchAt !== -1, 'the network attempt must have a failure path');
         assert.ok(catchAt > firstFetch, 'the failure path must come after the network attempt');
+        assert.match(body, /return fromCacheOrOffline\(\);/,
+            'the failure path must fall back to the cache');
 
         // And the network response must still be what gets returned when online.
-        assert.ok(/\.then\(\(response\) =>/.test(body), 'the online path must return the live network response');
+        assert.ok(/response = await fetch\(request\);/.test(body) || /\.then\(\(response\) =>/.test(body),
+            'the online path must return the live network response');
+        assert.match(body, /if \(!response\.redirected\) \{[\s\S]{0,200}return response;/,
+            'a response that was not redirected must still be served straight through');
     });
 });
 

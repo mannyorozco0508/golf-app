@@ -40,7 +40,14 @@ const SHELL_COUNT = (function () {
 // Service worker harness
 // ---------------------------------------------------------------------------
 
-function loadServiceWorker({ online = true, seedCaches = {}, failUrls = [] } = {}) {
+function loadServiceWorker({ online = true, seedCaches = {}, failUrls = [], redirect = null } = {}) {
+    // MUTABLE, so a test can do what a phone does: install WITH signal, then
+    // lose it. The old harness's cache.add() wrote to the store without
+    // fetching, so an "offline" install still filled the cache - which a real
+    // browser never does, since cache.add() fetches. The install now fetches
+    // (it has to launder redirects), so that artifact became a visible failure
+    // and the honest sequence is install online, then go offline.
+    let isOnline = online;
     const stores = new Map();
     Object.keys(seedCaches).forEach((name) => {
         stores.set(name, new Map(seedCaches[name].map((u) => [new URL(u, ORIGIN + '/').href, 'SEED:' + u])));
@@ -57,12 +64,41 @@ function loadServiceWorker({ online = true, seedCaches = {}, failUrls = [] } = {
         put: (req, res) => { stores.get(name).set(req.url, res); return Promise.resolve(); },
     });
 
+    // THE INSTALL NO LONGER USES cache.add() (2026-10-06). It fetches each shell
+    // file and stores a REBUILT response, because Cloudflare Pages redirects
+    // /index.html to / and WebKit refuses to serve a redirected response to a
+    // navigation - which is how a Safari reopen offline failed on a phone with
+    // "Response served by service worker has redirections". So this harness has
+    // to model the three things that rebuild needs: a fetch that returns a
+    // response with a body and a redirect flag, and the Response and Request
+    // constructors. Without them the install THREW and nothing was cached at
+    // all, which showed up here as every offline request falling through to the
+    // No connection card.
+    // ONE BODY SHAPE: it came off the network, so it says so. The runtime
+    // assertions read it to prove network-first; the install only counts keys.
+    const bodyFor = (u) => 'NETWORK:' + String(u).replace(ORIGIN + '/', '').replace(/^\.\//, '');
+    const netResponse = (u) => {
+        const requested = new URL(String(u).replace(/^\.\//, ''), ORIGIN + '/').href;
+        const redirectsTo = redirect && redirect[requested];
+        return {
+            ok: true, status: 200, statusText: 'OK',
+            url: redirectsTo || requested,
+            redirected: !!redirectsTo,
+            headers: { get: () => null },
+            // BOTH, because the worker reads blob() when it has to launder a
+            // redirect and the runtime assertions read the body directly.
+            body: bodyFor(u),
+            blob: () => Promise.resolve({ __body: bodyFor(u) }),
+            clone() { return netResponse(u); }
+        };
+    };
+
     const sandbox = {
         self: {
             addEventListener: (t, f) => { listeners[t] = f; },
             skipWaiting: () => {},
             clients: { claim: () => {} },
-            location: { origin: ORIGIN },
+            location: { origin: ORIGIN, href: ORIGIN + '/sw.js' },
         },
         caches: {
             open: (n) => { if (!stores.has(n)) stores.set(n, new Map()); return Promise.resolve(cacheFor(n)); },
@@ -81,10 +117,37 @@ function loadServiceWorker({ online = true, seedCaches = {}, failUrls = [] } = {
             },
         },
         console: { warn: (...a) => warnings.push(a.map(String).join(' ')), info: () => {} },
-        Response: class { constructor(body, init) { this.body = body; this.status = (init && init.status) || 200; } },
-        fetch: (req) => (online
-            ? Promise.resolve({ clone: () => 'NETWORK:' + (req.url || req) })
-            : Promise.reject(new TypeError('Failed to fetch'))),
+        // A REBUILT RESPONSE CARRIES NO REDIRECT HISTORY - redirected is false by
+        // construction here exactly as it is in a browser, which is the property
+        // the worker is laundering for.
+        Response: class {
+            constructor(body, init) {
+                const i = init || {};
+                this.body = (body && body.__body !== undefined) ? body.__body : body;
+                this.status = i.status === undefined ? 200 : i.status;
+                this.statusText = i.statusText || '';
+                this.ok = this.status >= 200 && this.status < 300;
+                this.headers = i.headers || { get: () => null };
+                this.redirected = false;
+                this.url = '';
+            }
+            blob() { return Promise.resolve({ __body: this.body }); }
+            clone() { return this; }
+        },
+        Request: class { constructor(u) { this.url = typeof u === 'string' ? new URL(u, ORIGIN + '/').href : u.url; this.method = 'GET'; } },
+        fetch: (req) => {
+            const u = req && req.url ? req.url : req;
+            if (!isOnline) return Promise.reject(new TypeError('Failed to fetch'));
+            if (failUrls.includes(u) || failUrls.includes(String(u).replace(ORIGIN + '/', './'))) {
+                return Promise.resolve({ ok: false, status: 404, url: u, redirected: false,
+                    headers: { get: () => null }, blob: () => Promise.resolve({ __body: '' }),
+                    clone() { return this; } });
+            }
+            // A page request keeps the old 'NETWORK:' shape the runtime
+            // assertions read; a shell file gets the fuller response the install
+            // needs. Both are the same object type as far as the worker cares.
+            return Promise.resolve(netResponse(u));
+        },
         URL, Promise, TypeError,
     };
     vm.createContext(sandbox);
@@ -104,7 +167,8 @@ function loadServiceWorker({ online = true, seedCaches = {}, failUrls = [] } = {
         return out === undefined ? '__PASSTHROUGH__' : await out;
     };
 
-    return { install, activate, request, stores, warnings, listeners };
+    return { install, activate, request, stores, warnings, listeners,
+             goOffline: () => { isOnline = false; }, goOnline: () => { isOnline = true; } };
 }
 
 // The real links the app generates. Not invented for the test - these mirror
@@ -125,8 +189,9 @@ const REAL_LINKS = [
 describe('SERVICE WORKER - offline behaviour against the URLs the app actually uses', () => {
 
     test('every real parameterised link is served from cache when offline', async () => {
-        const sw = loadServiceWorker({ online: false });
-        await sw.install();
+        const sw = loadServiceWorker({ online: true });
+        await sw.install();          // with signal, as an install always is
+        sw.goOffline();              // then the phone loses it
         for (const link of REAL_LINKS) {
             const res = await sw.request(link, 'navigate');
             assert.notEqual(res, undefined, `${link} resolved to undefined - respondWith(undefined) throws a TypeError and the navigation fails outright.`);
@@ -135,16 +200,18 @@ describe('SERVICE WORKER - offline behaviour against the URLs the app actually u
     });
 
     test('a page request never resolves to undefined, even for something never cached', async () => {
-        const sw = loadServiceWorker({ online: false });
+        const sw = loadServiceWorker({ online: true });
         await sw.install();
+        sw.goOffline();
         const res = await sw.request('never-existed.html?game=ABCD', 'navigate');
         assert.notEqual(res, undefined, 'Offline navigations must always get a Response.');
         assert.equal(res.status, 503, 'An uncacheable page should get the explicit offline notice, not a blank failure.');
     });
 
     test('scripts are matched exactly - loosening the match there would gain nothing', async () => {
-        const sw = loadServiceWorker({ online: false });
+        const sw = loadServiceWorker({ online: true });
         await sw.install();
+        sw.goOffline();
         for (const js of ['pool-engine.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'action-model.js', 'bet-strip.js', 'hole-events.js', 'live-skins.js', 'score-marks.js']) {
             const res = await sw.request(js, 'script');
             assert.ok(res && res !== '__PASSTHROUGH__' && res.status !== 503, `${js} was not served from cache offline.`);
@@ -158,8 +225,11 @@ describe('SERVICE WORKER - offline behaviour against the URLs the app actually u
         // actually navigated to, not the key the response was stored under.
         // If a page ever stopped doing that, sharing the shell WOULD collapse
         // identity, so the source check below is part of the contract.
-        const sw = loadServiceWorker({ online: false });
+        // ONLINE INSTALL, THEN NO SIGNAL - what a phone does. (An install
+        // fetches, so an "offline install" caches nothing in a browser.)
+        const sw = loadServiceWorker({ online: true });
         await sw.install();
+        sw.goOffline();
         const g1 = await sw.request('index.html?game=ABCD&group=1', 'navigate');
         const g2 = await sw.request('index.html?game=ABCD&group=2', 'navigate');
         assert.equal(g1, g2, 'Both groups should be served the same cached shell.');
@@ -177,7 +247,13 @@ describe('SERVICE WORKER - offline behaviour against the URLs the app actually u
         const res = await sw.request('index.html?game=ABCD&group=1', 'navigate');
         // The handler returns the network Response itself, not a cached string.
         assert.ok(res && typeof res.clone === 'function', 'Handler should return the live network response while online, not a cached copy.');
-        assert.match(res.clone(), /^NETWORK:/, 'Handler should be network-first while online.');
+        // RE-POINTED 2026-10-06: the harness's fetch used to return a bare
+        // object whose clone() was the STRING 'NETWORK:<url>'. The install now
+        // has to read a body and rebuild a Response (to launder redirects), so
+        // the fake fetch returns something Response-shaped and the body is
+        // where the marker lives. The claim is unchanged: online, the handler
+        // serves what the network gave it.
+        assert.match(String(res.body), /^NETWORK:/, 'Handler should be network-first while online.');
     });
 
     test('Firebase and other cross-origin traffic passes straight through, untouched', async () => {
@@ -195,13 +271,16 @@ describe('SERVICE WORKER - offline behaviour against the URLs the app actually u
 describe('SERVICE WORKER - install and update behaviour', () => {
 
     test('a fresh install caches the whole shell', async () => {
-        const sw = loadServiceWorker({ online: false });
+        // ONLINE, because an install fetches. The old harness's cache.add()
+        // wrote to the store without a network call, so this passed with
+        // online:false - which no browser does.
+        const sw = loadServiceWorker({ online: true });
         await sw.install();
         assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT, `All ${SHELL_COUNT} shell files should be cached.`);
     });
 
     test('one failing file costs that file only, and is logged rather than swallowed', async () => {
-        const sw = loadServiceWorker({ online: false, failUrls: ['./icon-512.png'] });
+        const sw = loadServiceWorker({ online: true, failUrls: ['./icon-512.png'] });
         await sw.install();
         assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT - 1, 'A single failure must not abort the whole install.');
         assert.equal(sw.warnings.length, 1, 'The failure should be logged.');
@@ -221,7 +300,7 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         // It is pinned to the shape, plus the current value, so a bump is a
         // deliberate one-line edit here rather than four mystery failures.
         assert.match(CACHE_NAME, /^golfapp-v\d+/, 'The cache key must carry a version number.');
-        assert.equal(CACHE_NAME, 'golfapp-v307-offline', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
+        assert.equal(CACHE_NAME, 'golfapp-v309-swredirect', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
     });
 });
 

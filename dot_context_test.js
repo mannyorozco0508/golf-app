@@ -564,7 +564,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v307-offline';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v309-swredirect';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw),
             'the old key must not still be the active one');
     });
@@ -626,7 +626,18 @@ describe('SERVICE WORKER', () => {
 
     test('fetch strategy is unchanged - still network-first', () => {
         assert.match(sw, /Network-first: always prefer the latest deployed version/);
-        assert.match(sw, /event\.respondWith\(\s*fetch\(request\)/);
+        // RE-POINTED 2026-10-06. Still network-first - the comment above it in
+        // sw.js says so and is pinned here - but the handler is now an async
+        // function rather than fetch(request).then(...), because a redirected
+        // response has to be REBUILT before it is cached or served: WebKit
+        // refuses to serve one to a navigation, which is how a Safari reopen
+        // offline failed on a phone. The strategy is unchanged; the shape of
+        // the call is not.
+        assert.match(sw, /event\.respondWith\(\(async \(\) => \{/);
+        assert.match(sw, /response = await fetch\(request\);/,
+            'the network is no longer tried first');
+        assert.match(sw, /return fromCacheOrOffline\(\);/,
+            'the cache is no longer the fallback');
     });
 
     test('local Firebase references remain intact', () => {

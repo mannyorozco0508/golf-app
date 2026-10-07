@@ -181,8 +181,33 @@ describe('BUNDLE MANIFEST INTEGRITY - the app cannot ship a page without its eng
         // names the API while doing so; the assertion is about what the code calls,
         // not what the prose mentions, so matching raw text would fail on its own
         // documentation.
-        const code = read('sw.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        // LINE COMMENTS FIRST, THEN BLOCK COMMENTS (2026-10-06). The other order
+        // is a trap this test walked into: sw.js has a LINE comment containing
+        // the characters "/*" (it talks about /api/*), so stripping block
+        // comments first treated that as an opening delimiter and deleted
+        // everything up to the next "*/" - the install handler included. The
+        // assertion then failed on code that was there, and had been passing
+        // only because the text it happened to look for sat outside the
+        // swallowed span.
+        const code = read('sw.js').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
         assert.doesNotMatch(code, /cache\.addAll\s*\(/, 'sw.js uses cache.addAll(), which is all-or-nothing: one missing file silently disables offline caching for every other file too.');
-        assert.match(code, /cache\.add\s*\(/, 'sw.js should cache shell files individually with cache.add() so one failure costs one file.');
+        // RE-POINTED 2026-10-06, AND THE CLAIM IS THE SAME ONE. The install no
+        // longer calls cache.add(): it fetches each file and cache.put()s a
+        // REBUILT response, because cache.add() stores whatever comes back and
+        // Cloudflare Pages redirects /index.html to / - so the precached shell
+        // carried redirected === true and WebKit refused to serve it to a
+        // navigation. That is the "Response served by service worker has
+        // redirections" a phone showed on reopening offline.
+        //
+        // What must stay true is the DEGRADATION: one file per promise, one
+        // catch per file, so a single 404 costs that file and not the shell.
+        // pwa_activation_test.js proves it behaviourally - install with one
+        // url failing and the other 73 are still cached, with one warning.
+        assert.match(code, /SHELL_FILES\.map\(\(file\) => fetch\(file/,
+            'the install no longer walks the shell one file at a time');
+        assert.match(code, /\.catch\(\(err\) => \{/,
+            'a failing file must be caught per file, or one 404 turns off offline support');
+        assert.doesNotMatch(code, /Promise\.all\(\s*SHELL_FILES\.map\(\(file\) => cache\.add/,
+            'back to cache.add(), which stores a redirected response');
     });
 });

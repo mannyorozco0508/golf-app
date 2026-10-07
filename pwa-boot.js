@@ -220,6 +220,12 @@
     }
 
     function renderPill() {
+        // THE BADGE SPEAKS FOR THE SCORECARD; this banner does not repeat it.
+        if (badgeOwnsTheMessage()) {
+            var mine = pillEl || document.getElementById('golfnet-pill');
+            if (mine) mine.style.display = 'none';
+            return;
+        }
         var el = ensurePill();
         if (!el) return;
         var s = state();
@@ -252,9 +258,7 @@
                 el.style.display = 'block';
                 el.style.background = '#fff4d6';
                 el.style.color = '#8a6100';
-                el.textContent = hasDurableQueue()
-                    ? '\uD83D\uDFE1 Offline \u2014 scores are saved on this phone. Other changes need signal.'
-                    : '\uD83D\uDFE1 Offline \u2014 keep this page open. Scores sync when the connection returns.';
+                el.textContent = offlineSentence();
             } else if (s.pending > 0) {
                 el.style.display = 'block';
                 el.style.background = '#eef6f2';
@@ -516,6 +520,44 @@
         return !!(typeof window !== 'undefined' && window.OfflineQueue
                   && typeof window.OfflineQueue.count === 'function');
     }
+    // ONE MESSAGE, WITH THE COUNT (2026-10-06). Manny's phone showed BOTH: this
+    // yellow banner saying "scores are saved on this phone" and, underneath,
+    // the scorecard's own badge saying how many were waiting. Two sentences
+    // about one fact, and only one of them had the number.
+    //
+    // THE PAGE THAT HAS A BADGE OWNS THE MESSAGE. index.html renders
+    // #offline-badge right under the hole card, which is where a scorekeeper is
+    // already looking and is the only place that can carry a live count; this
+    // banner then says nothing on that page. Every other page has no badge, so
+    // the banner carries the count itself rather than leaving it unsaid.
+    //
+    // DEFENSIVELY, because this file's contract is that nothing in it can take
+    // the round down. A document without getElementById is not hypothetical:
+    // the connectivity harness builds exactly that, and an unguarded call threw
+    // inside renderPill and stopped the pill being injected at all - measured,
+    // four pill tests went red naming a missing element rather than a throw.
+    function badgeOwnsTheMessage() {
+        try {
+            if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return false;
+            return !!(document.getElementById('offline-badge') && hasDurableQueue());
+        } catch (e) { return false; }
+    }
+    function waitingCount() {
+        try {
+            return (typeof window !== 'undefined' && window.OfflineQueue && window.localStorage)
+                ? (window.OfflineQueue.count(window.localStorage) || 0) : 0;
+        } catch (e) { return 0; }
+    }
+    function offlineSentence() {
+        if (!hasDurableQueue()) {
+            return '\uD83D\uDFE1 Offline \u2014 keep this page open. Scores sync when the connection returns.';
+        }
+        var n = waitingCount();
+        return n > 0
+            ? '\uD83D\uDCF4 Offline \u2014 ' + n + ' saved on this phone, waiting to send.'
+            : '\uD83D\uDCF4 Offline \u2014 scores are saved on this phone. Other changes need signal.';
+    }
+
     function keepOpenOrNot() {
         return hasDurableQueue()
             ? 'Scores are saved on this phone.'

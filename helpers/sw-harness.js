@@ -34,18 +34,66 @@ const vm = require('vm');
 
 const ORIGIN = 'https://golf-app-5a5.pages.dev';
 
-function networkResponseFor(url) {
+// REDIRECTS AND A REAL-ENOUGH Response (2026-10-06). WebKit refuses to serve a
+// response with redirected === true to a navigation, and Cloudflare Pages
+// redirects /index.html to / - so the worker has to launder such a response
+// before caching or serving it. None of that could be measured here: the fake
+// responses had no `redirected`, no `url`, no blob(), and the sandbox had no
+// Response or Request constructor to rebuild one with.
+//
+// `redirect` maps a requested url to the url the network ends up at. A response
+// built for a redirected request carries redirected: true and the FINAL url,
+// which is exactly what fetch() hands back.
+function networkResponseFor(url, redirect) {
     const isApi = /\/api\//.test(url);
     const body = isApi ? '{"status":"unavailable","reason":"rate_limited"}' : 'NETWORK:' + url;
+    const finalUrl = (redirect && redirect[url]) || url;
     return {
         status: isApi ? 503 : 200,
+        ok: !isApi,
         body,
+        url: finalUrl,
+        redirected: finalUrl !== url,
         headers: { get: (k) => (k.toLowerCase() === 'cache-control' ? (isApi ? 'no-store' : 'public') : null) },
-        clone() { return { status: this.status, body: this.body, headers: this.headers }; }
+        blob() { return Promise.resolve({ __body: body }); },
+        clone() { return networkResponseFor(url, redirect); }
     };
 }
 
-function loadServiceWorker(swPath, { online = true, seed = [] } = {}) {
+// The two constructors the worker uses to launder a response. Minimal on
+// purpose: a rebuilt Response carries NO redirect history, which is the whole
+// property under test, so `redirected` is false by construction here exactly as
+// it is in a browser.
+function makeResponseClass() {
+    return class FakeResponse {
+        constructor(body, init) {
+            const i = init || {};
+            this.status = i.status === undefined ? 200 : i.status;
+            this.statusText = i.statusText || '';
+            this.ok = this.status >= 200 && this.status < 300;
+            this.body = (body && body.__body !== undefined) ? body.__body : body;
+            this.headers = i.headers && typeof i.headers.get === 'function'
+                ? i.headers
+                : { get: (k) => ((i.headers || {})[k] || (i.headers || {})[String(k).toLowerCase()] || null) };
+            this.redirected = false;
+            this.url = '';
+        }
+        blob() { return Promise.resolve({ __body: this.body }); }
+        clone() { const r = new FakeResponse({ __body: this.body }, { status: this.status, statusText: this.statusText, headers: this.headers }); return r; }
+    };
+}
+function makeRequestClass() {
+    return class FakeRequest {
+        constructor(input, init) {
+            this.url = typeof input === 'string' ? new URL(input, ORIGIN + '/').href : input.url;
+            this.method = (init && init.method) || 'GET';
+            this.mode = (init && init.mode) || 'cors';
+            this.destination = (init && init.destination) || '';
+        }
+    };
+}
+
+function loadServiceWorker(swPath, { online = true, seed = [], redirect = null } = {}) {
     const source = fs.readFileSync(swPath, 'utf8');
     const m = /const CACHE_VERSION = '([^']+)'/.exec(source);
     if (!m) throw new Error(swPath + ' declares no CACHE_VERSION');
@@ -61,7 +109,10 @@ function loadServiceWorker(swPath, { online = true, seed = [] } = {}) {
     stores.set(cacheName, new Map(seed.map(([u, res]) => [u, res])));
 
     const sandbox = {
-        self: { addEventListener: (t, f) => { listeners[t] = f; }, skipWaiting() {}, clients: { claim() {} }, location: { origin: ORIGIN } },
+        self: { addEventListener: (t, f) => { listeners[t] = f; }, skipWaiting() {}, clients: { claim() {} }, location: { origin: ORIGIN, href: ORIGIN + '/sw.js' } },
+        Response: makeResponseClass(),
+        Request: makeRequestClass(),
+        URL: URL,
         caches: {
             open: (n) => { if (!stores.has(n)) stores.set(n, new Map()); return Promise.resolve(cacheFor(n)); },
             keys: () => Promise.resolve([...stores.keys()]),
@@ -79,8 +130,7 @@ function loadServiceWorker(swPath, { online = true, seed = [] } = {}) {
             }
         },
         console: { warn() {}, info() {} },
-        Response: class { constructor(body, init) { this.body = body; this.status = (init && init.status) || 200; this.headers = (init && init.headers) || {}; } },
-        fetch: (req) => (online ? Promise.resolve(networkResponseFor(req.url)) : Promise.reject(new TypeError('Failed to fetch'))),
+        fetch: (req) => (online ? Promise.resolve(networkResponseFor(req.url, redirect)) : Promise.reject(new TypeError('Failed to fetch'))),
         URL, Promise, TypeError
     };
     vm.createContext(sandbox);
