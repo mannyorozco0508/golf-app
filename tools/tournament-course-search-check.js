@@ -81,7 +81,9 @@ const PRE = `
       // navigates to the new event and the record of the write would go with
       // it. A promise that never settles keeps the setup screen on screen.
       r.set = function (v) { window.__writes.push({ op: 'set', path: String(p), value: JSON.parse(JSON.stringify(v)) }); if (/^tournaments\\/[A-Z0-9]+$/.test(String(p))) return new Promise(function () {}); return set.call(this, v); };
-      r.update = function (v) { window.__writes.push({ op: 'update', path: String(p), value: JSON.parse(JSON.stringify(v)) }); return update.call(this, v); };
+      // SINCE THE SCORECARD-LOCK WAVE the creating write is ONE ROOT update()
+      // (the record and its keys together). It is held the same way.
+      r.update = function (v) { window.__writes.push({ op: 'update', path: String(p), value: JSON.parse(JSON.stringify(v)) }); if ((p === undefined || p === '') && v && Object.keys(v).some(function (k) { return /^tournaments\\/[A-Z0-9]+$/.test(k); })) return new Promise(function () {}); return update.call(this, v); };
       return r;
     };
     return real;
@@ -151,8 +153,17 @@ const FILL_TEAM = { expression: `(function(){ document.getElementById('t-name').
     if (confirmed.box !== STICK_NAME) failures.push('confirmed: the box shows ' + JSON.stringify(confirmed.box));
     if (confirmed.panelRect) failures.push('confirmed: the panel is still there');
     if (confirmed.ddDisplay !== 'none') failures.push('confirmed: the dropdown is still open');
-    const set = saved.writes.find(w => w.op === 'set' && /^tournaments\/[A-Z0-9]+$/.test(w.path));
-    if (!set) failures.push('saved: no creating set: ' + JSON.stringify(saved.writes.map(w => w.path)));
+    // The creating write: a set of tournaments/<CODE>, or (since the scorecard-lock
+    // wave) one root update carrying tournaments/<CODE> and its keys.
+    let set = saved.writes.find(w => w.op === 'set' && /^tournaments\/[A-Z0-9]+$/.test(w.path));
+    const rootCreate = saved.writes.find(w => w.op === 'update' && (w.path === 'undefined' || w.path === '') && Object.keys(w.value || {}).some(k => /^tournaments\/[A-Z0-9]+$/.test(k)));
+    if (!set && rootCreate) {
+        const k = Object.keys(rootCreate.value).find(x => /^tournaments\/[A-Z0-9]+$/.test(x));
+        set = { path: k, value: rootCreate.value[k] };
+        const keys = rootCreate.value['tournamentKeys/' + k.split('/')[1]];
+        if (!keys || keys.on !== true) failures.push('saved: the new event was not born locked: ' + JSON.stringify(keys));
+    }
+    if (!set) failures.push('saved: no creating write: ' + JSON.stringify(saved.writes.map(w => w.path)));
     else {
         const v = set.value;
         if (v.activeCourseKey !== 'gca_a1b2c3d4' || v.courseName !== STICK_NAME) failures.push('saved: course fields ' + JSON.stringify([v.activeCourseKey, v.courseName]));
