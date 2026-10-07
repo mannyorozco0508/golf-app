@@ -339,7 +339,14 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
             getItem: k => (mem.has(String(k)) ? mem.get(String(k)) : null),
             setItem: (k, v) => { mem.set(String(k), String(v)); },
             removeItem: k => { mem.delete(String(k)); },
-            clear: () => { mem.clear(); }
+            clear: () => { mem.clear(); },
+            // key(i) AND length, because the Storage interface has them and code
+            // that ENUMERATES the store is real code: offline-queue.js finds the
+            // rounds this phone has by walking every key, and against a store
+            // with neither it found none - a list that is always empty passes a
+            // test that only ever asserts "nothing is shown".
+            key: i => [...mem.keys()][i],
+            get length() { return mem.size; }
         };
         if (options.seedStorage) {
             Object.keys(options.seedStorage).forEach(k =>

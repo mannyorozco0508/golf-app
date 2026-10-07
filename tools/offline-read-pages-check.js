@@ -60,6 +60,18 @@ const READ = `(function () {
     // DIAGNOSTIC: what the phone actually holds, and what the helper made of it.
     lsKeys: Object.keys(localStorage).filter(function (k) { return k.indexOf('golfapp') === 0; }),
     mode: (typeof currentMode !== 'undefined') ? String(currentMode) : 'undefined',
+    // HOME'S OWN EVIDENCE: the resume rows and where they point. Empty on every
+    // other page, which is why Home is held to a different criterion below.
+    resumeRows: (function () {
+      var rows = document.getElementById('offline-rounds');
+      return rows && getComputedStyle(rows).display !== 'none'
+        ? String(rows.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+    })(),
+    resumeHrefs: (function () {
+      var rows = document.getElementById('offline-rounds');
+      return rows ? Array.prototype.slice.call(rows.querySelectorAll('a'))
+        .map(function (a) { return a.getAttribute('href'); }).join(' ') : '';
+    })(),
     lr: (function () {
       if (!window.OfflineQueue) return 'no module';
       try { var x = window.OfflineQueue.localRound(localStorage, (typeof currentMode !== 'undefined') ? currentMode : '', null);
@@ -128,11 +140,21 @@ const typeInto = (nth, v) => ({ expression: `(function () {
 
         // 2. each reading page, same profile, the round ABSENT from the database.
         out.pages = {};
-        for (const page of ['leaderboard.html', 'skins.html', 'settlement.html', 'stats.html']) {
+        for (const page of ['leaderboard.html', 'skins.html', 'settlement.html', 'stats.html',
+                            // HOME, which is the consumer start_url - what a Home
+                            // Screen icon opens. It is in this list because the
+                            // profile already holds a round and a queue by now,
+                            // which is exactly the state its resume rows read.
+                            'admin.html']) {
             clearLocks();
             await new Promise(r => setTimeout(r, 400));
+            // HOME IS OPENED THE WAY THE ICON OPENS IT: no query at all. With
+            // ?game= admin.html goes into the round wizard and the lobby code -
+            // which is where the resume rows live - never runs, so the first
+            // version of this arm measured an empty box on the wrong screen.
+            const query = page === 'admin.html' ? '' : '?game=' + CODE;
             const r = await arriveCold({
-                url: base + page + '?game=' + CODE, db: EMPTY, auth: { uid: 'me-uid' },
+                url: base + page + query, db: EMPTY, auth: { uid: 'me-uid' },
                 viewport: { width: 390, height: 844 }, settleMs: 3200, profileDir: PROFILE,
                 preScript: PRETEND_OFFLINE, steps: [{ sleep: 1000 }, { expression: READ }]
             });
@@ -156,14 +178,24 @@ const typeInto = (nth, v) => ({ expression: `(function () {
         'leaderboard.html': (p) => p.names === 4 && /Offline Saturday/.test(p.bodyHead),
         'skins.html': (p) => /group|Bets|Skins/i.test(p.bodyHead) && p.chars > 300,
         'settlement.html': (p) => p.names === 4 && /Settle/.test(p.bodyHead),
-        'stats.html': (p) => /DOBSON RANCH/i.test(p.bodyHead) && /HOLE/.test(p.bodyHead)
+        'stats.html': (p) => /DOBSON RANCH/i.test(p.bodyHead) && /HOLE/.test(p.bodyHead),
+        // HOME offers the round back, by COURSE and with the waiting count - not
+        // a six-character code. Its href must carry the group.
+        'admin.html': (p) => /Resume Dobson Ranch/.test(p.resumeRows)
+                             && /3 waiting/.test(p.resumeRows)
+                             && /game=READ1/.test(p.resumeHrefs)
     };
     out.ok = !out.error && out.queuedBeforeReading === '3'
-        && Object.keys(pages).length === 4
+        && Object.keys(pages).length === 5
         && Object.keys(pages).every((k) => {
             const p = pages[k];
             const okEvidence = p && !p.error && EVIDENCE[k] && EVIDENCE[k](p);
             if (p) p.computedFromLocal = !!okEvidence;
+            // HOME IS HELD TO A DIFFERENT CLAIM. It is not a reading page: it
+            // shows no round and therefore no caveat, and the thing it must do
+            // is offer the round back. Asserting the caveat on it would be a
+            // criterion invented to fit the loop rather than the screen.
+            if (k === 'admin.html') return okEvidence && p.connecting === false;
             return okEvidence && p.caveat === 'May change when others sync.'
                 && p.connecting === false && p.lr && p.lr.fromLocal === true && p.lr.waiting === 3;
         });

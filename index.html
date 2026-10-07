@@ -2552,7 +2552,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // KEPT FOR THE NEXT COLD OPEN, every time, so the stored round is the
             // newest one the server has sent rather than the one we first saw.
             if (window.OfflineQueue && currentData && currentData.players) {
-                try { window.OfflineQueue.saveSnapshot(localStorage, currentMode, currentData); } catch (e) {}
+                try { window.OfflineQueue.saveSnapshot(localStorage, currentMode, currentData, { group: lockedGroup || null }); } catch (e) {}
             }
             // An organizer link that matches the round is remembered on this device
             // for this round (organizer-gate.js), so the setup stays reachable after

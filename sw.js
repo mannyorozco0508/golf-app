@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v146-swredirect. The tournament product cache
+// The consumer product cache is consumer-v147-homeresume. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4283,7 +4283,16 @@
 // /index.html?game=X&group=1 and at /?game=X both find it. A device on v308
 // cannot reopen a round offline in Safari at all.
 // v308 is held by tournaments-scorecard-lock, which is why this is v309.
-const CACHE_VERSION = 'golfapp-v309-swredirect';
+// Moved to v311: HOME OFFERS THE ROUND BACK WHEN THERE IS NO SIGNAL. admin.html
+// is the consumer start_url, so a Home Screen icon opens it - and offline all it
+// could offer was "Resume ABCD", a six-character code that says nothing about
+// which round it is, with no way back to this phone's own group except the
+// picker. Each row now names the COURSE and how many of this device's edits are
+// still unsent, and goes straight to that round's card with its group on the
+// URL (the group lives only in ?group=N, so the stored round records it). Shown
+// only offline; online, Resume and the two tiles are the right answer. A device
+// on v310 gets the bare code. (v310 was taken while this was being written.)
+const CACHE_VERSION = 'golfapp-v311-homeresume';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -206,13 +206,73 @@
     // phone with no signal can open it at all. Measured in the audit: with no
     // signal index.html renders "Connecting to game..." and 0 score boxes of 0,
     // because RTDB on web has no on-disk read cache either.
-    function saveSnapshot(store, code, data) {
+    // `meta` CARRIES WHAT THE URL KNOWS AND THE RECORD DOES NOT - the group this
+    // phone is keeping score for. A round record has no idea which four golfers
+    // this device is on; that is in ?group=N, which is why Home could otherwise
+    // only offer a link that drops it and asks the picker again.
+    function saveSnapshot(store, code, data, meta) {
         if (!store || !code || !data) return false;
         try {
+            var prev = loadSnapshot(store, code);
+            var m = meta || (prev && prev.meta) || null;
             store.setItem(SNAP + String(code).toUpperCase(),
-                JSON.stringify({ at: Date.now(), data: data }));
+                JSON.stringify({ at: Date.now(), data: data, meta: m }));
             return true;
         } catch (e) { return false; }
+    }
+
+    // EVERY ROUND THIS PHONE HAS OPENED, newest first, with what Home needs to
+    // offer it: the course, how many of this device's edits are still unsent,
+    // and the group so one tap lands back on the right card. Reads nothing but
+    // storage, so it works with no signal - which is the only time it is shown.
+    function localRounds(store) {
+        if (!store) return [];
+        var out = [];
+        var pending = {};
+        try {
+            peek(store).forEach(function (op) {
+                var m = /^events\/([^/]+)\//.exec(String(op.path || ''));
+                if (m) pending[m[1].toUpperCase()] = (pending[m[1].toUpperCase()] || 0) + 1;
+            });
+        } catch (e) { /* an unreadable queue just means no counts */ }
+        try {
+            for (var i = 0; i < store.length; i++) {
+                var k = store.key(i);
+                if (!k || k.indexOf(SNAP) !== 0) continue;
+                var code = k.slice(SNAP.length);
+                var snap = null;
+                try { snap = JSON.parse(store.getItem(k)); } catch (e) { continue; }
+                if (!snap || !snap.data) continue;
+                out.push({
+                    code: code,
+                    courseName: snap.data.courseName || '',
+                    eventName: snap.data.eventName || '',
+                    players: (snap.data.players || []).length,
+                    at: snap.at || 0,
+                    waiting: pending[code] || 0,
+                    group: (snap.meta && snap.meta.group) || null
+                });
+            }
+        } catch (e) { return out; }
+        out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+        return out;
+    }
+
+    // THE ONE TAP. The group goes back on the URL, because that is where the
+    // scorecard reads it from - a link without it sends the golfer through the
+    // group picker again on a round they have been scoring all afternoon.
+    function resumeHref(round) {
+        if (!round || !round.code) return null;
+        return 'index.html?game=' + encodeURIComponent(round.code)
+            + (round.group ? '&group=' + encodeURIComponent(round.group) : '');
+    }
+
+    // "Resume Dobson Ranch · 7 waiting" - the course, because that is what a
+    // golfer calls the round, and the count because it is the reason to care.
+    function resumeLabel(round) {
+        var where = (round && (round.courseName || round.eventName || round.code)) || '';
+        var n = (round && round.waiting) || 0;
+        return '\u25B6\uFE0F Resume ' + where + (n > 0 ? ' \u00B7 ' + n + ' waiting' : '');
     }
 
     function loadSnapshot(store, code) {
@@ -341,6 +401,7 @@
         drain: drain, isPermanent: isPermanent,
         saveSnapshot: saveSnapshot, loadSnapshot: loadSnapshot, applyQueued: applyQueued,
         localRound: localRound, syncNote: syncNote,
+        localRounds: localRounds, resumeHref: resumeHref, resumeLabel: resumeLabel,
         badge: badge
     };
 
