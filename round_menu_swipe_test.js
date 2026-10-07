@@ -56,11 +56,24 @@ const round = extra => Object.assign({
     scores: {}, gameFormat: 'stroke', settlementMode: 'whole-dollar',
     groupSizeOverrides: { 0: 4 }, ownerUid: 'anon-cold' }, extra || {});
 
+// LABELLED, NOT POSITIONAL (2026-10-06). The five reads below used to be
+// destructured out of the step results BY INDEX, and that is a trap with two
+// teeth. It bit twice in one day: adding a diagnostic step while chasing a
+// failure shifted every index by one, so the test read the state from before
+// the gesture and reported "the swipe up did not open it" about a sheet that
+// had opened perfectly - a false reproduction of the very bug being chased. And
+// an extra or missing result from any step does the same thing silently.
+//
+// Each read now carries its own name and is looked up by it, LAST ONE WINS, so
+// a second settle read can be added after any gesture without renumbering
+// anything - which is what makes the settle below safe to lengthen.
+const stateRead = (label) => ({ expression: STATE.replace('__LABEL__', label) });
 const STATE = `(function () {
   var s = document.getElementById('round-sheet');
   var h = document.getElementById('round-sheet-handle');
   if (!s || !h) return JSON.stringify({ missing: true });
   return JSON.stringify({
+    label: '__LABEL__',
     open: /\\bopen\\b/.test(s.className),
     dragging: /\\bdragging\\b/.test(s.className),
     sheetTop: Math.round(s.getBoundingClientRect().top),
@@ -87,16 +100,26 @@ before(async () => {
         url: fileUrl('index.html', 'game=SWIPE'),
         db: { events: { SWIPE: round() }, global_courses: {}, trips: {}, tournaments: {} },
         viewport: { width: 390, height: 844 }, settleMs: 3200,
-        steps: [{ expression: STATE }]
-            .concat(swipe(195, 815, 500, 10), [{ expression: STATE }])     // up on the pill
-            .concat(swipe(195, 120, 420, 10), [{ expression: STATE }])     // down on the open top
-            .concat(swipe(195, 815, 790, 6), [{ expression: STATE }])      // a short, slow drag
-            .concat([{ tap: '#round-sheet-handle' }, { sleep: 450 }, { expression: STATE }])
+        // READ TWICE AFTER EVERY GESTURE, and take the later one. swipe() already
+        // waits 450ms for the CSS transition; on a loaded machine that frame can
+        // be late, and the earlier version read the class exactly once and
+        // reported a sheet that had not opened YET as a sheet that did not open.
+        // Measured: this test failed three times in a row in one worktree while
+        // another Chrome suite was running, and passed ten times in a row
+        // afterwards - on a byte-identical index.html. A second read costs ~350ms
+        // and removes the race rather than hiding it.
+        steps: [stateRead('rest')]
+            .concat(swipe(195, 815, 500, 10), [stateRead('afterUp'), { sleep: 350 }, stateRead('afterUp')])
+            .concat(swipe(195, 120, 420, 10), [stateRead('afterDown'), { sleep: 350 }, stateRead('afterDown')])
+            .concat(swipe(195, 815, 790, 6), [stateRead('afterShort'), { sleep: 350 }, stateRead('afterShort')])
+            .concat([{ tap: '#round-sheet-handle' }, { sleep: 450 },
+                     stateRead('afterTap'), { sleep: 350 }, stateRead('afterTap')])
     });
     S.ok = r.ok; S.reason = r.reason;
     if (r.ok) {
         const j = (r.value || []).filter(v => typeof v === 'string' && v.charAt(0) === '{').map(v => JSON.parse(v));
-        [S.rest, S.afterUp, S.afterDown, S.afterShort, S.afterTap] = j;
+        // BY NAME, LAST WINS. Nothing here counts steps.
+        j.forEach((v) => { if (v && v.label) S[v.label] = v; });
     }
 
     // THE PAGE ITSELF, scrolled hard, on a round long enough to scroll. The
