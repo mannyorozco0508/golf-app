@@ -84,12 +84,17 @@ const db = {
 
 // Types a score into the first hole box the way a scorekeeper does, then the
 // probe reads what the CARD says about it (save-state) after the server answers.
-const TYPE = `setTimeout(function () {
+// WAITS FOR THE BOX rather than a fixed 3.5 s: against the emulator the first
+// snapshot can take longer, and a fixed wait made one sweep run report "no hole
+// box" on a card that rendered a moment later. Measured: the FIRST SDK
+// connection to a freshly started emulator can take well over 6 s.
+const TYPE = `(function tryType(n) {
   var i = document.querySelector('#holes-list input');
+  if (!i && n > 0) return setTimeout(function () { tryType(n - 1); }, 250);
   window.__typed = !!i;
   if (i) { i.value = '4'; i.dispatchEvent(new Event('change', { bubbles: true })); }
-}, 3500);`;
-const SAVE_PROBE = `(() => JSON.stringify({ typed: !!window.__typed,
+})(80);`;
+const SAVE_PROBE = `(() => JSON.stringify({ typed: !!window.__typed, text: (document.body.innerText || '').slice(0, 300),
   saveState: (document.getElementById('save-state') || {}).innerText || '' }))()`;
 const CARD_PROBE = `
 (() => {
@@ -182,8 +187,22 @@ function grantsToAnyone(sentence) {
     try { emu = await startEmulator({ rulesPath: path.join(__dirname, '..', 'database.rules.json'), port: 9473, ns: 'teamlink' }); }
     catch (e) { bail('could not start the emulator: ' + e.message); }
     await emu.admin('PUT', '', { tournaments: db.tournaments, tournamentKeys: db.tournamentKeys });
+    // A BLANK LOAD IS RETRIED, AND SAID SO. On a loaded machine a headless
+    // Chrome sometimes hands back a page that never loaded (0 characters, no
+    // DOM) - measured 2 of 3 runs one evening with nine orphaned headless
+    // Chromes from older sessions still running. That is not a card result,
+    // so it is retried up to twice and the count is printed in the verdict.
+    let retries = 0;
     const card = async (q) => {
-        const r = await arriveCold({ url: fileUrl('tournament-scorecard.html', q), emulator: emu.url, preScript: TYPE, settleMs: 7000,
+        for (let i = 0; i < 3; i++) {
+            const c = await cardOnce(q);
+            if (!c.ran || c.rendered > 0) return c;
+            retries++;
+        }
+        return cardOnce(q);
+    };
+    const cardOnce = async (q) => {
+        const r = await arriveCold({ url: fileUrl('tournament-scorecard.html', q), emulator: emu.url, preScript: TYPE, settleMs: 16000,
             steps: [{ expression: CARD_PROBE }, { expression: SAVE_PROBE }] });
         if (!r.ok) return { ran: false, reason: r.reason };
         try { return Object.assign({ ran: true }, JSON.parse(r.value[0]), JSON.parse(r.value[1])); }
@@ -223,6 +242,7 @@ function grantsToAnyone(sentence) {
             serverScores: stored
         },
         emulatorOnlyTransform: emu.transformed + ' x registrations email regex',
+        blankLoadsRetried: retries,
         organizerBlurb: org.linksBlurb,
         sentencesClaimingExclusivity: claiming,
         sentencesGrantingToAnyone: granting

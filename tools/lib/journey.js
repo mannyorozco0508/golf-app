@@ -191,7 +191,10 @@ function statefulStub(dbJson, auth) {
       }
       window.firebase = {
         initializeApp: function () { return {}; },
-        database: function () { return { ref: refFor }; },
+        // ServerValue, as the real SDK has it (2026-10-06). A keyed scorecard
+        // write sends t: firebase.database.ServerValue.TIMESTAMP; without this
+        // the stand-in threw before the write and a working card read as broken.
+        database: Object.assign(function () { return { ref: refFor }; }, { ServerValue: { TIMESTAMP: { '.sv': 'timestamp' } } }),
         // auth(): the real SDK is blocked above, so a page that asks for it must
         // find something - and since anonymous sign-in went live, what it finds
         // in production is a USER. By default this is an anonymous one, the way
