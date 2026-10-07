@@ -42,7 +42,9 @@ const ORGANIZER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false }
 const STRANGER = { uid: 'u-other', email: 'other@example.com', isAnonymous: false };
 const settle = () => new Promise((r) => setImmediate(r)).then(() => new Promise((r) => setImmediate(r)));
 
-const REFUSED = "⚠️ This event isn't accepting scores — ask the organizer.";
+// RE-PINNED, scorecard-lock wave (2026-10-06, Manny's wording): a refusal now
+// most often means a link without this team's key, so the sentence says so.
+const REFUSED = "⚠️ Not saved — this link can't score this card. Ask the organizer for your team's link.";
 const SIGNAL = '⚠️ Could not save — check your signal and re-enter that hole';
 
 // A team scramble the scorecard can score, with the stub's set() shaped per test.
@@ -75,7 +77,7 @@ function arriveCard(rejectWith) {
 const saveState = (sb) => { const el = sb.document.getElementById('save-state'); return { cls: el.className, text: el.textContent }; };
 
 describe('1. THE GOLFER\'S REFUSAL SENTENCE (tournament-scorecard.html)', () => {
-    test('a PERMISSION_DENIED on a score write says the event is not accepting scores - not "check your signal"', async () => {
+    test('a PERMISSION_DENIED on a score write says it was NOT SAVED and why - not "check your signal"', async () => {
         const sb = arriveCard({ code: 'PERMISSION_DENIED', message: 'PERMISSION_DENIED: Permission denied' });
         sb.saveHoleScore(1, '5');
         await settle();
@@ -99,7 +101,7 @@ describe('1. THE GOLFER\'S REFUSAL SENTENCE (tournament-scorecard.html)', () => 
     test('the two sentences are pinned in source, and the refusal reads the SDK code', () => {
         const src = read('tournament-scorecard.html');
         assert.ok(src.includes("err && err.code === 'PERMISSION_DENIED'"), 'the catch must switch on the SDK code');
-        assert.ok(src.includes("This event isn't accepting scores \\u2014 ask the organizer.") || src.includes(REFUSED), 'the refusal sentence');
+        assert.ok(src.includes("Not saved \\u2014 this link can't score this card. Ask the organizer for your team's link.") || src.includes(REFUSED), 'the refusal sentence');
         assert.ok(src.includes('check your signal and re-enter that hole'), 'the signal sentence stays for real signal failures');
     });
 });

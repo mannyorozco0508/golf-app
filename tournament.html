@@ -598,6 +598,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div class="form-group" style="margin-bottom:8px;"><label>Venue</label><input type="text" id="ev-venue" maxlength="120" placeholder="e.g. Camas Meadows Golf Club" onchange="setEventDetail('venue', this.value)"></div>
             <div class="form-group" style="margin-bottom:0;"><label>Beneficiary</label><input type="text" id="ev-beneficiary" maxlength="120" placeholder="e.g. Hope Foundation" onchange="setEventDetail('beneficiary', this.value)"></div>
         </div>
+        <!-- SCORING LINKS LOCK (scorecard-lock wave). Owner only; hidden otherwise,
+             in the tree. renderLockPanel decides the sentence and the button. -->
+        <div class="team-card" id="lock-links-block" style="display:none; margin-top:12px;">
+            <div class="team-card-header"><span class="team-label">🔑 Scoring links</span></div>
+            <p id="lock-links-state" style="font-size:0.8rem; color:var(--text-muted); margin:0 0 8px 0;"></p>
+            <button class="btn-outline" id="lock-links-btn" style="display:none;" onclick="lockScoringLinks()">Lock scoring links</button>
+        </div>
 
         <!-- Registration CONFIGURATION lives here: the "Ask golfers for" switches,
              the signup URL and Share. The desk itself - counts, filters, search
@@ -1639,7 +1646,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             payload.teams = {};   // an individual event has no teams
         }
 
-        db.ref(`tournaments/${currentCode}`).set(payload).then(() => {
+        // A NEW OWNED EVENT IS BORN LOCKED (scorecard-lock): its keys are written
+        // in the SAME update as the record, so there is no moment when a team
+        // exists without one. With no secure random source it is created exactly
+        // as before - unlocked - rather than with a guessable key.
+        const birthKeys = { on: true, t: {} };
+        let keyed = true;
+        Object.values(payload.teams || {}).forEach((t) => {
+            const k = newScoringKey();
+            if (!k) keyed = false; else birthKeys.t['team' + t.num] = k;
+        });
+        if (!newScoringKey()) keyed = false;
+        const createWrite = keyed
+            ? db.ref().update({ [`tournaments/${currentCode}`]: payload, [`tournamentKeys/${currentCode}`]: birthKeys })
+            : db.ref(`tournaments/${currentCode}`).set(payload);
+        createWrite.then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
             if (isMultiRoundSetup) {
                 // ROUND 1 IS THE EVENT AS CONFIGURED. Everything the organizer just
@@ -1695,7 +1716,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // same teams with its own round id - built the way group links are.
     function teamScorecardUrl(t, rid) {
         const roundPart = rid ? `&round=${rid}` : '';
-        return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${roundPart}`;
+        // THE KEY RIDES ON THE LINK (scorecard-lock). Only the owner can read it,
+        // so only the owner's page ever builds a link that carries one.
+        const k = teamKeyOf(t.num);
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${roundPart}${k ? `&k=${k}` : ''}`;
     }
     // The rounds of a multi-round event in play order, one shape for every list
     // that needs a set of links per round.
@@ -1769,8 +1793,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const label = t.name || `Team ${t.num}`;
         if (teamHasScores(t.num)) { alert(`${label} has scores and can't be removed.`); return; }
         if (!confirm(`Remove ${label}? Golfers on it will need a new team on the Desk.`)) return;
-        db.ref(`tournaments/${currentCode}/teams/team${t.num}`).remove()
-            .catch((err) => alert(`Error: ${err.message}`));
+        // Its key goes in the same write (scorecard-lock).
+        const gone = keysWritable()
+            ? db.ref().update({ [`tournaments/${currentCode}/teams/team${t.num}`]: null, [`${keysBase()}/t/team${t.num}`]: null })
+            : db.ref(`tournaments/${currentCode}/teams/team${t.num}`).remove();
+        gone.catch((err) => alert(`Error: ${err.message}`));
     }
 
     function sortedTeams() {
@@ -2060,7 +2087,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const teamName = document.getElementById('new-team-name').value.trim() || `Team ${nextNum}`;
         const teamHandicap = parseFloat(document.getElementById('new-team-handicap').value) || 0;
 
-        db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set({ num: nextNum, name: teamName, players: players, handicap: teamHandicap }).then(() => {
+        const team = { num: nextNum, name: teamName, players: players, handicap: teamHandicap };
+        const k = keysWritable() ? newScoringKey() : null;
+        const addWrite = k
+            ? db.ref().update({ [`tournaments/${currentCode}/teams/team${nextNum}`]: team, [`${keysBase()}/t/team${nextNum}`]: k })
+            : db.ref(`tournaments/${currentCode}/teams/team${nextNum}`).set(team);
+        addWrite.then(() => {
             document.getElementById('new-team-name').value = '';
             document.getElementById('new-team-p1').value = '';
             document.getElementById('new-team-p2').value = '';
@@ -2184,6 +2216,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         renderSignedInAs();
         syncRegistrationListener();
+        syncKeysListener();
+        renderLockPanel();
         renderRegistrationList();
     }
 
@@ -2542,6 +2576,122 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
+    }
+
+    // ===== SCORING-LINK KEYS (scorecard-lock wave, 2026-10-06) ===============
+    //
+    // A team or group link carries a private per-team key (&k=). On a LOCKED
+    // event (tournamentKeys/<code>/on === true) the rules accept a golfer's score
+    // only with a proof carrying that key, written in the same update as the
+    // score (tournament-scorecard.html writeScore). Scores themselves are where
+    // they always were.
+    //
+    // WHERE THE KEYS LIVE: tournamentKeys/<code>, OUTSIDE tournaments/<code> -
+    // that node is public to read and a child rule cannot hide anything under
+    // it. Owner-only to read and write. Shape:
+    //   on: true                 the lock (absent = not enforced)
+    //   t/team<N>: key           a team, every round
+    //   g/<gid>: key             a group (its link)
+    //   p/<pid>: key             a golfer's group key, single-round event
+    //   r/<rid>/<pid>: key       a golfer's group key in that round
+    //
+    // EVERY WRITER THAT MAKES A TEAM OR GROUP WRITES ITS KEY IN THE SAME UPDATE,
+    // locked or not, so a lock can never find a team without one: create,
+    // Add Another Team, Desk approve into a new team, group create, golfer
+    // assigned to / moved between groups, group delete and team remove (which
+    // delete the key). Locking backfills anything older and turns on the flag.
+    let scoringKeys = null;
+    let keysBoundCode = null;
+    let keysCb = null;
+    function syncKeysListener() {
+        const wanted = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        if (wanted && keysBoundCode === currentCode) return;
+        if (keysBoundCode) {
+            try {
+                const prev = db.ref('tournamentKeys/' + keysBoundCode);
+                if (prev && typeof prev.off === 'function' && keysCb) prev.off('value', keysCb);
+            } catch (e) { /* stub has no off */ }
+            keysBoundCode = null;
+            keysCb = null;
+        }
+        if (!wanted) { scoringKeys = null; return; }
+        const code = currentCode;
+        keysCb = (snap) => {
+            if (currentCode !== code) return;
+            scoringKeys = snap.val() || {};
+            renderTeamLinks();
+            renderGroupLinks();
+            renderLockPanel();
+        };
+        db.ref('tournamentKeys/' + code).on('value', keysCb);
+        keysBoundCode = code;
+    }
+    // 128 random bits from the platform's CSPRNG, as 32 hex characters. With no
+    // crypto there is NO key (null) rather than a guessable one; every caller
+    // then writes what it wrote before this wave.
+    function newScoringKey() {
+        const c = (typeof crypto !== 'undefined' && crypto && crypto.getRandomValues) ? crypto : null;
+        if (!c) return null;
+        const a = new Uint8Array(16);
+        c.getRandomValues(a);
+        return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    // Keys are written only for an OWNED event: a legacy record has no owner and
+    // the rules refuse a key on it (and it is frozen anyway).
+    const keysWritable = () => !!(currentCode && currentData && currentData.ownerUid);
+    const keysBase = () => `tournamentKeys/${currentCode}`;
+    const keysLocked = () => !!(scoringKeys && scoringKeys.on === true);
+    const teamKeyOf = (num) => (scoringKeys && scoringKeys.t && scoringKeys.t['team' + num]) || null;
+    const groupKeyOf = (gid) => (scoringKeys && scoringKeys.g && scoringKeys.g[gid]) || null;
+    const playerKeyPath = (pid, rid) => rid ? `${keysBase()}/r/${rid}/${pid}` : `${keysBase()}/p/${pid}`;
+
+    // ANY POSTED SCORE, ANY ROUND. Locking is offered only before the first one:
+    // a lock after scores would refuse every link already in golfers' hands.
+    function eventHasAnyScore() {
+        const any = (sc) => Object.keys(sc || {}).some((k) => sc[k] !== null && sc[k] !== undefined && sc[k] !== '');
+        return any(currentData.scores) || Object.values(currentData.rounds || {}).some((r) => any(r && r.scores));
+    }
+    function renderLockPanel() {
+        const box = document.getElementById('lock-links-block');
+        if (!box) return;
+        if (!keysWritable() || !canManage()) { box.style.display = 'none'; return; }
+        box.style.display = 'block';
+        const line = document.getElementById('lock-links-state');
+        const btn = document.getElementById('lock-links-btn');
+        if (keysLocked()) {
+            line.textContent = 'Keys are on: each team and group link carries its own key, and a score sent without it is not saved. Send the links from this page.';
+            btn.style.display = 'none';
+        } else if (eventHasAnyScore()) {
+            line.textContent = 'Scoring links can be locked only before the first score is posted.';
+            btn.style.display = 'none';
+        } else {
+            line.textContent = 'Locking gives every team and group link its own key. Links sent before you lock stop working, so lock first, then send them.';
+            btn.style.display = '';
+        }
+    }
+    function lockScoringLinks() {
+        if (!keysWritable() || !canManage() || keysLocked()) return;
+        if (eventHasAnyScore()) { alert('Scoring links can be locked only before the first score is posted.'); renderLockPanel(); return; }
+        const changes = {};
+        const k = (path, existing) => {
+            if (existing) return existing;
+            const fresh = newScoringKey();
+            if (!fresh) throw new Error('no secure random source on this device');
+            changes[path] = fresh;
+            return fresh;
+        };
+        try {
+            Object.values(currentData.teams || {}).forEach((t) => k(`${keysBase()}/t/team${t.num}`, teamKeyOf(t.num)));
+            const keyGroups = (groups, rid) => Object.keys(groups || {}).forEach((gid) => {
+                const gk = k(`${keysBase()}/g/${gid}`, groupKeyOf(gid));
+                (groups[gid].playerIds || []).forEach((pid) => { changes[playerKeyPath(pid, rid)] = gk; });
+            });
+            keyGroups(currentData.scoringGroups, null);
+            Object.keys(currentData.rounds || {}).forEach((rid) => keyGroups(currentData.rounds[rid].scoringGroups, rid));
+        } catch (e) { alert(`Could not lock: ${e.message}`); return; }
+        changes[`${keysBase()}/on`] = true;
+        if (!confirm('Lock scoring links? Every team and group gets a new link with its own key. Links you already sent stop working.')) return;
+        db.ref().update(changes).catch((err) => alert(`Error: ${err.message}`));
     }
 
     // ---- THE ORGANIZER'S CORRECTION PATH (Option A, 2026-09-16) -------------
@@ -3150,11 +3300,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const nextNum = taken.reduce((max, n) => Math.max(max, n), 0) + 1;
         reservedTeamNums[nextNum] = entryId;
         const teamName = String(entry.teamPreference || '').trim() || `Team ${nextNum}`;
-        commit({
+        const newTeam = {
             [`${tBase}/teams/team${nextNum}`]: { num: nextNum, name: teamName, players: [name], handicap: 0 },
             [`${regBase}/approvedAt`]: Date.now(),
             [`${regBase}/teamNum`]: nextNum
-        }, nextNum);
+        };
+        const tk = keysWritable() ? newScoringKey() : null;
+        if (tk) newTeam[`${keysBase()}/t/team${nextNum}`] = tk;   // its key, same write
+        commit(newTeam, nextNum);
     }
 
     // computeTeamHoleScore, computeTeamTotals, computeTournamentLeaderboard, and
@@ -3991,8 +4144,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const groups = currentGroups();
         const next = Object.keys(groups).length + 1;
         const gid = newGroupId();
-        db.ref(`${groupsPath()}/${gid}`)
-            .set({ id: gid, name: `Group ${next}`, playerIds: [], createdAt: Date.now() })
+        const g = { id: gid, name: `Group ${next}`, playerIds: [], createdAt: Date.now() };
+        const k = keysWritable() ? newScoringKey() : null;
+        (k ? db.ref().update({ [`${groupsPath()}/${gid}`]: g, [`${keysBase()}/g/${gid}`]: k })
+           : db.ref(`${groupsPath()}/${gid}`).set(g))
             .catch(err => alert(`Error adding group: ${err.message}`));
     }
 
@@ -4009,7 +4164,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             alert(`⚠️ ${g.name || 'That group'} still has golfers in it. Move them out first.`);
             return;
         }
-        db.ref(`${groupsPath()}/${gid}`).remove()
+        (keysWritable()
+            ? db.ref().update({ [`${groupsPath()}/${gid}`]: null, [`${keysBase()}/g/${gid}`]: null })
+            : db.ref(`${groupsPath()}/${gid}`).remove())
             .catch(err => alert(`Error: ${err.message}`));
     }
 
@@ -4033,6 +4190,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 updates[`${g}/playerIds`] = ids;
             }
         });
+        // THE GOLFER'S KEY FOLLOWS THEM (scorecard-lock): their scores are keyed
+        // by player, so the rules check the key of the group they are in now. In
+        // the same write; unassigned, the key is removed.
+        if (keysWritable()) {
+            const full = {};
+            Object.keys(updates).forEach((k) => { full[`${groupsPath()}/${k}`] = updates[k]; });
+            const rid = recordIsMultiRound() ? editingRoundId : null;
+            full[playerKeyPath(pid, rid)] = gid ? (groupKeyOf(gid) || null) : null;
+            db.ref().update(full).catch(err => alert(`Error: ${err.message}`));
+            return;
+        }
         db.ref(groupsPath()).update(updates)
             .catch(err => alert(`Error: ${err.message}`));
     }
@@ -4087,7 +4255,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // cross-product one, so it is built the way team links are and never through
         // product-links.js.
         const roundPart = rid ? `&round=${rid}` : '';
-        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}${roundPart}`;
+        const k = groupKeyOf(gid);
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}${roundPart}${k ? `&k=${k}` : ''}`;
     }
 
     // Across every round, for the "can this golfer be removed from the field" check -

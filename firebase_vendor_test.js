@@ -391,6 +391,11 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
             // rosters shared with their email.
             '/sharedGroups/$emailKey/$ownerUid/$groupId/.write',
             '/sharedGroups/$emailKey/.read',
+            // SCORECARD LOCK (2026-10-06, Manny-approved; the publish file is on
+            // the Desktop, published by hand): the per-team keys are the owner's
+            // to read and write. The score grants themselves use no auth.
+            '/tournamentKeys/$code/.read',
+            '/tournamentKeys/$code/.write',
             // The narrowing (2026-09-18, published by hand): the parent .write
             // names the owner - a code-holder writes scores and nothing else.
             '/tournaments/$tourneyCode/.write',

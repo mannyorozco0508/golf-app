@@ -76,7 +76,11 @@ describe('no scores: the team is removed and the Desk flags its golfers', () => 
         tapRemove(sb, 2);
         assert.equal(sb.__confirms.length, 1);
         assert.match(sb.__confirms[0], /^Remove Team 2\? Golfers on it will need a new team on the Desk\./);
-        assert.equal(JSON.stringify(sb.__dbWrites.map((w) => [w.op, w.path])), JSON.stringify([['remove', 'tournaments/RT1/teams/team2']]));
+        // ONE write. Since the scorecard-lock wave the team's key goes with it.
+        assert.equal(sb.__dbWrites.length, 1, JSON.stringify(sb.__dbWrites));
+        const w = sb.__dbWrites[0];
+        assert.equal(w.op, 'update');
+        assert.deepEqual(JSON.parse(JSON.stringify(w.value)), { 'tournaments/RT1/teams/team2': null, 'tournamentKeys/RT1/t/team2': null });
     });
 
     test('after the echo, and after a reload: both golfers "Needs a team", count 2; registrations untouched', () => {
