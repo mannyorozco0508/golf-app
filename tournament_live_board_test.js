@@ -179,7 +179,18 @@ describe('4. THE HARNESS AND THE SEAMS', () => {
         // second is a real bug this harness missed: a trip roster paste wrote 24
         // golfers and left Player 1..4 on the page. The claim pinned here is the
         // one that matters - no listener is re-fired by a write.
-        assert.match(c, /set: function \(v\) \{ window\.__coldWrites\.push\(\{ op: 'set', path: parts\.join\('\/'\), value: v \}\); applyWrite\(parts, v, true\); return Promise\.resolve\(\); \}/,
+        // RE-POINTED 2026-10-06 (OFFLINE MODE). set() gained ONE branch in front
+        // of this: window.__coldOffline, which makes a write never settle, the
+        // way a real offline Firebase write was measured to behave (0 resolved,
+        // 0 rejected). It is opt-in and off by default, so every existing check
+        // is untouched - and the durable-queue checks could not exist without
+        // it, because the stand-in database lives IN the page and CDP's offline
+        // emulation cannot reach it. The claim pinned here is unchanged: when a
+        // write DOES go through, it records, it lands in the fixture, and it
+        // re-fires no listener.
+        assert.match(c, /if \(window\.__coldOffline\) \{ window\.__coldWrites\.push\(\{ op: 'set', path: parts\.join\('\/'\), value: v, offline: true \}\); return new Promise\(function \(\) \{\}\); \}/,
+            'the opt-in offline branch is gone, so the durable-queue checks cannot make a write hang');
+        assert.match(c, /window\.__coldWrites\.push\(\{ op: 'set', path: parts\.join\('\/'\), value: v \}\); applyWrite\(parts, v, true\); return Promise\.resolve\(\);/,
             'set() records, applies, and re-fires nothing');
         assert.match(c, /function applyWrite\(parts, value, replace\)/);
         assert.ok(!/hits\.forEach[\s\S]{0,400}applyWrite/.test(c), 'a write must not deliver to listeners');

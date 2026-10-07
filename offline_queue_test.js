@@ -186,6 +186,34 @@ describe('3. AN OP LEAVES THE QUEUE ONLY WHEN THE SERVER SAYS SO', () => {
         assert.equal(Q.isPermanent(new Error('PERMISSION_DENIED')), true);
     });
 
+    test('A WRITE THAT NEVER SETTLES IS ABANDONED, AND THE OP STAYS - the bug that cost the feature', async () => {
+        // MEASURED END TO END before this existed: a drain that starts while the
+        // socket is still down issues ONE write, that write never settles, and
+        // the drain waits on it for the life of the page. The stand-in database
+        // recorded exactly one write, the queue stayed at 7, and the badge stayed
+        // on "Sending..." - so no later drain could ever start.
+        const s = store();
+        for (let h = 1; h <= 3; h++) Q.enqueue(s, scoreOp('AAA', 'p101_h' + h, 4));
+        const issued = [];
+        const r = await Q.drain(s, (op) => { issued.push(op.path); return new Promise(() => {}); },
+                                { timeoutMs: 150 });
+        assert.equal(issued.length, 1, 'it issued more than one write into a dead socket');
+        assert.equal(r.sent, 0);
+        assert.equal(r.dropped, 0, 'a timeout is not a refusal - the score must not be dropped');
+        assert.ok(r.stoppedOn && /did not settle/.test(r.stoppedOn.reason), JSON.stringify(r));
+        assert.equal(Q.count(s), 3, 'the queue lost an op to a write that never landed');
+        // AND THE DRAIN RETURNED, which is the whole point: the caller can try again.
+        assert.equal(Q.isPermanent({ code: 'queue_timeout' }), false);
+    });
+
+    test('and a write that settles inside the timeout is confirmed as normal', async () => {
+        const s = store();
+        Q.enqueue(s, scoreOp('AAA', 'p101_h1', 4));
+        const r = await Q.drain(s, () => new Promise(res => setTimeout(res, 40)), { timeoutMs: 400 });
+        assert.equal(r.sent, 1);
+        assert.equal(Q.count(s), 0);
+    });
+
     test('a writer that throws synchronously is an outage, not a crash', async () => {
         const s = store();
         Q.enqueue(s, scoreOp('AAA', 'p101_h1', 4));
@@ -228,6 +256,32 @@ describe('4. THE ROUND OPENS, AND IT SHOWS THE GOLFER THEIR OWN WORK', () => {
         Q.enqueue(s, scoreOp('AAA', 'p101_h1', null));
         const shown = Q.applyQueued(ROUND, Q.peek(s), 'AAA');
         assert.equal(shown.scores.p101_h1, undefined, 'a cleared box still shows its old number');
+    });
+
+    test('A KP ANSWER IS ONE ROOT UPDATE, and it shows on the card', () => {
+        // The app writes a KP as ONE update() at events/<code> carrying
+        // kpLeaders/hN and kpWinners/hN together, so a refusal cannot leave half
+        // of it. applyQueued skipped that shape at first - the path has nothing
+        // after the code - so a KP answered with no signal was in the queue and
+        // invisible on the card, which is how a group answers it twice.
+        const s = store();
+        Q.enqueue(s, { path: 'events/AAA', type: 'update', coalesceKey: 'kp:h3',
+            value: { 'kpLeaders/h3': { playerId: '101', distanceInches: 42 },
+                     'kpWinners/h3': '101' } });
+        const shown = Q.applyQueued(ROUND, Q.peek(s), 'AAA');
+        assert.equal(shown.kpWinners.h3, '101', 'the queued KP winner is not on the card');
+        assert.equal(shown.kpLeaders.h3.distanceInches, 42);
+        assert.equal(shown.scores.p101_h1, 4, 'the stored round was lost');
+    });
+
+    test('and answering the same hole again replaces it, newest wins', () => {
+        const s = store();
+        const kp = (pid) => ({ path: 'events/AAA', type: 'update', coalesceKey: 'kp:h3',
+            value: { 'kpLeaders/h3': { playerId: pid }, 'kpWinners/h3': pid } });
+        Q.enqueue(s, kp('101'));
+        Q.enqueue(s, kp('102'));
+        assert.equal(Q.count(s), 1, 'two answers to one hole queued as two facts');
+        assert.equal(Q.applyQueued(ROUND, Q.peek(s), 'AAA').kpWinners.h3, '102');
     });
 
     test('an op for ANOTHER round is never laid on this one', () => {

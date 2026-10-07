@@ -108,7 +108,13 @@ describe('ONE WRITE PATH — THE WHOLE POINT', () => {
         // match press can carry its own amount. It is still the same single writer.
         assert.match(src, /function confirmMatchPress\(stake\)/);
         assert.match(src, /function pressMatchBet\(baseId, nextHole\)/);
-        assert.equal((src.match(/matchPresses\/\$\{pushKey\}`\)\.set/g) || []).length, 2,
+        // RE-POINTED 2026-10-06 (OFFLINE MODE): both writers still exist and
+        // still write the same path, but through durableWrite, so the op is on
+        // the phone before it is issued. A manual press is still refused when
+        // the device is offline - connectivity_safety_test.js holds that - so
+        // this queue only covers a press created with signal whose write is
+        // still in flight when the app closes.
+        assert.equal((src.match(/matchPresses\/\$\{pushKey\}`, 'set'/g) || []).length, 2,
             'both round-format writers still present, unchanged in number');
     });
 });

@@ -45,12 +45,27 @@ function inlineJs(file) {
 // Every manual money write in the app, and the page it lives on. "Manual" is
 // the operative word: these are created by a human tapping a button to record
 // an agreement, not derived from a score.
+// THE KP WRITE IS NO LONGER ON THIS LIST (Manny's call, 2026-10-06), and that
+// is a deliberate narrowing rather than a gap: KP answers now go through the
+// durable queue like scores, because the KP question is asked on the green by
+// the group standing on it and it is the one answer nobody can reconstruct
+// afterwards - a score is on the paper card, "who was inside the circle on 7"
+// is not. offline_queue_test.js holds the queued shape and the newest-wins rule,
+// and the case below holds that it is still ONE atomic update.
+//
+// MANUAL PRESSES STAY ON THIS LIST and stay refused offline. A press is a
+// decision about money made at a moment, not a record of something that
+// happened; two phones pressing in a dead zone cannot be reconciled afterwards.
 const MONEY_WRITE_SITES = [
     { file: 'index.html', fn: 'confirmSidePress', anchor: 'sideMatches/${key}/${node}`).push().key', what: 'side match press from the scorecard' },
-    { file: 'index.html', fn: 'savePoolKp', anchor: "kpWinners/h' + hole", what: 'Money Pool KP winner' },
     { file: 'index.html', fn: 'confirmStrokePress', anchor: 'strokePresses/${pushKey}', what: 'stroke press' },
     { file: 'index.html', fn: 'confirmMatchPress', anchor: 'matchPresses/${pushKey}', what: 'match press' },
-    { file: 'index.html', fn: 'pressMatchBet', anchor: '.set({ baseId, startHole: nextHole })', what: 'press from View All Action' },
+    // ANCHOR MOVED 2026-10-06, not the guard: this press now goes through
+    // durableWrite (so a press created ONLINE survives the app closing mid-write)
+    // and the call reads durableWrite(path, 'set', {...}) instead of ref.set({...}).
+    // The requireOnlineForMoney check above it is untouched - a manual press is
+    // still refused offline.
+    { file: 'index.html', fn: 'pressMatchBet', anchor: "'set', { baseId, startHole: nextHole }", what: 'press from View All Action' },
     { file: 'index.html', fn: 'addAction', anchor: 'additionalGameInstances`).push().key', what: 'adding a betting game mid-round' },
     { file: 'index.html', fn: 'saveWolfCall', anchor: 'wolfCalls/h${hole}', what: 'Wolf call' },
     { file: 'index.html', fn: 'saveDots', anchor: 'dots/h${currentDotHole}', what: 'Dots for the hole' },
@@ -112,12 +127,32 @@ describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while o
     });
 
     test('the refusal wording is explicit about what did NOT happen', () => {
+        // RE-POINTED 2026-10-06 (Manny): the press refusal now says what still
+        // works, because "reconnect" told a golfer in a dead zone to do the one
+        // thing they cannot do and said nothing about the presses the app is
+        // applying for them anyway.
         const idx = inlineJs('index.html');
         const sm = inlineJs('sidematches.html');
-        assert.match(idx, /'PRESS NOT SAVED', 'Reconnect before creating a press\.'/);
-        assert.match(idx, /'KP NOT SAVED', 'Reconnect before recording the KP\.'/);
-        assert.match(sm, /'PRESS NOT SAVED', 'Reconnect before creating a press\.'/);
+        const PRESS = /'PRESS NOT SAVED', 'Pressing needs signal \\u2014 auto presses still work\.'/;
+        assert.match(idx, PRESS);
+        assert.match(sm, PRESS);
+        assert.equal(/Reconnect before creating a press/.test(idx + sm), false,
+            'the old wording is still somewhere, so two surfaces now disagree');
         assert.match(idx, /You\\'re offline\./, 'The refusal must say why.');
+    });
+
+    test('AND THE KP ANSWER IS QUEUED, NOT REFUSED - one atomic update through the queue', () => {
+        // Manny's call, 2026-10-06. The guard is gone from this one write and
+        // nothing else: the write still carries kpLeaders and kpWinners together,
+        // so a refusal can never leave half a KP, and it is coalesced by hole so
+        // a group who changes their answer replaces the queued one.
+        const idx = inlineJs('index.html');
+        assert.match(idx, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:h' \+ hole\)/,
+            'the KP write no longer goes through the durable queue');
+        assert.equal(/'KP NOT SAVED', 'Reconnect before recording the KP\.'/.test(idx), false,
+            'the KP offline refusal is back');
+        // AND THE QUEUE IS WHAT CARRIES IT, not a second copy of the logic here.
+        assert.match(idx, /window\.OfflineQueue/);
     });
 
     test('the guard returns false offline and true online, and never throws', () => {

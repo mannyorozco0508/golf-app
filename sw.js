@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v143-matchcard. The tournament product cache
+// The consumer product cache is consumer-v145-offline. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4257,7 +4257,20 @@
 // and there is not one dollar anywhere on it. Display only: every figure comes
 // out of the builders that already priced the round. A device on v302 has the old
 // card with its faded closed rows and no overall answer.
-const CACHE_VERSION = 'golfapp-v303-matchcard';
+// Moved to v307 FOR OFFLINE MODE YOU CAN TRUST. Scores and KP answers are
+// written to a durable queue on the phone (offline-queue.js) BEFORE they are
+// sent, replayed in order when signal returns, and removed only when the server
+// confirms each one. Measured end to end in tools/airplane-mode-check.js: seven
+// scores typed in airplane mode survive a reload AND a phone restart, then all
+// seven land when the signal comes back. Before this, the only queue was
+// Firebase's in-memory one - measured in tools/offline-durability-audit.js:
+// after a reload its length is 0 and the payload is in no durable store, so a
+// device on v306 that closes the app in a dead zone LOSES EVERY UNSENT SCORE.
+// A round already opened on the phone now opens and is scoreable with no
+// signal; the scorecard carries a badge saying what is waiting; and the
+// leaderboard, bets, results and final card compute from local data with "May
+// change when others sync." Manual presses still need signal, by decision.
+const CACHE_VERSION = 'golfapp-v307-offline';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

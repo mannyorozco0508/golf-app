@@ -5435,7 +5435,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             ? { startHole: fresh.nextPressHole, stake: stake }
             : { baseId: '18', startHole: fresh.nextPressHole, stake: stake };
 
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closeSidePress(); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) { closeSidePress(); return; }
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${key}/${node}`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${key}/${node}/${pushKey}`)
             .set(payload)
@@ -6107,7 +6107,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             uiFail('\u26A0\uFE0F NOT SAVED\nYou can only record a KP for a golfer in your own group.');
             return;
         }
-        if (!requireOnlineForMoney('KP NOT SAVED', 'Reconnect before recording the KP.')) return;
+        // KP ANSWERS QUEUE OFFLINE, LIKE SCORES (Manny's call, 2026-10-06). This
+        // was refused offline with the rest of the money writes, and the refusal
+        // was wrong for this one in a way the others are not: the KP question is
+        // asked ON THE GREEN, by the group standing on it, and it is the one
+        // answer nobody can reconstruct afterwards - a score is on the paper
+        // card, "who was inside the circle on 7" is not. A refusal there means
+        // the group answers it twice, or not at all.
+        //
+        // MANUAL PRESSES ARE THE OPPOSITE and stay refused - see the press
+        // handlers, which now say so in those words. The money guard is unchanged
+        // everywhere else and connectivity_safety_test.js still holds it there.
+        //
+        // Newest wins, by hole: coalesceKey 'kp:h<N>' means a group who changes
+        // their answer replaces the queued one instead of queueing a second.
 
         const players = currentData.players || [];
         const p = players.find(x => String(x.id) === String(pid));
@@ -6127,7 +6140,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // RETURNED, not just fired. A caller that must know whether the KP was
         // actually accepted - the forced modal, which may not close on a refusal -
         // has no other way to tell: every refusal above returns undefined.
-        return db.ref('events/' + currentMode).update(updates)
+        // ONE UPDATE, still: kpLeaders and kpWinners together, so a refusal can
+        // never leave half a KP. The queue carries that shape as a single op.
+        return durableWrite('events/' + currentMode, 'update', updates, 'kp:h' + hole)
             .then(() => {
                 kpEntryOpenHole = null;
                 renderKpEntryMount();
@@ -7158,7 +7173,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function confirmStrokePress(stake) {
         const model = currentBetStripModel();
         if (!model || !model.canPress) { closePressPanel(); uiRefuse('That bet can no longer be pressed.'); return; }
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) { closePressPanel(); return; }
         const pushKey = db.ref(`events/${currentMode}/strokePresses`).push().key;
         durableWrite(`events/${currentMode}/strokePresses/${pushKey}`, 'set',
                      { startHole: model.nextPressHole, stake })
@@ -7183,7 +7198,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function confirmMatchPress(stake) {
         const model = currentBetStripModel();
         if (!model || !model.canPress || !model.pressBaseId) { closePressPanel(); uiRefuse('That match can no longer be pressed.'); return; }
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) { closePressPanel(); return; }
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) { closePressPanel(); return; }
         const payload = { baseId: model.pressBaseId, startHole: model.nextPressHole };
         const amt = Number(stake);
         if (stake !== undefined && stake !== null && isFinite(amt) && amt > 0) payload.stake = amt;
@@ -8617,6 +8632,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             renderOfflineBadge();
         }, function () { renderOfflineBadge(); });
         renderOfflineBadge();
+        // ARMED HERE, not at arrival: there is now something to retry.
+        ensureRetryTimer();
         return p;
     }
 
@@ -8642,12 +8659,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
         draining = true;
         renderOfflineBadge(true);
+        // TIME-BOUND, and that is the fix for the defect that cost this feature
+        // once: an offline write never settles, so a drain started a moment too
+        // early waited on it for the life of the page - queue full, badge stuck
+        // on "Sending...", and no later drain able to start. offline-queue.js
+        // abandons a write that does not settle, leaves the op queued, and
+        // returns, so the retry below can have another go.
         return q.drain(store, function (op) {
             var ref = db.ref(op.path);
             if (op.type === 'remove' || op.value === null) return ref.remove();
             if (op.type === 'update') return ref.update(op.value);
             return ref.set(op.value);
-        }).then(function (r) {
+        }, { timeoutMs: 12000 }).then(function (r) {
             draining = false;
             if (r && r.dropped) lastDrop += r.dropped;
             renderOfflineBadge();
@@ -8683,12 +8706,52 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // AND ON ARRIVAL, because the app may have been closed with scores in the
         // queue and reopened with signal already back - no event fires for that.
         setTimeout(function () { drainQueue('arrival'); }, 1500);
+        // AND ON A TIMER, WHICH IS THE ONE THAT ACTUALLY SAVES A DEAD BAR - but
+        // only while something is waiting. See ensureRetryTimer.
+        ensureRetryTimer();
+    }
+
+    // THE RETRY, ARMED ONLY WHILE THERE IS SOMETHING TO SEND.
+    //
+    // WHY IT IS NOT A PLAIN setInterval. The events this would otherwise rely on
+    // both need something to CHANGE: `online` fires when the OS notices, and
+    // .info/connected when a socket opens. A phone sitting on one bar in a tree
+    // line changes neither for twenty minutes while every write hangs - the
+    // stuck state this wave exists to remove - so something has to ask again.
+    //
+    // AND WHY IT IS LAZY. The first version armed a 20s interval unconditionally
+    // at arrival, which is a wake-up every 20 seconds for the whole round on a
+    // phone with an empty queue, and - measured the hard way - a timer that
+    // never stops in the TEST harness either: the suites load this page's inline
+    // script into a sandbox with real timers, so `node --test` had nothing left
+    // to wait for except an interval that fires for ever. round_role_test.js
+    // alone did not finish in ten minutes. It now starts when an op is queued
+    // and stops when the queue empties, which is both kinder to the battery and
+    // the reason the suite terminates.
+    var retryTimer = null;
+    function ensureRetryTimer() {
+        if (retryTimer) return;
+        var st = offlineStore();
+        var q = window.OfflineQueue;
+        if (!st || !q) return;
+        var waiting = 0;
+        try { waiting = q.count(st) || 0; } catch (e) { waiting = 0; }
+        if (!waiting) return;
+        retryTimer = setInterval(function () {
+            var s2 = offlineStore();
+            var n = 0;
+            try { n = (window.OfflineQueue && s2) ? (window.OfflineQueue.count(s2) || 0) : 0; } catch (e) { n = 0; }
+            if (!n) { clearInterval(retryTimer); retryTimer = null; return; }
+            drainQueue('retry');
+        }, 20000);
     }
 
     // ---- THE BADGE ----------------------------------------------------------
     // NEVER A SCARY ERROR FOR A QUEUED SCORE. A score in this queue is on this
     // phone and will go; saying anything that reads as failure would be false and
     // would push a golfer into re-entering holes they already entered.
+    var syncedHideTimer = null;
+    var badgeHasSpoken = false;
     function renderOfflineBadge(sending) {
         var el = document.getElementById('offline-badge');
         if (!el) return;
@@ -8697,13 +8760,41 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!q || !store) { el.style.display = 'none'; return; }
         var waiting = 0;
         try { waiting = q.count(store) || 0; } catch (e) { waiting = 0; }
-        var b = q.badge({ waiting: waiting, sending: !!sending && waiting > 0, dropped: lastDrop });
+        // "Sending" ONLY WHILE A DRAIN IS GENUINELY IN FLIGHT. It used to be
+        // whatever the caller passed, and a drain stuck on a write that never
+        // settled left the word on screen for the rest of the round while nothing
+        // was being sent at all. `draining` is cleared the moment the drain
+        // returns - including when it gives up on a timeout - so the badge falls
+        // back to the honest "Saved on this phone - N waiting".
+        // SILENT UNTIL THERE HAS BEEN SOMETHING TO SEND. A fresh round has an
+        // empty queue, and showing "Synced" on arrival - even for two seconds -
+        // is a row of height the hole card does not have: measured, the heading
+        // moved 58px down the page and the card stopped fitting one screen, and
+        // two geometry guards said so. The badge appears when the first op is
+        // queued and goes quiet again two seconds after the last one lands.
+        if (!waiting && !lastDrop && !badgeHasSpoken) { el.style.display = 'none'; return; }
+        if (waiting) badgeHasSpoken = true;
+        var b = q.badge({ waiting: waiting, sending: !!sending && draining && waiting > 0,
+                          dropped: lastDrop });
         el.textContent = b.text;
         el.className = 'offline-badge obs-' + b.kind;
-        // SYNCED IS THE QUIET STATE. It is shown, because "is my round saved" is
-        // the question this badge exists to answer, but it is the only one that
-        // does not need attention drawn to it.
+        // "SYNCED" IS SHOWN, THEN THE ROW GOES. It has to be shown - "is my round
+        // saved" is the question this badge exists to answer - and it must not
+        // cost a permanent row: measured, a line that is always there pushed the
+        // hole card past one screen and moved the heading 58px down the page,
+        // and three geometry guards said so. So it behaves like the save-state
+        // line above it: visible for two seconds after the queue empties, then
+        // collapsed. Anything that needs attention - waiting, sending, refused -
+        // stays until it is resolved.
         el.style.display = 'block';
+        if (syncedHideTimer) { clearTimeout(syncedHideTimer); syncedHideTimer = null; }
+        if (b.kind === 'synced') {
+            syncedHideTimer = setTimeout(function () {
+                syncedHideTimer = null;
+                var e2 = document.getElementById('offline-badge');
+                if (e2 && /obs-synced/.test(e2.className)) { e2.style.display = 'none'; badgeHasSpoken = false; }
+            }, 2000);
+        }
     }
 
     // ---- OPENING WITH NO SIGNAL ---------------------------------------------
@@ -10509,7 +10600,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // blocking dialogs are unreliable inside an installed PWA, and the inline
     // press panel already shows the start hole before anything is written.
     function pressMatchBet(baseId, nextHole) {
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/matchPresses`).push().key;
         durableWrite(`events/${currentMode}/matchPresses/${pushKey}`, 'set', { baseId, startHole: nextHole })
             .catch(err => uiFail(`Press failed to save: ${err.message}`));

@@ -52,6 +52,9 @@
     var PERMANENT = ['PERMISSION_DENIED', 'permission_denied', 'INVALID_TOKEN', 'invalid-argument'];
 
     function isPermanent(err) {
+        // A TIMEOUT IS THE OPPOSITE OF PERMANENT - it is the sound of no signal,
+        // and dropping the op would be throwing the score away.
+        if (err && err.code === 'queue_timeout') return false;
         var s = String((err && (err.code || err.message)) || err || '');
         for (var i = 0; i < PERMANENT.length; i++) {
             if (s.indexOf(PERMANENT[i]) !== -1) return true;
@@ -135,15 +138,48 @@
     // STOPS AT THE FIRST OUTAGE. If an op fails for anything but a permanent
     // refusal, the drain ends there and leaves it - and everything after it -
     // queued. Carrying on would reorder the round.
-    function drain(store, write) {
+    // AND EVERY WRITE IS TIME-BOUND. This is the bug that cost the whole feature
+    // once already, measured end to end: a drain that starts while the socket is
+    // still down issues ONE write, that write NEVER SETTLES (which is exactly
+    // what an offline Firebase write does - measured, 0 resolved, 0 rejected),
+    // and the drain then waits on it for the life of the page. The queue stayed
+    // full, the badge stayed on "Sending...", and no later drain could start
+    // because the first one never finished. The stand-in database recorded
+    // precisely one write and the server got nothing.
+    //
+    // A timeout is not a guess about the network; it is the only way to get the
+    // drain back. The op stays queued, the caller is told it stopped, and the
+    // write that was in flight may still land later - which costs nothing,
+    // because every op carries its full path and its own value, so a replay
+    // writes the same number to the same place.
+    function drain(store, write, opts) {
         var ops = readAll(store);
+        var timeoutMs = (opts && opts.timeoutMs !== undefined) ? opts.timeoutMs : 15000;
         var result = { sent: 0, dropped: 0, left: ops.length, stoppedOn: null };
+        function timed(p) {
+            if (!timeoutMs) return Promise.resolve(p);
+            return new Promise(function (resolve, reject) {
+                var done = false;
+                var t = setTimeout(function () {
+                    if (done) return;
+                    done = true;
+                    var e = new Error('write did not settle in ' + timeoutMs + 'ms');
+                    e.code = 'queue_timeout';
+                    reject(e);
+                }, timeoutMs);
+                Promise.resolve(p).then(function (v) {
+                    if (done) return; done = true; clearTimeout(t); resolve(v);
+                }, function (err) {
+                    if (done) return; done = true; clearTimeout(t); reject(err);
+                });
+            });
+        }
         function step(i) {
             if (i >= ops.length) { result.left = count(store); return Promise.resolve(result); }
             var op = ops[i];
             var p;
             try { p = write(op); } catch (e) { p = Promise.reject(e); }
-            return Promise.resolve(p).then(function () {
+            return timed(p).then(function () {
                 confirm(store, op.id);
                 result.sent++;
                 return step(i + 1);
@@ -200,6 +236,28 @@
         for (var i = 0; i < (ops || []).length; i++) {
             var op = ops[i];
             var path = String(op.path || '');
+            // A MULTI-PATH UPDATE AT THE ROUND'S ROOT. This is how the app writes
+            // a KP answer - one update() carrying kpLeaders/hN and kpWinners/hN
+            // together, so a refusal cannot leave half of it - and the first
+            // version of this function skipped it entirely: the path is
+            // events/<code> with nothing after it, so the per-key walk below had
+            // no key to walk to and a queued KP never appeared on the card.
+            if (path === 'events/' + String(code || '').toUpperCase()
+                && op.type === 'update' && op.value && typeof op.value === 'object') {
+                for (var rk in op.value) {
+                    if (!Object.prototype.hasOwnProperty.call(op.value, rk)) continue;
+                    var seg = String(rk).split('/').filter(Boolean);
+                    if (!seg.length) continue;
+                    var n2 = out;
+                    for (var si = 0; si < seg.length - 1; si++) {
+                        if (n2[seg[si]] == null || typeof n2[seg[si]] !== 'object') n2[seg[si]] = {};
+                        n2 = n2[seg[si]];
+                    }
+                    if (op.value[rk] === null) delete n2[seg[seg.length - 1]];
+                    else n2[seg[seg.length - 1]] = op.value[rk];
+                }
+                continue;
+            }
             if (path.indexOf(prefix) !== 0) continue;
             var rest = path.slice(prefix.length).split('/').filter(Boolean);
             if (!rest.length) continue;
@@ -221,6 +279,42 @@
             } else { node[last] = op.value; }
         }
         return out;
+    }
+
+    // ---- WHAT THE READING PAGES SHOW (2026-10-06) ---------------------------
+    // Requirement 5 is a LABEL, not arithmetic (Manny: "No new math"). The
+    // leaderboard, matches, skins and results already compute from the round
+    // record they are handed; hand them the stored round with this phone's
+    // unsent edits laid on top and they compute offline by themselves. The only
+    // new thing is a sentence saying the numbers are provisional.
+    //
+    // ONE DEFINITION FOR FOUR PAGES. Four hand-written copies of "is this
+    // provisional" is how two of them end up disagreeing, and this repo has paid
+    // for a hand-written copy per page before.
+    function localRound(store, code, serverData) {
+        var out = { data: serverData || null, fromLocal: false, waiting: 0 };
+        if (!store || !code) return out;
+        try { out.waiting = count(store) || 0; } catch (e) { out.waiting = 0; }
+        var ops = [];
+        try { ops = peek(store) || []; } catch (e) { ops = []; }
+        if (!out.data || !out.data.players) {
+            // NOTHING FROM THE SERVER: the last round this phone saw, which is
+            // the difference between a leaderboard and "Connecting to game...".
+            var snap = loadSnapshot(store, code);
+            if (snap && snap.data) { out.data = snap.data; out.fromLocal = true; }
+        }
+        if (out.data && ops.length) out.data = applyQueued(out.data, ops, code) || out.data;
+        return out;
+    }
+
+    // SHOWN WHEN THE NUMBERS COULD STILL MOVE: this phone has unsent work, or it
+    // cannot hear the other phones. Not an error - a caveat.
+    function syncNote(state) {
+        var waiting = (state && state.waiting) || 0;
+        var offline = !!(state && state.offline);
+        var fromLocal = !!(state && state.fromLocal);
+        return { show: waiting > 0 || offline || fromLocal,
+                 text: 'May change when others sync.' };
     }
 
     // ---- WHAT THE BADGE SAYS ------------------------------------------------
@@ -246,6 +340,7 @@
         enqueue: enqueue, confirm: confirm, count: count, peek: peek, clear: clear,
         drain: drain, isPermanent: isPermanent,
         saveSnapshot: saveSnapshot, loadSnapshot: loadSnapshot, applyQueued: applyQueued,
+        localRound: localRound, syncNote: syncNote,
         badge: badge
     };
 

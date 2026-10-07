@@ -114,7 +114,18 @@ describe('TRACKED: a buffered save is counted by the pill and the guard, on both
         // in the Chrome probe: "🟡 Waiting to sync (1)…" / "keep this page open".
         const boot = read('pwa-boot.js');
         assert.match(boot, /Waiting to sync \(' \+ s\.pending \+ '\)/);
-        assert.match(boot, /waiting to sync\. Keep this page open\./);
+        // RE-POINTED 2026-10-06. "Keep this page open" is no longer a constant:
+        // the consumer scorecard has a durable queue for scores and KP answers
+        // that survives the app closing and the phone restarting, so telling
+        // THAT golfer to keep the page open is false. The tournament pages load
+        // pwa-boot and not the queue, and there the original sentence is still
+        // the true one - so the wording now follows the MECHANISM, and both
+        // halves are pinned here.
+        assert.match(boot, /waiting to sync\. ' \+ keepOpenOrNot\(\)/);
+        assert.match(boot, /\? 'Scores are saved on this phone\.'/);
+        assert.match(boot, /: 'Keep this page open\.'/);
+        assert.match(boot, /function hasDurableQueue\(\)/,
+            'the wording must be decided by whether the queue is present, not by a product name');
     });
     test('native shell: the same - the round save is tracked even though the course publish is a no-op there', { timeout: 4000 }, async () => {
         const sb = pageReadyToSave({ native: true });

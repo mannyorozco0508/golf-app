@@ -65,6 +65,7 @@
     <script src="grouping.js"></script>
     <!-- score-gaps.js (v192): the flag beside a total whose card has a blank hole inside it. -->
     <script src="score-gaps.js"></script>
+    <script src="offline-queue.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -333,7 +334,15 @@
         .to-par-even { color: var(--text-main); font-weight: bold; }
 
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
-    </style>
+            /* "MAY CHANGE WHEN OTHERS SYNC" (2026-10-06). One line, under the title,
+           on every reading page. It is a CAVEAT, not an error: the numbers are
+           real, they are this phone's view of a round whose other phones may not
+           have reported yet. Same words and one definition for all four pages -
+           OfflineQueue.syncNote - because four hand-written copies is how two of
+           them end up disagreeing. */
+        .sync-caveat { display: none; text-align: center; font-size: 0.76rem;
+            color: var(--text-muted); margin: 0 0 8px 0; }
+</style>
 <style>
 /* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
    page keeps its own padding and simply starts below the status bar. Every value
@@ -379,6 +388,7 @@ html {
     <div class="board-headline">
         <a class="back-btn" onclick="goBack()">← Back</a>
         <h2 class="event-title" id="main-title">🏆 Live Leaderboard</h2>
+        <p class="sync-caveat" id="sync-caveat" role="status" aria-live="polite"></p>
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
     </div>
 
@@ -598,12 +608,51 @@ html {
             guides.forEach(a => { a.href = href; });
         })();
 
+        // THE ROUND THIS PHONE ALREADY HAS, BEFORE THE LISTENER SAYS ANYTHING
+        // (2026-10-06). Measured: with the round absent from the database the
+        // value listener never fires at all, so hydrating inside it left these
+        // pages blank with no signal - the caveat showed and there was nothing
+        // under it. index.html hydrates ahead of its listener for the same
+        // reason. A real snapshot replaces this the moment one arrives.
+        (function () {
+            if (!window.OfflineQueue) return;
+            var lr = window.OfflineQueue.localRound(localStorage, currentMode, null);
+            if (!lr.data || !lr.data.players) return;
+            currentBoardData = lr.data;
+            try { document.getElementById('main-title').textContent = '\U0001F3C6 ' + (currentBoardData.eventName || 'Live Leaderboard'); renderBoard(); } catch (e) {}
+            renderSyncCaveat(lr);
+        })();
+
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
-            currentBoardData = snapshot.val() || {};
+            // LOCAL DATA PLUS THIS PHONE'S QUEUE (2026-10-06). Same engines,
+            // same arithmetic - only the record they are handed changes, so a
+            // leaderboard computes with no signal instead of showing nothing.
+            var lr = window.OfflineQueue
+                ? window.OfflineQueue.localRound(localStorage, currentMode, snapshot.val())
+                : { data: snapshot.val(), waiting: 0, fromLocal: false };
+            currentBoardData = lr.data || {};
+            if (window.OfflineQueue && currentBoardData.players) {
+                try { window.OfflineQueue.saveSnapshot(localStorage, currentMode, snapshot.val() || currentBoardData); } catch (e) {}
+            }
             document.getElementById("main-title").textContent = `🏆 ${currentBoardData.eventName || "Live Leaderboard"}`;
+            renderSyncCaveat(lr);
             renderBoard();
         });
     }
+    // ONE RENDERER, ONE SENTENCE, FOUR PAGES. The decision is OfflineQueue's;
+    // this only paints it. If offline-queue.js never loaded, nothing shows and
+    // the page behaves exactly as it did before it existed.
+    function renderSyncCaveat(lr) {
+        var el = document.getElementById('sync-caveat');
+        if (!el) return;
+        if (!window.OfflineQueue) { el.style.display = 'none'; return; }
+        var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+        var note = window.OfflineQueue.syncNote({
+            waiting: (lr && lr.waiting) || 0, offline: offline, fromLocal: !!(lr && lr.fromLocal) });
+        el.textContent = note.text;
+        el.style.display = note.show ? 'block' : 'none';
+    }
+
 
     // parseHcp and getStrokes now come from money-engine.js. They were duplicated
     // here verbatim; two copies of a handicap rule is one copy too many.
