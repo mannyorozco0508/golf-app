@@ -204,7 +204,7 @@
         },
         "scores": {
           "$scoreKey": {
-            ".write": "root.child('tournaments/' + $tourneyCode).exists()",
+            ".write": "root.child('tournaments/' + $tourneyCode).exists() && (root.child('tournamentKeys/' + $tourneyCode + '/on').val() !== true || newData.parent().parent().parent().parent().child('scoreProofs/' + $tourneyCode + '/' + $scoreKey + '/t').val() === now)",
             ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0"
           }
         },
@@ -212,11 +212,34 @@
           "$roundId": {
             "scores": {
               "$scoreKey": {
-                ".write": "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()",
+                ".write": "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists() && (root.child('tournamentKeys/' + $tourneyCode + '/on').val() !== true || newData.parent().parent().parent().parent().parent().parent().child('scoreProofs/' + $tourneyCode + '/r/' + $roundId + '/' + $scoreKey + '/t').val() === now)",
                 ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0"
               }
             }
           }
+        }
+      }
+    },
+    "tournamentKeys": {
+      "$code": {
+        ".read": "auth != null && auth.uid === root.child('tournaments/' + $code + '/ownerUid').val()",
+        ".write": "auth != null && auth.uid === newData.parent().parent().child('tournaments/' + $code + '/ownerUid').val()",
+        "on": { ".validate": "newData.isBoolean()" }
+      }
+    },
+    "scoreProofs": {
+      "$code": {
+        "r": {
+          "$rid": {
+            "$scoreKey": {
+              ".write": "root.child('tournaments/' + $code).exists() && (root.child('tournamentKeys/' + $code + '/on').val() !== true || (newData.child('t').val() === now && $scoreKey.beginsWith(newData.child('who').val() + '_') && (newData.child('k').val() === root.child('tournamentKeys/' + $code + '/t/' + newData.child('who').val()).val() || newData.child('k').val() === root.child('tournamentKeys/' + $code + '/r/' + $rid + '/' + newData.child('who').val()).val())))",
+              ".validate": "newData.hasChildren(['who', 'k', 't']) && newData.child('who').isString() && newData.child('who').val().length <= 40 && newData.child('k').isString() && newData.child('k').val().length >= 16 && newData.child('k').val().length <= 64 && newData.child('t').isNumber()"
+            }
+          }
+        },
+        "$scoreKey": {
+          ".write": "root.child('tournaments/' + $code).exists() && (root.child('tournamentKeys/' + $code + '/on').val() !== true || (newData.child('t').val() === now && $scoreKey.beginsWith(newData.child('who').val() + '_') && (newData.child('k').val() === root.child('tournamentKeys/' + $code + '/t/' + newData.child('who').val()).val() || newData.child('k').val() === root.child('tournamentKeys/' + $code + '/p/' + newData.child('who').val()).val())))",
+          ".validate": "newData.hasChildren(['who', 'k', 't']) && newData.child('who').isString() && newData.child('who').val().length <= 40 && newData.child('k').isString() && newData.child('k').val().length >= 16 && newData.child('k').val().length <= 64 && newData.child('t').isNumber()"
         }
       }
     },

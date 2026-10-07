@@ -4279,7 +4279,12 @@
 // precached here on the combined deploy and changed: a Setup team row has Remove,
 // refused for a team with any posted score. v304 stays with spectator-polish.
 // A device on v305 has no Remove offline.
-const CACHE_VERSION = 'golfapp-v306-remove-team';
+// Moved to v308: THE SCORECARD LOCK (Tournaments). tournament.html and
+// tournament-scorecard.html are precached here on the combined deploy and both
+// changed: keyed team and group links, and a card that sends a keyed score with
+// its proof. v307 is held by the offline-durable-queue work in progress, so this
+// skips it. A device on v306 keeps a card that cannot score a locked event.
+const CACHE_VERSION = 'golfapp-v308-scorecard-lock';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

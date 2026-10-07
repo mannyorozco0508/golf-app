@@ -291,7 +291,7 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // the page's own button, and nothing else. Introduced for the pairings sheet,
 // whose @media print rules can only be measured with print media emulated
 // AFTER the button that builds the sheet has been pressed.
-async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth }) {
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, emulator }) {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
@@ -376,12 +376,31 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
         await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
             { width: v.width, height: v.height, deviceScaleFactor: 3, mobile: true });
 
+        if (emulator) {
+            // EMULATOR MODE (2026-10-06, scorecard-lock): the page's REAL Firebase
+            // SDK loads and talks to a database emulator running the REAL rules,
+            // so a refused write is refused by the rules and not by a stand-in that
+            // accepts everything. Only the database URL is changed, by wrapping
+            // initializeApp the moment the SDK defines the global. Signed out, as a
+            // golfer is; the caller seeds the emulator itself.
+            await rpc(ws, id++, 'Network.setBlockedURLs', { urls: (blockUrls || []) });
+            await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument', { source: `(function () {
+              var EMU = ${JSON.stringify(emulator)}; var real;
+              Object.defineProperty(window, 'firebase', { configurable: true,
+                get: function () { return real; },
+                set: function (v) { real = v; if (v && v.initializeApp && !v.__emu) {
+                  var init = v.initializeApp.bind(v);
+                  v.initializeApp = function (cfg) { return init(Object.assign({}, cfg, { databaseURL: EMU })); };
+                  v.__emu = true; } } });
+            })();` });
+        } else {
         // The real bundles must not load, or they would replace the stand-in.
         await rpc(ws, id++, 'Network.setBlockedURLs',
             { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js', '*firebase-auth-compat.js']
                 .concat(blockUrls || []) });
         await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
             { source: firebaseStub(JSON.stringify(db || { events: rounds || {} }), auth) });
+        }
         if (preScript) {
             await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument', { source: preScript });
         }

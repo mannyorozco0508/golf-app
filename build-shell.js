@@ -264,7 +264,12 @@ const PRODUCTS = {
         // changed: each Setup team row has Remove, refused for a team with any
         // posted score, and the Desk then flags its golfers. A device on v56
         // has no way to remove a team.
-        cacheName: 'tournament-v57-remove-team',
+        // Moved to v58 FOR THE SCORECARD LOCK (2026-10-06). tournament.html and
+        // tournament-scorecard.html changed: team and group links carry a key, a
+        // new event is born locked, Setup offers Lock scoring links, and the card
+        // sends each keyed score with its proof. A device on v57 keeps a card
+        // that cannot score a locked event.
+        cacheName: 'tournament-v58-scorecard-lock',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

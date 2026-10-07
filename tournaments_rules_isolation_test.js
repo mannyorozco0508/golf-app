@@ -146,9 +146,13 @@ describe('THE HARNESS IS REALLY RUNNING', () => {
         // with nothing behind it, the record came into being, and the organizer's
         // own create on that code would have been refused. Candidate 2 (published
         // 2026-09-18, live hash 66d26ee9...) closed it.
-        assert.equal(real.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode).exists()");
+        // RE-PINNED, scorecard-lock wave (2026-10-06): the existence grant is
+        // still the FIRST conjunct; the second requires a same-update proof
+        // (t === now) when the event's keys are on. Proven in the emulator by
+        // tools/tournament-scorecard-lock-emulator-check.js.
+        assert.equal(real.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode).exists() && (root.child('tournamentKeys/' + $tourneyCode + '/on').val() !== true || newData.parent().parent().parent().parent().child('scoreProofs/' + $tourneyCode + '/' + $scoreKey + '/t').val() === now)");
         assert.ok(!('.write' in real.scores), 'no grant on scores/ itself - a board must not be replaceable in one write');
-        assert.equal(real.rounds.$roundId.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()");
+        assert.equal(real.rounds.$roundId.scores.$scoreKey['.write'], "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists() && (root.child('tournamentKeys/' + $tourneyCode + '/on').val() !== true || newData.parent().parent().parent().parent().parent().parent().child('scoreProofs/' + $tourneyCode + '/r/' + $roundId + '/' + $scoreKey + '/t').val() === now)");
         assert.match(real.scores.$scoreKey['.validate'], /newData\.val\(\) <= 30/);
         assert.equal(real.scores.$scoreKey['.validate'], real.rounds.$roundId.scores.$scoreKey['.validate'], 'one validate at both depths');
         const stub = JSON.parse(fs.readFileSync(STUB_PATH, 'utf8')).rules;

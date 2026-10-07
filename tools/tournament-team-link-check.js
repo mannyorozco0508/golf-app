@@ -27,6 +27,15 @@
 // So team 1 must be editable for the team-7 result to mean anything, and the
 // gate refuses to grade otherwise.
 //
+// SINCE THE SCORECARD-LOCK WAVE (2026-10-06) IT MEASURES THE WRITE, NOT THE
+// INPUTS. Changing &team= on a link still opens an editable card - the page
+// cannot know the key is wrong - so counting editable inputs would report the
+// old reach forever. Each card is now opened with the page's REAL Firebase SDK
+// against a database emulator running the REAL rules (tools/lib/db-emulator.js),
+// a score is typed into the first hole box, and the check reads what the
+// SERVER holds and what the card says. Team 1's link must save; the same link
+// with team=7 must be refused, show "Not saved", and never "Saved".
+//
 //   node tools/tournament-team-link-check.js
 //
 //   exit 0   the screen's description matches what the links measurably do
@@ -34,7 +43,11 @@
 //   exit 2   could not run, or a card rendered nothing. NOTHING PROVEN.
 // ============================================================================
 
+const path = require('path');
+const crypto = require('crypto');
 const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
+const { startEmulator } = require('./lib/db-emulator.js');
+const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 
 const PARS = [4, 5, 3, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 4, 5, 4];
 const course = PARS.map((p, i) => ({ hole: i + 1, par: p, hcpIndex: ((i * 7) % 18) + 1 }));
@@ -64,9 +77,20 @@ const db = {
             ownerUid: 'u-org'
         }
     },
+    // LOCKED: every team has a key and the lock is on, as a new event is born.
+    tournamentKeys: { LINK01: { on: true, t: Object.fromEntries(Object.keys(teams).map((k) => [k, crypto.randomBytes(16).toString('hex')])) } },
     events: {}, trips: {}, global_courses: {}
 };
 
+// Types a score into the first hole box the way a scorekeeper does, then the
+// probe reads what the CARD says about it (save-state) after the server answers.
+const TYPE = `setTimeout(function () {
+  var i = document.querySelector('#holes-list input');
+  window.__typed = !!i;
+  if (i) { i.value = '4'; i.dispatchEvent(new Event('change', { bubbles: true })); }
+}, 3500);`;
+const SAVE_PROBE = `(() => JSON.stringify({ typed: !!window.__typed,
+  saveState: (document.getElementById('save-state') || {}).innerText || '' }))()`;
 const CARD_PROBE = `
 (() => {
   const inputs = Array.prototype.slice.call(document.querySelectorAll('input'))
@@ -95,6 +119,8 @@ const ORGANIZER_PROBE = `
   return JSON.stringify({
     rendered: body.length,
     linksBlurb: i >= 0 ? (lines[i + 1] || '') : null,
+    // The links exactly as the Share buttons hand them out.
+    shareUrls: Array.prototype.slice.call(document.querySelectorAll('#team-links-list button[data-share-url]')).map(b => b.getAttribute('data-share-url')),
     everyLine: lines
   });
 })()`;
@@ -138,61 +164,65 @@ function grantsToAnyone(sentence) {
         process.exit(2);
     };
 
-    const own = await look('tournament-scorecard.html', 'tourney=LINK01&team=1', CARD_PROBE);
-    const other = await look('tournament-scorecard.html', 'tourney=LINK01&team=7', CARD_PROBE);
-    const org = await look('tournament.html', 'tourney=LINK01', ORGANIZER_PROBE, { uid: 'u-org', email: 'org@example.com', isAnonymous: false });
-    if (!own.ran) bail('team 1 card did not run: ' + own.reason);
-    if (!other.ran) bail('team 7 card did not run: ' + other.reason);
+    // ---- THE ORGANIZER'S SCREEN: the blurb, and team 1's link as handed out ----
+    const org = await look('tournament.html', 'tourney=LINK01', ORGANIZER_PROBE, OWNER);
     if (!org.ran) bail('the organizer screen did not run: ' + org.reason);
-
-    // ---- THE GATE ----
-    if (own.editable === 0) {
-        bail('a team opening its OWN link found nothing to type into, so "another team is '
-           + 'editable" cannot mean anything and the page is broken for a different reason',
-            { own });
-    }
     if (org.linksBlurb === null) {
         bail('the organizer screen has no "Team Scorecard Links" section, so there is no '
            + 'sentence to hold against the measurement',
             { firstLines: (org.everyLine || []).slice(0, 25) });
     }
+    const team1Link = (org.shareUrls || []).find((u) => /[?&]team=1(&|$)/.test(u));
+    if (!team1Link || !/[?&]k=[0-9a-f]{32}/.test(team1Link)) bail('the owner screen handed out no keyed link for team 1', org.shareUrls);
+    const q1 = team1Link.split('?')[1];
+    const q7 = q1.replace(/([?&]|^)team=1(&|$)/, '$1team=7$2');
+
+    // ---- THE CARDS, AGAINST THE REAL RULES ----
+    let emu;
+    try { emu = await startEmulator({ rulesPath: path.join(__dirname, '..', 'database.rules.json'), port: 9473, ns: 'teamlink' }); }
+    catch (e) { bail('could not start the emulator: ' + e.message); }
+    await emu.admin('PUT', '', { tournaments: db.tournaments, tournamentKeys: db.tournamentKeys });
+    const card = async (q) => {
+        const r = await arriveCold({ url: fileUrl('tournament-scorecard.html', q), emulator: emu.url, preScript: TYPE, settleMs: 7000,
+            steps: [{ expression: CARD_PROBE }, { expression: SAVE_PROBE }] });
+        if (!r.ok) return { ran: false, reason: r.reason };
+        try { return Object.assign({ ran: true }, JSON.parse(r.value[0]), JSON.parse(r.value[1])); }
+        catch (e) { return { ran: false, reason: 'non-JSON: ' + String(r.value).slice(0, 200) }; }
+    };
+    const own = await card(q1);
+    const other = await card(q7);
+    const stored = await emu.admin('GET', 'tournaments/LINK01/scores');
+    emu.stop();
+    if (!own.ran) bail('team 1 card did not run: ' + own.reason);
+    if (!other.ran) bail('team 7 card did not run: ' + other.reason);
+    if (!own.typed || !other.typed) bail('a card had no hole box to type into', { own, other });
 
     const failures = [];
+    const ownSaved = !!(stored && stored.team1_h1 === 4);
+    const otherSaved = !!(stored && stored.team7_h1 !== undefined);
+    // ---- THE GATE: the positive arm ----
+    if (!ownSaved) bail('team 1, on its OWN keyed link, did not save - so a refused team 7 proves nothing', { own, stored });
+
+    // ---- THE MEASUREMENT: what the database did with the tampered link ----
+    if (otherSaved) failures.push(`team 1's link with team=7 SAVED a score on team 7's card (server holds team7_h1=${stored.team7_h1})`);
+    if (!/Not saved/.test(other.saveState)) failures.push('the refused card did not say "Not saved": ' + JSON.stringify(other.saveState));
+    if (/Saved/.test(other.saveState.replace(/Not saved/g, ''))) failures.push('the refused card showed "Saved": ' + JSON.stringify(other.saveState));
+
+    // ---- THE BINDING: the organizer's sentence against what was measured ----
     const sentences = String(org.linksBlurb).split(/(?<=[.;!?])\s+/).filter(Boolean);
     const claiming = sentences.filter(claimsExclusivity);
     const granting = sentences.filter(grantsToAnyone);
-
-    // ---- THE BINDING. Measured reach vs stated reach. ----
-    if (other.editable > 0 && claiming.length > 0) {
-        failures.push(`the organizer screen claims exclusivity - ${JSON.stringify(claiming)} - `
-            + `while a link pointed at ANOTHER team opened ${other.editable} of ${other.inputs} `
-            + `editable inputs on ${JSON.stringify(other.teamsNamed)}. Team 1's own link opened `
-            + `${own.editable}. The sentence describes a protection the links do not have, and `
-            + `it is read by the person deciding how carefully to send them.`);
-    }
-    if (other.editable === 0 && granting.length > 0) {
-        failures.push(`the organizer screen says anyone with a link can score - ${JSON.stringify(granting)} - `
-            + `while a link pointed at ANOTHER team opened ${other.editable} of ${other.inputs} editable `
-            + 'inputs. The admission has become the false sentence; re-measure and re-word.');
-    }
-    if (other.editable > 0 && granting.length === 0 && claiming.length === 0) {
-        failures.push('another team\'s link is editable and the organizer screen neither admits it nor '
-            + 'claims otherwise. The sentence "Anyone who has a link can score that card." is the '
-            + 'measured truth and is meant to be beside the links.');
-    }
-    if (other.editable === 0 && claiming.length === 0 && !other.refused) {
-        failures.push('another team\'s link opened nothing AND the screen makes no claim - which '
-            + 'may be right, but this check can no longer tell a locked link from a broken one. '
-            + 'Look at it by hand.');
-    }
-
+    if (otherSaved && claiming.length > 0) failures.push('the screen claims exclusivity ' + JSON.stringify(claiming) + ' while a tampered link saved');
+    if (!ownSaved && granting.length > 0) failures.push('the screen says anyone with a link can score while a link\'s own card did not save');
     const verdict = failures.length ? 'FAIL' : 'PASS';
     console.log(JSON.stringify({
         verdict, failures,
         measured: {
-            ownLink: { editable: own.editable, of: own.inputs, teamsNamed: own.teamsNamed },
-            otherTeamLink: { editable: other.editable, of: other.inputs, teamsNamed: other.teamsNamed },
+            ownLink: { query: q1.replace(/k=[0-9a-f]+/, 'k=<team1 key>'), saved: ownSaved, saveState: own.saveState, editable: own.editable },
+            team1LinkPointedAtTeam7: { query: q7.replace(/k=[0-9a-f]+/, 'k=<team1 key>'), saved: otherSaved, saveState: other.saveState, editable: other.editable },
+            serverScores: stored
         },
+        emulatorOnlyTransform: emu.transformed + ' x registrations email regex',
         organizerBlurb: org.linksBlurb,
         sentencesClaimingExclusivity: claiming,
         sentencesGrantingToAnyone: granting
