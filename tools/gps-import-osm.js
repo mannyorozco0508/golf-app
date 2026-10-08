@@ -82,6 +82,9 @@ const COURSES = [
     { key: 'pinehills', file: 'myrtlewood', osm: 'relation(18885507)', preset: 'pinehills',
       holeFilter: (t) => /pine\s*hills/i.test(String(t['golf:course:name'] || '')) },
     { key: 'swwa_trimountain', file: 'tri_mountain', osm: 'way(149674375)', preset: 'swwa_trimountain' },
+    // Scottsdale (Wave 1, 2026-10-08): the Arizona test course. OSM way
+    // 78388948 is "TPC Scottsdale Stadium Course".
+    { key: 'az_tpc_stadium', file: 'tpc_scottsdale_stadium', osm: 'way(78388948)', preset: 'az_tpc_stadium' },
     { nines: true, file: 'thistle', osm: 'relation(21283499)', base: 'thistle_27',
       loops: { cameron: 'cameron', stewart: 'stewart', mackay: 'mckay' },
       nineNotes: { stewart: STEWART_NOTE } },
@@ -109,7 +112,7 @@ function trim(raw) {
 }
 
 async function fetchCourse(c) {
-    const q = `[out:json][timeout:60];\n${c.osm}->.course;\n.course map_to_area->.a;\n(nwr["golf"="hole"](area.a);nwr["golf"="green"](area.a););\nout geom;`;
+    const q = `[out:json][timeout:60];\n${c.osm}->.course;\n.course map_to_area->.a;\n(nwr["golf"="hole"](area.a);nwr["golf"="green"](area.a);nwr["golf"="tee"](area.a););\nout geom;`;
     const res = await fetch(OVERPASS, {
         method: 'POST',
         headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },

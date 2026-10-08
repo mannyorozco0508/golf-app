@@ -100,6 +100,16 @@ function inlineHaversineM(a, b) {
 // FROM THE TEE (off the hole, or no GPS): center is tee -> green center, derived
 // inline from the data; it is not read off the build.
 const TEE_CENTER = String(Math.round(inlineHaversineM(H1.tee, H1.mid) / 0.9144));
+const TEE_CENTER_YD = inlineHaversineM(H1.tee, H1.mid) / 0.9144;
+const ME_CENTER_YD = inlineHaversineM(ME, H1.mid) / 0.9144;
+// WAVE 1 ARCS, inline: carry arcs every 25 yds from 50 up to 40 yds short of the
+// pin; 100 / 150 / 200-to-the-pin marks when at least 40 yds short of it.
+function expectArcs(totalYd) {
+    const out = [];
+    for (let y = 50; y <= totalYd - 40; y += 25) out.push('c' + y);
+    [100, 150, 200].forEach((y) => { if (y <= totalYd - 40) out.push('p' + y); });
+    return out.join(' ');
+}
 if (String(Math.round(inlineHaversineM(ME, H1.mid) / 0.9144)) !== EXPECT.center) {
     console.error('the fixture moved: hole 1 center is no longer ' + EXPECT.center + ' yds from the test spot'); process.exit(2);
 }
@@ -169,6 +179,13 @@ const READ = `JSON.stringify((function () {
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(attr), map: box(mapEl),
                     back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
            teePx: ds.teePx ? ds.teePx.split(',').map(Number) : null,
+           arcs: ds.arcs == null ? null : ds.arcs,
+           arcLabels: o ? [].slice.call(o.querySelectorAll('.gps-arc-lbl')).filter(function (e) { return e.style.display !== 'none' && e.style.visibility !== 'hidden'; }).map(function (e) { return { text: e.innerText.trim(), box: box(e) }; }) : [],
+           midLbl: t('.gps-lbl-mid'), editPin: vis('.gps-edit-pin'), pinSave: vis('.gps-pin-save'), pinClear: vis('.gps-pin-clear'),
+           flag: box(q('.gps-flag')), flagEdit: !!(q('.gps-flag') && q('.gps-flag').classList.contains('gps-flag-edit')),
+           score: vis('.gps-score') ? t('.gps-score') : null, scoreBox: box(q('.gps-score')),
+           wind: vis('.gps-wind') ? t('.gps-wind') : null, windBox: box(q('.gps-wind')), windRot: q('.gps-wind') ? q('.gps-wind').getAttribute('data-rot') : null,
+           active: document.activeElement ? { cls: document.activeElement.className, hole: document.activeElement.getAttribute('data-hole') } : null,
            greenBox: ds.greenBox ? ds.greenBox.split(',').map(Number) : null,
            map: !!(o && o.querySelector('.maplibregl-canvas')),
            watches: window.__geo ? Object.keys(window.__geo.active).length : -1,
@@ -191,6 +208,9 @@ const mapTap = (x, y) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: {
 
 async function arm(name, key, ownerUid, mode, me, acc, steps, extra) {
     const code = 'GPS' + name.toUpperCase().slice(0, 5);
+    // No check reaches the real weather service: the wind arm brings a stand-in.
+    extra = Object.assign({}, extra || {});
+    extra.blockUrls = (extra.blockUrls || []).concat(['*api.weather.gov*']);
     const res = await arriveCold(Object.assign({
         url: fileUrl('index.html', 'game=' + code + '&group=1'),
         rounds: { [code]: round(key, ownerUid) },
@@ -246,12 +266,32 @@ function pillFails(tag, g, required) {
     if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two pills overlap');
     return f;
 }
+// Wave 1 arcs: the right set, a label for (nearly) every one, each label at the
+// LEFT end of its arc - left of the line of play - and covering nothing.
+function arcFails(tag, g, totalYd) {
+    const f = [], want = expectArcs(totalYd);
+    if (g.arcs !== want) f.push(`${tag}: arcs "${g.arcs}", expected "${want}"`);
+    const n = want ? want.split(' ').length : 0;
+    if (g.arcLabels.length < Math.min(n, Math.ceil(n * 0.6))) f.push(`${tag}: only ${g.arcLabels.length} of ${n} arc labels shown`);
+    const lineX = mid(g.boxes.mid) && mid(g.boxes.dot || g.boxes.tee);
+    g.arcLabels.forEach((l) => {
+        if (!/^\d+y( to pin)?$/.test(l.text)) f.push(`${tag}: arc label "${l.text}"`);
+        const c = mid(g.boxes.mid);
+        if (c && l.box && l.box.r > c.x + 2) f.push(`${tag}: arc label "${l.text}" is not at the left end (right edge ${l.box.r}, line x ${Math.round(c.x)})`);
+        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'dot', 'tee', 'attrib'].filter((k) => hitBox(l.box, g.boxes[k]));
+        g.pills.forEach((p) => { if (hitBox(l.box, p.box)) bad.push('a pill'); });
+        if (bad.length) f.push(`${tag}: arc label "${l.text}" covers ${bad.join(', ')}`);
+    });
+    return f;
+}
 // The tee AND the back of the green fully on screen, the tee clear of the attribution bar.
 function teeInView(tag, g) {
     const f = [], m = g.boxes.map, at = g.boxes.attrib;
     if (!m || !at || !g.teePx) return [tag + ': cannot read the frame: ' + JSON.stringify([m, at, g.teePx])];
     const teeY = m.t + g.teePx[1];
     if (teeY + 8 > at.t - 8) f.push(`${tag}: the tee (y ${teeY}) is not clear above the attribution bar (top ${at.t})`);
+    // Wave 1: and above the score button / wind row.
+    [['score button', g.scoreBox], ['wind box', g.windBox]].forEach(([n, b]) => { if (b && teeY + 8 > b.t - 4 && g.teePx[0] + m.l > b.l - 8 && g.teePx[0] + m.l < b.r + 8) f.push(`${tag}: the tee (y ${teeY}) is under the ${n} (top ${b.t})`); });
     if (g.teePx[0] < 8 || g.teePx[0] > m.r - m.l - 8) f.push(`${tag}: the tee is off the side of the map (x ${g.teePx[0]})`);
     const gb = greenPage(g);
     if (!gb || gb.t < m.t + 4 || (g.boxes.back && g.boxes.back.t < m.t)) f.push(`${tag}: the back of the green is cut off: ` + JSON.stringify([gb, g.boxes.back, m.t]));
@@ -315,6 +355,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (gps.maxZoom !== 18) fails.push('osm: max zoom ' + gps.maxZoom + ' with USGS only (expected 18)');
         fails.push(...teeInView('osm', gps), ...pillFails('osm', gps, true));
         if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
+        fails.push(...arcFails('osm', gps, ME_CENTER_YD));
+        if (gps.score !== 'Hole 1 · Enter Score') fails.push('osm: score button reads ' + gps.score);
         if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !/💰 Bets/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the toggle is not on screen: ' + arrive.toggle);
         if (arrive.side !== 'bets' || arrive.gpsShown) fails.push('osm: a fresh phone did not land on Bets');
         if (arrive.watchCalls !== 0) fails.push('osm: a location watch ran before GPS was shown');
@@ -454,7 +496,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         const [before, gps, bets] = d.reads;
         if (!/Location is off for HardPan/.test(gps.msg) || !/Settings/.test(gps.msg) || !/Bets and your scorecard are not affected/.test(gps.msg)) fails.push('denied: message ' + gps.msg);
         // NO GPS: everything is measured from the TEE, and says so; no dot.
-        if (gps.from !== 'Measuring from tee' || gps.m !== TEE_CENTER || gps.dot) fails.push('denied: not measuring from the tee: ' + JSON.stringify([gps.from, gps.m, TEE_CENTER, gps.dot]));
+        // Wave 1: measured from the tee, and NOT labelled so on the map.
+        if (gps.from || gps.m !== TEE_CENTER || gps.dot) fails.push('denied: not measuring from the tee (or labelled on the map): ' + JSON.stringify([gps.from, gps.m, TEE_CENTER, gps.dot]));
         if (bets.gpsShown || bets.scoreInputs !== before.scoreInputs || bets.scoreInputs < 4 || bets.cardHole !== before.cardHole) fails.push('denied: Bets is not the card it was');
         if (d.dump.writes.length) fails.push('denied: wrote ' + d.dump.writes.map((w) => w.path).join(', '));
     }
@@ -478,6 +521,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (!p1.dump.storage['hardpan_usgs_done_v1_caledonia']) fails.push('precache: not marked done');
         const off = p2.reads[0];
         if (!(off.tilesLoaded > 0)) fails.push('offline: no satellite tiles drawn from the cache (' + off.tilesLoaded + ')');
+        if (off.arcs !== expectArcs(ME_CENTER_YD)) fails.push('offline: arcs with no signal "' + off.arcs + '"');
         if (off.tilesNote) fails.push('offline: the no-signal note showed with tiles cached');
         const onlineReq = p1.requests.filter((q) => /basemap\.nationalmap\.gov/.test(urlOf(q))).length;
         if (onlineReq < 24) fails.push('precache: only ' + onlineReq + ' USGS requests seen while storing 24 tiles');
@@ -549,16 +593,15 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     out.offHole = fh; bail(out, fh);
     {
         const g = fh.reads[0];
-        if (g.from !== 'Measuring from tee') fails.push('off-hole: no "Measuring from tee" label: ' + JSON.stringify(g.from));
         if (g.dot) fails.push('off-hole: the blue dot is still shown');
         if (g.m !== TEE_CENTER) fails.push(`off-hole: center ${g.m}, expected tee -> center ${TEE_CENTER}`);
         if (!/^Tee → here: \d+$/.test(g.toHere || '')) fails.push('off-hole: target readout ' + g.toHere);
         if (!g.teePin || !g.centerPin || !(g.teePin.y > g.centerPin.y) || Math.abs(g.teePin.x - g.centerPin.x) > 3) fails.push('off-hole: tee not straight below the green: ' + JSON.stringify([g.teePin, g.centerPin]));
         if (g.acc !== 'You are off this hole') fails.push('off-hole: accuracy line ' + g.acc);
-        const fr = g.boxes.from, at = g.boxes.attrib, mp = g.boxes.map;
-        if (!fr || !at || !mp || fr.l > mp.l + 16 || fr.b > at.t || fr.t < mp.t + (mp.b - mp.t) / 2) fails.push('off-hole: "Measuring from tee" is not small at the bottom-left above the attribution: ' + JSON.stringify([fr, at, mp]));
-        else if ((fr.b - fr.t) > 24) fails.push('off-hole: the label is not small (' + (fr.b - fr.t) + 'px tall)');
-        if (hitBox(fr, greenPage(g)) || hitBox(fr, g.boxes.back) || hitBox(fr, g.boxes.tee)) fails.push('off-hole: the label covers the green or the tee');
+        // Wave 1 (Manny, 2026-10-08): NO "Measuring from tee" on the map.
+        if (g.from || g.boxes.from || /Measuring from tee/.test(JSON.stringify(g))) fails.push('off-hole: "Measuring from tee" is still on the map');
+        // Arcs from the TEE (inline expectation, not gps-geo's answer).
+        if (g.arcs !== expectArcs(TEE_CENTER_YD)) fails.push(`off-hole: arcs "${g.arcs}", expected "${expectArcs(TEE_CENTER_YD)}"`);
         fails.push(...teeInView('off-hole', g), ...pillFails('off-hole', g, true));
     }
 
@@ -624,8 +667,172 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         out.polishSummary = { zooms: [z1, z2, z3, z1b, z2b, rc].map((g) => [g.zoomBtn, g.zoom, g.ringPx]), pills: z1.pills.map((p) => p.text), pull, bets };
     }
 
+    // ==== WAVE 1 (2026-10-08) =======================================================
+    // A stand-in National Weather Service on 127.0.0.1: /points answers with an
+    // hourly forecast URL on api.weather.gov (as NWS does), the view swaps the
+    // host for the stand-in, and the forecast says "5 to 12 mph" from the NW.
+    const nwsSeen = [];
+    const nwsSrv = await new Promise((res) => {
+        const sv = require('http').createServer((q, r) => {
+            nwsSeen.push(q.url);
+            const h = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'application/geo+json' };
+            if (q.method === 'OPTIONS') { r.writeHead(204, h); r.end(); return; }
+            if (/^\/points\/-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q.url)) { r.writeHead(200, h); r.end(JSON.stringify({ properties: { forecastHourly: 'https://api.weather.gov/gridpoints/XXX/1,2/forecast/hourly' } })); return; }
+            if (q.url === '/gridpoints/XXX/1,2/forecast/hourly') { r.writeHead(200, h); r.end(JSON.stringify({ properties: { periods: [{ windSpeed: '5 to 12 mph', windDirection: 'NW' }] } })); return; }
+            r.writeHead(404, h); r.end();
+        });
+        sv.listen(0, '127.0.0.1', () => res(sv));
+    });
+    const NO = 'http://127.0.0.1:' + nwsSrv.address().port;
+    const NWS_CFG = `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return { nwsBase: '${NO}' }; }, set: function () {} });`;
+    const WIND_TO = 135;    // from the NW -> blowing to the SE
+    const windRotFor = (bearing) => String(((WIND_TO - bearing) % 360 + 360) % 360);
+
+    // ---- Edit Pin: today's hole location, for the whole group --------------------
+    // Another phone's pin, deliberately NOT computed by gps-geo: 35% of the way
+    // from the green's point farthest from the tee back toward its center.
+    const far = H1.green.reduce((b, p) => (inlineHaversineM(H1.tee, p) > inlineHaversineM(H1.tee, b) ? p : b), H1.green[0]);
+    // Saved a minute AFTER this phone's own save, so it is the newer pin.
+    const OTHER = { lat: +(far[0] + 0.35 * (H1.mid[0] - far[0])).toFixed(6), lng: +(far[1] + 0.35 * (H1.mid[1] - far[1])).toFixed(6), at: Date.now() + 60000 };
+    const yd = (a, b) => String(Math.round(inlineHaversineM(a, b) / 0.9144));
+    const ep = await arm('editp', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },          // 0
+        { tap: '.gps-edit-pin' }, { sleep: 400 }, { expression: READ },                   // 1 editing
+        { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ },      // 2 dragged toward the back
+        { drag: '.gps-flag', dx: 170, dy: 0 }, { sleep: 400 }, { expression: READ },      // 3 dragged off the green: stays on it
+        { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 4 saved
+        { deliver: { path: 'events/GPSEDITP', value: Object.assign(round('caledonia'), { pinLocs: { h1: OTHER } }) } }, { sleep: 600 }, { expression: READ }, // 5 another phone, later
+        // NO SIGNAL: moved and saved again - it must go into the phone's durable
+        // queue (and, unsent, it is what this phone shows: the app's rule for
+        // every unsent write).
+        { expression: '(window.__coldSetOffline(true), "offline")' },
+        { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: 10 }, { sleep: 300 },
+        { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 6 saved offline
+        { tap: '.gps-edit-pin' }, { sleep: 300 }, { tap: '.gps-pin-clear' }, { sleep: 500 }, { expression: READ }, // 7 pin to center
+    ]);
+    out.editPin = ep; bail(out, ep);
+    {
+        const [r0, r1, r2, r3, r4, r5, r6, r7] = ep.reads;
+        if (r0.midLbl !== 'CENTER' || !r0.editPin || r0.flag) fails.push('edit pin: before - ' + JSON.stringify([r0.midLbl, r0.editPin, r0.flag]));
+        if (r1.banner !== "Drag the flag to today's pin" || !r1.flagEdit || !r1.pinSave) fails.push('edit pin: not editing - ' + JSON.stringify([r1.banner, r1.flagEdit, r1.pinSave]));
+        if (r1.flag && r1.centerPin && dist(mid(r1.flag), r1.centerPin) > 3) fails.push('edit pin: the flag did not start on the center');
+        if (r1.fix) fails.push('edit pin: "Fix the green" offered while editing the pin');
+        if (!(r2.flag && r1.flag && mid(r2.flag).y < mid(r1.flag).y - 6)) fails.push('edit pin: the flag did not follow the drag: ' + JSON.stringify([r1.flag, r2.flag]));
+        if (r2.midLbl !== 'PIN' || r2.m === r1.m || !/^Here → pin: \d+$/.test(r2.hereCenter)) fails.push('edit pin: numbers did not follow the flag live: ' + JSON.stringify([r1.m, r2.m, r2.midLbl, r2.hereCenter]));
+        if (r2.arcs === r1.arcs && r2.m !== r1.m && expectArcs(+r2.m) !== expectArcs(+r1.m)) fails.push('edit pin: arcs did not follow the flag');
+        const gb = greenPage(r3), fc = mid(r3.flag);
+        if (!gb || !fc || fc.x < gb.l - 2 || fc.x > gb.r + 2 || fc.y < gb.t - 2 || fc.y > gb.b + 2) fails.push('edit pin: the flag left the green: ' + JSON.stringify([fc, gb]));
+        const sets = ep.dump.writes.filter((x) => x.path === 'events/GPSEDITP/pinLocs/h1' && x.op === 'set');
+        const w = sets[0], wOff = sets[1];
+        if (!w || !isFinite(w.value.lat) || !isFinite(w.value.lng) || !isFinite(w.value.at)) fails.push('edit pin: Save wrote nothing to events/<code>/pinLocs/h1: ' + JSON.stringify(ep.dump.writes.map((x) => x.path)));
+        else {
+            if (r4.m !== yd(ME, [w.value.lat, w.value.lng])) fails.push(`edit pin: after save PIN ${r4.m}, golfer -> saved pin is ${yd(ME, [w.value.lat, w.value.lng])}`);
+            if (Object.keys(w.value).sort().join() !== 'at,lat,lng') fails.push('edit pin: the pin record carries more than lat/lng/at: ' + JSON.stringify(w.value));
+        }
+        if (r4.flagEdit || r4.pinSave || r4.midLbl !== 'PIN' || !r4.flag) fails.push('edit pin: after save - ' + JSON.stringify([r4.flagEdit, r4.pinSave, r4.midLbl, !!r4.flag]));
+        if (!wOff || !wOff.offline) fails.push('edit pin: no offline save - this arm proves nothing about no signal: ' + JSON.stringify(sets));
+        else if (r6.m !== yd(ME, [wOff.value.lat, wOff.value.lng])) fails.push(`edit pin: saved with no signal, PIN ${r6.m}, expected ${yd(ME, [wOff.value.lat, wOff.value.lng])}`);
+        if (!/pinLocs/.test(ep.dump.storage.golfapp_wq_v1 || '')) fails.push('edit pin: a pin saved with no signal is not in the offline queue');
+        if (r5.m !== yd(ME, [OTHER.lat, OTHER.lng])) fails.push(`edit pin: another phone's pin not shown: PIN ${r5.m}, expected ${yd(ME, [OTHER.lat, OTHER.lng])}`);
+        if (!ep.dump.writes.some((x) => x.path === 'events/GPSEDITP/pinLocs/h1' && x.op === 'remove')) fails.push('edit pin: "Pin to center" did not remove the pin');
+        if (r7.midLbl !== 'CENTER' || r7.m !== EXPECT.center || r7.flag) fails.push('edit pin: after "Pin to center" - ' + JSON.stringify([r7.midLbl, r7.m, !!r7.flag]));
+        if (ep.dump.writes.some((x) => /course_gps|gpsPins/.test(x.path))) fails.push('edit pin: moving the pin touched the GREEN data');
+    }
+
+    // ---- the score button: the card's own score entry for this hole ---------------
+    const sc = await arm('score', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },          // 0
+        { tap: '.gps-score' }, { sleep: 500 }, { expression: READ },                      // 1 -> the card, box focused
+        { cdp: { method: 'Input.insertText', params: { text: '4' } } }, { sleep: 200 },
+        { expression: '(document.activeElement && document.activeElement.blur(), "blurred")' }, { sleep: 800 },
+    ]);
+    out.score = sc; bail(out, sc);
+    {
+        const [g0, g1] = sc.reads;
+        if (g0.score !== 'Hole 1 · Enter Score' || !g0.scoreBox) fails.push('score: button ' + JSON.stringify([g0.score, g0.scoreBox]));
+        const sb = g0.scoreBox, mp = g0.boxes.map;
+        if (sb && mp && Math.abs((sb.l + sb.r) / 2 - (mp.l + mp.r) / 2) > 2) fails.push('score: the button is not centered');
+        if (sb && g0.boxes.attrib && sb.b > g0.boxes.attrib.t) fails.push('score: the button sits on the attribution');
+        if (g1.side !== 'bets' || g1.gpsShown) fails.push('score: did not open the card: ' + g1.side);
+        if (!g1.active || !/score-input/.test(g1.active.cls) || g1.active.hole !== '1') fails.push('score: hole 1\'s score box is not focused: ' + JSON.stringify(g1.active));
+        const sw = sc.dump.writes.filter((x) => /^events\/GPSSCORE\/scores\//.test(x.path));
+        if (!sw.length || sw[0].value !== 4) fails.push('score: typing 4 did not save through the card: ' + JSON.stringify(sc.dump.writes));
+        if (sc.dump.writes.some((x) => !/^events\/GPSSCORE\/(scores|auditLog|scoresVerified)\b/.test(x.path))) fails.push('score: unexpected writes: ' + JSON.stringify(sc.dump.writes.map((x) => x.path)));
+    }
+
+    // ---- wind -------------------------------------------------------------------
+    const windProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-wind-profile-'));
+    const nws0 = nwsSeen.length;
+    const wd = await arm('wind', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ }, // 0
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 1 reload: from the phone
+        { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
+        { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, profileDir: windProfile });
+    out.wind = wd; bail(out, wd);
+    const nwsAfterFirst = nwsSeen.slice(nws0);
+    const wo = await arm('windoff', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3000 }, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, blockUrls: ['*127.0.0.1:' + nwsSrv.address().port + '*'] });
+    out.windOff = wo; bail(out, wo);
+    {
+        const [w0, w1, w2] = wd.reads;
+        if (!/^↑\s*12 mph$/.test(w0.wind || '')) fails.push('wind: box reads ' + JSON.stringify(w0.wind));
+        if (w0.windRot !== windRotFor(w0.bearing)) fails.push(`wind: arrow turned ${w0.windRot}, expected ${windRotFor(w0.bearing)} (to the SE, on a map turned ${w0.bearing})`);
+        const wb = w0.windBox, at = w0.boxes.attrib, mp = w0.boxes.map;
+        if (!wb || !at || wb.b > at.t || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2) fails.push('wind: not at the bottom-right above the attribution: ' + JSON.stringify([wb, at]));
+        if (hitBox(wb, w0.scoreBox)) fails.push('wind: covers the score button');
+        const pts = nwsAfterFirst.filter((u) => u.startsWith('/points/'));
+        const hourly = nwsAfterFirst.filter((u) => u.startsWith('/gridpoints/'));
+        const want = `/points/${Math.round(H1.mid[0] * 1e3) / 1e3},${Math.round(H1.mid[1] * 1e3) / 1e3}`;
+        if (pts.length !== 1 || pts[0] !== want) fails.push(`wind: NWS asked ${JSON.stringify(pts)}, expected once for the COURSE point ${want}`);
+        if (hourly.length !== 2) fails.push(`wind: hourly forecast asked ${hourly.length} times (expected 2: first look, then 16 minutes later; NOT on the reload)`);
+        if (w1.wind !== w0.wind) fails.push('wind: not shown from the phone after a reload: ' + w1.wind);
+        if (w2.wind !== w0.wind) fails.push('wind: lost when refreshed: ' + w2.wind);
+        if (nwsAfterFirst.some((u) => u.indexOf(ME[0].toFixed(3)) !== -1 && u.indexOf(ME[1].toFixed(3)) !== -1 && want.indexOf(ME[0].toFixed(3)) === -1)) fails.push('wind: the golfer\'s position went to the weather service');
+        if (wo.reads[0].wind !== null) fails.push('wind: shown with no weather service reachable: ' + wo.reads[0].wind);
+    }
+    try { fs.rmSync(windProfile, { recursive: true, force: true }); } catch (e) {}
+
+    // ---- the test courses: Myrtle (Caledonia, True Blue, Pine Lakes) + Scottsdale ----
+    // The live rounds NA4EZB / KHPSL4 / 3MKUCF are NOT opened: they are real trip
+    // rounds, and Save pin / Enter Score would write into them. These arms open
+    // the same COURSES in stand-in rounds. The golfer is 3 km off the hole, so
+    // everything is measured from the tee (inline expectation from the bundle).
+    const TEST_COURSES = [
+        { name: 'na4ez', key: 'caledonia', label: 'Caledonia (NA4EZB)', hole: 1 },
+        { name: 'khpsl', key: 'trueblue', label: 'True Blue (KHPSL4)', hole: 1 },
+        { name: '3mkuc', key: 'pinelakes', label: 'Pine Lakes (3MKUCF)', hole: 10 },
+        { name: 'tpcsd', key: 'az_tpc_stadium', label: 'TPC Scottsdale Stadium', hole: 1 },
+    ];
+    out.courses = [];
+    for (const tc of TEST_COURSES) {
+        const hr = table[tc.key].holes[String(tc.hole)].osm;
+        const away = [hr.mid[0] - 0.03, hr.mid[1]];
+        const nexts = []; for (let k = 1; k < tc.hole; k++) nexts.push({ tap: '.gps-next' }, { sleep: 500 });
+        const cr = await arm(tc.name, tc.key, null, 'ok', away, 5, [
+            { tap: '.gps-side-gps' }, WAIT_MAP, ...nexts, { sleep: 1500 },
+            { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ },
+            { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -10 }, { sleep: 400 }, { expression: READ },
+            { tap: '.gps-pin-cancel' }, { sleep: 300 },
+        ], { preScript: sensor('ok', away[0], away[1], 5) + NWS_CFG });
+        bail(out, cr);
+        const [g, e] = cr.reads, tag = tc.label + ' #' + tc.hole;
+        const total = inlineHaversineM(hr.tee, hr.mid) / 0.9144;
+        const res = { course: tag, title: g.title, fcb: [g.f, g.m, g.b], arcs: g.arcs, arcLabels: g.arcLabels.length, score: g.score, wind: g.wind, pinLive: [g.m, e.m, e.midLbl] };
+        out.courses.push(res);
+        if (g.title !== `Hole ${tc.hole} · Par ${sb.p[tc.key].data[tc.hole - 1].par}`) fails.push(`${tag}: title ${g.title}`);
+        if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
+        fails.push(...arcFails(tag, g, total), ...teeInView(tag, g), ...pillFails(tag, g, true));
+        if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
+        if (!/12 mph/.test(g.wind || '') || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.wind} turned ${g.windRot} (expected ${windRotFor(g.bearing)})`);
+        if (e.midLbl !== 'PIN' || e.m === g.m || !e.flagEdit) fails.push(`${tag}: Edit Pin did not move PIN live: ` + JSON.stringify([g.m, e.m, e.midLbl]));
+        if (cr.dump.writes.length) fails.push(`${tag}: Cancel still wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
+    }
+    nwsSrv.close();
+
     // ---- privacy, every arm ------------------------------------------------------
-    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME]].forEach(([r, me]) => {
+    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
@@ -648,6 +855,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         esriRequests: esri,
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
+        courses: out.courses,
         fails,
     };
     console.log(JSON.stringify(summary, null, 1));

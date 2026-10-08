@@ -227,6 +227,24 @@
         if (l) out.push(l);
         return out;
     }
+    // TODAY'S PIN (Wave 1): where the hole is cut today, set by anyone in the
+    // group with "Edit Pin" and stored on the ROUND (events/<code>/pinLocs/h<n>),
+    // so the whole group sees it. Not the green: "Fix the green" moves the
+    // green's center for every future round; this is today only. While the flag
+    // is being dragged, the draft is what every number uses.
+    function pinLoc() {
+        if (!S || !G) return null;
+        if (S.editingPin && S.pinDraft) return S.pinDraft;
+        var k = holeKey(S.hole);
+        if (S.localLocs && Object.prototype.hasOwnProperty.call(S.localLocs, k)) return G.pinPt(S.localLocs[k]);
+        return G.pinPt(S.round && S.round.pinLocs && S.round.pinLocs[k]);
+    }
+    // Where the CENTER number, the arcs, the white line and "Here -> ..." point:
+    // today's pin when there is one, else the green's center.
+    function aimAt(r) {
+        if (!r || !r.mid) return null;
+        return pinLoc() || r.mid;
+    }
     function resolved() {
         if (!S || !G) return null;
         var osm = osmRecord(S.courseKey);
@@ -363,7 +381,7 @@
         S.usgsGen++;
         try { S.map.getSource('usgs').setTiles(usgsSourceTiles()); } catch (e) {}
     }
-    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && S.mode === 'measure') ? 20 : 18; }
+    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && S.mode === 'measure' && !S.editingPin) ? 20 : 18; }
 
     // ---- THE MAP --------------------------------------------------------------
     var EMPTY = { type: 'FeatureCollection', features: [] };
@@ -382,6 +400,7 @@
                     attribution: escapeText(TILES.usgs.attribution) },
             hole: { type: 'geojson', data: EMPTY, attribution: OSM_ATTRIBUTION },
             lines: { type: 'geojson', data: EMPTY },
+            arcs: { type: 'geojson', data: EMPTY },
             acc: { type: 'geojson', data: EMPTY }
         };
         var layers = [
@@ -390,6 +409,10 @@
             { id: 'hole-line', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'line'], paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.45 } },
             { id: 'green-fill', type: 'fill', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'fill-color': '#4ade80', 'fill-opacity': 0.28 } },
             { id: 'green-edge', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'line-color': '#d9f99d', 'line-width': 2 } },
+            // YARDAGE ARCS: thin white curves across the hole (carry every 25 yds),
+            // dashed for the 100 / 150 / 200-to-the-pin marks.
+            { id: 'arc-carry', type: 'line', source: 'arcs', filter: ['==', ['get', 'k'], 'carry'], paint: { 'line-color': '#ffffff', 'line-width': 1.2, 'line-opacity': 0.75 } },
+            { id: 'arc-pin', type: 'line', source: 'arcs', filter: ['==', ['get', 'k'], 'pin'], paint: { 'line-color': '#fde68a', 'line-width': 1.4, 'line-opacity': 0.9, 'line-dasharray': [3, 2] } },
             { id: 'acc-fill', type: 'fill', source: 'acc', paint: { 'fill-color': '#60a5fa', 'fill-opacity': 0.12 } },
             { id: 'line-to', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'to'], paint: { 'line-color': '#facc15', 'line-width': 2 } },
             { id: 'line-on', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'on'], paint: { 'line-color': '#ffffff', 'line-width': 2 } }
@@ -534,7 +557,8 @@
     // layer (and with it its credit) comes off the map; it goes back afterwards.
     function syncImageryForMode() {
         if (!S || !S.map || !S.styleReady) return;
-        var pinning = S.mode !== 'measure';
+        // Today's pin is shared data too: placed on USGS, like a green.
+        var pinning = S.mode !== 'measure' || !!S.editingPin;
         if (S.map.getLayer('esri')) {
             var want = (pinning || S.esriFailed) ? 'none' : 'visible';
             if (S.map.getLayoutProperty('esri', 'visibility') !== want) {
@@ -609,7 +633,9 @@
         return a ? Math.ceil(a.getBoundingClientRect().height) : 20;
     }
     function viewPad() {
-        return { top: VIEW_PAD.top, bottom: Math.max(VIEW_PAD.bottom, attribH() + 24), left: VIEW_PAD.left, right: VIEW_PAD.right };
+        // The attribution bar, the score / wind row above it (38px + 8px gap), and
+        // 16px clear above that for the tee.
+        return { top: VIEW_PAD.top, bottom: Math.max(VIEW_PAD.bottom, attribH() + 8 + 38 + 16), left: VIEW_PAD.left, right: VIEW_PAD.right };
     }
     function holeView() {
         if (!S || !S.map) return null;
@@ -643,7 +669,7 @@
         // attribution bar may re-fit it until the golfer moves the map).
         S.zoomStep = 0; S.userMoved = false; S.attribAt = attribH();
         txt('.gps-zoom', ZOOM_STEPS[0] + 'x');
-        sizeTarget(); placePills();
+        sizeTarget(); placePills(); syncWind();
         var el = S.el.querySelector('.gps-map');
         if (el) {
             el.setAttribute('data-bearing', String(Math.round(S.map.getBearing())));
@@ -686,6 +712,103 @@
         marker('dfront', S.draft && S.draft.front, function () { return pinEl('gps-pin-front gps-pin-draft', 'F'); });
         marker('dback', S.draft && S.draft.back, function () { return pinEl('gps-pin-back gps-pin-draft', 'B'); });
         marker('tee', o && o.from === 'tee' ? o.pt : null, function () { return pinEl('gps-pin-tee', 'T'); });
+        drawArcs(r, o);
+        drawFlag(r);
+    }
+
+    // ---- YARDAGE ARCS (Wave 1) ------------------------------------------------
+    // Drawn from where the numbers are measured from (the golfer, or the tee
+    // when off the hole) toward today's pin or the green's center. All local
+    // math on bundled data: they work with no signal. Each carries a small label
+    // ("125y", or "150 to pin") at its LEFT end on screen - which end that is
+    // depends on the hole's turn, so it is worked out on every move.
+    function drawArcs(r, o) {
+        var aim = aimAt(r);
+        S.arcs = (S.mode === 'measure' && o && aim) ? G.yardageArcs(o.pt, aim) : [];
+        setData('arcs', { type: 'FeatureCollection', features: S.arcs.map(function (a) { return feature(a.kind, 'LineString', a.pts.map(ll)); }) });
+        var mel = S.el.querySelector('.gps-map');
+        if (mel) mel.setAttribute('data-arcs', S.arcs.map(function (a) { return (a.kind === 'pin' ? 'p' : 'c') + a.yards; }).join(' '));
+    }
+    function placeArcLabels(obstacles) {
+        var box = S && S.el.querySelector('.gps-arc-labels');
+        if (!box) return;
+        var arcs = (S.map && S.styleReady && S.side === 'gps' && S.mode === 'measure') ? (S.arcs || []) : [];
+        while (box.children.length < arcs.length) { var e = document.createElement('span'); e.className = 'gps-arc-lbl'; box.appendChild(e); }
+        var wrapR = S.el.querySelector('.gps-map-wrap').getBoundingClientRect();
+        var u = units();
+        for (var i = 0; i < box.children.length; i++) {
+            var el = box.children[i], a = arcs[i];
+            if (!a) { el.style.display = 'none'; continue; }
+            var p0 = S.map.project(ll(a.pts[0])), p1 = S.map.project(ll(a.pts[a.pts.length - 1]));
+            var L = p0.x <= p1.x ? p0 : p1;
+            var n = u === 'm' ? Math.round(a.yards * G.M_PER_YD) + 'm' : a.yards + 'y';
+            el.textContent = a.kind === 'pin' ? n + ' to pin' : n;
+            el.className = 'gps-arc-lbl' + (a.kind === 'pin' ? ' gps-arc-lbl-pin' : '');
+            el.style.display = ''; el.style.visibility = 'hidden';
+            var w = el.offsetWidth, h = el.offsetHeight;
+            var rc = { l: L.x - w - 3, t: L.y - h / 2, r: L.x - 3, b: L.y + h / 2 };
+            var clash = rc.l < 2 || rc.t < 2 || rc.r > wrapR.width - 2 || rc.b > wrapR.height - 2 ||
+                (obstacles || []).some(function (ob) { return hits(rc, ob); });
+            if (clash) { el.style.display = 'none'; continue; }
+            el.style.left = Math.round(rc.l) + 'px'; el.style.top = Math.round(rc.t) + 'px'; el.style.visibility = '';
+            (obstacles || []).push(rc);
+        }
+    }
+
+    // ---- TODAY'S PIN: THE FLAG (Wave 1) -------------------------------------------
+    // Shown whenever a pin is set for today; draggable only in "Edit Pin". It
+    // cannot leave the green: a drag past the edge stops at the edge.
+    function drawFlag(r) {
+        var loc = pinLoc();
+        var showIt = !!(loc && r && r.mid && (S.mode === 'measure'));
+        var m = marker('flag', showIt ? loc : null, function () {
+            var e = document.createElement('div');
+            e.className = 'gps-flag';
+            e.innerHTML = '<span>⚑</span>';
+            return e;
+        });
+        if (!m) return;
+        m.getElement().classList.toggle('gps-flag-edit', !!S.editingPin);
+        if (m.isDraggable() !== !!S.editingPin) m.setDraggable(!!S.editingPin);
+        if (!m.__hpWired) {
+            m.__hpWired = true;
+            m.on('drag', function () {
+                if (!S || !S.editingPin) return;
+                var p = m.getLngLat(), rr = resolved();
+                var c = G.clampToGreen([p.lat, p.lng], rr && rr.green, rr && rr.mid);
+                if (c[0] !== p.lat || c[1] !== p.lng) m.setLngLat(ll(c));
+                S.pinDraft = c;
+                render();
+            });
+            m.on('dragend', function () { if (S) { S.dragEndedAt = Date.now(); render(); } });
+        }
+    }
+    function startEditPin() {
+        var r = resolved();
+        if (!r || !r.mid) return;
+        S.editingPin = true;
+        S.pinDraft = pinLoc() || r.mid;
+        S.targetMoved = false;
+        render();
+    }
+    function endEditPin(save) {
+        if (!S) return;
+        var k = holeKey(S.hole), draft = S.pinDraft;
+        S.editingPin = false; S.pinDraft = null;
+        if (save === 'save' && draft) writeLoc(k, { lat: draft[0], lng: draft[1], at: Date.now() });
+        else if (save === 'clear') writeLoc(k, null);
+        S.targetMoved = false; S.target = null;
+        render();
+    }
+    // ONE writer for today's pin: the page's durable queue (a pin moved with no
+    // signal survives the app closing), with a local copy so the screen follows
+    // at once. Only a point dragged ON THE GREEN is ever here - never the golfer.
+    function writeLoc(k, val) {
+        S.localLocs = S.localLocs || {};
+        S.localLocs[k] = val;
+        S.localLocsAt = S.localLocsAt || {};
+        S.localLocsAt[k] = Date.now();
+        if (typeof S.writeHoleLoc === 'function') { try { S.writeHoleLoc(k, val); } catch (e) {} }
     }
     function circlePoly(pt, radiusM) {
         var ring = [];
@@ -729,7 +852,7 @@
     // the marker); a drag anywhere else pans, and two fingers zoom.
     function placeTarget(r) {
         if (!S || S.targetMoved) return;
-        var center = r && r.mid, o = origin(r);
+        var center = aimAt(r), o = origin(r);
         var p = (o && center) ? G.midpoint(o.pt, center) : null;
         if (p) S.target = p;
     }
@@ -739,7 +862,8 @@
         if (S.target && S.mode === 'measure') {
             var r = resolved(), o = origin(r);
             if (o) feats.push(feature('to', 'LineString', [ll(o.pt), ll(S.target)]));
-            if (r && r.mid) feats.push(feature('on', 'LineString', [ll(S.target), ll(r.mid)]));
+            var aim = aimAt(r);
+            if (aim) feats.push(feature('on', 'LineString', [ll(S.target), ll(aim)]));
         }
         setData('lines', { type: 'FeatureCollection', features: feats });
     }
@@ -752,7 +876,8 @@
         if (!on) return;
         var who = o && o.from === 'tee' ? 'Tee' : 'You';
         txt('.gps-to-here', who + ' → here: ' + (o ? G.shownDistance(G.haversineMeters(o.pt, S.target), u) : '—'));
-        txt('.gps-here-center', 'Here → center: ' + (r && r.mid ? G.shownDistance(G.haversineMeters(S.target, r.mid), u) : '—'));
+        var aim = aimAt(r);
+        txt('.gps-here-center', 'Here → ' + (pinLoc() ? 'pin' : 'center') + ': ' + (aim ? G.shownDistance(G.haversineMeters(S.target, aim), u) : '—'));
     }
     function drawTarget() {
         if (!S || !S.map || !S.styleReady) return;
@@ -877,7 +1002,7 @@
             g.forEach(function (q) { gb.l = Math.min(gb.l, q.x); gb.r = Math.max(gb.r, q.x); gb.t = Math.min(gb.t, q.y); gb.b = Math.max(gb.b, q.y); });
             add(gb, M);
         }
-        ['.gps-zoom', '.gps-recenter', '.gps-from', '.gps-banner', '.maplibregl-ctrl-attrib'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+        ['.gps-zoom', '.gps-recenter', '.gps-banner', '.gps-score', '.gps-wind', '.maplibregl-ctrl-attrib'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         var put = function (pill, a, b, text) {
             if (!a || !b || text === '\u2014') return;
             pill.textContent = text;
@@ -902,8 +1027,81 @@
             pill.style.display = 'none';
         };
         var t = P(S.target);
-        if (r && r.mid) put(pOn, t, P(r.mid), G.shownDistance(G.haversineMeters(S.target, r.mid), u));
+        var aim = aimAt(r);
+        if (aim) put(pOn, t, P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));
         if (o) put(pTo, P(o.pt), t, G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+        placeArcLabels(obstacles);
+    }
+
+    // ---- WIND (Wave 1) ----------------------------------------------------------
+    // The National Weather Service's hourly forecast (api.weather.gov - free, no
+    // key, US only) for the COURSE: a point from the bundled course data, to 3
+    // decimals - never the golfer's position (see PRIVACY above). Asked for only
+    // while the GPS side is showing, at most every 15 minutes per course (the
+    // answer is kept on the phone); the NWS grid point for the course is kept for
+    // a week. The box shows the last reading up to an hour old; with no reading
+    // (offline, outside the US, any error) it is quietly not there.
+    var WIND_FRESH_MS = 15 * 60 * 1000, WIND_SHOW_MS = 60 * 60 * 1000, NWS_POINT_MS = 7 * 24 * 3600 * 1000;
+    function nwsBase() {
+        var c = (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {};
+        return c.nwsBase || 'https://api.weather.gov';
+    }
+    function coursePoint() {
+        var osm = osmRecord(S.courseKey), first = null;
+        if (osm && osm.holes) {
+            var ks = Object.keys(osm.holes).sort(function (a, b) { return a - b; });
+            for (var i = 0; i < ks.length && !first; i++) first = osm.holes[ks[i]].osm && osm.holes[ks[i]].osm.mid;
+        }
+        if (!first) { var r = resolved(); first = r && r.mid; }
+        return first ? [Math.round(first[0] * 1e3) / 1e3, Math.round(first[1] * 1e3) / 1e3] : null;
+    }
+    function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    function windKey() { return 'hardpan_wind_v1_' + S.courseKey; }
+    function fetchWind() {
+        if (!S || S.windInFlight || typeof fetch !== 'function') return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        var pt = coursePoint();
+        if (!pt) return;
+        var mine = S, key = windKey(), ptKey = 'hardpan_nws_point_v1_' + S.courseKey;
+        var hdr = { headers: { Accept: 'application/geo+json' } };
+        S.windInFlight = true;
+        var done = function () { mine.windInFlight = false; };
+        var cachedPt = lsGet(ptKey);
+        var hourly = (cachedPt && cachedPt.url && Date.now() - cachedPt.at < NWS_POINT_MS) ? Promise.resolve(cachedPt.url)
+            : fetch(nwsBase() + '/points/' + pt[0] + ',' + pt[1], hdr).then(function (r) { if (!r.ok) throw new Error('nws ' + r.status); return r.json(); })
+                .then(function (j) { var u = j && j.properties && j.properties.forecastHourly; if (!u) throw new Error('no hourly'); lsSet(ptKey, { at: Date.now(), url: u }); return u; });
+        hourly.then(function (u) {
+            // NWS hands back an absolute URL; a stand-in base (the checks) keeps its own host.
+            if (nwsBase() !== 'https://api.weather.gov') u = u.replace(/^https:\/\/api\.weather\.gov/, nwsBase());
+            return fetch(u, hdr);
+        }).then(function (r) { if (!r.ok) throw new Error('nws ' + r.status); return r.json(); }).then(function (j) {
+            var per = j && j.properties && j.properties.periods && j.properties.periods[0];
+            var w = G.parseNwsWind(per);
+            lsSet(key, w ? { at: Date.now(), mph: w.mph, toDeg: w.toDeg, fromDeg: w.fromDeg } : { at: Date.now(), none: true });
+            done();
+            if (S === mine) syncWind();
+        }).catch(function () { done(); if (S === mine) { S.windFailedAt = Date.now(); syncWind(); } });
+    }
+    function syncWind() {
+        if (!S) return;
+        var box = S.el.querySelector('.gps-wind');
+        if (!box) return;
+        var w = lsGet(windKey()), now = Date.now();
+        var stale = !w || now - w.at > WIND_FRESH_MS;
+        // Ask again when stale - but not more than once a minute after a failure.
+        if (S.side === 'gps' && stale && !(S.windFailedAt && now - S.windFailedAt < 60000)) fetchWind();
+        var showIt = !!(w && !w.none && now - w.at <= WIND_SHOW_MS && S.side === 'gps');
+        box.style.display = showIt ? '' : 'none';
+        if (!showIt) return;
+        txt('.gps-wind-mph', w.mph + ' mph');
+        var arrow = box.querySelector('.gps-wind-arrow');
+        var bearing = S.map ? S.map.getBearing() : 0;
+        // The arrow points where the wind BLOWS, turned with the map.
+        var rot = Math.round(((w.toDeg - bearing) % 360 + 360) % 360);
+        arrow.style.transform = 'rotate(' + rot + 'deg)';
+        box.setAttribute('data-rot', String(rot));
+        box.setAttribute('aria-label', 'Wind ' + w.mph + ' mph from ' + ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(w.fromDeg / 22.5) % 16]);
     }
 
     // ---- NO PULL-DOWN ON GPS ----------------------------------------------------
@@ -925,6 +1123,13 @@
         if (S.mode === 'setFront') { S.draft.front = pt; S.mode = 'setBack'; render(); return; }
         if (S.mode === 'setBack') { S.draft.back = pt; S.mode = 'confirmAll'; render(); return; }
         if (S.mode !== 'measure') return;
+        if (S.editingPin) {
+            // Editing today's pin: a tap moves the flag there (kept on the green).
+            var rr = resolved();
+            S.pinDraft = G.clampToGreen(pt, rr && rr.green, rr && rr.mid);
+            render();
+            return;
+        }
         // Tap anywhere: the target jumps there.
         S.target = pt;
         S.targetMoved = true;
@@ -957,15 +1162,18 @@
         txt('.gps-title', 'Hole ' + S.hole + (S.par ? ' · Par ' + S.par : ''));
         txt('.gps-units', u === 'm' ? 'Meters' : 'Yards');
         txt('.gps-f', nums ? (nums.onGreen ? 'ON' : d(nums.frontM)) : '—');
-        txt('.gps-m', nums ? d(nums.middleM) : '—');
+        // CENTER is to today's pin when one is set - and says PIN.
+        var aim = aimAt(r);
+        txt('.gps-m', (nums && aim && o) ? d(G.haversineMeters(o.pt, aim)) : '—');
+        txt('.gps-lbl-mid', pinLoc() ? 'PIN' : 'CENTER');
         txt('.gps-b', nums ? d(nums.backM) : '—');
 
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
         // OFF THE HOLE (more than 1,000 yds from the green) or NO GPS: everything is
         // measured from the TEE, and says so.
         var fromTee = !!(o && o.from === 'tee');
-        txt('.gps-from', fromTee ? 'Measuring from tee' : '');
-        show('.gps-from', fromTee);
+        // No "Measuring from tee" label on the map (Wave 1: obvious and expected
+        // when you are not on the hole); the line under the numbers still says it.
         if (fromTee && acc && fix) acc = { text: 'You are off this hole', weak: false };
         var accEl = S.el.querySelector('.gps-acc');
         if (accEl) {
@@ -1004,20 +1212,28 @@
         else if (S.mode === 'setFront') banner = 'Tap the FRONT edge (optional)';
         else if (S.mode === 'setBack') banner = 'Tap the BACK edge (optional)';
         else if (S.mode === 'confirmMid' || S.mode === 'confirmAll') banner = 'Save this green for hole ' + S.hole + '?';
+        else if (S.editingPin) banner = 'Drag the flag to today\'s pin';
         else if (S.loadingCourses) banner = 'Loading the course…';
         else if (noGreen) banner = 'No green mapped for this hole yet';
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
 
-        var pinning = S.mode !== 'measure';
+        var pinning = S.mode !== 'measure' || !!S.editingPin;
         show('.gps-set-green', !pinning && noGreen && !S.loadingCourses);
         show('.gps-fix-green', !pinning && !noGreen && !!S.canFix);
+        show('.gps-edit-pin', !pinning && !noGreen);
+        show('.gps-pin-save', !!S.editingPin);
+        show('.gps-pin-cancel', !!S.editingPin);
+        show('.gps-pin-clear', !!S.editingPin && !!(S.localLocs && S.localLocs[holeKey(S.hole)] !== undefined ? S.localLocs[holeKey(S.hole)] : (S.round && S.round.pinLocs && S.round.pinLocs[holeKey(S.hole)])));
+        // THE SCORE BUTTON: the hole's own score entry, on the card (Bets side).
+        txt('.gps-score', 'Hole ' + S.hole + ' · Enter Score');
+        show('.gps-score', !pinning && typeof S.openScore === 'function');
         var canUndo = !pinning && !!S.canFix && r && r.source === 'pin' && r.pin && !!G.undoPin(r.pin, 1);
         show('.gps-undo-green', !!canUndo);
         show('.gps-skip', S.mode === 'setFront' || S.mode === 'setBack');
         show('.gps-addedges', S.mode === 'confirmMid');
         show('.gps-save', S.mode === 'confirmMid' || S.mode === 'confirmAll');
-        show('.gps-cancel', pinning);
+        show('.gps-cancel', S.mode !== 'measure');
         txt('.gps-src', r && r.source === 'osm' ? 'Green from OpenStreetMap'
             : (r && r.source === 'pin' ? (r.pin.by === 'undo' ? 'Green restored by undo' : 'Green set by a golfer') : ''));
 
@@ -1026,6 +1242,7 @@
         drawDot();
         drawTarget();
         placePills();
+        syncWind();
     }
 
     // ---- MARKUP AND STYLE -----------------------------------------------------
@@ -1039,17 +1256,21 @@
         + '<div class="gps-map-wrap">'
         +   '<div class="gps-map"></div>'
         +   '<div class="gps-banner" style="display:none"></div>'
-        +   '<div class="gps-from" style="display:none"></div>'
+        +   '<div class="gps-arc-labels"></div>'
         +   '<button type="button" class="gps-zoom" aria-label="Zoom 1x, 2x or 3x">1x</button>'
         +   '<button type="button" class="gps-recenter" aria-label="Recenter on the hole">⌖ Recenter</button>'
         +   '<div class="gps-pill gps-pill-to" style="display:none"></div>'
         +   '<div class="gps-pill gps-pill-on" style="display:none"></div>'
+        +   '<div class="gps-bottom-row">'
+        +     '<button type="button" class="gps-score" style="display:none"></button>'
+        +     '<div class="gps-wind" style="display:none" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span></div>'
+        +   '</div>'
         +   '<div class="gps-tiles-note" style="display:none">No satellite view here without signal — yardages still work.</div>'
         + '</div>'
         + '<div class="gps-panel">'
         +   '<div class="gps-nums">'
         +     '<div class="gps-num"><div class="gps-lbl">FRONT</div><div class="gps-big gps-f">—</div></div>'
-        +     '<div class="gps-num gps-num-mid"><div class="gps-lbl">CENTER</div><div class="gps-big gps-m">—</div></div>'
+        +     '<div class="gps-num gps-num-mid"><div class="gps-lbl gps-lbl-mid">CENTER</div><div class="gps-big gps-m">—</div></div>'
         +     '<div class="gps-num"><div class="gps-lbl">BACK</div><div class="gps-big gps-b">—</div></div>'
         +   '</div>'
         +   '<div class="gps-sub"><span class="gps-acc"></span><span class="gps-src"></span></div>'
@@ -1058,7 +1279,11 @@
         +   '<div class="gps-target-row" style="display:none"><span class="gps-to-here"></span><span class="gps-here-center"></span></div>'
         +   '<div class="gps-actions">'
         +     '<button type="button" class="gps-btn gps-set-green" style="display:none">Tap the center of the green</button>'
+        +     '<button type="button" class="gps-btn gps-edit-pin" style="display:none">Edit Pin</button>'
         +     '<button type="button" class="gps-btn gps-fix-green" style="display:none">Fix the green</button>'
+        +     '<button type="button" class="gps-btn gps-primary gps-pin-save" style="display:none">Save pin</button>'
+        +     '<button type="button" class="gps-btn gps-pin-clear" style="display:none">Pin to center</button>'
+        +     '<button type="button" class="gps-btn gps-pin-cancel" style="display:none">Cancel</button>'
         +     '<button type="button" class="gps-btn gps-undo-green" style="display:none">Undo last fix</button>'
         +     '<button type="button" class="gps-btn gps-addedges" style="display:none">Add front & back</button>'
         +     '<button type="button" class="gps-btn gps-skip" style="display:none">Skip</button>'
@@ -1096,13 +1321,25 @@
         + '#gps-overlay .gps-tiles-note{position:absolute;bottom:26px;left:8px;right:8px;z-index:1000;text-align:center;font-size:13px;color:#d1d5db;}'
         + '#gps-overlay .maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
         + '#gps-overlay .maplibregl-ctrl-attrib a{color:#0b4f8a;}'
-        // "Measuring from tee": small, bottom-left, just above the attribution bar -
-        // never over the green (it sat at the top, on the green, until 2026-10-07).
-        + '#gps-overlay .gps-from{position:absolute;left:8px;bottom:calc(var(--gps-attrib-h,20px) + 6px);z-index:3;background:rgba(250,204,21,.92);color:#111;'
-        +   'font-weight:700;font-size:11px;line-height:1.2;padding:3px 8px;border-radius:999px;white-space:nowrap;pointer-events:none;}'
         + '#gps-overlay .gps-zoom{position:absolute;left:10px;top:10px;z-index:3;background:rgba(11,15,12,.82);font-size:14px;font-weight:700;min-height:36px;min-width:44px;padding:6px 10px;}'
         + '#gps-overlay .gps-pill{position:absolute;z-index:2;pointer-events:none;background:rgba(11,15,12,.86);color:#fff;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
         +   'padding:4px 7px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
+        // The bottom row of the map, above the attribution bar: the score button in
+        // the middle, the wind at the right. Its height is part of the hole view's
+        // bottom margin, so the tee always shows above it.
+        + '#gps-overlay .gps-bottom-row{position:absolute;left:8px;right:8px;bottom:calc(var(--gps-attrib-h,20px) + 8px);z-index:3;height:38px;pointer-events:none;}'
+        + '#gps-overlay .gps-score{pointer-events:auto;position:absolute;left:50%;top:0;transform:translateX(-50%);max-width:calc(100% - 156px);min-height:38px;padding:8px 14px;'
+        +   'border-radius:999px;background:rgba(11,15,12,.88);border:1px solid #d9f99d;color:#d9f99d;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#gps-overlay .gps-wind{position:absolute;right:0;top:0;height:38px;min-width:62px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;'
+        +   'padding:0 8px;border-radius:10px;background:rgba(11,15,12,.82);color:#fff;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;white-space:nowrap;}'
+        + '#gps-overlay .gps-wind-arrow{display:inline-block;font-size:17px;line-height:1;color:#93c5fd;transform-origin:50% 50%;}'
+        + '#gps-overlay .gps-arc-labels{position:absolute;inset:0;pointer-events:none;z-index:2;}'
+        + '#gps-overlay .gps-arc-lbl{position:absolute;font:700 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#fff;'
+        +   'text-shadow:0 0 2px #000,0 0 3px #000;white-space:nowrap;}'
+        + '#gps-overlay .gps-arc-lbl-pin{color:#fde68a;}'
+        + '.gps-flag{width:30px;height:30px;display:flex;align-items:center;justify-content:center;pointer-events:none;}'
+        + '.gps-flag span{font-size:20px;line-height:1;color:#ef4444;text-shadow:0 0 2px #fff,0 0 3px #000;}'
+        + '.gps-flag.gps-flag-edit{width:48px;height:48px;pointer-events:auto;cursor:grab;touch-action:none;border-radius:50%;box-shadow:0 0 0 2px #facc15 inset;}'
         + '#gps-overlay .gps-pill-to{color:#facc15;border:1px solid rgba(250,204,21,.7);}'
         + '#gps-overlay .gps-pill-on{color:#fff;border:1px solid rgba(255,255,255,.6);}'
         // NO PULL-DOWN while GPS shows: nothing on the page scrolls, refreshes or bounces.
@@ -1195,6 +1432,7 @@
             hole: Number(opts.hole), par: opts.par, courseKey: String(opts.courseKey),
             round: opts.round || null, db: opts.db || null, canFix: !!opts.canFix, eventCode: String(opts.eventCode || ''),
             writeRoundPin: opts.writeRoundPin || null, stepHole: opts.stepHole || null,
+            writeHoleLoc: opts.writeHoleLoc || null, openScore: opts.openScore || null, localLocs: {},
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
             geoError: null, framed: null, mapRequested: false, loadingCourses: !window.HardPanGpsCourses
         };
@@ -1207,6 +1445,11 @@
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
         on(el, '.gps-recenter', function () { frameHole(false); });
         on(el, '.gps-zoom', cycleZoom);
+        on(el, '.gps-edit-pin', startEditPin);
+        on(el, '.gps-pin-save', function () { endEditPin('save'); });
+        on(el, '.gps-pin-clear', function () { endEditPin('clear'); });
+        on(el, '.gps-pin-cancel', function () { endEditPin(null); });
+        on(el, '.gps-score', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
         document.addEventListener('touchmove', blockPull, { passive: false });
         on(el, '.gps-set-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
         on(el, '.gps-fix-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
@@ -1286,6 +1529,7 @@
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;
+        S.editingPin = false; S.pinDraft = null;
         S.target = null; S.targetMoved = false;
         S.framed = null;
         frameHole(false);
@@ -1296,6 +1540,15 @@
     function roundUpdated(round) {
         if (!S) return;
         S.round = round || null;
+        // A pin this phone saved stops overriding the round once the round says
+        // the same thing - so another phone's later move shows up here.
+        // A NEWER pin from another phone wins too (its `at` is later than this
+        // phone's save); an older one does not undo what was just saved here.
+        Object.keys(S.localLocs || {}).forEach(function (k) {
+            var theirs = (S.round && S.round.pinLocs && S.round.pinLocs[k]) || null, mine = S.localLocs[k] || null;
+            var savedAt = mine ? Number(mine.at) || 0 : ((S.localLocsAt && S.localLocsAt[k]) || 0);
+            if (JSON.stringify(theirs) === JSON.stringify(mine) || (theirs && Number(theirs.at) > savedAt)) delete S.localLocs[k];
+        });
         render();
     }
 

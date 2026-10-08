@@ -480,3 +480,58 @@ test('shownDistance: four digits at most, a dash beyond', () => {
     assert.strictEqual(geo.shownDistance(null, 'yd'), '—');
     assert.strictEqual(geo.shownDistance(9999, 'm'), '9999');
 });
+
+// ---- WAVE 1 (2026-10-08): arcs, today's pin, wind ------------------------------
+test('destination: the point N metres away along a bearing', () => {
+    const a = [33.5, -79.1];
+    [0, 90, 180, 270, 33].forEach((b) => {
+        const p = geo.destination(a, b, 300);
+        assert.ok(Math.abs(geo.haversineMeters(a, p) - 300) < 0.5, 'distance at ' + b);
+        assert.ok(Math.abs(((geo.bearingDeg(a, p) - b + 540) % 360) - 180) < 0.2, 'bearing at ' + b);
+    });
+});
+
+test('yardageArcs: carry every 25 yds from 50 to 40 short of the pin, plus 100/150/200 to the pin', () => {
+    const tee = [33.5, -79.1];
+    const pin = geo.destination(tee, 30, 330 * 0.9144);   // 330 yds
+    const arcs = geo.yardageArcs(tee, pin);
+    assert.strictEqual(arcs.map((a) => (a.kind === 'pin' ? 'p' : 'c') + a.yards).join(' '),
+        'c50 c75 c100 c125 c150 c175 c200 c225 c250 c275 p100 p150 p200');
+    arcs.forEach((a) => {
+        const center = a.kind === 'pin' ? pin : tee;
+        a.pts.forEach((p) => assert.ok(Math.abs(geo.haversineYards(center, p) - a.yards) < 0.6, a.kind + a.yards + ' radius'));
+        // Centered on the line of play: both ends the same distance from it.
+        const ends = [a.pts[0], a.pts[a.pts.length - 1]];
+        const far = a.kind === 'pin' ? tee : pin;
+        assert.ok(Math.abs(geo.haversineMeters(ends[0], far) - geo.haversineMeters(ends[1], far)) < 0.5, a.kind + a.yards + ' centered');
+        // About a fairway wide (60 yds, narrower angle cap on the short ones).
+        const w = geo.haversineYards(ends[0], ends[1]);
+        assert.ok(w > 50 && w < 62, a.kind + a.yards + ' width ' + w);
+    });
+    // A short approach: nothing within 40 yds of either end.
+    assert.deepStrictEqual(geo.yardageArcs(tee, geo.destination(tee, 0, 85 * 0.9144)), []);
+    assert.deepStrictEqual(geo.yardageArcs(null, pin), []);
+});
+
+test('clampToGreen: a pin on the green stays put; one dragged off stops on the edge, inside', () => {
+    const c = [33.5, -79.1];
+    const ring = [0, 60, 120, 180, 240, 300].map((b) => geo.destination(c, b, 15));
+    const inside = geo.destination(c, 10, 5);
+    assert.deepStrictEqual(geo.clampToGreen(inside, ring, c), inside);
+    const out = geo.destination(c, 95, 60);
+    const k = geo.clampToGreen(out, ring, c);
+    assert.ok(geo.pointInRing(k, ring), 'clamped pin is on the green');
+    assert.ok(geo.haversineMeters(c, k) > 12 && geo.haversineMeters(c, k) < 15.1, 'at the edge');
+    // No outline (a tapped green): within 15 m of the center.
+    const k2 = geo.clampToGreen(out, null, c);
+    assert.ok(Math.abs(geo.haversineMeters(c, k2) - 15) < 0.2);
+    assert.deepStrictEqual(geo.clampToGreen(inside, null, c), inside);
+});
+
+test('parseNwsWind: NWS hourly windSpeed / windDirection -> mph and the way it blows', () => {
+    assert.deepStrictEqual(geo.parseNwsWind({ windSpeed: '10 mph', windDirection: 'N' }), { mph: 10, fromDeg: 0, toDeg: 180 });
+    assert.deepStrictEqual(geo.parseNwsWind({ windSpeed: '5 to 12 mph', windDirection: 'NW' }), { mph: 12, fromDeg: 315, toDeg: 135 });
+    assert.deepStrictEqual(geo.parseNwsWind({ windSpeed: '7 mph', windDirection: 'ssw' }), { mph: 7, fromDeg: 202.5, toDeg: 22.5 });
+    [null, {}, { windSpeed: '10 km/h', windDirection: 'N' }, { windSpeed: '10 mph', windDirection: 'Calm' }, { windSpeed: '', windDirection: 'N' }]
+        .forEach((p) => assert.strictEqual(geo.parseNwsWind(p), null, JSON.stringify(p)));
+});

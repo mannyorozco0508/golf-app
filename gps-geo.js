@@ -573,8 +573,92 @@
         return (v == null || v > 9999 || v < 0) ? '\u2014' : String(v);
     }
 
+    // ---- WAVE 1 (2026-10-08): ARCS, TODAY'S PIN, WIND --------------------------
+
+    // The point `meters` from `pt` along `bearing` (degrees from north). Flat
+    // earth over a golf hole: well under a yard off at 600 yds.
+    function destination(pt, bearing, meters) {
+        var proj = projector(pt), th = toRad(bearing);
+        return proj.inv([meters * Math.sin(th), meters * Math.cos(th)]);
+    }
+
+    // YARDAGE ARCS, like 18Birdies: thin curved lines across the hole.
+    //   carry  every `step` yards from where the numbers are measured from (the
+    //          golfer, or the tee), short of the pin;
+    //   pin    100 / 150 / 200 yards FROM THE PIN, back down the hole toward the
+    //          golfer - the classic layup marks.
+    // Each arc spans `halfWidthYd` either side of the line (a fairway's width).
+    // Arcs closer than `minYd` to either end are left out (they would sit on the
+    // dot or on the green). Returns [{ kind, yards, pts: [[lat, lng], ...] }].
+    var ARC_STEP_YD = 25, ARC_HALF_WIDTH_YD = 30, ARC_MIN_YD = 40, PIN_MARKS_YD = [100, 150, 200];
+    function yardageArcs(origin, pin, opts) {
+        if (!origin || !pin) return [];
+        opts = opts || {};
+        var step = opts.step || ARC_STEP_YD, half = (opts.halfWidthYd || ARC_HALF_WIDTH_YD) * M_PER_YD;
+        var minYd = opts.minYd == null ? ARC_MIN_YD : opts.minYd, segs = opts.segments || 16;
+        var total = haversineYards(origin, pin);
+        var out = [];
+        var arc = function (center, toward, yards, kind) {
+            var R = yards * M_PER_YD, b = bearingDeg(center, toward);
+            var a = Math.min(35, (half / R) * 180 / Math.PI);
+            var pts = [];
+            for (var i = 0; i <= segs; i++) pts.push(roundPt(destination(center, b - a + (2 * a * i / segs), R)));
+            out.push({ kind: kind, yards: yards, pts: pts });
+        };
+        for (var y = step * Math.ceil(minYd / step); y <= total - minYd; y += step) arc(origin, pin, y, 'carry');
+        PIN_MARKS_YD.forEach(function (y) { if (y <= total - minYd) arc(pin, origin, y, 'pin'); });
+        return out;
+    }
+
+    // TODAY'S PIN stays ON THE GREEN. Inside the outline: unchanged. Outside: the
+    // nearest point of the outline. With no outline (a tapped green has a center
+    // only): within `slackM` of the center.
+    function clampToGreen(pt, ring, mid, slackM) {
+        if (!pt) return null;
+        if (ring && ring.length >= 3) {
+            if (pointInRing(pt, ring)) return pt;
+            var proj = projector(pt), best = null, bestD = Infinity;
+            for (var i = 0; i < ring.length; i++) {
+                var a = proj.fwd(ring[i]), b = proj.fwd(ring[(i + 1) % ring.length]);
+                var dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+                var k = Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / L));
+                var q = [a[0] + k * dx, a[1] + k * dy], d = Math.hypot(q[0], q[1]);
+                if (d < bestD) { bestD = d; best = q; }
+            }
+            if (!best) return pt;
+            // Half a metre inside the edge, toward the green's middle, so the
+            // clamped pin reads as ON the green, not on its line.
+            var c = polygonCentroid(ring), cq = c ? proj.fwd(c) : null;
+            if (cq) { var vx = cq[0] - best[0], vy = cq[1] - best[1], vl = Math.hypot(vx, vy) || 1; best = [best[0] + 0.5 * vx / vl, best[1] + 0.5 * vy / vl]; }
+            return roundPt(proj.inv(best));
+        }
+        if (mid) {
+            var lim = slackM == null ? 15 : slackM, dm = haversineMeters(mid, pt);
+            return dm <= lim ? pt : roundPt(destination(mid, bearingDeg(mid, pt), lim));
+        }
+        return pt;
+    }
+
+    // WIND from the National Weather Service hourly forecast (api.weather.gov),
+    // first period: windSpeed "10 mph" or "5 to 10 mph", windDirection "NW".
+    // Returns { mph, fromDeg, toDeg } (fromDeg: where it blows FROM, like the
+    // forecast; toDeg: where it blows TO, which is where the arrow points), or
+    // null for anything else (calm, missing, a format we do not know).
+    var COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    function parseNwsWind(period) {
+        if (!period || typeof period.windSpeed !== 'string' || typeof period.windDirection !== 'string') return null;
+        var nums = (period.windSpeed.match(/\d+(\.\d+)?/g) || []).map(Number);
+        var di = COMPASS.indexOf(period.windDirection.trim().toUpperCase());
+        if (!nums.length || di < 0 || !/mph/i.test(period.windSpeed)) return null;
+        var mph = Math.round(Math.max.apply(null, nums));
+        var from = di * 22.5;
+        return { mph: mph, fromDeg: from, toDeg: (from + 180) % 360 };
+    }
+
     var api = {
-        bearingDeg: bearingDeg, holeCamera: holeCamera, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
+        bearingDeg: bearingDeg, holeCamera: holeCamera,
+        destination: destination, yardageArcs: yardageArcs, clampToGreen: clampToGreen, parseNwsWind: parseNwsWind,
+        ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,

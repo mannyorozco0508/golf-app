@@ -245,3 +245,63 @@ with a separate worker.
   GPS shows again (a hidden map has no size to fit it into).
 - Checked by `tools/gps-check.js`, arms `polish` and `esrtee`, plus the osm
   and off-hole arms.
+
+### 7c. Wave 1: the 18Birdies-style hole screen (2026-10-08, branch gps-wave1)
+
+The handoff was approved by Manny. Imagery stays USGS/NAIP plus OSM greens,
+with no paid map API. Esri code remains, but is dormant without a key. No
+paywall code yet.
+
+- **Removed:** the "Measuring from tee" label on the map. It's obvious, so it
+  isn't shown. Off the hole, the numbers are still from the tee, the dot is
+  hidden, and the line under the numbers says "You are off this hole".
+- **Yardage arcs:** thin white curves across the hole, 60 yds wide, centered
+  on the line of play from the golfer (or the tee, off the hole) to today's
+  pin (or the green's center).
+  - Carry arcs every 25 yds from 50 up to 40 yds short of the pin.
+  - The 100 / 150 / 200-yds-to-the-pin layup marks are dashed and gold,
+    labelled "150 to pin".
+  - Each arc has a small "125y" label at its left end on screen. A label that
+    would cover a pin, the target, a pill or a control is left out.
+  - Math: `gps-geo.yardageArcs`. It is local, so the arcs work with no signal.
+- **Edit Pin (today's hole location):**
+  - Anyone in the group drags the flag. It can't leave the green outline
+    (`gps-geo.clampToGreen`); a tapped green with no outline allows 15 m from
+    its center. A tap also moves it there.
+  - While dragging, CENTER (relabelled **PIN** when a pin is set), the arcs,
+    the white line and "Here → pin" all update live.
+  - Save writes `events/<code>/pinLocs/h<n> = { lat, lng, at }` through the
+    page's durable queue (`durableWrite`), so it works with no signal. The
+    existing event-level rule already lets a round member write a new child,
+    so **no rules change**.
+  - "Pin to center" removes it. A newer pin from another phone (a later `at`)
+    replaces this phone's. An unsent one stays until it lands, like every
+    unsent write.
+  - It is separate from "Fix the green", which moves the green for every
+    future round (`gpsPins` / `course_gps`). Edit Pin never touches those.
+- **Score button on the map:** "Hole N · Enter Score" at the bottom center,
+  above the attribution. It opens the card's own score entry for the hole: the
+  Bets side, with the first empty box focused inside the tap so the keyboard
+  opens. The score is saved by the same `saveScore` → `events/<code>/scores`
+  path as always. **No new data path.**
+- **Wind:** a small box at the bottom-right, with an arrow (where the wind
+  blows, turned with the map) and mph.
+  - Source: the National Weather Service hourly forecast (`api.weather.gov`,
+    free, no key, US only).
+  - It asks for the COURSE point, the first mapped hole's green to 3 decimals,
+    never the golfer's position. It is asked only while GPS shows, at most
+    every 15 minutes per course; the grid point is cached for a week.
+  - It shows the last reading up to an hour old, and hides quietly when there
+    is none (offline, outside the US, any error).
+  - Like the imagery tiles, the request tells NWS which course is being
+    looked at (IP + course point). It is not the golfer's location.
+- **Layout:** the hole view's bottom margin is the attribution bar + the
+  38 px score/wind row + 16 px, so the tee shows above the button.
+- **TPC Scottsdale Stadium** joins the bundle: OSM way 78388948, 18/18 holes,
+  pars match the card, all tees mapped. The importer's `--fetch` query now
+  asks for `golf=tee` as well.
+- **Checked by** `tools/gps-check.js`, arms `editp`, `score`, `wind`,
+  `windoff` and the four test courses (Caledonia, True Blue, Pine Lakes #10,
+  TPC Scottsdale), plus arc checks in osm / off-hole / offline.
+- **Not built (per the handoff):** #10 "Plays like" (USGS 3DEP elevation +
+  wind + temperature) and the paid tier next; #22 3D green / slope later.

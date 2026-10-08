@@ -6083,6 +6083,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const kp = document.getElementById('kp-force-overlay');
         if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets');
     }
+    // THE SCORE BUTTON ON THE MAP (Wave 1): the card's own score entry for this
+    // hole - the Bets side, the first empty box - so a score typed from GPS is
+    // saved by exactly the code that saves every other score. No new data path.
+    // Focused inside the tap, so the phone's keyboard opens.
+    function gpsOpenScore(hole) {
+        const g = window.HardPanGps;
+        if (g) g.showSide('bets');
+        const all = Array.from(document.querySelectorAll('.score-input[data-hole="' + Number(hole) + '"]:not([disabled])'));
+        const box = all.find(i => !String(i.value || '').trim()) || all[0];
+        if (box) {
+            try { box.scrollIntoView({ block: 'center' }); } catch (e) {}
+            try { box.focus(); } catch (e) {}
+        }
+    }
     let gpsPrecacheAsked = false;
     function gpsFollowHoleView() {
         const g = window.HardPanGps;
@@ -6099,6 +6113,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 // FIRST green on an unmapped hole can be set by anyone on the card.
                 canFix: roundOwnerHere(),
                 writeRoundPin: (k, pin) => durableWrite(base + k, 'set', pin, base + k),
+                // TODAY'S PIN (Wave 1): on the round, for the whole group; the same
+                // durable queue as a green, so it survives no signal.
+                writeHoleLoc: (k, loc) => {
+                    const at = 'events/' + currentMode + '/pinLocs/' + k;
+                    return loc ? durableWrite(at, 'set', loc, at) : durableWrite(at, 'remove', null, at);
+                },
+                openScore: gpsOpenScore,
                 stepHole: gpsStepHole
             });
         } else {
