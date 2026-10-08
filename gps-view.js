@@ -1827,7 +1827,9 @@
     var CSS = ''
         // On BETS: one "📍 GPS" button, above the Round Menu handle; the way back
         // from GPS is the Scorecard button on the map. On GPS it is not there.
-        + '#gps-side-toggle{position:fixed;right:12px;z-index:55;display:flex;bottom:calc(70px + env(safe-area-inset-bottom));' + PANEL + 'border-radius:999px;padding:3px;font-family:' + FONT + ';}'
+        // CENTERED, where the old GPS | Bets pill was: at the right it sat on the
+        // card's own Next button (hole_view_landing_test caught it).
+        + '#gps-side-toggle{position:fixed;left:50%;transform:translateX(-50%);z-index:55;display:flex;bottom:calc(70px + env(safe-area-inset-bottom));' + PANEL + 'border-radius:999px;padding:3px;font-family:' + FONT + ';}'
         + 'body.gps-side-gps #gps-side-toggle{display:none;}'
         + '#gps-side-toggle button{font-family:inherit;font-weight:800;font-size:15px;line-height:1;color:#0b0f0c;background:#d9f99d;border:0;border-radius:999px;padding:10px 16px;min-height:42px;cursor:pointer;}'
         + 'body.has-gps-toggle #main-content{padding-bottom:132px !important;}'
