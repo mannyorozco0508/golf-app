@@ -348,12 +348,17 @@ const PULL = (where) => `(function () { var t = ${where}; var e = new TouchEvent
     ob: getComputedStyle(document.documentElement).overscrollBehaviorY, bodyOb: getComputedStyle(document.body).overscrollBehaviorY,
     mapTA: m ? getComputedStyle(m).touchAction : null, scrollY: Math.round(scrollY) }); })()`;
 // A tap 22px below the front pin: on the map, through MapLibre's own events.
-const TAP_SHORT_OF_GREEN = `(function () { var f = document.querySelector('#gps-overlay .gps-pin-front').getBoundingClientRect();
+const TAP_SHORT_OF_GREEN = `(function () { var fp = document.querySelector('#gps-overlay .gps-pin-front'); if (!fp) return 'no front pin'; var f = fp.getBoundingClientRect();
   var c = document.querySelector('#gps-overlay .maplibregl-canvas'), x = f.left + f.width / 2, y = f.bottom + 22;
   ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 })); });
   return 'tapped'; })()`;
 const touch = (type, pts) => ({ cdp: { method: 'Input.dispatchTouchEvent', params: { type, touchPoints: pts } } });
-const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name, reason: r.reason }, null, 1)); process.exit(2); } };
+// An arm that could not run stops the check. What already failed is printed with
+// it, and makes the exit 1 (a guarantee broke) rather than 2 (could not run): a
+// broken build often breaks an arm's steps too (Wave 2: hasGpsPro() wrongly false
+// -> no map -> later arms have nothing to tap), and the earlier failure is the news.
+let FAILS_SO_FAR = [];
+const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name, reason: r.reason, failsSoFar: FAILS_SO_FAR }, null, 1)); process.exit(FAILS_SO_FAR.length ? 1 : 2); } };
 
 // ---- ONE STAND-IN FOR THE OUTSIDE SERVICES (Wave 2) --------------------------
 // On 127.0.0.1, with CORS like the real ones:
@@ -421,7 +426,7 @@ function usgsFallbackFails(tag, g, why) {
 }
 
 (async () => {
-    const fails = [];
+    const fails = FAILS_SO_FAR;
     const out = {};
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-check-profile-'));
     await startStandIn();
@@ -470,6 +475,8 @@ function usgsFallbackFails(tag, g, why) {
         if (arrive.side !== 'bets' || arrive.gpsShown) fails.push('osm: a fresh phone did not land on Bets');
         if (arrive.watchCalls !== 0) fails.push('osm: a location watch ran before GPS was shown');
         if (!gps.gpsShown || !gps.map || gps.side !== 'gps') fails.push('osm: GPS side did not show with a map');
+        // Wave 2: no override and no paywall -> HardPan GPS (Pro), the full screen.
+        if (gps.hasPro !== true || gps.basicMode || gps.tier !== null) fails.push('osm: a phone with no override is not Pro: ' + JSON.stringify([gps.hasPro, gps.basicMode, gps.tier]));
         if (JSON.stringify(gps.labels) !== '["FRONT","CENTER","BACK"]') fails.push('osm: labels ' + JSON.stringify(gps.labels));
         if (gps.f !== EXPECT.front || gps.m !== EXPECT.center || gps.b !== EXPECT.back) fails.push(`osm: F/C/B ${gps.f}/${gps.m}/${gps.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (gps.acc !== '±6 yds') fails.push('osm: accuracy ' + gps.acc);
@@ -859,7 +866,7 @@ function usgsFallbackFails(tag, g, why) {
     const wd = await arm('wind', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ }, // 0
         { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 1 reload: from the phone
-        { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
+        { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));if(!w)return 'no wind reading';w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
         { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, profileDir: windProfile });
     out.wind = wd; bail(out, wd);
@@ -1082,9 +1089,16 @@ function usgsFallbackFails(tag, g, why) {
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'DENY-PLAYS', nws: true, epqs: true }), profileDir: plaProfile });
     out.plays2 = pa2; bail(out, pa2);
     {
-        const again = SEEN.epqs.length - epqs1;
-        if (again !== 0) fails.push('plays: the second visit to hole 1 made ' + again + ' EPQS requests (expected 0)');
-        out.playsSummary.secondVisitEpqs = again;
+        // THE CACHE: nothing answered on the first visit is asked for again. (A
+        // point the first visit had not reached yet - possible on a loaded machine -
+        // may be asked once; the first run on 2026-10-08 measured 0 in all.)
+        const k = (u) => { const q = new URL(u, 'http://x').searchParams; return (+q.get('y')).toFixed(5) + ',' + (+q.get('x')).toFixed(5); };
+        const first = new Set(SEEN.epqs.slice(epqs0, epqs1).map(k));
+        const second = SEEN.epqs.slice(epqs1).map(k);
+        const reasked = second.filter((x) => first.has(x));
+        if (reasked.length) fails.push('plays: the second visit asked EPQS again for ' + reasked.length + ' point(s) already answered: ' + reasked.slice(0, 3).join(' | '));
+        out.playsSummary.secondVisitEpqs = second.length;
+        out.playsSummary.secondVisitReasked = reasked.length;
     }
     try { fs.rmSync(plaProfile, { recursive: true, force: true }); } catch (e) {}
 
@@ -1170,4 +1184,4 @@ function usgsFallbackFails(tag, g, why) {
     };
     console.log(JSON.stringify(summary, null, 1));
     process.exit(fails.length ? 1 : 0);
-})().catch((e) => { console.error(e); process.exit(2); });
+})().catch((e) => { console.error(e); console.log(JSON.stringify({ failsSoFar: FAILS_SO_FAR }, null, 1)); process.exit(FAILS_SO_FAR.length ? 1 : 2); });
