@@ -295,7 +295,11 @@ test('every shipped hole is plausible: its length fits its par, and the hole end
             const yds = o.lineM / 0.9144;
             const [lo, hi] = par === 3 ? [70, 260] : par === 4 ? [230, 500] : [400, 640];
             assert.ok(yds >= lo && yds <= hi, `${k} #${n} par ${par}: ${yds.toFixed(0)} yds along the hole line`);
-            assert.ok(geo.haversineMeters(o.tee, o.end) <= o.lineM + 1, `${k} #${n}: straight never exceeds the line`);
+            // The tee is the BACK tee (2026-10-07), which can sit behind where the
+            // hole line was drawn from - so the straight distance may exceed the
+            // line, but never by more than a tee complex is deep.
+            assert.ok(geo.haversineMeters(o.tee, o.end) <= o.lineM + 80, `${k} #${n}: tee is ${Math.round(geo.haversineMeters(o.tee, o.end) - o.lineM)} m beyond the line`);
+            assert.strictEqual(o.teeFrom, 'tee-box', `${k} #${n}: no mapped tee box`);
             assert.ok(geo.pointInRing(o.end, o.green), `${k} #${n}: hole line ends on its green`);
             assert.ok(o.green.length >= 3 && o.green.length <= 48, `${k} #${n}: compact polygon`);
             checked++;
@@ -379,4 +383,100 @@ test('midpoint: halfway between two points, null without both', () => {
     assert.deepStrictEqual(geo.midpoint([33, -79], [34, -78]), [33.5, -78.5]);
     assert.deepStrictEqual(geo.midpoint({ lat: 1, lng: 2 }, [3, 4]), [2, 3]);
     assert.strictEqual(geo.midpoint(null, [1, 1]), null);
+});
+
+test('the tee is the BACK tee on this hole\'s line - not the previous hole\'s, not the fairway, and the line start when none is mapped', () => {
+    const A = [33.5, -79.1];
+    const P = (n, e) => north(east(A, e), n);              // n metres north, e metres east of A
+    const way = (id, tags, pts) => ({ type: 'way', id, tags, geometry: pts.map((p) => ({ lat: p[0], lon: p[1] })) });
+    const box = (id, c) => way(id, { golf: 'tee' }, [P(c[0] - 4, c[1] - 4), P(c[0] - 4, c[1] + 4), P(c[0] + 4, c[1] + 4), P(c[0] + 4, c[1] - 4), P(c[0] - 4, c[1] - 4)]);
+    const green = (id, c) => way(id, { golf: 'green' }, [P(c[0] - 12, c[1] - 12), P(c[0] - 12, c[1] + 12), P(c[0] + 12, c[1] + 12), P(c[0] + 12, c[1] - 12), P(c[0] - 12, c[1] - 12)]);
+    const els = [
+        way(1, { golf: 'hole', ref: '1' }, [P(0, 0), P(150, 0), P(350, 0)]),       // hole 1 runs north 350 m
+        green(2, [350, 0]),
+        box(3, [-30, 2]),          // the back tee: 30 m behind the line start, on its extension
+        box(4, [15, 0]),           // a forward tee on the line
+        box(5, [200, 3]),          // a box at 57% of the line - a drop zone, not a tee
+        box(6, [-20, 120]),        // the previous hole's tee, 120 m off this line
+        way(7, { golf: 'hole', ref: '2' }, [P(0, 500), P(300, 500)]),             // hole 2: no tee box mapped
+        green(8, [300, 500]),
+    ];
+    const r = geo.osmToCourseGps(els);
+    close(geo.haversineMeters(r.holes['1'].osm.tee, P(-30, 2)), 0, 0.5, 'hole 1 tee is the back box');
+    assert.strictEqual(r.holes['1'].osm.teeFrom, 'tee-box');
+    close(geo.haversineMeters(r.holes['2'].osm.tee, P(0, 500)), 0, 0.5, 'hole 2 tee is the line start');
+    assert.strictEqual(r.holes['2'].osm.teeFrom, 'line-start');
+});
+
+// ---- THE HOLE VIEW, OFF THE HOLE, NUMBERS THAT FIT (2026-10-07) ----------------
+test('bearingDeg: north 0, east 90, south 180, west 270', () => {
+    const A = [33.5, -79.1];
+    close(geo.bearingDeg(A, north(A, 500)), 0, 0.01);
+    close(geo.bearingDeg(A, east(A, 500)), 90, 0.05);
+    close(geo.bearingDeg(A, north(A, -500)), 180, 0.01);
+    close(geo.bearingDeg(A, east(A, -500)), 270, 0.05);
+});
+
+// Independent Web Mercator, 512 px tiles (MapLibre): screen position of a point
+// for a camera, with the camera's padding shifting the center down/up.
+function screenXY(p, cam, view, pad) {
+    const R = 6378137, z2 = 512 * Math.pow(2, cam.zoom) / (2 * Math.PI * R);
+    const merc = (q) => [R * q[1] * Math.PI / 180, R * Math.log(Math.tan(Math.PI / 4 + q[0] * Math.PI / 360))];
+    const c = merc(cam.center), m = merc(p);
+    const dx = (m[0] - c[0]) * z2, dy = -(m[1] - c[1]) * z2;            // px, screen y down, north-up
+    // Bearing b puts compass direction b at the TOP of the screen: with b = 90
+    // (east up) a point due east must move UP (ry < 0) - checked by hand, since
+    // the first version of this helper turned the other way.
+    const th = cam.bearing * Math.PI / 180;
+    const rx = dx * Math.cos(th) + dy * Math.sin(th), ry = -dx * Math.sin(th) + dy * Math.cos(th);
+    const cx = pad.left + (view.w - pad.left - pad.right) / 2, cy = pad.top + (view.h - pad.top - pad.bottom) / 2;
+    return [cx + rx, cy + ry];
+}
+
+test('holeCamera: every shipped hole opens tee at the BOTTOM, green at the TOP, filling the view top to bottom or side to side', () => {
+    const view = { w: 390, h: 520 }, pad = { top: 44, bottom: 36, left: 18, right: 18 };
+    let checked = 0;
+    ['caledonia', 'trueblue', 'pinehills', 'swwa_trimountain', 'pinelakes', 'thistle_27_cameron'].forEach((k) => {
+        Object.entries(table[k].holes).forEach(([n, h]) => {
+            const o = h.osm;
+            const cam = geo.holeCamera(o.tee, o.green, view, pad, 22);
+            const tee = screenXY(o.tee, cam, view, pad), mid = screenXY(o.mid, cam, view, pad);
+            assert.ok(tee[1] > mid[1], `${k} #${n}: tee is not below the green`);
+            close(tee[0], mid[0], 2, `${k} #${n}: tee and green center are not on one vertical line`);
+            const pts = [o.tee].concat(o.green).map((p) => screenXY(p, cam, view, pad));
+            const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+            const eps = 0.75;
+            assert.ok(Math.min(...xs) >= pad.left - eps && Math.max(...xs) <= view.w - pad.right + eps, `${k} #${n}: off the sides`);
+            assert.ok(Math.min(...ys) >= pad.top - eps && Math.max(...ys) <= view.h - pad.bottom + eps, `${k} #${n}: off the top or bottom`);
+            // Snug: the hole fills the height (or, for a wide green, the width) to within a pixel.
+            const fillH = (Math.max(...ys) - Math.min(...ys)) / (view.h - pad.top - pad.bottom);
+            const fillW = (Math.max(...xs) - Math.min(...xs)) / (view.w - pad.left - pad.right);
+            assert.ok(Math.max(fillH, fillW) > 0.995, `${k} #${n}: only fills ${(100 * Math.max(fillH, fillW)).toFixed(1)}%`);
+            checked++;
+        });
+    });
+    assert.strictEqual(checked, 18 + 18 + 18 + 18 + 9 + 9);
+});
+
+test('holeCamera: a zoom cap holds (USGS 18, Esri 20), and no tee means no camera', () => {
+    const o = table.caledonia.holes['9'].osm;
+    assert.ok(geo.holeCamera(o.tee, o.green, { w: 390, h: 520 }, {}, 18).zoom <= 18);
+    assert.strictEqual(geo.holeCamera(null, o.green, { w: 390, h: 520 }, {}), null);
+});
+
+test('measureOrigin: me within 1,000 yds of the green; the TEE beyond it or with no GPS', () => {
+    const green = [33.5, -79.1], tee = north(green, -400 * 0.9144);
+    assert.strictEqual(geo.measureOrigin(north(green, -150), tee, green).from, 'me');
+    assert.strictEqual(geo.measureOrigin(north(green, -999 * 0.9144), tee, green).from, 'me', '999 yds: still on the hole');
+    assert.strictEqual(geo.measureOrigin(north(green, -1001 * 0.9144), tee, green).from, 'tee', '1,001 yds: off the hole');
+    assert.deepStrictEqual(geo.measureOrigin(null, tee, green), { from: 'tee', pt: tee }, 'no GPS: the tee');
+    assert.strictEqual(geo.measureOrigin(null, null, green), null, 'nothing to measure from');
+});
+
+test('shownDistance: four digits at most, a dash beyond', () => {
+    assert.strictEqual(geo.shownDistance(137.16, 'yd'), '150');
+    assert.strictEqual(geo.shownDistance(9999 * 0.9144, 'yd'), '9999');
+    assert.strictEqual(geo.shownDistance(10000 * 0.9144, 'yd'), '—');
+    assert.strictEqual(geo.shownDistance(null, 'yd'), '—');
+    assert.strictEqual(geo.shownDistance(9999, 'm'), '9999');
 });

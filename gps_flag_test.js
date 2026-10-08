@@ -39,7 +39,7 @@ const flag = require('./tools/gps-flag.js');
 
 const ROOT = __dirname;
 const ON_TREE = fs.existsSync(path.join(ROOT, 'gps-view.js'));
-const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPanGeo\b|leaflet|arcgis|nationalmap|watchPosition|getCurrentPosition|geolocation|NSLocation|📍 GPS|gps-side/;
+const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPanGeo\b|leaflet|maplibre|arcgis|nationalmap|watchPosition|getCurrentPosition|geolocation|NSLocation|📍 GPS|gps-side/;
 // sha256 of index.html at main 82d98b4 (the card guards) - the tree gps-v1 was
 // rebased onto on 2026-10-07 (second time). Before: d697ea55 (04f5fd1), 8ea54ad0 (7a6c3f5).
 // After the next rebase, re-pin it to that main's index.html.

@@ -86,8 +86,9 @@ test('no runtime cache route for Esri, no IndexedDB, and the only Cache Storage 
     const puts = raw.split('\n').filter((l) => /\.put\(/.test(l) && !/^\s*\/\//.test(l));
     assert.strictEqual(puts.length, 1, 'exactly one Cache Storage write in gps-view.js');
     assert.ok(/cache\.put\(url, r\)/.test(puts[0]));
-    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// Framed on the hole'));
+    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// ---- THE HOLE VIEW'));
     assert.ok(/TILES\.usgs\.url\.replace/.test(pre) && !/keyedUrl|esriTileUrl/.test(pre), 'the pre-cache builds USGS urls only');
-    // The Esri layer is a plain <img> tile layer: the browser fetches and caches it.
-    assert.ok(/L\.tileLayer\(esriTileUrl\(\)/.test(v), 'positive: the Esri layer is a stock Leaflet tile layer');
+    // The Esri layer is a plain MapLibre raster source: the browser fetches each
+    // tile, under its own HTTP cache, and nothing here stores one.
+    assert.ok(/sources\.esri = \{ type: 'raster', tiles: \[esriTileUrl\(\)/.test(v), 'positive: the Esri layer is a stock raster source');
 });

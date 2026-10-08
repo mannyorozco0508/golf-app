@@ -67,8 +67,8 @@ imagery comes from USGS instead (section 1b). What the app does with Esri:
 - Endpoint: `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`.
   No key and no account.
 - **Native to z16.** The service metadata gives `maxScale: 9027.98` (1:9,028 = z16),
-  and z17 answers HTTP 404 (measured). Past z16, Leaflet enlarges the z16
-  tiles, so the picture is softer than Esri's when zoomed in close.
+  and z17 answers HTTP 404 (measured). Past z16 the map enlarges the z16
+  tiles, up to zoom 18, so the picture is softer than Esri's when zoomed in close.
 - Licence: "Map services and data downloaded from The National Map are free and
   in the public domain … there are no use restrictions on these services"
   (USGS FAQ, https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map;
@@ -182,14 +182,35 @@ the map and USGS (public domain) is the picture, then they go back. Measured in
   the round grants write at its top level. `gps_rules_proposal_test.js` checks
   every case and the limit.
 
-## 7. Rotation (tee at the bottom, green at the top): north-up for now
+## 7. Rotation (tee at the bottom, green at the top): DONE with MapLibre (2026-10-07)
 
-Leaflet 1.9 can't rotate a map. The only rotation option is the third-party
-`leaflet-rotate` plugin, which works by patching Leaflet's own pointer, drag
-and tap handling. That's the same code the draggable target relies on (drag the
-target, pan everywhere else, tap to jump). I can't prove it on an iPhone from
-here, and a target that is off by a rotation would give confident wrong
-yardages. So the map stays **north-up**. If you want rotation, the safe path is
-a separate wave: vendor the plugin behind a setting that's off by default, and
-test drag, pan and tap on a real iPhone before turning it on.
+Leaflet can't rotate a map, and its rotation plugin patches the drag code the
+target depends on. So the GPS map moved to **MapLibre GL JS 5.24.0**: free and
+open source (BSD-3), vendored, and loaded on the first GPS tap. It rotates
+natively. Its single-file build is used because v6 ships only as ES modules
+with a separate worker.
 
+- Each hole opens rotated so the direction tee -> green points up. The whole
+  hole, from the back tee to the green's outline, fills the map with a small
+  margin. The fit is computed in the rotated frame (`gps-geo.holeCamera`), not
+  from a north-up bounding box, so a diagonal hole is fitted snugly.
+- **The tee** is the hole's BACK tee: of the OSM tee boxes on the first 45% of
+  the hole's line (within 45 m of it), the one farthest from the green. It
+  falls back to the line's start, but all 108 shipped holes have a mapped tee
+  box.
+- **Gestures:** one finger pans and two fingers zoom. Nothing rotates by
+  accident. **Recenter** returns to the hole's own view.
+- **Unchanged:** the draggable target, F/C/B, tap-to-jump and Fix the green
+  all work on the rotated map; MapLibre markers stay upright.
+- **Zoom:** up to 20 with Esri (native ~19), and 18 with USGS alone (native 16,
+  upscaled).
+- **Imagery** is unchanged: USGS raster (cache-first, through a `hpusgs://`
+  protocol that reads the pre-cache) under Esri raster. Setting a green turns
+  Esri off.
+- **Measuring from the tee:** more than 1,000 yds from the green, or with no
+  GPS, the numbers are measured from the TEE, a small "Measuring from tee"
+  label shows, and the blue dot is hidden.
+- **Numbers:** at most four digits ("—" beyond). FRONT / CENTER / BACK fit at
+  320 px wide, with four digits.
+- **No WebGL** (very old devices only): the numbers still work on the plain
+  panel, without a map.

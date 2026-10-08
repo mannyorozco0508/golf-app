@@ -4368,7 +4368,7 @@
 // screen gains a "📍 GPS | 💰 Bets" toggle - satellite hole, blue dot, big
 // front / center / back, a draggable target. Six files join the shell -
 // gps-geo.js, gps-view.js, gps-config.js, gps-courses.js (the bundled
-// OpenStreetMap greens) and the vendored leaflet.js and leaflet.css - so the
+// OpenStreetMap greens) and the vendored maplibre-gl.js and maplibre-gl.css - so the
 // GPS side opens with no signal. ESRI TILES ARE NEVER STORED: the fetch handler
 // below never sees them (cross-origin), so only the browser caches them, per
 // Esri's headers, which is all its terms allow. USGS public-domain tiles for the
@@ -4550,15 +4550,15 @@ const SHELL_FILES = [
     // GPS:BEGIN
     // HardPan GPS (v313). index.html loads gps-geo.js, gps-config.js and
     // gps-view.js (HardPan builds only - GPS_ENABLED=0 drops this block and
-    // the files); gps-view.js loads the course data and Leaflet on first use. All six are precached so
+    // the files); gps-view.js loads the course data and MapLibre on first use. All six are precached so
     // the GPS screen opens on the 14th tee with no bars. Esri tiles are NOT here.
     // NO APOSTROPHES IN THIS BLOCK.
     './gps-geo.js',
     './gps-view.js',
     './gps-config.js',
     './gps-courses.js',
-    './leaflet.js',
-    './leaflet.css',
+    './maplibre-gl.js',
+    './maplibre-gl.css',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the

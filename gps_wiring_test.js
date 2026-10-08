@@ -21,17 +21,17 @@ const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
-const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'leaflet.js', 'leaflet.css'];
+const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css'];
 
-test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT Leaflet or the course data', { skip }, () => {
+test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
     const at = html.indexOf('<!-- GPS:BEGIN -->');
     const block = html.slice(at, html.indexOf('<!-- GPS:END -->', at));
     assert.ok(at > 0, 'the GPS block is there');
     ['gps-geo.js', 'gps-config.js', 'gps-view.js'].forEach((f) => assert.ok(block.includes(`<script src="${f}"></script>`), f));
-    assert.ok(!/<script src="leaflet\.js"/.test(html), 'Leaflet is loaded on first use, not at boot');
+    assert.ok(!/<script src="maplibre-gl\.js"/.test(html), 'MapLibre is loaded on first use, not at boot');
     assert.ok(!/<script src="gps-courses\.js"/.test(html), 'course data is loaded on first use, not at boot');
-    assert.ok(!/leaflet\.css/.test(html), 'no Leaflet stylesheet at boot');
+    assert.ok(!/maplibre-gl\.css/.test(html), 'no MapLibre stylesheet at boot');
     // Every GPS mention in index.html is inside a GPS block, so a Consumer build
     // cannot keep one by accident.
     const outside = require('./tools/gps-flag.js').applyFlag(html, false);
@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v316-gps'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v317-gps'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -78,7 +78,7 @@ test('imagery terms: keyed Esri only (never the keyless endpoint), USGS cached, 
     // The only cache.put is in precacheCourse, on a USGS url.
     const puts = v.split('\n').filter((l) => /cache\.put\(/.test(l));
     assert.strictEqual(puts.length, 1, 'exactly one place stores tiles');
-    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// Framed on the hole'));
+    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// ---- THE HOLE VIEW'));
     assert.ok(/TILES\.usgs\.url\.replace/.test(pre) && /cache\.put\(url, r\)/.test(pre), 'it stores USGS urls');
     assert.ok(!/keyedUrl/.test(pre), 'and never an Esri url');
     // Attribution: all three, always on the map.
@@ -89,7 +89,7 @@ test('imagery terms: keyed Esri only (never the keyless endpoint), USGS cached, 
 
 test('the pre-cache is sized from the course, never from the golfer', { skip }, () => {
     const v = read('gps-view.js');
-    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// Framed on the hole'));
+    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// ---- THE HOLE VIEW'));
     assert.ok(/G\.courseBounds\(osm, extraPts/.test(pre), 'positive: the bounds call is there');
     assert.ok(!/\bfix\b|coords/.test(pre), 'precacheCourse reads no position');
 });
@@ -126,13 +126,15 @@ test('the scorecard owns the hole: every render hands it to GPS, GPS Prev/Next u
     assert.ok(!/hv-gps-btn/.test(html), 'the old header button is gone - the toggle replaced it');
 });
 
-test('Leaflet is the published 1.9.4 build, with its licence', { skip }, () => {
-    const l = read('leaflet.js');
-    assert.ok(/Leaflet 1\.9\.4/.test(l.slice(0, 200)));
-    assert.ok(/BSD 2-Clause/.test(read('LEAFLET-LICENSE.txt')));
-    const sha = require('crypto').createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'leaflet.js'))).digest('hex');
-    // Extracted from the npm tarball whose sha512 matched the registry's
-    // published integrity (sha512-nxS1ynzJ...FA74PA==), 2026-10-06.
-    assert.strictEqual(sha, LEAFLET_SHA256);
+test('MapLibre is the published 5.24.0 build (BSD-3), with its licence', { skip }, () => {
+    const l = read('maplibre-gl.js');
+    assert.ok(/MapLibre GL JS/.test(l.slice(0, 200)) && /v5\.24\.0/.test(l.slice(0, 300)));
+    assert.ok(/MapLibre contributors/.test(read('MAPLIBRE-LICENSE.txt')));
+    const sha = require('crypto').createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'maplibre-gl.js'))).digest('hex');
+    // Extracted from the npm tarball maplibre-gl-5.24.0.tgz, whose sha512 matched the
+    // registry's published integrity (sha512-ALyFxgtd5R...6ia3A==), 2026-10-07. The
+    // single-file UMD build (worker inlined); v6 ships only as ES modules.
+    assert.strictEqual(sha, MAPLIBRE_SHA256);
+    assert.ok(!fs.existsSync(path.join(__dirname, 'leaflet.js')), 'Leaflet is retired');
 });
-const LEAFLET_SHA256 = 'db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a';
+const MAPLIBRE_SHA256 = '45a9b07a9189ce56054c620a947ccf41e291e58c95e9b61533b740aaa65ee5cb';

@@ -329,7 +329,7 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // disk; a second process over the SAME profile directory is what a restart
 // actually is. Pass a directory to keep it, and the caller owns deleting it.
 // Default behaviour is unchanged: no option, throwaway profile, removed on exit.
-async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir }) {
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, webgl }) {
     const keepProfile = !!profileDir;
     const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (keepProfile) {
@@ -348,9 +348,15 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
     }
-    const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
+    // webgl: true (gps-v1, 2026-10-07) - a WebGL context for a page that needs one
+    // (the MapLibre GPS map). Headless Chrome with --disable-gpu has none at all
+    // ("Could not create a WebGL context ... GL_RENDERER = Disabled", measured), so
+    // this swaps that flag for the software renderer. Opt-in: every other check
+    // keeps exactly the flags it had.
+    const gpuArgs = webgl ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--disable-gpu'];
+    const chrome = spawn(CHROME, ['--headless=new'].concat(gpuArgs, ['--no-first-run',
         '--remote-debugging-port=0', '--user-data-dir=' + profile,
-        '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+        '--allow-file-access-from-files', 'about:blank']), { stdio: 'ignore' });
     // TRACKED BEFORE ANYTHING THAT CAN THROW OR BAIL. A caller that gives up
     // between here and the finally below exits through process.exit, which does
     // not run finally - the registry is what closes the browser then.
@@ -520,6 +526,22 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // ({ fx, fy }, fractions of the element's box) to start on an empty
                 // part of a big element. Like `tap`, it reads the DOM's rect and
                 // calls nothing the page defines. Pushes the start and end points.
+                // { waitFor: expression, timeout } (gps-v1, 2026-10-07) - poll until the
+                // expression is truthy, every 200 ms, up to `timeout` (default 20 s).
+                // For a page that becomes ready at its own pace (a WebGL map's first
+                // load), where a fixed sleep is either wasteful or flaky - measured
+                // both ways on the GPS map. Pushes 'waited <ms>' or 'TIMEOUT waitFor'.
+                if (step.waitFor) {
+                    const until = Date.now() + (step.timeout || 20000);
+                    let okW = false;
+                    while (Date.now() < until) {
+                        const w = await rpc(ws, id++, 'Runtime.evaluate', { expression: step.waitFor, returnByValue: true });
+                        if (w.result && w.result.result && w.result.result.value) { okW = true; break; }
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                    value.push(okW ? 'waited ' + ((step.timeout || 20000) - (until - Date.now())) + 'ms' : 'TIMEOUT waitFor');
+                    continue;
+                }
                 if (step.drag) {
                     const find = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.drag)})[${step.nth || 0}]; if (!el) return null; var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height }; })()`;
                     const f = await rpc(ws, id++, 'Runtime.evaluate', { expression: find, returnByValue: true });

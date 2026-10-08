@@ -233,9 +233,41 @@
     //                        under one polygon - Myrtlewood - by golf:course:name)
     // opts.holeNumber(tags)  the hole's number when ref= is not it (Thistle's
     //                        refs are unreliable; its names are "Cameron - Hole 3")
+    // Distance (m) from p to a polyline, and how far along the line (0..1) the
+    // nearest point is.
+    function alongLine(p, line) {
+        var proj = projector(p);
+        var P = [0, 0], best = { d: Infinity, t: 0 }, total = 0, segs = [];
+        for (var i = 1; i < line.length; i++) {
+            var a = proj.fwd(line[i - 1]), b = proj.fwd(line[i]);
+            var len = Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+            segs.push({ a: a, b: b, len: len, from: total });
+            total += len;
+        }
+        segs.forEach(function (sg) {
+            var dx = sg.b[0] - sg.a[0], dy = sg.b[1] - sg.a[1];
+            var u = sg.len ? Math.max(0, Math.min(1, ((P[0] - sg.a[0]) * dx + (P[1] - sg.a[1]) * dy) / (sg.len * sg.len))) : 0;
+            var x = sg.a[0] + u * dx, y = sg.a[1] + u * dy;
+            var d = Math.sqrt(x * x + y * y);
+            if (d < best.d) best = { d: d, t: total ? (sg.from + u * sg.len) / total : 0 };
+        });
+        return best;
+    }
+    function teeFor(line, teeBoxes, greenMid, ref) {
+        var cands = teeBoxes.filter(function (t) {
+            if (!t.at) return false;
+            if (ref && t.ref === ref) return true;
+            var a = alongLine(t.at, line);
+            return a.d <= 45 && a.t <= 0.45;
+        });
+        if (!cands.length) return null;
+        cands.sort(function (x, y) { return haversineMeters(y.at, greenMid) - haversineMeters(x.at, greenMid); });
+        return cands[0].at;
+    }
+
     function osmToCourseGps(elements, opts) {
         opts = opts || {};
-        var holes = [], greens = [], tees = 0, fairways = 0;
+        var holes = [], greens = [], teeBoxes = [], tees = 0, fairways = 0;
         (elements || []).forEach(function (el) {
             var tags = el.tags || {};
             var g = geomOf(el);
@@ -246,7 +278,7 @@
                 holes.push({ ref: num, par: parseInt(tags.par, 10) || null, line: g, id: el.id });
             }
             else if (tags.golf === 'green' && g.length >= 3) greens.push({ ref: holeRef(tags), ring: cleanRing(g), id: el.type + '/' + el.id });
-            else if (tags.golf === 'tee') tees++;
+            else if (tags.golf === 'tee') { tees++; teeBoxes.push({ ref: holeRef(tags), at: g.length >= 3 ? polygonCentroid(g) : g[0] }); }
             else if (tags.golf === 'fairway') fairways++;
         });
         greens.forEach(function (gr) { gr.centroid = polygonCentroid(gr.ring); });
@@ -272,7 +304,16 @@
             var lineM = 0;
             for (var li = 1; li < h.line.length; li++) lineM += haversineMeters(h.line[li - 1], h.line[li]);
             // lineM: the hole's length along its drawn line (doglegs included).
-            var rec = { tee: roundPt(h.line[0]), end: roundPt(end), lineM: Math.round(lineM) };
+            // THE TEE (2026-10-07): the BACK tee of this hole - of the tee boxes
+            // on the first part of this hole's line, the one farthest from the
+            // green. A tee box sits on the line (within 45 m of it) and in its
+            // first 45%, so the previous hole's tees and this hole's fairway
+            // cannot be mistaken for it. None mapped: the line's start, which is
+            // where a hole way begins by convention.
+            var greenMid = green ? green.centroid : end;
+            var back = teeFor(h.line, teeBoxes, greenMid, h.ref);
+            var rec = { tee: roundPt(back || h.line[0]), end: roundPt(end), lineM: Math.round(lineM) };
+            if (back) rec.teeFrom = 'tee-box'; else rec.teeFrom = 'line-start';
             if (h.par) rec.par = h.par;
             if (green) {
                 rec.green = compactRing(green.ring);
@@ -466,7 +507,74 @@
         return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     }
 
+    // ---- THE HOLE VIEW (2026-10-07) -------------------------------------------
+    // Initial bearing from a to b, degrees clockwise from north, [0, 360).
+    function bearingDeg(a, b) {
+        var p1 = toRad(a[0]), p2 = toRad(b[0]), dl = toRad(b[1] - a[1]);
+        var y = Math.sin(dl) * Math.cos(p2);
+        var x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    // TEE AT THE BOTTOM, GREEN AT THE TOP, THE WHOLE HOLE ON SCREEN. Returns the
+    // camera for a rotating map with 512 px tiles (MapLibre): bearing = the
+    // direction tee -> green, so that direction points up; zoom = the largest that
+    // fits every point (tee, green outline) inside the view minus `pad`; center =
+    // the middle of those points in the ROTATED frame, to be used with the same
+    // `pad` as the map's camera padding. A geographic bounding box would be
+    // fitted loosely when the hole runs diagonally; this fits the hole itself.
+    var EQUATOR_M = 40075016.686;
+    function holeCamera(tee, greenPts, view, pad, maxZoom) {
+        var pts = [tee].concat(greenPts || []).filter(function (p) { return p && isFinite(p[0]) && isFinite(p[1]); });
+        if (!tee || pts.length < 2) return null;
+        var g = polygonCentroid(greenPts) || greenPts[0];
+        var bearing = bearingDeg(tee, g);
+        var th = toRad(bearing);
+        var origin = tee, proj = projector(origin);
+        var uv = pts.map(function (p) {
+            var xy = proj.fwd(p);                       // x east, y north (m)
+            return [xy[0] * Math.cos(th) - xy[1] * Math.sin(th),   // u: screen-right
+                    xy[0] * Math.sin(th) + xy[1] * Math.cos(th)];  // v: screen-up
+        });
+        var uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+        uv.forEach(function (q) { uMin = Math.min(uMin, q[0]); uMax = Math.max(uMax, q[0]); vMin = Math.min(vMin, q[1]); vMax = Math.max(vMax, q[1]); });
+        pad = pad || {};
+        var availW = Math.max(40, view.w - (pad.left || 0) - (pad.right || 0));
+        var availH = Math.max(40, view.h - (pad.top || 0) - (pad.bottom || 0));
+        var u0 = (uMin + uMax) / 2, v0 = (vMin + vMax) / 2;
+        var cu = Math.cos(th), su = Math.sin(th);
+        // back from (u, v) to (x, y): x = u cos + v sin, y = -u sin + v cos
+        var center = proj.inv([u0 * cu + v0 * su, -u0 * su + v0 * cu]);
+        var k = EQUATOR_M * Math.cos(toRad(center[0])) / 512;   // metres per px at zoom 0
+        var zU = Math.log2(k * availW / Math.max(1, uMax - uMin));
+        var zV = Math.log2(k * availH / Math.max(1, vMax - vMin));
+        var zoom = Math.min(zU, zV, maxZoom == null ? 22 : maxZoom);
+        return { center: center, zoom: zoom, bearing: bearing };
+    }
+
+    // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
+    // the hole; the TEE when they are more than offYards from the green, or have
+    // no fix at all (planning a hole from the clubhouse, or a GPS that has not
+    // answered). Null when there is neither.
+    var OFF_HOLE_YARDS = 1000;
+    function measureOrigin(fixPt, tee, greenMid, offYards) {
+        var limit = offYards == null ? OFF_HOLE_YARDS : offYards;
+        if (fixPt && greenMid && haversineYards(fixPt, greenMid) <= limit) return { from: 'me', pt: fixPt };
+        if (tee) return { from: 'tee', pt: tee };
+        if (fixPt && !greenMid) return { from: 'me', pt: fixPt };
+        return null;
+    }
+
+    // A NUMBER THAT FITS. Four digits at most - 9999 yards is five and a half
+    // miles, so anything longer is not a golf distance and shows as a dash
+    // rather than pushing the layout off the screen.
+    function shownDistance(meters, unit) {
+        var v = distanceIn(meters, unit);
+        return (v == null || v > 9999 || v < 0) ? '\u2014' : String(v);
+    }
+
     var api = {
+        bearingDeg: bearingDeg, holeCamera: holeCamera, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,

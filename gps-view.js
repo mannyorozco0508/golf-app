@@ -45,10 +45,12 @@
 // signal, the USGS tiles for the course area are pre-cached; Esri tiles never
 // are (Esri's terms forbid it).
 //
-// ROTATION: north-up. Leaflet 1.9 cannot rotate a map; the only rotation is a
-// third-party plugin that patches Leaflet's core pointer and drag handling -
-// the exact code the draggable target depends on - and it cannot be proven on
-// an iPhone from here. See docs/gps-step0.md section 7.
+// ROTATION (2026-10-07): every hole opens tee at the bottom, green at the top,
+// the whole hole filling the map (gps-geo.holeCamera), on MapLibre GL JS - which
+// rotates natively, where Leaflet could not. Pinch zooms, one finger pans,
+// nothing rotates by accident; Recenter restores the hole's own view. More than
+// 1,000 yards from the green, or with no GPS, the numbers are measured from the
+// TEE and the dot is hidden.
 // ============================================================================
 
 (function () {
@@ -73,7 +75,7 @@
         fallbackCredit: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
         // USGS Imagery Only: public domain (USDA NAIP via The National Map), no key,
         // no account. Native to z16 - the service's maxScale is 1:9,028, and z17
-        // answers 404 (measured 2026-10-06). Beyond 16 Leaflet enlarges z16 tiles.
+        // answers 404 (measured 2026-10-06). Beyond 16 MapLibre enlarges z16 tiles (to 18).
         usgs: {
             url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}',
             maxNativeZoom: 16,
@@ -276,7 +278,7 @@
     }
 
     // ---- SCRIPTS LOADED ON FIRST USE ----------------------------------------
-    // Leaflet and the bundled greens are loaded the first time the GPS side (or
+    // MapLibre and the bundled greens are loaded the first time the GPS side (or
     // the pre-cache) needs them, so the Bets side's boot cost is unchanged. Both
     // are precached by the service worker, so this works with no signal.
     var scriptState = {};
@@ -298,153 +300,228 @@
         sc.onerror = function () { fin(false); };
         document.head.appendChild(sc);
     }
-    function L_() { return (typeof window !== 'undefined' && window.L && typeof window.L.map === 'function') ? window.L : null; }
-    function loadLeaflet(done) {
-        if (!document.querySelector('link[data-gps-leaflet]')) {
+    // MAPLIBRE GL JS 5.24.0 (vendored, BSD-3) - a WebGL map that ROTATES, which
+    // Leaflet cannot: every hole opens tee at the bottom, green at the top.
+    function ML() { return (typeof window !== 'undefined' && window.maplibregl && typeof window.maplibregl.Map === 'function') ? window.maplibregl : null; }
+    function loadMapLibre(done) {
+        if (!document.querySelector('link[data-gps-maplibre]')) {
             var link = document.createElement('link');
-            link.rel = 'stylesheet'; link.href = 'leaflet.css'; link.setAttribute('data-gps-leaflet', '1');
+            link.rel = 'stylesheet'; link.href = 'maplibre-gl.css'; link.setAttribute('data-gps-maplibre', '1');
             document.head.appendChild(link);
         }
-        loadScript('leaflet.js', function () { return !!L_(); }, done);
+        loadScript('maplibre-gl.js', function () { return !!ML(); }, done);
     }
     function loadCourses(done) {
         loadScript('gps-courses.js', function () { return !!window.HardPanGpsCourses; }, done);
     }
 
-    // ---- MAP ----------------------------------------------------------------
-    function buildMap() {
-        var L = L_();
-        var el = S.el.querySelector('.gps-map');
-        if (!L || !el) { S.map = null; if (el) el.classList.add('gps-no-tiles'); return; }
-        var map = L.map(el, { zoomControl: false, attributionControl: true, maxZoom: TILES.maxZoom, tap: true });
-        map.attributionControl.setPrefix(false);
-        var key = esriKey();
-        S.esri = null; S.esriCredits = [];
-        if (key) { map.attributionControl.addAttribution(TILES.poweredBy); S.esriCredits.push(TILES.poweredBy); addImageryCredit(map, key); }
-        map.attributionControl.addAttribution(escapeText(TILES.usgs.attribution));
-        map.attributionControl.addAttribution(OSM_ATTRIBUTION);
-        S.tileErrors = 0; S.tileLoads = 0;
-        S.esriFailed = !key || (typeof navigator !== 'undefined' && navigator.onLine === false);
-        var counted = function (layer) {
-            layer.on('tileerror', function () { if (!S) return; S.tileErrors++; syncNoTiles(); });
-            layer.on('tileload', function () { if (!S) return; S.tileLoads++; syncNoTiles(); });
-            return layer;
-        };
-        // Bottom: USGS, from the phone's pre-cache first.
-        S.usgs = counted(usgsLayer(L)).addTo(map);
-        // Top: Esri, only with a key and only online.
-        if (key && !S.esriFailed) {
-            var esriErrs = 0, esriLoads = 0;
-            var tl = L.tileLayer(esriTileUrl(), { key: encodeURIComponent(key), maxNativeZoom: TILES.maxNativeZoom, maxZoom: TILES.maxZoom });
-            tl.on('tileload', function () { esriLoads++; });
-            tl.on('tileerror', function () {
-                esriErrs++;
-                // Esri is not answering: no signal, or the free tier is used up on an
-                // account with no card (by design). Hand the picture to USGS.
-                if (S && !S.esriFailed && esriErrs >= 4 && esriLoads === 0) {
-                    S.esriFailed = true;
-                    try { map.removeLayer(tl); } catch (e) {}
-                    if (S.usgs) S.usgs.redraw();
-                }
-            });
-            counted(tl).addTo(map);
-            S.esri = tl;
-        }
-        S.layers = L.layerGroup().addTo(map);
-        S.dotLayer = L.layerGroup().addTo(map);
-        S.lineLayer = L.layerGroup().addTo(map);
-        map.on('click', function (e) { onMapTap([e.latlng.lat, e.latlng.lng]); });
-        S.map = map;
-        frameHole(true);
+    // ---- IMAGERY: USGS FROM THE PHONE FIRST, ESRI ON TOP --------------------
+    function cachedTile(url) {
+        try {
+            if (typeof caches === 'undefined') return Promise.resolve(null);
+            return caches.open(USGS_CACHE).then(function (c) { return c.match(url); })
+                .then(function (r) { return r ? r.arrayBuffer() : null; }, function () { return null; });
+        } catch (e) { return Promise.resolve(null); }
     }
-
+    // USGS goes to the network only when it is the picture: no Esri key, Esri has
+    // stopped answering, or a green is being set. Under a working Esri layer it
+    // reads the phone's cache only.
+    function usgsNetworkAllowed() {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+        return !!(S && (S.esriFailed || S.mode !== 'measure'));
+    }
+    var protocolAdded = false;
+    function addUsgsProtocol(ml) {
+        if (protocolAdded) return;
+        protocolAdded = true;
+        // hpusgs://{z}/{y}/{x} -> the USGS tile, from Cache Storage when the course
+        // was pre-cached, else from the network when USGS is allowed to be the
+        // picture. A tile it may not fetch is an error, which MapLibre draws as
+        // nothing - the plain background shows through, as intended.
+        ml.addProtocol('hpusgs', function (params) {
+            var m = /^hpusgs:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+            if (!m) return Promise.reject(new Error('bad tile url'));
+            var url = TILES.usgs.url.replace('{z}', m[1]).replace('{y}', m[2]).replace('{x}', m[3]);
+            return cachedTile(url).then(function (buf) {
+                if (buf) return { data: buf };
+                if (!usgsNetworkAllowed()) throw new Error('not cached');
+                return fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) {
+                    if (!r.ok) throw new Error('usgs ' + r.status);
+                    return r.arrayBuffer();
+                }).then(function (b) { return { data: b }; });
+            });
+        });
+    }
     var creditCache = null;
     function escapeText(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-    function addImageryCredit(map, key) {
-        var shown = creditCache || TILES.fallbackCredit;
-        map.attributionControl.addAttribution(escapeText(shown));
-        if (S) S.esriCredits.push(escapeText(shown));
-        if (creditCache || typeof fetch !== 'function') return;
-        // Service metadata only: the URL carries the tile key and nothing about the golfer.
+    function esriAttribution() { return TILES.poweredBy + ' | ' + escapeText(creditCache || TILES.fallbackCredit); }
+    function usgsSourceTiles() { return ['hpusgs://{z}/{y}/{x}?r=' + (S ? S.usgsGen : 0)]; }
+    // Ask MapLibre to fetch USGS again - after USGS becomes the picture (Esri
+    // failed, or a green is being set), tiles it was refused earlier can now come.
+    function refreshUsgs() {
+        if (!S || !S.map || !S.map.getSource('usgs')) return;
+        S.usgsGen++;
+        try { S.map.getSource('usgs').setTiles(usgsSourceTiles()); } catch (e) {}
+    }
+    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && S.mode === 'measure') ? 20 : 18; }
+
+    // ---- THE MAP --------------------------------------------------------------
+    var EMPTY = { type: 'FeatureCollection', features: [] };
+    function ll(p) { return [p[1], p[0]]; }               // [lat, lng] -> [lng, lat]
+    function buildMap() {
+        var ml = ML();
+        var el = S.el.querySelector('.gps-map');
+        if (!ml || !el) { S.map = null; if (el) el.classList.add('gps-no-tiles'); return; }
+        addUsgsProtocol(ml);
+        var key = esriKey();
+        S.esriOn = !!key;
+        S.esriFailed = !key || (typeof navigator !== 'undefined' && navigator.onLine === false);
+        S.tileErrors = 0; S.tileLoads = 0; S.usgsGen = 0;
+        var sources = {
+            usgs: { type: 'raster', tiles: usgsSourceTiles(), tileSize: 256, maxzoom: TILES.usgs.maxNativeZoom,
+                    attribution: escapeText(TILES.usgs.attribution) },
+            hole: { type: 'geojson', data: EMPTY, attribution: OSM_ATTRIBUTION },
+            lines: { type: 'geojson', data: EMPTY },
+            acc: { type: 'geojson', data: EMPTY }
+        };
+        var layers = [
+            { id: 'bg', type: 'background', paint: { 'background-color': '#1d3b2a' } },
+            { id: 'usgs', type: 'raster', source: 'usgs' },
+            { id: 'hole-line', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'line'], paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.45 } },
+            { id: 'green-fill', type: 'fill', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'fill-color': '#4ade80', 'fill-opacity': 0.28 } },
+            { id: 'green-edge', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'line-color': '#d9f99d', 'line-width': 2 } },
+            { id: 'acc-fill', type: 'fill', source: 'acc', paint: { 'fill-color': '#60a5fa', 'fill-opacity': 0.12 } },
+            { id: 'line-to', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'to'], paint: { 'line-color': '#facc15', 'line-width': 2 } },
+            { id: 'line-on', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'on'], paint: { 'line-color': '#ffffff', 'line-width': 2 } }
+        ];
+        if (S.esriOn && !S.esriFailed) {
+            sources.esri = { type: 'raster', tiles: [esriTileUrl().replace('{key}', encodeURIComponent(key))], tileSize: 256, maxzoom: 19,
+                             attribution: esriAttribution() };
+            layers.splice(2, 0, { id: 'esri', type: 'raster', source: 'esri' });
+        }
+        var map;
+        try {
+            map = new ml.Map({
+                container: el,
+                style: { version: 8, sources: sources, layers: layers },
+                center: [0, 20], zoom: 2, bearing: 0, pitch: 0, maxPitch: 0,
+                maxZoom: maxZoomNow(),
+                dragRotate: false, pitchWithRotate: false, keyboard: false,
+                attributionControl: false,
+                // One finger pans, two fingers pinch-zoom; neither rotates - the hole
+                // keeps its tee-to-green orientation until Recenter, which restores it.
+                touchPitch: false
+            });
+        } catch (e) {
+            // No WebGL on this device: the numbers still work, on the plain panel.
+            S.map = null; el.classList.add('gps-no-tiles'); S.noWebgl = true; return;
+        }
+        map.touchZoomRotate.disableRotation();
+        // ATTRIBUTION, ALWAYS ON THE MAP, never collapsed to an (i) button. It lists
+        // the sources whose layers are showing, so the Esri credit leaves the map
+        // with the Esri layer (while a green is set on USGS) and comes back with it.
+        map.addControl(new ml.AttributionControl({ compact: false }), 'bottom-right');
+        map.on('error', function (e) {
+            if (!S || S.map !== map) return;
+            var sid = e && e.sourceId;
+            if (sid === 'esri') {
+                S.esriErrs = (S.esriErrs || 0) + 1;
+                // Esri is not answering: no signal, or the free tier is used up on an
+                // account with no card (by design). Hand the picture to USGS.
+                if (!S.esriFailed && S.esriErrs >= 4 && !S.esriLoads) {
+                    S.esriFailed = true;
+                    try { map.setLayoutProperty('esri', 'visibility', 'none'); } catch (x) {}
+                    map.setMaxZoom(maxZoomNow());
+                    refreshUsgs();
+                }
+            }
+            if (sid === 'usgs' || sid === 'esri') { S.tileErrors++; syncNoTiles(); }
+        });
+        map.on('data', function (e) {
+            if (!S || S.map !== map || !e || e.dataType !== 'source' || !e.tile) return;
+            if (e.sourceId === 'esri') S.esriLoads = (S.esriLoads || 0) + 1;
+            if (e.sourceId === 'usgs' || e.sourceId === 'esri') { S.tileLoads++; syncNoTiles(); reportMapState(); }
+        });
+        map.on('moveend', function () { if (S && S.map === map) reportMapState(); });
+        // Tap anywhere: the target jumps there (or a green pin is placed).
+        map.on('click', function (e) { onMapTap([e.lngLat.lat, e.lngLat.lng]); });
+        S.map = map;
+        S.styleReady = false;
+        map.on('load', function () {
+            if (!S || S.map !== map) return;
+            S.styleReady = true;
+            refreshEsriCredit(key);
+            frameHole(true);
+            render();
+        });
+    }
+
+    // Esri's own credit line, read at runtime (Maxar became Vantor in 2026). Only
+    // the service metadata URL - the key, nothing about the golfer.
+    function refreshEsriCredit(key) {
+        if (!key || creditCache || typeof fetch !== 'function') return;
         fetch(esriMetaUrl().replace('{key}', encodeURIComponent(key))).then(function (r) { return r.json(); }).then(function (j) {
             var c = j && typeof j.copyrightText === 'string' ? j.copyrightText.trim() : '';
-            if (!c || c === shown) return;
+            if (!c || c === TILES.fallbackCredit) return;
             creditCache = c;
-            if (S && S.map === map) {
-                S.esriCredits = S.esriCredits.map(function (x) { return x === escapeText(shown) ? escapeText(c) : x; });
-                map.attributionControl.removeAttribution(escapeText(shown));
-                if (S.esri && map.hasLayer(S.esri)) map.attributionControl.addAttribution(escapeText(c));
-            }
+            // A source's attribution is fixed when it is added, so re-add the Esri
+            // source and layer with the real credit.
+            if (!S || !S.map || !S.map.getSource('esri')) return;
+            var m = S.map, vis = m.getLayoutProperty('esri', 'visibility') || 'visible';
+            try {
+                m.removeLayer('esri'); m.removeSource('esri');
+                m.addSource('esri', { type: 'raster', tiles: [esriTileUrl().replace('{key}', encodeURIComponent(key))], tileSize: 256, maxzoom: 19, attribution: esriAttribution() });
+                m.addLayer({ id: 'esri', type: 'raster', source: 'esri', layout: { visibility: vis } }, 'hole-line');
+            } catch (e) {}
         }, function () { /* offline: the fallback credit stays */ });
     }
 
-    // The plain background only when NOTHING has drawn: a few cached tiles around
-    // the green are worth showing even if the rest are missing.
+    // WHAT THE MAP IS DOING, on the map element - so a check (and anybody with the
+    // inspector open) can read it. A WebGL map is one canvas; its tiles and layers
+    // are not elements to count.
+    function reportMapState() {
+        var el = S && S.el.querySelector('.gps-map');
+        if (!el || !S.map) return;
+        var esri = !S.esriOn ? 'off' : (S.esriFailed ? 'failed' : (S.map.getLayer('esri') ? (S.map.getLayoutProperty('esri', 'visibility') || 'visible') : 'off'));
+        el.setAttribute('data-esri', esri);
+        el.setAttribute('data-esri-loads', String(S.esriLoads || 0));
+        el.setAttribute('data-tiles-loaded', String(S.tileLoads || 0));
+        el.setAttribute('data-max-zoom', String(S.map.getMaxZoom()));
+        el.setAttribute('data-bearing', String(Math.round(S.map.getBearing())));
+        el.setAttribute('data-zoom', S.map.getZoom().toFixed(2));
+    }
+
+    // The plain background only when NOTHING has drawn.
     function syncNoTiles() {
         if (!S) return;
         var on = S.tileLoads === 0 && S.tileErrors >= 4;
         S.noTiles = on;
         var el = S.el.querySelector('.gps-map');
-        if (el) el.classList.toggle('gps-no-tiles', on);
+        if (el) {
+            el.classList.toggle('gps-no-tiles', on);
+            el.setAttribute('data-tiles-loaded', String(S.tileLoads));
+        }
         var note = S.el.querySelector('.gps-tiles-note');
         if (note) note.style.display = on ? '' : 'none';
     }
 
-    // ---- USGS LAYER: CACHE FIRST --------------------------------------------
-    function cachedTile(url) {
-        try {
-            if (typeof caches === 'undefined') return Promise.resolve(null);
-            return caches.open(USGS_CACHE).then(function (c) { return c.match(url); })
-                .then(function (r) { return r ? r.blob() : null; }, function () { return null; });
-        } catch (e) { return Promise.resolve(null); }
-    }
-    // USGS goes to the network only when it is the picture: no Esri key, Esri has
-    // stopped answering, or a green is being set. Under a working Esri layer it
-    // reads its cache only.
-    function usgsNetworkAllowed() {
-        if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
-        return !!(S && (S.esriFailed || S.mode !== 'measure'));
-    }
-
     // SETTING A GREEN ALWAYS USES USGS, never Esri, even when Esri is on
-    // (decision 2026-10-07). A tapped green is stored and shared; deriving shared
-    // data from Esri imagery is outside its "visualization purposes" licence,
-    // and USGS imagery is public domain. So while a green is being set the Esri
-    // layer and its credits come off the map, and they go back afterwards.
+    // (decision 2026-10-07): a tapped green is stored and shared, and deriving
+    // shared data from Esri imagery is outside its "visualization purposes"
+    // licence; USGS imagery is public domain. While a green is being set the Esri
+    // layer (and with it its credit) comes off the map; it goes back afterwards.
     function syncImageryForMode() {
-        if (!S || !S.map || !S.esri) return;
+        if (!S || !S.map || !S.styleReady) return;
         var pinning = S.mode !== 'measure';
-        var on = S.map.hasLayer(S.esri);
-        if (pinning && on) {
-            S.map.removeLayer(S.esri);
-            S.esriCredits.forEach(function (c) { S.map.attributionControl.removeAttribution(c); });
-            if (S.usgs) S.usgs.redraw();
-        } else if (!pinning && !on && !S.esriFailed) {
-            S.esri.addTo(S.map);
-            S.esriCredits.forEach(function (c) { S.map.attributionControl.addAttribution(c); });
-        }
-    }
-    function usgsLayer(L) {
-        var Layer = L.TileLayer.extend({
-            createTile: function (coords, done) {
-                var img = document.createElement('img');
-                img.alt = '';
-                img.setAttribute('role', 'presentation');
-                var url = this.getTileUrl(coords);
-                var settled = false;
-                var finish = function (err) { if (settled) return; settled = true; done(err, img); };
-                img.onload = function () { if (img._hpBlob) { try { URL.revokeObjectURL(img._hpBlob); } catch (e) {} } finish(null); };
-                img.onerror = function () { finish(new Error('tile')); };
-                cachedTile(url).then(function (blob) {
-                    if (blob) { img._hpBlob = URL.createObjectURL(blob); img.src = img._hpBlob; return; }
-                    if (!usgsNetworkAllowed()) { finish(new Error('not cached')); return; }
-                    img.crossOrigin = 'anonymous';
-                    img.src = url;
-                });
-                return img;
+        if (S.map.getLayer('esri')) {
+            var want = (pinning || S.esriFailed) ? 'none' : 'visible';
+            if (S.map.getLayoutProperty('esri', 'visibility') !== want) {
+                S.map.setLayoutProperty('esri', 'visibility', want);
+                if (want === 'none') refreshUsgs();
             }
-        });
-        return new Layer(TILES.usgs.url, { maxNativeZoom: TILES.usgs.maxNativeZoom, maxZoom: TILES.maxZoom });
+        }
+        if (S.map.getMaxZoom() !== maxZoomNow()) S.map.setMaxZoom(maxZoomNow());
+        reportMapState();
     }
 
     // ---- PRE-CACHE THE COURSE (USGS ONLY) -------------------------------------
@@ -495,132 +572,180 @@
         }).catch(function () { return { ok: false, reason: 'error' }; });
     }
 
-    // Framed on the hole, never on the golfer (see PRIVACY above).
-    function frameHole(first) {
-        var L = L_();
-        if (!S || !S.map || !L) return;
+    // ---- THE HOLE VIEW: TEE AT THE BOTTOM, GREEN AT THE TOP ---------------------
+    // Framed on the HOLE, never on the golfer (see PRIVACY above): the back tee to
+    // the green's outline, rotated so tee -> green points up, fitted top to bottom
+    // with a small margin. A hole with no data at all is framed on the dot,
+    // north-up, so the golfer can see the ground to tap the green.
+    var VIEW_PAD = { top: 44, bottom: 36, left: 18, right: 18 };
+    function holeView() {
+        if (!S || !S.map) return null;
         var r = resolved();
-        var pts = [];
-        if (r && r.tee) pts.push(r.tee);
-        if (r && r.green) r.green.forEach(function (p) { pts.push(p); });
-        if (r && r.mid) pts.push(r.mid);
-        if (pts.length >= 2) {
-            S.map.fitBounds(L.latLngBounds(pts), { padding: [28, 28], maxZoom: 19 });
+        if (!r) return null;
+        var greenPts = (r.green && r.green.length) ? r.green : (r.mid ? [r.mid] : null);
+        var el = S.el.querySelector('.gps-map');
+        var w = el ? el.clientWidth : 390, h = el ? el.clientHeight : 500;
+        if (r.tee && greenPts) return G.holeCamera(r.tee, greenPts, { w: w, h: h }, VIEW_PAD, maxZoomNow());
+        if (r.mid) return { center: r.mid, zoom: 18, bearing: 0 };
+        return null;
+    }
+    function frameHole(first) {
+        if (!S || !S.map || !S.styleReady) return;
+        var cam = holeView();
+        if (cam) {
+            S.map.jumpTo({ center: ll(cam.center), zoom: cam.zoom, bearing: cam.bearing, padding: VIEW_PAD });
             S.framed = 'hole';
-        } else if (r && r.mid) {
-            S.map.setView(r.mid, 18);
-            S.framed = 'hole';
+            S.camera = cam;
         } else if (first || S.framed === 'hole') {
-            // Nothing known about this hole. Wait for the dot; see drawDot.
-            S.map.setView([20, 0], 2);
-            S.framed = null;
+            S.map.jumpTo({ center: [0, 20], zoom: 2, bearing: 0, padding: VIEW_PAD });
+            S.framed = null; S.camera = null;
+        }
+        var el = S.el.querySelector('.gps-map');
+        if (el) {
+            el.setAttribute('data-bearing', String(Math.round(S.map.getBearing())));
+            el.setAttribute('data-zoom', S.map.getZoom().toFixed(2));
         }
     }
 
-    function drawLayers() {
-        var L = L_();
-        if (!S || !S.map || !L) return;
-        S.layers.clearLayers();
-        var r = resolved();
-        if (!r) return;
-        // The hole's own line (tee -> green) from OSM, faint, for orientation.
-        var osmRec = osmRecord(S.courseKey), h = osmRec && osmRec.holes && osmRec.holes[String(S.hole)];
-        if (h && h.osm && h.osm.tee && h.osm.end) L.polyline([h.osm.tee, h.osm.end], { color: '#ffffff', weight: 1, opacity: 0.45, interactive: false }).addTo(S.layers);
-        if (r.green) L.polygon(r.green, { color: '#d9f99d', weight: 2, fillColor: '#4ade80', fillOpacity: 0.28, interactive: false }).addTo(S.layers);
-        var nums = G.holeNumbers(fix ? fix.pt : null, r);
-        var pin = function (pt, cls, label) {
-            if (!pt) return;
-            L.marker(pt, { interactive: false, icon: L.divIcon({ className: 'gps-pin ' + cls, html: '<span>' + label + '</span>', iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(S.layers);
-        };
-        if (nums) { pin(nums.front, 'gps-pin-front', 'F'); pin(nums.back, 'gps-pin-back', 'B'); }
-        pin(r.mid, 'gps-pin-mid', 'C');
-        // Pins being placed right now (Set the green / Fix).
-        if (S.draft) { pin(S.draft.mid, 'gps-pin-mid gps-pin-draft', 'C'); pin(S.draft.front, 'gps-pin-front gps-pin-draft', 'F'); pin(S.draft.back, 'gps-pin-back gps-pin-draft', 'B'); }
+    // ---- DRAWING ----------------------------------------------------------------
+    function setData(id, fc) { var s = S.map && S.map.getSource(id); if (s) s.setData(fc); }
+    function feature(k, type, coords) { return { type: 'Feature', properties: { k: k }, geometry: { type: type, coordinates: coords } }; }
+    function pinEl(cls, label, interactive) {
+        var el = document.createElement('div');
+        el.className = 'gps-pin ' + cls;
+        el.innerHTML = '<span>' + label + '</span>';
+        if (!interactive) el.style.pointerEvents = 'none';      // a tap on a pin is a tap on the map
+        return el;
     }
-
+    function marker(key, pt, makeEl) {
+        S.markers = S.markers || {};
+        var m = S.markers[key];
+        if (!pt) { if (m) { m.remove(); delete S.markers[key]; } return null; }
+        if (!m) { m = new (ML().Marker)({ element: makeEl(), anchor: 'center' }).setLngLat(ll(pt)).addTo(S.map); S.markers[key] = m; }
+        else m.setLngLat(ll(pt));
+        return m;
+    }
+    function drawLayers() {
+        if (!S || !S.map || !S.styleReady) return;
+        var r = resolved();
+        var feats = [];
+        var osmRec = osmRecord(S.courseKey), h = osmRec && osmRec.holes && osmRec.holes[String(S.hole)];
+        if (h && h.osm && h.osm.tee && h.osm.end) feats.push(feature('line', 'LineString', [ll(h.osm.tee), ll(h.osm.end)]));
+        if (r && r.green) feats.push(feature('green', 'Polygon', [r.green.concat([r.green[0]]).map(ll)]));
+        setData('hole', { type: 'FeatureCollection', features: feats });
+        var o = origin(r);
+        var nums = r ? G.holeNumbers(o ? o.pt : null, r) : null;
+        marker('front', nums && nums.front, function () { return pinEl('gps-pin-front', 'F'); });
+        marker('back', nums && nums.back, function () { return pinEl('gps-pin-back', 'B'); });
+        marker('mid', r && r.mid, function () { return pinEl('gps-pin-mid', 'C'); });
+        marker('dmid', S.draft && S.draft.mid, function () { return pinEl('gps-pin-mid gps-pin-draft', 'C'); });
+        marker('dfront', S.draft && S.draft.front, function () { return pinEl('gps-pin-front gps-pin-draft', 'F'); });
+        marker('dback', S.draft && S.draft.back, function () { return pinEl('gps-pin-back gps-pin-draft', 'B'); });
+        marker('tee', o && o.from === 'tee' ? o.pt : null, function () { return pinEl('gps-pin-tee', 'T'); });
+    }
+    function circlePoly(pt, radiusM) {
+        var ring = [];
+        for (var i = 0; i <= 32; i++) {
+            var a = 2 * Math.PI * i / 32;
+            var dLat = (radiusM * Math.cos(a)) / 111320;
+            var dLng = (radiusM * Math.sin(a)) / (111320 * Math.cos(pt[0] * Math.PI / 180));
+            ring.push([pt[1] + dLng, pt[0] + dLat]);
+        }
+        return { type: 'FeatureCollection', features: [feature('acc', 'Polygon', [ring])] };
+    }
     function drawDot() {
-        var L = L_();
-        if (!S || !S.map || !L) return;
-        S.dotLayer.clearLayers();
-        if (!fix) return;
-        if (isFinite(fix.acc) && fix.acc > 0) L.circle(fix.pt, { radius: fix.acc, color: '#60a5fa', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(S.dotLayer);
-        L.circleMarker(fix.pt, { radius: 8, color: '#ffffff', weight: 3, fillColor: '#2563eb', fillOpacity: 1, interactive: false }).addTo(S.dotLayer);
-        if (!S.framed) {
+        if (!S || !S.map || !S.styleReady) return;
+        var o = origin(resolved());
+        // OFF THE HOLE (or no GPS): the numbers are from the tee, and the dot -
+        // which would sit miles away or nowhere - is hidden.
+        var showDot = !!(fix && o && o.from === 'me');
+        setData('acc', showDot && isFinite(fix.acc) && fix.acc > 0 ? circlePoly(fix.pt, fix.acc) : EMPTY);
+        marker('dot', showDot ? fix.pt : null, function () { var e = document.createElement('div'); e.className = 'gps-dot'; e.style.pointerEvents = 'none'; return e; });
+        if (fix && !S.framed && S.map) {
             // A hole with no data: the golfer has to see the ground around them to
             // tap the green. This is the one view framed on the dot.
-            S.map.setView(fix.pt, 17);
+            S.map.jumpTo({ center: ll(fix.pt), zoom: 17, bearing: 0 });
             S.framed = 'dot';
         }
     }
 
+    // ---- WHERE THE NUMBERS ARE MEASURED FROM ------------------------------------
+    // The golfer when they are on or near the hole; the TEE when they are more
+    // than 1,000 yards from the green or have no fix (gps-geo.measureOrigin).
+    function origin(r) {
+        if (!r) return fix ? { from: 'me', pt: fix.pt } : null;
+        return G.measureOrigin(fix ? fix.pt : null, r.tee, r.mid);
+    }
+
     // ---- THE TARGET -----------------------------------------------------------
     // A crosshair the golfer drags, or moves by tapping the map. Until they touch
-    // it, it sits halfway between them and the green's center and follows them as
-    // they walk; once touched, it stays put until the hole changes.
-    //
-    // DRAGGING IT DOES NOT PAN THE MAP: it is a draggable Leaflet marker, and a
-    // drag that starts on a marker belongs to the marker. A drag that starts
-    // anywhere else pans and pinches the map as usual.
+    // it, it sits halfway between where the numbers are measured from and the
+    // green's center, and follows as they walk; once touched it stays put until
+    // the hole changes. Dragging it does not pan the map (a marker drag belongs to
+    // the marker); a drag anywhere else pans, and two fingers zoom.
     function placeTarget(r) {
         if (!S || S.targetMoved) return;
-        var center = r && r.mid;
-        var p = (fix && center) ? G.midpoint(fix.pt, center) : (center && r.tee ? G.midpoint(r.tee, center) : null);
+        var center = r && r.mid, o = origin(r);
+        var p = (o && center) ? G.midpoint(o.pt, center) : null;
         if (p) S.target = p;
     }
     function drawTargetLines() {
-        var L = L_();
-        if (!S || !S.map || !L) return;
-        S.lineLayer.clearLayers();
-        if (!S.target || S.mode !== 'measure') return;
-        var r = resolved();
-        if (fix) L.polyline([fix.pt, S.target], { color: '#facc15', weight: 2, opacity: 0.95, interactive: false }).addTo(S.lineLayer);
-        if (r && r.mid) L.polyline([S.target, r.mid], { color: '#ffffff', weight: 2, opacity: 0.95, interactive: false }).addTo(S.lineLayer);
+        if (!S || !S.map || !S.styleReady) return;
+        var feats = [];
+        if (S.target && S.mode === 'measure') {
+            var r = resolved(), o = origin(r);
+            if (o) feats.push(feature('to', 'LineString', [ll(o.pt), ll(S.target)]));
+            if (r && r.mid) feats.push(feature('on', 'LineString', [ll(S.target), ll(r.mid)]));
+        }
+        setData('lines', { type: 'FeatureCollection', features: feats });
     }
     function targetReadout() {
         if (!S || !G) return;
-        var r = resolved();
+        var r = resolved(), o = origin(r);
         var u = units();
-        var d = function (m) { var v = G.distanceIn(m, u); return v == null ? '—' : String(v); };
         var on = !!S.target && S.mode === 'measure';
         show('.gps-target-row', on);
         if (!on) return;
-        txt('.gps-to-here', 'You → here: ' + (fix ? d(G.haversineMeters(fix.pt, S.target)) : '—'));
-        txt('.gps-here-center', 'Here → center: ' + (r && r.mid ? d(G.haversineMeters(S.target, r.mid)) : '—'));
+        var who = o && o.from === 'tee' ? 'Tee' : 'You';
+        txt('.gps-to-here', who + ' → here: ' + (o ? G.shownDistance(G.haversineMeters(o.pt, S.target), u) : '—'));
+        txt('.gps-here-center', 'Here → center: ' + (r && r.mid ? G.shownDistance(G.haversineMeters(S.target, r.mid), u) : '—'));
     }
     function drawTarget() {
-        var L = L_();
-        if (!S || !S.map || !L) return;
+        if (!S || !S.map || !S.styleReady) return;
         drawTargetLines();
         var want = !!S.target && S.mode === 'measure';
-        if (!want) {
-            if (S.targetMarker) { S.map.removeLayer(S.targetMarker); S.targetMarker = null; }
-            return;
-        }
+        if (!want) { if (S.targetMarker) { S.targetMarker.remove(); S.targetMarker = null; } return; }
         if (!S.targetMarker) {
-            var m = L.marker(S.target, {
-                draggable: true, autoPan: false, keyboard: false, zIndexOffset: 1000,
-                icon: L.divIcon({ className: 'gps-target', html: '<span></span>', iconSize: [48, 48], iconAnchor: [24, 24] })
-            });
+            var el = document.createElement('div');
+            el.className = 'gps-target';
+            el.innerHTML = '<span></span>';
+            var m = new (ML().Marker)({ element: el, draggable: true, anchor: 'center' }).setLngLat(ll(S.target)).addTo(S.map);
             m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; });
-            m.on('drag', function (e) {
+            m.on('drag', function () {
                 if (!S) return;
-                var ll = e.target.getLatLng();
-                S.target = [ll.lat, ll.lng];
+                var p = m.getLngLat();
+                S.target = [p.lat, p.lng];
                 drawTargetLines();
                 targetReadout();
             });
-            m.on('dragend', function () { if (!S) return; S.dragging = false; render(); });
-            m.addTo(S.map);
+            m.on('dragend', function () {
+                if (!S) return;
+                // The click MapLibre may fire at the end of a drag must not be read as
+                // a tap that moves the target again.
+                S.dragging = false; S.dragEndedAt = Date.now();
+                render();
+            });
             S.targetMarker = m;
         } else if (!S.dragging) {
-            var cur = S.targetMarker.getLatLng();
-            if (cur.lat !== S.target[0] || cur.lng !== S.target[1]) S.targetMarker.setLatLng(S.target);
+            var cur = S.targetMarker.getLngLat();
+            if (cur.lat !== S.target[0] || cur.lng !== S.target[1]) S.targetMarker.setLngLat(ll(S.target));
         }
     }
 
     // ---- TAPS ---------------------------------------------------------------
     function onMapTap(pt) {
         if (!S) return;
+        if (S.dragEndedAt && Date.now() - S.dragEndedAt < 350) return;
         if (S.mode === 'setMid') { S.draft = { mid: pt }; S.mode = 'confirmMid'; render(); return; }
         if (S.mode === 'setFront') { S.draft.front = pt; S.mode = 'setBack'; render(); return; }
         if (S.mode === 'setBack') { S.draft.back = pt; S.mode = 'confirmAll'; render(); return; }
@@ -648,8 +773,11 @@
         if (!S || !G) return;
         var u = units();
         var r = resolved();
-        var nums = r ? G.holeNumbers(fix ? fix.pt : null, r) : null;
-        var d = function (m) { var v = G.distanceIn(m, u); return v == null ? '—' : String(v); };
+        var o = origin(r);
+        var nums = r ? G.holeNumbers(o ? o.pt : null, r) : null;
+        // Never more than four digits: anything longer is not a golf distance and
+        // would push FRONT / CENTER / BACK off the screen.
+        var d = function (m) { return G.shownDistance(m, u); };
 
         txt('.gps-title', 'Hole ' + S.hole + (S.par ? ' · Par ' + S.par : ''));
         txt('.gps-units', u === 'm' ? 'Meters' : 'Yards');
@@ -658,6 +786,12 @@
         txt('.gps-b', nums ? d(nums.backM) : '—');
 
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
+        // OFF THE HOLE (more than 1,000 yds from the green) or NO GPS: everything is
+        // measured from the TEE, and says so.
+        var fromTee = !!(o && o.from === 'tee');
+        txt('.gps-from', fromTee ? 'Measuring from tee' : '');
+        show('.gps-from', fromTee);
+        if (fromTee && acc && fix) acc = { text: 'You are off this hole', weak: false };
         var accEl = S.el.querySelector('.gps-acc');
         if (accEl) {
             accEl.classList.toggle('gps-weak', !!(acc && acc.weak));
@@ -729,6 +863,8 @@
         + '<div class="gps-map-wrap">'
         +   '<div class="gps-map"></div>'
         +   '<div class="gps-banner" style="display:none"></div>'
+        +   '<div class="gps-from" style="display:none"></div>'
+        +   '<button type="button" class="gps-recenter" aria-label="Recenter on the hole">⌖ Recenter</button>'
         +   '<div class="gps-tiles-note" style="display:none">No satellite view here without signal — yardages still work.</div>'
         + '</div>'
         + '<div class="gps-panel">'
@@ -776,17 +912,29 @@
         + '#gps-overlay .gps-prev,#gps-overlay .gps-next{width:44px;}'
         + '#gps-overlay .gps-map-wrap{position:relative;flex:1;min-height:180px;}'
         + '#gps-overlay .gps-map{position:absolute;inset:0;background:#1d3b2a;}'
-        + '#gps-overlay .gps-map.gps-no-tiles .leaflet-tile-pane{display:none;}'
         + '#gps-overlay .gps-banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(0,0,0,.78);'
         +   'padding:8px 14px;border-radius:999px;font-weight:700;font-size:15px;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay .gps-tiles-note{position:absolute;bottom:26px;left:8px;right:8px;z-index:1000;text-align:center;font-size:13px;color:#d1d5db;}'
-        + '#gps-overlay .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
+        + '#gps-overlay .maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
+        + '#gps-overlay .maplibregl-ctrl-attrib a{color:#0b4f8a;}'
+        + '#gps-overlay .gps-from{position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:3;background:rgba(250,204,21,.92);color:#111;'
+        +   'font-weight:700;font-size:13px;padding:4px 10px;border-radius:999px;white-space:nowrap;}'
+        + '#gps-overlay .gps-recenter{position:absolute;right:10px;top:10px;z-index:3;background:rgba(11,15,12,.82);font-size:14px;min-height:36px;padding:6px 10px;}'
+        + '.gps-dot{width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);}'
+        + '.gps-pin-tee{background:#93c5fd;}'
         + '#gps-overlay .gps-panel{padding:8px 12px 4px;background:#0b0f0c;}'
         + '#gps-overlay .gps-nums{display:flex;justify-content:space-between;text-align:center;}'
         + '#gps-overlay .gps-num{flex:1;}'
         + '#gps-overlay .gps-lbl{font-size:12px;letter-spacing:.08em;color:#a7b3aa;}'
-        + '#gps-overlay .gps-big{font-size:44px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;}'
-        + '#gps-overlay .gps-num-mid .gps-big{font-size:56px;color:#d9f99d;}'
+        // THE NUMBERS FIT (2026-10-07): three columns that may shrink, four digits
+        // at most, and a size that scales with the screen - FRONT / CENTER / BACK
+        // all visible on the narrowest iPhone (320 px) without overflow.
+        + '#gps-overlay .gps-num{min-width:0;overflow:hidden;}'
+        + '#gps-overlay .gps-big{font-size:clamp(28px,10.5vw,44px);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;}'
+        // CENTER is the biggest number, but its column is a third of the screen like
+        // the others: 11vw lets "9999" fit at 320px (12.5vw overflowed by 2px - the
+        // fit arm of tools/gps-check.js caught it).
+        + '#gps-overlay .gps-num-mid .gps-big{font-size:clamp(30px,11vw,54px);color:#d9f99d;}'
         + '#gps-overlay .gps-sub{display:flex;justify-content:space-between;font-size:13px;color:#a7b3aa;margin-top:4px;}'
         + '#gps-overlay .gps-acc.gps-weak{color:#fbbf24;font-weight:700;}'
         + '#gps-overlay .gps-msg{margin-top:8px;font-size:14px;line-height:1.35;color:#fde68a;}'
@@ -797,11 +945,14 @@
         + '#gps-overlay .gps-actions:empty{display:none;}'
         + '#gps-overlay .gps-btn{flex:1 1 auto;}'
         + '#gps-overlay .gps-primary{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;font-weight:700;}'
-        + '.gps-pin{display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #111;font:700 9px/1 sans-serif;color:#111;}'
+        // MapLibre centers a marker on its ELEMENT's box, so every marker element
+        // has an explicit size (an unsized one drew the crosshair 24px down and
+        // right of its point - measured in the first MapLibre screenshot).
+        + '.gps-pin{width:16px;height:16px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #111;font:700 9px/1 sans-serif;color:#111;}'
         + '.gps-pin-mid{background:#ffffff;}.gps-pin-front{background:#bef264;}.gps-pin-back{background:#fca5a5;}'
         + '.gps-pin-draft{outline:3px solid #facc15;}'
         // The target: a 48px touch area with a crosshair drawn in it.
-        + '.gps-target{background:transparent;}'
+        + '.gps-target{width:48px;height:48px;position:relative;background:transparent;cursor:grab;touch-action:none;}'
         + '.gps-target span{position:absolute;left:8px;top:8px;width:28px;height:28px;border:3px solid #facc15;border-radius:50%;'
         +   'box-shadow:0 0 0 1px rgba(0,0,0,.6);}'
         + '.gps-target span::before,.gps-target span::after{content:"";position:absolute;background:#facc15;box-shadow:0 0 0 1px rgba(0,0,0,.4);}'
@@ -860,6 +1011,8 @@
         on(el, '.gps-prev', function () { if (S && S.stepHole) S.stepHole(-1); });
         on(el, '.gps-next', function () { if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-units', function () { setUnits(units() === 'm' ? 'yd' : 'm'); render(); });
+        // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
+        on(el, '.gps-recenter', function () { frameHole(false); });
         on(el, '.gps-set-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
         on(el, '.gps-fix-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
         on(el, '.gps-addedges', function () { S.mode = 'setFront'; render(); });
@@ -891,7 +1044,7 @@
     }
 
     // The map is built the first time GPS is shown (a hidden 0x0 container would
-    // give Leaflet nothing to measure), then kept for the life of the round.
+    // give MapLibre nothing to measure), then kept for the life of the round.
     function ensureMap() {
         if (!S || S.mapRequested) return;
         S.mapRequested = true;
@@ -902,7 +1055,7 @@
             frameHole(false);
             render();
         });
-        loadLeaflet(function () { if (S === mine) { buildMap(); render(); } });
+        loadMapLibre(function () { if (S === mine) { buildMap(); render(); } });
     }
 
     function showSide(side) {
@@ -916,7 +1069,7 @@
         if (b) b.setAttribute('aria-pressed', side === 'bets' ? 'true' : 'false');
         if (side === 'gps') {
             ensureMap();
-            if (S.map) { try { S.map.invalidateSize(false); } catch (e) {} }
+            if (S.map) { try { S.map.resize(); } catch (e) {} }
             startWatch();
             render();
         } else {
@@ -938,6 +1091,7 @@
         S.par = par;
         S.mode = 'measure'; S.draft = null;
         S.target = null; S.targetMoved = false;
+        S.framed = null;
         frameHole(false);
         render();
     }

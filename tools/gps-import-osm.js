@@ -97,7 +97,7 @@ function loadCourseData() {
 function trim(raw) {
     const keep = (raw.elements || []).filter((e) => {
         const g = e.tags && e.tags.golf;
-        return g === 'hole' || g === 'green';
+        return g === 'hole' || g === 'green' || g === 'tee';
     }).map((e) => {
         const o = { type: e.type, id: e.id, tags: e.tags };
         if (e.geometry) o.geometry = e.geometry.map((p) => ({ lat: p.lat, lon: p.lon }));

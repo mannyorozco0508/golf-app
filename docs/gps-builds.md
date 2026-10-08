@@ -78,8 +78,8 @@ version. Its `index.html` is byte-identical to `main`'s (sha `92a63164…`, main
 ### Web: `build-shell.js`
 
 ```bash
-node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v151-cardguard, unchanged from main)
-GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v152-gps)
+node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v152-unplayedzero, unchanged from main)
+GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v153-gps)
 node build-shell.js tournament               # Tournaments never ship GPS, whatever the flag says
 ```
 
@@ -185,3 +185,37 @@ git worktree remove --force /tmp/consumer-tree
 
 A flag-off build removes the whole block. A `GPS:ELSE` branch comes back
 uncommented. Unbalanced markers stop the build instead of guessing.
+
+## After Oct 16 (PLAN ONLY): a test Firebase project for previews
+
+**Today** every preview (`<branch>.golf-app-5a5.pages.dev`) uses the **live**
+database, `golfapp-9fb21`, because the Firebase config is written into each
+page. A round made while testing GPS, like ZNBLP8, is a real live round.
+
+**Plan:**
+1. **Create a Firebase project `hardpan-test`** on the free Spark plan. Add a
+   Realtime Database and turn on Anonymous and Email-link sign-in. Add the
+   preview hosts (`*.hardpan-gps.pages.dev` can't be a wildcard; add each
+   branch host you test on) to its Authorized domains. Publish the repo's
+   `database.rules.json` to it. That's a test project, not a live rules
+   publish.
+2. **Seed it** with a copy of `global_courses` (exported from live in the
+   console, imported into test), so course search and the built-in courses
+   behave the same. Never copy `events`, `trips` or `organizers`: no real
+   rounds or people.
+3. **Choose the database at build time, not in the page.** `build-shell.js`
+   (and the planned `tools/site-build.js`) rewrite the one `firebaseConfig`
+   block per page from an env var: `FIREBASE_TARGET=test` or `live`.
+   Cloudflare Pages tells a build which branch it is building
+   (`CF_PAGES_BRANCH`), so:
+   - **production (`main`)** uses `live`;
+   - **every preview branch** uses `test`, automatically.
+   A guard test fails if a build for any branch other than `main` contains the
+   live `databaseURL`, and if a `main` build contains the test one.
+4. **Push notifications stay live-only.** The test project gets no FCM setup,
+   so preview rounds can never notify real phones.
+5. **Rollback** is to remove `FIREBASE_TARGET` from the Pages build settings;
+   builds then default to `live`, which is today's behaviour.
+
+This rides on the deploy change above (a build step on Pages), so it lands
+after it, and after Oct 16, like everything here.

@@ -218,21 +218,21 @@ const CONSUMER_SHELL = [
     'season.html', 'season.js',
     // GPS:BEGIN
     // HardPan GPS (gps-v1): the GPS side of the round screen, its course greens and
-    // the vendored Leaflet it loads on first use. In a GPS block, so a Consumer
+    // the vendored MapLibre GL JS it loads on first use. In a GPS block, so a Consumer
     // tree has none of these lines; and listed again in GPS_SHELL below, which is
     // what the build scripts filter on. NO APOSTROPHES IN THIS BLOCK.
-    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'leaflet.js', 'leaflet.css',
+    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
     // GPS:END
 ];
 
 // HARDPAN GPS (gps-v1). Shipped ONLY when GPS_ENABLED=1 (HardPan). The Consumer
 // build (GPS_ENABLED=0, the default) does not copy one of these files, and
 // tools/gps-flag.js removes every GPS block from the files it does copy - so
-// Consumer carries no GPS code, no Leaflet, no course geometry and no tile key.
+// Consumer carries no GPS code, no map library, no course geometry and no tile key.
 // The same six names sit in CONSUMER_SHELL inside a GPS block;
 // gps_wiring_test.js holds the two lists equal. NO APOSTROPHES IN THIS BLOCK.
 const GPS_SHELL = [
-    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'leaflet.js', 'leaflet.css',
+    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

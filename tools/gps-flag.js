@@ -35,7 +35,7 @@
 // are comments.
 //
 // GPS-ONLY FILES (GPS_SHELL in sync-mobile-web.js) are simply not copied when
-// the flag is off: no GPS code, no Leaflet, no course geometry, no tile key.
+// the flag is off: no GPS code, no map library, no course geometry, no tile key.
 //
 // The repo root ITSELF - what Cloudflare Pages serves with no build step -
 // is the source, i.e. flag ON. See docs/gps-builds.md.
