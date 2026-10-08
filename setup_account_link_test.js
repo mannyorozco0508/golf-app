@@ -106,8 +106,14 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         //   second-device adopt path  migrationNote still tells an ADOPTED uid
         //                             from the SAME one, in different words
         // And email_link_auth_test.js is 19/19 green against it.
+        // RE-PINNED AGAIN 2026-10-08 (THE GMAIL WRAPPER AND THE OFF-SCREEN
+        // REFUSAL; was b37fa69c6c37b152...). Same three paths re-measured and
+        // email_link_auth_test.js still 19/19 green. The change: codeFromPaste
+        // unwraps percent-encoded text so Gmail's own redirect yields the code,
+        // and setStatus takes a reveal flag so a refusal scrolls into view -
+        // measured at 390x844, the status line was at top 832 of 844.
         // was 0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a
-        assert.equal(sha('email-link-auth.js'), 'b37fa69c6c37b152f529b3bbc5a32c1c42adc50b7ea57e2aec5b466b00fcccb2',
+        assert.equal(sha('email-link-auth.js'), '6670713c72576b3678f09973f4c26f9f9a8f6a3187ad52c898a90dcbeecc31c8',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

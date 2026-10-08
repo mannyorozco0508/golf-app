@@ -4386,7 +4386,16 @@
 // missing was any sentence telling him not to tap the link, and a BARE CODE was
 // refused. Both fixed. Plus: a trip's organizer is now the organizer of its
 // rounds. A device on v320 still sends him to the website to sign in.
-const CACHE_VERSION = 'golfapp-v321-nativesignin';
+// Moved to v322. FINISH SIGN-IN DID NOTHING, AND IT WAS TWO FAULTS AT ONCE.
+// Manny on build 11 pasted a fresh link copied from Gmail and got no error and
+// no sign-in. Measured: (1) Gmail's "Copy Link" hands over its OWN redirect -
+// google.com/url?q=<the real link, percent-encoded> - so "oobCode=" was present
+// only as "oobCode%3D" and the parse failed; he pasted the whole link and was
+// told to paste the whole link. (2) The refusal rendered at top 832 of an 844px
+// viewport - 24px off the bottom of the screen - so there was no way to see it.
+// A pasted link is unwrapped now (bounded, string-only, nothing fetched), and a
+// refusal scrolls itself into view. A device on v321 still looks dead.
+const CACHE_VERSION = 'golfapp-v322-pastewrapper';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

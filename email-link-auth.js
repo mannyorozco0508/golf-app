@@ -276,11 +276,28 @@
         try { document.addEventListener('DOMContentLoaded', flushStatus); } catch (e) { /* no document events */ }
         try { window.addEventListener('load', flushStatus); } catch (e) { /* no window events */ }
     }
-    function setStatus(text) {
+    // A MESSAGE NOBODY CAN SEE IS NOT A MESSAGE (2026-10-08). Manny reported
+    // Finish sign-in doing NOTHING - no error, no sign-in. The app did answer:
+    // measured in the Account panel at 390x844, the status line rendered at top
+    // 832 of an 844px viewport, 24px off the bottom of the screen. So a refusal
+    // now scrolls itself into view.
+    //
+    // ONLY ON A REFUSAL (reveal: true), not on every note: the running
+    // "Finishing sign-in…" must not yank the panel around while somebody is
+    // still reading the field they just typed into.
+    function setStatus(text, opts) {
         lastNote = text || '';
         if (window.emailLinkAuth) window.emailLinkAuth.lastNote = lastNote;
         var el = document.getElementById('email-link-status');
-        if (el) { el.textContent = lastNote; return; }
+        if (el) {
+            el.textContent = lastNote;
+            if (opts && opts.reveal && typeof el.scrollIntoView === 'function') {
+                try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {
+                    try { el.scrollIntoView(); } catch (e2) { /* nothing more to try */ }
+                }
+            }
+            return;
+        }
         armFlush();
     }
 
@@ -458,10 +475,39 @@
     // A CODE IS NOT A LOOSE WORD. The shape is Firebase's: base64url, long
     // enough that a typo is not a sign-in attempt, so "hello" is refused.
     var CODE_RE = /^[A-Za-z0-9_-]{12,512}$/;
+
+    // WHAT A MAIL APP ACTUALLY HANDS OVER (2026-10-08). Gmail's "Copy Link"
+    // does NOT give you the link: it gives its own redirect,
+    // https://www.google.com/url?q=<the real link, PERCENT-ENCODED>&source=gmail
+    // so "oobCode=" is present only as "oobCode%3D" and every check for the
+    // real thing failed. Manny pasted the whole link, correctly, and the app
+    // told him to paste the whole link.
+    //
+    // SO THE TEXT IS UNWRAPPED FIRST: decode repeatedly until it stops
+    // changing, which handles a wrapper inside a wrapper as well as a single
+    // one, and bounded so a hostile string cannot spin. Nothing is fetched and
+    // nothing is followed - this is string work on what the golfer pasted.
+    function unwrapPaste(text) {
+        var t = String(text == null ? '' : text);
+        for (var i = 0; i < 4; i++) {
+            if (!/%[0-9A-Fa-f]{2}/.test(t)) break;
+            var next;
+            try { next = decodeURIComponent(t); } catch (e) { break; }
+            if (next === t) break;
+            t = next;
+        }
+        return t;
+    }
+
     function codeFromPaste(text) {
-        var t = String(text == null ? '' : text).trim();
-        if (!t) return null;
-        var m = /[?&\s]oobCode=([A-Za-z0-9_-]+)/.exec(t) || /^oobCode=([A-Za-z0-9_-]+)/.exec(t);
+        var raw = String(text == null ? '' : text).trim();
+        if (!raw) return null;
+        // The bare code, before any unwrapping can mangle it.
+        if (CODE_RE.test(raw)) return raw;
+        var t = unwrapPaste(raw);
+        var m = /[?&\s]oobCode=([A-Za-z0-9_-]+)/.exec(t)
+             || /^oobCode=([A-Za-z0-9_-]+)/.exec(t)
+             || /oobCode=([A-Za-z0-9_-]+)/.exec(t);
         if (m) return m[1];
         return CODE_RE.test(t) ? t : null;
     }
@@ -479,20 +525,23 @@
         var paste = document.getElementById('email-link-paste');
         var typed = paste ? String(paste.value || '').trim() : '';
         var href = typed || pageUrl();
-        // A LINK FIRST, THEN A BARE CODE. The link path is untouched; the code
-        // path only runs when what was pasted is not a link at all.
+        // A LINK FIRST, THEN ANYTHING A CODE CAN BE READ OUT OF - a bare code, a
+        // Gmail redirect, a tracking wrapper. The link path is untouched.
         if (!isEmailLink(href)) {
             var code = codeFromPaste(typed);
             if (code) href = linkForCode(code);
         }
-        if (!isEmailLink(href)) { setStatus(NOTE_PASTE); return; }
+        if (!isEmailLink(href)) { setStatus(NOTE_PASTE, { reveal: true }); return; }
         var input = document.getElementById('email-link-input');
         var email = input ? input.value : '';
         setStatus('Finishing sign-in…');
         whenReady().then(function () { return completeLink(href, email); }).then(function (result) {
             publish(result);
         }, function (err) {
-            setStatus(messageFor(err));
+            // A FAILED COMPLETION IS A REFUSAL TOO, and it was landing in the
+            // same off-screen line - "cannot attach the link to the current
+            // account" and "enter the same email address" were both invisible.
+            setStatus(messageFor(err), { reveal: true });
         });
     }
 
