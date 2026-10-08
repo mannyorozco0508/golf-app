@@ -2601,6 +2601,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             const incoming = snapshot.val();
+            // THE TRIP'S OWNER, IF THIS ROUND BELONGS TO A TRIP. Fired here
+            // because this is where the round record arrives; requestTripOwner
+            // does nothing twice and nothing at all without a tripCode.
+            if (incoming && incoming.tripCode) {
+                currentData = currentData || {};
+                currentData.tripCode = incoming.tripCode;
+                requestTripOwner();
+            }
             // AN EMPTY ANSWER WHILE OFFLINE IS NOT AN ANSWER (2026-10-06). The
             // page used to take whatever arrived, and with a locally hydrated
             // round that would mean a null snapshot WIPING a card the golfer is
@@ -8120,13 +8128,43 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // bare link that is the old behaviour and stays. On a group link it would hand the doors
     // to whoever was passed the link for their foursome, which is the thing the group lock
     // was guarding against in the first place. organizerEvidence() is that narrower test.
+    // THE ROUND'S TRIP, WHEN IT HAS ONE (2026-10-08). A trip's organizer is the
+    // organizer of its rounds - Manny's rule - and the trip holds the round
+    // codes, not the other way round, so the round could not find its trip at
+    // all. A round in a trip now carries tripCode, and this is the one read
+    // that turns it into an owner.
+    //
+    // ONE READ, ONCE, AND NEVER ON A ROUND WITHOUT A tripCode. It is a `once`
+    // rather than a listener because a trip does not change owner mid-round,
+    // and the gate is re-evaluated anyway: renderScorecard runs again when the
+    // read lands, exactly as it does when the uid arrives.
+    let currentTripRecord = null;
+    let tripOwnerRequested = '';
+    function requestTripOwner() {
+        const code = currentData && currentData.tripCode;
+        if (!code || tripOwnerRequested === String(code)) return;
+        tripOwnerRequested = String(code);
+        try {
+            db.ref('trips/' + code + '/ownerUid').once('value').then((snap) => {
+                const owner = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!owner) return;
+                currentTripRecord = { ownerUid: String(owner) };
+                // The gate may have said "spectator" before this landed, for the
+                // same reason it does before the uid lands. Re-render so the
+                // answer is not stuck on the first paint.
+                if (currentData && currentData.players) renderScorecard();
+            }, () => {});
+        } catch (e) { /* no socket: the round's own ownerUid still decides */ }
+    }
+
     function canReachSetup() {
         if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
         const uid = (window.authBootState && window.authBootState.uid) || null;
         const token = window.organizerGate.heldOrganizerToken(currentMode, organizerTokenParam);
+        const trip = currentTripRecord;
         if (hasGroupLock && typeof window.organizerGate.organizerEvidence === 'function'
-            && !window.organizerGate.organizerEvidence(currentData, uid, token)) return false;
-        return window.organizerGate.isRoundOrganizer(currentData, uid, token);
+            && !window.organizerGate.organizerEvidence(currentData, uid, token, trip)) return false;
+        return window.organizerGate.isRoundOrganizer(currentData, uid, token, trip);
     }
     // ---- WHO MAY DELETE A ROUND (2026-10-04) --------------------------------
     //

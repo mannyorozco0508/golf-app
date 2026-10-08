@@ -64,7 +64,7 @@
     var NOTE_FRESH = 'Signed in. The free trial and a founder pass, if this account has them, are the ones on this account.';
     var NOTE_SENT = 'Link sent. Open it in this app, or paste it below. Finish here before you open it in another browser — that would start a different account and leave the free trial and a founder pass behind.';
     var NOTE_NEED_EMAIL = 'Enter the same email address the link was sent to, then tap Finish sign-in.';
-    var NOTE_PASTE = 'Paste the whole link from the email.';
+    var NOTE_PASTE = 'Paste the whole link from the email, or just the code from the end of it.';
     var NOTE_CONSOLE = 'Email sign-in is not turned on for this app yet. It has to be enabled in the Firebase console before a link can be sent.';
     var NOTE_NOT_READY = 'Sign-in is not ready yet. Wait a moment and try again.';
     var NOTE_BAD_EMAIL = 'That email address does not look usable.';
@@ -443,10 +443,48 @@
         return false;
     }
 
+    // THE CODE ON ITS OWN (2026-10-08). Manny on TestFlight: Account -> "Use
+    // email instead" -> tapped the link in the email -> it opened the WEB app,
+    // so the native app stayed anonymous and he was a spectator on his own
+    // rounds. The paste field already existed and a pasted LINK already
+    // completed sign-in in place - but a bare oobCode was refused, and that is
+    // the short thing a person can read off a screen without copying a
+    // 300-character URL on a phone.
+    //
+    // NO UNIVERSAL LINKS NEEDED, which is the point: the completion happens
+    // inside the app from text the golfer brings in. Nothing about the link
+    // path changes - it is tried first, exactly as before.
+    //
+    // A CODE IS NOT A LOOSE WORD. The shape is Firebase's: base64url, long
+    // enough that a typo is not a sign-in attempt, so "hello" is refused.
+    var CODE_RE = /^[A-Za-z0-9_-]{12,512}$/;
+    function codeFromPaste(text) {
+        var t = String(text == null ? '' : text).trim();
+        if (!t) return null;
+        var m = /[?&\s]oobCode=([A-Za-z0-9_-]+)/.exec(t) || /^oobCode=([A-Za-z0-9_-]+)/.exec(t);
+        if (m) return m[1];
+        return CODE_RE.test(t) ? t : null;
+    }
+    // The shape signInWithEmailLink parses: it reads oobCode (and mode) out of
+    // the string and ignores the rest, so the origin here is cosmetic - but it
+    // is shareBaseUrl() rather than location, because inside the shell location
+    // is capacitor://localhost.
+    function linkForCode(code) {
+        var base = (typeof shareBaseUrl === 'function') ? shareBaseUrl()
+            : ((typeof window !== 'undefined' && window.shareBaseUrl) ? window.shareBaseUrl() : WEB_FALLBACK);
+        return base + 'admin.html?mode=signIn&oobCode=' + encodeURIComponent(String(code || ''));
+    }
+
     function submitPaste() {
         var paste = document.getElementById('email-link-paste');
         var typed = paste ? String(paste.value || '').trim() : '';
         var href = typed || pageUrl();
+        // A LINK FIRST, THEN A BARE CODE. The link path is untouched; the code
+        // path only runs when what was pasted is not a link at all.
+        if (!isEmailLink(href)) {
+            var code = codeFromPaste(typed);
+            if (code) href = linkForCode(code);
+        }
         if (!isEmailLink(href)) { setStatus(NOTE_PASTE); return; }
         var input = document.getElementById('email-link-input');
         var email = input ? input.value : '';
@@ -472,6 +510,8 @@
         normalizeEmail: normalizeEmail,
         isPlausibleEmail: isPlausibleEmail,
         isEmailLink: isEmailLink,
+        codeFromPaste: codeFromPaste,
+        linkForCode: linkForCode,
         pageUrl: pageUrl,
         continueUrl: continueUrl,
         actionCodeSettings: actionCodeSettings,

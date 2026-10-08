@@ -89,7 +89,25 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         //                                   the link, with no reopen and no reload"
         // Nothing in the send path, the link path or the adopt path was touched; the
         // diff is the message map and one helper that reads window.location.hostname.
-        assert.equal(sha('email-link-auth.js'), '0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a',
+        // RE-PINNED 2026-10-08, AND IT WAS RE-PROVED RATHER THAN RE-PINNED,
+        // which is what this pin's own message asks for. Manny on TestFlight
+        // tapped the link in the email, it opened the WEB app, and the native
+        // app stayed anonymous - a spectator on rounds his own account owns.
+        // The change is ONE new branch in submitPaste: when what was pasted is
+        // not a link, a bare oobCode is accepted and turned into one. The link
+        // path is tried first and is unchanged.
+        //
+        // THE THREE PATHS THIS PIN NAMES, re-measured against the CHANGED file:
+        //   held-note flush (v214)    setStatus with no element on the page
+        //                             still leaves lastNote === the note
+        //   uid-preserving link path  planCompletion on an anonymous user still
+        //                             answers {action:'link'} - linkWithCredential,
+        //                             so the uid does not change
+        //   second-device adopt path  migrationNote still tells an ADOPTED uid
+        //                             from the SAME one, in different words
+        // And email_link_auth_test.js is 19/19 green against it.
+        // was 0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a
+        assert.equal(sha('email-link-auth.js'), 'b37fa69c6c37b152f529b3bbc5a32c1c42adc50b7ea57e2aec5b466b00fcccb2',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '
