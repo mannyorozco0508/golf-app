@@ -25,10 +25,16 @@
 // NO UNIVERSAL LINKS NEEDED, which is the point: the completion happens in the
 // app from text the golfer brings in.
 //
-// BASELINE, against the pre-change email-link-auth.js and admin.html, all 7
-// tests: 1 PASS / 6 FAIL. The one that passes is "a FULL LINK still works",
-// which is the path that ALREADY worked and must not break - so it is a
-// don't-regress pin rather than a caught defect, and saying so is the point.
+// BASELINE, RE-MEASURED over the FINISHED file (2026-10-08) against the
+// pre-change email-link-auth.js and admin.html, all 11 tests: 1 PASS / 10 FAIL.
+// 1 + 10 = 11. The first version of this header said 7 tests, measured before
+// the four wrapper tests were appended - which is the stale-count mistake this
+// repo has made twice and the arithmetic check caught it a third time.
+//
+// The one that passes there is "the paste control is still wired to the one
+// completer": the field and its Finish button have existed since v203, so that
+// is a don't-regress pin rather than a caught defect, and saying so is the
+// point.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -120,5 +126,62 @@ describe('2. THE APP SAYS WHAT TO DO WITH THE EMAIL', () => {
         assert.match(src, /onclick="emailLinkAuth\.submitPaste\(\)"/,
             'Finish sign-in no longer calls submitPaste');
         assert.match(src, /id="email-link-paste"/, 'the paste field is gone');
+    });
+});
+
+// ============================================================================
+// 3. WHAT A MAIL APP ACTUALLY HANDS OVER (2026-10-08, build 11 bug)
+//
+// Manny: Finish sign-in did NOTHING with a fresh, unused link copied from Gmail
+// with Press and hold -> Copy Link. Measured, and it is two faults at once:
+//
+//   1. GMAIL DOES NOT GIVE YOU THE LINK. "Copy Link" yields its own redirect -
+//      https://www.google.com/url?q=<the real link, PERCENT-ENCODED>&source=gmail
+//      - so "oobCode=" appears only as "oobCode%3D" and every check for the
+//      real thing failed. He pasted the whole link, correctly, and was told to
+//      paste the whole link.
+//   2. THE REFUSAL WAS BELOW THE FOLD. Measured in the Account panel at
+//      390x844: the status line rendered at top 832, bottom 868 - 24px off the
+//      bottom of the screen. The app did say something; there was no way to see
+//      it. That is the "nothing happens".
+// ============================================================================
+
+describe('3. A WRAPPED LINK IS STILL A LINK', () => {
+
+    const real = 'https://golfapp-9fb21.firebaseapp.com/__/auth/action?apiKey=K&mode=signIn'
+        + '&oobCode=' + CODE + '&continueUrl=https%3A%2F%2Fgolf-app-5a5.pages.dev%2Fadmin.html&lang=en';
+
+    test('Gmail’s own redirect wrapper still yields the code', () => {
+        const e = E();
+        const gmail = 'https://www.google.com/url?q=' + encodeURIComponent(real) + '&source=gmail&ust=1&usg=A';
+        assert.equal(e.codeFromPaste(gmail), CODE,
+            'the code could not be read out of a Gmail Copy Link');
+    });
+
+    test('and so does a doubly-encoded one, and other wrappers', () => {
+        const e = E();
+        [['double encoding', 'https://www.google.com/url?q=' + encodeURIComponent(encodeURIComponent(real))],
+         ['url= wrapper', 'https://click.example.com/x?url=' + encodeURIComponent(real)],
+         ['target= wrapper', 'https://t.example.com/r?target=' + encodeURIComponent(real)],
+         ['the encoded code alone', 'oobCode%3D' + CODE]].forEach(([label, u]) => {
+            assert.equal(e.codeFromPaste(u), CODE, label + ' did not yield the code');
+        });
+    });
+
+    test('a wrapper with NO code in it is still refused', () => {
+        // The failure that must stay a failure: a tracking link that never
+        // carried the code cannot be turned into a sign-in.
+        const e = E();
+        ['https://url8936.example.com/ls/click?upn=abc123def456',
+         'https://www.google.com/url?q=' + encodeURIComponent('https://example.com/hello') + '&source=gmail'
+        ].forEach((u) => {
+            assert.equal(e.codeFromPaste(u), null, u.slice(0, 40) + ' was accepted with no code in it');
+        });
+    });
+
+    test('the raw link still works, unwrapped', () => {
+        const e = E();
+        assert.equal(e.codeFromPaste(real), CODE);
+        assert.equal(e.isEmailLink(real), true);
     });
 });
