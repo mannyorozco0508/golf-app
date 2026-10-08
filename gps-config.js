@@ -19,4 +19,4 @@
 // free numbers-only screen unless the phone is entitled (gps-view.js
 // hasGpsPro() - the one check). Testers: ?gpstier=free | pro | clear.
 // ============================================================================
-window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTalx4-ROdiwzeHwjfx4h8zkw..MMqY0Ob6l3l3qcOc5Fb2_3Zh53-BUqlWSQ4IXMpQeG4GTah3KFMVo9VlYeW0rWwwntujx2sHK1FWNqSo54Atw7zSo2XYNbjLrT4_LaQbWHuyn3oB3fdMhyoxB1VLkObto_RcIgnTFjPPXDqQB1dKSQpKWg2STkFw9xci0hkz4CrNQ87kNbSZEmpkfmiNQsSvaGqen5te3hKLmt_dXt2ec7f26WraFZgZK9Wp1o8BAtoP4cEXjJgopst5vjU.AT1_49lmfRNb', paywall: false };
+window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626sm39ujgfU89O2WgTbHOzScHuYC-jqnuh5PVjH4bTxis1jT2WYkunGwob17JGYuZzmp1nsVMZ4tqOzl3AfGe-nTOrsadF8AW1UJcfeMJe1ERbpXz0O0wX8mKr_4URw8uNLdWdsySPhs8J-yoZbizzwiCU-7J5HLnEPamSYe2Xt9IcoBw_OUDiQwKSZBEh1R-OQGiGncsJvl57ehuv0mfk_aLMUZ6fHKlCeqfgk4V2wE-uNv-Pk.AT1_49lmfRNb', paywall: false };
