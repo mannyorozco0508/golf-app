@@ -92,6 +92,11 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
+         qr-codes.js builds the list, the sheet and the swipe. Both are in the
+         offline shell: the code is drawn on the phone with no signal. -->
+    <script src="qr-encode.js"></script>
+    <script src="qr-codes.js"></script>
     <!-- score-gaps.js (v192): the one builder for "a hole inside a card is blank" -
          the outlined box, the banner, the Board's flag and the money pages' "Not
          final" all draw from it. Pure; reads scores the way the engines do. -->
@@ -1372,6 +1377,69 @@
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title, .lm-card-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .lm-sub { font-size: 0.68rem; color: var(--text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* ---- THE QR SHEET (Wave 1, 2026-10-07) --------------------------------
+           An organizer holds the phone up on the first tee and each scorekeeper
+           scans their own group. So the code is as big as the screen allows, the
+           label is under it, and swiping moves to the next group.
+
+           FULL SCREEN AND OPAQUE, deliberately: a camera a metre away needs
+           contrast and no clutter, and position:fixed with its own background
+           means the hole underneath cannot show through a translucent panel.
+
+           ALWAYS LIGHT-ON-DARK-FRAME, NEVER THEMED. The code itself is drawn
+           black on white at both themes - a scanner reads dark modules on a
+           light ground, and an inverted QR is one many cameras refuse. Only the
+           frame around it follows the theme. */
+        .qr-sheet {
+            position: fixed; inset: 0; z-index: 1200; display: none;
+            flex-direction: column; align-items: center;
+            background: var(--bg-main); padding: 10px 14px 18px;
+            /* The notch and the home bar, so neither eats the close button nor
+               the dots. */
+            padding-top: calc(10px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+        .qr-sheet.open { display: flex; }
+        .qr-sheet-head { width: 100%; max-width: 560px; display: flex; align-items: flex-start; gap: 10px; }
+        .qr-round-name { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main); line-height: 1.25; overflow-wrap: break-word; }
+        .qr-course-name { font-size: 0.8rem; color: var(--text-muted); }
+        .qr-close {
+            flex: 0 0 auto; width: 44px; height: 44px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            background: var(--bg-card); color: var(--text-main); font-size: 1.1rem; line-height: 1;
+        }
+        /* THE TRACK IS THE SWIPE SURFACE. One slide at a time, translated by JS;
+           overflow hidden so the neighbours are not half visible and mistaken
+           for the code being scanned. */
+        .qr-track { position: relative; flex: 1 1 auto; width: 100%; max-width: 560px; overflow: hidden; }
+        .qr-slide {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            transition: transform 220ms ease, opacity 180ms ease;
+        }
+        .qr-sheet.dragging .qr-slide { transition: none; }
+        /* The code: as big as the shorter side allows, white ground included, so
+           the quiet zone is part of the white and not the page behind it. */
+        .qr-art {
+            width: min(84vw, 62vh); height: min(84vw, 62vh);
+            background: #ffffff; border-radius: 10px; padding: 0;
+            box-shadow: 0 2px 10px var(--shadow-color);
+        }
+        .qr-art svg { display: block; border-radius: 10px; }
+        .qr-slide-label { font-size: 1.3rem; font-weight: 800; color: var(--text-main); }
+        .qr-slide-sub { font-size: 0.85rem; color: var(--text-muted); text-align: center; max-width: 86vw; }
+        .qr-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+        .qr-arrow {
+            width: 44px; height: 44px; margin: 0; padding: 0; border-radius: 50%;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-size: 1.4rem; line-height: 1;
+        }
+        .qr-arrow:disabled { opacity: 0.35; }
+        .qr-dots { display: flex; gap: 7px; }
+        .qr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); }
+        .qr-dot.on { background: var(--brand-green); }
+        .qr-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .qr-open-btn { width: 100%; }
         .lm-seg { padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
         .lm-seg:last-child { border-bottom: none; }
         .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
@@ -1832,6 +1900,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
     <div class="scorecard-main" id="scorecard-main">
     <div class="group-filter-bar" id="group-filter-container"></div>
+    <!-- SHOW QR CODE (Wave 1, 2026-10-07). A static mount, like every other
+         block the Round Menu owns: buildRoundSheet MOVES these elements into the
+         sheet rather than rebuilding them, so the id, the handler and the
+         renderer all survive the move. Filled by renderQrShareButton(). -->
+    <div id="qr-share-mount"></div>
     <div id="group-links-panel" style="display:none;"></div>
     <!-- PASTE-TO-CLAIM (v200): on a BARE link whose doors are hidden, the device
          that was set up somewhere else pastes the organizer link and unlocks
@@ -6466,6 +6539,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             'dot-context-row',          // the Dots: selector, on rounds that have one
             'view-mode-toggle',         // Hole View / Full Card
             'group-filter-container',   // All Players, Edit round setup, Players
+            'qr-share-mount',           // Show QR code (every golfer, not just the organizer)
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
         ];
@@ -8224,9 +8298,50 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <div class="glb-title">Scorekeeper Links</div>
             <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
             ${rows}
+            <button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet()">📷 Show QR code</button>
             ${organizerRow}
         </div>`;
         panel.style.display = 'block';
+    }
+
+    // ---- SHOW QR CODE ------------------------------------------------------
+    //
+    // IN THE ROUND MENU, FOR EVERYONE. Manny asked for it on the Round Menu and
+    // on the organizer's share screen; the Round Menu belongs to whoever has
+    // the round open, and a scorekeeper holding up their own group's code for
+    // the next player to scan is the same job. Nothing here is organizer-only
+    // because nothing here carries anything an organizer has and a golfer does
+    // not: the codes are the group links and the leaderboard.
+    //
+    // THE LIST AND THE SHEET COME FROM qr-codes.js, which both this page and
+    // admin.html call - so there is one swipe, one layout and one list.
+    function renderQrShareButton() {
+        const mount = document.getElementById('qr-share-mount');
+        if (!mount) return;
+        // No round, no codes. currentMode is the game code.
+        if (!currentMode || typeof qrOpenSheet !== 'function') { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<button type="button" class="btn-outline qr-open-btn" '
+            + 'onclick="openRoundQrSheet()">\uD83D\uDCF7 Show QR code</button>';
+    }
+
+    function openRoundQrSheet() {
+        if (typeof qrOpenSheet !== 'function') return;
+        // THE ROSTER AND THE CODE, NOT THE ROUND RECORD. currentData holds
+        // organizerToken; qr-codes.js is never given it, which is what makes
+        // "no organizer link in a QR" a property of the interface rather than a
+        // promise about code. shareBaseUrl() is the same base every copied link
+        // uses, so the code and the link are the same string.
+        const n = qrOpenSheet({
+            code: currentMode,
+            players: currentData.players || [],
+            groupSizeOverrides: currentData.groupSizeOverrides || {},
+            baseUrl: shareBaseUrl(),
+            roundName: currentData.eventName || 'This round',
+            courseName: currentData.courseName || ''
+        });
+        // The same refusal as admin.html, in the same words: nothing was drawn,
+        // so it does not float away like something that worked.
+        if (!n && typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
     }
 
     function copyGroupLinkFromScorecard(url, groupNum, btn) {
@@ -11140,6 +11255,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // this function does - which is right, because a DOM write before it can
         // take the caret out of the box a golfer is typing in.
         renderEndRoundControl();
+        // THE QR BUTTON IS RENDERED HERE, on the same beat and for the same
+        // reason: it needs currentMode and the roster, and the first paint has
+        // neither. A render function nothing calls is this project's most
+        // repeated defect - a priced Auto Press label that 37 tests called
+        // themselves and no code path ever did - so the call site matters more
+        // than the function. qr_share_entry_test.js arrives at the page the way
+        // a golfer does and taps, without naming either one.
+        if (typeof renderQrShareButton === 'function') renderQrShareButton();
         const historyModal = document.getElementById("history-modal-overlay");
         if (historyModal && historyModal.style.display === "flex") {
             renderHistoryList();

@@ -79,6 +79,11 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
+         qr-codes.js builds the list, the sheet and the swipe. Both are in the
+         offline shell: the code is drawn on the phone with no signal. -->
+    <script src="qr-encode.js"></script>
+    <script src="qr-codes.js"></script>
     <script src="code-issuer.js"></script>
     <!-- THE ROUNDS THIS PHONE ALREADY HAS. Home is the start_url, so a Home
          Screen icon opens here with no signal - and offline the only thing it
@@ -438,6 +443,69 @@
         .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
         .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
+        /* ---- THE QR SHEET (Wave 1, 2026-10-07) --------------------------------
+           An organizer holds the phone up on the first tee and each scorekeeper
+           scans their own group. So the code is as big as the screen allows, the
+           label is under it, and swiping moves to the next group.
+
+           FULL SCREEN AND OPAQUE, deliberately: a camera a metre away needs
+           contrast and no clutter, and position:fixed with its own background
+           means the hole underneath cannot show through a translucent panel.
+
+           ALWAYS LIGHT-ON-DARK-FRAME, NEVER THEMED. The code itself is drawn
+           black on white at both themes - a scanner reads dark modules on a
+           light ground, and an inverted QR is one many cameras refuse. Only the
+           frame around it follows the theme. */
+        .qr-sheet {
+            position: fixed; inset: 0; z-index: 1200; display: none;
+            flex-direction: column; align-items: center;
+            background: var(--bg-main); padding: 10px 14px 18px;
+            /* The notch and the home bar, so neither eats the close button nor
+               the dots. */
+            padding-top: calc(10px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+        .qr-sheet.open { display: flex; }
+        .qr-sheet-head { width: 100%; max-width: 560px; display: flex; align-items: flex-start; gap: 10px; }
+        .qr-round-name { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main); line-height: 1.25; overflow-wrap: break-word; }
+        .qr-course-name { font-size: 0.8rem; color: var(--text-muted); }
+        .qr-close {
+            flex: 0 0 auto; width: 44px; height: 44px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            background: var(--bg-card); color: var(--text-main); font-size: 1.1rem; line-height: 1;
+        }
+        /* THE TRACK IS THE SWIPE SURFACE. One slide at a time, translated by JS;
+           overflow hidden so the neighbours are not half visible and mistaken
+           for the code being scanned. */
+        .qr-track { position: relative; flex: 1 1 auto; width: 100%; max-width: 560px; overflow: hidden; }
+        .qr-slide {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            transition: transform 220ms ease, opacity 180ms ease;
+        }
+        .qr-sheet.dragging .qr-slide { transition: none; }
+        /* The code: as big as the shorter side allows, white ground included, so
+           the quiet zone is part of the white and not the page behind it. */
+        .qr-art {
+            width: min(84vw, 62vh); height: min(84vw, 62vh);
+            background: #ffffff; border-radius: 10px; padding: 0;
+            box-shadow: 0 2px 10px var(--shadow-color);
+        }
+        .qr-art svg { display: block; border-radius: 10px; }
+        .qr-slide-label { font-size: 1.3rem; font-weight: 800; color: var(--text-main); }
+        .qr-slide-sub { font-size: 0.85rem; color: var(--text-muted); text-align: center; max-width: 86vw; }
+        .qr-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+        .qr-arrow {
+            width: 44px; height: 44px; margin: 0; padding: 0; border-radius: 50%;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-size: 1.4rem; line-height: 1;
+        }
+        .qr-arrow:disabled { opacity: 0.35; }
+        .qr-dots { display: flex; gap: 7px; }
+        .qr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); }
+        .qr-dot.on { background: var(--brand-green); }
+        .qr-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .qr-open-btn { width: 100%; }
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
         /* The whole-round link's row (2026-09-20): the group row's look, NOT its class -
            tools/round-share-check.js counts .group-link-row to prove the group links
@@ -3247,6 +3315,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // after Save, beside the links they are already sending: the link that makes
         // any other device - Safari on the same phone, a Mac, a second phone - the
         // organizer of this round. Worded so nobody sends it to the group chat.
+        // SHOW QR CODE, on the organizer's own share screen (Wave 1, 2026-10-07).
+        //
+        // BEFORE the organizer-link block on purpose: the codes are the things
+        // that get held up to the group, and the organizer link is the one
+        // thing that must never be one. qr-codes.js is handed the roster and
+        // the code, never this round record - which is where organizerToken is.
+        html += '<div class="rr-qr-box" style="margin-top:14px;">'
+            + '<button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet()">'
+            + '\uD83D\uDCF7 Show QR code</button>'
+            + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
+            + 'Hold the phone up on the first tee \u2014 each scorekeeper scans their own group. '
+            + 'Swipe for the next one. Works with no signal.</div>'
+            + '</div>';
         if (data && data.organizerToken) {
             html += '<div class="rr-organizer-link" style="margin-top:14px;">'
                 + '<div class="wr-label" style="margin-bottom:4px;">Your own devices</div>'
@@ -10457,6 +10538,28 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // canonical one inside the app, where location.origin is capacitor://
         // localhost and useless to whoever is sent the link.
         return shareBaseUrl() + page;
+    }
+
+    // ONE CALL, THE SHARED SHEET. Same function name as index.html's, same
+    // arguments, and the list and swipe both come from qr-codes.js - so there is
+    // nothing here for the two screens to disagree about.
+    function openRoundQrSheet() {
+        if (typeof qrOpenSheet !== 'function') return;
+        const data = currentSavedRound || {};
+        const n = qrOpenSheet({
+            code: currentMode,
+            players: data.players || [],
+            groupSizeOverrides: data.groupSizeOverrides || {},
+            baseUrl: shareBaseUrl(),
+            roundName: data.eventName || 'This round',
+            courseName: data.courseName || ''
+        });
+        // A REFUSAL, NOT A TOAST, and that is this page's own rule rather than a
+        // preference: dialog_admin_test.js caps the floating messages and says
+        // why - a toast is a RECEIPT OF A COMPLETED WRITE, and nothing happened
+        // here. Nothing was drawn, so it must stay on screen and not float away
+        // like something that worked.
+        if (!n && typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
     }
 
     function scorecardUrlFor(gameCode, groupNum) {

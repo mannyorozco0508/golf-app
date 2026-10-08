@@ -4508,6 +4508,63 @@ the dark state; `my_groups_test.js` holds the feature.
   `consumer-v150-unplayedzero`. 1.0.7 build 10 is unchanged - still READY TO
   ARCHIVE, now with this fix in the bundle.
 
+- **QR CODES ARE LIVE (Wave 1, 2026-10-07, `main`).** An organizer holds the
+  phone up on the first tee and each scorekeeper scans their own group.
+
+  WHERE: "Show QR code" in the Round Menu on the scorecard (every golfer, not
+  just the organizer), on the Scorekeeper Links panel, and on Round Ready's
+  share screen in admin.html. Full-screen sheet, one code per group, swipe or
+  tap the arrows between them, plus a Watch code at the end.
+
+  WHAT EACH CODE IS: `index.html?game=CODE&group=N` per group - the SAME string
+  that group's Copy button hands out - and `leaderboard.html?game=CODE` for
+  Watch. **The organizer link is never a QR**, and that is a property of the
+  interface rather than a promise: `qr-codes.js` is handed the code, the roster
+  and a base URL, never the round record that holds `organizerToken`.
+
+  OFFLINE: `qr-encode.js` is qrcode-generator 2.0.4 (Kazuhiko Arase, MIT),
+  vendored unmodified with its provenance in the header, audited for network
+  and eval calls (none), and precached with `qr-codes.js` - so the code is
+  drawn on the phone in a dead zone. 58 KB, 2,297 lines.
+
+  GUARDS. `qr_targets_test.js` (12 tests; 0 pass / 12 fail against main, which
+  proves nothing per assertion because the file was absent, then 11 / 1 with
+  the builder present and the pages unwired). And
+  `tools/qr-decode-check.js`, which is the one that matters: it opens the
+  scorecard, swipes the Round Menu open with a real touch gesture, taps the
+  button, photographs each code and decodes it with **Apple's Vision
+  framework** - an independent decoder, not our own encoder read back. 9 faults
+  against the pre-wave pages, 0 after. It also opens the DECODED URLs and
+  counts inputs, so "read-only" is measured: Watch shows 0 score inputs,
+  Group 2 shows 76 of 76 editable and exactly its own four golfers.
+
+  **WHAT MANNY MUST SET UP for "opens the app if installed".** Today a scan
+  opens the WEB link. There are no Universal Links or App Links in this repo at
+  all - measured: no `associated-domains` entitlement, no
+  `apple-app-site-association`, no `assetlinks.json`, no Android intent
+  filters. Making a scan open the installed app needs, and none of it can be
+  guessed: (1) Associated Domains enabled for the App ID in the Apple Developer
+  portal and the entitlement added to both configurations - which changes
+  signing, so it was NOT done unilaterally before an archive; (2)
+  `/.well-known/apple-app-site-association` served from
+  golf-app-5a5.pages.dev carrying `TEAMID.com.rattlegolf.app`; (3) the Android
+  intent filter plus `/.well-known/assetlinks.json` carrying the SHA-256
+  fingerprint of `~/rattle-keys/rattle-upload.jks`. Give me the Team ID and the
+  keystore fingerprint and this is a small wave on its own.
+
+  Cache `golfapp-v318-qrcodes` / `consumer-v153-qrcodes` - v317 is held by the
+  gps-v1 branch. Shell count 74 -> 76. 1.0.7 build 10 unchanged.
+
+  MY OWN FAULTS, LOGGED, all three the same shape - a comment tripping a guard
+  that reads source: my sw.js note inside `SHELL_FILES` contained the word
+  "app's", and `shell_declarations_test.js` reads filenames by extracting
+  quoted strings, so the apostrophe opened a string that swallowed the next
+  entry and reported a correct manifest as broken. The parser strips comments
+  now (line comments first, then block - the order `bundle_manifest_test.js`
+  learned the hard way). The vendoring header's "no fetch, no XMLHttpRequest"
+  and qr-codes.js's note about never receiving `organizerToken` tripped their
+  own guards the same way; those assertions read comment-stripped source now.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
