@@ -133,7 +133,9 @@ const PRODUCTS = {
         // and a device on v135 keeps the caption handle and the duplicate board.
         // Moved to v135: the scorecard wave - the hole on screen, the reading
         // cards on the page under it, the rest behind one handle.
-        cacheName: 'consumer-v149-fourbugs',
+        // Moved to v151 for the two card guards (admin.html): a round can no longer
+        // be saved with no holes. v150 is held by gps-v1. A device on v149 can.
+        cacheName: 'consumer-v151-cardguard',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
