@@ -7507,6 +7507,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // and callers that merely want to LOOK at the card cannot trip a side effect.
     // The name pieces come back as data for the same reason - saveSettings still
     // owns selectedCourseName.
+    // ONE SENTENCE FOR BOTH CARD GUARDS, so the organizer is told the same thing
+    // whichever one stops them - and told what to do about it.
+    const NO_HOLE_CARD = "this course has no hole card yet. Check your signal and pick the course again, "
+        + "or tick \u270F\uFE0F Review / Edit Course Pars & Handicaps and type the pars.";
+
     function previewCourseData(courseKey) {
         const out = { ok: true, reason: '', data: [], untrimmed: [],
                       isEditing: false, courseNameOverride: null, nameSuffix: '' };
@@ -7550,9 +7555,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // in this bundle, needing no network at all.
             built = coursePresets[courseKey].data;
         } else if (globalCourses[courseKey]) {
-            // A global record with no card: unchanged behaviour, and now only
-            // reached when nothing else has holes either.
-            built = globalCourses[courseKey].data || [];
+            // GUARD 1 (2026-10-07): A SHARED RECORD WITH NO CARD AND NO BUILT-IN
+            // BEHIND IT. Reached only when nothing else has holes: an online import
+            // whose card has not arrived (bad signal), or a record carrying tees
+            // but no hole card. This used to build `.data || []` - an EMPTY card -
+            // and Save wrote a round whose scorecard reads "No course data for
+            // this round yet" (round ZNBLP8 was the preset half of this; main
+            // fixed that half in 256fab1). Refuse instead, and say what to do.
+            // course_card_guard_test.js.
+            return { ...out, ok: false, reason: NO_HOLE_CARD };
         } else {
             const unmappedCheck = validateCourseGrid();
             if (!unmappedCheck.ok) return { ...out, ok: false, reason: unmappedCheck.message };
@@ -10598,6 +10609,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // validation below still run against what is actually written.
             if (loadedExistingRound && loadedCourseData && courseKey === loadedCourseKey) {
                 finalCourseData = JSON.parse(JSON.stringify(loadedCourseData));
+            }
+            // GUARD 2 (2026-10-07): NEVER A ROUND WITHOUT HOLES, whatever produced
+            // the card. Tests the card itself - an empty or missing list - and
+            // nothing else, so a round that HAS holes (18, a nine, Thistle's
+            // loops, a typed card, a re-save keeping its own card) is never
+            // stopped here. The finally block below puts the button back.
+            // course_card_guard_test.js.
+            if (!Array.isArray(finalCourseData) || finalCourseData.length === 0) {
+                uiRefuse('\u26A0\uFE0F Course card problem: ' + NO_HOLE_CARD);
+                return;
             }
 
             // Publishing order is deliberate and unchanged: the UNTRIMMED card, under

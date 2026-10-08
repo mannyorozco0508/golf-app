@@ -4343,7 +4343,15 @@
 //   leaderboard   page scrolled sideways at 390px and all 26 amounts on it were
 //                 off screen.
 // A device on v312 has all four.
-const CACHE_VERSION = 'golfapp-v314-fourbugs';
+// Moved to v315 FOR TWO CARD GUARDS (hotfix, approved 2026-10-07). main 256fab1
+// fixed a built-in course losing its holes to a name-only stub; what was left: a
+// shared record with NO card and no built-in (an import whose card has not
+// arrived, or tees with no holes) still built an EMPTY card, and Save had no
+// refusal. Setup now refuses both with "this course has no hole card yet...",
+// and never stops a round that has holes (course_card_guard_test.js,
+// tools/course-card-guard-check.js). A device on v314 can still save a round
+// with no holes from such a record. (v313 is held by gps-v1.)
+const CACHE_VERSION = 'golfapp-v315-cardguard';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
