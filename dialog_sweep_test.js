@@ -479,7 +479,15 @@ describe('6. THE SWEEP IS FINISHED', () => {
             // buy-in and a daily pot with no round to go in are refused, each save
             // says what it did, and putting a pot into every unplayed round ASKS
             // first and names the rounds it will not touch.
-            'trip.html':    { refuse: 28, fail: 15, toast: 9, confirm: 4 },
+            // 31 SINCE THE RECAP IMAGE (2026-10-08, was 28): shareTripRecapImage
+            // refuses three times, and all three are refusals rather than
+            // toasts because in each one NOTHING WAS SENT - no linked round
+            // with scores, nothing in the recap to draw, or the share sheet
+            // would not open. A toast is a receipt of something that happened;
+            // a golfer who thinks they posted the recap and did not is the
+            // failure this page's split exists to prevent. The third one also
+            // leaves the card on screen, so there is still a way to get it.
+            'trip.html':    { refuse: 31, fail: 15, toast: 9, confirm: 4 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

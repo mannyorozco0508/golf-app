@@ -520,15 +520,7 @@
         }
 
         try {
-            return Promise.resolve(
-                plugins.Filesystem.writeFile({ path: fileName, data: data, directory: 'CACHE' })
-            ).then(function () {
-                return plugins.Filesystem.getUri({ path: fileName, directory: 'CACHE' });
-            }).then(function (res) {
-                const uri = res && res.uri;
-                if (!uri) throw new Error('Filesystem.getUri returned no uri');
-                return plugins.Share.share({ title: safeName(title), files: [uri] });
-            }).then(function () {
+            return shareBytes(fileName, data, title).then(function () {
                 if (onAfter) onAfter();
                 return { path: 'native-shared', fileName: fileName };
             }).catch(function (err) {
@@ -548,7 +540,31 @@
         }
     }
 
+    // ---- ONE WRITE-AND-SHARE PATH, WHATEVER THE BYTES ARE ------------------
+    //
+    // Lifted out of the PDF path unchanged (2026-10-08) so the trip recap IMAGE
+    // shares through the same chain rather than a second one. Everything that
+    // took three builds to get right lives here: Plugins before registerPlugin,
+    // CACHE as the directory, getUri before Share, and a dismissed share sheet
+    // treated as a choice rather than a failure.
+    //
+    // `data` is base64 with no data: prefix - what Filesystem.writeFile wants.
+    function shareBytes(fileName, data, title) {
+        const plugins = nativePlugins();
+        if (!plugins) return Promise.reject(new Error('no native Filesystem/Share plugins'));
+        return Promise.resolve(
+            plugins.Filesystem.writeFile({ path: fileName, data: data, directory: 'CACHE' })
+        ).then(function () {
+            return plugins.Filesystem.getUri({ path: fileName, directory: 'CACHE' });
+        }).then(function (res) {
+            const uri = res && res.uri;
+            if (!uri) throw new Error('Filesystem.getUri returned no uri');
+            return plugins.Share.share({ title: safeName(title), files: [uri] });
+        });
+    }
+
     window.RattleExport = {
+        shareBytes: shareBytes,
         isNative: isNative,
         _plugins: nativePlugins,
         bridgePresent: bridgePresent,
