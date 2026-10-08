@@ -499,6 +499,51 @@
         return t;
     }
 
+    // THE PAGE'S OWN apiKey, never a second copy of it. Read back off the
+    // initialised Firebase app, so there is one source for it.
+    function pageApiKey() {
+        try {
+            var fb = window.firebase;
+            if (fb && typeof fb.app === 'function') {
+                var o = fb.app().options || {};
+                if (o.apiKey) return String(o.apiKey);
+            }
+        } catch (e) { /* fall through */ }
+        try {
+            if (window.firebaseConfig && window.firebaseConfig.apiKey) return String(window.firebaseConfig.apiKey);
+        } catch (e) { /* fall through */ }
+        return '';
+    }
+
+    // THE WRAPPER FIREBASE ACTUALLY SENDS (2026-10-08, the build 13 no-op). The
+    // email arrives as
+    //
+    //   https://<project>.firebaseapp.com/__/auth/links?link=<URL-ENCODED
+    //       action URL with mode=signIn&oobCode=...&continueUrl=...>
+    //
+    // The WRAPPER is not an action URL and the SDK will not accept it; the inner
+    // one is, and it already carries the apiKey. So when a paste contains an
+    // inner action URL that is what gets used - Firebase's own URL, untouched,
+    // rather than anything reassembled here.
+    function actionUrlFromPaste(text) {
+        var raw = String(text == null ? '' : text).trim();
+        if (!raw) return null;
+        var m = /[?&](?:link|url|target|q)=([^&#\s]+)/.exec(raw);
+        if (m) {
+            var inner = m[1];
+            for (var i = 0; i < 4 && /%[0-9A-Fa-f]{2}/.test(inner); i++) {
+                var next;
+                try { next = decodeURIComponent(inner); } catch (e) { break; }
+                if (next === inner) break;
+                inner = next;
+                if (/oobCode=/.test(inner)) break;
+            }
+            if (/oobCode=/.test(inner) && /^https?:\/\//.test(inner)) return inner;
+        }
+        if (/^https?:\/\//.test(raw) && /[?&]oobCode=/.test(raw) && !/__\/auth\/links/.test(raw)) return raw;
+        return null;
+    }
+
     function codeFromPaste(text) {
         var raw = String(text == null ? '' : text).trim();
         if (!raw) return null;
@@ -515,34 +560,64 @@
     // the string and ignores the rest, so the origin here is cosmetic - but it
     // is shareBaseUrl() rather than location, because inside the shell location
     // is capacitor://localhost.
-    function linkForCode(code) {
+    // AND IT MUST CARRY AN apiKey (2026-10-08). Without one, Firebase's real
+    // isSignInWithEmailLink answers FALSE - the key is part of an action URL's
+    // shape - so every pasted bare code was refused on the device. The harness
+    // has no real SDK and fell through to a regex that said yes, which is
+    // exactly how this passed a green suite and failed on a phone.
+    function linkForCode(code, apiKey) {
         var base = (typeof shareBaseUrl === 'function') ? shareBaseUrl()
             : ((typeof window !== 'undefined' && window.shareBaseUrl) ? window.shareBaseUrl() : WEB_FALLBACK);
-        return base + 'admin.html?mode=signIn&oobCode=' + encodeURIComponent(String(code || ''));
+        var key = apiKey || pageApiKey() || 'no-api-key';
+        return base + 'admin.html?apiKey=' + encodeURIComponent(key)
+            + '&mode=signIn&oobCode=' + encodeURIComponent(String(code || ''));
     }
 
+    // WRAPPED END TO END, BECAUSE THE BUG WAS A NO-OP (2026-10-08). Manny on
+    // build 13: Finish sign-in did nothing at all - no sign-in and no error -
+    // for the full emailed link, for the oobCode alone, and for a fresh link's
+    // code. A tap that produces NOTHING is the worst outcome available here:
+    // there is no way to tell a refusal from a dead button. So every path out
+    // of this function ends in a sentence on screen - the synchronous work sits
+    // in a try, the catch speaks, and both promise arms speak.
+    //
+    // THE ORDER OF PREFERENCE, and it is not arbitrary:
+    //   1. the INNER ACTION URL out of Firebase's /__/auth/links wrapper - its
+    //      own URL, carrying the apiKey the SDK insists on
+    //   2. the paste as it stands, when it already IS a sign-in link
+    //   3. a link built around whatever code can be read out of it, carrying
+    //      the page's apiKey
     function submitPaste() {
-        var paste = document.getElementById('email-link-paste');
-        var typed = paste ? String(paste.value || '').trim() : '';
-        var href = typed || pageUrl();
-        // A LINK FIRST, THEN ANYTHING A CODE CAN BE READ OUT OF - a bare code, a
-        // Gmail redirect, a tracking wrapper. The link path is untouched.
-        if (!isEmailLink(href)) {
-            var code = codeFromPaste(typed);
-            if (code) href = linkForCode(code);
+        try {
+            var paste = document.getElementById('email-link-paste');
+            var typed = paste ? String(paste.value || '').trim() : '';
+            var href = '';
+            var action = actionUrlFromPaste(typed);
+            if (action) href = action;
+            else if (isEmailLink(typed)) href = typed;
+            else {
+                var code = codeFromPaste(typed);
+                if (code) href = linkForCode(code);
+            }
+            if (!href) href = pageUrl();
+            if (!actionUrlFromPaste(href) && !isEmailLink(href)) {
+                setStatus(NOTE_PASTE, { reveal: true });
+                return;
+            }
+            var input = document.getElementById('email-link-input');
+            var email = input ? input.value : '';
+            setStatus('Finishing sign-in\u2026');
+            whenReady().then(function () { return completeLink(href, email); }).then(function (result) {
+                publish(result);
+            }, function (err) {
+                setStatus(messageFor(err), { reveal: true });
+            });
+        } catch (e) {
+            // THE CATCH SPEAKS. A missing element, an SDK that is not there, a
+            // string the URL parser throws on - any of them used to leave the
+            // button looking dead.
+            setStatus(messageFor(e) || NOTE_PASTE, { reveal: true });
         }
-        if (!isEmailLink(href)) { setStatus(NOTE_PASTE, { reveal: true }); return; }
-        var input = document.getElementById('email-link-input');
-        var email = input ? input.value : '';
-        setStatus('Finishing sign-in…');
-        whenReady().then(function () { return completeLink(href, email); }).then(function (result) {
-            publish(result);
-        }, function (err) {
-            // A FAILED COMPLETION IS A REFUSAL TOO, and it was landing in the
-            // same off-screen line - "cannot attach the link to the current
-            // account" and "enter the same email address" were both invisible.
-            setStatus(messageFor(err), { reveal: true });
-        });
     }
 
     window.emailLinkAuth = {
@@ -560,6 +635,8 @@
         isPlausibleEmail: isPlausibleEmail,
         isEmailLink: isEmailLink,
         codeFromPaste: codeFromPaste,
+        actionUrlFromPaste: actionUrlFromPaste,
+        pageApiKey: pageApiKey,
         linkForCode: linkForCode,
         pageUrl: pageUrl,
         continueUrl: continueUrl,

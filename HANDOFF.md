@@ -4723,6 +4723,42 @@ the dark state; `my_groups_test.js` holds the feature.
   no cache bump, because no shell file moved - and the 1.0.7 review, Firebase
   and the engines were not touched.
 
+- **1.0.7 BUILD 14 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). FINISH
+  SIGN-IN WAS A NO-OP ON THE DEVICE, AND THE TEST HARNESS IS WHY IT SURVIVED A
+  GREEN SUITE.**
+
+  Manny on 1.0.7 (13), iPhone 17 Pro: paste the emailed link, or the oobCode, or
+  a fresh link's code - tap Finish sign-in - nothing. No sign-in and no error.
+
+  **THE CAUSE.** For anything that is not already a sign-in link, `submitPaste`
+  synthesised one with `linkForCode` - and that link carried **no apiKey**.
+  Firebase's real `isSignInWithEmailLink` parses an action URL and the key is
+  part of that shape, so on a device it answered **false** for all three input
+  shapes. In the harness there is no real SDK, so `isEmailLink` fell through to
+  its own regex, answered **true**, and every test passed. THE HARNESS WAS MORE
+  PERMISSIVE THAN THE RUNTIME, which is the only way this survives a green
+  suite - and it is worth remembering next time a native-only failure appears.
+
+  **AND THE EMAIL ARRIVES WRAPPED:**
+  `https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=<URL-encoded action
+  URL>`. The wrapper is not an action URL and the SDK will not take it. The
+  inner one is, and it already carries the apiKey - so that is what is used now,
+  Firebase's own URL untouched rather than anything reassembled.
+
+  **AND NO FAILURE IS SILENT.** `submitPaste` is wrapped end to end: the
+  synchronous work sits in a try, the catch puts a sentence on screen, and both
+  promise arms do. Measured in the Account panel at 390x844 - the wrapped link,
+  the bare code and the inner action URL all now reach completion with a message
+  at top 706 of 844, and rubbish and an empty field both refuse clearly in the
+  same place.
+
+  `email_link_native_paste_test.js` is 19 tests, baseline **3 pass / 16 fail**
+  against the pre-wave files; the three are don't-regress pins and the header
+  says so. Cache `golfapp-v324-signinparse` / `consumer-v159-signinparse`.
+  `CURRENT_PROJECT_VERSION` 14 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7. database.rules.json and all ten money engines byte-identical; the 1.0.7
+  review and Firebase were not touched.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY

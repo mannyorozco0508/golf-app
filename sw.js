@@ -4403,7 +4403,17 @@
 // while his email account kept all 38 of his rounds. The rule is about the
 // PROVIDER now, and the Account sheet has deliberate Link Apple / Link Google
 // buttons that refuse rather than adopt. A device on v322 still switches.
-const CACHE_VERSION = 'golfapp-v323-linkprovider';
+// Moved to v324. FINISH SIGN-IN WAS A NO-OP ON THE DEVICE, AND THE HARNESS WAS
+// WHY IT SURVIVED A GREEN SUITE. For a bare code (and anything not already a
+// link) submitPaste synthesised one - with NO apiKey. Firebase's real
+// isSignInWithEmailLink requires it, so on a phone it answered false for all
+// three input shapes; in the test harness there is no real SDK and the fallback
+// regex said yes. The email also arrives WRAPPED as
+// /__/auth/links?link=<encoded action URL>, which is not an action URL at all.
+// Now: the inner action URL is preferred, a synthesised link carries the page's
+// apiKey, and submitPaste is wrapped end to end so no failure is silent.
+// A device on v323 has a dead Finish sign-in button.
+const CACHE_VERSION = 'golfapp-v324-signinparse';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

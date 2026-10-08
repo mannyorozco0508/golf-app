@@ -26,15 +26,20 @@
 // app from text the golfer brings in.
 //
 // BASELINE, RE-MEASURED over the FINISHED file (2026-10-08) against the
-// pre-change email-link-auth.js and admin.html, all 11 tests: 1 PASS / 10 FAIL.
-// 1 + 10 = 11. The first version of this header said 7 tests, measured before
-// the four wrapper tests were appended - which is the stale-count mistake this
-// repo has made twice and the arithmetic check caught it a third time.
+// pre-wave email-link-auth.js and admin.html, all 19 tests: 3 PASS / 16 FAIL.
+// 3 + 16 = 19.
 //
-// The one that passes there is "the paste control is still wired to the one
-// completer": the field and its Finish button have existed since v203, so that
-// is a don't-regress pin rather than a caught defect, and saying so is the
-// point.
+// This header has now been re-measured TWICE for the same reason - it said 7
+// tests, then 11, while tests were still being appended underneath it. The rule
+// is that the baseline describes the file as it stands, and the arithmetic
+// check caught both.
+//
+// The three that pass against the pre-wave files are all don't-regress pins
+// rather than caught defects, and saying so is the point:
+//   the paste control is still wired     the field and its Finish button have
+//                                        existed since v203
+//   a used or expired link has a message these codes were already mapped
+//   an unknown failure says something     so was the fallback
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -183,5 +188,115 @@ describe('3. A WRAPPED LINK IS STILL A LINK', () => {
         const e = E();
         assert.equal(e.codeFromPaste(real), CODE);
         assert.equal(e.isEmailLink(real), true);
+    });
+});
+
+// ============================================================================
+// 4. THE WRAPPER FIREBASE ACTUALLY SENDS, AND WHY THE TAP WAS A NO-OP
+//    (build 13 bug, 2026-10-08)
+//
+// Manny on 1.0.7 (13), iPhone 17 Pro: Finish sign-in did NOTHING - no sign-in
+// and no error - with the full emailed link, with the oobCode alone, and with a
+// fresh link's code. The email arrives as
+//
+//   https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=<URL-ENCODED
+//       action URL with mode=signIn&oobCode=...&continueUrl=...>
+//
+// THE DEFECT, AND THE TEST GAP THAT HID IT. For a bare code (and for anything
+// that is not already a link) submitPaste synthesises one with linkForCode -
+// and that synthesised link carried NO apiKey. Firebase's real
+// isSignInWithEmailLink parses an action URL and requires apiKey, so on a
+// device it answered false for every one of the three shapes. In this harness
+// there is no real SDK, so isEmailLink fell through to its own regex, answered
+// TRUE, and every test passed. The harness was more permissive than the
+// runtime, which is the only way a bug like this survives a green suite.
+//
+// SO: the inner action URL is preferred when the paste contains one - it is
+// Firebase's own URL, apiKey included - and a synthesised link carries the
+// apiKey from the page's own config. Neither depends on the SDK being lenient.
+// ============================================================================
+
+describe('4. ALL THREE SHAPES, AND THE APIKEY THE SDK INSISTS ON', () => {
+
+    const action = 'https://golfapp-9fb21.firebaseapp.com/__/auth/action?apiKey=AIzaKEY'
+        + '&mode=signIn&oobCode=' + CODE
+        + '&continueUrl=https%3A%2F%2Fgolf-app-5a5.pages.dev%2Fadmin.html&lang=en';
+    const wrapped = 'https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=' + encodeURIComponent(action);
+
+    test('the WRAPPED /__/auth/links form yields the inner action URL, apiKey and all', () => {
+        const e = E();
+        const got = e.actionUrlFromPaste(wrapped);
+        assert.ok(got, 'the wrapper yielded no action URL');
+        assert.match(got, /oobCode=/, 'the action URL lost the code');
+        assert.match(got, /apiKey=/, 'the action URL lost the apiKey - the SDK will refuse it');
+        assert.match(got, /mode=signIn/);
+        // AND IT IS THE INNER URL, not the wrapper: the wrapper is not an
+        // action URL and the SDK does not accept it.
+        assert.doesNotMatch(got, /__\/auth\/links/, 'it handed back the wrapper rather than the inner URL');
+    });
+
+    test('the inner action URL pasted directly is used as it is', () => {
+        const e = E();
+        assert.equal(e.actionUrlFromPaste(action), action);
+    });
+
+    test('a BARE CODE becomes a link that carries an apiKey', () => {
+        const e = E();
+        const url = e.linkForCode(CODE, 'AIzaFROMPAGE');
+        assert.match(url, /oobCode=/ , 'the synthesised link lost the code');
+        assert.match(url, /apiKey=AIzaFROMPAGE/,
+            'the synthesised link has no apiKey, so Firebase isSignInWithEmailLink answers false');
+        assert.match(url, /mode=signIn/);
+    });
+
+    test('and it still carries one when no key is passed, from the page config', () => {
+        // The page's own firebaseConfig is the source; a hard-coded fallback
+        // here would be a second copy of a credential.
+        const e = E();
+        const url = e.linkForCode(CODE);
+        assert.match(url, /apiKey=[A-Za-z0-9_-]{10,}/,
+            'with no key argument the link must still find one: ' + url);
+    });
+
+    test('rubbish still yields nothing, in either function', () => {
+        const e = E();
+        ['', 'hello', 'https://example.com/nothing-here'].forEach((bad) => {
+            assert.equal(e.actionUrlFromPaste(bad), null, JSON.stringify(bad) + ' produced an action URL');
+        });
+    });
+});
+
+describe('5. A FAILURE IS NEVER A SILENT NO-OP', () => {
+
+    test('submitPaste cannot throw past its own handler', () => {
+        // THE NO-OP IS THE BUG. Whatever goes wrong - a missing element, an SDK
+        // that is not there, a link the SDK refuses - the golfer must get a
+        // sentence. So the whole body is wrapped, and the catch says something.
+        const src = fs.readFileSync(path.join(__dirname, 'email-link-auth.js'), 'utf8');
+        const at = src.indexOf('function submitPaste');
+        const fn = src.slice(at, src.indexOf('\n    function ', at + 10));
+        assert.ok(fn.length > 300, 'submitPaste did not slice - this test is guarding nothing');
+        assert.match(fn, /try\s*\{/, 'submitPaste has no try - a throw is a silent no-op');
+        assert.match(fn, /catch/, 'submitPaste has no catch');
+        // AND THE CATCH MUST SPEAK. A catch that swallows is the same no-op.
+        const tail = fn.slice(fn.indexOf('catch'));
+        assert.match(tail, /setStatus\(/, 'the catch does not put anything on screen');
+    });
+
+    test('there is a clear message for a used or expired link', () => {
+        const e = E();
+        [['auth/invalid-action-code', /expired|already been used|new link/i],
+         ['auth/expired-action-code', /expired|new link/i],
+         ['auth/invalid-email', /email/i]].forEach(([code, want]) => {
+            const msg = e.messageFor({ code: code });
+            assert.ok(msg && msg.length > 15, 'no message for ' + code);
+            assert.match(msg, want, code + ' says: ' + msg);
+        });
+    });
+
+    test('and an unknown failure still says something rather than nothing', () => {
+        const e = E();
+        const msg = e.messageFor({ code: 'auth/something-nobody-has-seen' });
+        assert.ok(msg && msg.length > 15, 'an unknown code produced no message: ' + JSON.stringify(msg));
     });
 });
