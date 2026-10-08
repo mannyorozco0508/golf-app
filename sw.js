@@ -4362,7 +4362,12 @@
 // NO ENGINE FILE MOVED: pool-engine.js keeps the rule that KP money never goes
 // back to the field, and still answers -$5 here; the page stops asking it.
 // A device on v315 still charges for a round nobody played.
-const CACHE_VERSION = 'golfapp-v316-unplayedzero';
+// Moved to v318 (v317 is held by the gps-v1 branch). QR CODES (Wave 1). Two new precached files - qr-encode.js
+// (vendored, MIT) and qr-codes.js - plus the sheet on index.html and
+// admin.html: an organizer holds the phone up on the first tee and each
+// scorekeeper scans their own group's code. Drawn on the phone, no network.
+// A device on v316 has no QR codes at all.
+const CACHE_VERSION = 'golfapp-v318-qrcodes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4404,6 +4409,11 @@ const SHELL_FILES = [
     // link and every group-scoped write is measured against. Four pages load it;
     // an offline launch without it would not degrade, it would break the page.
     './grouping.js',
+    // THE QR CODES (Wave 1): drawn on the phone, so both files are precached.
+    // qr-encode.js is vendored upstream (MIT); qr-codes.js holds the list, the
+    // sheet and the controller for both pages.
+    './qr-encode.js',
+    './qr-codes.js',
     // Every page that can START something loads this: it issues the code and
     // checks it is free first. Precached, or the first offline launch cannot
     // open the setup screen at all.

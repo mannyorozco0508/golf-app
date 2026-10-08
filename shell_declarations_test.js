@@ -39,7 +39,22 @@ const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 function listIn(src, name) {
     const m = new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];').exec(src);
     assert.ok(m, name + ' must be declared');
-    return [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+    // COMMENTS OUT FIRST, and this is not tidiness. These arrays are commented
+    // heavily, and the filenames are read out of them by matching quoted
+    // strings - so an APOSTROPHE in a comment ("the app's own list") opens a
+    // string that runs to the next quote and swallows the entry after it. That
+    // happened: a correct sw.js reported qr-encode.js as "precached but no
+    // longer declared in any shell", and the fix looked like a manifest bug.
+    //
+    // LINE COMMENTS BEFORE BLOCK COMMENTS, the order bundle_manifest_test.js
+    // learned the hard way: a line comment containing "/*" otherwise swallows
+    // everything up to the next "*/".
+    const body = m[1].replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const names = [...body.matchAll(/'([^']+)'/g)].map(x => x[1]);
+    // AND IT STILL FOUND SOMETHING: a strip that ate the array would make every
+    // "is still shipped" assertion below true of an empty list, forever.
+    assert.ok(names.length >= 5, name + ' parsed as only ' + names.length + ' entries - the comment strip ate the list');
+    return names;
 }
 
 const sync = read('sync-mobile-web.js');
