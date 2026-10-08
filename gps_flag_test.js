@@ -147,7 +147,7 @@ test('HARDPAN WEB BUILD (GPS_ENABLED=1): the GPS files and the toggle, in dist/h
     GPS_SHELL.forEach((f) => assert.ok(fs.existsSync(path.join(web, f)), 'dist/hardpan is missing ' + f));
     assert.ok(/<script src="gps-view\.js"><\/script>/.test(fs.readFileSync(path.join(web, 'index.html'), 'utf8')));
     assert.ok(/📍 GPS/.test(fs.readFileSync(path.join(web, 'gps-view.js'), 'utf8')), 'the toggle');
-    assert.ok(/const CACHE_VERSION = 'consumer-v154-gps-polish';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
+    assert.ok(/const CACHE_VERSION = 'consumer-v155-gps-arcs';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
 });
 
 test('THERE IS NO HARDPAN APP BUILD: sync-mobile-web.js refuses GPS_ENABLED=1 and writes nothing', () => {

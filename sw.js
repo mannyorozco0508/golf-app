@@ -4382,7 +4382,16 @@
 // installed iPhone app paints from its cache first, so without a new key it would
 // keep the old GPS screen. HardPan builds only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v318-gps-polish';
+// GPS:BEGIN
+// Moved to v319 FOR HARDPAN GPS WAVE 1 (branch gps-wave1, on gps-v1; 2026-10-08):
+// yardage arcs, Edit Pin (today's pin, events/<code>/pinLocs), a score button on
+// the map that opens the card's own score entry, and the wind from the National
+// Weather Service. No new files join the shell (gps-view.js / gps-geo.js /
+// gps-courses.js changed; the last gained TPC Scottsdale Stadium). NWS answers
+// are never stored by this worker: cross-origin, so the fetch handler below never
+// sees them; gps-view.js keeps the last reading in localStorage. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v319-gps-arcs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -79,7 +79,7 @@ version. Its `index.html` is byte-identical to `main`'s (sha `92a63164…`, main
 
 ```bash
 node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v152-unplayedzero, unchanged from main)
-GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v154-gps-polish)
+GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v155-gps-arcs)
 node build-shell.js tournament               # Tournaments never ship GPS, whatever the flag says
 ```
 

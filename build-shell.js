@@ -71,7 +71,7 @@ const PRODUCTS = {
         // byte for byte the app it built before GPS existed.
         gps: GPS_ENABLED,
         outDir: GPS_ENABLED ? 'hardpan' : 'consumer',
-        cacheNameGps: 'consumer-v154-gps-polish',
+        cacheNameGps: 'consumer-v155-gps-arcs',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.
