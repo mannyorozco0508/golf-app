@@ -605,8 +605,14 @@
             for (var i = 0; i <= segs; i++) pts.push(roundPt(destination(center, b - a + (2 * a * i / segs), R)));
             out.push({ kind: kind, yards: yards, pts: pts });
         };
-        for (var y = step * Math.ceil(minYd / step); y <= total - minYd; y += step) arc(origin, pin, y, 'carry');
-        PIN_MARKS_YD.forEach(function (y) { if (y <= total - minYd) arc(pin, origin, y, 'pin'); });
+        // A carry arc within half a step of a to-the-pin mark is left out: the two
+        // would be one doubled line with two labels fighting for one spot.
+        var marks = PIN_MARKS_YD.filter(function (y) { return y <= total - minYd; });
+        for (var y = step * Math.ceil(minYd / step); y <= total - minYd; y += step) {
+            var nearMark = marks.some(function (m) { return Math.abs(y - (total - m)) < step / 2; });
+            if (!nearMark) arc(origin, pin, y, 'carry');
+        }
+        marks.forEach(function (y) { arc(pin, origin, y, 'pin'); });
         return out;
     }
 

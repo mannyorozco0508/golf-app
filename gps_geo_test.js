@@ -496,7 +496,8 @@ test('yardageArcs: carry every 25 yds from 50 to 40 short of the pin, plus 100/1
     const pin = geo.destination(tee, 30, 330 * 0.9144);   // 330 yds
     const arcs = geo.yardageArcs(tee, pin);
     assert.strictEqual(arcs.map((a) => (a.kind === 'pin' ? 'p' : 'c') + a.yards).join(' '),
-        'c50 c75 c100 c125 c150 c175 c200 c225 c250 c275 p100 p150 p200');
+        // 125 / 175 / 225 fall within half a step of the marks (130 / 180 / 230 from the tee): left out
+        'c50 c75 c100 c150 c200 c250 c275 p100 p150 p200');
     arcs.forEach((a) => {
         const center = a.kind === 'pin' ? pin : tee;
         a.pts.forEach((p) => assert.ok(Math.abs(geo.haversineYards(center, p) - a.yards) < 0.6, a.kind + a.yards + ' radius'));

@@ -104,10 +104,12 @@ const TEE_CENTER_YD = inlineHaversineM(H1.tee, H1.mid) / 0.9144;
 const ME_CENTER_YD = inlineHaversineM(ME, H1.mid) / 0.9144;
 // WAVE 1 ARCS, inline: carry arcs every 25 yds from 50 up to 40 yds short of the
 // pin; 100 / 150 / 200-to-the-pin marks when at least 40 yds short of it.
-function expectArcs(totalYd) {
-    const out = [];
-    for (let y = 50; y <= totalYd - 40; y += 25) out.push('c' + y);
-    [100, 150, 200].forEach((y) => { if (y <= totalYd - 40) out.push('p' + y); });
+function expectArcs(totalYd, step) {
+    const out = [], st = step || 25;
+    const marks = [100, 150, 200].filter((y) => y <= totalYd - 40);
+    // no carry arc within half a step of a to-the-pin mark
+    for (let y = st * Math.ceil(40 / st); y <= totalYd - 40; y += st) if (!marks.some((m) => Math.abs(y - (totalYd - m)) < st / 2)) out.push('c' + y);
+    marks.forEach((y) => out.push('p' + y));
     return out.join(' ');
 }
 if (String(Math.round(inlineHaversineM(ME, H1.mid) / 0.9144)) !== EXPECT.center) {
@@ -179,11 +181,12 @@ const READ = `JSON.stringify((function () {
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(attr), map: box(mapEl),
                     back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
            teePx: ds.teePx ? ds.teePx.split(',').map(Number) : null,
-           arcs: ds.arcs == null ? null : ds.arcs,
+           arcs: ds.arcs == null ? null : ds.arcs, arcStep: ds.arcStep == null ? null : Number(ds.arcStep),
            arcLabels: o ? [].slice.call(o.querySelectorAll('.gps-arc-lbl')).filter(function (e) { return e.style.display !== 'none' && e.style.visibility !== 'hidden'; }).map(function (e) { return { text: e.innerText.trim(), box: box(e) }; }) : [],
            midLbl: t('.gps-lbl-mid'), editPin: vis('.gps-edit-pin'), pinSave: vis('.gps-pin-save'), pinClear: vis('.gps-pin-clear'),
            flag: box(q('.gps-flag')), flagEdit: !!(q('.gps-flag') && q('.gps-flag').classList.contains('gps-flag-edit')),
            score: vis('.gps-score') ? t('.gps-score') : null, scoreBox: box(q('.gps-score')),
+           bannerBox: box(q('.gps-banner')), zoomBox: box(q('.gps-zoom')), recenterBox: box(q('.gps-recenter')),
            wind: vis('.gps-wind') ? t('.gps-wind') : null, windBox: box(q('.gps-wind')), windRot: q('.gps-wind') ? q('.gps-wind').getAttribute('data-rot') : null,
            active: document.activeElement ? { cls: document.activeElement.className, hole: document.activeElement.getAttribute('data-hole') } : null,
            greenBox: ds.greenBox ? ds.greenBox.split(',').map(Number) : null,
@@ -270,8 +273,17 @@ function pillFails(tag, g, required) {
 }
 // Wave 1 arcs: the right set, a label for (nearly) every one, each label at the
 // LEFT end of its arc - left of the line of play - and covering nothing.
-function arcFails(tag, g, totalYd) {
-    const f = [], want = expectArcs(totalYd);
+// SPACING: 25 / 50 / 100 yds, the first that is at least 26 px on screen -
+// worked out here from the zoom and the latitude (a borderline 26 px may go either way).
+function arcStepRule(lat, zoom) {
+    const ppy = ringPxAt(lat, zoom) / RING_YD;
+    return { step: [25, 50, 100].find((st) => st * ppy >= 26) || 100, edge: [25, 50, 100].some((st) => Math.abs(st * ppy - 26) < 1) };
+}
+function arcFails(tag, g, totalYd, lat) {
+    const f = [];
+    const rule = arcStepRule(lat == null ? H1.mid[0] : lat, g.zoom);
+    if (g.arcStep !== rule.step && !rule.edge) f.push(`${tag}: arcs every ${g.arcStep} yds at zoom ${g.zoom}, expected every ${rule.step}`);
+    const want = expectArcs(totalYd, g.arcStep);
     if (g.arcs !== want) f.push(`${tag}: arcs "${g.arcs}", expected "${want}"`);
     const n = want ? want.split(' ').length : 0;
     if (g.arcLabels.length < Math.min(n, Math.ceil(n * 0.6))) f.push(`${tag}: only ${g.arcLabels.length} of ${n} arc labels shown`);
@@ -436,6 +448,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (opened.banner !== 'No green mapped for this hole yet' || !opened.set) fails.push('unmapped: no "tap the green" offer');
         if (opened.m !== '—') fails.push('unmapped: a center with no green: ' + opened.m);
         if (setting.banner !== 'Tap the CENTER of the green') fails.push('unmapped: banner ' + setting.banner);
+        // Wave 1: a banner never covers the buttons, the score button or the wind.
+        [['opened', opened], ['setting', setting], ['confirm', confirm]].forEach(([n, g]) => {
+            ['zoomBox', 'recenterBox', 'scoreBox', 'windBox'].forEach((k) => { if (hitBox(g.bannerBox, g[k])) fails.push(`unmapped (${n}): the banner covers the ${k.replace('Box', '')}: ` + JSON.stringify([g.bannerBox, g[k]])); });
+            if (g.bannerBox && g.bannerBox.r > g.vw) fails.push(`unmapped (${n}): the banner runs off the screen`);
+        });
         if (confirm.banner !== 'Save this green for hole 1?') fails.push('unmapped: confirm banner ' + confirm.banner);
         if (!/^\d+$/.test(saved.m) || saved.banner) fails.push('unmapped: after save, center ' + saved.m);
         if (again.m !== saved.m) fails.push('unmapped: the green did not survive a switch');
@@ -523,7 +540,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (!p1.dump.storage['hardpan_usgs_done_v1_caledonia']) fails.push('precache: not marked done');
         const off = p2.reads[0];
         if (!(off.tilesLoaded > 0)) fails.push('offline: no satellite tiles drawn from the cache (' + off.tilesLoaded + ')');
-        if (off.arcs !== expectArcs(ME_CENTER_YD)) fails.push('offline: arcs with no signal "' + off.arcs + '"');
+        if (off.arcs !== expectArcs(ME_CENTER_YD, off.arcStep) || !off.arcStep) fails.push('offline: arcs with no signal "' + off.arcs + '"');
         if (off.tilesNote) fails.push('offline: the no-signal note showed with tiles cached');
         const onlineReq = p1.requests.filter((q) => /basemap\.nationalmap\.gov/.test(urlOf(q))).length;
         if (onlineReq < 24) fails.push('precache: only ' + onlineReq + ' USGS requests seen while storing 24 tiles');
@@ -603,7 +620,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         // Wave 1 (Manny, 2026-10-08): NO "Measuring from tee" on the map.
         if (g.from || g.boxes.from || /Measuring from tee/.test(JSON.stringify(g))) fails.push('off-hole: "Measuring from tee" is still on the map');
         // Arcs from the TEE (inline expectation, not gps-geo's answer).
-        if (g.arcs !== expectArcs(TEE_CENTER_YD)) fails.push(`off-hole: arcs "${g.arcs}", expected "${expectArcs(TEE_CENTER_YD)}"`);
+        fails.push(...arcFails('off-hole', g, TEE_CENTER_YD));
         fails.push(...teeInView('off-hole', g), ...pillFails('off-hole', g, true));
     }
 
@@ -659,6 +676,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
             if (g.toHere !== z1.toHere) fails.push(`polish ${k}: zooming moved the target: ${g.toHere}`);
         });
         if (dist(z2.target, z3.target) > 2) fails.push('polish: 2x -> 3x did not zoom around the target: ' + JSON.stringify([z2.target, z3.target]));
+        [z1, z2, z3].forEach((g, k) => { const rule = arcStepRule(H1.mid[0], g.zoom); if (g.arcStep !== rule.step && !rule.edge) fails.push(`polish ${k}: arcs every ${g.arcStep} yds at zoom ${g.zoom}, expected ${rule.step}`); });
         if (!(z2.ringPx > z1.ringPx * 1.8)) fails.push(`polish: the ring did not grow with the zoom: ${z1.ringPx} -> ${z2.ringPx}`);
         if (dist(rc.centerPin, z1.centerPin) > 3) fails.push('polish: Recenter did not go back to the 1x hole view');
         if (!pull.pull || !pull.lock || pull.ob !== 'none' || pull.bodyOb !== 'none' || pull.mapTA !== 'none') fails.push('polish: GPS does not stop the page pulling: ' + JSON.stringify(pull));
@@ -719,9 +737,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (r1.banner !== "Drag the flag to today's pin" || !r1.flagEdit || !r1.pinSave) fails.push('edit pin: not editing - ' + JSON.stringify([r1.banner, r1.flagEdit, r1.pinSave]));
         if (r1.flag && r1.centerPin && dist(mid(r1.flag), r1.centerPin) > 3) fails.push('edit pin: the flag did not start on the center');
         if (r1.fix) fails.push('edit pin: "Fix the green" offered while editing the pin');
+        ['zoomBox', 'recenterBox', 'windBox'].forEach((k) => { if (hitBox(r1.bannerBox, r1[k])) fails.push(`edit pin: the banner covers the ${k.replace('Box', '')}`); });
+        if (hitBox(r1.bannerBox, greenPage(r1)) || hitBox(r1.bannerBox, r1.flag)) fails.push('edit pin: the banner covers the green or the flag');
         if (!(r2.flag && r1.flag && mid(r2.flag).y < mid(r1.flag).y - 6)) fails.push('edit pin: the flag did not follow the drag: ' + JSON.stringify([r1.flag, r2.flag]));
         if (r2.midLbl !== 'PIN' || r2.m === r1.m || !/^Here → pin: \d+$/.test(r2.hereCenter)) fails.push('edit pin: numbers did not follow the flag live: ' + JSON.stringify([r1.m, r2.m, r2.midLbl, r2.hereCenter]));
-        if (r2.arcs === r1.arcs && r2.m !== r1.m && expectArcs(+r2.m) !== expectArcs(+r1.m)) fails.push('edit pin: arcs did not follow the flag');
+        if (r2.arcs === r1.arcs && r2.m !== r1.m && expectArcs(+r2.m, r2.arcStep) !== expectArcs(+r1.m, r1.arcStep)) fails.push('edit pin: arcs did not follow the flag');
         const gb = greenPage(r3), fc = mid(r3.flag);
         if (!gb || !fc || fc.x < gb.l - 2 || fc.x > gb.r + 2 || fc.y < gb.t - 2 || fc.y > gb.b + 2) fails.push('edit pin: the flag left the green: ' + JSON.stringify([fc, gb]));
         const sets = ep.dump.writes.filter((x) => x.path === 'events/GPSEDITP/pinLocs/h1' && x.op === 'set');
@@ -825,7 +845,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         out.courses.push(res);
         if (g.title !== `Hole ${tc.hole} · Par ${sb.p[tc.key].data[tc.hole - 1].par}`) fails.push(`${tag}: title ${g.title}`);
         if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
-        fails.push(...arcFails(tag, g, total), ...teeInView(tag, g), ...pillFails(tag, g, true));
+        fails.push(...arcFails(tag, g, total, hr.mid[0]), ...teeInView(tag, g), ...pillFails(tag, g, true));
         if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
         if (!/12 mph/.test(g.wind || '') || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.wind} turned ${g.windRot} (expected ${windRotFor(g.bearing)})`);
         if (e.midLbl !== 'PIN' || e.m === g.m || !e.flagEdit) fails.push(`${tag}: Edit Pin did not move PIN live: ` + JSON.stringify([g.m, e.m, e.midLbl]));

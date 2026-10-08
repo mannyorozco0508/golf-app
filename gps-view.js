@@ -469,7 +469,13 @@
         // A move the golfer made (a pan or a pinch) - not one this file made.
         map.on('movestart', function (e) { if (S && S.map === map && e && e.originalEvent) S.userMoved = true; });
         // The pills and the ring follow the map as it moves and zooms.
-        map.on('move', function () { if (S && S.map === map) { sizeTarget(); placePills(); } });
+        map.on('move', function () {
+            if (!S || S.map !== map) return;
+            sizeTarget();
+            var r = resolved();
+            if (S.arcs && S.arcStep !== arcStepNow(aimAt(r))) drawArcs(r, origin(r));
+            placePills();
+        });
         map.on('resize', function () { if (S && S.map === map && (S.needsFrame || (S.framed === 'hole' && !S.userMoved && !S.zoomStep))) frameHole(false); });
         // Tap anywhere: the target jumps there (or a green pin is placed).
         map.on('click', function (e) { onMapTap([e.lngLat.lat, e.lngLat.lng]); });
@@ -726,17 +732,32 @@
     // math on bundled data: they work with no signal. Each carries a small label
     // ("125y", or "150 to pin") at its LEFT end on screen - which end that is
     // depends on the hole's turn, so it is worked out on every move.
+    // SPACING FOLLOWS THE ZOOM: every 25 yds when 25 yds is at least 26 px on the
+    // screen, else 50, else 100 - a 580-yd par 5 seen whole would otherwise be a
+    // ladder of 22 lines (measured on Pine Lakes #10, 2026-10-08).
+    var ARC_MIN_PX = 26;
+    function arcStepNow(at) {
+        if (!S.map || !at) return G.ARC_STEP_YD;
+        var ppy = G.M_PER_YD / metersPerPx(at[0]);
+        return [25, 50, 100].filter(function (st) { return st * ppy >= ARC_MIN_PX; })[0] || 100;
+    }
     function drawArcs(r, o) {
         var aim = aimAt(r);
-        S.arcs = (S.mode === 'measure' && o && aim) ? G.yardageArcs(o.pt, aim) : [];
+        S.arcStep = arcStepNow(aim);
+        // At least 44 px either side of the line on screen, so each label sits
+        // clear of the pills and the target on the line (30 yds was 26 px on a
+        // par 5 seen whole, and half the labels had nowhere to go).
+        var ppy = (S.map && aim) ? G.M_PER_YD / metersPerPx(aim[0]) : 1;
+        S.arcs = (S.mode === 'measure' && o && aim) ? G.yardageArcs(o.pt, aim, { step: S.arcStep, halfWidthYd: Math.max(30, 44 / ppy) }) : [];
         setData('arcs', { type: 'FeatureCollection', features: S.arcs.map(function (a) { return feature(a.kind, 'LineString', a.pts.map(ll)); }) });
         var mel = S.el.querySelector('.gps-map');
-        if (mel) mel.setAttribute('data-arcs', S.arcs.map(function (a) { return (a.kind === 'pin' ? 'p' : 'c') + a.yards; }).join(' '));
+        if (mel) { mel.setAttribute('data-arcs', S.arcs.map(function (a) { return (a.kind === 'pin' ? 'p' : 'c') + a.yards; }).join(' ')); mel.setAttribute('data-arc-step', String(S.arcStep)); }
     }
     function placeArcLabels(obstacles) {
         var box = S && S.el.querySelector('.gps-arc-labels');
         if (!box) return;
-        var arcs = (S.map && S.styleReady && S.side === 'gps' && S.mode === 'measure') ? (S.arcs || []) : [];
+        // The 100 / 150 / 200-to-the-pin labels first: they win a crowded spot.
+        var arcs = (S.map && S.styleReady && S.side === 'gps' && S.mode === 'measure') ? (S.arcs || []).slice().sort(function (a, b) { return (a.kind === 'pin' ? 0 : 1) - (b.kind === 'pin' ? 0 : 1); }) : [];
         while (box.children.length < arcs.length) { var e = document.createElement('span'); e.className = 'gps-arc-lbl'; box.appendChild(e); }
         var wrapR = S.el.querySelector('.gps-map-wrap').getBoundingClientRect();
         var u = units();
@@ -751,8 +772,9 @@
             el.style.display = ''; el.style.visibility = 'hidden';
             var w = el.offsetWidth, h = el.offsetHeight;
             var rc = { l: L.x - w - 3, t: L.y - h / 2, r: L.x - 3, b: L.y + h / 2 };
+            var pad = { l: rc.l - 3, t: rc.t - 3, r: rc.r + 3, b: rc.b + 3 };
             var clash = rc.l < 2 || rc.t < 2 || rc.r > wrapR.width - 2 || rc.b > wrapR.height - 2 ||
-                (obstacles || []).some(function (ob) { return hits(rc, ob); });
+                (obstacles || []).some(function (ob) { return hits(pad, ob); });
             if (clash) { el.style.display = 'none'; continue; }
             el.style.left = Math.round(rc.l) + 'px'; el.style.top = Math.round(rc.t) + 'px'; el.style.visibility = '';
             (obstacles || []).push(rc);
@@ -1231,7 +1253,11 @@
         show('.gps-pin-clear', !!S.editingPin && !!(S.localLocs && S.localLocs[holeKey(S.hole)] !== undefined ? S.localLocs[holeKey(S.hole)] : (S.round && S.round.pinLocs && S.round.pinLocs[holeKey(S.hole)])));
         // THE SCORE BUTTON: the hole's own score entry, on the card (Bets side).
         txt('.gps-score', 'Hole ' + S.hole + ' · Enter Score');
-        show('.gps-score', !pinning && typeof S.openScore === 'function');
+        var scoreOn = !pinning && typeof S.openScore === 'function';
+        show('.gps-score', scoreOn);
+        // Both in the bottom row (an unmapped hole says so while measuring): the
+        // banner goes up one row, above the score button.
+        S.el.classList.toggle('gps-banner-up', scoreOn && !!banner);
         var canUndo = !pinning && !!S.canFix && r && r.source === 'pin' && r.pin && !!G.undoPin(r.pin, 1);
         show('.gps-undo-green', !!canUndo);
         show('.gps-skip', S.mode === 'setFront' || S.mode === 'setBack');
@@ -1320,8 +1346,11 @@
         + '#gps-overlay .gps-prev,#gps-overlay .gps-next{width:44px;}'
         + '#gps-overlay .gps-map-wrap{position:relative;flex:1;min-height:180px;}'
         + '#gps-overlay .gps-map{position:absolute;inset:0;background:#1d3b2a;}'
-        + '#gps-overlay .gps-banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(0,0,0,.78);'
-        +   'padding:8px 14px;border-radius:999px;font-weight:700;font-size:15px;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;}'
+        // The instruction banner sits in the bottom row, where the score button is
+        // (hidden while a green or a pin is being set): at the top it covered the
+        // 1x and Recenter buttons and the green being tapped (Wave 1 screenshot).
+        + '#gps-overlay .gps-banner{position:absolute;bottom:calc(var(--gps-attrib-h,20px) + 8px);left:50%;transform:translateX(-50%);z-index:1000;background:rgba(0,0,0,.82);'
+        +   'padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;white-space:nowrap;max-width:calc(100% - 156px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
         + '#gps-overlay .gps-tiles-note{position:absolute;bottom:26px;left:8px;right:8px;z-index:1000;text-align:center;font-size:13px;color:#d1d5db;}'
         + '#gps-overlay .maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
         + '#gps-overlay .maplibregl-ctrl-attrib a{color:#0b4f8a;}'
@@ -1331,6 +1360,7 @@
         // The bottom row of the map, above the attribution bar: the score button in
         // the middle, the wind at the right. Its height is part of the hole view's
         // bottom margin, so the tee always shows above it.
+        + '#gps-overlay.gps-banner-up .gps-banner{bottom:calc(var(--gps-attrib-h,20px) + 54px);max-width:calc(100% - 16px);}'
         + '#gps-overlay .gps-bottom-row{position:absolute;left:8px;right:8px;bottom:calc(var(--gps-attrib-h,20px) + 8px);z-index:3;height:38px;pointer-events:none;}'
         + '#gps-overlay .gps-score{pointer-events:auto;position:absolute;left:50%;top:0;transform:translateX(-50%);max-width:calc(100% - 156px);min-height:38px;padding:8px 14px;'
         +   'border-radius:999px;background:rgba(11,15,12,.88);border:1px solid #d9f99d;color:#d9f99d;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
