@@ -6076,6 +6076,24 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const meta = ((currentData && currentData.courseData) || []).find(h => parseInt(h.hole, 10) === Number(hole));
         return meta ? meta.par : null;
     }
+    // THE TOP PANEL (redesign, 2026-10-08): par, the card's yards and stroke
+    // index for a hole, the holes in order for the picker, and a jump to one -
+    // through the card's own goToHole, so the KP gate holds there too.
+    function gpsHoleMeta(hole) {
+        const meta = ((currentData && currentData.courseData) || []).find(h => parseInt(h.hole, 10) === Number(hole));
+        if (!meta) return null;
+        const y = Number(meta.yardage || meta.yards);
+        const si = Number(meta.hcpIndex);
+        return { par: meta.par, si: isFinite(si) && si > 0 ? si : null, yards: isFinite(y) && y > 0 ? y : null };
+    }
+    function gpsHoleList() {
+        return ((currentData && currentData.courseData) || []).map(h => parseInt(h.hole, 10)).filter(n => n > 0).sort((a, b) => a - b);
+    }
+    function gpsGotoHole(hole) {
+        goToHole(Number(hole));
+        const kp = document.getElementById('kp-force-overlay');
+        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets');
+    }
     function gpsStepHole(dir) {
         goToAdjacentHole(dir);
         // The KP question gates leaving a KP hole and is answered on the card,
@@ -6120,6 +6138,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     return loc ? durableWrite(at, 'set', loc, at) : durableWrite(at, 'remove', null, at);
                 },
                 openScore: gpsOpenScore,
+                holeMeta: gpsHoleMeta, holeList: gpsHoleList, gotoHole: gpsGotoHole,
                 stepHole: gpsStepHole
             });
         } else {

@@ -118,6 +118,9 @@ if (String(Math.round(inlineHaversineM(ME, H1.mid) / 0.9144)) !== EXPECT.center)
 
 function sensor(mode, lat, lng, acc) {
     return `(function () {
+      // Page errors, recorded: an arm that fails reads WHY (Wave 2 redesign).
+      window.__errs = [];
+      window.addEventListener('error', function (e) { window.__errs.push(String(e && e.message) + ' @' + (e && e.lineno)); });
       var calls = { watch: 0, clear: 0, active: {}, opts: null };
       window.__geo = calls;
       var nextId = 1, oks = {}, cur = { lat: ${lat}, lng: ${lng}, acc: ${acc} };
@@ -153,6 +156,8 @@ const READ = `JSON.stringify((function () {
   var attr = o && o.querySelector('.maplibregl-ctrl-attrib');
   var box = function (e) { if (!e || e.offsetParent === null) return null; var r = e.getBoundingClientRect(); if (!r.width) return null; return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) }; };
   var q = function (s) { return o && o.querySelector(s); };
+  // A Tools item is ON OFFER when it is not hidden - whether or not the menu is open.
+  var avail = function (s) { var e = q(s); return !!(e && e.style.display !== 'none' && (!o.classList.contains('gps-basic-mode'))); };
   var mapEl = o && o.querySelector('.gps-map');
   var ds = mapEl ? mapEl.dataset : {};
   var big = o ? [].slice.call(o.querySelectorAll('.gps-big')).map(function (e) { var r = e.getBoundingClientRect(); return { text: e.innerText.trim(), over: e.scrollWidth > e.clientWidth + 1, l: Math.round(r.left), r: Math.round(r.right) }; }) : [];
@@ -168,7 +173,7 @@ const READ = `JSON.stringify((function () {
            banner: vis('.gps-banner') ? t('.gps-banner') : '', tilesNote: vis('.gps-tiles-note'),
            toHere: vis('.gps-target-row') ? t('.gps-to-here') : '', hereCenter: vis('.gps-target-row') ? t('.gps-here-center') : '',
            units: t('.gps-units'), src: t('.gps-src'),
-           set: vis('.gps-set-green'), fix: vis('.gps-fix-green'), undo: vis('.gps-undo-green'),
+           set: avail('.gps-set-green'), fix: avail('.gps-fix-green'), undo: avail('.gps-undo-green'),
            target: rect('.gps-target'), centerPin: rect('.gps-pin-mid'), dot: rect('.gps-dot'), teePin: rect('.gps-pin-tee'),
            from: vis('.gps-from') ? t('.gps-from') : '', recenter: vis('.gps-recenter'),
            bearing: ds.bearing == null ? null : Number(ds.bearing), zoom: ds.zoom == null ? null : Number(ds.zoom),
@@ -182,11 +187,12 @@ const READ = `JSON.stringify((function () {
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
            ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(attr), map: box(mapEl),
+                    top: box(q('.gps-top')), sub: box(q('.gps-sub')), right: box(q('.gps-right')), recenterB: box(q('.gps-recenter')), toPill: box(q('.gps-target-row')), bottom: box(q('.gps-bottom')),
                     back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
            teePx: ds.teePx ? ds.teePx.split(',').map(Number) : null,
            arcs: ds.arcs == null ? null : ds.arcs, arcStep: ds.arcStep == null ? null : Number(ds.arcStep),
            arcLabels: o ? [].slice.call(o.querySelectorAll('.gps-arc-lbl')).filter(function (e) { return e.style.display !== 'none' && e.style.visibility !== 'hidden'; }).map(function (e) { return { text: e.innerText.trim(), box: box(e) }; }) : [],
-           midLbl: t('.gps-lbl-mid'), editPin: vis('.gps-edit-pin'), pinSave: vis('.gps-pin-save'), pinClear: vis('.gps-pin-clear'),
+           midLbl: t('.gps-lbl-mid'), editPin: avail('.gps-edit-pin'), pinSave: vis('.gps-pin-save'), pinClear: vis('.gps-pin-clear'),
            flag: box(q('.gps-flag')), flagEdit: !!(q('.gps-flag') && q('.gps-flag').classList.contains('gps-flag-edit')),
            score: vis('.gps-score') ? t('.gps-score') : null, scoreBox: box(q('.gps-score')),
            bannerBox: box(q('.gps-banner')), zoomBox: box(q('.gps-zoom')), recenterBox: box(q('.gps-recenter')),
@@ -201,6 +207,7 @@ const READ = `JSON.stringify((function () {
            scrollY: Math.round(window.scrollY),
            scoreInputs: document.querySelectorAll('.score-input').length,
            usgsCached: window.__usgsN == null ? null : window.__usgsN,
+           errs: (window.__errs || []).slice(0, 5), coursesLoaded: !!window.HardPanGpsCourses, ready: ds.ready || null,
            // Wave 2
            esriWhy: ds.esriWhy || '', esriFailAt: ds.esriFailAt ? Number(ds.esriFailAt) : null, esriSrcMax: ds.esriSrcMax ? Number(ds.esriSrcMax) : null,
            attribHtml: attr ? attr.innerHTML : null, tilesNoteShown: vis('.gps-tiles-note'),
@@ -210,7 +217,10 @@ const READ = `JSON.stringify((function () {
            sheet: vis('.gps-sheet') ? (q('.gps-sheet').innerText || '').replace(/\\s+/g, ' ').trim() : null,
            sheetBuyDisabled: q('.gps-sheet-buy') ? q('.gps-sheet-buy').disabled : null,
            basicScore: vis('.gps-score-basic') ? t('.gps-score-basic') : null, getPro: vis('.gps-get-pro'),
-           targetRow: vis('.gps-target-row'), editPinShown: vis('.gps-edit-pin'),
+           targetRow: vis('.gps-target-row'), editPinShown: avail('.gps-edit-pin'),
+           holeMeta: t('.gps-meta'), holeNum: t('.gps-hole-num'), picker: vis('.gps-picker') ? o.querySelectorAll('.gps-picker-grid button').length : 0, tools: vis('.gps-tools-menu'),
+           mapCenter: ds.center ? ds.center.split(',').map(Number) : null, bounds: ds.bounds ? ds.bounds.split(',').map(Number) : null, minZoom: ds.minZoom == null ? null : Number(ds.minZoom),
+           scoreboxBox: box(q('.gps-scorebox')), cardBtn: vis('.gps-side-bets'), back: vis('.gps-back'),
            view: ds.view || null, greenBtn: vis('.gps-green-view') ? t('.gps-green-view') : null, greenDims: vis('.gps-green-dims') ? t('.gps-green-dims') : null,
            greenLbls: o ? [].slice.call(o.querySelectorAll('.gps-green-lbl')).filter(function (e) { return e.style.display !== 'none' && e.offsetParent !== null; }).map(function (e) { return { k: e.className.replace(/.*gps-green-lbl-/, ''), text: e.innerText.trim(), box: box(e) }; }) : [],
            hasPro: window.HardPanGps && window.HardPanGps.hasGpsPro ? window.HardPanGps.hasGpsPro() : null,
@@ -294,7 +304,7 @@ function pillFails(tag, g, required) {
         const [a, b] = ends[p.k];
         const reach = Math.hypot(p.box.r - p.box.l, p.box.b - p.box.t) / 2 + 8;
         if (a && b && segDist(mid(p.box), a, b) > reach) f.push(`${tag}: the ${p.k} pill is off its line by ${Math.round(segDist(mid(p.box), a, b))}px`);
-        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib'].filter((k) => hitBox(p.box, g.boxes[k]));
+        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'sub', 'right', 'recenterB', 'toPill', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
         if (hitBox(p.box, greenPage(g))) bad.push('green');
         if (bad.length) f.push(`${tag}: the ${p.k} pill covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
@@ -322,7 +332,7 @@ function arcFails(tag, g, totalYd, lat) {
         if (!/^\d+y( to pin)?$/.test(l.text)) f.push(`${tag}: arc label "${l.text}"`);
         const c = mid(g.boxes.mid);
         if (c && l.box && l.box.r > c.x + 2) f.push(`${tag}: arc label "${l.text}" is not at the left end (right edge ${l.box.r}, line x ${Math.round(c.x)})`);
-        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'dot', 'tee', 'attrib'].filter((k) => hitBox(l.box, g.boxes[k]));
+        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'dot', 'tee', 'attrib', 'top', 'sub', 'right', 'recenterB', 'toPill', 'bottom'].filter((k) => hitBox(l.box, g.boxes[k]));
         g.pills.forEach((p) => { if (hitBox(l.box, p.box)) bad.push('a pill'); });
         if (bad.length) f.push(`${tag}: arc label "${l.text}" covers ${bad.join(', ')}`);
     });
@@ -334,11 +344,13 @@ function teeInView(tag, g) {
     if (!m || !at || !g.teePx) return [tag + ': cannot read the frame: ' + JSON.stringify([m, at, g.teePx])];
     const teeY = m.t + g.teePx[1];
     if (teeY + 8 > at.t - 8) f.push(`${tag}: the tee (y ${teeY}) is not clear above the attribution bar (top ${at.t})`);
-    // Wave 1: and above the score button / wind row.
-    [['score button', g.scoreBox], ['wind box', g.windBox]].forEach(([n, b]) => { if (b && teeY + 8 > b.t - 4 && g.teePx[0] + m.l > b.l - 8 && g.teePx[0] + m.l < b.r + 8) f.push(`${tag}: the tee (y ${teeY}) is under the ${n} (top ${b.t})`); });
+    // Redesign: above the Recenter row and the bottom row, which float over the map.
+    [['Recenter', g.boxes.recenterB], ['bottom row', g.boxes.bottom], ['score button', g.scoreBox]].forEach(([n, b]) => { if (b && teeY + 8 > b.t - 4) f.push(`${tag}: the tee (y ${teeY}) is under the ${n} (top ${b.t})`); });
     if (g.teePx[0] < 8 || g.teePx[0] > m.r - m.l - 8) f.push(`${tag}: the tee is off the side of the map (x ${g.teePx[0]})`);
     const gb = greenPage(g);
-    if (!gb || gb.t < m.t + 4 || (g.boxes.back && g.boxes.back.t < m.t)) f.push(`${tag}: the back of the green is cut off: ` + JSON.stringify([gb, g.boxes.back, m.t]));
+    // ... and the back of the green below the top panel and the line under it.
+    const under = Math.max(m.t, g.boxes.top ? g.boxes.top.b : 0, g.boxes.sub ? g.boxes.sub.b : 0);
+    if (!gb || gb.t < under + 2 || (g.boxes.back && g.boxes.back.t < under)) f.push(`${tag}: the back of the green is cut off (under the top panel at ${under}): ` + JSON.stringify([gb, g.boxes.back]));
     return f;
 }
 // THE RING IS 20 YARDS ACROSS ON THE GROUND, inline: 512px tiles, metres per px.
@@ -438,11 +450,11 @@ function usgsFallbackFails(tag, g, why) {
         { expression: READ },                                                   // 0 arrival: Bets
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },        // 1 GPS
         { drag: '.gps-target', dx: 70, dy: -40 }, { sleep: 400 }, { expression: READ },   // 2 target dragged
-        { drag: '.gps-map', at: { fx: 0.15, fy: 0.85 }, dx: -50, dy: -30 }, { sleep: 500 }, { expression: READ }, // 3 map panned
+        { drag: '.gps-map', at: { fx: 0.15, fy: 0.6 }, dx: -50, dy: -30 }, { sleep: 500 }, { expression: READ }, // 3 map panned
         { tap: '.gps-recenter' }, { sleep: 500 }, { expression: READ },         // R recenter
         ...mapTap(120, 260), { expression: READ },                              // 4 tap: jump
-        { tap: '.gps-units' }, { sleep: 200 }, { expression: READ },            // 5 meters
-        { tap: '.gps-units' }, { sleep: 200 },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, { expression: READ },            // 5 meters
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 },
         { tap: '.gps-next' }, { sleep: 800 }, { expression: READ },             // 6 GPS Next -> hole 2
         { tap: '.gps-side-bets' }, { sleep: 500 }, { expression: READ },        // 7 Bets on hole 2
         { tap: '.hole-view-nav-row .hole-view-nav-btn', nth: 1 }, { sleep: 800 }, { expression: READ }, // 8 card Next -> 3
@@ -473,7 +485,9 @@ function usgsFallbackFails(tag, g, why) {
         if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
         fails.push(...arcFails('osm', gps, ME_CENTER_YD));
         if (gps.score !== 'Hole 1 · Enter Score') fails.push('osm: score button reads ' + gps.score);
-        if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !/💰 Bets/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the toggle is not on screen: ' + arrive.toggle);
+        // Redesign: on the card, ONE "📍 GPS" button; on the map, the Card button back.
+        if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the GPS button is not on the card: ' + arrive.toggle);
+        if (!gps.cardBtn || gps.toggleOnScreen) fails.push('osm: on the map, the Card button / no GPS pill: ' + JSON.stringify([gps.cardBtn, gps.toggleOnScreen]));
         if (arrive.side !== 'bets' || arrive.gpsShown) fails.push('osm: a fresh phone did not land on Bets');
         if (arrive.watchCalls !== 0) fails.push('osm: a location watch ran before GPS was shown');
         if (!gps.gpsShown || !gps.map || gps.side !== 'gps') fails.push('osm: GPS side did not show with a map');
@@ -481,11 +495,11 @@ function usgsFallbackFails(tag, g, why) {
         R.forEach((g, k) => { if (g.sheet || g.getPro) fails.push(`osm read ${k}: the upgrade sheet / link shown to a Pro user: ` + JSON.stringify([g.sheet, g.getPro])); });
         // Wave 2: no override and no paywall -> HardPan GPS (Pro), the full screen.
         if (gps.hasPro !== true || gps.basicMode || gps.tier !== null) fails.push('osm: a phone with no override is not Pro: ' + JSON.stringify([gps.hasPro, gps.basicMode, gps.tier]));
-        if (JSON.stringify(gps.labels) !== '["FRONT","CENTER","BACK"]') fails.push('osm: labels ' + JSON.stringify(gps.labels));
+        if (JSON.stringify(gps.labels) !== '["CENTER","F","B"]') fails.push('osm: labels ' + JSON.stringify(gps.labels));
         if (gps.f !== EXPECT.front || gps.m !== EXPECT.center || gps.b !== EXPECT.back) fails.push(`osm: F/C/B ${gps.f}/${gps.m}/${gps.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (gps.acc !== '±6 yds') fails.push('osm: accuracy ' + gps.acc);
         if (!gps.highAccuracy || gps.watches !== 1) fails.push('osm: watch on GPS: ' + gps.watches + ' high=' + gps.highAccuracy);
-        if (gps.toHere !== 'You → here: ' + EXPECT.half || gps.hereCenter !== 'Here → center: ' + EXPECT.half) fails.push('osm: target did not start halfway: ' + gps.toHere + ' / ' + gps.hereCenter);
+        if (gps.toHere !== 'You → target: ' + EXPECT.half || gps.hereCenter !== 'Target → center: ' + EXPECT.half) fails.push('osm: target did not start halfway: ' + gps.toHere + ' / ' + gps.hereCenter);
         if (!/USDA, USGS The National Map: Orthoimagery/.test(gps.attribution || '') || !/OpenStreetMap contributors/.test(gps.attribution || '') || !gps.attributionOnScreen) fails.push('osm: attribution ' + gps.attribution);
         // Drag the target: it moves, the map does not.
         if (dist(dragged.target, gps.target) < 60) fails.push('osm: the target did not follow the drag: ' + JSON.stringify([gps.target, dragged.target]));
@@ -497,7 +511,7 @@ function usgsFallbackFails(tag, g, why) {
         if (panned.toHere !== dragged.toHere || panned.hereCenter !== dragged.hereCenter) fails.push('osm: panning changed the target numbers');
         // Tap: the target jumps there.
         if (dist(jumped.target, { x: 120, y: 260 }) > 3) fails.push('osm: a tap did not move the target to the tap: ' + JSON.stringify(jumped.target));
-        if (meters.units !== 'Meters' || meters.m !== EXPECT.centerM) fails.push(`osm: meters ${meters.m} (${meters.units})`);
+        if (meters.units !== 'Units: Meters' || meters.m !== EXPECT.centerM) fails.push(`osm: meters ${meters.m} (${meters.units})`);
         // One hole, both sides.
         if (gpsNext.title !== 'Hole 2 · Par 5') fails.push('osm: GPS Next -> ' + gpsNext.title);
         if (betsH2.cardHole !== 'Hole 2' || betsH2.gpsShown) fails.push('osm: GPS Next did not move the card: ' + betsH2.cardHole);
@@ -542,7 +556,7 @@ function usgsFallbackFails(tag, g, why) {
     const pl = [33.7111, -78.8869];
     const b = await arm('unmap', 'pinelakes', null, 'ok', pl, 20, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-set-green' }, { sleep: 200 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 200 }, { expression: READ },
         ...mapTap(90, 200), { expression: READ },
         { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
         { tap: '.gps-side-bets' }, { sleep: 200 }, { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
@@ -575,9 +589,9 @@ function usgsFallbackFails(tag, g, why) {
     // ---- organizer -------------------------------------------------------------
     const c = await arm('organ', 'caledonia', 'org-1', 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-fix-green' }, { sleep: 200 }, ...mapTap(80, 160),
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 200 }, ...mapTap(80, 160),
         { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
-        { tap: '.gps-undo-green' }, { sleep: 500 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-undo-green' }, { sleep: 500 }, { expression: READ },
     ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' } });
     out.organizer = c; bail(out, c);
     {
@@ -592,7 +606,7 @@ function usgsFallbackFails(tag, g, why) {
     const TME = [tm.tee[0] + 0.5 * (tm.mid[0] - tm.tee[0]), tm.tee[1] + 0.5 * (tm.mid[1] - tm.tee[1])];
     const vf = await arm('verif', 'thistle_stewart_mackay', 'org-1', 'ok', TME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-fix-green' }, { sleep: 300 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 300 }, { expression: READ },
         // On the green, well away from the golfer (halfway down the hole): the
         // privacy check below looks for the golfer's spot in every write, so a
         // tap that lands on it would read as a leak.
@@ -666,7 +680,7 @@ function usgsFallbackFails(tag, g, why) {
     const ESRI_CFG = CFG({ esri: 'OK' });
     const e = await arm('esri', 'pinelakes', null, 'ok', pl, 5, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-set-green' }, { sleep: 3000 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 3000 }, { expression: READ },
         ...mapTap(90, 200), { tap: '.gps-save' }, { sleep: 3000 }, { expression: READ },
     ], { preScript: sensor('ok', pl[0], pl[1], 5) + ESRI_CFG });
     // The Esri credit makes the attribution bar two lines: the tee must stay clear of it.
@@ -708,7 +722,7 @@ function usgsFallbackFails(tag, g, why) {
         const g = fh.reads[0];
         if (g.dot) fails.push('off-hole: the blue dot is still shown');
         if (g.m !== TEE_CENTER) fails.push(`off-hole: center ${g.m}, expected tee -> center ${TEE_CENTER}`);
-        if (!/^Tee → here: \d+$/.test(g.toHere || '')) fails.push('off-hole: target readout ' + g.toHere);
+        if (!/^Tee → target: \d+$/.test(g.toHere || '')) fails.push('off-hole: target readout ' + g.toHere);
         if (!g.teePin || !g.centerPin || !(g.teePin.y > g.centerPin.y) || Math.abs(g.teePin.x - g.centerPin.x) > 3) fails.push('off-hole: tee not straight below the green: ' + JSON.stringify([g.teePin, g.centerPin]));
         if (g.acc !== 'You are off this hole') fails.push('off-hole: accuracy line ' + g.acc);
         // Wave 1 (Manny, 2026-10-08): NO "Measuring from tee" on the map.
@@ -740,11 +754,11 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 4 2x
         { tap: '.gps-recenter' }, { sleep: 500 }, { expression: READ },            // 5 Recenter -> 1x
         { expression: TAP_SHORT_OF_GREEN }, { sleep: 500 }, { expression: READ },  // 5b target just short of the green
-        { expression: PULL(`document.querySelector('#gps-overlay .gps-panel')`) },   // 6 a pull on GPS
+        { expression: PULL(`document.querySelector('#gps-overlay .gps-top')`) },   // 6 a pull on GPS
         touch('touchStart', [{ x: 300, y: 300 }]), touch('touchMove', [{ x: 300, y: 360 }]), touch('touchMove', [{ x: 300, y: 430 }]),
         touch('touchMove', [{ x: 300, y: 500 }]), touch('touchEnd', []), { sleep: 700 }, { expression: READ },  // 7 a finger drag pans the map
-        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ },               // 8 meters
-        { tap: '.gps-units' }, { sleep: 200 },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 300 }, { expression: READ },               // 8 meters
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 },
         { tap: '.gps-side-bets' }, { sleep: 400 }, { expression: PULL('document.body') },  // 9 Bets scrolls as before
     ]);
     out.polish = po; bail(out, po);
@@ -799,7 +813,7 @@ function usgsFallbackFails(tag, g, why) {
     const yd = (a, b) => String(Math.round(inlineHaversineM(a, b) / 0.9144));
     const ep = await arm('editp', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },          // 0
-        { tap: '.gps-edit-pin' }, { sleep: 400 }, { expression: READ },                   // 1 editing
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 400 }, { expression: READ },                   // 1 editing
         { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ },      // 2 dragged toward the back
         { drag: '.gps-flag', dx: 170, dy: 0 }, { sleep: 400 }, { expression: READ },      // 3 dragged off the green: stays on it
         { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 4 saved
@@ -808,9 +822,9 @@ function usgsFallbackFails(tag, g, why) {
         // queue (and, unsent, it is what this phone shows: the app's rule for
         // every unsent write).
         { expression: '(window.__coldSetOffline(true), "offline")' },
-        { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: 10 }, { sleep: 300 },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: 10 }, { sleep: 300 },
         { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 6 saved offline
-        { tap: '.gps-edit-pin' }, { sleep: 300 }, { tap: '.gps-pin-clear' }, { sleep: 500 }, { expression: READ }, // 7 pin to center
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { tap: '.gps-pin-clear' }, { sleep: 500 }, { expression: READ }, // 7 pin to center
     ]);
     out.editPin = ep; bail(out, ep);
     {
@@ -822,7 +836,7 @@ function usgsFallbackFails(tag, g, why) {
         ['zoomBox', 'recenterBox', 'windBox'].forEach((k) => { if (hitBox(r1.bannerBox, r1[k])) fails.push(`edit pin: the banner covers the ${k.replace('Box', '')}`); });
         if (hitBox(r1.bannerBox, greenPage(r1)) || hitBox(r1.bannerBox, r1.flag)) fails.push('edit pin: the banner covers the green or the flag');
         if (!(r2.flag && r1.flag && mid(r2.flag).y < mid(r1.flag).y - 6)) fails.push('edit pin: the flag did not follow the drag: ' + JSON.stringify([r1.flag, r2.flag]));
-        if (r2.midLbl !== 'PIN' || r2.m === r1.m || !/^Here → pin: \d+$/.test(r2.hereCenter)) fails.push('edit pin: numbers did not follow the flag live: ' + JSON.stringify([r1.m, r2.m, r2.midLbl, r2.hereCenter]));
+        if (r2.midLbl !== 'PIN' || r2.m === r1.m || !/^Target → pin: \d+$/.test(r2.hereCenter)) fails.push('edit pin: numbers did not follow the flag live: ' + JSON.stringify([r1.m, r2.m, r2.midLbl, r2.hereCenter]));
         if (r2.arcs === r1.arcs && r2.m !== r1.m && expectArcs(+r2.m, r2.arcStep) !== expectArcs(+r1.m, r1.arcStep)) fails.push('edit pin: arcs did not follow the flag');
         const gb = greenPage(r3), fc = mid(r3.flag);
         if (!gb || !fc || fc.x < gb.l - 2 || fc.x > gb.r + 2 || fc.y < gb.t - 2 || fc.y > gb.b + 2) fails.push('edit pin: the flag left the green: ' + JSON.stringify([fc, gb]));
@@ -854,8 +868,8 @@ function usgsFallbackFails(tag, g, why) {
     {
         const [g0, g1] = sc.reads;
         if (g0.score !== 'Hole 1 · Enter Score' || !g0.scoreBox) fails.push('score: button ' + JSON.stringify([g0.score, g0.scoreBox]));
-        const sb = g0.scoreBox, mp = g0.boxes.map;
-        if (sb && mp && Math.abs((sb.l + sb.r) / 2 - (mp.l + mp.r) / 2) > 2) fails.push('score: the button is not centered');
+        const sb = g0.scoreboxBox, mp = g0.boxes.map;
+        if (!sb || !mp || Math.abs((sb.l + sb.r) / 2 - (mp.l + mp.r) / 2) > 2) fails.push('score: the Enter Score box is not centered: ' + JSON.stringify([sb, mp]));
         if (sb && g0.boxes.attrib && sb.b > g0.boxes.attrib.t) fails.push('score: the button sits on the attribution');
         if (g1.side !== 'bets' || g1.gpsShown) fails.push('score: did not open the card: ' + g1.side);
         if (!g1.active || !/score-input/.test(g1.active.cls) || g1.active.hole !== '1') fails.push('score: hole 1\'s score box is not focused: ' + JSON.stringify(g1.active));
@@ -871,7 +885,7 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ }, // 0
         { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 1 reload: from the phone
         { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));if(!w)return 'no wind reading';w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
-        { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, profileDir: windProfile });
     out.wind = wd; bail(out, wd);
     const nwsAfterFirst = nwsSeen.slice(nws0);
@@ -884,7 +898,8 @@ function usgsFallbackFails(tag, g, why) {
         if (!/^↑\s*12 mph$/.test(w0.wind || '')) fails.push('wind: box reads ' + JSON.stringify(w0.wind));
         if (w0.windRot !== windRotFor(w0.bearing)) fails.push(`wind: arrow turned ${w0.windRot}, expected ${windRotFor(w0.bearing)} (to the SE, on a map turned ${w0.bearing})`);
         const wb = w0.windBox, at = w0.boxes.attrib, mp = w0.boxes.map;
-        if (!wb || !at || wb.b > at.t || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2) fails.push('wind: not at the bottom-right above the attribution: ' + JSON.stringify([wb, at]));
+        // Redesign: top of the right-hand stack, under the top panel.
+        if (!wb || !at || !w0.boxes.top || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2 || wb.t < w0.boxes.top.b || wb.t > w0.boxes.top.b + 30) fails.push('wind: not at the top of the right-hand stack: ' + JSON.stringify([wb, w0.boxes.top]));
         if (hitBox(wb, w0.scoreBox)) fails.push('wind: covers the score button');
         const pts = nwsAfterFirst.filter((u) => u.startsWith('/points/'));
         const hourly = nwsAfterFirst.filter((u) => u.startsWith('/gridpoints/'));
@@ -917,7 +932,7 @@ function usgsFallbackFails(tag, g, why) {
         const cr = await arm(tc.name, tc.key, null, 'ok', away, 5, [
             { tap: '.gps-side-gps' }, WAIT_MAP, ...nexts, { sleep: 1500 },
             { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ },
-            { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -10 }, { sleep: 400 }, { expression: READ },
+            { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -10 }, { sleep: 400 }, { expression: READ },
             { tap: '.gps-pin-cancel' }, { sleep: 300 },
         ], { preScript: sensor('ok', away[0], away[1], 5) + NWS_CFG });
         bail(out, cr);
@@ -944,7 +959,7 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, WAIT_MAP, { tap: '.gps-next' }, { sleep: 500 }, { tap: '.gps-next' }, { sleep: 1500 }, { expression: READ },   // 0 hole 3, 1x
         { tap: '.gps-zoom' }, { sleep: 800 }, { expression: READ },                                                          // 1 2x
         { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                                                         // 2 3x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { tap: '.gps-edit-pin' }, { sleep: 800 }, { expression: READ },                 // 3 Edit Pin
+        { tap: '.gps-zoom' }, { sleep: 500 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 800 }, { expression: READ },                 // 3 Edit Pin
         { tap: '.gps-pin-cancel' }, { sleep: 800 }, { expression: READ },                                                    // 4 back
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-3X' }) });
     out.esri3x = ex; bail(out, ex);
@@ -1036,12 +1051,12 @@ function usgsFallbackFails(tag, g, why) {
     const PLAYS_SHOWN = { waitFor: `(function () { var e = document.querySelector('#gps-overlay .gps-plays'); return !!(e && e.style.visibility !== 'hidden' && /elev/.test(e.getAttribute('data-terms') || '')); })()`, timeout: 20000 };
     const pa = await arm('plays', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, PLAYS_SHOWN, { sleep: 500 }, { expression: READ },          // 0 at 55 %
-        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-units' }, { sleep: 200 },   // 1 meters
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 },   // 1 meters
         { expression: `window.__moveTo(${P40[0]}, ${P40[1]})` }, { sleep: 500 }, { expression: READ },       // 2 walked back to 40 %
         { expression: `window.__moveTo(${NEAR[0]}, ${NEAR[1]})` }, { sleep: 500 }, { expression: READ },     // 3 20 yds out: hidden
         { expression: `window.__moveTo(${ONGREEN[0]}, ${ONGREEN[1]})` }, { sleep: 500 }, { expression: READ }, // 4 on the green: hidden
         { expression: `window.__moveTo(${ME[0]}, ${ME[1]})` }, { sleep: 500 }, { expression: READ },         // 5 back at 55 %
-        { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ }, // 6 pin dragged: live
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ }, // 6 pin dragged: live
         { tap: '.gps-pin-save' }, { sleep: 2500 }, { expression: READ },                                     // 7 saved
         // The writes are recorded per page: read the pin's before the reload below.
         { expression: `'PINW' + JSON.stringify((window.__coldWrites || []).filter(function (x) { return /pinLocs\\/h1$/.test(x.path) && x.op === 'set'; }))` },
@@ -1116,8 +1131,8 @@ function usgsFallbackFails(tag, g, why) {
     const gv = await arm('green', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },                          // 0 hole
         { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 1 green
-        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-units' }, { sleep: 200 }, // 2 meters
-        { tap: '.gps-edit-pin' }, { sleep: 400 }, { drag: '.gps-flag', dx: 0, dy: -24 }, { sleep: 500 }, { expression: READ }, // 3 pin dragged
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, // 2 meters
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 400 }, { drag: '.gps-flag', dx: 0, dy: -24 }, { sleep: 500 }, { expression: READ }, // 3 pin dragged
         { tap: '.gps-pin-save' }, { sleep: 700 }, { expression: READ },                                 // 4 saved
         { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 5 back to the hole
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-GREEN' }) });
@@ -1149,6 +1164,44 @@ function usgsFallbackFails(tag, g, why) {
         out.greenSummary = { zoom: [h0.zoom, g1.zoom], dims: g1.greenDims, inline: [G_DEPTH, G_WIDTH], labels: g1.greenLbls.map((x) => x.text), afterPin: g4.greenLbls.map((x) => x.text) };
     }
 
+    // ---- REDESIGN STEP 1: the hole picker, Enter Score ›, Back, FREE PAN on the course ----
+    const WHEEL = (dy) => ({ cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mouseWheel', x: 195, y: 420, deltaX: 0, deltaY: dy } } });
+    const ly = await arm('layout', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },                                      // 0 hole 1
+        // FREE PAN: far up the course (six long drags), then far zoomed out (wheel).
+        ...[0, 1, 2, 3, 4, 5].map(() => ({ drag: '.gps-map', at: { fx: 0.5, fy: 0.3 }, dx: 0, dy: 320 })), { sleep: 600 }, { expression: READ }, // 1 panned
+        WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 700 }, { expression: READ }, // 2 zoomed out
+        { tap: '.gps-recenter' }, { sleep: 600 }, { expression: READ },                                                   // 3 Recenter
+        { tap: '.gps-hole-btn' }, { sleep: 400 }, { expression: READ },                                                   // 4 picker open
+        { tap: '.gps-picker-grid button[data-hole="5"]' }, { sleep: 900 }, { expression: READ },                          // 5 hole 5
+        { drag: '.gps-map', at: { fx: 0.5, fy: 0.4 }, dx: 120, dy: 80 }, { sleep: 400 },
+        { tap: '.gps-score-next' }, { sleep: 900 }, { expression: READ },                                                 // 6 › hole 6, own view
+        { tap: '.gps-back' }, { sleep: 500 }, { expression: READ },                                                       // 7 Back -> the card
+    ]);
+    out.layout = ly; bail(out, ly);
+    {
+        const [l0, l1, l2, l3, l4, l5, l6, l7] = ly.reads;
+        const inB = (g) => !!(g.mapCenter && g.bounds && g.mapCenter[0] >= g.bounds[0] - 1e-4 && g.mapCenter[0] <= g.bounds[2] + 1e-4 && g.mapCenter[1] >= g.bounds[1] - 1e-4 && g.mapCenter[1] <= g.bounds[3] + 1e-4);
+        if (!l0.bounds || !inB(l0)) fails.push('layout: no course limit on the map: ' + JSON.stringify([l0.bounds, l0.mapCenter]));
+        // The limit is the course (every tee and green) plus 400 m - from the bundle, inline.
+        const allPts = []; Object.values(table.caledonia.holes).forEach((h) => { const o = h.osm; if (!o) return; if (o.tee) allPts.push(o.tee); if (o.end) allPts.push(o.end); (o.green || []).forEach((q) => allPts.push(q)); });
+        const nMax = Math.max(...allPts.map((q) => q[0])), dLat = 400 / 6371008.8 * 180 / Math.PI;
+        if (l0.bounds && Math.abs(l0.bounds[3] - (nMax + dLat)) > 2e-4) fails.push(`layout: the north limit ${l0.bounds[3]} is not the course + 400 m (${(nMax + dLat).toFixed(4)})`);
+        if (!l1.mapCenter || !l0.mapCenter || Math.hypot(l1.mapCenter[0] - l0.mapCenter[0], l1.mapCenter[1] - l0.mapCenter[1]) < 0.002) fails.push('layout: the map did not pan away from the hole: ' + JSON.stringify([l0.mapCenter, l1.mapCenter]));
+        if (!inB(l1)) fails.push('layout: panned off the course: ' + JSON.stringify([l1.mapCenter, l1.bounds]));
+        if (l1.f !== l0.f || l1.m !== l0.m || l1.b !== l0.b || l1.toHere !== l0.toHere || l1.title !== l0.title) fails.push('layout: panning away changed the hole\'s numbers: ' + JSON.stringify([[l0.f, l0.m, l0.b, l0.toHere], [l1.f, l1.m, l1.b, l1.toHere]]));
+        if (!(l2.zoom < l0.zoom - 1) || l2.zoom < 13 - 0.01 || l2.minZoom !== 13 || !inB(l2)) fails.push(`layout: zooming out - ${l0.zoom} -> ${l2.zoom} (floor ${l2.minZoom}), in bounds ${inB(l2)}`);
+        if (dist(l3.centerPin, l0.centerPin) > 3 || Math.abs(l3.zoom - l0.zoom) > 0.02 || l3.bearing !== l0.bearing) fails.push('layout: Recenter did not snap back to the hole: ' + JSON.stringify([l0.centerPin, l3.centerPin, l0.zoom, l3.zoom]));
+        if (l3.boxes.recenterB && l3.boxes.bottom && !(l3.boxes.recenterB.b <= l3.boxes.bottom.t && l3.boxes.recenterB.l < 60)) fails.push('layout: Recenter is not on the left above the Card button');
+        if (l4.picker !== 18) fails.push('layout: the hole picker shows ' + l4.picker + ' holes');
+        if (l5.title !== 'Hole 5 · Par ' + sb.p.caledonia.data[4].par || l5.picker) fails.push('layout: picking 5 -> ' + l5.title);
+        if (l5.holeMeta !== `Par ${sb.p.caledonia.data[4].par} · ~${Math.round(inlineHaversineM(table.caledonia.holes['5'].osm.tee, table.caledonia.holes['5'].osm.mid) / 0.9144)}y · HCP ${sb.p.caledonia.data[4].hcpIndex}`) fails.push('layout: hole 5 line "' + l5.holeMeta + '"');
+        if (l6.title !== 'Hole 6 · Par ' + sb.p.caledonia.data[5].par || l6.view !== 'hole' || l6.zoomBtn !== '1x') fails.push('layout: Enter Score › -> ' + JSON.stringify([l6.title, l6.view, l6.zoomBtn]));
+        fails.push(...teeInView('layout hole 6 (after a pan on 5)', l6));
+        if (l7.side !== 'bets' || l7.gpsShown || l7.cardHole !== 'Hole 6') fails.push('layout: Back did not go to the card on hole 6: ' + JSON.stringify([l7.side, l7.cardHole]));
+        out.layoutSummary = { bounds: l0.bounds, centers: [l0.mapCenter, l1.mapCenter, l2.mapCenter], zoom: [l0.zoom, l2.zoom, l3.zoom], meta: [l0.holeMeta, l5.holeMeta] };
+    }
+
     // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
     const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
     const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
@@ -1162,7 +1215,7 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-bets' }, { sleep: 400 }, { expression: READ },                       // 4 Bets
         { tap: '.gps-side-gps' }, { sleep: 600 }, { expression: READ },                        // 5 GPS again: no sheet
         { sleep: 6000 },                                                                       //   past the pre-cache's 4 s
-        { tap: '.gps-score-basic' }, { sleep: 500 }, { expression: READ },                     // 6 Enter Score
+        { tap: '.gps-score' }, { sleep: 500 }, { expression: READ },                           // 6 Enter Score
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, query: '&gpstier=free', profileDir: freeProfile });
     out.free = fr; bail(out, fr);
     const cl = await arm('clear', 'caledonia', null, 'ok', ME, 4.6, [
@@ -1181,7 +1234,7 @@ function usgsFallbackFails(tag, g, why) {
         if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (f2.acc !== '±6 yds' || f2.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('free: title / accuracy ' + JSON.stringify([f2.title, f2.acc]));
-        if (f2.basicScore !== 'Hole 1 · Enter Score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.basicScore, f2.getPro]));
+        if (f2.score !== 'Hole 1 · Enter Score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.score, f2.getPro]));
         if (f2.targetRow || f2.editPinShown || f2.fix || f2.set || f2.wind || f2.plays) fails.push('free: a Pro feature is showing: ' + JSON.stringify({ target: f2.targetRow, editPin: f2.editPinShown, fix: f2.fix, set: f2.set, wind: f2.wind, plays: f2.plays }));
         if (!f3.sheet) fails.push('free: "Get HardPan GPS" did not open the sheet');
         if (f4.gpsShown || f4.scoreInputs !== a.reads[0].scoreInputs || f4.scoreInputs < 4) fails.push('free: Bets is not the same card: ' + JSON.stringify([f4.scoreInputs, a.reads[0].scoreInputs]));
@@ -1202,13 +1255,13 @@ function usgsFallbackFails(tag, g, why) {
 
     // ---- privacy, every arm ------------------------------------------------------
     [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME],
-     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME]].forEach(([r, me]) => {
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
     // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
     // Esri hosts are never asked - a check must not spend the free tier.
-    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl, gv].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
     if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
@@ -1222,11 +1275,12 @@ function usgsFallbackFails(tag, g, why) {
         verify: vf.reads.map((r) => ({ verify: r.verify, src: r.src, m: r.m })),
         precache: out.precacheSummary,
         attribution: a.reads[1] && a.reads[1].attribution,
+        osmFirstGps: a.reads[1] && { zoom: a.reads[1].zoom, bearing: a.reads[1].bearing, bounds: a.reads[1].bounds, minZoom: a.reads[1].minZoom, errs: a.reads[1].errs, courses: a.reads[1].coursesLoaded, ready: a.reads[1].ready },
         esriRequests: esri,
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
-        green: out.greenSummary,
+        green: out.greenSummary, layout: out.layoutSummary,
         esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
         esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,

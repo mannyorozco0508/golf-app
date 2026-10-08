@@ -414,3 +414,42 @@ Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
   - The 1x / 2x / 3x button hides while it shows.
 - **Cache:** `golfapp-v326-gps-green` / `consumer-v161-gps-green`. Main used
   v322–v325 and consumer-v160 for builds 12–15, so these go above them.
+
+### 7e. Redesign step 1: full-screen map, floating panels, free pan (2026-10-08)
+
+Our own look (deep green-black glass, a lime accent, rounded panels), not a copy
+of any other app.
+
+- **Map:** edge to edge. Every control floats over it on a translucent panel.
+- **Top panel:**
+  - **Back** returns to the card.
+  - **The hole:** ‹ HOLE n ▾ › — tapping the number opens a 1–18 picker
+    through the card's own `goToHole`.
+  - **The hole line:** "Par 4 · 385y · HCP 12" from our card. A card with no
+    yardage shows the mapped tee → green distance as "~335y".
+  - **The numbers:** CENTER big, with F and B small beside it, and "plays ~"
+    under it.
+- **Under it:** accuracy and the green's source, the green's size in the Green
+  view, and the "⚠ Verify green" note — one line until tapped, so it never
+  covers the green.
+- **Right-hand stack:** wind (the arrow relative to the hole), 1x / 2x / 3x
+  zoom, and Green / Hole.
+- **Left, above the Card button:** Recenter (⌖), plus the "You → target: 75 ·
+  plays ~78" pill.
+- **Bottom row:**
+  - **Card** (the scorecard) replaces the old GPS ⇄ Bets pill. The card has
+    one "📍 GPS" button back.
+  - **"Hole N · Enter Score"** with a › to the next hole.
+  - **Tools:** Edit Pin, set / fix the green, Undo, Units.
+- **Free pan:**
+  - Pan and pinch anywhere on the course. The map is held to the course's own
+    area (every mapped tee and green, plus greens golfers set) with a 400 m
+    margin, and z13 is the closest it zooms out.
+  - The limit is off on a hole with no data, which is framed on the golfer. A
+    partly mapped course like Pine Lakes can have holes outside the mapped area.
+  - Recenter, the arrows, the picker and › all return to that hole's own view.
+  - The target, distances, arcs and F / C / B stay tied to the current hole
+    while panned away.
+- **Hole view fit:** the hole is fitted into the space the panels leave clear,
+  measured from the DOM. It refits when the panels change size, at most 3 times
+  in 2 s, and never from inside a frame (that was a refit loop).

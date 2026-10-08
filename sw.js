@@ -4412,7 +4412,13 @@
 // without a price, "plays ~" - gps-view.js changed after v321 reached the
 // preview. v322-v325 are main's (builds 12-15), so this goes above them. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v326-gps-green';
+// GPS:BEGIN
+// Moved to v328 (GPS redesign step 1, 2026-10-08): the map full screen with
+// floating panels, a top panel, a right-hand stack, the Card / Enter Score /
+// Tools row, the hole picker and free pan kept on the course. gps-view.js and
+// index.html's GPS block changed. Above main's v327. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v328-gps-redesign';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
