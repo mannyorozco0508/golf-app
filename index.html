@@ -378,6 +378,17 @@
         /* ---- Match card ---------------------------------------------------------
            A match is a small card, not a table row: name and stake, one plain sentence,
            progress, then its presses. Reads top-to-bottom on a phone in one glance. */
+        /* THE ORGANIZER'S GROUP PICKER (2026-10-08), in the element that used to
+           carry the read-only sentence. Thumb-sized, wraps at 390px. */
+        .org-score-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: center; }
+        .org-score-label { font-size: 0.82rem; color: var(--text-muted); margin-right: 2px; }
+        .org-score-pick {
+            min-height: 38px; padding: 6px 12px; margin: 0;
+            border: 1px solid var(--border-mid); border-radius: 8px;
+            background: var(--bg-card); color: var(--text-main);
+            font-size: 0.84rem; font-weight: bold; width: auto;
+        }
+        .org-score-pick.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .match-card {
             padding: 10px 12px; border-top: 1px solid var(--border-light);
         }
@@ -1904,6 +1915,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
          block the Round Menu owns: buildRoundSheet MOVES these elements into the
          sheet rather than rebuilding them, so the id, the handler and the
          renderer all survive the move. Filled by renderQrShareButton(). -->
+    <!-- EDIT ROUND SETUP, AT THE TOP OF THE ROUND MENU (2026-10-08). Manny,
+         signed in as the owner, had NO way from the scorecard to Players - so no
+         way to set foursomes or tees on the day. It existed only inside
+         #group-filter-container, which is a different view. Filled by
+         renderSetupEntry(), organizer only. -->
+    <div id="setup-entry-mount"></div>
     <div id="qr-share-mount"></div>
     <div id="group-links-panel" style="display:none;"></div>
     <!-- PASTE-TO-CLAIM (v200): on a BARE link whose doors are hidden, the device
@@ -6541,6 +6558,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // behind a handle is what a golfer touches once a round: the theme, the
         // code, the nav, the Dots selector, the way out and the way to delete.
         var ROUND_SHEET_BLOCKS = [
+            'setup-entry-mount',        // Edit Round Setup (organizer) - FIRST, by Manny's instruction
             'header-controls-row',      // Dark Mode, History
             'header-box',               // the game code, the course and the round name
             'app-nav-wrap',             // Leaderboard, Bets, Results, Matches, Home...
@@ -8157,6 +8175,53 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         } catch (e) { /* no socket: the round's own ownerUid still decides */ }
     }
 
+    // ---- THE ORGANIZER IS NEVER A SPECTATOR ON HIS OWN ROUND (2026-10-08) --
+    //
+    // Manny, signed in as the owner, opening Myrtle Day 1 through "Open a round
+    // you already have" - a BARE link, no ?group=. The delete control appeared,
+    // so the organizer gate knew him; and the scorecard told him "Read-only. Ask
+    // the organizer for your group's link to enter scores."
+    //
+    // Both the badge and every score box were decided by POSITION ALONE -
+    // `players.length > 4 && !hasGroupLock` - with no organizer check in
+    // either. So on any round above a foursome without a group link, every
+    // viewer was a spectator, the owner included.
+    //
+    // THE ORGANIZER PICKS A GROUP rather than getting all 24 cards at once: a
+    // mis-tap across six foursomes is a wrong score on somebody else's card,
+    // and the group picker is the same shape a scorekeeper link already has.
+    // The choice is remembered per round, so a reload does not send him back to
+    // a locked card.
+    var ORG_GROUP_KEY_PREFIX = 'golfapp_org_group_';
+    function organizerScoreGroupKey() { return ORG_GROUP_KEY_PREFIX + String(currentMode || ''); }
+    function organizerScoreGroup() {
+        if (!canReachSetup()) return null;
+        try {
+            var v = localStorage.getItem(organizerScoreGroupKey());
+            return v ? Number(v) : null;
+        } catch (e) { return null; }
+    }
+    function setOrganizerScoreGroup(group) {
+        try {
+            if (group === null || group === undefined || group === '') localStorage.removeItem(organizerScoreGroupKey());
+            else localStorage.setItem(organizerScoreGroupKey(), String(group));
+        } catch (e) { /* private mode: it holds for this render */ }
+        renderScorecard();
+    }
+
+    // MAY I TYPE IN THIS BOX? One predicate, so the badge, the banner and the
+    // inputs cannot disagree - which is exactly how the organizer came to be
+    // shown a read-only card he was also the owner of.
+    function canScoreBox(playerId, groupOf, multiGroup) {
+        if (roundSuperseded()) return false;
+        if (!multiGroup) return true;
+        var g = groupOf ? groupOf[playerId] : null;
+        if (hasGroupLock) return String(g) === String(lockedGroup);
+        var mine = organizerScoreGroup();
+        if (mine && canReachSetup()) return String(g) === String(mine);
+        return false;
+    }
+
     function canReachSetup() {
         if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
         const uid = (window.authBootState && window.authBootState.uid) || null;
@@ -8353,6 +8418,25 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     //
     // THE LIST AND THE SHEET COME FROM qr-codes.js, which both this page and
     // admin.html call - so there is one swipe, one layout and one list.
+    // EDIT ROUND SETUP, FOR THE ORGANIZER, AT THE TOP OF THE MENU.
+    //
+    // Same gate as every other organizer door - canReachSetup(), which is the
+    // owner uid, a held organizer token, or the trip-organizer inheritance - so
+    // this cannot disagree with the delete control the way the scorecard's
+    // read-only banner did.
+    function renderSetupEntry() {
+        const mount = document.getElementById('setup-entry-mount');
+        if (!mount) return;
+        if (!currentMode || !canReachSetup()) { mount.innerHTML = ''; return; }
+        let href = 'admin.html?game=' + encodeURIComponent(currentMode);
+        if (currentData && currentData.organizerToken) {
+            href += '&organizer=' + encodeURIComponent(currentData.organizerToken);
+        }
+        mount.innerHTML = '<a class="btn-outline qr-open-btn" style="display:block; text-align:center; '
+            + 'text-decoration:none; margin-bottom:10px;" href="' + href + '">'
+            + '\u270F\uFE0F Edit Round Setup \u00B7 Players, Tees, Groups</a>';
+    }
+
     function renderQrShareButton() {
         const mount = document.getElementById('qr-share-mount');
         if (!mount) return;
@@ -11300,6 +11384,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // themselves and no code path ever did - so the call site matters more
         // than the function. qr_share_entry_test.js arrives at the page the way
         // a golfer does and taps, without naming either one.
+        if (typeof renderSetupEntry === 'function') renderSetupEntry();
         if (typeof renderQrShareButton === 'function') renderQrShareButton();
         const historyModal = document.getElementById("history-modal-overlay");
         if (historyModal && historyModal.style.display === "flex") {
@@ -11333,14 +11418,43 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         const lockBadge = document.getElementById("group-lock-badge");
         const spectatorBanner = document.getElementById("spectator-hint-banner");
+        // THE ORGANIZER IS NEVER TOLD TO ASK THE ORGANIZER (2026-10-08). This
+        // block went straight from "no group link" to "Spectator View
+        // (Read-Only)" on any round above a foursome, without ever asking who
+        // was looking - so the owner of a 24-golfer round was shown the
+        // read-only sentence about himself. The read-only path is still here,
+        // unchanged, for somebody who really is read-only.
+        const orgGroup = organizerScoreGroup();
         if (lockedGroup) {
             lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
             lockBadge.style.display = "inline-block";
             if (spectatorBanner) spectatorBanner.style.display = "none";
+        } else if (isMultiGroupRound && canReachSetup()) {
+            // THE ORGANIZER. A picker instead of a refusal: he chooses which
+            // foursome he is entering, and the boxes for that group unlock.
+            lockBadge.textContent = orgGroup
+                ? `✏️ Organizer: scoring Group ${orgGroup}`
+                : `✏️ Organizer: pick a group to score`;
+            lockBadge.style.display = "inline-block";
+            if (spectatorBanner) {
+                const opts = groupBoundaries.map(b =>
+                    `<button type="button" class="org-score-pick${String(b.group) === String(orgGroup) ? ' on' : ''}"`
+                    + ` onclick="setOrganizerScoreGroup(${b.group})">Group ${b.group}</button>`).join('');
+                spectatorBanner.innerHTML = '<div class="org-score-row">'
+                    + '<span class="org-score-label">Score for:</span>' + opts
+                    + (orgGroup ? '<button type="button" class="org-score-pick" onclick="setOrganizerScoreGroup(null)">Done</button>' : '')
+                    + '</div>';
+                spectatorBanner.style.display = "block";
+            }
         } else if (isMultiGroupRound) {
             lockBadge.textContent = `👁️ Spectator View (Read-Only)`;
             lockBadge.style.display = "inline-block";
-            if (spectatorBanner) spectatorBanner.style.display = "block";
+            if (spectatorBanner) {
+                // THE SENTENCE IS PUT BACK, because the organizer branch above
+                // replaces this element's innerHTML.
+                spectatorBanner.innerHTML = '\uD83D\uDC41\uFE0F Read-only. Ask the organizer for your group\u2019s link to enter scores.';
+                spectatorBanner.style.display = "block";
+            }
         } else {
             lockBadge.style.display = "none";
             if (spectatorBanner) spectatorBanner.style.display = "none";
@@ -11786,7 +11900,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 // circle different holes.
                 const markClass = (typeof scoreMarkClass === 'function') ? scoreMarkClass(scoreVal, h.par) : '';
 
-                const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));
+                // ONE PREDICATE, shared with the badge and the banner above
+                // (2026-10-08). This read `isMultiGroupRound && (!hasGroupLock
+                // || ...)` - position only - so the organizer on a bare link had
+                // every box disabled on a round he owns.
+                const isLocked = !canScoreBox(p.id, playerGroupMap, isMultiGroupRound);
                 // data-player-id / data-hole name the box, so focus can find "the same
                 // box" again after a rebuild (see restoreScoreFocus) - by identity,
                 // never by element or position.

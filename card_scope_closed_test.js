@@ -223,7 +223,11 @@ describe('THE UNAFFECTED LINKS - the old page, character for character', () => {
         // joined the Round Menu. Diffed first - 0 text keys changed, 1 added, 0
         // removed, display untouched - and the fixture's own "repinned" array
         // carries the same record.
-        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '7764b3a8');
+        // 34fbb53c since THE ORGANIZER'S OWN CONTROLS (2026-10-08; was 7764b3a8):
+        // the bare arm's badge, the picker replacing the read-only sentence, and the
+        // Edit Round Setup entry. Diffed first; the fixture's own "repinned" array
+        // carries the full record.
+        assert.equal(sha(read('card_scope_closed_prev.fixture.json')).slice(0, 8), '34fbb53c');
         assert.deepEqual(PREV.links['group-3'].filtered, ['Ivy', 'Jon', 'Kim', 'Lee']);
         assert.equal(PREV.links.bare.filtered.length, 24);
         assert.deepEqual(PREV.links['one-group-1'].filtered, ['Ann', 'Ben', 'Cal', 'Dee']);

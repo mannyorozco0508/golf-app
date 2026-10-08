@@ -4413,7 +4413,17 @@
 // Now: the inner action URL is preferred, a synthesised link carries the page's
 // apiKey, and submitPaste is wrapped end to end so no failure is silent.
 // A device on v323 has a dead Finish sign-in button.
-const CACHE_VERSION = 'golfapp-v324-signinparse';
+// Moved to v325. THE ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND. Both the
+// scorecard badge and every score box were decided by POSITION ALONE -
+// players.length > 4 && no ?group= - with no organizer check in either, so the
+// owner of a 24-golfer round was told "Read-only. Ask the organizer for your
+// group's link." about himself, and had no way from the scorecard to Players.
+// Now: one canScoreBox() predicate shared by the badge, the banner and the
+// inputs; a "Score for: Group N" picker for the organizer, remembered per
+// round; Edit Round Setup at the TOP of the Round Menu; and the Matches/Bets
+// page asks the same question instead of reading the URL.
+// A device on v324 shows its own organizer a read-only card.
+const CACHE_VERSION = 'golfapp-v325-organizercontrols';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -60,7 +60,7 @@
     "action-center-mount": "|🔥 My Round|3 live · hide|👋 Which one are you?|choose|🏆 Weekly Game · $480|📍 KP 0/2 claimed · 🥩 0 skins won|🏅 NET FINISH · $100|1st $60 · 2nd $40|Winners show once every card is in.|📍 KP · $40|Hole 3 · |Pending|$20|Hole 7 · |Pending|$20|⚔️ Side Matches|⚔️ Ivy vs Jon|$20|›|Ivy is 2 up|$20 at stake|Thru 6|⚔️ Kim vs Vic|$30|›|Vic is 2 up|$30 at stake|Thru 6|Nothing here is settled yet.|+ SIDE BETS|",
     "fc-ticker-mount": "|🏆 LIVE LEADERBOARD — NET TO PAR|Full Leaderboard ›|T1|Ivy India|-6|T1|Quy Quebec|-6|T3|Cal Charlie|-5|T3|Fay Foxtrot|-5|T3|Kim Kilo|-5|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · NET · $20|Ivy v Jon|Ivy 2 UP|thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · NET · $30|Kim v Vic|Vic 2 UP|thru 6|OVERALL MATCH|Vic 2 UP|$30|",
     "live-skins-mount": "|WHOLE-FIELD NET SKINS · NO CARRY|Official thru 6|No skins won yet.|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|hide hole-by-hole|Hole 7 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 8 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 9 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 10 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 11 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 12 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 13 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 14 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 15 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 16 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 17 — Waiting on Groups 1, 2, 3, 4, 5, 6|Hole 18 — Waiting on Groups 1, 2, 3, 4, 5, 6|",
-    "group-lock-badge": "👁️ Spectator View (Read-Only)",
+    "group-lock-badge": "✏️ Organizer: pick a group to score",
     "course-title": "Closed Links",
     "format-subtitle": "Scope • STROKE PLAY (NET)",
     "group-filter-container": "|👥 All Players|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|🔗 Group Links|✏️ Edit round setup|👥 Players|",
@@ -74,7 +74,9 @@
     "ticker-status-val": "|Ann: |E| | |Ben: |-3| | |Cal: |-5| | |Dee: |-1| | |Eli: |-4| | |Fay: |-5| | |Gus: |-2| | |Hal: |-4| | |Ivy: |-6| | |Jon: |-2| | |Kim: |-5| | |Lee: |-1| | |Max: |-3| | |Ned: |-5| | |Oli: |-2| | |Pat: |-4| | |Quy: |-6| | |Rae: |-2| | |Sam: |-4| | |Tia: |E| | |Uma: |-3| | |Vic: |-5| | |Wes: |-1| | |Xan: |-4|",
     "kp-entry-mount": "|⛳ Hole 7 — Closest to the Pin|No KP yet.|",
     "live-ticker-mount": "|🥩 SKINS WON|Thru Hole 6|No official skins yet.|Tied holes are not shown · Official through Hole 6|⚔️ LIVE MATCHES &amp; PRESSES|2 wagers|Match Play · NET · $20|Ivy v Jon|Ivy 2 UP|thru 6|OVERALL MATCH|Ivy 2 UP|$20|Match Play · NET · $30|Kim v Vic|Vic 2 UP|thru 6|OVERALL MATCH|Vic 2 UP|$30|",
-    "qr-share-mount": "|📷 Show QR code|"
+    "qr-share-mount": "|📷 Show QR code|",
+    "setup-entry-mount": "|✏️ Edit Round Setup · Players, Tees, Groups|",
+    "spectator-hint-banner": "|Score for:|Group 1|Group 2|Group 3|Group 4|Group 5|Group 6|"
    },
    "display": {
     "detailed-breakdown-wrapper": "none",
@@ -261,6 +263,11 @@
    "date": "2026-10-07",
    "was": "9deb0f25",
    "why": "QR CODES (Wave 1). Show QR code joined the Round Menu, so a new element - #qr-share-mount - appears on every link. DIFFED BEFORE RE-PINNING, which is the whole point of a golden: across all three links, 0 text keys CHANGED, 1 ADDED (qr-share-mount, reading \"Show QR code\"), 0 removed, and the display map is untouched. The button is in the Round Menu for every golfer because it carries nothing an organizer has and a scorekeeper does not: the codes ARE the group links and the leaderboard, and qr-codes.js is never handed the round record that holds organizerToken. Nothing about scope, the card, the action centre or the note moved - which is what this golden exists to say."
+  },
+  {
+   "date": "2026-10-08",
+   "was": "7764b3a8",
+   "why": "THE ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND. The bare-link arm of this golden IS the organizer's own view, and it captured him being told \"Spectator View (Read-Only)\" with every score box disabled on a round he owns - which is the defect, now visible in the fixture as the thing that changed. DIFFED BEFORE RE-PINNING: on the BARE arm 1 text key changed (group-lock-badge, from the spectator badge to \"Organizer: pick a group to score\") and 2 were ADDED (setup-entry-mount, and the picker replacing the read-only sentence in spectator-hint-banner); on the two ?group= arms only setup-entry-mount was added, because a scorekeeper link behaves exactly as before - no badge, no banner and no lock changed on either. The read-only sentence is NOT deleted: a true spectator still gets it, asserted in organizer_scores_and_setup_test.js and measured in the browser (0 of 456 boxes editable, badge \"Spectator View (Read-Only)\"). CORRECTION, and the golden caught it: I first added setup-entry-mount to the two ?group= arms as well. It correctly does NOT render there - canReachSetup() refuses a group-locked link that carries no organizer evidence, and this fixture round has no ownerUid, so the bare arm is the only organizer view in it. Removed."
   }
  ]
 }

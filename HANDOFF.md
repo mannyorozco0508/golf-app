@@ -4759,6 +4759,47 @@ the dark state; `my_groups_test.js` holds the feature.
   1.0.7. database.rules.json and all ten money engines byte-identical; the 1.0.7
   review and Firebase were not touched.
 
+- **1.0.7 BUILD 15 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). THE
+  ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND.**
+
+  Manny on build 14, signed in as the owner, opening Myrtle Day 1 through "Open
+  a round you already have" - a BARE link. The delete control appeared, so the
+  organizer gate knew him. But the Round Menu had no Edit Round Setup, and the
+  scorecard said "Read-only. Ask the organizer for your group's link to enter
+  scores." To the organizer. About himself.
+
+  **THE CAUSE, and it was the same line twice.** Both the badge and every score
+  box were decided by POSITION ALONE - `players.length > 4 && no ?group=` - with
+  no organizer check in either. On any round above a foursome without a group
+  link, every viewer was a spectator, the owner included. The delete control was
+  right because it asks a different question; those two never asked it.
+
+  **THE FIX.** One predicate, `canScoreBox()`, now answers for the badge, the
+  banner and the inputs, so they cannot disagree. The organizer gets a
+  **"Score for: Group N" picker** where the read-only sentence used to be,
+  remembered per round so a reload does not lock him out again - a picker rather
+  than all 24 cards at once, because a mis-tap across six foursomes is a wrong
+  score on somebody else's card. **Edit Round Setup is the FIRST item in the
+  Round Menu** for the organizer, carrying the organizer token in its href.
+  Measured in the browser on the real P7S2BE as the real owner: setup entry
+  present, read-only sentence gone, badge "Organizer: pick a group to score",
+  and after picking Group 2, **76 of 456 boxes editable**. A true spectator on
+  the same round still gets the sentence and 0 editable.
+
+  **THE AUDIT (job 3).** trip.html and leaderboard.html gate no controls on the
+  group lock at all. skins.html and settlement.html use it only for scoping.
+  **sidematches.html (Bets/Matches) had the same defect**: `canPressSideMatch`
+  returned `!isMultiGroupRound` on a bare link, with the comment "the same URL
+  is what spectators hold, so it grants nothing" - true before the gate existed.
+  It now asks the same question index.html asks, through the same module, with
+  the trip-organizer inheritance included. organizer_gate_test.js's four-page
+  rule became five with the reason recorded; the constraint it actually protects
+  (read the predicate, never write the trial) is asserted for sidematches too.
+
+  `CURRENT_PROJECT_VERSION` 15 on both configurations, 1.0.7 unchanged. Cache
+  `golfapp-v325-organizercontrols` / `consumer-v160-organizercontrols`.
+  database.rules.json and all ten money engines byte-identical.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
