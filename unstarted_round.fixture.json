@@ -1,0 +1,159 @@
+{
+ "eventName": "Day 3",
+ "courseName": "Pine Lakes Country Club",
+ "gameFormat": "stroke",
+ "players": [
+  {
+   "hcp": "8",
+   "id": 101,
+   "name": "Manny",
+   "playingForMoney": true,
+   "squad": "red",
+   "team": "Team 1"
+  },
+  {
+   "hcp": "12",
+   "id": 102,
+   "name": "Reese",
+   "playingForMoney": true,
+   "squad": "red",
+   "team": "Team 1"
+  },
+  {
+   "hcp": "15",
+   "id": 103,
+   "name": "Marty",
+   "playingForMoney": true,
+   "squad": "red",
+   "team": "Team 1"
+  },
+  {
+   "hcp": "10",
+   "id": 104,
+   "name": "Tim",
+   "playingForMoney": true,
+   "squad": "red",
+   "team": "Team 1"
+  }
+ ],
+ "courseData": [
+  {
+   "hcpIndex": 15,
+   "hole": 1,
+   "par": 4
+  },
+  {
+   "hcpIndex": 9,
+   "hole": 2,
+   "par": 3
+  },
+  {
+   "hcpIndex": 1,
+   "hole": 3,
+   "par": 4
+  },
+  {
+   "hcpIndex": 17,
+   "hole": 4,
+   "par": 4
+  },
+  {
+   "hcpIndex": 3,
+   "hole": 5,
+   "par": 5
+  },
+  {
+   "hcpIndex": 7,
+   "hole": 6,
+   "par": 4
+  },
+  {
+   "hcpIndex": 13,
+   "hole": 7,
+   "par": 4
+  },
+  {
+   "hcpIndex": 5,
+   "hole": 8,
+   "par": 3
+  },
+  {
+   "hcpIndex": 11,
+   "hole": 9,
+   "par": 4
+  },
+  {
+   "hcpIndex": 10,
+   "hole": 10,
+   "par": 5
+  },
+  {
+   "hcpIndex": 18,
+   "hole": 11,
+   "par": 3
+  },
+  {
+   "hcpIndex": 8,
+   "hole": 12,
+   "par": 4
+  },
+  {
+   "hcpIndex": 4,
+   "hole": 13,
+   "par": 4
+  },
+  {
+   "hcpIndex": 2,
+   "hole": 14,
+   "par": 4
+  },
+  {
+   "hcpIndex": 16,
+   "hole": 15,
+   "par": 4
+  },
+  {
+   "hcpIndex": 14,
+   "hole": 16,
+   "par": 3
+  },
+  {
+   "hcpIndex": 12,
+   "hole": 17,
+   "par": 4
+  },
+  {
+   "hcpIndex": 6,
+   "hole": 18,
+   "par": 4
+  }
+ ],
+ "moneyPool": {
+  "buyIn": 20,
+  "enabled": true,
+  "kp": {
+   "amount": 20,
+   "holes": [
+    2,
+    8,
+    11,
+    16
+   ]
+  },
+  "net": {
+   "amount": 40,
+   "places": [
+    50,
+    30,
+    20
+   ]
+  },
+  "skins": {
+   "carryOver": true,
+   "mode": "remainder",
+   "scoring": "net"
+  }
+ },
+ "scores": {},
+ "roundDay": "Day 3"
+}

@@ -4483,10 +4483,30 @@ the dark state; `my_groups_test.js` holds the feature.
   byte-identical between build 8 and main, so the web carried them too. Bug 4
   is the same CSS on main, so the web has it as well.
 
-  **DEFERRED, MANNY'S CALL:** the same -$5 still appears on an unplayed round's
-  OWN Results page - the KP-refund rule applied to a round nobody started. Not
-  changed, because it is a different screen and a different rule from the trip
-  ledger.
+  **THAT DEFERRED ITEM IS NOW FIXED (2026-10-07, Manny said do it).** An
+  unplayed round's own Results page shows $0 for everyone. Measured on the real
+  Day 3 (3MKUCF, Pine Lakes, 0 scores, read from the live database and saved as
+  `unstarted_round.fixture.json`): $20 a golfer in, "$60 / 4" refunded = $15
+  back, and the $20 KP bucket held as "$5 in the pot" on four blank holes - so
+  the page said every golfer was $5 down on a round nobody played.
+  `settlement.html`'s pool section is now gated on settlement-engine's own
+  `started`, read through the page's existing `receiptSettlement()`, and renders
+  "Not played yet - it owes nobody anything." with $0 a golfer - the trip
+  ledger's rule and its exact sentence, pinned together so they cannot drift
+  apart.
+
+  NO ENGINE FILE MOVED, and that is asserted rather than claimed: ten money
+  files byte-identical by sha, and a test that deliberately pins the engine
+  STILL answering -$5 for an unstarted round. pool-engine.js keeps Manny's
+  2026-09-22 rule that KP money never goes back to the field; the page simply
+  stops asking it before the round starts. Guards:
+  `unstarted_round_results_test.js` (7 tests; 5 pass / 2 fail against the
+  pre-fix page - one of the five is an inert don't-regress pin, said so in the
+  header) and `tools/unstarted-results-check.js` (Chrome at 390px: 5 faults
+  before, 0 after, with a positive control that a fully played round still
+  renders the whole pool card). Cache `golfapp-v315-unplayedzero` /
+  `consumer-v150-unplayedzero`. 1.0.7 build 10 is unchanged - still READY TO
+  ARCHIVE, now with this fix in the bundle.
 
 ## Known open items
 

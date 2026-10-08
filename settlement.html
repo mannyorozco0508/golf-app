@@ -1609,6 +1609,42 @@ html {
         const r = computeMoneyPool(data, courseData, savedScores);
         if (!r) { mount.innerHTML = ''; return; }
         const $ = c => '$' + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+        // ------------------------------------------------------------------
+        // A ROUND NOBODY HAS STARTED OWES NOBODY ANYTHING (2026-10-07).
+        //
+        // Manny's rule, the same one the trip ledger now follows. Measured on
+        // his real Day 3 (3MKUCF, Pine Lakes, 0 scores): each golfer had paid
+        // $20 in, the card refunded "$60 / 4" = $15 each, and the KP bucket
+        // held "$5 in the pot" on each of four blank holes - so the Results
+        // page of a round nobody played said every golfer was $5 down.
+        // computeCombinedNetTotals agreed at -5 apiece.
+        //
+        // NOTHING IS RECOMPUTED AND NO ENGINE IS TOUCHED. pool-engine.js keeps
+        // Manny's 2026-09-22 rule that KP money never goes back to the field;
+        // that rule is not in question. The point is that a round nobody has
+        // started has no KP to resolve and no buy-in to account for yet, so
+        // this page must not present the pot's accounting at all - exactly as
+        // trip.html stops ASKING an unplayed round what it owes.
+        //
+        // `started` is settlement-engine's own predicate (at least one golfer
+        // with at least one hole), read through the page's own
+        // receiptSettlement() so there is one definition of started on this
+        // screen, not a second one here.
+        const poolStart = receiptSettlement(data, courseData, savedScores);
+        if (!poolStart.started) {
+            const esc = t => String(t).replace(/[&<>"]/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const buyIn = $(r.buyInCents || 0);
+            mount.innerHTML = '<div class="results-section-label">\uD83C\uDFC6 Weekly Game</div>'
+                + '<div class="settle-card">'
+                + '<div class="settle-header">Not played yet \u2014 it owes nobody anything.</div>'
+                + '<div class="ledger-row"><span>' + buyIn + ' a golfer is collected once the '
+                + 'round starts. Until then nothing is in the pot and nothing comes back.</span></div>'
+                + (data.players || []).map(pl => '<div class="ledger-row"><span>'
+                    + esc(pl.name) + '</span><span>$0</span></div>').join('')
+                + '</div>';
+            return;
+        }
         // ONE CARD PER GAME (v196, 2026-09-22): KP, Net Finish, Skins per flight -
         // sibling .game-card blocks under a small "Weekly Game" label, each with a
         // coloured head band, the title large, the pot on the right, the winners by
