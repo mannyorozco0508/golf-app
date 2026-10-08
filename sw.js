@@ -4396,7 +4396,18 @@
 // preview - arc spacing by zoom, labels clear of the line, banners in the bottom
 // row. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v320-gps-arcs';
+// GPS:BEGIN
+// Moved to v321 FOR HARDPAN GPS WAVE 2 (branch gps-wave2, on gps-wave1; 2026-10-08):
+// Esri World Imagery goes live (gps-config.js now carries the referrer-locked key)
+// with a fallback to USGS on four Esri errors in a row or no signal; "plays like"
+// under CENTER / PIN (USGS EPQS heights for course points, kept in localStorage);
+// and the free / Pro split (hasGpsPro: free is the numbers only, no map). No new
+// files join the shell; gps-view.js, gps-geo.js and gps-config.js changed. Esri
+// tiles and EPQS answers are never stored by this worker (cross-origin). The key
+// is "gps-wave-two", not "gps-wave2": the cache-key tests allow no digit after
+// the version number. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v321-gps-wave-two';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

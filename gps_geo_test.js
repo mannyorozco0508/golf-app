@@ -536,3 +536,65 @@ test('parseNwsWind: NWS hourly windSpeed / windDirection -> mph and the way it b
     [null, {}, { windSpeed: '10 km/h', windDirection: 'N' }, { windSpeed: '10 mph', windDirection: 'Calm' }, { windSpeed: '', windDirection: 'N' }]
         .forEach((p) => assert.strictEqual(geo.parseNwsWind(p), null, JSON.stringify(p)));
 });
+
+// ---- WAVE 2 (2026-10-08): PLAYS LIKE ------------------------------------------
+// Every expected number below is worked by hand from the formula in the
+// handoff, not by calling the function: D = 150 yds unless said.
+//   E = (to ft - from ft) / 3; head = mph cos(from - bearing);
+//   W = head > 0 ? D 0.01 head : D 0.005 head; T = D 0.001 (70 - F).
+test('playsLike: uphill and downhill (elevation only)', () => {
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 130 }).yards, 160);   // +30 ft = +10 yds
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 130, elevToFt: 100 }).yards, 140);   // -30 ft = -10 yds
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 50, elevToFt: 50 }).yards, 150);     // flat
+});
+test('playsLike: headwind, tailwind, crosswind and a quartering wind', () => {
+    // Into the face: from 90, shot to 90, 10 mph -> 150 x 0.01 x 10 = +15.
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: 90, shotBearingDeg: 90 }).yards, 165);
+    // Helping: from 270, shot to 90 -> head -10 -> 160 x 0.005 x -10 = -8.
+    assert.strictEqual(geo.playsLike({ yards: 160, windMph: 10, windFromDeg: 270, shotBearingDeg: 90 }).yards, 152);
+    // Straight across: from 0, shot to 90 -> head 0 -> no change.
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: 0, shotBearingDeg: 90 }).yards, 150);
+    // Quartering into: from 135, shot to 90 -> head 10 cos 45 = 7.071 -> +10.6.
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: 135, shotBearingDeg: 90 }).yards, 161);
+    // Calm (0 mph) is data: the term is there, and worth nothing.
+    assert.deepStrictEqual(Object.keys(geo.playsLike({ yards: 150, windMph: 0, windFromDeg: 0, shotBearingDeg: 90 }).terms), ['wind']);
+});
+test('playsLike: temperature, and everything together', () => {
+    assert.strictEqual(geo.playsLike({ yards: 150, tempF: 50 }).yards, 153);   // 150 x 0.001 x 20 = +3
+    assert.strictEqual(geo.playsLike({ yards: 150, tempF: 90 }).yards, 147);   // -3
+    // +10 (up 30 ft) +15 (10 mph into) +3 (50 F) = 178.
+    const all = geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 130, windMph: 10, windFromDeg: 90, shotBearingDeg: 90, tempF: 50 });
+    assert.strictEqual(all.yards, 178);
+    assert.deepStrictEqual(Object.keys(all.terms).sort(), ['elev', 'temp', 'wind']);
+});
+test('playsLike: missing data leaves its term out; no data at all is null', () => {
+    assert.strictEqual(geo.playsLike({ yards: 150 }), null);
+    assert.strictEqual(geo.playsLike(null), null);
+    assert.strictEqual(geo.playsLike({ yards: NaN, tempF: 50 }), null);
+    // One end of the slope unknown (null is NOT a height of 0): no elevation term.
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: null, elevToFt: 130 }), null);
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: undefined }), null);
+    // Wind without its direction, or without the shot's: no wind term.
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: null, shotBearingDeg: 90 }), null);
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: 90 }), null);
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: null, windFromDeg: 90, shotBearingDeg: 90 }), null);
+    // Each pair without the third.
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 130, tempF: 50 }).yards, 163);
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 130, windMph: 10, windFromDeg: 90, shotBearingDeg: 90 }).yards, 175);
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 10, windFromDeg: 90, shotBearingDeg: 90, tempF: 50 }).yards, 168);
+    // A bad value in one term does not poison the others.
+    assert.strictEqual(geo.playsLike({ yards: 150, elevFromFt: 'x', elevToFt: 130, tempF: 50 }).yards, 153);
+});
+test('parseNwsTempF: the NWS period temperature, Celsius converted', () => {
+    assert.strictEqual(geo.parseNwsTempF({ temperature: 72, temperatureUnit: 'F' }), 72);
+    assert.strictEqual(geo.parseNwsTempF({ temperature: 20, temperatureUnit: 'C' }), 68);
+    assert.strictEqual(geo.parseNwsTempF({ temperature: 61 }), 61);
+    [null, {}, { temperature: '72' }, { temperature: NaN }].forEach((p) => assert.strictEqual(geo.parseNwsTempF(p), null, JSON.stringify(p)));
+});
+test('alongLine (now exported): how far along tee -> green a point projects', () => {
+    const a = geo.alongLine([0.0001, 0.0005], [[0, 0], [0, 0.001]]);
+    assert.ok(Math.abs(a.t - 0.5) < 1e-6, 't ' + a.t);
+    assert.ok(Math.abs(a.d - 11.13) < 0.1, 'd ' + a.d);   // 0.0001 deg of latitude ~ 11.1 m
+    assert.strictEqual(geo.alongLine([0, -0.001], [[0, 0], [0, 0.001]]).t, 0);   // behind the tee
+    assert.strictEqual(geo.alongLine([0, 0.002], [[0, 0], [0, 0.001]]).t, 1);    // past the green
+});

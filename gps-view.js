@@ -65,14 +65,17 @@
     // ---- IMAGERY -----------------------------------------------------------
     var TILES = {
         keyedUrl: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}',
+        // Esri's tiles stop at z19: the SOURCE never asks past it. Beyond 19 the
+        // map enlarges the z19 tiles (to maxZoom) with no extra requests. Asking
+        // past its coverage is worse than useless - Esri answers HTTP 200 with a
+        // "Map data not yet available" picture, not an error, so nothing falls back.
         maxNativeZoom: 19,
         maxZoom: 21,
-        // Esri: "Powered by Esri" on the map, plus the service's own data credits,
-        // read at runtime from its copyrightText because they change (Maxar became
-        // Vantor in 2026). fallbackCredit is what the service said on 2026-10-06.
+        // Esri's required credit, word for word (Wave 2, 2026-10-08). Fixed text,
+        // not read at runtime: the attribution Esri requires for this key is this
+        // exact line, and one less request per round.
         poweredBy: 'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>',
-        metaUrl: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer?f=json&token={key}',
-        fallbackCredit: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
+        credit: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
         // USGS Imagery Only: public domain (USDA NAIP via The National Map), no key,
         // no account. Native to z16 - the service's maxScale is 1:9,028, and z17
         // answers 404 (measured 2026-10-06). Beyond 16 MapLibre enlarges z16 tiles (to 18).
@@ -89,17 +92,40 @@
     var PRECACHE_DAYS = 30;
     var PRECACHE_CAP = 400;                         // tiles; a course measures 15-36
 
-    function esriKey() {
-        try { return String((window.HARDPAN_GPS_CONFIG && window.HARDPAN_GPS_CONFIG.esriKey) || ''); } catch (e) { return ''; }
+    function cfg() {
+        try { return (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {}; } catch (e) { return {}; }
     }
+    function esriKey() { return String(cfg().esriKey || ''); }
     // A CHECK'S STAND-IN FOR ESRI: tools/gps-check.js points this at a local image so
     // a "working Esri layer" can be measured without a key. Unset in every build.
-    function esriTileUrl() {
-        try { return String((window.HARDPAN_GPS_CONFIG && window.HARDPAN_GPS_CONFIG.esriTileUrl) || '') || TILES.keyedUrl; } catch (e) { return TILES.keyedUrl; }
+    function esriTileUrl() { return String(cfg().esriTileUrl || '') || TILES.keyedUrl; }
+
+    // ---- HARDPAN GPS PRO: THE ONE CHECK (Wave 2, 2026-10-08) -----------------
+    // Free: the numbers (FRONT / CENTER / BACK, accuracy, Enter Score) and no map.
+    // Pro: everything else - the satellite hole, arcs, target, Edit Pin, wind,
+    // plays like. This is the ONLY place that decides; in-app purchase plugs in
+    // here later (step 3) and nowhere else. In order:
+    //   1. a tester's override: ?gpstier=free | pro | clear, kept on the phone;
+    //   2. HARDPAN_GPS_CONFIG.paywall - false (this wave) means everyone is Pro;
+    //   3. (later) the App Store entitlement. Until it exists, paywall on = free.
+    var TIER_KEY = 'hardpan_gps_tier';
+    function readTierParam() {
+        try {
+            var m = /[?&]gpstier=(free|pro|clear)\b/.exec(String(window.location.search || ''));
+            if (!m) return;
+            if (m[1] === 'clear') localStorage.removeItem(TIER_KEY);
+            else localStorage.setItem(TIER_KEY, m[1]);
+        } catch (e) {}
     }
-    function esriMetaUrl() {
-        try { return String((window.HARDPAN_GPS_CONFIG && window.HARDPAN_GPS_CONFIG.esriMetaUrl) || '') || TILES.metaUrl; } catch (e) { return TILES.metaUrl; }
+    function hasGpsPro() {
+        var t = null;
+        try { t = localStorage.getItem(TIER_KEY); } catch (e) {}
+        if (t === 'free') return false;
+        if (t === 'pro') return true;
+        if (cfg().paywall !== true) return true;
+        return false;
     }
+    if (typeof window !== 'undefined' && window.location) readTierParam();
 
     // ---- STATE --------------------------------------------------------------
     var S = null;          // the mounted GPS side for this round, or null
@@ -370,18 +396,53 @@
             });
         });
     }
-    var creditCache = null;
     function escapeText(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-    function esriAttribution() { return TILES.poweredBy + ' | ' + escapeText(creditCache || TILES.fallbackCredit); }
+    function esriAttribution() { return TILES.poweredBy + ' | ' + escapeText(TILES.credit); }
+    // The Esri layer's source, in ONE place: its tiles never past z19.
+    function esriSource(key) {
+        return { type: 'raster', tiles: [esriTileUrl().replace('{key}', encodeURIComponent(key))], tileSize: 256, maxzoom: TILES.maxNativeZoom,
+                 attribution: esriAttribution() };
+    }
     function usgsSourceTiles() { return ['hpusgs://{z}/{y}/{x}?r=' + (S ? S.usgsGen : 0)]; }
     // Ask MapLibre to fetch USGS again - after USGS becomes the picture (Esri
     // failed, or a green is being set), tiles it was refused earlier can now come.
     function refreshUsgs() {
         if (!S || !S.map || !S.map.getSource('usgs')) return;
         S.usgsGen++;
+        // Refusals from before (USGS was not the picture then) no longer count.
+        S.usgsErrs = 0;
         try { S.map.getSource('usgs').setTiles(usgsSourceTiles()); } catch (e) {}
     }
-    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && S.mode === 'measure' && !S.editingPin) ? 20 : 18; }
+    // Esri on the map: z21 (z19 tiles, enlarged). USGS: z18 (z16 tiles, enlarged).
+    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && S.mode === 'measure' && !S.editingPin) ? TILES.maxZoom : 18; }
+
+    // ---- ESRI STOPS ANSWERING: USGS TAKES OVER ----------------------------------
+    // Four Esri tile errors IN A ROW (a tile that loads resets the count) hand the
+    // picture to USGS for the rest of the round - whether Esri never answered (a
+    // host the key does not list: 403) or stopped mid-round (the free tier's 2M
+    // tiles used up - the account has no card, so it stops rather than bills - the
+    // key expired, or the signal went). Losing the signal does it at once. No
+    // retry loop: Esri is tried again once, only if it was the signal that went.
+    var ESRI_ERRS_TO_FAIL = 4;
+    function dropEsri(why) {
+        if (!S || !S.esriOn || S.esriFailed) return;
+        S.esriFailed = true; S.esriFailWhy = why; S.esriFailAt = S.esriErrRun || 0;
+        if (S.map) {
+            try { if (S.map.getLayer('esri')) S.map.setLayoutProperty('esri', 'visibility', 'none'); } catch (x) {}
+            try { S.map.setMaxZoom(maxZoomNow()); } catch (x) {}
+            refreshUsgs();
+            reportMapState();
+        }
+    }
+    function onOffline() { dropEsri('offline'); }
+    function onOnline() {
+        if (!S || !S.esriFailed || S.esriFailWhy !== 'offline' || S.esriRetried || !S.map || !S.map.getSource('esri')) return;
+        S.esriRetried = true;
+        S.esriFailed = false; S.esriFailWhy = null; S.esriErrRun = 0;
+        // Tiles that failed while offline are asked for again.
+        try { S.map.getSource('esri').setTiles(esriSource(esriKey()).tiles); } catch (x) {}
+        syncImageryForMode();
+    }
 
     // ---- THE MAP --------------------------------------------------------------
     var EMPTY = { type: 'FeatureCollection', features: [] };
@@ -393,7 +454,10 @@
         addUsgsProtocol(ml);
         var key = esriKey();
         S.esriOn = !!key;
-        S.esriFailed = !key || (typeof navigator !== 'undefined' && navigator.onLine === false);
+        var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        S.esriFailed = !key || offline;
+        S.esriFailWhy = !key ? 'no-key' : (offline ? 'offline' : null);
+        S.esriErrRun = 0;
         S.tileErrors = 0; S.tileLoads = 0; S.usgsGen = 0;
         var sources = {
             usgs: { type: 'raster', tiles: usgsSourceTiles(), tileSize: 256, maxzoom: TILES.usgs.maxNativeZoom,
@@ -417,10 +481,11 @@
             { id: 'line-to', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'to'], paint: { 'line-color': '#facc15', 'line-width': 2 } },
             { id: 'line-on', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'on'], paint: { 'line-color': '#ffffff', 'line-width': 2 } }
         ];
-        if (S.esriOn && !S.esriFailed) {
-            sources.esri = { type: 'raster', tiles: [esriTileUrl().replace('{key}', encodeURIComponent(key))], tileSize: 256, maxzoom: 19,
-                             attribution: esriAttribution() };
-            layers.splice(2, 0, { id: 'esri', type: 'raster', source: 'esri' });
+        // With a key the Esri layer is always there - hidden while it has failed, so
+        // it can come back once if the signal does. A hidden layer asks for nothing.
+        if (S.esriOn) {
+            sources.esri = esriSource(key);
+            layers.splice(2, 0, { id: 'esri', type: 'raster', source: 'esri', layout: { visibility: S.esriFailed ? 'none' : 'visible' } });
         }
         var map;
         try {
@@ -448,21 +513,17 @@
             if (!S || S.map !== map) return;
             var sid = e && e.sourceId;
             if (sid === 'esri') {
+                // Esri is not answering - in a row, however many tiles loaded before.
                 S.esriErrs = (S.esriErrs || 0) + 1;
-                // Esri is not answering: no signal, or the free tier is used up on an
-                // account with no card (by design). Hand the picture to USGS.
-                if (!S.esriFailed && S.esriErrs >= 4 && !S.esriLoads) {
-                    S.esriFailed = true;
-                    try { map.setLayoutProperty('esri', 'visibility', 'none'); } catch (x) {}
-                    map.setMaxZoom(maxZoomNow());
-                    refreshUsgs();
-                }
+                S.esriErrRun = (S.esriErrRun || 0) + 1;
+                if (S.esriErrRun >= ESRI_ERRS_TO_FAIL) dropEsri('errors');
             }
+            if (sid === 'usgs') S.usgsErrs = (S.usgsErrs || 0) + 1;
             if (sid === 'usgs' || sid === 'esri') { S.tileErrors++; syncNoTiles(); }
         });
         map.on('data', function (e) {
             if (!S || S.map !== map || !e || e.dataType !== 'source' || !e.tile) return;
-            if (e.sourceId === 'esri') S.esriLoads = (S.esriLoads || 0) + 1;
+            if (e.sourceId === 'esri') { S.esriLoads = (S.esriLoads || 0) + 1; S.esriErrRun = 0; }
             if (e.sourceId === 'usgs' || e.sourceId === 'esri') { S.tileLoads++; syncNoTiles(); reportMapState(); }
         });
         map.on('moveend', function () { if (S && S.map === map) reportMapState(); });
@@ -484,7 +545,6 @@
         map.on('load', function () {
             if (!S || S.map !== map) return;
             S.styleReady = true;
-            refreshEsriCredit(key);
             frameHole(true);
             render();
             // READY: loaded, framed on the hole and drawn. data-zoom alone is not
@@ -492,26 +552,6 @@
             // for it read a map still at its world view, tee at x -255).
             el.setAttribute('data-ready', '1');
         });
-    }
-
-    // Esri's own credit line, read at runtime (Maxar became Vantor in 2026). Only
-    // the service metadata URL - the key, nothing about the golfer.
-    function refreshEsriCredit(key) {
-        if (!key || creditCache || typeof fetch !== 'function') return;
-        fetch(esriMetaUrl().replace('{key}', encodeURIComponent(key))).then(function (r) { return r.json(); }).then(function (j) {
-            var c = j && typeof j.copyrightText === 'string' ? j.copyrightText.trim() : '';
-            if (!c || c === TILES.fallbackCredit) return;
-            creditCache = c;
-            // A source's attribution is fixed when it is added, so re-add the Esri
-            // source and layer with the real credit.
-            if (!S || !S.map || !S.map.getSource('esri')) return;
-            var m = S.map, vis = m.getLayoutProperty('esri', 'visibility') || 'visible';
-            try {
-                m.removeLayer('esri'); m.removeSource('esri');
-                m.addSource('esri', { type: 'raster', tiles: [esriTileUrl().replace('{key}', encodeURIComponent(key))], tileSize: 256, maxzoom: 19, attribution: esriAttribution() });
-                m.addLayer({ id: 'esri', type: 'raster', source: 'esri', layout: { visibility: vis } }, 'hole-line');
-            } catch (e) {}
-        }, function () { /* offline: the fallback credit stays */ });
     }
 
     // WHAT THE MAP IS DOING, on the map element - so a check (and anybody with the
@@ -523,6 +563,10 @@
         var esri = !S.esriOn ? 'off' : (S.esriFailed ? 'failed' : (S.map.getLayer('esri') ? (S.map.getLayoutProperty('esri', 'visibility') || 'visible') : 'off'));
         el.setAttribute('data-esri', esri);
         el.setAttribute('data-esri-loads', String(S.esriLoads || 0));
+        el.setAttribute('data-esri-why', S.esriFailWhy || '');
+        el.setAttribute('data-esri-fail-at', S.esriFailed && S.esriFailWhy === 'errors' ? String(S.esriFailAt) : '');
+        var es = S.map.getSource('esri');
+        el.setAttribute('data-esri-src-max', es ? String(es.maxzoom) : '');
         el.setAttribute('data-tiles-loaded', String(S.tileLoads || 0));
         el.setAttribute('data-max-zoom', String(S.map.getMaxZoom()));
         el.setAttribute('data-bearing', String(Math.round(S.map.getBearing())));
@@ -546,10 +590,12 @@
         if (S.attribAt != null && h !== S.attribAt) frameHole(false);
     }
 
-    // The plain background only when NOTHING has drawn.
+    // The plain background only when NOTHING has drawn - and USGS, the picture
+    // of last resort, has failed too (Esri refusing while USGS is still on its
+    // way is not "no signal": Wave 2 found the note flashing up on a 403).
     function syncNoTiles() {
         if (!S) return;
-        var on = S.tileLoads === 0 && S.tileErrors >= 4;
+        var on = S.tileLoads === 0 && (S.usgsErrs || 0) >= 4 && (!S.esriOn || !!S.esriFailed);
         S.noTiles = on;
         var el = S.el.querySelector('.gps-map');
         if (el) {
@@ -591,6 +637,8 @@
         var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
         G = G || window.HardPanGeo || null;
         if (!courseKey || !G) return why('no-course');
+        // Free: no map, so no imagery stored either.
+        if (!hasGpsPro()) return why('free');
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return why('offline');
         if (typeof caches === 'undefined' || typeof fetch !== 'function') return why('unsupported');
         try {
@@ -877,7 +925,7 @@
     // the hole changes. Dragging it does not pan the map (a marker drag belongs to
     // the marker); a drag anywhere else pans, and two fingers zoom.
     function placeTarget(r) {
-        if (!S || S.targetMoved) return;
+        if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
         var p = (o && center) ? G.midpoint(o.pt, center) : null;
         if (p) S.target = p;
@@ -897,7 +945,7 @@
         if (!S || !G) return;
         var r = resolved(), o = origin(r);
         var u = units();
-        var on = !!S.target && S.mode === 'measure';
+        var on = !!S.target && S.mode === 'measure' && S.pro;
         show('.gps-target-row', on);
         if (!on) return;
         var who = o && o.from === 'tee' ? 'Tee' : 'You';
@@ -1104,7 +1152,9 @@
         }).then(function (r) { if (!r.ok) throw new Error('nws ' + r.status); return r.json(); }).then(function (j) {
             var per = j && j.properties && j.properties.periods && j.properties.periods[0];
             var w = G.parseNwsWind(per);
-            lsSet(key, w ? { at: Date.now(), mph: w.mph, toDeg: w.toDeg, fromDeg: w.fromDeg } : { at: Date.now(), none: true });
+            // The same reading's temperature, for plays like - no second request.
+            var tf = G.parseNwsTempF(per);
+            lsSet(key, w ? { at: Date.now(), mph: w.mph, toDeg: w.toDeg, fromDeg: w.fromDeg, tempF: tf } : { at: Date.now(), none: true, tempF: tf });
             done();
             if (S === mine) syncWind();
         }).catch(function () { done(); if (S === mine) { S.windFailedAt = Date.now(); syncWind(); } });
@@ -1113,6 +1163,9 @@
         if (!S) return;
         var box = S.el.querySelector('.gps-wind');
         if (!box) return;
+        // Free (no HardPan GPS): no wind, and no request for it.
+        if (!S.pro) { box.style.display = 'none'; return; }
+        syncPlays();
         var w = lsGet(windKey()), now = Date.now();
         var stale = !w || now - w.at > WIND_FRESH_MS;
         // Ask again when stale - but not more than once a minute after a failure.
@@ -1129,6 +1182,130 @@
         box.setAttribute('data-rot', String(rot));
         box.setAttribute('aria-label', 'Wind ' + w.mph + ' mph from ' + ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(w.fromDeg / 22.5) % 16]);
     }
+
+    // ---- PLAYS LIKE (Wave 2) -----------------------------------------------------
+    // "plays 158" under CENTER / PIN: gps-geo.playsLike on the slope, the wind and
+    // the temperature. ELEVATION comes from the USGS Elevation Point Query Service
+    // (free, no key, US only) for COURSE POINTS ONLY - the tee, 25 / 50 / 75 % of
+    // the way to the green, the green's center and today's saved pin, each to 5
+    // decimals - never the golfer's position (see PRIVACY above). The golfer's
+    // height is worked out ON THE PHONE: their spot projected onto the tee ->
+    // green line, between the two sampled points either side. Each point is asked
+    // for once, ever (kept on the phone), one request at a time, only for the hole
+    // on screen, while GPS is showing and there is signal. WIND and TEMPERATURE
+    // are the wind box's own NWS reading (no other request), used up to an hour
+    // old. No data for a term: that term is left out. No data at all, under 30
+    // yds, on the green or outside the US: the line is quietly not there.
+    var EPQS_URL = 'https://epqs.nationalmap.gov/v1/json?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
+    var ELEV_PREFIX = 'hardpan_elev_v1_';
+    var PLAYS_MIN_YD = 30;
+    var ELEV_T = [0, 0.25, 0.5, 0.75, 1];
+    function epqsUrl(p) { return String(cfg().epqsUrl || EPQS_URL).replace('{lng}', String(p[1])).replace('{lat}', String(p[0])); }
+    function r5(p) { return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]; }
+    function lerp(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+    function elevKey(p) { var q = r5(p); return ELEV_PREFIX + q[0] + ',' + q[1]; }
+    // Feet, or null: not asked yet, or the service had no height there.
+    function elevAt(p) { var v = p ? lsGet(elevKey(p)) : null; return v && typeof v.ft === 'number' ? v.ft : null; }
+    // The lower 48, Alaska, Hawaii: where USGS heights and NWS forecasts exist.
+    function inUS(p) {
+        if (!p) return false;
+        var la = p[0], lo = p[1];
+        return (la > 24.3 && la < 49.5 && lo > -125 && lo < -66.8) || (la > 51 && la < 71.6 && lo > -170 && lo < -129.9)
+            || (la > 18.8 && la < 22.4 && lo > -160.5 && lo < -154.7);
+    }
+    // The course points for this hole: tee, three along the line, the green's
+    // center, and today's SAVED pin (a pin being dragged uses the center's height).
+    function elevPoints(r) {
+        if (!r || !r.tee || !r.mid) return [];
+        var pts = ELEV_T.map(function (t) { return t === 0 ? r.tee : (t === 1 ? r.mid : lerp(r.tee, r.mid, t)); });
+        var k = holeKey(S.hole);
+        var saved = (S.localLocs && Object.prototype.hasOwnProperty.call(S.localLocs, k)) ? G.pinPt(S.localLocs[k]) : G.pinPt(S.round && S.round.pinLocs && S.round.pinLocs[k]);
+        if (saved) pts.push(saved);
+        return pts.map(r5);
+    }
+    function fetchElevs() {
+        if (!S || !S.pro || S.side !== 'gps' || S.elevInFlight || typeof fetch !== 'function') return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        if (S.elevFailedAt && Date.now() - S.elevFailedAt < 60000) return;
+        var pts = elevPoints(resolved());
+        if (!pts.length || !inUS(pts[0])) return;
+        var p = pts.filter(function (q) { return lsGet(elevKey(q)) == null; })[0];
+        if (!p) return;
+        var mine = S, k = elevKey(p);
+        S.elevInFlight = true;
+        fetch(epqsUrl(p), { mode: 'cors', credentials: 'omit' }).then(function (res) { if (!res.ok) throw new Error('epqs ' + res.status); return res.json(); }).then(function (j) {
+            var v = j && j.value != null ? Number(j.value) : NaN;
+            // -1000000 (or anything at or below -1000) is the service's "no data".
+            lsSet(k, isFinite(v) && v > -1000 ? { ft: Math.round(v * 10) / 10 } : { none: 1 });
+            mine.elevInFlight = false;
+            if (S === mine) { syncPlays(); fetchElevs(); }
+        }).catch(function () { mine.elevInFlight = false; mine.elevFailedAt = Date.now(); });
+    }
+    // The golfer's height: their spot projected onto the tee -> green line, between
+    // the sampled points either side. From the tee: the tee's.
+    function originElev(r, o) {
+        // No tee (a green tapped on an unmapped hole): no line to sample, no slope.
+        if (!r.tee || !r.mid) return null;
+        if (o.from === 'tee') return elevAt(r.tee);
+        var t = Math.max(0, Math.min(1, G.alongLine(o.pt, [r.tee, r.mid]).t));
+        for (var i = 1; i < ELEV_T.length; i++) {
+            if (t <= ELEV_T[i]) {
+                var a = elevAt(lerp(r.tee, r.mid, ELEV_T[i - 1])), b = elevAt(lerp(r.tee, r.mid, ELEV_T[i]));
+                if (ELEV_T[i - 1] === 0) a = elevAt(r.tee);
+                if (ELEV_T[i] === 1) b = elevAt(r.mid);
+                if (a == null || b == null) return null;
+                return a + (b - a) * (t - ELEV_T[i - 1]) / (ELEV_T[i] - ELEV_T[i - 1]);
+            }
+        }
+        return null;
+    }
+    function playsNow() {
+        if (!S || !S.pro || S.mode !== 'measure') return null;
+        var r = resolved(), o = origin(r), aim = aimAt(r);
+        if (!r || !o || !aim || !inUS(aim)) return null;
+        var nums = G.holeNumbers(o.pt, r);
+        if (nums && nums.onGreen) return null;
+        var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
+        if (D < PLAYS_MIN_YD) return null;
+        var w = lsGet(windKey()), fresh = !!(w && Date.now() - w.at <= WIND_SHOW_MS);
+        var pin = pinLoc();
+        var to = (pin && elevAt(pin) != null) ? elevAt(pin) : elevAt(r.mid);
+        return G.playsLike({
+            yards: D, elevFromFt: originElev(r, o), elevToFt: to,
+            windMph: fresh && !w.none ? w.mph : null, windFromDeg: fresh && !w.none ? w.fromDeg : null,
+            shotBearingDeg: G.bearingDeg(o.pt, aim), tempF: fresh && typeof w.tempF === 'number' ? w.tempF : null
+        });
+    }
+    function syncPlays() {
+        if (!S) return;
+        var el = S.el.querySelector('.gps-plays');
+        if (!el) return;
+        fetchElevs();
+        var pl = playsNow();
+        var text = pl ? 'plays ' + (units() === 'm' ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) : '';
+        if (el.textContent !== text) el.textContent = text;
+        // Its line is kept either way, so the map does not jump when it appears.
+        el.style.visibility = pl ? '' : 'hidden';
+        el.setAttribute('data-terms', pl ? Object.keys(pl.terms).join(' ') : '');
+    }
+
+    // ---- THE UPGRADE SHEET (Wave 2: shown, nothing sold yet) -------------------------
+    // The first time GPS is shown in a session without HardPan GPS, and from "Get
+    // HardPan GPS" on the panel. The buy button is "Coming soon" until the App
+    // Store purchase exists.
+    var SHEET_SEEN = 'hardpan_gps_sheet_seen';
+    var sheetSeenHere = false;
+    function sheetSeen() {
+        try { if (sessionStorage.getItem(SHEET_SEEN) === '1') return true; } catch (e) {}
+        return sheetSeenHere;
+    }
+    function openSheet() {
+        if (!S) return;
+        sheetSeenHere = true;
+        try { sessionStorage.setItem(SHEET_SEEN, '1'); } catch (e) {}
+        show('.gps-sheet', true);
+    }
+    function closeSheet() { show('.gps-sheet', false); }
 
     // ---- NO PULL-DOWN ON GPS ----------------------------------------------------
     // A drag on the GPS side moves the map and nothing else: no page scroll, no
@@ -1225,7 +1402,7 @@
         // Shown while the green is still OSM's; gone once anyone sets or fixes it.
         var osmRec = osmRecord(S.courseKey);
         var note = (r && r.source === 'osm' && osmRec && osmRec.verify && osmRec.verify[String(S.hole)]) || '';
-        txt('.gps-verify', note ? '⚠ Verify green: ' + note + (S.canFix ? ' Use "Fix the green" if it is off.' : ' The organizer can fix it.') : '');
+        txt('.gps-verify', note ? '⚠ Verify green: ' + note + (S.canFix && S.pro ? ' Use "Fix the green" if it is off.' : (S.pro ? ' The organizer can fix it.' : '')) : '');
         show('.gps-verify', !!note && S.mode === 'measure');
 
         placeTarget(r);
@@ -1245,9 +1422,10 @@
         show('.gps-banner', !!banner);
 
         var pinning = S.mode !== 'measure' || !!S.editingPin;
-        show('.gps-set-green', !pinning && noGreen && !S.loadingCourses);
-        show('.gps-fix-green', !pinning && !noGreen && !!S.canFix);
-        show('.gps-edit-pin', !pinning && !noGreen);
+        // Free: no map, so nothing to tap or drag - the numbers only.
+        show('.gps-set-green', S.pro && !pinning && noGreen && !S.loadingCourses);
+        show('.gps-fix-green', S.pro && !pinning && !noGreen && !!S.canFix);
+        show('.gps-edit-pin', S.pro && !pinning && !noGreen);
         show('.gps-pin-save', !!S.editingPin);
         show('.gps-pin-cancel', !!S.editingPin);
         show('.gps-pin-clear', !!S.editingPin && !!(S.localLocs && S.localLocs[holeKey(S.hole)] !== undefined ? S.localLocs[holeKey(S.hole)] : (S.round && S.round.pinLocs && S.round.pinLocs[holeKey(S.hole)])));
@@ -1255,10 +1433,12 @@
         txt('.gps-score', 'Hole ' + S.hole + ' · Enter Score');
         var scoreOn = !pinning && typeof S.openScore === 'function';
         show('.gps-score', scoreOn);
+        txt('.gps-score-basic', 'Hole ' + S.hole + ' · Enter Score');
+        show('.gps-score-basic', !S.pro && typeof S.openScore === 'function');
         // Both in the bottom row (an unmapped hole says so while measuring): the
         // banner goes up one row, above the score button.
         S.el.classList.toggle('gps-banner-up', scoreOn && !!banner);
-        var canUndo = !pinning && !!S.canFix && r && r.source === 'pin' && r.pin && !!G.undoPin(r.pin, 1);
+        var canUndo = S.pro && !pinning && !!S.canFix && r && r.source === 'pin' && r.pin && !!G.undoPin(r.pin, 1);
         show('.gps-undo-green', !!canUndo);
         show('.gps-skip', S.mode === 'setFront' || S.mode === 'setBack');
         show('.gps-addedges', S.mode === 'confirmMid');
@@ -1300,13 +1480,18 @@
         + '<div class="gps-panel">'
         +   '<div class="gps-nums">'
         +     '<div class="gps-num"><div class="gps-lbl">FRONT</div><div class="gps-big gps-f">—</div></div>'
-        +     '<div class="gps-num gps-num-mid"><div class="gps-lbl gps-lbl-mid">CENTER</div><div class="gps-big gps-m">—</div></div>'
+        +     '<div class="gps-num gps-num-mid"><div class="gps-lbl gps-lbl-mid">CENTER</div><div class="gps-big gps-m">—</div><div class="gps-plays" style="visibility:hidden"></div></div>'
         +     '<div class="gps-num"><div class="gps-lbl">BACK</div><div class="gps-big gps-b">—</div></div>'
         +   '</div>'
         +   '<div class="gps-sub"><span class="gps-acc"></span><span class="gps-src"></span></div>'
         +   '<div class="gps-msg" style="display:none"></div>'
         +   '<div class="gps-verify" style="display:none"></div>'
         +   '<div class="gps-target-row" style="display:none"><span class="gps-to-here"></span><span class="gps-here-center"></span></div>'
+        // FREE (no HardPan GPS): the hole's score entry and the way to the upgrade.
+        +   '<div class="gps-basic">'
+        +     '<button type="button" class="gps-btn gps-primary gps-score-basic" style="display:none"></button>'
+        +     '<button type="button" class="gps-get-pro">Get HardPan GPS</button>'
+        +   '</div>'
         +   '<div class="gps-actions">'
         +     '<button type="button" class="gps-btn gps-set-green" style="display:none">Tap the center of the green</button>'
         +     '<button type="button" class="gps-btn gps-edit-pin" style="display:none">Edit Pin</button>'
@@ -1319,6 +1504,15 @@
         +     '<button type="button" class="gps-btn gps-skip" style="display:none">Skip</button>'
         +     '<button type="button" class="gps-btn gps-primary gps-save" style="display:none">Save green</button>'
         +     '<button type="button" class="gps-btn gps-cancel" style="display:none">Cancel</button>'
+        +   '</div>'
+        + '</div>'
+        + '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="HardPan GPS" style="display:none">'
+        +   '<div class="gps-sheet-card">'
+        +     '<div class="gps-sheet-title">HardPan GPS</div>'
+        +     '<div class="gps-sheet-price">$29.99/year · 7-day free trial</div>'
+        +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Yardage arcs</li><li>Edit Pin (today\'s pin)</li><li>Wind</li><li>Plays-like yardage</li></ul>'
+        +     '<button type="button" class="gps-sheet-buy" disabled>Coming soon</button>'
+        +     '<button type="button" class="gps-sheet-close">Not now</button>'
         +   '</div>'
         + '</div>';
 
@@ -1351,7 +1545,7 @@
         // 1x and Recenter buttons and the green being tapped (Wave 1 screenshot).
         + '#gps-overlay .gps-banner{position:absolute;bottom:calc(var(--gps-attrib-h,20px) + 8px);left:50%;transform:translateX(-50%);z-index:1000;background:rgba(0,0,0,.82);'
         +   'padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;white-space:nowrap;max-width:calc(100% - 156px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
-        + '#gps-overlay .gps-tiles-note{position:absolute;bottom:26px;left:8px;right:8px;z-index:1000;text-align:center;font-size:13px;color:#d1d5db;}'
+        + '#gps-overlay .gps-tiles-note{position:absolute;bottom:calc(var(--gps-attrib-h,20px) + 54px);left:8px;right:8px;z-index:1000;text-align:center;font-size:13px;color:#d1d5db;text-shadow:0 0 3px #000;}'
         + '#gps-overlay .maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
         + '#gps-overlay .maplibregl-ctrl-attrib a{color:#0b4f8a;}'
         + '#gps-overlay .gps-zoom{position:absolute;left:10px;top:10px;z-index:3;background:rgba(11,15,12,.82);font-size:14px;font-weight:700;min-height:36px;min-width:44px;padding:6px 10px;}'
@@ -1396,6 +1590,25 @@
         // the others: 11vw lets "9999" fit at 320px (12.5vw overflowed by 2px - the
         // fit arm of tools/gps-check.js caught it).
         + '#gps-overlay .gps-num-mid .gps-big{font-size:clamp(30px,11vw,54px);color:#d9f99d;}'
+        // PLAYS LIKE under CENTER / PIN; its line is always kept (no jump).
+        + '#gps-overlay .gps-plays{font-size:13px;line-height:15px;min-height:15px;font-weight:700;color:#a7b3aa;white-space:nowrap;}'
+        // FREE: no map - the numbers fill the screen, with Enter Score under them.
+        + '#gps-overlay .gps-basic{display:none;}'
+        + '#gps-overlay.gps-basic-mode .gps-map-wrap{display:none;}'
+        + '#gps-overlay.gps-basic-mode .gps-panel{flex:1;display:flex;flex-direction:column;justify-content:center;padding:12px 16px;}'
+        + '#gps-overlay.gps-basic-mode .gps-big{font-size:clamp(34px,13vw,64px);}'
+        + '#gps-overlay.gps-basic-mode .gps-num-mid .gps-big{font-size:clamp(38px,14vw,76px);}'
+        + '#gps-overlay.gps-basic-mode .gps-basic{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:22px;}'
+        + '#gps-overlay.gps-basic-mode .gps-score-basic{width:100%;min-height:48px;font-size:16px;}'
+        + '#gps-overlay .gps-get-pro{background:transparent;border:0;color:#d9f99d;text-decoration:underline;font-size:15px;font-weight:700;min-height:40px;}'
+        + '#gps-overlay .gps-sheet{position:absolute;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;}'
+        + '#gps-overlay .gps-sheet-card{width:100%;max-width:480px;box-sizing:border-box;background:#121a14;border:1px solid #3a4a3e;border-radius:18px 18px 0 0;'
+        +   'padding:22px 20px calc(' + (TOGGLE_H + 22) + 'px + env(safe-area-inset-bottom));}'
+        + '#gps-overlay .gps-sheet-title{font-size:24px;font-weight:800;color:#d9f99d;}'
+        + '#gps-overlay .gps-sheet-price{margin-top:4px;font-size:16px;font-weight:700;color:#f4f4ef;}'
+        + '#gps-overlay .gps-sheet-list{margin:14px 0 18px;padding-left:20px;font-size:15px;line-height:1.6;color:#d1d5db;}'
+        + '#gps-overlay .gps-sheet-buy{display:block;width:100%;min-height:48px;background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;font-weight:800;font-size:16px;opacity:.55;cursor:not-allowed;}'
+        + '#gps-overlay .gps-sheet-close{display:block;width:100%;margin-top:10px;min-height:44px;background:transparent;}'
         + '#gps-overlay .gps-sub{display:flex;justify-content:space-between;font-size:13px;color:#a7b3aa;margin-top:4px;}'
         + '#gps-overlay .gps-acc.gps-weak{color:#fbbf24;font-weight:700;}'
         + '#gps-overlay .gps-msg{margin-top:8px;font-size:14px;line-height:1.35;color:#fde68a;}'
@@ -1468,8 +1681,11 @@
             writeRoundPin: opts.writeRoundPin || null, stepHole: opts.stepHole || null,
             writeHoleLoc: opts.writeHoleLoc || null, openScore: opts.openScore || null, localLocs: {},
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
-            geoError: null, framed: null, mapRequested: false, loadingCourses: !window.HardPanGpsCourses
+            geoError: null, framed: null, mapRequested: false, loadingCourses: !window.HardPanGpsCourses,
+            // Decided once per round, by the one check (hasGpsPro).
+            pro: hasGpsPro()
         };
+        el.classList.toggle('gps-basic-mode', !S.pro);
 
         on(tg, '.gps-side-gps', function () { showSide('gps'); });
         on(tg, '.gps-side-bets', function () { showSide('bets'); });
@@ -1484,6 +1700,11 @@
         on(el, '.gps-pin-clear', function () { endEditPin('clear'); });
         on(el, '.gps-pin-cancel', function () { endEditPin(null); });
         on(el, '.gps-score', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
+        on(el, '.gps-score-basic', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
+        on(el, '.gps-get-pro', openSheet);
+        on(el, '.gps-sheet-close', closeSheet);
+        window.addEventListener('offline', onOffline);
+        window.addEventListener('online', onOnline);
         document.addEventListener('touchmove', blockPull, { passive: false });
         on(el, '.gps-set-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
         on(el, '.gps-fix-green', function () { S.mode = 'setMid'; S.draft = null; render(); });
@@ -1527,6 +1748,9 @@
             frameHole(false);
             render();
         });
+        // FREE: no map at all - MapLibre is never loaded, so no tile, Esri or
+        // USGS request can happen. The bundled course data gives the numbers.
+        if (!S.pro) return;
         loadMapLibre(function () { if (S === mine) { buildMap(); render(); } });
     }
 
@@ -1541,6 +1765,7 @@
         if (a) a.setAttribute('aria-pressed', side === 'gps' ? 'true' : 'false');
         if (b) b.setAttribute('aria-pressed', side === 'bets' ? 'true' : 'false');
         if (side === 'gps') {
+            if (!S.pro && !sheetSeen()) openSheet();
             ensureMap();
             if (S.map) { try { S.map.resize(); } catch (e) {} if (S.needsFrame) frameHole(false); }
             startWatch();
@@ -1548,6 +1773,7 @@
         } else {
             // Kept running for IDLE_STOP_MS, so a quick look at Bets and back
             // does not cost a fresh fix; then stopped.
+            closeSheet();
             clearIdle();
             if (isWatching()) idleTimer = setTimeout(function () { idleTimer = null; stopWatch(); }, IDLE_STOP_MS);
         }
@@ -1591,6 +1817,8 @@
         fix = null;
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('offline', onOffline);
+        window.removeEventListener('online', onOnline);
         if (!S) return false;
         var s = S;
         S = null;
@@ -1606,6 +1834,8 @@
     var api = {
         mount: mount, unmount: unmount, showSide: showSide, setHole: setHole, roundUpdated: roundUpdated,
         precacheCourse: precacheCourse,
+        // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
+        hasGpsPro: hasGpsPro,
         isMounted: function () { return !!S; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,

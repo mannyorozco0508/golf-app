@@ -660,10 +660,44 @@
         var from = di * 22.5;
         return { mph: mph, fromDeg: from, toDeg: (from + 180) % 360 };
     }
+    // TEMPERATURE from the same NWS hourly period: { temperature: 72,
+    // temperatureUnit: "F" } (or "C", converted). null when it is not a number.
+    function parseNwsTempF(period) {
+        if (!period || typeof period.temperature !== 'number' || !isFinite(period.temperature)) return null;
+        var u = String(period.temperatureUnit || 'F').trim().toUpperCase();
+        return Math.round((u === 'C' ? period.temperature * 9 / 5 + 32 : period.temperature) * 10) / 10;
+    }
+
+    // PLAYS LIKE (Wave 2, 2026-10-08): the yardage to CENTER / PIN adjusted for
+    // the slope, the wind and the air. D = yards to the aim point.
+    //   elevation    E = (target ft - origin ft) / 3        (1 yd per 3 ft up)
+    //   wind         head = mph x cos(windFrom - shotBearing)  (+ into the face)
+    //                W = head > 0 ? D x 0.01 x head : D x 0.005 x head
+    //                (1% per mph into the wind, 0.5% per mph helping)
+    //   temperature  T = D x 0.001 x (70 - tempF)           (0.1% per degree)
+    //   plays like = round(D + E + W + T)
+    // Only the terms whose data is there; null when none is. Pure: the screen
+    // decides what is fresh enough to pass in.
+    function isNum(x) { return typeof x === 'number' && isFinite(x); }
+    function playsLike(o) {
+        if (!o || !isNum(o.yards)) return null;
+        var D = o.yards, terms = {}, n = 0;
+        if (isNum(o.elevFromFt) && isNum(o.elevToFt)) { terms.elev = (o.elevToFt - o.elevFromFt) / 3; n++; }
+        if (isNum(o.windMph) && isNum(o.windFromDeg) && isNum(o.shotBearingDeg)) {
+            var head = o.windMph * Math.cos(toRad(o.windFromDeg - o.shotBearingDeg));
+            terms.wind = head > 0 ? D * 0.01 * head : D * 0.005 * head;
+            n++;
+        }
+        if (isNum(o.tempF)) { terms.temp = D * 0.001 * (70 - o.tempF); n++; }
+        if (!n) return null;
+        var exact = D + (terms.elev || 0) + (terms.wind || 0) + (terms.temp || 0);
+        return { yards: Math.round(exact), exact: exact, terms: terms };
+    }
 
     var api = {
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, clampToGreen: clampToGreen, parseNwsWind: parseNwsWind,
+        parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse,

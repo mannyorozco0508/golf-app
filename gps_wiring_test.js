@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v320-gps-arcs'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v321-gps-wave-two'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -138,3 +138,59 @@ test('MapLibre is the published 5.24.0 build (BSD-3), with its licence', { skip 
     assert.ok(!fs.existsSync(path.join(__dirname, 'leaflet.js')), 'Leaflet is retired');
 });
 const MAPLIBRE_SHA256 = '45a9b07a9189ce56054c620a947ccf41e291e58c95e9b61533b740aaa65ee5cb';
+
+// ---- WAVE 2 (2026-10-08): Esri live, plays like, the free / Pro check ----------
+// The key itself is never written into a test, a log or a message: these
+// assertions read its SHAPE and print nothing of it.
+test('gps-config.js: an Esri key is set, the paywall is off, and nothing else rides along', { skip }, () => {
+    const c = read('gps-config.js');
+    const sbx = { window: {} };
+    require('vm').runInNewContext(c, sbx);
+    const cfg = sbx.window.HARDPAN_GPS_CONFIG;
+    assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
+    assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl) in the shipped config');
+    // The key appears in this one file only.
+    const k = cfg.esriKey;
+    ['gps-view.js', 'gps-geo.js', 'index.html', 'sw.js', 'tools/gps-check.js', 'docs/gps-step0.md', 'docs/gps-builds.md'].forEach((f) => {
+        if (fs.existsSync(path.join(__dirname, f))) assert.ok(read(f).indexOf(k) === -1, 'the Esri key is copied into ' + f);
+    });
+});
+
+test('Esri: tiles never asked past z19, the map to z21, the exact credit, fallback on errors in a row', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/maxNativeZoom: 19,/.test(v) && /maxZoom: 21,/.test(v));
+    assert.ok(/maxzoom: TILES\.maxNativeZoom/.test(v), 'the Esri source max is the one constant');
+    assert.ok(!/maxzoom: (19|2\d)/.test(v), 'no second, hard-coded Esri source max');
+    assert.ok(v.includes(`poweredBy: 'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>'`));
+    assert.ok(v.includes(`credit: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community'`));
+    const err = v.slice(v.indexOf("map.on('error'"), v.indexOf("map.on('data'"));
+    assert.ok(/S\.esriErrRun >= ESRI_ERRS_TO_FAIL\) dropEsri\('errors'\)/.test(err), 'consecutive errors drop Esri');
+    assert.ok(!/esriLoads/.test(err), 'a tile that loaded once no longer blocks the fallback');
+    assert.ok(/window\.addEventListener\('offline', onOffline\)/.test(v), 'losing the signal drops Esri at once');
+    // No Esri prefetch: the only fetch() calls are USGS, NWS and EPQS.
+    const fetches = v.split('\n').filter((l) => /\bfetch\(/.test(l) && !/^\s*\/\//.test(l)).map((l) => l.trim());
+    fetches.forEach((l) => assert.ok(!/esri|keyedUrl/i.test(l), 'an Esri fetch outside the map: ' + l));
+});
+
+test('plays like: elevation from USGS EPQS for COURSE points, cached forever, one at a time', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(v.includes("var EPQS_URL = 'https://epqs.nationalmap.gov/v1/json?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';"));
+    assert.ok(/var ELEV_PREFIX = 'hardpan_elev_v1_';/.test(v));
+    const pts = v.slice(v.indexOf('function elevPoints('), v.indexOf('function fetchElevs('));
+    assert.ok(/r\.tee/.test(pts) && /r\.mid/.test(pts), 'positive: the course points');
+    assert.ok(!/\bfix\b|origin\(|coords/.test(pts), 'elevPoints reads no position');
+    const fe = v.slice(v.indexOf('function fetchElevs('), v.indexOf('function originElev('));
+    assert.ok(/S\.elevInFlight/.test(fe) && /lsGet\(elevKey\(q\)\) == null/.test(fe), 'one at a time, only what is not on the phone');
+    assert.ok(/!S\.pro/.test(fe) && /S\.side !== 'gps'/.test(fe) && /onLine === false/.test(fe), 'only Pro, only on GPS, only online');
+});
+
+test('HardPan GPS (Pro): ONE check, exported; free never loads MapLibre', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.strictEqual((v.match(/function hasGpsPro\(/g) || []).length, 1);
+    assert.ok(/hasGpsPro: hasGpsPro/.test(v), 'exported on window.HardPanGps');
+    const em = v.slice(v.indexOf('function ensureMap('), v.indexOf('function showSide('));
+    assert.ok(em.indexOf('if (!S.pro) return;') !== -1 && em.indexOf('if (!S.pro) return;') < em.indexOf('loadMapLibre('), 'free returns before MapLibre loads');
+    assert.ok(/\$29\.99\/year · 7-day free trial/.test(v) && /Coming soon/.test(v) && /Not now/.test(v));
+    assert.ok(!/Season Pass/i.test(v), 'HardPan GPS, never "Season Pass" (that is the organizer product)');
+});

@@ -120,14 +120,17 @@ function sensor(mode, lat, lng, acc) {
     return `(function () {
       var calls = { watch: 0, clear: 0, active: {}, opts: null };
       window.__geo = calls;
-      var nextId = 1;
+      var nextId = 1, oks = {}, cur = { lat: ${lat}, lng: ${lng}, acc: ${acc} };
+      var report = function (id) { if (calls.active[id]) oks[id]({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: cur.acc }, timestamp: Date.now() }); };
+      // Wave 2: the golfer walks - every live watch hears the new spot.
+      window.__moveTo = function (la, ln) { cur.lat = la; cur.lng = ln; Object.keys(calls.active).forEach(report); return 'moved'; };
       var fake = {
         watchPosition: function (ok, err, opts) {
-          var id = nextId++; calls.watch++; calls.active[id] = true; calls.opts = opts || null;
+          var id = nextId++; calls.watch++; calls.active[id] = true; calls.opts = opts || null; oks[id] = ok;
           setTimeout(function () {
             if (!calls.active[id]) return;
             if (${JSON.stringify(mode)} === 'denied') err({ code: 1, message: 'User denied Geolocation' });
-            else ok({ coords: { latitude: ${lat}, longitude: ${lng}, accuracy: ${acc} }, timestamp: Date.now() });
+            else report(id);
           }, 50);
           return id;
         },
@@ -197,7 +200,19 @@ const READ = `JSON.stringify((function () {
            cardHole: card ? card.innerText.trim() : null,
            scrollY: Math.round(window.scrollY),
            scoreInputs: document.querySelectorAll('.score-input').length,
-           usgsCached: window.__usgsN == null ? null : window.__usgsN };
+           usgsCached: window.__usgsN == null ? null : window.__usgsN,
+           // Wave 2
+           esriWhy: ds.esriWhy || '', esriFailAt: ds.esriFailAt ? Number(ds.esriFailAt) : null, esriSrcMax: ds.esriSrcMax ? Number(ds.esriSrcMax) : null,
+           attribHtml: attr ? attr.innerHTML : null, tilesNoteShown: vis('.gps-tiles-note'),
+           plays: q('.gps-plays') && q('.gps-plays').style.visibility !== 'hidden' && vis('.gps-plays') ? t('.gps-plays') : null,
+           playsTerms: q('.gps-plays') ? q('.gps-plays').getAttribute('data-terms') : null,
+           basicMode: !!(o && o.classList.contains('gps-basic-mode')), mapWrapShown: vis('.gps-map-wrap'),
+           sheet: vis('.gps-sheet') ? (q('.gps-sheet').innerText || '').replace(/\\s+/g, ' ').trim() : null,
+           sheetBuyDisabled: q('.gps-sheet-buy') ? q('.gps-sheet-buy').disabled : null,
+           basicScore: vis('.gps-score-basic') ? t('.gps-score-basic') : null, getPro: vis('.gps-get-pro'),
+           targetRow: vis('.gps-target-row'), editPinShown: vis('.gps-edit-pin'),
+           hasPro: window.HardPanGps && window.HardPanGps.hasGpsPro ? window.HardPanGps.hasGpsPro() : null,
+           tier: (function () { try { return localStorage.getItem('hardpan_gps_tier'); } catch (e) { return 'err'; } })() };
 })())`;
 const DUMP = `JSON.stringify({ writes: window.__coldWrites || [], storage: (function () { var o = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; })() })`;
 const COUNT_USGS = `(window.__usgsN = null, (typeof caches === 'undefined' ? (window.__usgsN = -1) : caches.open('hardpan-usgs-v1').then(function (c) { return c.keys(); }).then(function (k) { window.__usgsN = k.length; }, function () { window.__usgsN = -2; })), 'counting')`;
@@ -213,14 +228,20 @@ const mapTap = (x, y) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: {
 
 async function arm(name, key, ownerUid, mode, me, acc, steps, extra) {
     const code = 'GPS' + name.toUpperCase().slice(0, 5);
-    // No check reaches the real weather service: the wind arm brings a stand-in.
+    // No check reaches a real outside service: not the weather service, not the
+    // elevation service, not Esri. The arms that need one bring a stand-in.
     extra = Object.assign({}, extra || {});
-    extra.blockUrls = (extra.blockUrls || []).concat(['*api.weather.gov*']);
+    extra.blockUrls = (extra.blockUrls || []).concat(['*api.weather.gov*', '*epqs.nationalmap.gov*', '*arcgis.com*', '*arcgisonline.com*']);
+    const query = extra.query || '';
+    delete extra.query;
     const res = await arriveCold(Object.assign({
-        url: fileUrl('index.html', 'game=' + code + '&group=1'),
+        url: fileUrl('index.html', 'game=' + code + '&group=1' + query),
         rounds: { [code]: round(key, ownerUid) },
         viewport: { width: 390, height: 844 },
-        preScript: sensor(mode, me[0], me[1], acc),
+        // WAVE 2: by default Esri has a key and REFUSES it (403) - what localhost
+        // and any host the key does not list get. Every default arm is therefore
+        // also a fallback check: USGS within 4 tiles, never a blank map.
+        preScript: sensor(mode, me[0], me[1], acc) + CFG({ esri: 'DENY' }),
         settleMs: 3000, steps: steps.concat([{ expression: DUMP }]),
         // MapLibre draws with WebGL; the harness's software renderer provides it.
         webgl: true,
@@ -234,10 +255,17 @@ async function arm(name, key, ownerUid, mode, me, acc, steps, extra) {
 function leaks(r, me) {
     const needles = [me[0].toFixed(4), me[1].toFixed(4)];
     const hay = [];
+    // Wave 2: an elevation request or cache entry names ONE point. On a hole that
+    // runs east-west a course point shares the golfer's latitude to 4 decimals
+    // (measured: 33.4501, 50 % along Caledonia #1) - the point decides, not one
+    // coordinate. Within 3 m of the golfer it IS a leak; the plays arm also checks
+    // every elevation point against the course's own list.
+    const elevAt = (h) => { const m = /epqs\?x=(-?[\d.]+)&y=(-?[\d.]+)/.exec(h) || /hardpan_elev_v1_(-?[\d.]+),(-?[\d.]+)/.exec(h); if (!m) return null; return /epqs/.test(h) ? [+m[2], +m[1]] : [+m[1], +m[2]]; };
+    const elevNotMe = (h) => { const p = elevAt(h); return !!p && inlineHaversineM(p, me) >= 3; };
     r.dump.writes.forEach((w) => hay.push('write ' + w.path + ' ' + JSON.stringify(w.value)));
     r.requests.forEach((q) => hay.push('request ' + urlOf(q)));
     Object.keys(r.dump.storage).forEach((k) => hay.push('storage ' + k + ' ' + r.dump.storage[k]));
-    return hay.filter((h) => needles.some((n) => h.indexOf(n) !== -1));
+    return hay.filter((h) => needles.some((n) => h.indexOf(n) !== -1) && !elevNotMe(h));
 }
 // The harness records each request as its URL string.
 const urlOf = (q) => String((q && q.url) || q || '');
@@ -327,10 +355,76 @@ const TAP_SHORT_OF_GREEN = `(function () { var f = document.querySelector('#gps-
 const touch = (type, pts) => ({ cdp: { method: 'Input.dispatchTouchEvent', params: { type, touchPoints: pts } } });
 const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name, reason: r.reason }, null, 1)); process.exit(2); } };
 
+// ---- ONE STAND-IN FOR THE OUTSIDE SERVICES (Wave 2) --------------------------
+// On 127.0.0.1, with CORS like the real ones:
+//   /esri/<TOKEN>/tile/z/y/x   Esri World Imagery. TOKEN OK* answers a tile; DENY*
+//                              answers 403 (a host the key does not list); a token
+//                              switched by /ctl/break/<TOKEN> answers 403 from then on
+//                              (the free tier used up mid-round, the key expired).
+//   /epqs?x=&y=                USGS EPQS: heights for known course points, else
+//                              the service's "no data" (-1000000).
+//   /points/.., /gridpoints/.. the National Weather Service (as before).
+const SEEN = { esri: {}, epqs: [], nws: [] };
+const BROKEN = new Set();
+const ELEV = {};                     // "lat,lng" (5 dp) -> feet
+const TILEPNG = fs.readFileSync(path.join(__dirname, '..', 'icon-192.png'));
+let SRV = null, SO = '';
+function startStandIn() {
+    return new Promise((res) => {
+        SRV = require('http').createServer((q, r) => {
+            const h = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+            if (q.method === 'OPTIONS') { r.writeHead(204, h); return r.end(); }
+            let m = /^\/esri\/([A-Za-z0-9-]+)\/tile\/(\d+)\/(\d+)\/(\d+)/.exec(q.url);
+            if (m) {
+                (SEEN.esri[m[1]] = SEEN.esri[m[1]] || []).push(+m[2]);
+                if (/^DENY/.test(m[1]) || BROKEN.has(m[1])) { r.writeHead(403, Object.assign({ 'Content-Type': 'application/json' }, h)); return r.end('{"error":{"code":403,"message":"Invalid token"}}'); }
+                r.writeHead(200, Object.assign({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }, h)); return r.end(TILEPNG);
+            }
+            if ((m = /^\/ctl\/break\/([A-Za-z0-9-]+)/.exec(q.url))) { BROKEN.add(m[1]); r.writeHead(200, h); return r.end('broken'); }
+            if (/^\/epqs\?/.test(q.url)) {
+                SEEN.epqs.push(q.url);
+                const u = new URL(q.url, 'http://x');
+                const k = (+u.searchParams.get('y')).toFixed(5) + ',' + (+u.searchParams.get('x')).toFixed(5);
+                r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
+                return r.end(JSON.stringify({ location: { x: +u.searchParams.get('x'), y: +u.searchParams.get('y') }, value: k in ELEV ? ELEV[k] : -1000000 }));
+            }
+            SEEN.nws.push(q.url);
+            const hj = Object.assign({ 'Content-Type': 'application/geo+json' }, h);
+            if (/^\/points\/-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q.url)) { r.writeHead(200, hj); return r.end(JSON.stringify({ properties: { forecastHourly: 'https://api.weather.gov/gridpoints/XXX/1,2/forecast/hourly' } })); }
+            if (q.url === '/gridpoints/XXX/1,2/forecast/hourly') { r.writeHead(200, hj); return r.end(JSON.stringify({ properties: { periods: [{ windSpeed: '5 to 12 mph', windDirection: 'NW', temperature: 61, temperatureUnit: 'F' }] } })); }
+            r.writeHead(404, h); r.end();
+        });
+        SRV.listen(0, '127.0.0.1', () => { SO = 'http://127.0.0.1:' + SRV.address().port; res(); });
+    });
+}
+// The page's HARDPAN_GPS_CONFIG, replaced (gps-config.js's own assignment is
+// ignored): esri = a token (or null for no key), nws / epqs = use the stand-in.
+function CFG(o) {
+    const c = {};
+    if (o.esri) { c.esriKey = 'CHECK'; c.esriTileUrl = SO + '/esri/' + o.esri + '/tile/{z}/{y}/{x}?token={key}'; }
+    if (o.nws) c.nwsBase = SO;
+    if (o.epqs) c.epqsUrl = SO + '/epqs?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
+    if (o.paywall != null) c.paywall = o.paywall;
+    return `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return ${JSON.stringify(c)}; }, set: function () {} });`;
+}
+const ESRI_CREDIT = 'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> | Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community';
+const ESRI_CREDIT_TEXT = 'Powered by Esri | Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community';
+// Esri refused or failed: USGS is the picture - its credit, z18, and tiles drawn.
+function usgsFallbackFails(tag, g, why) {
+    const f = [];
+    if (g.esri !== 'failed' || (why && g.esriWhy !== why)) f.push(`${tag}: Esri did not hand over to USGS: ` + JSON.stringify([g.esri, g.esriWhy]));
+    if (why === 'errors' && g.esriFailAt !== 4) f.push(`${tag}: fell back after ${g.esriFailAt} Esri errors in a row (expected 4)`);
+    if (/Powered by Esri/.test(g.attribution || '') || !/USDA, USGS The National Map: Orthoimagery/.test(g.attribution || '')) f.push(`${tag}: attribution after the fallback: ` + g.attribution);
+    if (g.maxZoom !== 18) f.push(`${tag}: max zoom ${g.maxZoom} after the fallback (USGS: 18)`);
+    if (!(g.tilesLoaded > 0) || g.tilesNoteShown) f.push(`${tag}: a blank map after the fallback: ` + JSON.stringify([g.tilesLoaded, g.tilesNoteShown]));
+    return f;
+}
+
 (async () => {
     const fails = [];
     const out = {};
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-check-profile-'));
+    await startStandIn();
 
     // ---- osm -----------------------------------------------------------------
     const a = await arm('osm', 'caledonia', null, 'ok', ME, 4.6, [
@@ -366,7 +460,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (!gps.centerPin || !gps.dot || !(gps.centerPin.y < gps.dot.y) || Math.abs(gps.centerPin.x - gps.dot.x) > 3) fails.push('osm: green not straight above the golfer: ' + JSON.stringify([gps.centerPin, gps.dot]));
         if (!gps.recenter) fails.push('osm: no Recenter button');
         if (dist(recentered.centerPin, gps.centerPin) > 3) fails.push('osm: Recenter did not restore the hole view: ' + JSON.stringify([gps.centerPin, panned.centerPin, recentered.centerPin]));
-        if (gps.maxZoom !== 18) fails.push('osm: max zoom ' + gps.maxZoom + ' with USGS only (expected 18)');
+        // Esri refused (403, as on localhost): USGS within 4 tiles, never blank.
+        fails.push(...usgsFallbackFails('osm (Esri refused)', gps, 'errors'));
         fails.push(...teeInView('osm', gps), ...pillFails('osm', gps, true));
         if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
         fails.push(...arcFails('osm', gps, ME_CENTER_YD));
@@ -557,20 +652,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     // file:// URL cannot answer. Measuring: Esri drawing, its credit on the map,
     // zoom to 20. Setting a green: Esri OFF the map, its credit gone, USGS asked
     // for, zoom capped at 18 (USGS's 16, upscaled). After Save: Esri back.
-    const http = require('http');
-    const TILEPNG = fs.readFileSync(path.join(__dirname, '..', 'icon-192.png'));
-    const esriSrv = await new Promise((res) => {
-        const sv = http.createServer((q, r) => {
-            if (/MapServer\?f=json/.test(q.url)) { r.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return r.end(JSON.stringify({ copyrightText: 'Source: stand-in Esri' })); }
-            if (/\/tile\//.test(q.url)) { r.writeHead(200, { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'max-age=86400' }); return r.end(TILEPNG); }
-            r.writeHead(404); r.end();
-        });
-        sv.listen(0, '127.0.0.1', () => res(sv));
-    });
-    const EO = 'http://127.0.0.1:' + esriSrv.address().port;
-    const ESRI_CFG = `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return { esriKey: 'CHECK',
-        esriTileUrl: '${EO}/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}',
-        esriMetaUrl: '${EO}/arcgis/rest/services/World_Imagery/MapServer?f=json&token={key}' }; }, set: function () {} });`;
+    const ESRI_CFG = CFG({ esri: 'OK' });
     const e = await arm('esri', 'pinelakes', null, 'ok', pl, 5, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
         { tap: '.gps-set-green' }, { sleep: 3000 }, { expression: READ },
@@ -580,7 +662,6 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     const et = await arm('esrtee', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3000 }, { expression: READ },
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ESRI_CFG });
-    esriSrv.close();
     out.esriTee = et; bail(out, et);
     {
         const g = et.reads[0];
@@ -593,7 +674,9 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         const [measuring, pinning, saved] = e.reads;
         const usgsReq = e.requests.filter((q) => /basemap\.nationalmap\.gov/.test(urlOf(q))).length;
         if (measuring.esri !== 'visible' || !(measuring.esriLoads > 0) || !/Powered by Esri/.test(measuring.attribution || '')) fails.push('esri: the stand-in Esri did not draw while measuring: ' + JSON.stringify([measuring.esri, measuring.esriLoads, measuring.attribution]));
-        if (measuring.maxZoom !== 20) fails.push('esri: max zoom with Esri is ' + measuring.maxZoom + ' (expected 20)');
+        if (measuring.maxZoom !== 21) fails.push('esri: max zoom with Esri is ' + measuring.maxZoom + ' (expected 21: z19 tiles enlarged)');
+        if (!(measuring.attribHtml || '').includes(ESRI_CREDIT) || !(measuring.attribution || '').includes(ESRI_CREDIT_TEXT)) fails.push('esri: the credit is not Esri\'s exact line: ' + JSON.stringify(measuring.attribHtml));
+        if (measuring.esriSrcMax !== 19) fails.push('esri: the Esri source asks for tiles to z' + measuring.esriSrcMax + ' (must stop at 19)');
         if (pinning.esri !== 'none' || /Powered by Esri/.test(pinning.attribution || '')) fails.push('esri: Esri still on the map while setting a green: ' + JSON.stringify([pinning.esri, pinning.attribution]));
         if (pinning.maxZoom !== 18) fails.push('esri: max zoom while setting a green is ' + pinning.maxZoom + ' (expected 18, USGS)');
         if (usgsReq === 0) fails.push('esri: USGS was never asked for while setting a green');
@@ -691,20 +774,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     // A stand-in National Weather Service on 127.0.0.1: /points answers with an
     // hourly forecast URL on api.weather.gov (as NWS does), the view swaps the
     // host for the stand-in, and the forecast says "5 to 12 mph" from the NW.
-    const nwsSeen = [];
-    const nwsSrv = await new Promise((res) => {
-        const sv = require('http').createServer((q, r) => {
-            nwsSeen.push(q.url);
-            const h = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'application/geo+json' };
-            if (q.method === 'OPTIONS') { r.writeHead(204, h); r.end(); return; }
-            if (/^\/points\/-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q.url)) { r.writeHead(200, h); r.end(JSON.stringify({ properties: { forecastHourly: 'https://api.weather.gov/gridpoints/XXX/1,2/forecast/hourly' } })); return; }
-            if (q.url === '/gridpoints/XXX/1,2/forecast/hourly') { r.writeHead(200, h); r.end(JSON.stringify({ properties: { periods: [{ windSpeed: '5 to 12 mph', windDirection: 'NW' }] } })); return; }
-            r.writeHead(404, h); r.end();
-        });
-        sv.listen(0, '127.0.0.1', () => res(sv));
-    });
-    const NO = 'http://127.0.0.1:' + nwsSrv.address().port;
-    const NWS_CFG = `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return { nwsBase: '${NO}' }; }, set: function () {} });`;
+    const nwsSeen = SEEN.nws;
+    const NWS_CFG = CFG({ nws: true });
     const WIND_TO = 135;    // from the NW -> blowing to the SE
     const windRotFor = (bearing) => String(((WIND_TO - bearing) % 360 + 360) % 360);
 
@@ -795,7 +866,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     const nwsAfterFirst = nwsSeen.slice(nws0);
     const wo = await arm('windoff', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3000 }, { expression: READ },
-    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, blockUrls: ['*127.0.0.1:' + nwsSrv.address().port + '*'] });
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, blockUrls: ['*' + SO.replace('http://', '') + '/points*', '*' + SO.replace('http://', '') + '/gridpoints*'] });
     out.windOff = wo; bail(out, wo);
     {
         const [w0, w1, w2] = wd.reads;
@@ -851,17 +922,232 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (e.midLbl !== 'PIN' || e.m === g.m || !e.flagEdit) fails.push(`${tag}: Edit Pin did not move PIN live: ` + JSON.stringify([g.m, e.m, e.midLbl]));
         if (cr.dump.writes.length) fails.push(`${tag}: Cancel still wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
     }
-    nwsSrv.close();
+
+    // ==== WAVE 2 (2026-10-08) =======================================================
+    const zOf = (tok) => (SEEN.esri[tok] || []);
+
+    // ---- Esri live on a short par 3: 3x reaches its full step; z19 tiles at most ----
+    // Caledonia #3 (par 3). Then Edit Pin: the picture goes to USGS while a pin is
+    // placed (shared data is never derived from Esri imagery).
+    const ex = await arm('esrix', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { tap: '.gps-next' }, { sleep: 500 }, { tap: '.gps-next' }, { sleep: 1500 }, { expression: READ },   // 0 hole 3, 1x
+        { tap: '.gps-zoom' }, { sleep: 800 }, { expression: READ },                                                          // 1 2x
+        { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                                                         // 2 3x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { tap: '.gps-edit-pin' }, { sleep: 800 }, { expression: READ },                 // 3 Edit Pin
+        { tap: '.gps-pin-cancel' }, { sleep: 800 }, { expression: READ },                                                    // 4 back
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-3X' }) });
+    out.esri3x = ex; bail(out, ex);
+    {
+        const [z1, z2, z3, pin, back] = ex.reads;
+        if (z1.title !== 'Hole 3 · Par 3') fails.push('esri 3x: not on the par 3: ' + z1.title);
+        if (z1.esri !== 'visible' || z1.maxZoom !== 21) fails.push('esri 3x: Esri not live: ' + JSON.stringify([z1.esri, z1.maxZoom]));
+        if (!(z1.attribHtml || '').includes(ESRI_CREDIT)) fails.push('esri 3x: credit ' + JSON.stringify(z1.attribHtml));
+        const want3 = z1.zoom + Math.log2(3);
+        if (Math.abs(z3.zoom - want3) > 0.02 || z3.zoomBtn !== '3x') fails.push(`esri 3x: 3x reached zoom ${z3.zoom}, its full step is ${want3.toFixed(2)} (max ${z3.maxZoom})`);
+        const zs = zOf('OK-3X'), top = Math.max(...zs);
+        if (top !== 19 && z3.zoom >= 18) fails.push(`esri 3x: at map zoom ${z3.zoom} the closest Esri tiles asked for were z${top} (expected exactly 19 - never past it)`);
+        if (z3.esriSrcMax !== 19) fails.push('esri 3x: source max ' + z3.esriSrcMax);
+        if (pin.esri !== 'none' || pin.maxZoom !== 18 || /Powered by Esri/.test(pin.attribution || '')) fails.push('esri 3x: Edit Pin is not on USGS: ' + JSON.stringify([pin.esri, pin.maxZoom, pin.attribution]));
+        if (back.esri !== 'visible' || back.maxZoom !== 21) fails.push('esri 3x: Esri did not come back after Edit Pin: ' + JSON.stringify([back.esri, back.maxZoom]));
+        out.esri3xSummary = { zooms: [z1.zoom, z2.zoom, z3.zoom], maxZoom: z1.maxZoom, highestTileZ: top, tileRequests: zs.length };
+    }
+
+    // ---- Esri breaks MID-ROUND (tiles loaded first): USGS takes over ---------------
+    const eb = await arm('esrib', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },                                          // 0 Esri drawing
+        { expression: `fetch('${SO}/ctl/break/OK-BREAK').then(function () { return 'broke'; })` }, { sleep: 300 },
+        { tap: '.gps-zoom' }, { sleep: 800 }, { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                   // 1 new tiles refused
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-BREAK' }) });
+    out.esriBreak = eb; bail(out, eb);
+    {
+        const [b0, b1] = eb.reads;
+        if (b0.esri !== 'visible' || !(b0.esriLoads > 0)) fails.push('esri break: Esri was not drawing first - this arm proves nothing: ' + JSON.stringify([b0.esri, b0.esriLoads]));
+        fails.push(...usgsFallbackFails('esri break (after ' + b0.esriLoads + ' Esri tiles loaded)', b1, 'errors'));
+        if (b1.tilesLoaded <= b0.tilesLoaded) fails.push('esri break: no USGS tiles drawn after the fallback');
+    }
+
+    // ---- Esri, then NO SIGNAL: USGS at once; signal back: Esri once more -------------
+    const NET = (offline) => ({ cdp: { method: 'Network.emulateNetworkConditions', params: { offline, latency: 0, downloadThroughput: -1, uploadThroughput: -1 } } });
+    const eo = await arm('esrio', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },     // 0 Esri drawing
+        NET(true), { sleep: 800 }, { expression: READ },                               // 1 offline
+        NET(false), { sleep: 2500 }, { expression: READ },                             // 2 online again
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-OFF' }) });
+    out.esriOffline = eo; bail(out, eo);
+    {
+        const [o0, o1, o2] = eo.reads;
+        if (o0.esri !== 'visible') fails.push('esri offline: Esri was not drawing first: ' + o0.esri);
+        if (o1.esri !== 'failed' || o1.esriWhy !== 'offline' || o1.maxZoom !== 18 || /Powered by Esri/.test(o1.attribution || '')) fails.push('esri offline: no signal did not hand over to USGS: ' + JSON.stringify([o1.esri, o1.esriWhy, o1.maxZoom, o1.attribution]));
+        if (!(o1.tilesLoaded > 0) || o1.tilesNoteShown) fails.push('esri offline: blank map');
+        if (o2.esri !== 'visible' || o2.maxZoom !== 21) fails.push('esri offline: Esri was not tried again when the signal came back: ' + JSON.stringify([o2.esri, o2.maxZoom]));
+    }
+
+    // ---- THE TILE BUDGET: holes 1-18, 1x then 3x on each ------------------------------
+    const budgetSteps = [{ tap: '.gps-side-gps' }, WAIT_MAP];
+    for (let h = 1; h <= 18; h++) {
+        budgetSteps.push({ sleep: 1500 }, { tap: '.gps-zoom' }, { sleep: 400 }, { tap: '.gps-zoom' }, { sleep: 1500 }, { expression: READ }, { tap: '.gps-zoom' }, { sleep: 300 });
+        if (h < 18) budgetSteps.push({ tap: '.gps-next' }, { sleep: 400 });
+    }
+    const bu = await arm('budgt', 'caledonia', null, 'ok', ME, 4.6, budgetSteps, { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-BUDGET' }) });
+    out.budget = bu; bail(out, bu);
+    {
+        const last = bu.reads[bu.reads.length - 1];
+        if (bu.reads.length !== 18 || last.title !== 'Hole 18 · Par ' + sb.p.caledonia.data[17].par) fails.push('budget: did not walk 18 holes: ' + bu.reads.length + ' ' + last.title);
+        if (bu.reads.some((g) => g.esri !== 'visible')) fails.push('budget: Esri was not the picture on every hole');
+        out.budgetSummary = { esriTileRequests: zOf('OK-BUDGET').length, dataEsriLoads: last.esriLoads, perHole: bu.reads.map((g) => g.esriLoads) };
+    }
+
+    // ---- PLAYS LIKE: EPQS stand-in heights, NWS wind 12 mph from the NW, 61 F ----------
+    const r5k = (p) => (Math.round(p[0] * 1e5) / 1e5).toFixed(5) + ',' + (Math.round(p[1] * 1e5) / 1e5).toFixed(5);
+    const lerpP = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const HOLE1_PTS = [[H1.tee, 100], [lerpP(H1.tee, H1.mid, 0.25), 104], [lerpP(H1.tee, H1.mid, 0.5), 108], [lerpP(H1.tee, H1.mid, 0.75), 112], [H1.mid, 130]];
+    HOLE1_PTS.forEach(([p, ft]) => { ELEV[r5k(p)] = ft; });
+    const H2 = table.caledonia.holes['2'].osm;
+    const COURSE_KEYS = new Set(HOLE1_PTS.map(([p]) => r5k(p)).concat([0, 0.25, 0.5, 0.75, 1].map((t) => r5k(t === 0 ? H2.tee : t === 1 ? H2.mid : lerpP(H2.tee, H2.mid, t)))));
+    // Inline, sharing no code with gps-geo: the golfer's height on the tee -> green
+    // line, the great-circle bearing, the handoff's formula.
+    const elevOnLine = (t) => { const T = [0, 0.25, 0.5, 0.75, 1], E = [100, 104, 108, 112, 130]; for (let i = 1; i < 5; i++) if (t <= T[i]) return E[i - 1] + (E[i] - E[i - 1]) * (t - T[i - 1]) / 0.25; return 130; };
+    const brg = (a, b) => { const r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r), x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r); return (Math.atan2(y, x) / r + 360) % 360; };
+    const expectPlays = (golfer, t, aim, elevTo) => {
+        const D = inlineHaversineM(golfer, aim) / 0.9144;
+        const E = (elevTo - elevOnLine(t)) / 3;
+        const head = 12 * Math.cos((315 - brg(golfer, aim)) * Math.PI / 180);
+        const W = head > 0 ? D * 0.01 * head : D * 0.005 * head;
+        const T = D * 0.001 * (70 - 61);
+        return { yd: Math.round(D + E + W + T), m: Math.round((D + E + W + T) * 0.9144) };
+    };
+    const P40 = lerpP(H1.tee, H1.mid, 0.4);
+    const H1_TOTAL_YD = inlineHaversineM(H1.tee, H1.mid) / 0.9144;
+    const NEAR = lerpP(H1.mid, H1.tee, 20 / H1_TOTAL_YD);                  // 20 yds short of the center
+    const ONGREEN = lerpP(H1.mid, far, 0.3);                                // on the green, not its center
+    const plaProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-plays-profile-'));
+    const epqs0 = SEEN.epqs.length;
+    const PLAYS_SHOWN = { waitFor: `(function () { var e = document.querySelector('#gps-overlay .gps-plays'); return !!(e && e.style.visibility !== 'hidden' && /elev/.test(e.getAttribute('data-terms') || '')); })()`, timeout: 20000 };
+    const pa = await arm('plays', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, PLAYS_SHOWN, { sleep: 500 }, { expression: READ },          // 0 at 55 %
+        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-units' }, { sleep: 200 },   // 1 meters
+        { expression: `window.__moveTo(${P40[0]}, ${P40[1]})` }, { sleep: 500 }, { expression: READ },       // 2 walked back to 40 %
+        { expression: `window.__moveTo(${NEAR[0]}, ${NEAR[1]})` }, { sleep: 500 }, { expression: READ },     // 3 20 yds out: hidden
+        { expression: `window.__moveTo(${ONGREEN[0]}, ${ONGREEN[1]})` }, { sleep: 500 }, { expression: READ }, // 4 on the green: hidden
+        { expression: `window.__moveTo(${ME[0]}, ${ME[1]})` }, { sleep: 500 }, { expression: READ },         // 5 back at 55 %
+        { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ }, // 6 pin dragged: live
+        { tap: '.gps-pin-save' }, { sleep: 2500 }, { expression: READ },                                     // 7 saved
+        // The writes are recorded per page: read the pin's before the reload below.
+        { expression: `'PINW' + JSON.stringify((window.__coldWrites || []).filter(function (x) { return /pinLocs\\/h1$/.test(x.path) && x.op === 'set'; }))` },
+        { tap: '.gps-next' }, { sleep: 3500 }, { expression: READ },                                         // 8 hole 2
+        { tap: '.gps-prev' }, { sleep: 1500 }, { expression: READ },                                         // 9 hole 1 again
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 2500 }, { expression: READ },          // 10 reloaded
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'DENY-PLAYS', nws: true, epqs: true }), profileDir: plaProfile });
+    out.plays = pa; bail(out, pa);
+    {
+        const R = pa.reads;
+        const [p0, pm, p40, pnear, pgreen, pback, pdrag, psaved, ph2, ph1, preload] = R;
+        const at55 = expectPlays(ME, 0.55, H1.mid, 130);
+        const num = (t) => { const m = /^plays (\d+)$/.exec(t || ''); return m ? +m[1] : null; };
+        const near = (got, want, tag) => { if (got == null || Math.abs(got - want) > 1) fails.push(`plays: ${tag} reads ${JSON.stringify(got)}, expected ${want} (inline)`); };
+        near(num(p0.plays), at55.yd, 'at 55% of hole 1');
+        if (p0.playsTerms !== 'elev wind temp') fails.push('plays: terms used ' + JSON.stringify(p0.playsTerms) + ' (expected elev wind temp)');
+        if (num(p0.plays) === +p0.m) fails.push('plays: says the same as CENTER - the adjustment is not applied');
+        near(num(pm.plays), at55.m, 'in meters');
+        near(num(p40.plays), expectPlays(P40, 0.4, H1.mid, 130).yd, 'after walking back to 40%');
+        if (pnear.plays !== null) fails.push('plays: shown 20 yds from the green: ' + pnear.plays);
+        if (pgreen.plays !== null) fails.push('plays: shown on the green: ' + pgreen.plays);
+        near(num(pback.plays), at55.yd, 'back at 55%');
+        if (pdrag.midLbl !== 'PIN' || num(pdrag.plays) === num(pback.plays)) fails.push('plays: did not follow Edit Pin live: ' + JSON.stringify([pback.plays, pdrag.plays, pdrag.midLbl]));
+        const pinRaw = pa.raw.find((v) => typeof v === 'string' && v.startsWith('PINW'));
+        const pinW = pinRaw ? JSON.parse(pinRaw.slice(4))[0] : null;
+        if (pinW) near(num(psaved.plays), expectPlays(ME, 0.55, [pinW.value.lat, pinW.value.lng], 130).yd, 'to the saved pin (no height there: the green center\'s)');
+        else fails.push('plays: the pin was not saved');
+        if (!/^Hole 2/.test(ph2.title)) fails.push('plays: Next did not reach hole 2');
+        if (ph1.plays !== psaved.plays) fails.push('plays: hole 1 again reads ' + ph1.plays + ', was ' + psaved.plays);
+        // The stand-in database is re-made from the fixture on a reload (the pin is
+        // gone there): after it, plays like is to the center again - from the
+        // phone's cached heights.
+        if (preload.midLbl !== 'CENTER' || num(preload.plays) !== num(p0.plays)) fails.push('plays: after a reload reads ' + JSON.stringify([preload.midLbl, preload.plays]) + ', expected ' + p0.plays);
+        const asked = SEEN.epqs.slice(epqs0);
+        const keys = asked.map((u) => { const q = new URL(u, 'http://x').searchParams; return (+q.get('y')).toFixed(5) + ',' + (+q.get('x')).toFixed(5); });
+        const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+        if (dupes.length) fails.push('plays: EPQS asked again for a point it already answered (no cache?): ' + dupes.slice(0, 3).join(' | '));
+        const allowed = new Set(COURSE_KEYS); if (pinW) allowed.add(r5k([pinW.value.lat, pinW.value.lng]));
+        const strange = keys.filter((k) => !allowed.has(k));
+        if (strange.length) fails.push('plays: EPQS asked for a point that is not a course point (the golfer?): ' + strange.slice(0, 3).join(' | '));
+        [ME, P40, NEAR, ONGREEN].forEach((g) => { if (asked.some((u) => { const q = new URL(u, 'http://x').searchParams; return inlineHaversineM(g, [+q.get('y'), +q.get('x')]) < 3; })) fails.push('plays: an EPQS request was at the golfer\'s spot ' + g.map((v) => v.toFixed(4)).join(',')); });
+        if (keys.length < 6) fails.push('plays: only ' + keys.length + ' EPQS requests - this arm proves nothing about caching');
+        out.playsSummary = { expected55: at55, shown: R.map((g) => g.plays), terms: p0.playsTerms, epqsRequests: keys.length, epqsUnique: new Set(keys).size };
+    }
+    // A SECOND VISIT asks for nothing: a fresh page on the same phone, hole 1.
+    const epqs1 = SEEN.epqs.length;
+    const pa2 = await arm('plays', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, PLAYS_SHOWN, { sleep: 1500 }, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'DENY-PLAYS', nws: true, epqs: true }), profileDir: plaProfile });
+    out.plays2 = pa2; bail(out, pa2);
+    {
+        const again = SEEN.epqs.length - epqs1;
+        if (again !== 0) fails.push('plays: the second visit to hole 1 made ' + again + ' EPQS requests (expected 0)');
+        out.playsSummary.secondVisitEpqs = again;
+    }
+    try { fs.rmSync(plaProfile, { recursive: true, force: true }); } catch (e) {}
+
+    // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
+    const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
+    const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
+    const SVC = new RegExp('maplibre-gl|nationalmap\\.gov|arcgis|' + SO.replace(/[.:/]/g, (c) => '\\' + c));
+    const fr = await arm('free', 'caledonia', null, 'ok', ME, 4.6, [
+        { expression: READ },                                                                  // 0 arrival: Bets
+        { tap: '.gps-side-gps' }, { sleep: 1500 }, { expression: READ },                       // 1 the sheet
+        { tap: '.gps-sheet-close' }, { sleep: 300 }, { expression: READ },                      // 2 basic numbers
+        { tap: '.gps-get-pro' }, { sleep: 300 }, { expression: READ },                          // 3 sheet again
+        { tap: '.gps-sheet-close' }, { sleep: 200 },
+        { tap: '.gps-side-bets' }, { sleep: 400 }, { expression: READ },                       // 4 Bets
+        { tap: '.gps-side-gps' }, { sleep: 600 }, { expression: READ },                        // 5 GPS again: no sheet
+        { sleep: 6000 },                                                                       //   past the pre-cache's 4 s
+        { tap: '.gps-score-basic' }, { sleep: 500 }, { expression: READ },                     // 6 Enter Score
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, query: '&gpstier=free', profileDir: freeProfile });
+    out.free = fr; bail(out, fr);
+    const cl = await arm('clear', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, query: '&gpstier=clear', profileDir: freeProfile });
+    out.clear = cl; bail(out, cl);
+    {
+        const [f0, f1, f2, f3, f4, f5, f6] = fr.reads;
+        if (f1.hasPro !== false || f1.tier !== 'free') fails.push('free: ?gpstier=free did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
+        if (!f0.toggle || !/📍 GPS/.test(f0.toggle)) fails.push('free: the GPS button is not there');
+        const sheetWant = ['HardPan GPS', '$29.99/year · 7-day free trial', 'Satellite hole map', 'Yardage arcs', "Edit Pin (today's pin)", 'Wind', 'Plays-like yardage', 'Coming soon', 'Not now'];
+        if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
+        if (f1.sheetBuyDisabled !== true) fails.push('free: the buy button is not disabled');
+        if (f2.sheet) fails.push('free: "Not now" did not close the sheet');
+        if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
+        if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
+        if (f2.acc !== '±6 yds' || f2.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('free: title / accuracy ' + JSON.stringify([f2.title, f2.acc]));
+        if (f2.basicScore !== 'Hole 1 · Enter Score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.basicScore, f2.getPro]));
+        if (f2.targetRow || f2.editPinShown || f2.fix || f2.set || f2.wind || f2.plays) fails.push('free: a Pro feature is showing: ' + JSON.stringify({ target: f2.targetRow, editPin: f2.editPinShown, fix: f2.fix, set: f2.set, wind: f2.wind, plays: f2.plays }));
+        if (!f3.sheet) fails.push('free: "Get HardPan GPS" did not open the sheet');
+        if (f4.gpsShown || f4.scoreInputs !== a.reads[0].scoreInputs || f4.scoreInputs < 4) fails.push('free: Bets is not the same card: ' + JSON.stringify([f4.scoreInputs, a.reads[0].scoreInputs]));
+        if (f5.sheet) fails.push('free: the sheet opened again in the same session');
+        if (f6.side !== 'bets' || !f6.active || !/score-input/.test(f6.active.cls) || f6.active.hole !== '1') fails.push('free: Enter Score did not open hole 1\'s score: ' + JSON.stringify([f6.side, f6.active]));
+        const outside = fr.requests.filter((u) => SVC.test(urlOf(u)));
+        if (outside.length) fails.push('free: ' + outside.length + ' map / imagery / elevation / weather requests: ' + outside.slice(0, 3).map(urlOf).join(' | '));
+        if (fr.dump.storage['hardpan_usgs_done_v1_caledonia']) fails.push('free: the USGS imagery was pre-cached');
+        // ?gpstier=clear: Pro again, the map back - and the same services DO get asked (the control).
+        const c0 = cl.reads[0];
+        if (c0.hasPro !== true || c0.tier !== null || !c0.map || c0.basicMode) fails.push('clear: ?gpstier=clear did not restore Pro: ' + JSON.stringify([c0.hasPro, c0.tier, c0.map, c0.basicMode]));
+        const ctl = cl.requests.filter((u) => SVC.test(urlOf(u)));
+        if (!ctl.some((u) => /maplibre-gl/.test(u)) || !ctl.some((u) => /\/esri\//.test(u))) fails.push('clear: the control asked for no map / Esri - the free arm proves nothing');
+        out.freeSummary = { freeServiceRequests: outside.length, proControlRequests: ctl.length, sheet: f1.sheet };
+    }
+    try { fs.rmSync(freeProfile, { recursive: true, force: true }); } catch (e) {}
+    SRV.close();
 
     // ---- privacy, every arm ------------------------------------------------------
-    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME]].forEach(([r, me]) => {
+    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME],
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
-    // Every arm but `esri` (which has a stand-in key) runs with NO key, and must ask Esri for nothing.
-    const esri = [a, i, b, c, d, p1, p2, vf, fh, ft, po].reduce((n, r) => n + r.requests.filter((q) => /arcgis\.com/i.test(urlOf(q))).length, 0);
-    // No key in gps-config.js, so Esri must not have been asked for anything.
-    if (esri !== 0) fails.push('esri: ' + esri + ' requests with no key configured');
+    // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
+    // Esri hosts are never asked - a check must not spend the free tier.
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
     const summary = {
@@ -878,6 +1164,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
+        esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
+        esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,
     };
     console.log(JSON.stringify(summary, null, 1));

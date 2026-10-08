@@ -112,6 +112,8 @@ the portfolio: the planned GPS app is $39.99/year against the ~$70/year Manny
 already pays for a competitor. A ten dollar price on the betting and
 settlement engine — the harder product — undercuts both.
 
+> **Update 2026-10-08 (HardPan GPS Wave 2):** the GPS line above is out of date. HardPan GPS is **$29.99/year with a 7-day free trial** (Manny, 2026-10-08); the upgrade sheet shows that price, with purchasing not yet live (StoreKit comes later).
+
 ### Trip Pass — $19.99
 
 Thirty days of unlimited round creation, plus everything trip-shaped:

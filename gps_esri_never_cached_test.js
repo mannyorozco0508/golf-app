@@ -90,5 +90,6 @@ test('no runtime cache route for Esri, no IndexedDB, and the only Cache Storage 
     assert.ok(/TILES\.usgs\.url\.replace/.test(pre) && !/keyedUrl|esriTileUrl/.test(pre), 'the pre-cache builds USGS urls only');
     // The Esri layer is a plain MapLibre raster source: the browser fetches each
     // tile, under its own HTTP cache, and nothing here stores one.
-    assert.ok(/sources\.esri = \{ type: 'raster', tiles: \[esriTileUrl\(\)/.test(v), 'positive: the Esri layer is a stock raster source');
+    // (Wave 2: built in ONE place, esriSource(), used by buildMap.)
+    assert.ok(/function esriSource\(key\) \{\s*return \{ type: 'raster', tiles: \[esriTileUrl\(\)/.test(v) && /sources\.esri = esriSource\(key\)/.test(v), 'positive: the Esri layer is a stock raster source');
 });

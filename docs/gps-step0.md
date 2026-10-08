@@ -305,3 +305,96 @@ paywall code yet.
   TPC Scottsdale), plus arc checks in osm / off-hole / offline.
 - **Not built (per the handoff):** #10 "Plays like" (USGS 3DEP elevation +
   wind + temperature) and the paid tier next; #22 3D green / slope later.
+
+### 7d. Wave 2: Esri live, "plays like", free / Pro (2026-10-08, branch gps-wave2)
+
+Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
+`gps-wave1` and unmerged until after Oct 17.
+
+- **Esri World Imagery is live:**
+  - **The key:** `gps-config.js` carries the ArcGIS key. It has Basemaps
+    privileges only and an Allowed Referrers list: gps.hardpangolf.com,
+    hardpan-gps.pages.dev, and the gps-v1 / gps-wave1 previews.
+  - **Not in other builds:** `GPS_SHELL` keeps the file out of the Consumer,
+    iOS and Android builds.
+  - **Public, on purpose:** the key is public by design (and visible in the
+    public repo). The account has no payment method, so past the free tier
+    (2M tiles a month) Esri stops answering; it never bills.
+  - **The key is written down in one place only.** Tests and checks use a
+    stand-in, and the key is not repeated in this document.
+- **Zoom:**
+  - The Esri source asks for tiles up to z19 (`TILES.maxNativeZoom`, one
+    constant). The map goes to z21, enlarging the z19 tiles with no extra
+    requests.
+  - Never raise the source max: past its coverage Esri answers HTTP 200 with a
+    "Map data not yet available" picture, which is not an error.
+  - USGS stays at z18.
+  - With Esri, 3x reaches its full step on a short par 3.
+- **Attribution:** exactly `Powered by Esri | Source: Esri, Vantor, Earthstar
+  Geographics, and the GIS User Community`. "Esri" links to esri.com.
+  - It is fixed text now. The runtime `copyrightText` read was removed: one
+    request less, and the required line is this one.
+  - On 2026-10-08 the service's own `copyrightText` read exactly the same.
+- **When Esri fails, USGS takes over:**
+  - **4 Esri tile errors in a row:** a loaded tile resets the count. This is
+    the same whether Esri never answered (a host the key does not list: 403 on
+    localhost and new previews) or stopped mid-round (the free tier used up, the
+    key expired).
+  - **The phone loses signal:** the `offline` event hands over at once. When
+    the signal comes back (`online`), Esri is tried once more, only after an
+    offline fallback.
+  - **No retry loops and no Esri prefetch.** Setting a green and Edit Pin stay
+    on USGS.
+- **Plays like:** a small "plays 158" line under CENTER / PIN.
+  - **Formula:** `gps-geo.playsLike`, with D = yards to the aim point.
+
+    ```
+    E    = (target ft - origin ft) / 3
+    head = mph x cos(windFrom - shotBearing)
+    W    = head > 0 ? D x 0.01 x head : D x 0.005 x head
+    T    = D x 0.001 x (70 - tempF)
+    plays like = round(D + E + W + T)
+    ```
+
+    Only the terms with data are used. Wind and temperature are used only up to
+    an hour old.
+  - **Heights:** from USGS EPQS (`epqs.nationalmap.gov`, free, no key, US
+    only).
+    - It is asked only for **course points**: the tee, 25 / 50 / 75 % along
+      tee → green, the green's center and today's saved pin. Each is rounded to
+      5 decimals, **never the golfer's position**.
+    - Each point is asked for once ever (`hardpan_elev_v1_<lat>,<lng>`), one at
+      a time, only for the hole on screen, while GPS shows and online.
+  - **The golfer's height** is worked out on the phone: the fix projected onto
+    tee → green (`gps-geo.alongLine`), between the sampled points either side.
+  - **Wind and temperature** come from the wind box's own NWS reading
+    (`periods[0].temperature`). There is no other weather request.
+  - **When it is hidden** (quietly): under 30 yds, on the green, outside the
+    US, or with no data at all.
+- **Free / Pro (no purchases yet):**
+  - **`hasGpsPro()`** is the one check, exported on `window.HardPanGps`. It
+    reads, in order:
+    1. `?gpstier=free|pro|clear` (stored as `hardpan_gps_tier`)
+    2. `HARDPAN_GPS_CONFIG.paywall`, which is `false` this wave, so everyone in
+       the GPS build is Pro
+    3. later, the App Store entitlement
+  - **Free basic mode:**
+    - It shows the title, ◀ ▶, units, FRONT / CENTER / BACK, accuracy, Enter
+      Score and "Get HardPan GPS".
+    - There is no map: MapLibre is never loaded, and there are no tile, Esri,
+      USGS pre-cache, EPQS or NWS requests.
+  - **The upgrade sheet** reads "HardPan GPS — $29.99/year · 7-day free
+    trial". The buy button is a disabled "Coming soon".
+    - It opens the first time GPS is shown in a session, and from "Get HardPan
+      GPS".
+    - Betting stays free.
+- **Checked by** `tools/gps-check.js`. It runs one stand-in on 127.0.0.1 for
+  Esri, EPQS and NWS. Every default arm runs with Esri **refusing** (403), so
+  each one is also a fallback check.
+  - **New arms:**
+    - `esrix`: 3x on a par 3, tiles z ≤ 19, Edit Pin on USGS.
+    - `esrib`: breaks mid-round.
+    - `esrio`: offline, then online again.
+    - `budgt`: the tile budget.
+    - `plays` + a second visit with 0 EPQS requests.
+    - `free` / `clear`: basic mode, then Pro restored.
