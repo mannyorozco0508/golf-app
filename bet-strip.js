@@ -852,6 +852,92 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                         tone = live.tone;
                         const speak = strip.mode === 'stroke' ? strokeSentence : matchSentence;
                         sentence = speak(status, meName);
+
+                        // AND ONCE THE BET IS DECIDED, THE RECEIPT HAS THE LAST
+                        // WORD (2026-10-07).
+                        //
+                        // Manny, finished round, Matches tab: every match read
+                        // "All square - Thru 18" when he had won 7&6. Measured on
+                        // the real round (NA4EZB, saved as
+                        // matches_tab_finished.fixture.json): all three rows said
+                        // ALL SQUARE while the scorecard card said "Manny v Reese
+                        // FINAL - Manny +$120 - won 8 of 9 bets ... TOTAL Manny
+                        // 7&6".
+                        //
+                        // The line above picks a chip off the LIVE strip - the
+                        // first one that is not closed, else the first of all -
+                        // and on a finished Nassau with auto-presses that is not
+                        // the decided bet. The scorecard never had this problem
+                        // because it reads the RECEIPT settlement-engine already
+                        // priced. So does this now: the overall result, in the
+                        // card's own words, for the overall bet (Total on a
+                        // Nassau, the single base on a Match Play).
+                        //
+                        // NOTHING IS COMPUTED HERE. seg.result is the string the
+                        // card prints; no arithmetic, no money, no new source of
+                        // truth - which is why the two screens can no longer
+                        // disagree.
+                        // A FINISHED MATCH READS LIKE THE CARD (2026-10-07).
+                        //
+                        // THE DEFECT: on a round that is over, every row on the
+                        // Matches tab said "All square - Thru 18", including the
+                        // one Manny won 7&6. status came from money-engine's live
+                        // statusText, a scoreboard reading of the CURRENT hole; on
+                        // a closed match there is no current hole, so it fell back
+                        // to level. The scorecard card and the Receipt both had the
+                        // right answer the whole time.
+                        //
+                        // NO ARITHMETIC AND NO MONEY HERE. This reads the receipt
+                        // settlement-engine.js already priced, and says what
+                        // buildLiveMatchCardHtml says for the same wager:
+                        //   - the overall bet's own result when it has a winner
+                        //     ("Manny 7&6"), which is the card's TOTAL row;
+                        //   - otherwise the card's headline, because a halved
+                        //     overall does NOT mean nobody got paid. Marty v Tim
+                        //     on NA4EZB halved its TOTAL and still finished
+                        //     "Marty +$60" off the front, back and presses, and a
+                        //     row reading "All square" beside $60 is the same lie
+                        //     one level down.
+                        //
+                        // AND `result` IS NOT THE FINISHED TEST. Measured on the
+                        // same wager through seven holes: the Total segment reads
+                        // "Manny 3 up" and carries a result string the whole way
+                        // round, because the receipt falls back to the live status
+                        // until the bet closes. Keying on it marked every row FINAL
+                        // mid-round. The gate is the card's own gate -
+                        // sideMatchRangeComplete, every hole in the bet's range
+                        // posted by everyone in it, or the organizer has finished
+                        // the round - so the tab goes final exactly when the card
+                        // does and not one hole sooner.
+                        const rec = smlReceipts[id];
+                        const sm = (data.sideMatches || {})[id] || null;
+                        let overAll = false;
+                        if (rec && sm && typeof sideMatchRangeComplete === 'function') {
+                            let roundDone = false;
+                            if (typeof computeRoundFinish === 'function') {
+                                try { roundDone = !!computeRoundFinish(data, courseData, savedScores).finished; }
+                                catch (e) { roundDone = false; }
+                            }
+                            overAll = !!sideMatchRangeComplete(sm, data.players || [], courseData,
+                                savedScores, { roundFinished: roundDone });
+                        }
+                        if (overAll && typeof sideMatchOrderedSegments === 'function') {
+                            const ordered = sideMatchOrderedSegments(rec)
+                                .filter(seg => seg && Number(seg.pressNum || 0) === 0);
+                            const overall = ordered.length ? ordered[ordered.length - 1] : null;
+                            const net = (typeof sideMatchDecidedNet === 'function')
+                                ? Number(sideMatchDecidedNet(rec) || 0) : 0;
+                            let finalWords = (overall && overall.result) ? overall.result : '';
+                            if (finalWords && !overall.winner && net !== 0) {
+                                finalWords = (net > 0 ? rec.nameA : rec.nameB)
+                                    + ' +$' + Math.abs(net);
+                            }
+                            if (finalWords) {
+                                status = finalWords;
+                                sentence = finalWords;
+                                tone = 'final';
+                            }
+                        }
                         strip.chips.forEach(c => {
                             if (!c.closed) atStake += c.stake || 0;
                         });

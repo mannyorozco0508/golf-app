@@ -4328,7 +4328,22 @@
 //   was still on a version where Home did not load the queue at all. A guard
 //   now pins Home's wording so that explanation cannot hide a regression.
 // A device on v311 shows the code on Resume.
-const CACHE_VERSION = 'golfapp-v312-resumename';
+// Moved to v314. FOUR DEFECTS FOUND SETTING UP SCREENSHOTS, all four in the
+// shell:
+//   admin.html    a built-in Myrtle course (Caledonia, True Blue, Pine Lakes)
+//                 saved a round with NO HOLES - "No course data for this round
+//                 yet" - because the picker's name-only stub won over the
+//                 built-in's 18 pars.
+//   trip.html     the trip ledger charged an UNPLAYED round: an unscored Day 3
+//                 took $5 off every golfer and the pot settled before the trip
+//                 was over.
+//   bet-strip.js  every row on the Matches tab of a FINISHED round read "All
+//                 square - Thru 18", including one won 7&6.
+//   index.html    the live matches box was 462px wide in a 342px column, so the
+//   leaderboard   page scrolled sideways at 390px and all 26 amounts on it were
+//                 off screen.
+// A device on v312 has all four.
+const CACHE_VERSION = 'golfapp-v314-fourbugs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

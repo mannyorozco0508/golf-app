@@ -166,7 +166,16 @@ describe('TRIP SETTLEMENT — the canonical combiner is the only definition of m
 
     test('trip.html calls computeCombinedNetTotals, not the narrower main-format helper', () => {
         const trip = read('trip.html');
-        const fn = trip.slice(trip.indexOf('function renderTripMoneySettlement'), trip.indexOf('function renderTripMoneySettlement') + 3000);
+        // THE WHOLE FUNCTION, NOT THE FIRST 3000 CHARACTERS (2026-10-07). This
+        // read a fixed-length window, and the unplayed-round skip inserted
+        // ahead of the aggregation pushed the call past character 3000 - so the
+        // assertion went red on a file where the call was still there, four
+        // lines further down. A character count is a guess about file length
+        // that any edit above the call invalidates; the endpoint below is the
+        // end of the function, which is what the claim is actually about.
+        const start = trip.indexOf('function renderTripMoneySettlement');
+        const fn = trip.slice(start, trip.indexOf('\n    function ', start + 10));
+        assert.ok(fn.length > 500, 'the slice of renderTripMoneySettlement collapsed, so this test is guarding nothing');
         assert.ok(/computeCombinedNetTotals/.test(fn), 'trip totals must use the complete money picture');
         // Checked against the whole function rather than a slice that now ends before
         // the aggregation: the merge of contributions was inserted between the call

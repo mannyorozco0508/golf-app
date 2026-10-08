@@ -1,0 +1,250 @@
+{
+ "eventName": "Day 1",
+ "courseName": "Caledonia Golf & Fish Club",
+ "gameFormat": "stroke",
+ "players": [
+  {
+   "id": 101,
+   "name": "Manny",
+   "hcp": "8",
+   "playingForMoney": true
+  },
+  {
+   "id": 102,
+   "name": "Reese",
+   "hcp": "12",
+   "playingForMoney": true
+  },
+  {
+   "id": 103,
+   "name": "Marty",
+   "hcp": "15",
+   "playingForMoney": true
+  },
+  {
+   "id": 104,
+   "name": "Tim",
+   "hcp": "10",
+   "playingForMoney": true
+  }
+ ],
+ "courseData": [
+  {
+   "hcpIndex": 12,
+   "hole": 1,
+   "par": 4
+  },
+  {
+   "hcpIndex": 8,
+   "hole": 2,
+   "par": 5
+  },
+  {
+   "hcpIndex": 14,
+   "hole": 3,
+   "par": 3
+  },
+  {
+   "hcpIndex": 6,
+   "hole": 4,
+   "par": 4
+  },
+  {
+   "hcpIndex": 2,
+   "hole": 5,
+   "par": 4
+  },
+  {
+   "hcpIndex": 16,
+   "hole": 6,
+   "par": 3
+  },
+  {
+   "hcpIndex": 4,
+   "hole": 7,
+   "par": 4
+  },
+  {
+   "hcpIndex": 10,
+   "hole": 8,
+   "par": 5
+  },
+  {
+   "hcpIndex": 18,
+   "hole": 9,
+   "par": 3
+  },
+  {
+   "hcpIndex": 15,
+   "hole": 10,
+   "par": 5
+  },
+  {
+   "hcpIndex": 13,
+   "hole": 11,
+   "par": 3
+  },
+  {
+   "hcpIndex": 9,
+   "hole": 12,
+   "par": 4
+  },
+  {
+   "hcpIndex": 5,
+   "hole": 13,
+   "par": 4
+  },
+  {
+   "hcpIndex": 7,
+   "hole": 14,
+   "par": 4
+  },
+  {
+   "hcpIndex": 3,
+   "hole": 15,
+   "par": 4
+  },
+  {
+   "hcpIndex": 1,
+   "hole": 16,
+   "par": 4
+  },
+  {
+   "hcpIndex": 17,
+   "hole": 17,
+   "par": 3
+  },
+  {
+   "hcpIndex": 11,
+   "hole": 18,
+   "par": 4
+  }
+ ],
+ "scores": {
+  "p101_h1": 4,
+  "p101_h10": 5,
+  "p101_h11": 3,
+  "p101_h12": 4,
+  "p101_h13": 5,
+  "p101_h14": 5,
+  "p101_h15": 4,
+  "p101_h16": 5,
+  "p101_h17": 3,
+  "p101_h18": 4,
+  "p101_h2": 5,
+  "p101_h3": 3,
+  "p101_h4": 5,
+  "p101_h5": 4,
+  "p101_h6": 3,
+  "p101_h7": 5,
+  "p101_h8": 5,
+  "p101_h9": 3,
+  "p102_h1": 5,
+  "p102_h10": 6,
+  "p102_h11": 4,
+  "p102_h12": 5,
+  "p102_h13": 5,
+  "p102_h14": 5,
+  "p102_h15": 5,
+  "p102_h16": 5,
+  "p102_h17": 4,
+  "p102_h18": 5,
+  "p102_h2": 6,
+  "p102_h3": 4,
+  "p102_h4": 5,
+  "p102_h5": 5,
+  "p102_h6": 4,
+  "p102_h7": 5,
+  "p102_h8": 6,
+  "p102_h9": 3,
+  "p103_h1": 5,
+  "p103_h10": 6,
+  "p103_h11": 3,
+  "p103_h12": 5,
+  "p103_h13": 5,
+  "p103_h14": 5,
+  "p103_h15": 5,
+  "p103_h16": 5,
+  "p103_h17": 3,
+  "p103_h18": 5,
+  "p103_h2": 6,
+  "p103_h3": 4,
+  "p103_h4": 5,
+  "p103_h5": 5,
+  "p103_h6": 3,
+  "p103_h7": 5,
+  "p103_h8": 6,
+  "p103_h9": 4,
+  "p104_h1": 4,
+  "p104_h10": 6,
+  "p104_h11": 4,
+  "p104_h12": 5,
+  "p104_h13": 4,
+  "p104_h14": 5,
+  "p104_h15": 5,
+  "p104_h16": 5,
+  "p104_h17": 4,
+  "p104_h18": 5,
+  "p104_h2": 6,
+  "p104_h3": 3,
+  "p104_h4": 4,
+  "p104_h5": 5,
+  "p104_h6": 3,
+  "p104_h7": 4,
+  "p104_h8": 5,
+  "p104_h9": 3
+ },
+ "sideMatches": {
+  "-P3OQaTmUzIBwkIzdpCh": {
+   "backStake": 10,
+   "createdAt": 1791428028356,
+   "format": "nassau",
+   "frontStake": 10,
+   "overallStake": 20,
+   "pressRule": "2down",
+   "scoring": "net",
+   "stake": 20,
+   "startHole": 1,
+   "teamAIds": [
+    "101"
+   ],
+   "teamBIds": [
+    "102"
+   ]
+  },
+  "-P3OQcHrZ_nMQ1dbYHfn": {
+   "backStake": 10,
+   "createdAt": 1791428035785,
+   "format": "nassau",
+   "frontStake": 10,
+   "overallStake": 20,
+   "pressRule": "2down",
+   "scoring": "net",
+   "stake": 20,
+   "startHole": 1,
+   "teamAIds": [
+    "103"
+   ],
+   "teamBIds": [
+    "104"
+   ]
+  },
+  "-P3OQe61XPLU13-w8pYF": {
+   "createdAt": 1791428043220,
+   "format": "match",
+   "pressRule": "2down",
+   "scoring": "net",
+   "stake": 20,
+   "startHole": 1,
+   "teamAIds": [
+    "101",
+    "104"
+   ],
+   "teamBIds": [
+    "102",
+    "103"
+   ]
+  }
+ },
+ "settlementMode": "whole-dollar"
+}

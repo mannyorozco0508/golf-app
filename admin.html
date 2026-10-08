@@ -3648,7 +3648,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // call selectCourse and read the grid on the next line, exactly as a tap does.
     function courseCardInHand(key) {
         if (!key) return true;
-        if (typeof coursePresets !== 'undefined' && coursePresets[key]) return true;
+        // IN HAND MEANS HOLES IN HAND (2026-10-07), not "a key I recognise".
+        // This returned true for any preset key, so nothing ever fetched the
+        // real record - which was survivable while the preset's own card was
+        // used, and was half of why an empty card shipped when it was not.
+        if (typeof coursePresets !== 'undefined' && coursePresets[key]
+            && (coursePresets[key].data || []).length) return true;
         if (typeof nineHoleLoops !== 'undefined' && nineHoleLoops[key]) return true;
         const rec = globalCourses[key];
         // A STUB IS A RECORD WHOSE ONLY KEY IS name. Testing for `.data` instead
@@ -7528,10 +7533,26 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             } else {
                 out.courseNameOverride = `${getCourseNameById(courseKey, globalCourses).split(' (')[0]} (${loops[frontKey].name.split(' ')[0]} Only)`;
             }
+        } else if (globalCourses[courseKey] && (globalCourses[courseKey].data || []).length) {
+            // THE LIVE RECORD WINS WHEN IT HAS A CARD - an imported or edited
+            // course must not be overridden by a built-in of the same key.
+            built = globalCourses[courseKey].data;
+        } else if (coursePresets[courseKey] && (coursePresets[courseKey].data || []).length) {
+            // AND THE BUILT-IN WINS OVER A NAME-ONLY STUB (2026-10-07).
+            //
+            // This branch used to sit BELOW an `else if (globalCourses[courseKey])`
+            // that tested the key's mere presence, and course-index.js merges a
+            // stub - { name: '...' } and nothing else - into globalCourses for
+            // every course the picker lists. So the stub won, `.data || []` gave
+            // an EMPTY card, and Caledonia, True Blue and Pine Lakes saved
+            // rounds whose scorecard read "No course data for this round yet."
+            // Three of the Myrtle courses, from data sitting in course-data.js
+            // in this bundle, needing no network at all.
+            built = coursePresets[courseKey].data;
         } else if (globalCourses[courseKey]) {
+            // A global record with no card: unchanged behaviour, and now only
+            // reached when nothing else has holes either.
             built = globalCourses[courseKey].data || [];
-        } else if (coursePresets[courseKey]) {
-            built = coursePresets[courseKey].data || [];
         } else {
             const unmappedCheck = validateCourseGrid();
             if (!unmappedCheck.ok) return { ...out, ok: false, reason: unmappedCheck.message };
