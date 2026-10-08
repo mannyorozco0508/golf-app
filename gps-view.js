@@ -481,6 +481,10 @@
             refreshEsriCredit(key);
             frameHole(true);
             render();
+            // READY: loaded, framed on the hole and drawn. data-zoom alone is not
+            // this - tile data sets it before the load event (a check that waited
+            // for it read a map still at its world view, tee at x -255).
+            el.setAttribute('data-ready', '1');
         });
     }
 

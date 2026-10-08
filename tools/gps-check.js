@@ -201,7 +201,9 @@ const COUNT_USGS = `(window.__usgsN = null, (typeof caches === 'undefined' ? (wi
 
 // THE MAP HAS LOADED: MapLibre reports its camera on the map element once its
 // style is up and the hole is framed. Waited for, not slept on.
-const WAIT_MAP = { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.zoom != null); })()`, timeout: 25000 };
+// Loaded, framed and drawn (gps-view sets data-ready at the end of its load
+// handler). data-zoom alone came too early under load: tile data sets it first.
+const WAIT_MAP = { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && m.dataset.zoom != null); })()`, timeout: 30000 };
 const mapTap = (x, y) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed', x, y, button: 'left', clickCount: 1 } } },
                           { cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 } } },
                           { sleep: 400 }];
