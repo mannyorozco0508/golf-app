@@ -80,6 +80,12 @@
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
     <script src="code-issuer.js"></script>
+    <!-- THE ROUNDS THIS PHONE ALREADY HAS. Home is the start_url, so a Home
+         Screen icon opens here with no signal - and offline the only thing it
+         could offer was a Resume badge showing a six-character code.
+         offline-queue.js holds a snapshot of every round opened on this
+         device, and the decisions about what to show come from there. -->
+    <script src="offline-queue.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -1182,6 +1188,14 @@ html {
     <div id="resume-container" style="display: none;">
         <a class="resume-link" onclick="resumeGame()">▶️ Resume <span id="resume-room-badge"></span></a>
     </div>
+
+    <!-- WITH NO SIGNAL, THE ROUNDS THIS PHONE HAS (2026-10-06). Each row names
+         the COURSE and how many of this device's edits are still unsent, and
+         goes straight back to that round's own card, group and all - the group
+         lives only in ?group=N, so the snapshot records it.
+         SHOWN ONLY OFFLINE: online, Resume and the two tiles are the right
+         answer and a second list would just be another card on Home. -->
+    <div id="offline-rounds" style="display: none;"></div>
 
     <!-- OPENING A ROUND YOU ALREADY HAVE, which is a different question from the
          one the tiles answer. It sits under Resume because the two are the same
@@ -2518,6 +2532,44 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         'scramble', 'hilo', 'wolf', 'ryder', 'ryder-cup'];
 
     let currentWizardStep = 1;
+
+    // WHAT RESUME CALLS THE ROUND. Online or off: the course if this phone has
+    // ever stored the round, the code if it has not. One line, and it is the
+    // same snapshot the offline rows read, so the two can never disagree.
+    function resumeBadgeText(code) {
+        if (!code) return '';
+        try {
+            var snap = window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, code);
+            var name = snap && snap.data && (snap.data.courseName || snap.data.eventName);
+            if (name) return String(name).trim();
+        } catch (e) { /* fall through to the code */ }
+        return code;
+    }
+
+    // THE ROUNDS ON THIS PHONE, OFFLINE ONLY.
+    //
+    // Every decision belongs to offline-queue.js - which rounds exist, what to
+    // call each one, how many edits are waiting, where the tap goes. This paints
+    // them. If the module never loaded nothing shows and Home behaves exactly as
+    // it did before, which is the same contract pwa-boot.js keeps.
+    function renderOfflineRounds() {
+        var box = document.getElementById('offline-rounds');
+        if (!box) return;
+        var q = window.OfflineQueue;
+        var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+        if (!q || !offline) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        var rounds = [];
+        try { rounds = q.localRounds(localStorage) || []; } catch (e) { rounds = []; }
+        if (!rounds.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        // NEWEST FIRST AND CAPPED AT FOUR: a phone that has opened thirty rounds
+        // does not need thirty rows on a screen with no signal, it needs the one
+        // it is on.
+        box.innerHTML = rounds.slice(0, 4).map(function (r) {
+            return '<a class="resume-link" href="' + escapeHtml(q.resumeHref(r)) + '">'
+                + escapeHtml(q.resumeLabel(r)) + '</a>';
+        }).join('');
+        box.style.display = 'block';
+    }
 
     function currentPrimaryFormat() {
         const sel = document.getElementById('game-format-select');
@@ -3884,8 +3936,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const lastRoom = skipResume ? null : localStorage.getItem('lastRoomCode');
         if (lastRoom) {
             document.getElementById("resume-container").style.display = "block";
-            document.getElementById("resume-room-badge").textContent = lastRoom;
+            // THE COURSE, NOT THE CODE (2026-10-06, Manny on a phone: it read
+            // "Resume 9GB4J6"). A six-character code is the one thing about a
+            // round a golfer never remembers; the course is what they call it.
+            // The name comes from the snapshot this phone already stores for
+            // that round, so it needs no network - and the code remains the
+            // fallback for a round saved before snapshots existed.
+            document.getElementById("resume-room-badge").textContent = resumeBadgeText(lastRoom);
         }
+        renderOfflineRounds();
 
         if (tripLinkCode) {
             document.getElementById("trip-context-banner").style.display = "block";

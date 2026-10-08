@@ -20,8 +20,17 @@
 // on-disk write queue - `outstandingPuts_` is a plain in-memory array, and the
 // only things the SDK ever writes to localStorage are a host hint and a
 // websocket-failure flag. So a reload while offline loses unsynced writes, full
-// stop. Nothing here can change that, and nothing here pretends to. The pill
-// says "keep this page open" because that is literally the guarantee.
+// stop. Nothing here can change that, and nothing here pretends to.
+//
+// THE PILL USED TO SAY "keep this page open" UNCONDITIONALLY, because that was
+// literally the guarantee. Since 2026-10-06 it is conditional: offline-queue.js
+// gives the CONSUMER scorecard a durable queue for scores and KP answers that
+// survives the app closing and the phone restarting, so on a page that loads it
+// the pill says the scores are saved instead. The tournament pages load this
+// file and not the queue, and there the original sentence is still the true one.
+// See hasDurableQueue() - the wording follows the mechanism, never the product
+// name, so a page that stops loading the queue goes back to the honest warning
+// by itself.
 //
 // THE MONEY GUARD IS NOT HERE, ON PURPOSE. Refusing an offline press has to
 // work even if this file never loaded, so that check lives inline in the pages
@@ -211,6 +220,12 @@
     }
 
     function renderPill() {
+        // THE BADGE SPEAKS FOR THE SCORECARD; this banner does not repeat it.
+        if (badgeOwnsTheMessage()) {
+            var mine = pillEl || document.getElementById('golfnet-pill');
+            if (mine) mine.style.display = 'none';
+            return;
+        }
         var el = ensurePill();
         if (!el) return;
         var s = state();
@@ -238,12 +253,12 @@
                 el.style.background = '#fff4d6';
                 el.style.color = '#8a6100';
                 el.textContent = '\uD83D\uDFE1 Offline \u2014 ' + s.pending + ' change' + (s.pending === 1 ? '' : 's')
-                    + ' waiting to sync. Keep this page open.';
+                    + ' waiting to sync. ' + keepOpenOrNot();
             } else if (!s.online) {
                 el.style.display = 'block';
                 el.style.background = '#fff4d6';
                 el.style.color = '#8a6100';
-                el.textContent = '\uD83D\uDFE1 Offline \u2014 keep this page open. Scores sync when the connection returns.';
+                el.textContent = offlineSentence();
             } else if (s.pending > 0) {
                 el.style.display = 'block';
                 el.style.background = '#eef6f2';
@@ -488,6 +503,67 @@
     }
 
     // Public surface. Kept deliberately small.
+    // "KEEP THIS PAGE OPEN" WAS THE GUARANTEE, AND ON ONE PRODUCT IT NO LONGER IS
+    // (2026-10-06). The consumer scorecard now writes every score and KP answer
+    // to a durable queue (offline-queue.js) that survives the app closing and
+    // the phone restarting - measured end to end in tools/airplane-mode-check.js
+    // - so telling that golfer to keep the page open is false, and false in the
+    // direction that makes them afraid to close it.
+    //
+    // IT IS STILL TRUE EVERYWHERE ELSE, and that is why this is a question and
+    // not a rewrite: tournament.html and tournament-scorecard.html load this
+    // file and do NOT load the queue, so on those pages the SDK's in-memory
+    // buffer really is the only thing holding a write. The sentence follows the
+    // mechanism rather than the product name: if the queue is on the page, say
+    // the scores are safe; if it is not, say what was always true.
+    function hasDurableQueue() {
+        return !!(typeof window !== 'undefined' && window.OfflineQueue
+                  && typeof window.OfflineQueue.count === 'function');
+    }
+    // ONE MESSAGE, WITH THE COUNT (2026-10-06). Manny's phone showed BOTH: this
+    // yellow banner saying "scores are saved on this phone" and, underneath,
+    // the scorecard's own badge saying how many were waiting. Two sentences
+    // about one fact, and only one of them had the number.
+    //
+    // THE PAGE THAT HAS A BADGE OWNS THE MESSAGE. index.html renders
+    // #offline-badge right under the hole card, which is where a scorekeeper is
+    // already looking and is the only place that can carry a live count; this
+    // banner then says nothing on that page. Every other page has no badge, so
+    // the banner carries the count itself rather than leaving it unsaid.
+    //
+    // DEFENSIVELY, because this file's contract is that nothing in it can take
+    // the round down. A document without getElementById is not hypothetical:
+    // the connectivity harness builds exactly that, and an unguarded call threw
+    // inside renderPill and stopped the pill being injected at all - measured,
+    // four pill tests went red naming a missing element rather than a throw.
+    function badgeOwnsTheMessage() {
+        try {
+            if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return false;
+            return !!(document.getElementById('offline-badge') && hasDurableQueue());
+        } catch (e) { return false; }
+    }
+    function waitingCount() {
+        try {
+            return (typeof window !== 'undefined' && window.OfflineQueue && window.localStorage)
+                ? (window.OfflineQueue.count(window.localStorage) || 0) : 0;
+        } catch (e) { return 0; }
+    }
+    function offlineSentence() {
+        if (!hasDurableQueue()) {
+            return '\uD83D\uDFE1 Offline \u2014 keep this page open. Scores sync when the connection returns.';
+        }
+        var n = waitingCount();
+        return n > 0
+            ? '\uD83D\uDCF4 Offline \u2014 ' + n + ' saved on this phone, waiting to send.'
+            : '\uD83D\uDCF4 Offline \u2014 scores are saved on this phone. Other changes need signal.';
+    }
+
+    function keepOpenOrNot() {
+        return hasDurableQueue()
+            ? 'Scores are saved on this phone.'
+            : 'Keep this page open.';
+    }
+
     var GolfNet = {
         // Already used internally to skip service-worker registration inside
         // Capacitor. Exposed because the Consumer pages need the same answer for a

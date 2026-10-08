@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v143-matchcard. The tournament product cache
+// The consumer product cache is consumer-v148-resumename. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 //
@@ -4279,7 +4279,56 @@
 // precached here on the combined deploy and changed: a Setup team row has Remove,
 // refused for a team with any posted score. v304 stays with spectator-polish.
 // A device on v305 has no Remove offline.
-const CACHE_VERSION = 'golfapp-v306-remove-team';
+// Moved to v307 FOR OFFLINE MODE YOU CAN TRUST. Scores and KP answers are
+// written to a durable queue on the phone (offline-queue.js) BEFORE they are
+// sent, replayed in order when signal returns, and removed only when the server
+// confirms each one. Measured end to end in tools/airplane-mode-check.js: seven
+// scores typed in airplane mode survive a reload AND a phone restart, then all
+// seven land when the signal comes back. Before this, the only queue was
+// Firebase's in-memory one - measured in tools/offline-durability-audit.js:
+// after a reload its length is 0 and the payload is in no durable store, so a
+// device on v306 that closes the app in a dead zone LOSES EVERY UNSENT SCORE.
+// A round already opened on the phone now opens and is scoreable with no
+// signal; the scorecard carries a badge saying what is waiting; and the
+// leaderboard, bets, results and final card compute from local data with "May
+// change when others sync." Manual presses still need signal, by decision.
+// Moved to v309 BECAUSE SAFARI WOULD NOT REOPEN THE ROUND. Measured on Manny's
+// phone: enter scores offline (fine), close the Safari tab, reopen it still
+// offline - "Safari can't open the page. Response served by service worker has
+// redirections." Cloudflare Pages redirects /index.html to /, so both the
+// precached shell and the runtime cache held a response with redirected ===
+// true, and WebKit refuses to serve one to a navigation. Chrome serves it
+// without a word, which is why every check was green. Every response is now
+// REBUILT from its body, status and headers before it is cached or served -
+// same bytes, no redirect history - and a page is stored under both the url
+// asked for and the url the network ended at, query string kept, so a reopen at
+// /index.html?game=X&group=1 and at /?game=X both find it. A device on v308
+// cannot reopen a round offline in Safari at all.
+// v308 is held by tournaments-scorecard-lock, which is why this is v309.
+// Moved to v311: HOME OFFERS THE ROUND BACK WHEN THERE IS NO SIGNAL. admin.html
+// is the consumer start_url, so a Home Screen icon opens it - and offline all it
+// could offer was "Resume ABCD", a six-character code that says nothing about
+// which round it is, with no way back to this phone's own group except the
+// picker. Each row now names the COURSE and how many of this device's edits are
+// still unsent, and goes straight to that round's card with its group on the
+// URL (the group lives only in ?group=N, so the stored round records it). Shown
+// only offline; online, Resume and the two tiles are the right answer. A device
+// on v310 gets the bare code. (v310 was taken while this was being written.)
+// Moved to v312 for two things a phone found in v311 (Manny, iPhone Safari,
+// airplane mode - the queue itself passed: scores survived a tab close AND a
+// phone restart and synced on reconnect with everything there):
+//   RESUME SAID "Resume 9GB4J6". A six-character code is the one thing about a
+//   round a golfer never remembers. It reads the course now, from the snapshot
+//   this phone already stores, with the code as the fallback for a round saved
+//   before snapshots existed.
+//   AND HOME'S OFFLINE BANNER. The old "keep this page open" sentence appeared
+//   there. It is not reachable from this tree - measured in Chrome, Home says
+//   "scores are saved on this phone" - and the likeliest cause is the Home
+//   Screen icon's own cache, which iOS keeps separate from Safari's and which
+//   was still on a version where Home did not load the queue at all. A guard
+//   now pins Home's wording so that explanation cannot hide a regression.
+// A device on v311 shows the code on Resume.
+const CACHE_VERSION = 'golfapp-v312-resumename';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4449,6 +4498,7 @@ const SHELL_FILES = [
     // The three ways into a round. index.html calls it unguarded from the arrival
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
+    './offline-queue.js',
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
     // card itself carries, so a cached shell without it plays 1..18 - which is what
@@ -4530,9 +4580,34 @@ self.addEventListener('install', (event) => {
     // have surfaced it. For an app whose job is to work on a course with no signal,
     // that is the wrong way round: a single missing file should cost that one file,
     // not the whole shell.
+    // AND NOT WITH cache.add(), FOR THE SAME REASON THE FETCH HANDLER LAUNDERS
+    // (2026-10-06). cache.add() fetches and stores whatever comes back - and
+    // Cloudflare Pages redirects /index.html to /, so the PRECACHED shell entry
+    // carried redirected === true. That is the copy a cold install serves on the
+    // first offline reopen, which is exactly when Manny's Safari said "Response
+    // served by service worker has redirections": the runtime fix alone would
+    // have left the first reopen after an install broken and the second one
+    // fine, which is the worst kind of half-fix to debug.
+    //
+    // Measured in tools/sw-offline-reopen-check.js: with cache.add() the cache
+    // held one redirected entry, /index.html, after a clean install.
+    //
+    // So each file is fetched here and stored as a REBUILT response. Same bytes,
+    // no redirect history. A redirected shell file is also stored under its
+    // FINAL url, because that is what the browser will ask for once it has
+    // learned the redirect.
     event.waitUntil(
         caches.open(CACHE_VERSION).then((cache) => Promise.all(
-            SHELL_FILES.map((file) => cache.add(file).catch((err) => {
+            SHELL_FILES.map((file) => fetch(file, { cache: 'reload' }).then(async (res) => {
+                if (!res || !res.ok) throw new Error('HTTP ' + (res && res.status));
+                const body = await res.blob();
+                const mk = () => new Response(body, {
+                    status: res.status, statusText: res.statusText, headers: res.headers
+                });
+                const urls = [new URL(file, self.location.href).href];
+                if (res.redirected && res.url && urls.indexOf(res.url) === -1) urls.push(res.url);
+                return Promise.all(urls.map((u) => cache.put(new Request(u), mk())));
+            }).catch((err) => {
                 // Logged rather than swallowed, so a broken entry is findable in
                 // Safari/Chrome devtools instead of failing invisibly.
                 console.warn('[sw] could not cache', file, err);
@@ -4603,13 +4678,46 @@ self.addEventListener('fetch', (event) => {
     //
     // Scripts and icons keep exact matching - they have no query strings, and
     // loosening the match there would gain nothing.
+    // WEBKIT WILL NOT SERVE A REDIRECTED RESPONSE TO A NAVIGATION (2026-10-06).
+    //
+    // Measured on Manny's phone, Safari, preview URL: open the round online -
+    // fine; close the tab OFFLINE and reopen it - "Safari can't open the page.
+    // Response served by service worker has redirections." Chrome serves it
+    // without complaint, which is why every check here was green.
+    //
+    // WHERE THE REDIRECT COMES FROM. Cloudflare Pages redirects /index.html to /
+    // (it strips .html), so `fetch(request)` follows it and hands back a
+    // response with redirected === true and a different .url. That response was
+    // then cache.put() as-is AND handed to respondWith(). WebKit refuses it for
+    // a document request - the rule is in the Fetch spec, and it is the one
+    // engine that enforces it.
+    //
+    // THE FIX IS TO LAUNDER IT. A Response rebuilt from the body, the status and
+    // the headers is byte-identical and carries no redirect history, so it is
+    // servable and cacheable. Nothing about the bytes changes.
+    async function clean(resp) {
+        // 204/205/304 have a null body by definition and must not be rebuilt
+        // with one; they are also never the shell, so they pass through.
+        if (!resp || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp;
+        const body = await resp.blob();
+        return new Response(body, {
+            status: resp.status || 200,
+            statusText: resp.statusText,
+            headers: resp.headers
+        });
+    }
+
     async function fromCacheOrOffline() {
         const exact = await caches.match(request);
-        if (exact) return exact;
+        // A CACHED REDIRECTED RESPONSE IS THE SAME TRAP, and entries written by
+        // an older worker are already out there on installed phones. Launder on
+        // the way out as well as on the way in, so the first offline reopen
+        // after this update works rather than the second.
+        if (exact) return isNavigation && exact.redirected ? clean(exact) : exact;
 
         if (isNavigation) {
             const shell = await caches.match(request, { ignoreSearch: true });
-            if (shell) return shell;
+            if (shell) return shell.redirected ? clean(shell) : shell;
         }
 
         // Never resolve to undefined. respondWith(undefined) throws a TypeError
@@ -4628,13 +4736,47 @@ self.addEventListener('fetch', (event) => {
     // Network-first: always prefer the latest deployed version when online, so a
     // fresh deploy shows up on the next navigation rather than being trapped
     // behind a stale cache entry. Cache is purely the no-connection fallback.
-    event.respondWith(
-        fetch(request)
-            .then((response) => {
-                const responseClone = response.clone();
-                caches.open(CACHE_VERSION).then((cache) => cache.put(request, responseClone));
-                return response;
-            })
-            .catch(() => fromCacheOrOffline())
-    );
+    event.respondWith((async () => {
+        let response;
+        try {
+            response = await fetch(request);
+        } catch (e) {
+            return fromCacheOrOffline();
+        }
+
+        if (!response.redirected) {
+            const copy = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+            return response;
+        }
+
+        // REDIRECTED. Launder it once, store it under BOTH urls, serve the clean
+        // copy. A Response body can only be read once, so the blob is taken a
+        // single time and a fresh Response is built per use.
+        const body = await response.blob();
+        const rebuild = () => new Response(body, {
+            status: response.status || 200, statusText: response.statusText, headers: response.headers
+        });
+
+        // BOTH KEYS, AND THE QUERY SURVIVES. The browser will ask for
+        // /index.html?game=ABCD&group=1 on the next cold open, and Cloudflare's
+        // own answer lives at /?game=ABCD&group=1 - so a cache holding only one
+        // of them misses on the other. Every link this app hands out carries a
+        // query, and the pages read their identity from window.location.search
+        // rather than from the cache key, so keeping it costs nothing and
+        // dropping it would lose ?game= and ?group=.
+        const keys = [request.url];
+        try {
+            const finalUrl = new URL(response.url);
+            if (!finalUrl.search && url.search) finalUrl.search = url.search;
+            if (finalUrl.href !== request.url) keys.push(finalUrl.href);
+        } catch (e) { /* an unparseable final url is just one key */ }
+
+        if (response.ok) {
+            caches.open(CACHE_VERSION).then((cache) =>
+                Promise.all(keys.map((k) => cache.put(new Request(k), rebuild())))
+            ).catch(() => {});
+        }
+        return rebuild();
+    })());
 });

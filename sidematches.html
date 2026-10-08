@@ -2916,7 +2916,7 @@ html {
         if (raw === null) return;   // golfer changed their mind - nothing happens
         const amt = parseFloat(raw);
         if (isNaN(amt) || amt <= 0) { uiRefuse('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
             .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
@@ -3020,7 +3020,7 @@ html {
         const rate = parseFloat(input.value);
         if (isNaN(rate) || rate <= 0) { uiRefuse("Please enter a valid dollar amount."); return; }
         const smForAck = sideMatchById(matchId);
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/holePresses/${pushKey}`).set({ fromHole: nextHole, newStake: rate })
             .then(() => {
@@ -3053,7 +3053,7 @@ html {
         if (rawO === null) return;
         const amtO = parseFloat(rawO);
         if (isNaN(amtO) || amtO <= 0) { uiRefuse('\u26A0\uFE0F Enter a dollar amount above 0. No press was created.'); return; }
-        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Reconnect before creating a press.')) return;
+        if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
             .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))

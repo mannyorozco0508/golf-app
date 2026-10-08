@@ -368,10 +368,18 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
 describe('NOTHING ELSE IN THE SERVICE WORKER MOVED', () => {
 
     test('it is still network-first with runtime caching', () => {
+        // RE-POINTED 2026-10-06. Same strategy, different shape: the handler is
+        // async because a redirected response has to be rebuilt before it is
+        // cached or served (WebKit will not serve one to a navigation - a
+        // Safari reopen offline failed on a phone with "Response served by
+        // service worker has redirections"). Network first, cache as fallback,
+        // runtime caching - all three still asserted.
         const src = read('sw.js');
-        assert.match(src, /fetch\(request\)/, 'network-first');
-        assert.match(src, /cache\.put\(request, responseClone\)/, 'runtime caching');
-        assert.match(src, /catch\(\(\) => fromCacheOrOffline\(\)\)/, 'cache is the fallback');
+        assert.match(src, /response = await fetch\(request\);/, 'network-first');
+        assert.match(src, /cache\.put\(request, copy\)/, 'runtime caching');
+        assert.match(src, /return fromCacheOrOffline\(\);/, 'cache is the fallback');
+        assert.match(src, /cache\.put\(new Request\(k\), rebuild\(\)\)/,
+            'a redirected page must be cached under both urls, laundered');
     });
 
     test('the offline page and navigation fallback are unchanged', () => {

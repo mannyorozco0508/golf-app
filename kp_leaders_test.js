@@ -337,13 +337,25 @@ describe('ONE ATOMIC WRITE', () => {
 
 describe('SAFETY RAILS PRESERVED', () => {
 
-    test('an offline KP write is refused before Firebase sees it', async () => {
+    test('AN OFFLINE KP IS QUEUED NOW, NOT REFUSED (Manny, 2026-10-06)', async () => {
+        // THIS TEST USED TO ASSERT THE OPPOSITE, and the old reason was sound as
+        // far as it went: "a buffered money write that never lands is worse than
+        // a refusal". What changed is that it no longer never lands. The KP goes
+        // into a durable queue on the phone (offline-queue.js) and is replayed
+        // when signal returns, which is the whole of this wave - and the KP is
+        // the one answer nobody can reconstruct afterwards, because a score is on
+        // the paper card and "who was inside the circle on 7" is not.
+        //
+        // MANUAL PRESSES WENT THE OTHER WAY and are still refused offline: see
+        // connectivity_safety_test.js, which still holds the guard on every one
+        // of them.
         const b = boot({ group: 2, hole: 7 });
         b.run('navigator.onLine = false;');
         b.setLeader('Manny');
         await settle();
-        assert.equal(b.writes().length, 0, 'a buffered money write that never lands is worse than a refusal');
-        assert.ok(b.alerts().some(a => /KP NOT SAVED/.test(a)));
+        assert.equal(b.writes().length, 1, 'the KP was not written at all: ' + JSON.stringify(b.writes()));
+        assert.ok(!b.alerts().some(a => /KP NOT SAVED/.test(a)),
+            'the golfer was still told it failed: ' + JSON.stringify(b.alerts()));
     });
 
     test('score-writing permissions are untouched', () => {

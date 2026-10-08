@@ -298,7 +298,10 @@ describe('THE SEAMS', () => {
     test('saveKpLeader is unchanged in what it writes: one update, kpLeaders/hN and kpWinners/hN', () => {
         const fn = src.slice(src.indexOf('function saveKpLeader('), src.indexOf('function savePoolKp('));
         assert.match(fn, /updates\['kpLeaders\/h' \+ hole\] = leader;\s*updates\['kpWinners\/h' \+ hole\] = String\(pid\);/);
-        assert.match(fn, /db\.ref\('events\/' \+ currentMode\)\.update\(updates\)/);
+        // RE-POINTED 2026-10-06: still ONE update carrying both keys - which is
+        // the claim this test exists for - but issued through durableWrite, so
+        // the op is on the phone before it is sent and is coalesced by hole.
+        assert.match(fn, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:h' \+ hole\)/);
         assert.doesNotMatch(fn, /kpAsked|sessionStorage|transaction/);
     });
     test('the question is answered in sessionStorage per round and hole; the mount is rendered on every snapshot (the last score lights it)', () => {
