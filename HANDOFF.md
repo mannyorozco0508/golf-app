@@ -4117,6 +4117,39 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   `CURRENT_PROJECT_VERSION` 5 -> 6 on Debug and Release. It was superseded the same
   day and **cancelled in App Store Connect** rather than reviewed; nothing about it
   shipped. Its contents are a subset of build 7's.
+- **1.0.6 BUILD 9 IS SET AND READY TO ARCHIVE (2026-10-07, `main` `2fe31b2`).**
+  `CURRENT_PROJECT_VERSION` 9 on Debug and Release, `MARKETING_VERSION` 1.0.6,
+  Release signing with `App/AppRelease.entitlements` (aps-environment production
+  + Sign in with Apple). `build-shell`, `sync-mobile-web` and `cap sync ios` all
+  run; the bundle under `ios/App/App/public/` is byte-identical to the repo for
+  index.html, admin.html, sw.js and offline-queue.js, and both pages in the
+  bundle load the queue.
+
+  **ASK BEFORE ARCHIVING: has 1.0.6 been APPROVED?** Build 7 was uploaded and
+  submitted on 2026-10-05 with Manual Release held, and nothing in this repo can
+  see App Store Connect. MARKETING_VERSION is left at 1.0.6 per Manny's standing
+  instruction; if 1.0.6 has been approved (or released), build 9 needs 1.0.7
+  instead and the stamp has to change before the archive.
+
+  **BUILD 9 = BUILD 8 + OFFLINE MODE.** Every score and KP answer is written to a
+  durable queue on the phone (`offline-queue.js`) BEFORE it is sent, replayed in
+  order when signal returns, and removed only when the server confirms it.
+  Measured first: Firebase's own queue is an in-memory array, so before this a
+  phone closed in a dead zone lost every unsent score, and a round would not even
+  open with no signal. A round already opened on the phone now opens and is
+  scoreable offline; Home offers it back by COURSE with the count of unsent
+  edits; the leaderboard, bets, results and final card compute from local data
+  under "May change when others sync."; the scorecard carries a badge saying
+  what is waiting. Manual presses still need signal, by decision - the refusal
+  says "Pressing needs signal - auto presses still work."
+  PROVED ON THE PHONE (Manny, iPhone Safari, airplane mode, v311): scores
+  queued, survived a tab close AND a phone restart, synced on reconnect with
+  everything there. Caches `golfapp-v312-resumename` / `consumer-v148-resumename`.
+  NOTE FOR THE NATIVE BUILD: the service worker is not involved in the app at all
+  (`registerServiceWorker` returns `skipped-native` before `canRegister`), so the
+  Safari redirect fix is web-only; the queue is localStorage and works the same
+  in both.
+
 - **1.0.6 BUILD 7 IS UPLOADED AND SUBMITTED (2026-10-05, ~11:03 AM PT).** Manual
   Release is HELD - it does not go to the store on approval; Manny presses it.
   `CURRENT_PROJECT_VERSION` 7 on Debug and Release, `MARKETING_VERSION` 1.0.6.
