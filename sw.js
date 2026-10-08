@@ -4343,7 +4343,18 @@
 //   leaderboard   page scrolled sideways at 390px and all 26 amounts on it were
 //                 off screen.
 // A device on v312 has all four.
-const CACHE_VERSION = 'golfapp-v314-fourbugs';
+// Moved to v315. AN UNPLAYED ROUND'S OWN RESULTS PAGE CHARGED EVERYONE.
+//   settlement.html  measured on the real Day 3 (3MKUCF, Pine Lakes, 0 scores):
+//                    $20 a golfer in, "$60 / 4" refunded = $15 back, and the
+//                    $20 KP bucket held as "$5 in the pot" on four blank holes -
+//                    so the Results page of a round nobody played said every
+//                    golfer was $5 down. It now shows $0 a golfer and says
+//                    "Not played yet - it owes nobody anything.", the same rule
+//                    and the same sentence as the trip ledger.
+// NO ENGINE FILE MOVED: pool-engine.js keeps the rule that KP money never goes
+// back to the field, and still answers -$5 here; the page stops asking it.
+// A device on v314 still charges for a round nobody played.
+const CACHE_VERSION = 'golfapp-v315-unplayedzero';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
