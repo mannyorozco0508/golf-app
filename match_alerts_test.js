@@ -15,6 +15,12 @@
 // and sends nothing. So this wave is a new KIND in that layer plus its gates -
 // all of it testable in plain node, with no credential and no network.
 //
+// BASELINE, against the pre-wave push-notify.js (sha cee160ce5da245f6 is the
+// FIXED file; the baseline is the version at main 8cf3b90), all 26 tests:
+// 3 PASS / 23 FAIL. The three that pass are the existing channels, which this
+// wave does not touch - and the recipients arm's own CONTROL is what stops the
+// other seven being satisfied by a function that returns nothing.
+//
 // THE ONE THAT CANNOT BE WRITTEN HERE: "quiet while the golfer is viewing that
 // round" has a second half on the phone, in push-boot.js, because the only
 // thing that truly knows which round is on screen is the screen. The decision
@@ -196,5 +202,80 @@ describe('6. THE ORGANIZER CAN TURN THEM OFF FOR THE WHOLE ROUND', () => {
             facts: { uid: 'u-ivy', roundCode: 'ABC123', roundName: 'Saturday', netCents: 4000 }
         });
         assert.equal(d.send, true, 'the round switch silenced an essential: ' + d.reason);
+    });
+});
+
+// ============================================================================
+// 7. WHO HEARS ABOUT IT - MANNY'S RULING, 2026-10-07
+//
+// "Alert for a match you're in even when your partner made the swing - still
+// never for holes your own group played."
+//
+// So the recipient set for a posted hole is: everyone in the match whose OWN
+// group is not the group that posted it. Not just the other side, and not just
+// the golfer who played the hole. The two halves pull in opposite directions
+// and both have to be tested, because the obvious implementations get one or
+// the other wrong:
+//
+//   "the other side only"   drops the partner, which is the ruling reversed
+//   "everyone in the match" buzzes the scorer's own foursome, which is the
+//                           thing that makes a golfer turn the feature off
+// ============================================================================
+
+describe('7. THE RECIPIENTS: your partner counts, your own group never does', () => {
+
+    // A FOUR-BALL ACROSS TWO GROUPS, which is the shape the ruling is about.
+    // Ivy and Jon are partners in group 1; Kim and Vic are partners in group 3.
+    const GROUPS = { ivy: 1, jon: 1, kim: 3, vic: 3 };
+    const MATCH = { teamAIds: ['ivy', 'jon'], teamBIds: ['kim', 'vic'] };
+
+    test('a swing by Kim (group 3) reaches all of group 1, both sides', () => {
+        const got = P.matchAlertRecipients(MATCH, GROUPS, 3).slice().sort();
+        // Ivy and Jon are the opposition and hear about it; Vic is Kim's
+        // PARTNER and is in the scoring group, so he watched it happen.
+        assert.deepEqual(got, ['ivy', 'jon']);
+    });
+
+    test('and a swing by Ivy (group 1) reaches all of group 3, both sides', () => {
+        const got = P.matchAlertRecipients(MATCH, GROUPS, 1).slice().sort();
+        assert.deepEqual(got, ['kim', 'vic']);
+    });
+
+    test('THE PARTNER IS IN, which is the ruling itself', () => {
+        // A four-ball where the partners are in DIFFERENT groups: Jon is Ivy's
+        // partner and is not in the scoring group, so he must hear about it.
+        const split = { ivy: 1, jon: 2, kim: 3, vic: 3 };
+        const got = P.matchAlertRecipients(MATCH, split, 1).slice().sort();
+        assert.deepEqual(got, ['jon', 'kim', 'vic'],
+            'Jon is Ivy’s partner in another group and was left out');
+    });
+
+    test('nobody in the scoring group is ever in the list', () => {
+        [1, 2, 3].forEach((g) => {
+            P.matchAlertRecipients(MATCH, { ivy: 1, jon: 2, kim: 3, vic: 3 }, g)
+                .forEach((id) => {
+                    assert.notEqual(String({ ivy: 1, jon: 2, kim: 3, vic: 3 }[id]), String(g),
+                        id + ' is in group ' + g + ' and was told about his own group’s hole');
+                });
+        });
+    });
+
+    test('an unplaceable golfer is left out, not guessed at', () => {
+        // Fails closed, the same rule as the gate in pushDecide: a golfer the
+        // group map cannot place might be in the scoring group.
+        const got = P.matchAlertRecipients(MATCH, { ivy: 1, kim: 3, vic: 3 }, 3);
+        assert.deepEqual(got, ['ivy'], 'Jon has no group and was alerted anyway');
+    });
+
+    test('and a one-group match tells nobody', () => {
+        const got = P.matchAlertRecipients(MATCH, { ivy: 1, jon: 1, kim: 1, vic: 1 }, 1);
+        assert.deepEqual(got, []);
+    });
+
+    test('CONTROL: it is not simply returning nothing', () => {
+        // Every assertion above except two is satisfied by a function that
+        // returns []. This is the one that proves it does not.
+        assert.ok(P.matchAlertRecipients(MATCH, GROUPS, 3).length > 0);
+        assert.ok(P.matchAlertRecipients(MATCH, { ivy: 1, jon: 2, kim: 3, vic: 4 }, 1).length === 3);
     });
 });

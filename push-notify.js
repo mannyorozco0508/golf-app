@@ -237,6 +237,39 @@ function pushCopy(kind, facts) {
     return null;
 }
 
+// WHO HEARS ABOUT A POSTED HOLE - Manny's ruling, 2026-10-07.
+//
+// "Alert for a match you are in even when your PARTNER made the swing - still
+// never for holes your own group played."
+//
+// So: every golfer in the match whose OWN group is not the group that posted
+// the hole. The two halves pull against each other, and the two obvious
+// implementations each get one wrong - "the other side only" drops the partner,
+// which is the ruling reversed, and "everyone in the match" buzzes the scorer's
+// own foursome, which is the thing that makes a golfer turn the feature off.
+//
+// FAILS CLOSED on a golfer the group map cannot place, the same rule as the
+// gate in pushDecide: an unplaceable golfer might be in the scoring group, and
+// guessing sends exactly the notification the rule exists to prevent.
+//
+// PURE, and takes the map rather than the round: groupOf comes from
+// grouping.js playerGroupMap(), which is the one place that answers "which
+// foursome is this golfer in" - this file does not get a second opinion.
+function matchAlertRecipients(sideMatch, groupOf, scoringGroup) {
+    var sm = sideMatch || {};
+    var map = groupOf || {};
+    if (scoringGroup === null || scoringGroup === undefined || scoringGroup === '') return [];
+    var ids = [].concat(sm.teamAIds || [], sm.teamBIds || []).map(String);
+    var seen = {};
+    return ids.filter(function (id) {
+        if (seen[id]) return false;
+        seen[id] = true;
+        var g = map[id];
+        if (g === null || g === undefined || g === '') return false;
+        return String(g) !== String(scoringGroup);
+    });
+}
+
 // AMOUNTS OUT, UNLESS THE ROUND IS OVER. Applied to the composed line rather
 // than trusting the facts: `swing` and `state` are built by a caller, and the
 // one thing this feature must never do is put a dollar figure on a lock screen
@@ -426,7 +459,7 @@ if (typeof module !== 'undefined' && module.exports) {
         PUSH_STREAK_BIRDIES, PUSH_STREAK_WINDOW,
         pushChannelOf, pushPrefsNormalise, pushAllowed, pushMoneyText, pushCopy,
         pushHypeTitle, pushHypeBody, pushHypeFor, pushDedupeKey, pushThrottleKey,
-        PUSH_MATCH_KINDS, pushMatchThrottleKey, pushScrubMoney,
+        PUSH_MATCH_KINDS, pushMatchThrottleKey, pushScrubMoney, matchAlertRecipients,
         pushDecide
     };
 }

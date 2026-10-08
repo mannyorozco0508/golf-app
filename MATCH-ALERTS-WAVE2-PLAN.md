@@ -86,7 +86,17 @@ both are optional polish rather than blockers:
   cross-group swing, nothing is needed — the roster has the names. Listed only
   so it is not mistaken for missing work.
 
-One decision I would like from you when you pick this up: **should a match
-alert fire for a match you are in but are NOT a participant of the swing** —
-e.g. your partner's birdie in a four-ball. I have assumed yes (it is your
-match), and the throttle makes it one buzz either way.
+## Manny's decision, 2026-10-07
+
+**YES — alert for a match you are in even when your PARTNER made the swing.**
+It is your match; a four-ball partner holing a putt changes your position as
+much as you holing it. The throttle makes it one buzz either way.
+
+**And the other half of that ruling stands unchanged: still never for holes
+your own group played.** So the recipient set for a posted hole is every golfer
+in the match whose OWN group is not the group that posted it — not just the
+golfers on the other side, and not just the one who played the hole.
+
+That is now `matchAlertRecipients()` below, with a test that a partner on the
+same side as the scorer is included and that anyone in the scoring group is
+excluded whichever side they are on.
