@@ -88,17 +88,29 @@
 // ============================================================================
 
 // The three channels, and which of the six ride on each.
-var PUSH_CHANNELS = ['essentials', 'bets', 'hype'];
+var PUSH_CHANNELS = ['essentials', 'bets', 'hype', 'match'];
 var PUSH_KIND_CHANNEL = {
     'youre-in': 'essentials',
     'final-results': 'essentials',
     'bet-challenge': 'bets',
     'press-offered': 'bets',
-    'hype': 'hype'
+    'hype': 'hype',
+    // BIG-MOMENT MATCH ALERTS (Wave 2). Their own channel, not 'bets': a golfer
+    // who does not want to be asked to accept wagers may well want to know his
+    // match just went all square, and one switch for both would make him choose.
+    'match-swing': 'match',
+    'match-press': 'match',
+    'match-decided': 'match'
 };
+// The match kinds, as a table rather than a regex on the name - a kind called
+// 'rematch' would otherwise quietly inherit every gate below.
+var PUSH_MATCH_KINDS = { 'match-swing': true, 'match-press': true, 'match-decided': true };
 // The kinds a single hole can fire more than one of. Everything else is an
 // occasion, not an event on a hole.
-var PUSH_HOLE_SCOPED = { 'press-offered': true, 'hype': true };
+var PUSH_HOLE_SCOPED = { 'press-offered': true, 'hype': true,
+    // All three match kinds are events on a hole: the throttle below is what
+    // keeps a busy green from buzzing four times.
+    'match-swing': true, 'match-press': true, 'match-decided': true };
 
 function pushChannelOf(kind) {
     return PUSH_KIND_CHANNEL[kind] || null;
@@ -114,7 +126,10 @@ function pushPrefsNormalise(raw) {
     return {
         essentials: true,
         bets: p.bets === undefined ? true : !!p.bets,
-        hype: p.hype === undefined ? true : !!p.hype
+        hype: p.hype === undefined ? true : !!p.hype,
+        // ON BY DEFAULT, by Manny's instruction - a golfer who has never opened
+        // the screen hears about his own match.
+        match: p.match === undefined ? true : !!p.match
     };
 }
 
@@ -183,7 +198,60 @@ function pushCopy(kind, facts) {
     if (kind === 'hype') {
         return { title: pushHypeTitle(f), body: pushHypeBody(f) };
     }
+    // ---- BIG-MOMENT MATCH ALERTS (Wave 2) ---------------------------------
+    //
+    // NO MONEY IN ANY OF THESE WHILE THE ROUND IS LIVE. The Receipt's oldest
+    // defect was printing "+$30" with twelve holes unplayed, and a notification
+    // is the worse place for it: a golfer cannot scroll it into context, and a
+    // figure that moves twice has already been believed once. So the amounts
+    // are not merely left out of the templates - the composed line is SCRUBBED
+    // below, because the facts come from a caller and a caller can be wrong.
+    if (PUSH_MATCH_KINDS[kind]) {
+        var mName = String(f.matchName || f.matchLabel || 'Your match').trim();
+        var hole = Number(f.hole) || 0;
+        var body = '';
+        var title = mName;
+        if (kind === 'match-swing') {
+            // Manny's own example: "Reese birdied 7 - Nassau now all square".
+            var swing = String(f.swing || '').trim();
+            var state = String(f.state || '').trim();
+            body = swing
+                ? (swing + (state ? ' \u2014 ' + mName + ' now ' + state : ''))
+                : (state ? mName + ' is now ' + state : '');
+        } else if (kind === 'match-press') {
+            // THE STAKE IS NOT IN IT. A press is a money event and this is a
+            // live round; that the press exists is the news.
+            title = 'A press started';
+            body = 'A press just started in ' + mName + (hole ? ' on hole ' + hole : '');
+        } else {
+            // DECIDED. The RESULT is not money - "Ivy 6&5" is how golfers say
+            // it - so it is quoted, and the dollars wait for the Receipt.
+            title = mName + ' is final';
+            var result = String(f.result || '').trim();
+            body = result ? (mName + ' is final \u2014 ' + result) : (mName + ' is final');
+        }
+        body = pushScrubMoney(body, f.roundFinished);
+        title = pushScrubMoney(title, f.roundFinished);
+        return body ? { title: title, body: body } : null;
+    }
     return null;
+}
+
+// AMOUNTS OUT, UNLESS THE ROUND IS OVER. Applied to the composed line rather
+// than trusting the facts: `swing` and `state` are built by a caller, and the
+// one thing this feature must never do is put a dollar figure on a lock screen
+// mid-round. A scrub leaves the sentence readable - "Jon birdied 7" has no
+// money in it anyway - and push_notify's banned-vocabulary tests hold the rest.
+function pushScrubMoney(text, roundFinished) {
+    var t = String(text || '');
+    if (roundFinished) return t;
+    return t
+        .replace(/[\u2212-]?\$\s?[0-9][0-9,.]*/g, '')
+        .replace(/\b[0-9][0-9,.]*\s?(?:dollars?|bucks)\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+([\u2014,.])/g, '$1')
+        .replace(/[\u2014\-]\s*$/, '')
+        .trim();
 }
 
 // HYPE, AND THE THREE THINGS WORTH A BUZZ. A hole-in-one, an eagle, and a run of
@@ -238,12 +306,25 @@ function pushDedupeKey(kind, facts) {
     // An offer is identified by the offer, not the hole alone: two presses on
     // one hole are two different things to accept.
     if (f.offerId) parts.push(String(f.offerId));
+    // THE MATCH IS PART OF THE IDENTITY. Without it two matches swinging on one
+    // hole are one notification, and the second golfer hears nothing.
+    if (f.matchId) parts.push(String(f.matchId));
     if (kind === 'hype' && f.hype) parts.push(String(f.hype));
     return parts.join(':');
 }
 
 function pushThrottleKey(roundCode, uid, hole) {
     return 'buzz:' + String(roundCode || '') + ':' + String(uid || '') + ':h' + (Number(hole) || 0);
+}
+
+// ONE PER HOLE PER MATCH, which is Manny's limit and is deliberately NOT the
+// per-golfer one above. A golfer in two matches may hear about both on the same
+// hole - they are two different pieces of news - but a single match cannot
+// speak twice about one hole however many times its state wobbles while four
+// cards come in.
+function pushMatchThrottleKey(roundCode, matchId, hole) {
+    return 'match:' + String(roundCode || '') + ':' + String(matchId || '')
+        + ':h' + (Number(hole) || 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +347,40 @@ function pushDecide(input) {
     if (!d.tokens || !d.tokens.length) return no('no-device');
     if (!pushAllowed(kind, d.prefs)) return no('channel-off');
 
+    // ---- THE MATCH-ALERT GATES (Wave 2) ---------------------------------
+    //
+    // IN THIS ORDER, and the order is the product: the organizer's switch beats
+    // everything, then "is this even news to you", then "are you already
+    // looking at it". Each refusal has its own reason so a log says which gate
+    // closed rather than leaving it to be guessed at.
+    if (PUSH_MATCH_KINDS[kind]) {
+        // THE ORGANIZER'S ROUND-LEVEL OFF SWITCH. Scoped to the match kinds by
+        // the table above, so muting the chatter cannot mute "you won $40" -
+        // an essential is not a match alert, and that is asserted.
+        if (d.roundAlertsOff) return no('round-off');
+
+        // NEVER ABOUT YOUR OWN GROUP'S HOLES. You watched it happen; a buzz
+        // about the card in your own hand is the thing that makes a golfer turn
+        // the feature off.
+        //
+        // AND IT FAILS CLOSED. A missing group is not evidence of a DIFFERENT
+        // group: on a one-group round, a roster with no grouping, or a recipient
+        // the group map cannot place, the honest answer is silence. Guessing
+        // sends exactly the notification this rule exists to prevent.
+        var mine = facts.recipientGroup;
+        var theirs = facts.scoredByGroup;
+        if (mine === null || mine === undefined || theirs === null || theirs === undefined
+            || mine === '' || theirs === '') return no('group-unknown');
+        if (String(mine) === String(theirs)) return no('own-group');
+
+        // QUIET WHILE THE GOLFER IS LOOKING AT THAT ROUND. This is the decision
+        // layer's half; the phone has the other half, because the only thing
+        // that truly knows which round is on screen is the screen. Both are
+        // needed - this one catches a golfer who was on the round seconds ago,
+        // push-boot.js catches the one holding it now.
+        if (facts.viewing) return no('viewing');
+    }
+
     // A ROUND WITH NO NAME IS NOT AN INVITATION. The refusal used to be about a
     // missing tee time; the field is gone, so what has to be there now is the one
     // thing the message is about.
@@ -275,7 +390,12 @@ function pushDecide(input) {
     if (d.alreadySent && d.alreadySent[dedupeKey]) return no('already-sent');
 
     var throttleKey = null;
-    if (PUSH_HOLE_SCOPED[kind]) {
+    if (PUSH_MATCH_KINDS[kind]) {
+        // PER HOLE PER MATCH, not per hole: a golfer in two matches hears about
+        // both, and one match cannot speak twice about one hole.
+        throttleKey = pushMatchThrottleKey(facts.roundCode, facts.matchId, facts.hole);
+        if (d.buzzedHoles && d.buzzedHoles[throttleKey]) return no('throttled');
+    } else if (PUSH_HOLE_SCOPED[kind]) {
         throttleKey = pushThrottleKey(facts.roundCode, facts.uid, facts.hole);
         // ESSENTIALS ARE NEVER THROTTLED - they are not in PUSH_HOLE_SCOPED, so
         // this branch cannot reach them, which is the point of the table rather
@@ -306,6 +426,7 @@ if (typeof module !== 'undefined' && module.exports) {
         PUSH_STREAK_BIRDIES, PUSH_STREAK_WINDOW,
         pushChannelOf, pushPrefsNormalise, pushAllowed, pushMoneyText, pushCopy,
         pushHypeTitle, pushHypeBody, pushHypeFor, pushDedupeKey, pushThrottleKey,
+        PUSH_MATCH_KINDS, pushMatchThrottleKey, pushScrubMoney,
         pushDecide
     };
 }

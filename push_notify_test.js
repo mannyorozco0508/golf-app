@@ -56,7 +56,18 @@ const path = require('path');
 const P = require('./push-notify.js');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 
-const KINDS = ['youre-in', 'final-results', 'bet-challenge', 'press-offered', 'hype'];
+// EIGHT SINCE BIG-MOMENT MATCH ALERTS (Wave 2, 2026-10-07; was the five that
+// shipped in Wave 39). The three new kinds are a golfer's own match moving on a
+// hole ANOTHER group played: a swing, a press starting, and the match being
+// decided. They are on their own 'match' channel rather than 'bets', because a
+// golfer who does not want to be asked to accept wagers may well want to know
+// his match just went all square - one switch for both would make him choose.
+// match_alerts_test.js holds their rules: never your own group's holes (failing
+// CLOSED on an unknown group), one per hole per MATCH, no money mid-round,
+// silent while he is looking at that round, and an organizer switch for the
+// whole round that cannot touch an essential.
+const KINDS = ['youre-in', 'final-results', 'bet-challenge', 'press-offered', 'hype',
+               'match-swing', 'match-press', 'match-decided'];
 const base = (over) => Object.assign({
     kind: 'final-results',
     tokens: ['tok-1'],
@@ -95,7 +106,9 @@ describe('1. FIVE NOTIFICATIONS, THREE CHANNELS, AND ESSENTIALS CANNOT BE SILENC
     });
 
     test('bets and hype are opt-OUT: on by default, off when turned off', () => {
-        assert.deepEqual(P.pushPrefsNormalise({}), { essentials: true, bets: true, hype: true });
+        // match joined in Wave 2 and is ON by default, by Manny's instruction.
+        assert.deepEqual(P.pushPrefsNormalise({}),
+            { essentials: true, bets: true, hype: true, match: true });
         assert.equal(P.pushAllowed('bet-challenge', { bets: false }), false);
         assert.equal(P.pushAllowed('press-offered', { bets: false }), false);
         assert.equal(P.pushAllowed('hype', { hype: false }), false);
@@ -303,8 +316,12 @@ describe('6. THE TEE TIME, AND THE REMINDER THAT IS NOT HERE', () => {
         assert.equal(P.pushChannelOf('tee-reminder'), null, 'the kind is gone');
         assert.equal(P.pushCopy('tee-reminder', { roundName: 'Sat' }), null, 'and so is its sentence');
         assert.equal(P.pushDecide(base({ kind: 'tee-reminder' })).reason, 'unknown-kind');
-        assert.deepEqual(Object.keys(P.PUSH_KIND_CHANNEL).sort(),
-            ['bet-challenge', 'final-results', 'hype', 'press-offered', 'youre-in']);
+        // THE WHOLE LIST, so a dormant kind cannot hide in it. KINDS is the one
+        // place it is written down, which is what kept this honest when Wave 2
+        // added three: a second hand-typed list here would have been updated to
+        // match whatever the code happened to say.
+        assert.deepEqual(Object.keys(P.PUSH_KIND_CHANNEL).sort(), KINDS.slice().sort());
+        assert.equal(KINDS.indexOf('tee-reminder'), -1, 'the reminder is back in the list');
         const src = read('push-notify.js');
         assert.ok(!/PUSH_TEE_REMINDER_MS|PUSH_REMINDER_LATEST_MS/.test(src),
             'the reminder window constants are still here with nothing reading them');
