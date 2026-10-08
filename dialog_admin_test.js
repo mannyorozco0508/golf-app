@@ -428,8 +428,13 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // Ready screen, which is a live write to events/<code> rather than a form
         // field, so silence there would leave an organizer unsure whether the tee
         // moved.
-        assert.equal(refuse + fail + toast, 64,
-            'the alerts should still be 64 messages, got '
+        // 65 SINCE THE CARD GUARDS (2026-10-07, was 64): saveSettings refuses a
+        // round with an EMPTY card - "Course card problem: this course has no hole
+        // card yet..." - whatever produced it (course_card_guard_test.js). The
+        // builder's own refusal reuses the existing "Course card problem" call, so
+        // it adds no message. A refusal, because nothing is written.
+        assert.equal(refuse + fail + toast, 65,
+            'the alerts should still be 65 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

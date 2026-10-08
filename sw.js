@@ -4343,7 +4343,15 @@
 //   leaderboard   page scrolled sideways at 390px and all 26 amounts on it were
 //                 off screen.
 // A device on v312 has all four.
-// Moved to v315. AN UNPLAYED ROUND'S OWN RESULTS PAGE CHARGED EVERYONE.
+// Moved to v315 FOR TWO CARD GUARDS (hotfix, approved 2026-10-07). main 256fab1
+// fixed a built-in course losing its holes to a name-only stub; what was left: a
+// shared record with NO card and no built-in (an import whose card has not
+// arrived, or tees with no holes) still built an EMPTY card, and Save had no
+// refusal. Setup now refuses both with "this course has no hole card yet...",
+// and never stops a round that has holes (course_card_guard_test.js,
+// tools/course-card-guard-check.js). A device on v314 can still save a round
+// with no holes from such a record. (v313 is held by gps-v1.)
+// Moved to v316. AN UNPLAYED ROUND'S OWN RESULTS PAGE CHARGED EVERYONE.
 //   settlement.html  measured on the real Day 3 (3MKUCF, Pine Lakes, 0 scores):
 //                    $20 a golfer in, "$60 / 4" refunded = $15 back, and the
 //                    $20 KP bucket held as "$5 in the pot" on four blank holes -
@@ -4353,8 +4361,8 @@
 //                    and the same sentence as the trip ledger.
 // NO ENGINE FILE MOVED: pool-engine.js keeps the rule that KP money never goes
 // back to the field, and still answers -$5 here; the page stops asking it.
-// A device on v314 still charges for a round nobody played.
-const CACHE_VERSION = 'golfapp-v315-unplayedzero';
+// A device on v315 still charges for a round nobody played.
+const CACHE_VERSION = 'golfapp-v316-unplayedzero';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
