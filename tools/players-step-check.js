@@ -66,8 +66,21 @@ const COURSE = {
 const ROUND = {
     eventName: 'Tee Field', courseName: 'Rated Pines', activeCourseKey: 'ratedpines',
     gameFormat: 'stroke', players: PLAYERS, courseData: CD, scores: {},
+    // A CARD ALREADY IN HAND - the round carries its own courseData, exactly as
+    // every Myrtle round does - which is what made the tee fetch look unnecessary.
     ownerUid: 'me-uid', organizerToken: 'tok-players-step'
 };
+// THE COURSE RECORD AS THE APP ACTUALLY SEES IT (2026-10-08). This used to hand
+// over the whole record, tees included, which is NOT what the running app has:
+// course-index.js keeps only a {name} STUB in globalCourses until something asks
+// for the card, and every Myrtle course is also a bundled preset with 18 holes
+// and NO tees - so courseCardInHand() said "in hand", the record was never
+// fetched, and no golfer row had a Tee dropdown. A fixture that pre-loads the
+// record cannot see that: it was the difference between this check passing and
+// Manny's phone showing nothing.
+//
+// So the stand-in database holds the record (that is what the server has) and
+// the page must go and GET it. Nothing here pre-fills globalCourses.
 const DB = { events: { [CODE]: ROUND }, trips: {}, global_courses: { ratedpines: COURSE }, tournaments: {} };
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',

@@ -4800,6 +4800,54 @@ the dark state; `my_groups_test.js` holds the feature.
   `golfapp-v325-organizercontrols` / `consumer-v160-organizercontrols`.
   database.rules.json and all ten money engines byte-identical.
 
+- **1.0.7 BUILD 16 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). NO TEE
+  DROPDOWN ON ANY GOLFER ROW - PROVED AND FIXED ON THE iOS SIMULATOR.**
+
+  **THE CAUSE, and it was not native at all.** `courseCardInHand()` answers a
+  question about the CARD - pars and stroke indexes - and EVERY Myrtle course is
+  a bundled preset in course-data.js carrying 18 holes and **no tees**. So the
+  card was "in hand", `ensureCourseCard()` never ran, `globalCourses` kept only
+  a `{ name }` stub, `courseTeeChoices()` found nothing, the round-level tee
+  select stayed empty, and `appendTeeControl()` returned early on every row. No
+  CSP problem, no REST problem, no Capacitor problem.
+
+  **AND MY BROWSER CHECK COULD NEVER HAVE CAUGHT IT**: its fixture pre-loaded
+  the whole course record, tees included, into `global_courses` - which is not
+  what the running app has. A fixture more generous than reality is the same
+  class of fault as the apiKey one in build 14, two days running.
+
+  **THE FIX.** Tees are a separate need from the card: `needsTees` asks whether
+  the active course has any RATED tees in hand and fetches the shared record
+  when it does not, whatever the card says. The early return that required
+  `rec.data` would have thrown away a record that answered with tees and no
+  card - this exact bug - so it keeps tees first. And
+  `refreshRowTeeControls()` gives the dropdown to rows that were drawn before
+  the record came back, keeping each row's stored tee via `data-tee-key`.
+
+  **PROVED ON THE SIMULATOR, NOT A BROWSER** (Manny's instruction): built with
+  `xcodebuild` for iPhone 17 Pro Max, installed and launched, and driven to the
+  Players step of the real P7S2BE through the organizer link. Measured on screen
+  in the native WKWebView: **24 rows, 24 TEE DROPDOWNS**, each listing all six
+  Caledonia tees (Pintail Black, Mallard Blue, Wood Duck White, Redhead Red, and
+  the two Women's), round tee select 6, 48 order arrows, 24 group pickers. The
+  Review step also showed **"Slope 144, Course Rating 71.4, Par 70"** - Pintail
+  Black - so the shared record loads natively. The probe was injected into the
+  BUNDLE ONLY (gitignored) and removed afterwards; the repo never carried it.
+
+  **GHIN INDEX OR STROKES - REPORTED, NOT CHANGED.** All seven Myrtle rounds
+  carry **no `handicapBasis` field at all** and had no `teeRating`. The two
+  defaults disagree: `handicapBasisOf()` in handicap-labels.js returns
+  `ghin-index` when the field is absent, while the setup screen's own select
+  defaults to `as-entered` (Strokes). On the simulator the box label read
+  **"Index"**. Saving stores the TYPED number either way - the conversion in
+  `previewStrokes()` is a preview, not the save - but the basis and tee rating
+  the round then carries are what the nets are computed through. **Manny's
+  call.**
+
+  `CURRENT_PROJECT_VERSION` 16 on both configurations, 1.0.7 unchanged. Cache
+  `golfapp-v326-teedropdown` / `consumer-v161-teedropdown`. All ten money
+  engines and database.rules.json byte-identical.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY

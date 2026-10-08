@@ -8012,6 +8012,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         applyRowOrder(rosterMoveToGroup(rows, from, Number(group), groupSizeOverrides));
     }
 
+    // THE ROWS THAT WERE BUILT BEFORE THE TEES ARRIVED (2026-10-08). The
+    // per-row dropdown is COPIED from the round-level select at the moment
+    // addPlayerRow runs, so a roster drawn before the shared course record came
+    // back has no dropdowns at all - and nothing redrew them when it did. This
+    // adds the control to any row still missing it, keeping whatever tee the row
+    // already carried.
+    function refreshRowTeeControls() {
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        Array.from(list.querySelectorAll('.player-row')).forEach((row) => {
+            if (row.querySelector('.p-tee-input')) return;
+            const line = row.querySelector('.p-tee-line');
+            if (line) line.remove();
+            appendTeeControl(row, row.getAttribute('data-tee-key') || undefined);
+        });
+    }
+
     function appendTeeControl(row, teeKey) {
         const src = document.getElementById('tee-rating-select');
         if (!src || !src.options || src.options.length < 2) return;
@@ -8031,6 +8048,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
             ? teeKey : (src.value || '');
         sel.value = want;
+        // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
+        // builds a control for a row that had none.
+        row.setAttribute('data-tee-key', want || '');
+        sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
         sel.onchange = function () { if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
         const line = document.createElement('div');
         line.className = 'p-tee-line';
@@ -10075,11 +10096,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // course is a directory preset, a nine-hole loop, or already fetched
             // takes no extra work at all.
             const needsCard = data.activeCourseKey && !courseCardInHand(data.activeCourseKey);
+            // TEES ARE A SEPARATE NEED FROM THE CARD (2026-10-08). "In hand"
+            // answers a question about the CARD - pars and stroke indexes - and
+            // every Myrtle course is a bundled preset in course-data.js, which
+            // carries 18 holes and NO TEES. So courseCardInHand said yes,
+            // ensureCourseCard never ran, globalCourses kept only a {name} stub,
+            // courseTeeChoices found nothing, the round-level tee select stayed
+            // empty, and appendTeeControl returned early - no Tee dropdown on any
+            // golfer row. Manny had no way to put golfers on different tees.
+            //
+            // The shared record DOES have them (53 rated tee sets were loaded on
+            // 2026-10-08), so this asks for the record whenever the tees are
+            // missing, whatever the card says.
+            const needsTees = data.activeCourseKey
+                && !courseTeeChoices(courseRecordForTees(data.activeCourseKey)).length;
             handleCourseChange();
             if (data.teeRating) applyStoredTeeRating(data.teeRating);
-            if (needsCard) {
+            if (needsCard || needsTees) {
                 ensureCourseCard(data.activeCourseKey).then((rec) => {
-                    if (!rec || !rec.data) return;
+                    // A RECORD WITH TEES AND NO CARD IS STILL WORTH HAVING: the
+                    // early return used to require rec.data, so a shared record
+                    // that answered with tees for a course whose card was already
+                    // in hand was thrown away - which is this exact bug.
+                    if (!rec) return;
+                    if (rec.tees) {
+                        syncTeeRatingFromCourse(data.activeCourseKey, { keepSelection: true });
+                        if (data.teeRating) applyStoredTeeRating(data.teeRating);
+                        refreshRowTeeControls();
+                    }
+                    if (!rec.data) return;
                     // handleCourseChange repaints only when the course IDENTITY
                     // changes, and it has not - the key was set before the first
                     // call. Clearing it is what makes the real card replace the

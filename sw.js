@@ -4423,7 +4423,15 @@
 // round; Edit Round Setup at the TOP of the Round Menu; and the Matches/Bets
 // page asks the same question instead of reading the URL.
 // A device on v324 shows its own organizer a read-only card.
-const CACHE_VERSION = 'golfapp-v325-organizercontrols';
+// Moved to v326. NO TEE DROPDOWN ON ANY GOLFER ROW. "In hand" answers a
+// question about the CARD - pars and stroke indexes - and every Myrtle course is
+// a bundled preset in course-data.js carrying 18 holes and NO TEES. So
+// courseCardInHand() said yes, ensureCourseCard() never ran, globalCourses kept
+// a {name} stub, courseTeeChoices() found nothing, the round-level tee select
+// stayed empty and appendTeeControl() returned early. Tees are a separate need
+// now, and rows built before the record arrives get their dropdown when it does.
+// A device on v325 cannot put two golfers on different tees.
+const CACHE_VERSION = 'golfapp-v326-teedropdown';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
