@@ -211,6 +211,8 @@ const READ = `JSON.stringify((function () {
            sheetBuyDisabled: q('.gps-sheet-buy') ? q('.gps-sheet-buy').disabled : null,
            basicScore: vis('.gps-score-basic') ? t('.gps-score-basic') : null, getPro: vis('.gps-get-pro'),
            targetRow: vis('.gps-target-row'), editPinShown: vis('.gps-edit-pin'),
+           view: ds.view || null, greenBtn: vis('.gps-green-view') ? t('.gps-green-view') : null, greenDims: vis('.gps-green-dims') ? t('.gps-green-dims') : null,
+           greenLbls: o ? [].slice.call(o.querySelectorAll('.gps-green-lbl')).filter(function (e) { return e.style.display !== 'none' && e.offsetParent !== null; }).map(function (e) { return { k: e.className.replace(/.*gps-green-lbl-/, ''), text: e.innerText.trim(), box: box(e) }; }) : [],
            hasPro: window.HardPanGps && window.HardPanGps.hasGpsPro ? window.HardPanGps.hasGpsPro() : null,
            tier: (function () { try { return localStorage.getItem('hardpan_gps_tier'); } catch (e) { return 'err'; } })() };
 })())`;
@@ -475,6 +477,8 @@ function usgsFallbackFails(tag, g, why) {
         if (arrive.side !== 'bets' || arrive.gpsShown) fails.push('osm: a fresh phone did not land on Bets');
         if (arrive.watchCalls !== 0) fails.push('osm: a location watch ran before GPS was shown');
         if (!gps.gpsShown || !gps.map || gps.side !== 'gps') fails.push('osm: GPS side did not show with a map');
+        // A Pro user never sees the upgrade sheet or the link to it.
+        R.forEach((g, k) => { if (g.sheet || g.getPro) fails.push(`osm read ${k}: the upgrade sheet / link shown to a Pro user: ` + JSON.stringify([g.sheet, g.getPro])); });
         // Wave 2: no override and no paywall -> HardPan GPS (Pro), the full screen.
         if (gps.hasPro !== true || gps.basicMode || gps.tier !== null) fails.push('osm: a phone with no override is not Pro: ' + JSON.stringify([gps.hasPro, gps.basicMode, gps.tier]));
         if (JSON.stringify(gps.labels) !== '["FRONT","CENTER","BACK"]') fails.push('osm: labels ' + JSON.stringify(gps.labels));
@@ -1050,7 +1054,7 @@ function usgsFallbackFails(tag, g, why) {
         const R = pa.reads;
         const [p0, pm, p40, pnear, pgreen, pback, pdrag, psaved, ph2, ph1, preload] = R;
         const at55 = expectPlays(ME, 0.55, H1.mid, 130);
-        const num = (t) => { const m = /^plays (\d+)$/.exec(t || ''); return m ? +m[1] : null; };
+        const num = (t) => { const m = /^plays ~(\d+)$/.exec(t || ''); return m ? +m[1] : null; };
         const near = (got, want, tag) => { if (got == null || Math.abs(got - want) > 1) fails.push(`plays: ${tag} reads ${JSON.stringify(got)}, expected ${want} (inline)`); };
         near(num(p0.plays), at55.yd, 'at 55% of hole 1');
         if (p0.playsTerms !== 'elev wind temp') fails.push('plays: terms used ' + JSON.stringify(p0.playsTerms) + ' (expected elev wind temp)');
@@ -1102,6 +1106,49 @@ function usgsFallbackFails(tag, g, why) {
     }
     try { fs.rmSync(plaProfile, { recursive: true, force: true }); } catch (e) {}
 
+    // ---- GREEN VIEW: the green alone, same turn, F / C / B / PIN, depth x width -------
+    // Depth and width inline: the outline turned to the line of play (tee -> center).
+    const gAxis = brg(H1.tee, H1.mid);
+    const gAl = [], gAc = [];
+    H1.green.forEach((p) => { const d = inlineHaversineM(H1.mid, p), t = d ? (brg(H1.mid, p) - gAxis) * Math.PI / 180 : 0; gAl.push(d * Math.cos(t)); gAc.push(d * Math.sin(t)); });
+    const G_DEPTH = Math.round((Math.max(...gAl) - Math.min(...gAl)) / 0.9144), G_WIDTH = Math.round((Math.max(...gAc) - Math.min(...gAc)) / 0.9144);
+    const G_DEPTH_M = Math.round(Math.max(...gAl) - Math.min(...gAl)), G_WIDTH_M = Math.round(Math.max(...gAc) - Math.min(...gAc));
+    const gv = await arm('green', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },                          // 0 hole
+        { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 1 green
+        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-units' }, { sleep: 200 }, // 2 meters
+        { tap: '.gps-edit-pin' }, { sleep: 400 }, { drag: '.gps-flag', dx: 0, dy: -24 }, { sleep: 500 }, { expression: READ }, // 3 pin dragged
+        { tap: '.gps-pin-save' }, { sleep: 700 }, { expression: READ },                                 // 4 saved
+        { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 5 back to the hole
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-GREEN' }) });
+    out.green = gv; bail(out, gv);
+    {
+        const [h0, g1, gm, g3, g4, h5] = gv.reads;
+        const lbl = (g, k) => (g.greenLbls.find((x) => x.k === k) || {}).text || null;
+        const dimsIn = (txt, d, w, unit) => { const m = new RegExp('^Green (\\d+) ' + unit + ' deep · (\\d+) ' + unit + ' wide$').exec(txt || ''); return !!m && Math.abs(+m[1] - d) <= 1 && Math.abs(+m[2] - w) <= 1; };
+        if (h0.greenBtn !== '⛳ Green' || h0.view !== 'hole' || h0.greenDims) fails.push('green: hole view - ' + JSON.stringify([h0.greenBtn, h0.view, h0.greenDims]));
+        if (g1.view !== 'green' || g1.greenBtn !== '⛳ Hole' || g1.zoomBtn !== null) fails.push('green: not in the green view: ' + JSON.stringify([g1.view, g1.greenBtn, g1.zoomBtn]));
+        if (g1.bearing !== h0.bearing) fails.push(`green: the turn changed: ${h0.bearing} -> ${g1.bearing}`);
+        if (!(g1.zoom > h0.zoom + 1)) fails.push(`green: did not zoom in to the green: ${h0.zoom} -> ${g1.zoom}`);
+        const gb = greenPage(g1), mp = g1.boxes.map;
+        if (!gb || !mp || gb.t < mp.t || gb.b > mp.b || gb.l < mp.l || gb.r > mp.r) fails.push('green: the green is not all on screen: ' + JSON.stringify([gb, mp]));
+        // It fills the view - unless the imagery's closest zoom stops it (USGS: z18).
+        else if (g1.zoom < g1.maxZoom - 0.01 && (gb.b - gb.t) < 0.3 * (mp.b - mp.t) && (gb.r - gb.l) < 0.4 * (mp.r - mp.l)) fails.push('green: the green does not fill the view: ' + JSON.stringify(gb));
+        if (g1.esri !== 'visible' || g1.maxZoom !== 21) fails.push('green: this arm needs Esri on (z21) to prove the fill: ' + JSON.stringify([g1.esri, g1.maxZoom]));
+        if (g3.maxZoom !== 18 || g3.esri !== 'none') fails.push('green: Edit Pin in the green view is not on USGS: ' + JSON.stringify([g3.esri, g3.maxZoom]));
+        if (lbl(g1, 'f') !== 'F ' + g1.f || lbl(g1, 'c') !== 'C ' + g1.m || lbl(g1, 'b') !== 'B ' + g1.b || lbl(g1, 'p')) fails.push('green: labels ' + JSON.stringify(g1.greenLbls.map((x) => x.text)) + ' vs F/C/B ' + [g1.f, g1.m, g1.b].join('/'));
+        if (g1.f !== EXPECT.front || g1.m !== EXPECT.center || g1.b !== EXPECT.back) fails.push('green: the numbers changed in the green view: ' + [g1.f, g1.m, g1.b].join('/'));
+        g1.greenLbls.forEach((x) => { const near = { f: g1.boxes.front, c: g1.boxes.mid, b: g1.boxes.back }[x.k]; if (near && x.box && Math.abs((x.box.t + x.box.b) / 2 - (near.t + near.b) / 2) > 30) fails.push('green: label ' + x.text + ' is not beside its point'); });
+        if (!dimsIn(g1.greenDims, G_DEPTH, G_WIDTH, 'yds')) fails.push(`green: "${g1.greenDims}", inline ${G_DEPTH} deep x ${G_WIDTH} wide`);
+        if (!dimsIn(gm.greenDims, G_DEPTH_M, G_WIDTH_M, 'm')) fails.push(`green (meters): "${gm.greenDims}", inline ${G_DEPTH_M} x ${G_WIDTH_M} m`);
+        if (!g3.flagEdit || g3.view !== 'green' || g3.midLbl !== 'PIN' || lbl(g3, 'p') !== 'PIN ' + g3.m) fails.push('green: Edit Pin in the green view - ' + JSON.stringify([g3.flagEdit, g3.view, g3.midLbl, lbl(g3, 'p'), g3.m]));
+        const w = gv.dump.writes.filter((x) => /pinLocs\/h1$/.test(x.path) && x.op === 'set')[0];
+        if (!w) fails.push('green: Save pin in the green view wrote nothing');
+        if (lbl(g4, 'p') !== 'PIN ' + g4.m || lbl(g4, 'c') !== 'C ' + EXPECT.center) fails.push('green: after save - ' + JSON.stringify(g4.greenLbls.map((x) => x.text)));
+        if (h5.view !== 'hole' || h5.bearing !== h0.bearing || Math.abs(h5.zoom - h0.zoom) > 0.02 || h5.zoomBtn !== '1x' || h5.greenBtn !== '⛳ Green' || h5.greenLbls.length || h5.greenDims) fails.push('green: "Hole" did not return to the hole view: ' + JSON.stringify([h5.view, h5.bearing, h5.zoom, h0.zoom, h5.zoomBtn, h5.greenBtn, h5.greenLbls.length]));
+        out.greenSummary = { zoom: [h0.zoom, g1.zoom], dims: g1.greenDims, inline: [G_DEPTH, G_WIDTH], labels: g1.greenLbls.map((x) => x.text), afterPin: g4.greenLbls.map((x) => x.text) };
+    }
+
     // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
     const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
     const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
@@ -1126,9 +1173,10 @@ function usgsFallbackFails(tag, g, why) {
         const [f0, f1, f2, f3, f4, f5, f6] = fr.reads;
         if (f1.hasPro !== false || f1.tier !== 'free') fails.push('free: ?gpstier=free did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
         if (!f0.toggle || !/📍 GPS/.test(f0.toggle)) fails.push('free: the GPS button is not there');
-        const sheetWant = ['HardPan GPS', '$29.99/year · 7-day free trial', 'Satellite hole map', 'Yardage arcs', "Edit Pin (today's pin)", 'Wind', 'Plays-like yardage', 'Coming soon', 'Not now'];
+        // NO PRICE until Manny sets one: "HardPan GPS — coming soon", the list, Not now.
+        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Yardage arcs', "Edit Pin (today's pin)", 'Wind', 'Plays-like yardage', 'Not now'];
         if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
-        if (f1.sheetBuyDisabled !== true) fails.push('free: the buy button is not disabled');
+        if (/\$|\/year|trial|Coming soon$/.test(f1.sheet.replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));
         if (f2.sheet) fails.push('free: "Not now" did not close the sheet');
         if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
@@ -1154,13 +1202,13 @@ function usgsFallbackFails(tag, g, why) {
 
     // ---- privacy, every arm ------------------------------------------------------
     [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME],
-     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME]].forEach(([r, me]) => {
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
     // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
     // Esri hosts are never asked - a check must not spend the free tier.
-    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl, gv].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
     if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
@@ -1178,6 +1226,7 @@ function usgsFallbackFails(tag, g, why) {
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
+        green: out.greenSummary,
         esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
         esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,

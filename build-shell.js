@@ -74,7 +74,9 @@ const PRODUCTS = {
         // HardPan (dist/hardpan) moved to v157 for GPS Wave 2 (2026-10-08): Esri
         // live, plays like, the free / Pro split - gps-view.js, gps-geo.js and
         // gps-config.js changed. Consumer's own key below does not move.
-        cacheNameGps: 'consumer-v157-gps-wave2',
+        // v161 (same day): the Green view, the sheet without a price, "plays ~" -
+        // above main's consumer-v160.
+        cacheNameGps: 'consumer-v161-gps-green',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

@@ -4407,7 +4407,12 @@
 // is "gps-wave-two", not "gps-wave2": the cache-key tests allow no digit after
 // the version number. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v321-gps-wave-two';
+// GPS:BEGIN
+// Moved to v326 (Wave 2 follow-up, 2026-10-08): the Green view, the upgrade sheet
+// without a price, "plays ~" - gps-view.js changed after v321 reached the
+// preview. v322-v325 are main's (builds 12-15), so this goes above them. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v326-gps-green';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

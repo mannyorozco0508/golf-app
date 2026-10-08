@@ -537,7 +537,11 @@
             if (S.arcs && S.arcStep !== arcStepNow(aimAt(r))) drawArcs(r, origin(r));
             placePills();
         });
-        map.on('resize', function () { if (S && S.map === map && (S.needsFrame || (S.framed === 'hole' && !S.userMoved && !S.zoomStep))) frameHole(false); });
+        map.on('resize', function () {
+            if (!S || S.map !== map) return;
+            if (S.view === 'green' && !S.userMoved) { frameGreen(); return; }
+            if (S.needsFrame || (S.framed === 'hole' && !S.userMoved && !S.zoomStep)) frameHole(false);
+        });
         // Tap anywhere: the target jumps there (or a green pin is placed).
         map.on('click', function (e) { onMapTap([e.lngLat.lat, e.lngLat.lng]); });
         S.map = map;
@@ -563,6 +567,7 @@
         var esri = !S.esriOn ? 'off' : (S.esriFailed ? 'failed' : (S.map.getLayer('esri') ? (S.map.getLayoutProperty('esri', 'visibility') || 'visible') : 'off'));
         el.setAttribute('data-esri', esri);
         el.setAttribute('data-esri-loads', String(S.esriLoads || 0));
+        el.setAttribute('data-view', S.view || 'hole');
         el.setAttribute('data-esri-why', S.esriFailWhy || '');
         el.setAttribute('data-esri-fail-at', S.esriFailed && S.esriFailWhy === 'errors' ? String(S.esriFailAt) : '');
         var es = S.map.getSource('esri');
@@ -585,7 +590,7 @@
     // The hole's own view follows the screen until the golfer moves the map: the
     // phone's toolbars settle, or the attribution bar gains the Esri credit.
     function maybeRefit() {
-        if (!S || !S.map || S.framed !== 'hole' || S.userMoved || S.zoomStep) return;
+        if (!S || !S.map || S.framed !== 'hole' || S.userMoved || S.zoomStep || S.view === 'green') return;
         var h = attribH();
         if (S.attribAt != null && h !== S.attribAt) frameHole(false);
     }
@@ -726,6 +731,7 @@
         // Back to 1x, and the view is the hole's own again (a resize or a taller
         // attribution bar may re-fit it until the golfer moves the map).
         S.zoomStep = 0; S.userMoved = false; S.attribAt = attribH();
+        S.view = 'hole';
         txt('.gps-zoom', ZOOM_STEPS[0] + 'x');
         sizeTarget(); placePills(); syncWind();
         var el = S.el.querySelector('.gps-map');
@@ -864,6 +870,8 @@
         S.pinDraft = pinLoc() || r.mid;
         S.targetMoved = false;
         render();
+        // A pin is placed on USGS (max z18): the green view refits to it.
+        if (S.view === 'green') frameGreen();
     }
     function endEditPin(save) {
         if (!S) return;
@@ -873,6 +881,7 @@
         else if (save === 'clear') writeLoc(k, null);
         S.targetMoved = false; S.target = null;
         render();
+        if (S.view === 'green') frameGreen();
     }
     // ONE writer for today's pin: the page's durable queue (a pin moved with no
     // signal survives the app closing), with a local copy so the screen follows
@@ -1012,6 +1021,99 @@
         }
     }
 
+    // ---- GREEN VIEW (Wave 2 follow-up, 2026-10-08) ---------------------------------
+    // "Green" zooms to the green alone, in the hole's own turn (tee -> green still
+    // points up): its outline, F / C / B and today's pin, each labelled with the
+    // distance from the golfer (or the tee, off the hole), and the green's DEPTH
+    // (along the line of play) and WIDTH (across it) in yards. Edit Pin works here
+    // like anywhere. "Hole" (the same button) goes back to the hole's view.
+    // Depth and width are measured on the outline turned to the line of play; a
+    // green tapped without an outline has a depth only when its front and back were.
+    function greenShape(r) {
+        if (!r || !r.mid) return null;
+        var axis = r.tee ? G.bearingDeg(r.tee, r.mid) : (S.camera ? S.camera.bearing : 0);
+        var outline = !!(r.green && r.green.length >= 3 && r.useGreenForEdges);
+        var pts = outline ? r.green : [r.front, r.mid, r.back].filter(Boolean);
+        var al = [], ac = [];
+        pts.forEach(function (p) {
+            var d = G.haversineMeters(r.mid, p);
+            var t = d ? (G.bearingDeg(r.mid, p) - axis) * Math.PI / 180 : 0;
+            al.push(d * Math.cos(t)); ac.push(d * Math.sin(t));
+        });
+        var a0 = Math.min.apply(null, al), a1 = Math.max.apply(null, al), c0 = Math.min.apply(null, ac), c1 = Math.max.apply(null, ac);
+        var depthM = (outline || (r.front && r.back)) ? a1 - a0 : null;
+        var widthM = outline ? c1 - c0 : null;
+        return {
+            axis: axis, depthM: depthM, widthM: widthM,
+            // What the view must hold: the green, or 25 m when it is only a point.
+            spanA: Math.max(a1 - a0, 25), spanC: Math.max(c1 - c0, 25),
+            center: G.destination(G.destination(r.mid, axis, (a0 + a1) / 2), axis + 90, (c0 + c1) / 2)
+        };
+    }
+    var GREEN_PAD = { top: 64, left: 64, right: 64 };
+    function frameGreen() {
+        if (!S || !S.map || !S.styleReady) return false;
+        var g = greenShape(resolved());
+        var box = S.el.querySelector('.gps-map');
+        if (!g || !box || box.clientWidth < 10) return false;
+        var pad = { top: GREEN_PAD.top, bottom: viewPad().bottom, left: GREEN_PAD.left, right: GREEN_PAD.right };
+        var availH = Math.max(60, box.clientHeight - pad.top - pad.bottom), availW = Math.max(60, box.clientWidth - pad.left - pad.right);
+        var mpp = Math.max(g.spanA * 1.15 / availH, g.spanC * 1.15 / availW);
+        var zoom = Math.min(Math.log2(40075016.686 * Math.cos(g.center[0] * Math.PI / 180) / (512 * mpp)), maxZoomNow());
+        // The SAME turn as the hole view: tee -> green points up.
+        var bearing = S.camera ? S.camera.bearing : g.axis;
+        S.map.jumpTo({ center: ll(g.center), zoom: zoom, bearing: bearing, padding: pad });
+        S.view = 'green'; S.zoomStep = 0; S.userMoved = false;
+        render();
+        reportMapState();
+        return true;
+    }
+    function toggleGreenView() {
+        if (!S) return;
+        if (S.view === 'green') { frameHole(false); render(); }
+        else frameGreen();
+    }
+    // The labels beside F, C, B and the pin, and the depth x width line.
+    function placeGreenLabels() {
+        var box = S && S.el.querySelector('.gps-green-lbls'), dims = S && S.el.querySelector('.gps-green-dims');
+        if (!box || !dims) return;
+        var on = !!(S.map && S.styleReady && S.view === 'green' && S.side === 'gps' && S.mode === 'measure');
+        box.style.display = on ? '' : 'none';
+        dims.style.display = 'none';
+        if (!on) return;
+        var r = resolved(), o = origin(r), u = units();
+        var nums = r ? G.holeNumbers(o ? o.pt : null, r) : null;
+        var pin = pinLoc();
+        var d = function (m) { return m == null ? '—' : G.shownDistance(m, u); };
+        var items = [
+            { k: 'b', pt: nums && nums.back, text: 'B ' + d(nums && nums.backM) },
+            { k: 'c', pt: r && r.mid, text: 'C ' + d(o && r && r.mid ? G.haversineMeters(o.pt, r.mid) : null) },
+            { k: 'p', pt: pin, text: 'PIN ' + d(o && pin ? G.haversineMeters(o.pt, pin) : null) },
+            { k: 'f', pt: nums && nums.front, text: 'F ' + d(nums && nums.frontM) }
+        ];
+        var placed = [];
+        items.forEach(function (it) {
+            var el = box.querySelector('.gps-green-lbl-' + it.k);
+            if (!el) { el = document.createElement('span'); el.className = 'gps-green-lbl gps-green-lbl-' + it.k; box.appendChild(el); }
+            if (!it.pt) { el.style.display = 'none'; return; }
+            el.textContent = it.text; el.style.display = ''; el.style.visibility = 'hidden';
+            var q = S.map.project(ll(it.pt)), w = el.offsetWidth, h = el.offsetHeight;
+            // To the right of its point; the pin's to the left, so the two never sit on each other.
+            var x = it.k === 'p' ? q.x - 16 - w : q.x + 14, y = q.y - h / 2;
+            placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
+            el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
+            placed.push({ l: x, t: y, r: x + w, b: y + h });
+        });
+        var g = greenShape(r);
+        if (g && g.depthM != null) {
+            var yd = function (m) { return u === 'm' ? Math.round(m) + ' m' : Math.round(m / G.M_PER_YD) + ' yds'; };
+            dims.textContent = 'Green ' + yd(g.depthM) + ' deep' + (g.widthM != null ? ' · ' + yd(g.widthM) + ' wide' : '');
+            dims.style.display = '';
+            var mel = S.el.querySelector('.gps-map');
+            if (mel) mel.setAttribute('data-green-dims', Math.round(g.depthM / G.M_PER_YD) + 'x' + (g.widthM != null ? Math.round(g.widthM / G.M_PER_YD) : ''));
+        }
+    }
+
     // ---- ZOOM: 1x -> 2x -> 3x -> 1x -----------------------------------------------
     // Around the target (or the golfer's dot when there is no target), keeping the
     // hole's tee-to-green turn. 1x is the hole's own view; Recenter goes back to it.
@@ -1060,7 +1162,7 @@
         var pTo = S.el.querySelector('.gps-pill-to'), pOn = S.el.querySelector('.gps-pill-on');
         if (!pTo || !pOn) return;
         pTo.style.display = 'none'; pOn.style.display = 'none';
-        if (!S.map || !S.styleReady || !S.target || S.mode !== 'measure' || S.side !== 'gps') return;
+        if (!S.map || !S.styleReady || !S.target || S.mode !== 'measure' || S.side !== 'gps') { placeGreenLabels(); return; }
         var r = resolved(), o = origin(r), u = units();
         var wrap = S.el.querySelector('.gps-map-wrap'), wrapR = wrap.getBoundingClientRect();
         var W = wrapR.width, H = wrapR.height;
@@ -1105,6 +1207,7 @@
         if (aim) put(pOn, t, P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));
         if (o) put(pTo, P(o.pt), t, G.shownDistance(G.haversineMeters(o.pt, S.target), u));
         placeArcLabels(obstacles);
+        placeGreenLabels();
     }
 
     // ---- WIND (Wave 1) ----------------------------------------------------------
@@ -1282,7 +1385,8 @@
         if (!el) return;
         fetchElevs();
         var pl = playsNow();
-        var text = pl ? 'plays ' + (units() === 'm' ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) : '';
+        // "plays ~158": an estimate, and it says so.
+        var text = pl ? 'plays ~' + (units() === 'm' ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) : '';
         if (el.textContent !== text) el.textContent = text;
         // Its line is kept either way, so the map does not jump when it appears.
         el.style.visibility = pl ? '' : 'hidden';
@@ -1299,13 +1403,25 @@
         try { if (sessionStorage.getItem(SHEET_SEEN) === '1') return true; } catch (e) {}
         return sheetSeenHere;
     }
+    // NEVER shown to a HardPan GPS (Pro) user, whatever calls it.
     function openSheet() {
-        if (!S) return;
+        if (!S || S.pro) return;
+        syncSheetPrice();
         sheetSeenHere = true;
         try { sessionStorage.setItem(SHEET_SEEN, '1'); } catch (e) {}
         show('.gps-sheet', true);
     }
     function closeSheet() { show('.gps-sheet', false); }
+    // NO PRICE until Manny sets one (2026-10-08): the sheet says "HardPan GPS —
+    // coming soon". HARDPAN_GPS_CONFIG.priceLine (one line: the price and the trial)
+    // brings back the price line and the (still disabled) buy button.
+    function syncSheetPrice() {
+        var line = String(cfg().priceLine || '').trim();
+        txt('.gps-sheet-title', line ? 'HardPan GPS' : 'HardPan GPS — coming soon');
+        txt('.gps-sheet-price', line);
+        show('.gps-sheet-price', !!line);
+        show('.gps-sheet-buy', !!line);
+    }
 
     // ---- NO PULL-DOWN ON GPS ----------------------------------------------------
     // A drag on the GPS side moves the map and nothing else: no page scroll, no
@@ -1430,6 +1546,10 @@
         show('.gps-pin-cancel', !!S.editingPin);
         show('.gps-pin-clear', !!S.editingPin && !!(S.localLocs && S.localLocs[holeKey(S.hole)] !== undefined ? S.localLocs[holeKey(S.hole)] : (S.round && S.round.pinLocs && S.round.pinLocs[holeKey(S.hole)])));
         // THE SCORE BUTTON: the hole's own score entry, on the card (Bets side).
+        // GREEN / HOLE: the green alone, or back to the whole hole.
+        show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
+        txt('.gps-green-view', S.view === 'green' ? '⛳ Hole' : '⛳ Green');
+        show('.gps-zoom', S.view !== 'green');
         txt('.gps-score', 'Hole ' + S.hole + ' · Enter Score');
         var scoreOn = !pinning && typeof S.openScore === 'function';
         show('.gps-score', scoreOn);
@@ -1468,6 +1588,9 @@
         +   '<div class="gps-banner" style="display:none"></div>'
         +   '<div class="gps-arc-labels"></div>'
         +   '<button type="button" class="gps-zoom" aria-label="Zoom 1x, 2x or 3x">1x</button>'
+        +   '<button type="button" class="gps-green-view" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
+        +   '<div class="gps-green-lbls" style="display:none"></div>'
+        +   '<div class="gps-green-dims" style="display:none"></div>'
         +   '<button type="button" class="gps-recenter" aria-label="Recenter on the hole">⌖ Recenter</button>'
         +   '<div class="gps-pill gps-pill-to" style="display:none"></div>'
         +   '<div class="gps-pill gps-pill-on" style="display:none"></div>'
@@ -1509,9 +1632,9 @@
         + '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="HardPan GPS" style="display:none">'
         +   '<div class="gps-sheet-card">'
         +     '<div class="gps-sheet-title">HardPan GPS</div>'
-        +     '<div class="gps-sheet-price">$29.99/year · 7-day free trial</div>'
+        +     '<div class="gps-sheet-price" style="display:none"></div>'
         +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Yardage arcs</li><li>Edit Pin (today\'s pin)</li><li>Wind</li><li>Plays-like yardage</li></ul>'
-        +     '<button type="button" class="gps-sheet-buy" disabled>Coming soon</button>'
+        +     '<button type="button" class="gps-sheet-buy" disabled style="display:none">Coming soon</button>'
         +     '<button type="button" class="gps-sheet-close">Not now</button>'
         +   '</div>'
         + '</div>';
@@ -1549,6 +1672,11 @@
         + '#gps-overlay .maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.82);color:#111;display:block !important;}'
         + '#gps-overlay .maplibregl-ctrl-attrib a{color:#0b4f8a;}'
         + '#gps-overlay .gps-zoom{position:absolute;left:10px;top:10px;z-index:3;background:rgba(11,15,12,.82);font-size:14px;font-weight:700;min-height:36px;min-width:44px;padding:6px 10px;}'
+        + '#gps-overlay .gps-green-view{position:absolute;left:62px;top:10px;z-index:3;background:rgba(11,15,12,.82);font-size:14px;font-weight:700;min-height:36px;padding:6px 10px;}'
+        + '#gps-overlay .gps-green-lbls{position:absolute;inset:0;pointer-events:none;z-index:2;}'
+        + '#gps-overlay .gps-green-lbl{position:absolute;background:rgba(11,15,12,.86);color:#fff;font:700 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:3px 6px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
+        + '#gps-overlay .gps-green-lbl-p{color:#fca5a5;border:1px solid rgba(239,68,68,.7);}'
+        + '#gps-overlay .gps-green-dims{position:absolute;left:10px;top:54px;z-index:3;background:rgba(11,15,12,.86);color:#d9f99d;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:6px 9px;border-radius:10px;white-space:nowrap;}'
         + '#gps-overlay .gps-pill{position:absolute;z-index:2;pointer-events:none;background:rgba(11,15,12,.86);color:#fff;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
         +   'padding:4px 7px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         // The bottom row of the map, above the attribution bar: the score button in
@@ -1695,6 +1823,7 @@
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
         on(el, '.gps-recenter', function () { frameHole(false); });
         on(el, '.gps-zoom', cycleZoom);
+        on(el, '.gps-green-view', toggleGreenView);
         on(el, '.gps-edit-pin', startEditPin);
         on(el, '.gps-pin-save', function () { endEditPin('save'); });
         on(el, '.gps-pin-clear', function () { endEditPin('clear'); });

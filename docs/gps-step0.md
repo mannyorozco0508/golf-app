@@ -345,7 +345,8 @@ Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
     offline fallback.
   - **No retry loops and no Esri prefetch.** Setting a green and Edit Pin stay
     on USGS.
-- **Plays like:** a small "plays 158" line under CENTER / PIN.
+- **Plays like:** a small "plays ~158" line under CENTER / PIN (the "~" says
+  it is an estimate).
   - **Formula:** `gps-geo.playsLike`, with D = yards to the aim point.
 
     ```
@@ -383,8 +384,11 @@ Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
       Score and "Get HardPan GPS".
     - There is no map: MapLibre is never loaded, and there are no tile, Esri,
       USGS pre-cache, EPQS or NWS requests.
-  - **The upgrade sheet** reads "HardPan GPS — $29.99/year · 7-day free
-    trial". The buy button is a disabled "Coming soon".
+  - **The upgrade sheet** reads "HardPan GPS — coming soon", with the feature
+    list and "Not now". It shows **no price** until Manny sets one: setting
+    `HARDPAN_GPS_CONFIG.priceLine` brings back a price line and a disabled buy
+    button.
+    - It is never shown to a Pro user.
     - It opens the first time GPS is shown in a session, and from "Get HardPan
       GPS".
     - Betting stays free.
@@ -398,3 +402,15 @@ Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
     - `budgt`: the tile budget.
     - `plays` + a second visit with 0 EPQS requests.
     - `free` / `clear`: basic mode, then Pro restored.
+
+- **Green view (follow-up, same day):** "⛳ Green" zooms to the green alone.
+  - It keeps the hole's own turn (tee → green up).
+  - It shows the outline, F / C / B and today's pin, each labelled with its
+    distance from the golfer (or the tee).
+  - It shows "Green N yds deep · M wide", measured on the outline turned to the
+    line of play. A tapped green without an outline shows depth only when F and
+    B were tapped.
+  - Edit Pin works there. "⛳ Hole" (the same button) goes back.
+  - The 1x / 2x / 3x button hides while it shows.
+- **Cache:** `golfapp-v326-gps-green` / `consumer-v161-gps-green`. Main used
+  v322–v325 and consumer-v160 for builds 12–15, so these go above them.

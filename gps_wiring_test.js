@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v321-gps-wave-two'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v326-gps-green'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -191,6 +191,10 @@ test('HardPan GPS (Pro): ONE check, exported; free never loads MapLibre', { skip
     assert.ok(/hasGpsPro: hasGpsPro/.test(v), 'exported on window.HardPanGps');
     const em = v.slice(v.indexOf('function ensureMap('), v.indexOf('function showSide('));
     assert.ok(em.indexOf('if (!S.pro) return;') !== -1 && em.indexOf('if (!S.pro) return;') < em.indexOf('loadMapLibre('), 'free returns before MapLibre loads');
-    assert.ok(/\$29\.99\/year · 7-day free trial/.test(v) && /Coming soon/.test(v) && /Not now/.test(v));
+    // No price anywhere in the code until Manny sets one (2026-10-08): the sheet
+    // says "HardPan GPS — coming soon"; a price comes only from config.priceLine.
+    assert.ok(!/\$\d/.test(v), 'a price is written into gps-view.js');
+    assert.ok(/HardPan GPS — coming soon/.test(v) && /Not now/.test(v));
+    assert.ok(/function openSheet\(\) \{\s*(\/\/.*\s*)?if \(!S \|\| S\.pro\) return;/.test(v), 'the sheet is never opened for a Pro user');
     assert.ok(!/Season Pass/i.test(v), 'HardPan GPS, never "Season Pass" (that is the organizer product)');
 });
