@@ -527,6 +527,20 @@
         .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
         .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
 
+        /* THE ROW'S OWN ORDER CONTROLS (2026-10-08). A golfer's foursome is
+           their position in the roster, so this is how an organizer sets the
+           foursomes on the day: two arrows and a group picker, on their own
+           full-width line under the row. */
+        .p-order-wrap { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+        .p-order-label { font-size: 0.75rem; color: var(--text-muted); }
+        .p-order-btn {
+            width: 34px; min-height: 34px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 7px;
+            background: var(--bg-card); color: var(--brand-green);
+            font-size: 0.78rem; line-height: 1; cursor: pointer;
+        }
+        .p-group-input { width: auto; min-width: 92px; margin: 0 0 0 auto; padding: 6px 4px; font-size: 0.76rem; }
+
         .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
@@ -7865,6 +7879,115 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // rendered at all and the row is byte-identical to before this existed.
     // DEFAULT IS THE ROUND'S TEE, which is what makes a same-tee round save
     // exactly what it saved yesterday: the select matches, so nothing is stored.
+    // ---- SETTING THE FOURSOMES ON THE DAY (2026-10-08) --------------------
+    //
+    // Manny, before a 24-man Myrtle trip: the Players step could change group
+    // SIZES but not WHO was in which group, because a golfer's foursome is
+    // their POSITION in the roster and the only control on a row was delete.
+    // Putting four named people together meant deleting and re-adding them in
+    // order, on a phone, on a tee box.
+    //
+    // THE ARITHMETIC IS NOT HERE. grouping.js owns rosterMove() and
+    // rosterMoveToGroup() - it already owns what a group IS - and
+    // roster_order_test.js holds them against a 24-man field, including that no
+    // id is lost or duplicated by any move. This function moves DOM nodes to
+    // match, and nothing else.
+    //
+    // IDS RIDE WITH THE ROWS. captureCurrentPlayerInputs() reads the rows in
+    // DOM order and takes each row's own id with it, so reordering rows changes
+    // the foursomes and binds no golfer to a different number.
+    function appendOrderControl(row) {
+        // A FULL-WIDTH LINE UNDER THE ROW, the same shape appendTeeControl uses:
+        // .player-row is a GRID with a fixed column template per format, so an
+        // extra child would land in an implicit cell and squeeze the handicap
+        // box. gridColumn 1 / -1 gives the controls their own line instead.
+        const wrap = document.createElement('div');
+        wrap.className = 'p-order-wrap';
+        wrap.style.gridColumn = '1 / -1';
+        const btn = (glyph, label, fn) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'p-order-btn';
+            b.textContent = glyph;
+            b.setAttribute('aria-label', label);
+            b.onclick = fn;
+            return b;
+        };
+        const label = document.createElement('span');
+        label.className = 'p-order-label';
+        label.textContent = 'Order';
+        wrap.appendChild(label);
+        wrap.appendChild(btn('\u25B2', 'Move this golfer up', function () { moveRowBy(row, -1); }));
+        wrap.appendChild(btn('\u25BC', 'Move this golfer down', function () { moveRowBy(row, 1); }));
+        // MOVE TO GROUP N, as a select rather than a menu: on a phone the native
+        // picker is one tap and needs no layout of ours, and it reads out the
+        // group names to a screen reader for free.
+        const sel = document.createElement('select');
+        sel.className = 'p-group-input';
+        sel.setAttribute('aria-label', 'Move this golfer to a group');
+        sel.onchange = function () { moveRowToGroup(row, sel.value); };
+        wrap.appendChild(sel);
+        row.appendChild(wrap);
+    }
+
+    // The group select is filled from the CURRENT boundaries, so it offers the
+    // groups that exist rather than a guess - and it is refilled by
+    // renderGroupDividers(), which already runs after every resize, add, delete
+    // and paste.
+    function syncRowGroupSelects() {
+        const listContainer = document.getElementById('player-list');
+        if (!listContainer) return;
+        const rows = Array.from(listContainer.querySelectorAll('.player-row'));
+        const bounds = computeGroupBoundaries(rows.length, groupSizeOverrides);
+        rows.forEach((row, idx) => {
+            const sel = row.querySelector('.p-group-input');
+            if (!sel) return;
+            let mine = 1;
+            bounds.forEach(b => { if (idx >= b.startIdx && idx < b.startIdx + b.size) mine = b.group; });
+            // ONE GROUP MEANS NOTHING TO MOVE BETWEEN, so the control goes away
+            // rather than offering a move to the group you are already in.
+            if (bounds.length <= 1) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+            sel.style.display = '';
+            const want = bounds.map(b => b.group).join(',') + '|' + mine;
+            if (sel.getAttribute('data-filled') === want) return;
+            sel.innerHTML = bounds.map(b =>
+                '<option value="' + b.group + '"' + (b.group === mine ? ' selected' : '') + '>'
+                + 'Group ' + b.group + '</option>').join('');
+            sel.setAttribute('data-filled', want);
+        });
+    }
+
+    function playerRowsNow() {
+        const listContainer = document.getElementById('player-list');
+        return listContainer ? Array.from(listContainer.querySelectorAll('.player-row')) : [];
+    }
+
+    // THE DOM IS REORDERED TO MATCH THE ANSWER, not instead of it: grouping.js
+    // is asked where the row should go, and the node is moved there. A rebuild
+    // would throw away every input the organizer has typed but not saved.
+    function applyRowOrder(nextOrder) {
+        const listContainer = document.getElementById('player-list');
+        if (!listContainer) return;
+        nextOrder.forEach(row => listContainer.appendChild(row));
+        if (typeof renderGroupDividers === 'function') renderGroupDividers();
+        if (typeof refreshMultiGroupMoneyRule === 'function') refreshMultiGroupMoneyRule();
+        if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
+    }
+
+    function moveRowBy(row, delta) {
+        const rows = playerRowsNow();
+        const from = rows.indexOf(row);
+        if (from === -1) return;
+        applyRowOrder(rosterMove(rows, from, from + delta));
+    }
+
+    function moveRowToGroup(row, group) {
+        const rows = playerRowsNow();
+        const from = rows.indexOf(row);
+        if (from === -1) return;
+        applyRowOrder(rosterMoveToGroup(rows, from, Number(group), groupSizeOverrides));
+    }
+
     function appendTeeControl(row, teeKey) {
         const src = document.getElementById('tee-rating-select');
         if (!src || !src.options || src.options.length < 2) return;
@@ -10356,6 +10479,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         `;
         if (flightsOn) appendFlightControl(row, flight, flightAsLine);
         appendTeeControl(row, teeKey);
+        appendOrderControl(row);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -10472,6 +10596,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const playerCount = rows.length;
         const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
 
+        // BEFORE THE EARLY RETURN, deliberately. On a single group there are no
+        // dividers to draw AND no group to move between - so the select must be
+        // HIDDEN rather than left showing whatever the last multi-group state
+        // put in it, which is what a return above this line caused.
+        syncRowGroupSelects();
         if (boundaries.length <= 1) return; // single group, no need to label it
 
         boundaries.forEach((b, gIdx) => {

@@ -28,6 +28,9 @@
 // BASELINE, measured over the FINISHED file against main (4f8873f, index.html
 // swapped out and restored by sha), all 9 tests: 7 PASS / 2 FAIL. 7 + 2 = 9.
 //
+// BASELINE COUNT DELTA: +1 the modal guard, added 2026-10-08 - see the note at
+// the bottom of this header for what it caught and why the old red was not the app.
+//
 // AND SEVEN PASSING IS NOT SEVEN PROVEN. Four of them are VACUOUS against a page
 // with no drag in it, and saying so is the point:
 //   "swipe down closes it"        the sheet was never open, so it was already closed
@@ -39,6 +42,17 @@
 // arrival, the page scrolling without opening the sheet, and the spectator
 // having no delete button.
 //   The two reds are the wave: the swipe up, and where the listeners live.
+//
+// WHAT THE MODAL GUARD CAUGHT (2026-10-08), and it was not the app. This file
+// reported "the swipe up did not open it" on main for three waves. The fixture
+// opened a BARE multi-group link, which raises "How are you joining this
+// round?" - and that dialog correctly swallows every gesture aimed at the page
+// beneath it, so the test was dispatching touches into a dialog. Measured on a
+// byte-identical index.html: bare link, sheet top 782 before AND after the
+// swipe; with &group=1, 782 -> 208 and open. Two of the passing tests were
+// vacuous while it lasted, because "closed" is true of a sheet that never
+// opened. The arrivals carry &group=1 now and the guard refuses to let anything
+// below it mean anything while a modal is up.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -81,7 +95,15 @@ const STATE = `(function () {
     scrollY: Math.round(window.pageYOffset || 0),
     // An inline transform left behind after a release would freeze the sheet
     // where the finger let go, whatever the class says.
-    inlineTransform: String(s.style.transform || '')
+    inlineTransform: String(s.style.transform || ''),
+    // ANY MODAL OVER THE PAGE, by name. A dialog swallows every gesture aimed
+    // at what is under it - correctly - so a touch test that runs with one up
+    // is measuring the dialog. This is read on every state so the test can say
+    // "a modal was in the way" instead of "the Round Menu is broken", which is
+    // what three waves were told.
+    modals: Array.prototype.slice.call(document.querySelectorAll('.modal-overlay'))
+      .filter(function (e) { return getComputedStyle(e).display !== 'none'; })
+      .map(function (e) { return e.id || '(unnamed)'; })
   });
 })()`;
 
@@ -97,7 +119,25 @@ function swipe(x, y0, y1, steps) {
 const S = {};
 before(async () => {
     const r = await arriveCold({
-        url: fileUrl('index.html', 'game=SWIPE'),
+        // &group=1, NOT THE BARE LINK, AND THAT IS THE FIX (2026-10-08).
+        //
+        // MEASURED, both ways, on a byte-identical index.html:
+        //   bare ?game=SWIPE   #group-pick-overlay is display:flex and the sheet
+        //                      stays shut - top 782 before and after the swipe
+        //   ?game=SWIPE&group=1  no modal, and the swipe OPENS it - top 782 -> 208
+        //
+        // This fixture is eight golfers, which is two groups, and a bare link on
+        // a multi-group round now raises "How are you joining this round?". That
+        // modal is CORRECT and it correctly swallows gestures aimed at the page
+        // under it - so this test was dispatching touches into a dialog and
+        // reporting the Round Menu as broken. The app was never broken; three
+        // waves looked for a defect that was in the fixture.
+        //
+        // AND THE REST OF THE FILE WAS VACUOUS WHILE IT LASTED: "swipe down
+        // closes it" and "a short drag snaps back" both assert open === false,
+        // which is trivially true of a sheet that never opened. The guard below
+        // refuses to run if a modal is up, so this cannot come back silently.
+        url: fileUrl('index.html', 'game=SWIPE&group=1'),
         db: { events: { SWIPE: round() }, global_courses: {}, trips: {}, tournaments: {} },
         viewport: { width: 390, height: 844 }, settleMs: 3200,
         // READ TWICE AFTER EVERY GESTURE, and take the later one. swipe() already
@@ -125,7 +165,7 @@ before(async () => {
     // THE PAGE ITSELF, scrolled hard, on a round long enough to scroll. The
     // handle must not have taken the gesture.
     const long = await arriveCold({
-        url: fileUrl('index.html', 'game=SCROLLY'),
+        url: fileUrl('index.html', 'game=SCROLLY&group=1'),   // &group=1 for the same reason as above: a bare multi-group link puts a modal over the page
         db: { events: { SCROLLY: round({ players: makePlayers(
             ['A A', 'B B', 'C C', 'D D', 'E E', 'F F', 'G G', 'H H'], [1, 2, 3, 4, 5, 6, 7, 8], 201) }) },
             global_courses: {}, trips: {}, tournaments: {} },
@@ -163,6 +203,22 @@ before(async () => {
 describe('1. THE SHEET FOLLOWS THE FINGER, AND SNAPS', () => {
 
     test('ran', () => assert.ok(S.ok && S.okScroll && S.okSpec, S.reason));
+
+    test('NO MODAL WAS IN THE WAY - or nothing below means anything', () => {
+        // THE GUARD THAT STOPS THIS FILE LYING AGAIN. Every assertion after this
+        // one is about a gesture reaching the page; if a dialog is over it, they
+        // are about the dialog. The bare-link fixture put #group-pick-overlay up
+        // and the three gesture tests then passed or failed for reasons that had
+        // nothing to do with the sheet - two of them VACUOUSLY, because "closed"
+        // is true of a sheet that never opened.
+        ['rest', 'afterUp', 'afterDown', 'afterShort'].forEach((k) => {
+            const st = S[k];
+            if (!st) return;
+            assert.deepEqual(st.modals || [], [],
+                'a modal was over the page at "' + k + '", so this file measured a dialog: '
+                + JSON.stringify(st.modals));
+        });
+    });
 
     test('SWIPE UP on the pill opens it', () => {
         assert.equal(S.rest.open, false, 'it did not start closed');
