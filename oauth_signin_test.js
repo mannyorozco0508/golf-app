@@ -50,6 +50,15 @@
 //
 //     0 PASS / 12 FAIL
 //
+// BASELINE COUNT DELTA: +1 the linking case added in Build 12 (2026-10-08) - a
+// signed-in user WITHOUT that provider must LINK it rather than be switched to
+// whatever account owns it. It is the other half of the test above it, and the
+// half that was broken: planOauth inferred "already linked" from isAnonymous
+// alone, so an email account tapping Google was moved rather than linked. It
+// would have been red against 8a4a980 too, for the same no-module reason, but
+// it was not measured there - so it is declared rather than folded into a
+// number it was not part of.
+//
 // Every one is red for the same reason - there is no module - and the file earns
 // its keep from the first line of it.
 // ============================================================================
@@ -82,6 +91,13 @@ function fakeFirebase(opts) {
     const auth = {
         currentUser: user && {
             uid: user.uid, isAnonymous: user.isAnonymous, email: user.email,
+            // providerData TRAVELS (2026-10-08). The stub used to copy three
+            // fields and drop this one, which was harmless while planOauth only
+            // looked at isAnonymous - and silently defeated every fixture the
+            // moment the rule became "is this provider already on the account".
+            // A fixture whose data never reaches the code under test is the
+            // same class of fault as an empty slice.
+            providerData: user.providerData || [],
             linkWithPopup: mk('linkWithPopup'), linkWithCredential: mk('linkWithCredential')
         },
         signInWithPopup: mk('signInWithPopup'),
@@ -170,12 +186,38 @@ describe('one-tap sign-in keeps the organizer', () => {
     });
 
     test('an already-linked user signs in and is not linked again', async () => {
-        const stub = fakeFirebase({ user: { uid: 'u-real', isAnonymous: false, email: 'a@b.com' },
-                                    after: { uid: 'u-real', isAnonymous: false, email: 'a@b.com' } });
+        // THE FIXTURE NOW SAYS WHICH PROVIDER IS LINKED, and that is the point
+        // of the Build 12 change rather than a loosening (2026-10-08). This
+        // fixture used to declare only isAnonymous:false and rely on
+        // planOauth INFERRING "already linked" from it - and that inference was
+        // the defect: a golfer signed in with EMAIL has no Google provider on
+        // him, so the inference sent him down signInWithCredential and SWITCHED
+        // his account. Measured in the project's auth: that is how a stray
+        // privaterelay account appeared while the email account kept all 38
+        // rounds. The rule is about the PROVIDER now, so a test about an
+        // already-linked user has to say what is linked.
+        const stub = fakeFirebase({
+            user: { uid: 'u-real', isAnonymous: false, email: 'a@b.com',
+                    providerData: [{ providerId: 'google.com' }] },
+            after: { uid: 'u-real', isAnonymous: false, email: 'a@b.com' } });
         const o = withFirebase(stub);
         const r = await o.signIn('google');
         assert.deepEqual(stub.calls, ['signInWithPopup']);
         assert.equal(r.preserved, true);
+    });
+
+    test('and a signed-in user WITHOUT that provider LINKS it instead of switching', async () => {
+        // The other half of the same rule, and the one that was broken: an
+        // email account tapping Google must have Google attached to it, not be
+        // moved to whatever account owns that Google identity.
+        const stub = fakeFirebase({
+            user: { uid: 'u-real', isAnonymous: false, email: 'a@b.com',
+                    providerData: [{ providerId: 'password' }] },
+            after: { uid: 'u-real', isAnonymous: false, email: 'a@b.com' } });
+        const o = withFirebase(stub);
+        const r = await o.signIn('google');
+        assert.deepEqual(stub.calls, ['linkWithPopup'], 'it switched accounts instead of linking');
+        assert.equal(r.preserved, true, 'the uid must not move when a provider is linked');
     });
 
     test('THE PROVIDERS ARE OFF TODAY, and the button says so instead of failing blank', () => {

@@ -4647,6 +4647,55 @@ the dark state; `my_groups_test.js` holds the feature.
   `golfapp-v320-recapimage` / `consumer-v155-recapimage`. ANDROID IS UNTOUCHED
   and still ships versionCode 2 - the two trains move separately.
 
+- **1.0.7 BUILD 12 IS SET AND READY TO ARCHIVE (2026-10-08, `main`).**
+  `CURRENT_PROJECT_VERSION` 12 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7, Release signs with `App/AppRelease.entitlements`. Cache
+  `golfapp-v323-linkprovider` / `consumer-v158-linkprovider`. All ten money
+  goldens byte-identical.
+
+  **PORTRAIT ONLY, EVERYWHERE.** `UISupportedInterfaceOrientations` and
+  `UISupportedInterfaceOrientations~ipad` are both a single portrait entry (the
+  iPad list carried four, upside-down included), and Android's MainActivity is
+  `screenOrientation="portrait"`. `portrait_only_test.js` holds both files and
+  also refuses the word Landscape anywhere in Info.plist, because a new key
+  with a landscape value would pass a list check and still rotate.
+
+  **LINKING APPLE OR GOOGLE TO THE ACCOUNT YOU ARE ALREADY IN**, and this is the
+  defect behind Manny's stray account. `planOauth` read `if (!user.isAnonymous)
+  return 'sign-in'` with the reason "already-linked" - and that was an
+  inference, not a fact: a golfer signed in with EMAIL has no Apple provider on
+  him, so tapping Continue with Apple ran `signInWithCredential` and SWITCHED
+  him to whatever account that Apple identity belonged to. Measured in the
+  project's own auth: `h8Axnef...` carries exactly one provider (password) and a
+  **founder pass**, owns **38 rounds**, and there are four apple.com accounts,
+  three on privaterelay addresses. THE RULE IS ABOUT THE PROVIDER NOW: a user
+  without it links, a user with it signs in. The Account sheet has deliberate
+  **Link Apple / Link Google** buttons which pass `deliberateLink`, and on
+  `credential-already-in-use` they REFUSE with their own message instead of
+  adopting - adopting is the exact move that made the stray account.
+
+  **THE STRAY RELAY ACCOUNT, `xujB3BjfOjdc61jJy5RVODZxv7c2`
+  (`89gphwy4ch@privaterelay.appleid.com`, created and last used 2026-10-07) -
+  PLANNED, NOT DELETED.** Audited read-only: `organizers/<uid>` is **null** (no
+  trial, no pass), it owns **0 rounds** and **0 trips**, and carries **1 push
+  token**. So there is nothing on it to lose, and it is the thing standing in
+  the way: Manny's Apple identity is attached to it, so `linkWithCredential`
+  from his email account will fail `credential-already-in-use` until it is
+  removed. RECOMMENDATION: delete that one auth user (Firebase console ->
+  Authentication -> that row -> Delete), then Link Apple succeeds. Manny's call;
+  nothing was deleted.
+
+  **SESSION PERSISTENCE** is the SDK default (`local`, IndexedDB with a
+  localStorage fallback) - no `setPersistence` call anywhere - and auth-boot asks
+  `onAuthStateChanged` FIRST, signing in anonymously only when no persisted user
+  answers. That is the right shape, and whether a WKWebView on
+  capacitor://localhost keeps it across a kill and a phone restart is MANNY'S
+  TEST on the build: a harness cannot prove it.
+
+  Also in build 12: the paste-wrapper fix (`de24141`) - Gmail's Copy Link
+  redirect now yields the code, and a refusal scrolls into view instead of
+  rendering 24px below the fold.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY

@@ -4395,7 +4395,15 @@
 // viewport - 24px off the bottom of the screen - so there was no way to see it.
 // A pasted link is unwrapped now (bounded, string-only, nothing fetched), and a
 // refusal scrolls itself into view. A device on v321 still looks dead.
-const CACHE_VERSION = 'golfapp-v322-pastewrapper';
+// Moved to v323. BUILD 12: PORTRAIT ONLY, AND LINKING APPLE TO THE ACCOUNT YOU
+// ARE ALREADY IN. planOauth treated any non-anonymous user as "already linked"
+// whatever providers were actually on them - so a golfer signed in with EMAIL
+// tapping Continue with Apple was SWITCHED to whatever account that Apple
+// identity belonged to, which is how a stray privaterelay account appeared
+// while his email account kept all 38 of his rounds. The rule is about the
+// PROVIDER now, and the Account sheet has deliberate Link Apple / Link Google
+// buttons that refuse rather than adopt. A device on v322 still switches.
+const CACHE_VERSION = 'golfapp-v323-linkprovider';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

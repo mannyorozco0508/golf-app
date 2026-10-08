@@ -1201,6 +1201,22 @@ html {
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
     </section>
+    <!-- LINK APPLE OR GOOGLE TO THE ACCOUNT YOU ARE ALREADY IN (Build 12,
+         2026-10-08). Manny signed in with email, tapped "Continue with Apple",
+         and was SWITCHED to a new privaterelay account instead of having Apple
+         attached to his - because planOauth treated any non-anonymous user as
+         "already linked" whatever providers were actually on them. These
+         buttons are the deliberate version: they LINK, and they refuse rather
+         than adopt if that Apple or Google account belongs to someone else.
+         Shown only to a signed-in email account that does not already have the
+         provider - syncOauthLinkRow decides. -->
+    <section id="oauth-link-card" class="email-link-card" style="display:none;">
+        <h2>One tap next time</h2>
+        <p id="oauth-link-lead">Attach Apple or Google to this account, and signing in on a new phone is one tap &mdash; no email, no link to paste.</p>
+        <button type="button" id="oauth-link-apple" class="btn-primary" onclick="oauthLinkTap('apple')">&#63743;&nbsp; Link Apple</button>
+        <button type="button" id="oauth-link-google" class="btn-outline" onclick="oauthLinkTap('google')">Link Google</button>
+        <p id="oauth-link-status" role="status"></p>
+    </section>
     <!-- SIGN OUT AND DELETE ACCOUNT (Wave 34). Required by App Review 5.1.1(v):
          an app that lets somebody create an account has to let them delete it from
          inside the app, and Wave 33 made Apple and Google the front door. Shown
@@ -8315,6 +8331,50 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function oauthReady() {
         return !!(window.oauthSignin && typeof window.oauthSignin.signIn === 'function');
     }
+    // WHO SEES THE LINK ROW. A signed-in account that does NOT already carry the
+    // provider - so an anonymous organizer (who gets the ordinary one-tap card)
+    // and an account that already has Apple attached are both left alone. The
+    // per-button hiding matters: offering "Link Apple" to somebody who already
+    // linked Apple is an invitation to a refusal.
+    function syncOauthLinkRow() {
+        var card = document.getElementById('oauth-link-card');
+        if (!card) return;
+        var u = null;
+        try { u = window.firebase && firebase.auth && firebase.auth().currentUser; } catch (e) { u = null; }
+        var linked = (window.oauthSignin && typeof oauthSignin.linkedProviders === 'function')
+            ? oauthSignin.linkedProviders(u) : [];
+        var signedInNotAnon = !!(u && u.uid && !u.isAnonymous);
+        var a = document.getElementById('oauth-link-apple');
+        var g = document.getElementById('oauth-link-google');
+        var hasApple = linked.indexOf('apple.com') !== -1;
+        var hasGoogle = linked.indexOf('google.com') !== -1;
+        if (a) a.style.display = (signedInNotAnon && !hasApple) ? '' : 'none';
+        if (g) g.style.display = (signedInNotAnon && !hasGoogle) ? '' : 'none';
+        card.style.display = (signedInNotAnon && (!hasApple || !hasGoogle)) ? 'block' : 'none';
+    }
+
+    // THE DELIBERATE LINK. Same module, same one sign-in path, with the flag
+    // that stops it adopting somebody else's account on
+    // credential-already-in-use - which is the move that made the stray one.
+    function oauthLinkTap(which) {
+        if (!oauthReady()) return setTextOnce(document.getElementById('oauth-link-status'),
+            'Sign-in is not ready yet. Wait a moment and try again.');
+        var a = document.getElementById('oauth-link-apple'), g = document.getElementById('oauth-link-google');
+        if (a) a.disabled = true; if (g) g.disabled = true;
+        setTextOnce(document.getElementById('oauth-link-status'), 'Opening\u2026');
+        window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
+            if (a) a.disabled = false; if (g) g.disabled = false;
+            setTextOnce(document.getElementById('oauth-link-status'),
+                'Linked. Next time, one tap on this account.');
+            refreshAccountState();
+            syncOauthLinkRow();
+        }, function (err) {
+            if (a) a.disabled = false; if (g) g.disabled = false;
+            setTextOnce(document.getElementById('oauth-link-status'),
+                window.oauthSignin.messageFor(err, { deliberateLink: true }));
+        });
+    }
+
     function oauthTap(which) {
         if (!oauthReady()) return setTextOnce(document.getElementById('oauth-status'),
             'Sign-in is not ready yet. Wait a moment and try again.');
@@ -8672,6 +8732,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             setTextOnce(document.getElementById('oauth-lead'),
                 'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email.');
         }
+        // THE LINK ROW IS DECIDED HERE, on the same beat as everything else
+        // about the account. A render function nothing calls is this project's
+        // most repeated defect - a priced Auto Press label that 37 tests called
+        // themselves and no code path ever did - so the call site matters more
+        // than the function. refreshAccountState already runs on every auth
+        // change and when the panel opens.
+        if (typeof syncOauthLinkRow === 'function') syncOauthLinkRow();
     }
 
     function previewPastedPlayers() {
