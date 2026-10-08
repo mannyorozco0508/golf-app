@@ -4425,6 +4425,69 @@ the dark state; `my_groups_test.js` holds the feature.
 | **Full Card has no KP entry** | logged, not fixed |
 | **`stats.html` defines its own `nassauStakeConfig`** (`:800`), a byte-copy of money-engine's | found in the Wave 29 recon; a duplicated builder, not a divergence - yet |
 
+- **1.0.7 BUILD 10 IS SET AND READY TO ARCHIVE (2026-10-07, `main`).**
+  `CURRENT_PROJECT_VERSION` 10 on Debug and Release, `MARKETING_VERSION` stays
+  1.0.7, Release still signs with `App/AppRelease.entitlements`. Build 10 =
+  build 9 plus the four defects Manny found setting up screenshots on an
+  iPhone 17 Pro Max simulator. Cache `golfapp-v314-fourbugs` /
+  `consumer-v149-fourbugs`.
+
+  1. **A BUILT-IN MYRTLE COURSE SAVED A ROUND WITH NO HOLES.** Picking
+     Caledonia, True Blue or Pine Lakes in Game Day setup produced "No course
+     data for this round yet." `course-index.js` merges a NAME-ONLY stub into
+     `globalCourses` for every course the picker lists, and `admin.html` took
+     that stub over the built-in's 18 pars - and `courseCardInHand()` returned
+     true for it, so the card never loaded. Both halves fixed: in-hand means
+     HOLES in hand, and a built-in beats a name-only stub.
+     `myrtle_course_card_test.js` (6 tests; 2 pass / 4 fail against build 8).
+     THE LIVE MYRTLE TRIP WAS AUDITED and every round already had its full 18
+     pars and handicap indexes - nothing was written.
+
+  2. **THE TRIP LEDGER CHARGED AN UNPLAYED ROUND.** An unscored Day 3 took $5
+     off every golfer and the pot settled before the trip was over. `trip.html`
+     now skips a round `computeRoundSettlement` says nobody started and names
+     it under "Not Settled Yet". NO ENGINE FILE WAS TOUCHED FOR THIS.
+     `trip_unplayed_round_money_test.js` (14 tests; 13 pass / 1 fail against
+     build 8's trip.html).
+
+  3. **A FINISHED ROUND READ "ALL SQUARE - THRU 18" ON THE MATCHES TAB** for
+     every match, including one Manny won 7&6. `bet-strip.js` (PROTECTED, see
+     below) took the headline from the live chip, and `closed` is false for a
+     level match at the 18th. It now reads the receipt settlement-engine
+     already priced, gated on the card's own `sideMatchRangeComplete`.
+     `matches_tab_finished_test.js` (6 tests; 3 pass / 3 fail against main).
+     THE MONEY WAS NEVER WRONG - $120/$60/$60 were right on main; only the
+     words and the tone lied, which reads as a bug in the money.
+
+  4. **THE LIVE MATCHES BOX WAS WIDER THAN THE PHONE.** 462px in a 342px
+     column, so the page scrolled sideways at 390px (scrollWidth 486) and all
+     26 amounts on the card were off screen. A grid item is `min-width: auto`,
+     which means min-content; the card simply was never allowed to shrink.
+     `min-width: 0` plus the result text wrapping instead of being ellipsised,
+     in index.html AND leaderboard.html. `tools/match-card-overflow-check.js`
+     (Chrome at 390px: 28 faults against main, 0 after) and
+     `match_card_width_test.js` (4 tests; 1 pass / 3 fail against main).
+
+  **bet-strip.js IS PROTECTED AND WAS CHANGED,** approved per-file in this
+  brief: `6a876155251e71a2` -> `3b2dd5fb785e16f3`. One site in
+  `buildSideActionRows`. No arithmetic entered the file - the only numeric
+  expression added is `Math.abs()` on a net the receipt had already computed,
+  used to build a label. Re-pinned with the reason in
+  `bets_matches_split_test.js`, `card_scope_closed_test.js`,
+  `format_first_wizard_test.js` and `per_golfer_tees_test.js`; the other nine
+  money files are byte-identical to build 8.
+
+  **ALL THREE OF 1-3 WERE IN THE LIVE 1.0.6 APP AND ON THE LIVE WEB.** Measured
+  by swapping build 8's own files in (`21f9c7f`) and running the guards: bug 1
+  4 fail, bug 2 2 fail, bug 3 3 fail. trip.html and bet-strip.js are
+  byte-identical between build 8 and main, so the web carried them too. Bug 4
+  is the same CSS on main, so the web has it as well.
+
+  **DEFERRED, MANNY'S CALL:** the same -$5 still appears on an unplayed round's
+  OWN Results page - the KP-refund rule applied to a round nobody started. Not
+  changed, because it is a different screen and a different rule from the trip
+  ledger.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY

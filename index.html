@@ -1359,7 +1359,16 @@
         .sb-line span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .sb-note { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
         .sb-lead { font-size: 0.78rem; font-weight: bold; margin-top: 2px; }
-        .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        .lm-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color);
+            /* A GRID ITEM IS min-width:auto BY DEFAULT, WHICH MEANS min-content
+               (2026-10-07). Measured on the finished Myrtle round at 390px: the
+               1fr column was 342px and this card rendered 462px, so the PAGE
+               scrolled sideways (scrollWidth 486) and the right-hand amounts ran
+               off the screen - "Manny/Tim 6&5 - FINAL ... +$20" with the $20 past
+               the edge. Forced to 342px by hand the card lays out correctly, so
+               nothing inside needed resizing: it simply was never allowed to
+               shrink to its column. */
+            min-width: 0; max-width: 100%; }
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title, .lm-card-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .lm-sub { font-size: 0.68rem; color: var(--text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1367,7 +1376,12 @@
         .lm-seg:last-child { border-bottom: none; }
         .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
         .lm-seg-name { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.04em; color: var(--text-secondary); width: 62px; flex-shrink: 0; }
-        .lm-seg-status { font-size: 1rem; font-weight: bold; color: var(--text-main); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* AND THE RESULT WRAPS INSTEAD OF BEING CUT (2026-10-07). With the card
+           finally shrinking to its column, nowrap+ellipsis clipped
+           "Manny/Tim 6&5 - FINAL" to "Manny/Tim 6..." - the result thrown away
+           to save a line. Manny: "Wrap/shrink the text". The money keeps its
+           nowrap, so the amount is never the thing that breaks. */
+        .lm-seg-status { font-size: 1rem; font-weight: bold; color: var(--text-main); flex: 1; min-width: 0; overflow-wrap: break-word; white-space: normal; }
         .lm-quiet { color: var(--text-muted); font-weight: normal; font-style: italic; font-size: 0.84rem; }
         .lm-press { display: flex; align-items: baseline; gap: 8px; padding: 2px 0 2px 16px; }
         .lm-press-tag { font-size: 0.68rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
@@ -1375,7 +1389,7 @@
         .lm-divider { border-top: 1px solid var(--border-mid); margin: 6px 0; }
         .lm-wager-head { font-size: 0.74rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 3px; }
         .lm-press-link { float: right; font-size: 0.74rem; font-weight: bold; color: var(--brand-navy); text-decoration: none; padding: 6px 8px; margin: -6px -4px 0 0; min-height: 44px; display: inline-flex; align-items: center; }
-        .lm-press-status { font-size: 0.84rem; font-weight: 600; color: var(--text-main); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lm-press-status { font-size: 0.84rem; font-weight: 600; color: var(--text-main); flex: 1; min-width: 0; overflow-wrap: break-word; white-space: normal; }
         /* A CLOSED ROW IS NOT A FADED ROW (2026-10-05). opacity 0.6 measured 2.1:1
            against the card - below the 4.5:1 WCAG asks of body text, and the
            thing Manny could not read. A finished bet is distinguished by its

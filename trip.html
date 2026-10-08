@@ -3539,6 +3539,38 @@ html {
             // Birdie Pool + KPs + every Side Match - identical to what this round's own
             // Results page shows. Trip totals are now the sum of finalized round
             // settlements, not a narrower second opinion about what counts as money.
+            // AN UNPLAYED ROUND OWES NOTHING (2026-10-07, Manny on the Myrtle trip).
+            //
+            // Day 3 had not been played - not one score - and this card charged
+            // every golfer -$5 for it and folded that into the trip total.
+            // Measured on the live round (3MKUCF): a $20 buy-in, the net prize
+            // and the skins remainder refunded ($15 each) and the $20 KP pot
+            // HELD, because a blank KP on a round that is not finished is "not
+            // yet" rather than a refund. -$20 + $15 = -$5 each.
+            //
+            // That rule is right for a round in progress - the KP money is on
+            // the table - and wrong for a round NOBODY HAS TEED OFF ON, where
+            // there is no table. So the trip stops asking: a round with no
+            // scores at all contributes nothing to any total, and is listed as
+            // one the trip is waiting for.
+            //
+            // `started` is settlement-engine's own predicate (at least one
+            // golfer with at least one hole), already read below to decide
+            // whether the heading may say Final. NO ENGINE FILE CHANGES: what a
+            // round owes is computed exactly as before, it is simply not asked
+            // of a round that has not begun. The same -$5 still appears on that
+            // round's OWN Results page, which is a question about the KP refund
+            // rule and is Manny's to answer, not something to change quietly
+            // inside money math.
+            const settlement = computeRoundSettlement(data, courseData, savedScores);
+            if (!settlement.started) {
+                inPlayRounds.push({ label, started: false, thru: 0,
+                                    playing: [], left: (data.players || []).length });
+                perRoundBreakdown.push({ label, formatLabel: '', rows: [],
+                                         message: 'Not played yet \u2014 it owes nobody anything.' });
+                return;
+            }
+
             const combined = computeCombinedNetTotals(data, courseData, savedScores);
 
             // MERGED ACROSS THE WEEK. "Does anybody owe another golfer money" is asked
@@ -3563,7 +3595,7 @@ html {
             // the heading cannot say Final while a golfer is still out, and the round
             // is named so the group knows which one to wait for. A round with no
             // scores at all has not started, and holds the trip open the same way.
-            const settlement = computeRoundSettlement(data, courseData, savedScores);
+            // (settlement was computed above, before the unplayed-round skip.)
             if (!settlement.kpSettled) {
                 unresolvedRounds.push({ label, cents: settlement.kpUnresolvedCents || 0 });
                 unresolvedDollars += (settlement.kpUnresolvedCents || 0) / 100;

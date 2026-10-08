@@ -144,7 +144,7 @@ describe('2. THE MONEY FILES DO NOT MOVE', () => {
         const PINS = {
             'handicap.js': '2d3b2f7fd916', 'money-engine.js': '12bfa41c2c8e',
             'settlement-engine.js': '6ddd4c8676cd', 'pool-engine.js': '372e76d7d5c4',
-            'action-model.js': '399ba26f0025', 'bet-strip.js': '6a876155251e',
+            'action-model.js': '399ba26f0025', 'bet-strip.js': '3b2dd5fb785e',   // RE-PINNED 2026-10-07 (MATCHES TAB ON A FINISHED ROUND; was 6a876155): approved per-file by Manny in the four-bug brief, ONE site in buildSideActionRows - on a round that is over every row read "All square - Thru 18", including one won 7&6. It now reads the RECEIPT settlement-engine.js already priced, gated on the card's own sideMatchRangeComplete so a running match is untouched. No arithmetic entered the file; matches_tab_finished_test.js holds the behaviour and its mid-round control proves the gate.
             'hole-events.js': '6fd7f7edf41e', 'score-marks.js': '02f972d6d2fc',
             'payouts.js': 'c35e34f571e5', 'match-engine.js': '42bb272d1181',
             'ryder-cup.js': '0b4e3f9059ad', 'play-order.js': 'c243c2eafb8d'
