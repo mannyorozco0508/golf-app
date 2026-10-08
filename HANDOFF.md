@@ -4619,6 +4619,34 @@ the dark state; `my_groups_test.js` holds the feature.
   got its own record carrying ITS OWN existing card and was repointed - without
   it one Thistle round showed the other's tees.
 
+- **1.0.7 BUILD 11 IS SET AND READY TO ARCHIVE (2026-10-08, `main` `b968691` or
+  later).**
+  `CURRENT_PROJECT_VERSION` 11 on Debug AND Release - verified two of each in the
+  project file - and `MARKETING_VERSION` stays 1.0.7. Release signs with
+  `App/AppRelease.entitlements` (aps-environment **production** + Sign in with
+  Apple); Debug keeps **development**, which is the pair that matters because one
+  file for both is how a TestFlight build registers on the wrong APNs gateway and
+  silently never receives.
+
+  **BUILD 11 = BUILD 10 PLUS:**
+  - **Roster reorder** - up/down arrows and "Move to Group N" on every golfer on
+    the Players step, so the foursomes can be set on the day from the phone. QR
+    codes and group links follow. (`golfapp-v319-foursomes`)
+  - **The trip recap as an image** - one tap draws the rendered recap card to a
+    canvas and hands a 2160x2916 PNG to the iOS share sheet.
+    (`golfapp-v320-recapimage`)
+  - **The round-menu swipe test fixed** - a TEST fix, no app change: its fixture
+    opened a bare multi-group link and was dispatching touches into the "How are
+    you joining this round?" dialog.
+  - **Man O' War tee data** - DATA ONLY, written to the live database, no code.
+
+  `build-shell`, `sync-mobile-web` and `cap sync ios` all run; repo = www/app =
+  `ios/App/App/public` verified by sha for sw.js, admin.html, index.html,
+  trip.html, trip-recap-image.js, grouping.js, native-export.js, qr-codes.js and
+  qr-encode.js, and native_bundle_freshness_test.js is green. Cache
+  `golfapp-v320-recapimage` / `consumer-v155-recapimage`. ANDROID IS UNTOUCHED
+  and still ships versionCode 2 - the two trains move separately.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
