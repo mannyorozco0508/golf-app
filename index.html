@@ -6131,12 +6131,6 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 // FIRST green on an unmapped hole can be set by anyone on the card.
                 canFix: roundOwnerHere(),
                 writeRoundPin: (k, pin) => durableWrite(base + k, 'set', pin, base + k),
-                // TODAY'S PIN (Wave 1): on the round, for the whole group; the same
-                // durable queue as a green, so it survives no signal.
-                writeHoleLoc: (k, loc) => {
-                    const at = 'events/' + currentMode + '/pinLocs/' + k;
-                    return loc ? durableWrite(at, 'set', loc, at) : durableWrite(at, 'remove', null, at);
-                },
                 openScore: gpsOpenScore,
                 holeMeta: gpsHoleMeta, holeList: gpsHoleList, gotoHole: gpsGotoHole,
                 stepHole: gpsStepHole

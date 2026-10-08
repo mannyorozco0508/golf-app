@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v328-gps-redesign'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v329-gps-greengps'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -197,4 +197,27 @@ test('HardPan GPS (Pro): ONE check, exported; free never loads MapLibre', { skip
     assert.ok(/HardPan GPS — coming soon/.test(v) && /Not now/.test(v));
     assert.ok(/function openSheet\(\) \{\s*(\/\/.*\s*)?if \(!S \|\| S\.pro\) return;/.test(v), 'the sheet is never opened for a Pro user');
     assert.ok(!/Season Pass/i.test(v), 'HardPan GPS, never "Season Pass" (that is the organizer product)');
+});
+
+// EDIT PIN WAS REMOVED (2026-10-08): no code reads or writes today's pin; the
+// old pinLocs records stay in the database untouched.
+test('Edit Pin is gone: no pinLocs in the GPS code or the scorecard\'s GPS block', { skip }, () => {
+    const code = (t) => t.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    const v = code(read('gps-view.js'));
+    assert.ok(/aimAt\(r\)/.test(v), 'positive: CENTER still has its aim');
+    ['pinLocs', 'editingPin', 'gps-edit-pin', 'gps-flag', 'writeHoleLoc'].forEach((w) => assert.ok(v.indexOf(w) === -1, 'gps-view.js still has ' + w));
+    const html = read('index.html');
+    const blocks = html.split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
+    assert.ok(/gpsFollowHoleView/.test(blocks), 'positive: the GPS block was found');
+    assert.ok(!/pinLocs|writeHoleLoc/.test(blocks), 'index.html still writes today\'s pin');
+    assert.ok(!/clampToGreen/.test(read('gps-geo.js')), 'the pin clamp is gone from gps-geo.js');
+});
+
+test('setting a green by GPS: Esri stays up; only the tap fallback is USGS; ±5 yds gate', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/var GREEN_GPS_YD = 5;/.test(v));
+    assert.ok(/function tapMode\(\) \{ return !!S && \['setMid', 'confirmMid', 'setFront', 'setBack', 'confirmAll'\]/.test(v), 'only the photo-tap modes are tap modes');
+    assert.ok(/var pinning = tapMode\(\);/.test(v), 'syncImageryForMode hides Esri only for the tap fallback');
+    assert.ok(/Set by tapping \(lower detail\)/.test(v), 'the fallback link is there');
+    assert.ok(/if \(!S \|\| !gpsGoodEnough\(\)\) return;/.test(v), 'Set does nothing below ±5 yds');
 });

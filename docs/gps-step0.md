@@ -453,3 +453,30 @@ of any other app.
 - **Hole view fit:** the hole is fitted into the space the panels leave clear,
   measured from the DOM. It refits when the panels change size, at most 3 times
   in 2 s, and never from inside a frame (that was a refit loop).
+
+### 7f. Edit Pin removed; the green is set by GPS; one credit line (2026-10-08)
+
+- **Edit Pin is gone:** the Tools item, the flag, PIN and "Pin to center" are
+  removed.
+  - The app no longer reads or writes `events/<code>/pinLocs`. Existing
+    records stay in the database untouched.
+  - CENTER is always the green's center. `gps-geo.clampToGreen`, its test and
+    the Edit Pin check arm went with it.
+- **Set / fix the green by GPS (Tools):**
+  - The golfer stands on the middle of the green and taps **Set center**,
+    then can add front and back the same way. The sharp Esri photo stays up,
+    because nothing is taken from it.
+  - Set works only at ±5 yds or better; below that the banner says so and
+    the button is off.
+  - "Set by tapping (lower detail)" is the old photo-tap way, and the only
+    place USGS is used besides offline.
+  - **Privacy note:** this is the one place a GPS position is saved — the
+    spot the golfer stands on, saved AS the green, when they tap Set. It goes
+    into the green record (round + course copy) like a tapped green does.
+- **Credits:** no white block. One line at the bottom-left, under the Card /
+  Enter Score row: "Powered by Esri · ⓘ" (or "USGS · ⓘ" when USGS is the
+  picture).
+  - ⓘ opens every credit line — Esri's sources, USGS when shown, ©
+    OpenStreetMap contributors — taken from MapLibre's own attribution for
+    the sources on the map.
+  - A tap anywhere closes it.

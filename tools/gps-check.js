@@ -126,7 +126,7 @@ function sensor(mode, lat, lng, acc) {
       var nextId = 1, oks = {}, cur = { lat: ${lat}, lng: ${lng}, acc: ${acc} };
       var report = function (id) { if (calls.active[id]) oks[id]({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: cur.acc }, timestamp: Date.now() }); };
       // Wave 2: the golfer walks - every live watch hears the new spot.
-      window.__moveTo = function (la, ln) { cur.lat = la; cur.lng = ln; Object.keys(calls.active).forEach(report); return 'moved'; };
+      window.__moveTo = function (la, ln, acc) { cur.lat = la; cur.lng = ln; if (acc != null) cur.acc = acc; Object.keys(calls.active).forEach(report); return 'moved'; };
       var fake = {
         watchPosition: function (ok, err, opts) {
           var id = nextId++; calls.watch++; calls.active[id] = true; calls.opts = opts || null; oks[id] = ok;
@@ -161,7 +161,9 @@ const READ = `JSON.stringify((function () {
   var mapEl = o && o.querySelector('.gps-map');
   var ds = mapEl ? mapEl.dataset : {};
   var big = o ? [].slice.call(o.querySelectorAll('.gps-big')).map(function (e) { var r = e.getBoundingClientRect(); return { text: e.innerText.trim(), over: e.scrollWidth > e.clientWidth + 1, l: Math.round(r.left), r: Math.round(r.right) }; }) : [];
-  var ar = attr ? attr.getBoundingClientRect() : null;
+  // CREDITS (item 7): one line at the bottom-left; the full lines behind ⓘ.
+  var cr = o && o.querySelector('.gps-credit');
+  var ar = cr ? cr.getBoundingClientRect() : null;
   var gpsBtn = tg && tg.querySelector('.gps-side-gps');
   var card = document.querySelector('.hv-hole-num');
   return { mounted: !!o, gpsShown: !!(o && getComputedStyle(o).display !== 'none'),
@@ -181,19 +183,23 @@ const READ = `JSON.stringify((function () {
            big: big, vw: innerWidth,
            attribution: attr ? (attr.innerText || '').trim() : null,
            attributionOnScreen: !!(ar && ar.width > 0 && ar.height > 0 && ar.bottom <= innerHeight && ar.top >= 0),
+           creditLine: cr && cr.offsetParent !== null ? (cr.innerText || '').replace(/\\s+/g, ' ').trim() : null,
+           creditPop: vis('.gps-credit-pop') ? (q('.gps-credit-pop').innerText || '').replace(/\\s+/g, ' ').trim() : null,
+           creditBg: cr ? getComputedStyle(cr).backgroundColor : null,
            tilesLoaded: Number(ds.tilesLoaded || 0),
            zoomBtn: vis('.gps-zoom') ? t('.gps-zoom') : null,
            pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
            ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
-           boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(attr), map: box(mapEl),
+           boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(cr), map: box(mapEl),
                     top: box(q('.gps-top')), sub: box(q('.gps-sub')), right: box(q('.gps-right')), recenterB: box(q('.gps-recenter')), toPill: box(q('.gps-target-row')), bottom: box(q('.gps-bottom')),
                     back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
            teePx: ds.teePx ? ds.teePx.split(',').map(Number) : null,
            arcs: ds.arcs == null ? null : ds.arcs, arcStep: ds.arcStep == null ? null : Number(ds.arcStep),
            arcLabels: o ? [].slice.call(o.querySelectorAll('.gps-arc-lbl')).filter(function (e) { return e.style.display !== 'none' && e.style.visibility !== 'hidden'; }).map(function (e) { return { text: e.innerText.trim(), box: box(e) }; }) : [],
-           midLbl: t('.gps-lbl-mid'), editPin: avail('.gps-edit-pin'), pinSave: vis('.gps-pin-save'), pinClear: vis('.gps-pin-clear'),
-           flag: box(q('.gps-flag')), flagEdit: !!(q('.gps-flag') && q('.gps-flag').classList.contains('gps-flag-edit')),
+           midLbl: t('.gps-lbl-mid'), editPinEl: !!q('.gps-edit-pin') || !!q('.gps-flag') || !!q('.gps-pin-save'),
+           gpsSet: vis('.gps-gps-set') ? { text: t('.gps-gps-set'), disabled: q('.gps-gps-set').disabled } : null, tapFallback: vis('.gps-tap-fallback'),
+           addEdges: vis('.gps-addedges'), saveGreen: vis('.gps-save'),
            score: vis('.gps-score') ? t('.gps-score') : null, scoreBox: box(q('.gps-score')),
            bannerBox: box(q('.gps-banner')), zoomBox: box(q('.gps-zoom')), recenterBox: box(q('.gps-recenter')),
            wind: vis('.gps-wind') ? t('.gps-wind') : null, windBox: box(q('.gps-wind')), windRot: q('.gps-wind') ? q('.gps-wind').getAttribute('data-rot') : null,
@@ -217,7 +223,7 @@ const READ = `JSON.stringify((function () {
            sheet: vis('.gps-sheet') ? (q('.gps-sheet').innerText || '').replace(/\\s+/g, ' ').trim() : null,
            sheetBuyDisabled: q('.gps-sheet-buy') ? q('.gps-sheet-buy').disabled : null,
            basicScore: vis('.gps-score-basic') ? t('.gps-score-basic') : null, getPro: vis('.gps-get-pro'),
-           targetRow: vis('.gps-target-row'), editPinShown: avail('.gps-edit-pin'),
+           targetRow: vis('.gps-target-row'),
            holeMeta: t('.gps-meta'), holeNum: t('.gps-hole-num'), picker: vis('.gps-picker') ? o.querySelectorAll('.gps-picker-grid button').length : 0, tools: vis('.gps-tools-menu'),
            mapCenter: ds.center ? ds.center.split(',').map(Number) : null, bounds: ds.bounds ? ds.bounds.split(',').map(Number) : null, minZoom: ds.minZoom == null ? null : Number(ds.minZoom),
            scoreboxBox: box(q('.gps-scorebox')), cardBtn: vis('.gps-side-bets'), back: vis('.gps-back'),
@@ -233,7 +239,10 @@ const COUNT_USGS = `(window.__usgsN = null, (typeof caches === 'undefined' ? (wi
 // style is up and the hole is framed. Waited for, not slept on.
 // Loaded, framed and drawn (gps-view sets data-ready at the end of its load
 // handler). data-zoom alone came too early under load: tile data sets it first.
-const WAIT_MAP = { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && m.dataset.zoom != null); })()`, timeout: 30000 };
+// ... and FRAMED: the course data in and the map off its world view (a loaded
+// machine read the world view, tee at x -255, before the course data arrived -
+// the page re-frames then, as it should; the check had read too soon).
+const WAIT_MAP = { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && m.dataset.zoom != null && window.HardPanGpsCourses && Number(m.dataset.zoom) > 3); })()`, timeout: 45000 };
 const mapTap = (x, y) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed', x, y, button: 'left', clickCount: 1 } } },
                           { cdp: { method: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 } } },
                           { sleep: 400 }];
@@ -281,6 +290,7 @@ function leaks(r, me) {
 }
 // The harness records each request as its URL string.
 const urlOf = (q) => String((q && q.url) || q || '');
+const lerpPt = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 const dist = (a, b) => (a && b) ? Math.round(Math.hypot(a.x - b.x, a.y - b.y)) : -1;
 // ---- the polish of 2026-10-07: pills, ring, zoom, no pull, the tee in view ----
 const hitBox = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t);
@@ -556,7 +566,7 @@ function usgsFallbackFails(tag, g, why) {
     const pl = [33.7111, -78.8869];
     const b = await arm('unmap', 'pinelakes', null, 'ok', pl, 20, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 200 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 200 }, { tap: '.gps-tap-fallback' }, { sleep: 200 }, { expression: READ },
         ...mapTap(90, 200), { expression: READ },
         { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
         { tap: '.gps-side-bets' }, { sleep: 200 }, { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
@@ -589,7 +599,7 @@ function usgsFallbackFails(tag, g, why) {
     // ---- organizer -------------------------------------------------------------
     const c = await arm('organ', 'caledonia', 'org-1', 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 200 }, ...mapTap(80, 160),
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 200 }, { tap: '.gps-tap-fallback' }, { sleep: 200 }, ...mapTap(80, 160),
         { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
         { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-undo-green' }, { sleep: 500 }, { expression: READ },
     ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' } });
@@ -606,7 +616,7 @@ function usgsFallbackFails(tag, g, why) {
     const TME = [tm.tee[0] + 0.5 * (tm.mid[0] - tm.tee[0]), tm.tee[1] + 0.5 * (tm.mid[1] - tm.tee[1])];
     const vf = await arm('verif', 'thistle_stewart_mackay', 'org-1', 'ok', TME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 300 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 300 }, { tap: '.gps-tap-fallback' }, { sleep: 300 }, { expression: READ },
         // On the green, well away from the golfer (halfway down the hole): the
         // privacy check below looks for the golfer's spot in every write, so a
         // tap that lands on it would read as a leak.
@@ -680,7 +690,7 @@ function usgsFallbackFails(tag, g, why) {
     const ESRI_CFG = CFG({ esri: 'OK' });
     const e = await arm('esri', 'pinelakes', null, 'ok', pl, 5, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 3000 }, { expression: READ },
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 300 }, { tap: '.gps-tap-fallback' }, { sleep: 3000 }, { expression: READ },
         ...mapTap(90, 200), { tap: '.gps-save' }, { sleep: 3000 }, { expression: READ },
     ], { preScript: sensor('ok', pl[0], pl[1], 5) + ESRI_CFG });
     // The Esri credit makes the attribution bar two lines: the tee must stay clear of it.
@@ -700,6 +710,7 @@ function usgsFallbackFails(tag, g, why) {
         const usgsReq = e.requests.filter((q) => /basemap\.nationalmap\.gov/.test(urlOf(q))).length;
         if (measuring.esri !== 'visible' || !(measuring.esriLoads > 0) || !/Powered by Esri/.test(measuring.attribution || '')) fails.push('esri: the stand-in Esri did not draw while measuring: ' + JSON.stringify([measuring.esri, measuring.esriLoads, measuring.attribution]));
         if (measuring.maxZoom !== 21) fails.push('esri: max zoom with Esri is ' + measuring.maxZoom + ' (expected 21: z19 tiles enlarged)');
+        if (measuring.creditLine !== 'Powered by Esri · ⓘ' || pinning.creditLine !== 'USGS · ⓘ') fails.push('esri: the credit line - ' + JSON.stringify([measuring.creditLine, pinning.creditLine]));
         if (!(measuring.attribHtml || '').includes(ESRI_CREDIT) || !(measuring.attribution || '').includes(ESRI_CREDIT_TEXT)) fails.push('esri: the credit is not Esri\'s exact line: ' + JSON.stringify(measuring.attribHtml));
         if (measuring.esriSrcMax !== 19) fails.push('esri: the Esri source asks for tiles to z' + measuring.esriSrcMax + ' (must stop at 19)');
         if (pinning.esri !== 'none' || /Powered by Esri/.test(pinning.attribution || '')) fails.push('esri: Esri still on the map while setting a green: ' + JSON.stringify([pinning.esri, pinning.attribution]));
@@ -804,57 +815,44 @@ function usgsFallbackFails(tag, g, why) {
     const WIND_TO = 135;    // from the NW -> blowing to the SE
     const windRotFor = (bearing) => String(((WIND_TO - bearing) % 360 + 360) % 360);
 
-    // ---- Edit Pin: today's hole location, for the whole group --------------------
-    // Another phone's pin, deliberately NOT computed by gps-geo: 35% of the way
-    // from the green's point farthest from the tee back toward its center.
+    // EDIT PIN WAS REMOVED (Manny, 2026-10-08). Its arm went with it. The green's
+    // point farthest from the tee is still used below (plays like, the GPS green).
     const far = H1.green.reduce((b, p) => (inlineHaversineM(H1.tee, p) > inlineHaversineM(H1.tee, b) ? p : b), H1.green[0]);
-    // Saved a minute AFTER this phone's own save, so it is the newer pin.
-    const OTHER = { lat: +(far[0] + 0.35 * (H1.mid[0] - far[0])).toFixed(6), lng: +(far[1] + 0.35 * (H1.mid[1] - far[1])).toFixed(6), at: Date.now() + 60000 };
     const yd = (a, b) => String(Math.round(inlineHaversineM(a, b) / 0.9144));
-    const ep = await arm('editp', 'caledonia', null, 'ok', ME, 4.6, [
-        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },          // 0
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 400 }, { expression: READ },                   // 1 editing
-        { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ },      // 2 dragged toward the back
-        { drag: '.gps-flag', dx: 170, dy: 0 }, { sleep: 400 }, { expression: READ },      // 3 dragged off the green: stays on it
-        { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 4 saved
-        { deliver: { path: 'events/GPSEDITP', value: Object.assign(round('caledonia'), { pinLocs: { h1: OTHER } }) } }, { sleep: 600 }, { expression: READ }, // 5 another phone, later
-        // NO SIGNAL: moved and saved again - it must go into the phone's durable
-        // queue (and, unsent, it is what this phone shows: the app's rule for
-        // every unsent write).
-        { expression: '(window.__coldSetOffline(true), "offline")' },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: 10 }, { sleep: 300 },
-        { tap: '.gps-pin-save' }, { sleep: 500 }, { expression: READ },                   // 6 saved offline
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { tap: '.gps-pin-clear' }, { sleep: 500 }, { expression: READ }, // 7 pin to center
-    ]);
-    out.editPin = ep; bail(out, ep);
+
+    // ---- FIX THE GREEN BY GPS (2026-10-08): stand there, Set - on the sharp Esri photo ----
+    // The organizer on Caledonia #1. GPS first ±10 yds (Set is off), then ±3 yds
+    // standing on the green: Set center, Add front & back, Set front, Set back, Save.
+    const nearT = H1.green.reduce((b, q) => (inlineHaversineM(H1.tee, q) < inlineHaversineM(H1.tee, b) ? q : b), H1.green[0]);
+    const GMID = lerpPt(H1.mid, far, 0.2), GFRONT = lerpPt(H1.mid, nearT, 0.8), GBACK = lerpPt(H1.mid, far, 0.8);
+    const gg = await arm('gpsgr', 'caledonia', 'org-1', 'ok', ME, 9, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 1500 }, { expression: READ },                                       // 0
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 400 }, { expression: READ },          // 1 GPS ±10: Set is off
+        { tap: '.gps-gps-set' }, { sleep: 300 }, { expression: READ },                                                    // 2 a tap on it does nothing
+        { expression: `window.__moveTo(${GMID[0]}, ${GMID[1]}, 3)` }, { sleep: 500 }, { expression: READ },             // 3 on the green, ±3
+        { tap: '.gps-gps-set' }, { sleep: 400 }, { expression: READ },                                                    // 4 center set
+        { tap: '.gps-addedges' }, { sleep: 300 },
+        { expression: `window.__moveTo(${GFRONT[0]}, ${GFRONT[1]}, 3)` }, { sleep: 400 }, { tap: '.gps-gps-set' }, { sleep: 300 },
+        { expression: `window.__moveTo(${GBACK[0]}, ${GBACK[1]}, 3)` }, { sleep: 400 }, { tap: '.gps-gps-set' }, { sleep: 300 }, { expression: READ }, // 5 confirm all
+        { tap: '.gps-save' }, { sleep: 1500 }, { expression: READ },                                                      // 6 saved
+    ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' }, preScript: sensor('ok', ME[0], ME[1], 9) + CFG({ esri: 'OK-GPSGREEN' }) });
+    out.gpsGreen = gg; bail(out, gg);
     {
-        const [r0, r1, r2, r3, r4, r5, r6, r7] = ep.reads;
-        if (r0.midLbl !== 'CENTER' || !r0.editPin || r0.flag) fails.push('edit pin: before - ' + JSON.stringify([r0.midLbl, r0.editPin, r0.flag]));
-        if (r1.banner !== "Drag the flag to today's pin" || !r1.flagEdit || !r1.pinSave) fails.push('edit pin: not editing - ' + JSON.stringify([r1.banner, r1.flagEdit, r1.pinSave]));
-        if (r1.flag && r1.centerPin && dist(mid(r1.flag), r1.centerPin) > 3) fails.push('edit pin: the flag did not start on the center');
-        if (r1.fix) fails.push('edit pin: "Fix the green" offered while editing the pin');
-        ['zoomBox', 'recenterBox', 'windBox'].forEach((k) => { if (hitBox(r1.bannerBox, r1[k])) fails.push(`edit pin: the banner covers the ${k.replace('Box', '')}`); });
-        if (hitBox(r1.bannerBox, greenPage(r1)) || hitBox(r1.bannerBox, r1.flag)) fails.push('edit pin: the banner covers the green or the flag');
-        if (!(r2.flag && r1.flag && mid(r2.flag).y < mid(r1.flag).y - 6)) fails.push('edit pin: the flag did not follow the drag: ' + JSON.stringify([r1.flag, r2.flag]));
-        if (r2.midLbl !== 'PIN' || r2.m === r1.m || !/^Target → pin: \d+$/.test(r2.hereCenter)) fails.push('edit pin: numbers did not follow the flag live: ' + JSON.stringify([r1.m, r2.m, r2.midLbl, r2.hereCenter]));
-        if (r2.arcs === r1.arcs && r2.m !== r1.m && expectArcs(+r2.m, r2.arcStep) !== expectArcs(+r1.m, r1.arcStep)) fails.push('edit pin: arcs did not follow the flag');
-        const gb = greenPage(r3), fc = mid(r3.flag);
-        if (!gb || !fc || fc.x < gb.l - 2 || fc.x > gb.r + 2 || fc.y < gb.t - 2 || fc.y > gb.b + 2) fails.push('edit pin: the flag left the green: ' + JSON.stringify([fc, gb]));
-        const sets = ep.dump.writes.filter((x) => x.path === 'events/GPSEDITP/pinLocs/h1' && x.op === 'set');
-        const w = sets[0], wOff = sets[1];
-        if (!w || !isFinite(w.value.lat) || !isFinite(w.value.lng) || !isFinite(w.value.at)) fails.push('edit pin: Save wrote nothing to events/<code>/pinLocs/h1: ' + JSON.stringify(ep.dump.writes.map((x) => x.path)));
-        else {
-            if (r4.m !== yd(ME, [w.value.lat, w.value.lng])) fails.push(`edit pin: after save PIN ${r4.m}, golfer -> saved pin is ${yd(ME, [w.value.lat, w.value.lng])}`);
-            if (Object.keys(w.value).sort().join() !== 'at,lat,lng') fails.push('edit pin: the pin record carries more than lat/lng/at: ' + JSON.stringify(w.value));
-        }
-        if (r4.flagEdit || r4.pinSave || r4.midLbl !== 'PIN' || !r4.flag) fails.push('edit pin: after save - ' + JSON.stringify([r4.flagEdit, r4.pinSave, r4.midLbl, !!r4.flag]));
-        if (!wOff || !wOff.offline) fails.push('edit pin: no offline save - this arm proves nothing about no signal: ' + JSON.stringify(sets));
-        else if (r6.m !== yd(ME, [wOff.value.lat, wOff.value.lng])) fails.push(`edit pin: saved with no signal, PIN ${r6.m}, expected ${yd(ME, [wOff.value.lat, wOff.value.lng])}`);
-        if (!/pinLocs/.test(ep.dump.storage.golfapp_wq_v1 || '')) fails.push('edit pin: a pin saved with no signal is not in the offline queue');
-        if (r5.m !== yd(ME, [OTHER.lat, OTHER.lng])) fails.push(`edit pin: another phone's pin not shown: PIN ${r5.m}, expected ${yd(ME, [OTHER.lat, OTHER.lng])}`);
-        if (!ep.dump.writes.some((x) => x.path === 'events/GPSEDITP/pinLocs/h1' && x.op === 'remove')) fails.push('edit pin: "Pin to center" did not remove the pin');
-        if (r7.midLbl !== 'CENTER' || r7.m !== EXPECT.center || r7.flag) fails.push('edit pin: after "Pin to center" - ' + JSON.stringify([r7.midLbl, r7.m, !!r7.flag]));
-        if (ep.dump.writes.some((x) => /course_gps|gpsPins/.test(x.path))) fails.push('edit pin: moving the pin touched the GREEN data');
+        const [q0, q1, q2, q3, q4, q5, q6] = gg.reads;
+        if (!q0.fix || q0.set) fails.push('gps green: Fix the green not offered to the organizer: ' + JSON.stringify([q0.fix, q0.set]));
+        if (!q1.gpsSet || q1.gpsSet.text !== 'Set center' || q1.gpsSet.disabled !== true || !/^GPS ±10 yds - needs ±5 or better$/.test(q1.banner) || !q1.tapFallback) fails.push('gps green: at ±10 yds - ' + JSON.stringify([q1.gpsSet, q1.banner, q1.tapFallback]));
+        if (q2.banner !== q1.banner || q2.addEdges) fails.push('gps green: a tap on a disabled Set did something');
+        if (!q3.gpsSet || q3.gpsSet.disabled || q3.banner !== 'Stand on the MIDDLE of the green, then Set center') fails.push('gps green: at ±3 yds on the green - ' + JSON.stringify([q3.gpsSet, q3.banner]));
+        if (q4.banner !== 'Save this green for hole 1?' || !q4.addEdges || !q4.saveGreen) fails.push('gps green: after Set center - ' + JSON.stringify([q4.banner, q4.addEdges, q4.saveGreen]));
+        if (q5.banner !== 'Save this green for hole 1?' || !q5.saveGreen || q5.addEdges) fails.push('gps green: after front and back - ' + JSON.stringify([q5.banner, q5.saveGreen]));
+        // THE SHARP PHOTO THE WHOLE TIME: nothing is taken from it.
+        [q1, q3, q4, q5, q6].forEach((g, k) => { if (g.esri !== 'visible' || g.maxZoom !== 21 || !/Powered by Esri/.test(g.attribution || '')) fails.push(`gps green read ${k}: not on Esri: ` + JSON.stringify([g.esri, g.maxZoom])); });
+        const w = gg.dump.writes.filter((x) => x.path === `events/${gg.code}/gpsPins/h1`);
+        const pin = w[0] && w[0].value;
+        const close = (a, p) => !!(a && p) && inlineHaversineM([a.lat, a.lng], p) < 0.5;
+        if (w.length !== 1 || !close(pin.mid, GMID) || !close(pin.front, GFRONT) || !close(pin.back, GBACK) || pin.by !== 'organizer') fails.push('gps green: the saved green is not where the golfer stood: ' + JSON.stringify(pin));
+        if (q6.src !== 'Green set by a golfer' || q6.banner) fails.push('gps green: after save - ' + JSON.stringify([q6.src, q6.banner]));
+        out.gpsGreenSummary = { banners: [q1.banner, q3.banner, q4.banner], saved: pin };
     }
 
     // ---- the score button: the card's own score entry for this hole ---------------
@@ -932,21 +930,19 @@ function usgsFallbackFails(tag, g, why) {
         const cr = await arm(tc.name, tc.key, null, 'ok', away, 5, [
             { tap: '.gps-side-gps' }, WAIT_MAP, ...nexts, { sleep: 1500 },
             { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ },
-            { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -10 }, { sleep: 400 }, { expression: READ },
-            { tap: '.gps-pin-cancel' }, { sleep: 300 },
         ], { preScript: sensor('ok', away[0], away[1], 5) + NWS_CFG });
         bail(out, cr);
-        const [g, e] = cr.reads, tag = tc.label + ' #' + tc.hole;
+        const [g] = cr.reads, tag = tc.label + ' #' + tc.hole;
         const total = inlineHaversineM(hr.tee, hr.mid) / 0.9144;
-        const res = { course: tag, title: g.title, fcb: [g.f, g.m, g.b], arcs: g.arcs, arcLabels: g.arcLabels.length, score: g.score, wind: g.wind, pinLive: [g.m, e.m, e.midLbl] };
+        const res = { course: tag, title: g.title, fcb: [g.f, g.m, g.b], arcs: g.arcs, arcLabels: g.arcLabels.length, score: g.score, wind: g.wind };
         out.courses.push(res);
         if (g.title !== `Hole ${tc.hole} · Par ${sb.p[tc.key].data[tc.hole - 1].par}`) fails.push(`${tag}: title ${g.title}`);
         if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
         fails.push(...arcFails(tag, g, total, hr.mid[0]), ...teeInView(tag, g), ...pillFails(tag, g, true));
         if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
         if (!/12 mph/.test(g.wind || '') || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.wind} turned ${g.windRot} (expected ${windRotFor(g.bearing)})`);
-        if (e.midLbl !== 'PIN' || e.m === g.m || !e.flagEdit) fails.push(`${tag}: Edit Pin did not move PIN live: ` + JSON.stringify([g.m, e.m, e.midLbl]));
-        if (cr.dump.writes.length) fails.push(`${tag}: Cancel still wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
+        if (g.midLbl !== 'CENTER' || g.editPinEl) fails.push(`${tag}: Edit Pin is still on the screen: ` + JSON.stringify([g.midLbl, g.editPinEl]));
+        if (cr.dump.writes.length) fails.push(`${tag}: just looking wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
     }
 
     // ==== WAVE 2 (2026-10-08) =======================================================
@@ -959,12 +955,10 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, WAIT_MAP, { tap: '.gps-next' }, { sleep: 500 }, { tap: '.gps-next' }, { sleep: 1500 }, { expression: READ },   // 0 hole 3, 1x
         { tap: '.gps-zoom' }, { sleep: 800 }, { expression: READ },                                                          // 1 2x
         { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                                                         // 2 3x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 800 }, { expression: READ },                 // 3 Edit Pin
-        { tap: '.gps-pin-cancel' }, { sleep: 800 }, { expression: READ },                                                    // 4 back
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-3X' }) });
     out.esri3x = ex; bail(out, ex);
     {
-        const [z1, z2, z3, pin, back] = ex.reads;
+        const [z1, z2, z3] = ex.reads;
         if (z1.title !== 'Hole 3 · Par 3') fails.push('esri 3x: not on the par 3: ' + z1.title);
         if (z1.esri !== 'visible' || z1.maxZoom !== 21) fails.push('esri 3x: Esri not live: ' + JSON.stringify([z1.esri, z1.maxZoom]));
         if (!(z1.attribHtml || '').includes(ESRI_CREDIT)) fails.push('esri 3x: credit ' + JSON.stringify(z1.attribHtml));
@@ -973,8 +967,6 @@ function usgsFallbackFails(tag, g, why) {
         const zs = zOf('OK-3X'), top = Math.max(...zs);
         if (top !== 19 && z3.zoom >= 18) fails.push(`esri 3x: at map zoom ${z3.zoom} the closest Esri tiles asked for were z${top} (expected exactly 19 - never past it)`);
         if (z3.esriSrcMax !== 19) fails.push('esri 3x: source max ' + z3.esriSrcMax);
-        if (pin.esri !== 'none' || pin.maxZoom !== 18 || /Powered by Esri/.test(pin.attribution || '')) fails.push('esri 3x: Edit Pin is not on USGS: ' + JSON.stringify([pin.esri, pin.maxZoom, pin.attribution]));
-        if (back.esri !== 'visible' || back.maxZoom !== 21) fails.push('esri 3x: Esri did not come back after Edit Pin: ' + JSON.stringify([back.esri, back.maxZoom]));
         out.esri3xSummary = { zooms: [z1.zoom, z2.zoom, z3.zoom], maxZoom: z1.maxZoom, highestTileZ: top, tileRequests: zs.length };
     }
 
@@ -1056,18 +1048,14 @@ function usgsFallbackFails(tag, g, why) {
         { expression: `window.__moveTo(${NEAR[0]}, ${NEAR[1]})` }, { sleep: 500 }, { expression: READ },     // 3 20 yds out: hidden
         { expression: `window.__moveTo(${ONGREEN[0]}, ${ONGREEN[1]})` }, { sleep: 500 }, { expression: READ }, // 4 on the green: hidden
         { expression: `window.__moveTo(${ME[0]}, ${ME[1]})` }, { sleep: 500 }, { expression: READ },         // 5 back at 55 %
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 300 }, { drag: '.gps-flag', dx: 0, dy: -14 }, { sleep: 400 }, { expression: READ }, // 6 pin dragged: live
-        { tap: '.gps-pin-save' }, { sleep: 2500 }, { expression: READ },                                     // 7 saved
-        // The writes are recorded per page: read the pin's before the reload below.
-        { expression: `'PINW' + JSON.stringify((window.__coldWrites || []).filter(function (x) { return /pinLocs\\/h1$/.test(x.path) && x.op === 'set'; }))` },
-        { tap: '.gps-next' }, { sleep: 3500 }, { expression: READ },                                         // 8 hole 2
-        { tap: '.gps-prev' }, { sleep: 1500 }, { expression: READ },                                         // 9 hole 1 again
-        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 2500 }, { expression: READ },          // 10 reloaded
+        { tap: '.gps-next' }, { sleep: 3500 }, { expression: READ },                                         // 6 hole 2
+        { tap: '.gps-prev' }, { sleep: 1500 }, { expression: READ },                                         // 7 hole 1 again
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 2500 }, { expression: READ },          // 8 reloaded
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'DENY-PLAYS', nws: true, epqs: true }), profileDir: plaProfile });
     out.plays = pa; bail(out, pa);
     {
         const R = pa.reads;
-        const [p0, pm, p40, pnear, pgreen, pback, pdrag, psaved, ph2, ph1, preload] = R;
+        const [p0, pm, p40, pnear, pgreen, pback, ph2, ph1, preload] = R;
         const at55 = expectPlays(ME, 0.55, H1.mid, 130);
         const num = (t) => { const m = /^plays ~(\d+)$/.exec(t || ''); return m ? +m[1] : null; };
         const near = (got, want, tag) => { if (got == null || Math.abs(got - want) > 1) fails.push(`plays: ${tag} reads ${JSON.stringify(got)}, expected ${want} (inline)`); };
@@ -1079,22 +1067,15 @@ function usgsFallbackFails(tag, g, why) {
         if (pnear.plays !== null) fails.push('plays: shown 20 yds from the green: ' + pnear.plays);
         if (pgreen.plays !== null) fails.push('plays: shown on the green: ' + pgreen.plays);
         near(num(pback.plays), at55.yd, 'back at 55%');
-        if (pdrag.midLbl !== 'PIN' || num(pdrag.plays) === num(pback.plays)) fails.push('plays: did not follow Edit Pin live: ' + JSON.stringify([pback.plays, pdrag.plays, pdrag.midLbl]));
-        const pinRaw = pa.raw.find((v) => typeof v === 'string' && v.startsWith('PINW'));
-        const pinW = pinRaw ? JSON.parse(pinRaw.slice(4))[0] : null;
-        if (pinW) near(num(psaved.plays), expectPlays(ME, 0.55, [pinW.value.lat, pinW.value.lng], 130).yd, 'to the saved pin (no height there: the green center\'s)');
-        else fails.push('plays: the pin was not saved');
         if (!/^Hole 2/.test(ph2.title)) fails.push('plays: Next did not reach hole 2');
-        if (ph1.plays !== psaved.plays) fails.push('plays: hole 1 again reads ' + ph1.plays + ', was ' + psaved.plays);
-        // The stand-in database is re-made from the fixture on a reload (the pin is
-        // gone there): after it, plays like is to the center again - from the
-        // phone's cached heights.
+        if (ph1.plays !== pback.plays) fails.push('plays: hole 1 again reads ' + ph1.plays + ', was ' + pback.plays);
+        // After a reload: the same, from the phone's cached heights.
         if (preload.midLbl !== 'CENTER' || num(preload.plays) !== num(p0.plays)) fails.push('plays: after a reload reads ' + JSON.stringify([preload.midLbl, preload.plays]) + ', expected ' + p0.plays);
         const asked = SEEN.epqs.slice(epqs0);
         const keys = asked.map((u) => { const q = new URL(u, 'http://x').searchParams; return (+q.get('y')).toFixed(5) + ',' + (+q.get('x')).toFixed(5); });
         const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
         if (dupes.length) fails.push('plays: EPQS asked again for a point it already answered (no cache?): ' + dupes.slice(0, 3).join(' | '));
-        const allowed = new Set(COURSE_KEYS); if (pinW) allowed.add(r5k([pinW.value.lat, pinW.value.lng]));
+        const allowed = new Set(COURSE_KEYS);
         const strange = keys.filter((k) => !allowed.has(k));
         if (strange.length) fails.push('plays: EPQS asked for a point that is not a course point (the golfer?): ' + strange.slice(0, 3).join(' | '));
         [ME, P40, NEAR, ONGREEN].forEach((g) => { if (asked.some((u) => { const q = new URL(u, 'http://x').searchParams; return inlineHaversineM(g, [+q.get('y'), +q.get('x')]) < 3; })) fails.push('plays: an EPQS request was at the golfer\'s spot ' + g.map((v) => v.toFixed(4)).join(',')); });
@@ -1132,13 +1113,11 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },                          // 0 hole
         { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 1 green
         { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 300 }, { expression: READ }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, // 2 meters
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-edit-pin' }, { sleep: 400 }, { drag: '.gps-flag', dx: 0, dy: -24 }, { sleep: 500 }, { expression: READ }, // 3 pin dragged
-        { tap: '.gps-pin-save' }, { sleep: 700 }, { expression: READ },                                 // 4 saved
-        { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 5 back to the hole
+        { tap: '.gps-green-view' }, { sleep: 900 }, { expression: READ },                               // 3 back to the hole
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-GREEN' }) });
     out.green = gv; bail(out, gv);
     {
-        const [h0, g1, gm, g3, g4, h5] = gv.reads;
+        const [h0, g1, gm, h5] = gv.reads;
         const lbl = (g, k) => (g.greenLbls.find((x) => x.k === k) || {}).text || null;
         const dimsIn = (txt, d, w, unit) => { const m = new RegExp('^Green (\\d+) ' + unit + ' deep · (\\d+) ' + unit + ' wide$').exec(txt || ''); return !!m && Math.abs(+m[1] - d) <= 1 && Math.abs(+m[2] - w) <= 1; };
         if (h0.greenBtn !== '⛳ Green' || h0.view !== 'hole' || h0.greenDims) fails.push('green: hole view - ' + JSON.stringify([h0.greenBtn, h0.view, h0.greenDims]));
@@ -1150,18 +1129,13 @@ function usgsFallbackFails(tag, g, why) {
         // It fills the view - unless the imagery's closest zoom stops it (USGS: z18).
         else if (g1.zoom < g1.maxZoom - 0.01 && (gb.b - gb.t) < 0.3 * (mp.b - mp.t) && (gb.r - gb.l) < 0.4 * (mp.r - mp.l)) fails.push('green: the green does not fill the view: ' + JSON.stringify(gb));
         if (g1.esri !== 'visible' || g1.maxZoom !== 21) fails.push('green: this arm needs Esri on (z21) to prove the fill: ' + JSON.stringify([g1.esri, g1.maxZoom]));
-        if (g3.maxZoom !== 18 || g3.esri !== 'none') fails.push('green: Edit Pin in the green view is not on USGS: ' + JSON.stringify([g3.esri, g3.maxZoom]));
         if (lbl(g1, 'f') !== 'F ' + g1.f || lbl(g1, 'c') !== 'C ' + g1.m || lbl(g1, 'b') !== 'B ' + g1.b || lbl(g1, 'p')) fails.push('green: labels ' + JSON.stringify(g1.greenLbls.map((x) => x.text)) + ' vs F/C/B ' + [g1.f, g1.m, g1.b].join('/'));
         if (g1.f !== EXPECT.front || g1.m !== EXPECT.center || g1.b !== EXPECT.back) fails.push('green: the numbers changed in the green view: ' + [g1.f, g1.m, g1.b].join('/'));
         g1.greenLbls.forEach((x) => { const near = { f: g1.boxes.front, c: g1.boxes.mid, b: g1.boxes.back }[x.k]; if (near && x.box && Math.abs((x.box.t + x.box.b) / 2 - (near.t + near.b) / 2) > 30) fails.push('green: label ' + x.text + ' is not beside its point'); });
         if (!dimsIn(g1.greenDims, G_DEPTH, G_WIDTH, 'yds')) fails.push(`green: "${g1.greenDims}", inline ${G_DEPTH} deep x ${G_WIDTH} wide`);
         if (!dimsIn(gm.greenDims, G_DEPTH_M, G_WIDTH_M, 'm')) fails.push(`green (meters): "${gm.greenDims}", inline ${G_DEPTH_M} x ${G_WIDTH_M} m`);
-        if (!g3.flagEdit || g3.view !== 'green' || g3.midLbl !== 'PIN' || lbl(g3, 'p') !== 'PIN ' + g3.m) fails.push('green: Edit Pin in the green view - ' + JSON.stringify([g3.flagEdit, g3.view, g3.midLbl, lbl(g3, 'p'), g3.m]));
-        const w = gv.dump.writes.filter((x) => /pinLocs\/h1$/.test(x.path) && x.op === 'set')[0];
-        if (!w) fails.push('green: Save pin in the green view wrote nothing');
-        if (lbl(g4, 'p') !== 'PIN ' + g4.m || lbl(g4, 'c') !== 'C ' + EXPECT.center) fails.push('green: after save - ' + JSON.stringify(g4.greenLbls.map((x) => x.text)));
         if (h5.view !== 'hole' || h5.bearing !== h0.bearing || Math.abs(h5.zoom - h0.zoom) > 0.02 || h5.zoomBtn !== '1x' || h5.greenBtn !== '⛳ Green' || h5.greenLbls.length || h5.greenDims) fails.push('green: "Hole" did not return to the hole view: ' + JSON.stringify([h5.view, h5.bearing, h5.zoom, h0.zoom, h5.zoomBtn, h5.greenBtn, h5.greenLbls.length]));
-        out.greenSummary = { zoom: [h0.zoom, g1.zoom], dims: g1.greenDims, inline: [G_DEPTH, G_WIDTH], labels: g1.greenLbls.map((x) => x.text), afterPin: g4.greenLbls.map((x) => x.text) };
+        out.greenSummary = { zoom: [h0.zoom, g1.zoom], dims: g1.greenDims, inline: [G_DEPTH, G_WIDTH], labels: g1.greenLbls.map((x) => x.text) };
     }
 
     // ---- REDESIGN STEP 1: the hole picker, Enter Score ›, Back, FREE PAN on the course ----
@@ -1169,18 +1143,28 @@ function usgsFallbackFails(tag, g, why) {
     const ly = await arm('layout', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },                                      // 0 hole 1
         // FREE PAN: far up the course (six long drags), then far zoomed out (wheel).
-        ...[0, 1, 2, 3, 4, 5].map(() => ({ drag: '.gps-map', at: { fx: 0.5, fy: 0.3 }, dx: 0, dy: 320 })), { sleep: 600 }, { expression: READ }, // 1 panned
+        // (from the right-hand edge of the map, clear of the target and the lines)
+        ...[0, 1, 2, 3, 4, 5].map(() => ({ drag: '.gps-map', at: { fx: 0.82, fy: 0.42 }, dx: 0, dy: 300 })), { sleep: 600 }, { expression: READ }, // 1 panned
         WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 300 }, WHEEL(800), { sleep: 700 }, { expression: READ }, // 2 zoomed out
         { tap: '.gps-recenter' }, { sleep: 600 }, { expression: READ },                                                   // 3 Recenter
         { tap: '.gps-hole-btn' }, { sleep: 400 }, { expression: READ },                                                   // 4 picker open
         { tap: '.gps-picker-grid button[data-hole="5"]' }, { sleep: 900 }, { expression: READ },                          // 5 hole 5
         { drag: '.gps-map', at: { fx: 0.5, fy: 0.4 }, dx: 120, dy: 80 }, { sleep: 400 },
         { tap: '.gps-score-next' }, { sleep: 900 }, { expression: READ },                                                 // 6 › hole 6, own view
-        { tap: '.gps-back' }, { sleep: 500 }, { expression: READ },                                                       // 7 Back -> the card
-    ]);
+        { tap: '.gps-credit-i' }, { sleep: 300 }, { expression: READ },                                                   // 7 credits open
+        ...mapTap(200, 300), { expression: READ },                                                                        // 8 a tap closes them
+        { tap: '.gps-back' }, { sleep: 500 }, { expression: READ },                                                       // 9 Back -> the card
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-LAYOUT' }) });
     out.layout = ly; bail(out, ly);
     {
-        const [l0, l1, l2, l3, l4, l5, l6, l7] = ly.reads;
+        const [l0, l1, l2, l3, l4, l5, l6, lc, lc2, l7] = ly.reads;
+        // CREDITS: one line, no white block, below (or beside) the Card / Enter Score row.
+        if (l0.creditLine !== 'Powered by Esri · ⓘ') fails.push('layout: the credit line reads ' + JSON.stringify(l0.creditLine));
+        if (!/rgba\(0, 0, 0, 0\)|transparent/.test(l0.creditBg || '')) fails.push('layout: the credit line has a background: ' + l0.creditBg);
+        const cb = l0.boxes.attrib, bb = l0.boxes.bottom;
+        if (!cb || !bb || (cb.t < bb.b - 1 && cb.l < bb.r && cb.r > bb.l) || cb.b > l0.boxes.map.b || cb.b - cb.t > 26) fails.push('layout: the credit line is not one line under the Card / Enter Score row: ' + JSON.stringify([cb, bb]));
+        if (!lc.creditPop || !lc.creditPop.includes(ESRI_CREDIT_TEXT.replace('Powered by Esri | ', '')) || !/Powered by Esri/.test(lc.creditPop) || !/OpenStreetMap contributors/.test(lc.creditPop)) fails.push('layout: ⓘ does not show every credit line: ' + JSON.stringify(lc.creditPop));
+        if (lc2.creditPop) fails.push('layout: a tap did not close the credits');
         const inB = (g) => !!(g.mapCenter && g.bounds && g.mapCenter[0] >= g.bounds[0] - 1e-4 && g.mapCenter[0] <= g.bounds[2] + 1e-4 && g.mapCenter[1] >= g.bounds[1] - 1e-4 && g.mapCenter[1] <= g.bounds[3] + 1e-4);
         if (!l0.bounds || !inB(l0)) fails.push('layout: no course limit on the map: ' + JSON.stringify([l0.bounds, l0.mapCenter]));
         // The limit is the course (every tee and green) plus 400 m - from the bundle, inline.
@@ -1227,7 +1211,8 @@ function usgsFallbackFails(tag, g, why) {
         if (f1.hasPro !== false || f1.tier !== 'free') fails.push('free: ?gpstier=free did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
         if (!f0.toggle || !/📍 GPS/.test(f0.toggle)) fails.push('free: the GPS button is not there');
         // NO PRICE until Manny sets one: "HardPan GPS — coming soon", the list, Not now.
-        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Yardage arcs', "Edit Pin (today's pin)", 'Wind', 'Plays-like yardage', 'Not now'];
+        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Yardage arcs', 'Wind', 'Plays-like yardage', 'Not now'];
+        if (/Edit Pin/.test(f1.sheet || '')) fails.push('free: the sheet still offers Edit Pin');
         if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
         if (/\$|\/year|trial|Coming soon$/.test(f1.sheet.replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));
         if (f2.sheet) fails.push('free: "Not now" did not close the sheet');
@@ -1235,7 +1220,7 @@ function usgsFallbackFails(tag, g, why) {
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (f2.acc !== '±6 yds' || f2.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('free: title / accuracy ' + JSON.stringify([f2.title, f2.acc]));
         if (f2.score !== 'Hole 1 · Enter Score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.score, f2.getPro]));
-        if (f2.targetRow || f2.editPinShown || f2.fix || f2.set || f2.wind || f2.plays) fails.push('free: a Pro feature is showing: ' + JSON.stringify({ target: f2.targetRow, editPin: f2.editPinShown, fix: f2.fix, set: f2.set, wind: f2.wind, plays: f2.plays }));
+        if (f2.targetRow || f2.fix || f2.set || f2.wind || f2.plays) fails.push('free: a Pro feature is showing: ' + JSON.stringify({ target: f2.targetRow, fix: f2.fix, set: f2.set, wind: f2.wind, plays: f2.plays }));
         if (!f3.sheet) fails.push('free: "Get HardPan GPS" did not open the sheet');
         if (f4.gpsShown || f4.scoreInputs !== a.reads[0].scoreInputs || f4.scoreInputs < 4) fails.push('free: Bets is not the same card: ' + JSON.stringify([f4.scoreInputs, a.reads[0].scoreInputs]));
         if (f5.sheet) fails.push('free: the sheet opened again in the same session');
@@ -1254,14 +1239,18 @@ function usgsFallbackFails(tag, g, why) {
     SRV.close();
 
     // ---- privacy, every arm ------------------------------------------------------
-    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [ep, ME], [sc, ME], [wd, ME], [wo, ME],
+    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [gg, ME],
      [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
+    // EDIT PIN IS GONE: no arm writes today's pin (events/<code>/pinLocs) any more.
+    [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].forEach((r) => {
+        if (r.dump.writes.some((x) => /pinLocs/.test(x.path))) fails.push(r.name + ': wrote a pinLocs record');
+    });
     // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
     // Esri hosts are never asked - a check must not spend the free tier.
-    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, ep, sc, wd, wo, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
     if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}

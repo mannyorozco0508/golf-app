@@ -4418,7 +4418,12 @@
 // Tools row, the hole picker and free pan kept on the course. gps-view.js and
 // index.html's GPS block changed. Above main's v327. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v328-gps-redesign';
+// GPS:BEGIN
+// Moved to v329 (2026-10-08): Edit Pin removed, the green set by GPS on the
+// Esri photo, one credit line with ⓘ - gps-view.js and index.html's GPS block
+// changed after v328 reached the preview. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v329-gps-greengps';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

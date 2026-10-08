@@ -616,35 +616,6 @@
         return out;
     }
 
-    // TODAY'S PIN stays ON THE GREEN. Inside the outline: unchanged. Outside: the
-    // nearest point of the outline. With no outline (a tapped green has a center
-    // only): within `slackM` of the center.
-    function clampToGreen(pt, ring, mid, slackM) {
-        if (!pt) return null;
-        if (ring && ring.length >= 3) {
-            if (pointInRing(pt, ring)) return pt;
-            var proj = projector(pt), best = null, bestD = Infinity;
-            for (var i = 0; i < ring.length; i++) {
-                var a = proj.fwd(ring[i]), b = proj.fwd(ring[(i + 1) % ring.length]);
-                var dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
-                var k = Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / L));
-                var q = [a[0] + k * dx, a[1] + k * dy], d = Math.hypot(q[0], q[1]);
-                if (d < bestD) { bestD = d; best = q; }
-            }
-            if (!best) return pt;
-            // Half a metre inside the edge, toward the green's middle, so the
-            // clamped pin reads as ON the green, not on its line.
-            var c = polygonCentroid(ring), cq = c ? proj.fwd(c) : null;
-            if (cq) { var vx = cq[0] - best[0], vy = cq[1] - best[1], vl = Math.hypot(vx, vy) || 1; best = [best[0] + 0.5 * vx / vl, best[1] + 0.5 * vy / vl]; }
-            return roundPt(proj.inv(best));
-        }
-        if (mid) {
-            var lim = slackM == null ? 15 : slackM, dm = haversineMeters(mid, pt);
-            return dm <= lim ? pt : roundPt(destination(mid, bearingDeg(mid, pt), lim));
-        }
-        return pt;
-    }
-
     // WIND from the National Weather Service hourly forecast (api.weather.gov),
     // first period: windSpeed "10 mph" or "5 to 10 mph", windDirection "NW".
     // Returns { mph, fromDeg, toDeg } (fromDeg: where it blows FROM, like the
@@ -696,7 +667,7 @@
 
     var api = {
         bearingDeg: bearingDeg, holeCamera: holeCamera,
-        destination: destination, yardageArcs: yardageArcs, clampToGreen: clampToGreen, parseNwsWind: parseNwsWind,
+        destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
