@@ -14,6 +14,21 @@
 //
 // WHAT THIS DOES NOT CLAIM. It reads the configuration, not a device. Nothing
 // here proves iOS honours it; that is Manny's rotation test on the build.
+//
+// AND PORTRAIT-ONLY ON iPAD IS NOT FREE (2026-10-08). Build 12 was REJECTED by
+// App Store Connect with error 90474:
+//
+//   "UIInterfaceOrientationPortrait orientations were provided for
+//    UISupportedInterfaceOrientations ... but you need to include all of
+//    Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight to support
+//    iPad multitasking."
+//
+// An iPad app that supports multitasking must accept every orientation, because
+// Slide Over and Split View can hand it any of them. The way to keep
+// portrait-only is to OPT OUT of multitasking with UIRequiresFullScreen, and my
+// change set the iPad list to portrait without it - so the upload was refused
+// and the build number is burned. That key is now part of what this file
+// guards: the orientation lists and the opt-out only make sense together.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -52,6 +67,24 @@ describe('1. iOS IS PORTRAIT ON BOTH DEVICE FAMILIES', () => {
         assert.ok(got, 'UISupportedInterfaceOrientations~ipad is gone from Info.plist');
         assert.deepEqual(got, ['UIInterfaceOrientationPortrait'],
             'the iPad orientation list is not portrait-only');
+    });
+
+    test('and iPad multitasking is OPTED OUT, or the upload is refused', () => {
+        // THE PAIR IS THE POINT. Portrait-only on iPad is only legal alongside
+        // UIRequiresFullScreen; without it App Store Connect rejects the upload
+        // with error 90474 and demands all four orientations back. So the two
+        // are asserted together - a future edit that removes this key while
+        // leaving the lists portrait-only would pass every other test in this
+        // file and fail at the only place that matters, an upload.
+        const s = read(PLIST);
+        const at = s.indexOf('<key>UIRequiresFullScreen</key>');
+        assert.notEqual(at, -1,
+            'Info.plist has no UIRequiresFullScreen, so a portrait-only iPad list will be '
+            + 'rejected by App Store Connect with error 90474');
+        // The VALUE, not just the key: <false/> would be the same rejection.
+        const after = s.slice(at + '<key>UIRequiresFullScreen</key>'.length, at + 120);
+        assert.match(after, /^\s*<true\s*\/>/,
+            'UIRequiresFullScreen is present but not true: ' + after.slice(0, 40));
     });
 
     test('the word Landscape appears nowhere in Info.plist', () => {

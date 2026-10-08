@@ -4696,6 +4696,33 @@ the dark state; `my_groups_test.js` holds the feature.
   redirect now yields the code, and a refusal scrolls into view instead of
   rendering 24px below the fold.
 
+- **1.0.7 BUILD 13 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). BUILD 12
+  WAS REJECTED ON UPLOAD AND ITS NUMBER IS BURNED.**
+
+  App Store Connect refused build 12 with **error 90474**: an iPad app that
+  supports multitasking must declare all four orientations, because Slide Over
+  and Split View can hand it any of them. My portrait-only change set
+  `UISupportedInterfaceOrientations~ipad` to portrait **without opting out of
+  multitasking**, so the upload was rejected - the archive exists, so 12 cannot
+  be reused.
+
+  THE FIX, and it keeps portrait-only everywhere:
+  `<key>UIRequiresFullScreen</key><true/>` in `ios/App/App/Info.plist`. Both
+  orientation lists stay a single portrait entry. `plutil -lint` passes on the
+  hand-edited plist.
+
+  `portrait_only_test.js` now asserts the KEY AND ITS VALUE alongside the lists
+  (6 tests; the new one red first), because the two only make sense together: an
+  edit that removed the opt-out while leaving the lists portrait-only would pass
+  every other assertion in that file and fail at the only place that matters, an
+  upload.
+
+  `CURRENT_PROJECT_VERSION` 13 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7. THREE FILES CHANGED AND NOTHING ELSE: the plist, the project file and
+  that test. sw.js, database.rules.json and every money engine are untouched -
+  no cache bump, because no shell file moved - and the 1.0.7 review, Firebase
+  and the engines were not touched.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
