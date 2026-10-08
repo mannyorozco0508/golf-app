@@ -28,7 +28,8 @@
 // ---------------------------------------------------------------------------
 //
 // Stripping the suffix words and matching on the remaining tokens fixes all
-// 1410 sign-name variants. STRIPPING ALONE IS A REGRESSION and this file exists
+// 1390 sign-name variants (1410 until two duplicate directory entries were
+// removed on 2026-10-08). STRIPPING ALONE IS A REGRESSION and this file exists
 // partly to stop anyone shipping it:
 //
 //   a token-prefix matcher does not match INSIDE a word, and the substring test
@@ -75,7 +76,7 @@ const SUFFIX_WORDS = ['golf', 'club', 'course', 'courses', 'resort', 'links',
 // The five endings a golfer actually confuses. Nobody types "Camas Meadows
 // Resort" for a Golf Club; plenty say Course when the sign says Club.
 const CONFUSABLE = ['golf club', 'golf course', 'country club', 'golf links', 'golf resort', 'golf'];
-// The full variant set the 1410 figure was measured over.
+// The full variant set the 1390 figure was measured over.
 const VARIANTS = ['golf club', 'golf course', 'golf resort', 'golf links', 'country club',
                   'golf', 'club', 'course', 'resort', ''];
 
@@ -176,12 +177,18 @@ describe('R1 - EVERY SIGN-NAME VARIANT FINDS ITS COURSE', () => {
         // and each of them is true of an empty list.
         assert.ok(NAMES.length >= 130,
             `only ${NAMES.length} directory names were parsed out of course-data.js; the `
-            + 'numbers pinned in this file were measured over 141.');
-        assert.ok(NAMES.includes('Camas Meadows Golf Club'),
-            'the entry every example in this file is written around is gone from the directory');
+            + 'numbers pinned in this file were measured over 139.');
+        // THE ANCHOR MOVED, 2026-10-08. It was 'Camas Meadows Golf Club', and
+        // that entry has deliberately left courseDirectory: it was there AND in
+        // global_courses, and the hard-coded copy was the one with no rated
+        // tees. Caledonia is the anchor now - it is in the directory, it is the
+        // course the Myrtle trip is built on, and it is not going anywhere.
+        // course_picker_no_duplicates_test.js holds the removal itself.
+        assert.ok(NAMES.includes('Caledonia Golf & Fish Club'),
+            'the anchor entry is gone from the directory, so this corpus is not what it claims');
     });
 
-    test('all 1410 variants are found', () => {
+    test('all 1390 variants are found', () => {
         let trials = 0;
         const missed = [];
         NAMES.forEach((name) => {
@@ -193,8 +200,8 @@ describe('R1 - EVERY SIGN-NAME VARIANT FINDS ITS COURSE', () => {
                 if (!pageMatch(typed, name)) missed.push(typed + ' -> ' + name);
             });
         });
-        assert.equal(trials, 1410,
-            `expected 1410 trials over the measured directory, got ${trials}. The directory `
+        assert.equal(trials, 1390,
+            `expected 1390 trials over the measured directory, got ${trials}. The directory `
             + 'changed since these numbers were measured; re-measure before trusting them.');
         assert.deepEqual(missed.slice(0, 12), [],
             `${missed.length} of ${trials} sign-name variants do not find their own course. `
@@ -271,8 +278,16 @@ describe('R3 - SINGLE-WORD QUERIES RETURN EXACTLY WHAT THEY DO TODAY', () => {
 
     // The exact counts measured. Pinned as numbers so a future widening of the
     // strip list shows up as a diff rather than as a vague "feels noisier".
-    const PINNED = { Pine: 3, Camas: 1, Meadow: 2, Oak: 3, Glen: 4, River: 9,
-                     Eagle: 4, Willow: 2, Chambers: 1 };
+    // RE-MEASURED 2026-10-08, after "Camas Meadows Golf Club" and "Chambers Bay"
+    // left courseDirectory (each was a tee-less duplicate of a shared record
+    // that has tees). Camas and Chambers are no longer pinned here at all:
+    // pinning them at 0 would make both assertions below trivially true, and
+    // their absence is already asserted directly, with a better message, in
+    // course_picker_no_duplicates_test.js. Meadow was 2 and is 1 - the survivor
+    // is Meadow Park. Nothing else moved: a removal cannot make a query NOISIER,
+    // and the seven untouched numbers are the evidence of that.
+    const PINNED = { Pine: 3, Meadow: 1, Oak: 3, Glen: 4, River: 9,
+                     Eagle: 4, Willow: 2 };
 
     Object.keys(PINNED).forEach((q) => {
         test(`"${q}" returns exactly ${PINNED[q]}, as today`, () => {

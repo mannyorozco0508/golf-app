@@ -4453,7 +4453,15 @@
 // its own now resolves when exactly one tee ends in it.
 // A device on v327 has no Tee dropdown on a new round. (v328 was already
 // taken by the gps-wave2 branch, which is why this is v329.)
-const CACHE_VERSION = 'golfapp-v329-teeeverypath';
+// Moved to v330. ONE ENTRY PER COURSE IN THE PICKER. "Camas Meadows Golf Club"
+// and "Chambers Bay" were hard-coded in courseDirectory AND present in
+// global_courses, and the hard-coded copy was the one with NO rated tees - so
+// each course showed twice and tapping the built-in one gave a round that could
+// never offer a per-golfer tee. The two entries are gone; the shared records
+// that carry the tees stay (14 sets and 20 sets). Their CARDS stay in
+// coursePresets, because 37 saved rounds point at those keys.
+// A device on v329 still lists both courses twice.
+const CACHE_VERSION = 'golfapp-v330-onecourseentry';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
