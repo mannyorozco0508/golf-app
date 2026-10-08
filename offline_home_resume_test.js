@@ -201,3 +201,63 @@ describe('2. HOME PAINTS THEM, AND ONLY WITH NO SIGNAL', () => {
         assert.match(ADMIN, /<script src="offline-queue\.js"><\/script>/);
     });
 });
+
+// ---------------------------------------------------------------------------
+describe('3. WHAT HOME CALLS THE ROUND, AND WHAT IT SAYS WHEN OFFLINE', () => {
+
+    function lobby({ online, lastRoom, snapshot }) {
+        const sb = loadHtmlInlineScript('admin.html', [], { localStorage: true });
+        vm.runInContext(fs.readFileSync(path.join(__dirname, 'offline-queue.js'), 'utf8'), sb);
+        vm.runInContext('navigator.onLine = ' + (online ? 'true' : 'false') + ';', sb);
+        if (lastRoom) vm.runInContext(`localStorage.setItem('lastRoomCode', ${JSON.stringify(lastRoom)});`, sb);
+        if (snapshot) {
+            vm.runInContext(`window.OfflineQueue.saveSnapshot(localStorage, ${JSON.stringify(lastRoom)},
+                ${JSON.stringify(snapshot)}, { group: 1 });`, sb);
+        }
+        return sb;
+    }
+
+    test('RESUME SHOWS THE COURSE, not the six-character code', () => {
+        // Manny on a phone: it read "Resume 9GB4J6". The code is the one thing
+        // about a round a golfer never remembers.
+        const sb = lobby({ online: true, lastRoom: '9GB4J6',
+                           snapshot: round('Camas Meadows') });
+        assert.equal(vm.runInContext("resumeBadgeText('9GB4J6')", sb), 'Camas Meadows');
+    });
+
+    test('and falls back to the code when no name was ever stored', () => {
+        const sb = lobby({ online: true, lastRoom: '9GB4J6' });
+        assert.equal(vm.runInContext("resumeBadgeText('9GB4J6')", sb), '9GB4J6',
+            'a round saved before snapshots existed must still be resumable');
+        // AND IT NEVER THROWS on a page where the module never loaded.
+        const bare = loadHtmlInlineScript('admin.html', [], { localStorage: true });
+        vm.runInContext("localStorage.setItem('lastRoomCode','ZZZZZZ');", bare);
+        assert.equal(vm.runInContext("resumeBadgeText('ZZZZZZ')", bare), 'ZZZZZZ');
+    });
+
+    test('the event name is used when there is no course', () => {
+        const sb = lobby({ online: true, lastRoom: 'ABCD1X',
+                           snapshot: Object.assign(round(''), { eventName: 'Myrtle Day 2' }) });
+        assert.equal(vm.runInContext("resumeBadgeText('ABCD1X')", sb), 'Myrtle Day 2');
+    });
+
+    test('AND HOME’S OFFLINE BANNER USES THE NEW WORDING, not "keep this page open"', () => {
+        // Manny saw the old sentence on Home. The current tree does not produce
+        // it - measured in Chrome - and the likeliest explanation is the Home
+        // Screen icon's own cache, which iOS keeps separate from Safari's and
+        // which was still on a version where Home did not load the queue at all.
+        // This pins it so that explanation cannot become a regression hiding
+        // behind a plausible story.
+        const boot = fs.readFileSync(path.join(__dirname, 'pwa-boot.js'), 'utf8');
+        assert.match(boot, /scores are saved on this phone\. Other changes need signal\./);
+        // The old sentence survives ONLY for a page with no durable queue - the
+        // tournament pages - and Home is not one of those any more.
+        assert.match(ADMIN, /<script src="offline-queue\.js"><\/script>/,
+            'Home stopped loading the queue, so its banner falls back to the old warning');
+        const fn = boot.slice(boot.indexOf('function offlineSentence'),
+                              boot.indexOf('\n    function ', boot.indexOf('function offlineSentence') + 30));
+        assert.ok(fn.length > 100, 'the slice collapsed, so this assertion is vacuous');
+        assert.match(fn, /if \(!hasDurableQueue\(\)\) \{/,
+            'the old wording must be reachable only when there is genuinely no queue');
+    });
+});

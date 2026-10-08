@@ -3566,7 +3566,7 @@
 // round_format_label_test.js (5 tests, the GROSS Nassau case included). Baselines
 // 25/3 and 1/4. Control: drop the re-land from Back and all three inset cases go red.
 //
-// The consumer product cache is consumer-v147-homeresume. The tournament product cache
+// The consumer product cache is consumer-v148-resumename. The tournament product cache
 // stays tournament-v54-rattle-golf. iOS is at 1.0.4 build 2 and already submitted; this
 // is web/Cap only and does not archive, upload or reopen it.
 // Moved to v258 SO A SIDE MATCH CARD SAYS WHO WON WHAT.
@@ -4292,7 +4292,21 @@
 // URL (the group lives only in ?group=N, so the stored round records it). Shown
 // only offline; online, Resume and the two tiles are the right answer. A device
 // on v310 gets the bare code. (v310 was taken while this was being written.)
-const CACHE_VERSION = 'golfapp-v311-homeresume';
+// Moved to v312 for two things a phone found in v311 (Manny, iPhone Safari,
+// airplane mode - the queue itself passed: scores survived a tab close AND a
+// phone restart and synced on reconnect with everything there):
+//   RESUME SAID "Resume 9GB4J6". A six-character code is the one thing about a
+//   round a golfer never remembers. It reads the course now, from the snapshot
+//   this phone already stores, with the code as the fallback for a round saved
+//   before snapshots existed.
+//   AND HOME'S OFFLINE BANNER. The old "keep this page open" sentence appeared
+//   there. It is not reachable from this tree - measured in Chrome, Home says
+//   "scores are saved on this phone" - and the likeliest cause is the Home
+//   Screen icon's own cache, which iOS keeps separate from Safari's and which
+//   was still on a version where Home did not load the queue at all. A guard
+//   now pins Home's wording so that explanation cannot hide a regression.
+// A device on v311 shows the code on Resume.
+const CACHE_VERSION = 'golfapp-v312-resumename';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

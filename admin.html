@@ -2533,6 +2533,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     let currentWizardStep = 1;
 
+    // WHAT RESUME CALLS THE ROUND. Online or off: the course if this phone has
+    // ever stored the round, the code if it has not. One line, and it is the
+    // same snapshot the offline rows read, so the two can never disagree.
+    function resumeBadgeText(code) {
+        if (!code) return '';
+        try {
+            var snap = window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, code);
+            var name = snap && snap.data && (snap.data.courseName || snap.data.eventName);
+            if (name) return String(name).trim();
+        } catch (e) { /* fall through to the code */ }
+        return code;
+    }
+
     // THE ROUNDS ON THIS PHONE, OFFLINE ONLY.
     //
     // Every decision belongs to offline-queue.js - which rounds exist, what to
@@ -3923,7 +3936,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const lastRoom = skipResume ? null : localStorage.getItem('lastRoomCode');
         if (lastRoom) {
             document.getElementById("resume-container").style.display = "block";
-            document.getElementById("resume-room-badge").textContent = lastRoom;
+            // THE COURSE, NOT THE CODE (2026-10-06, Manny on a phone: it read
+            // "Resume 9GB4J6"). A six-character code is the one thing about a
+            // round a golfer never remembers; the course is what they call it.
+            // The name comes from the snapshot this phone already stores for
+            // that round, so it needs no network - and the code remains the
+            // fallback for a round saved before snapshots existed.
+            document.getElementById("resume-room-badge").textContent = resumeBadgeText(lastRoom);
         }
         renderOfflineRounds();
 
