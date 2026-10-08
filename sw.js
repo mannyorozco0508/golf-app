@@ -4440,7 +4440,20 @@
 // building it was submitPaste's early return - paste the wrong thing and Finish
 // sign-in said nothing at all, which is the complaint verbatim.
 // A device on v326 still has silent buttons on the account sheet.
-const CACHE_VERSION = 'golfapp-v327-tapfeedback';
+// Moved to v329. NO TEE DROPDOWN ON FOUR MORE PATHS. Build 16 fixed the saved
+// round and wrote the test INLINE in that one function, so every other door into
+// Players kept the defect: a NEW Game Day, the coach, and a trip round all drew
+// their first row before the tees arrived and nothing repaired it. The question
+// is now asked once - courseTeesInHand - and filling the round tee select
+// repairs the rows already on screen, which is the one place every path passes
+// through. Also: a rebuild (format switch, delete, paste) dropped every golfer's
+// tee because the capture never read it, and "Zack Carrano 6 blue" set no tee at
+// all - the parser had been handed the names since October and nothing read the
+// answer. Caledonia's tees are "Mallard Blue" and "Pintail Black", so a colour on
+// its own now resolves when exactly one tee ends in it.
+// A device on v327 has no Tee dropdown on a new round. (v328 was already
+// taken by the gps-wave2 branch, which is why this is v329.)
+const CACHE_VERSION = 'golfapp-v329-teeeverypath';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -3799,6 +3799,27 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const keys = Object.keys(rec);
         return !(keys.length === 1 && keys[0] === 'name');
     }
+    // TEES ARE A SEPARATE NEED FROM THE CARD, AND THE QUESTION IS ASKED ONCE
+    // (2026-10-08). courseCardInHand answers about the CARD - pars and stroke
+    // indexes - and every Myrtle course, Caledonia included, is a bundled preset
+    // in course-data.js carrying 18 holes and NO TEES. So the card was "in
+    // hand", nothing was ever fetched, and the shared record's rated tees (6 for
+    // Caledonia) were never read: the round-level tee select stayed empty and
+    // appendTeeControl returned early on every golfer row.
+    //
+    // Build 16 fixed that for loadModeData with a check written INLINE in that
+    // one function, and Manny found build 17 still broken on the new-round path.
+    // A rule in one function is not a rule. This is the one both gates call.
+    function courseTeesInHand(key) {
+        if (!key) return true;
+        return courseTeeChoices(courseRecordForTees(key)).length > 0;
+    }
+    // THE CARD AND THE TEES. ensureCard memoizes per key in course-index.js, so
+    // a course that genuinely has no rated tees costs ONE read and then answers
+    // from the same promise - a miss cannot turn into a read on every pick.
+    function courseFullyInHand(key) {
+        return courseCardInHand(key) && courseTeesInHand(key);
+    }
     const ensureCourseCard = (key) => courseIndex.ensureCard(key);
 
     // What the old listener did when a snapshot landed, unchanged: a course can
@@ -6820,7 +6841,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // DO NOT WAIT AT ALL: a directory preset, a nine-hole loop, a second pick
         // of the same course and a course just imported are all already in hand,
         // and those stay exactly as synchronous as they were.
-        if (courseCardInHand(id)) { handleCourseChange(); return; }
+        // THE TEES COUNT AS PART OF "IN HAND" (2026-10-08). This asked
+        // courseCardInHand alone, so picking Caledonia on a NEW round took the
+        // synchronous path, never read the record, and left every golfer row
+        // without a Tee dropdown. The common cases are still synchronous: a
+        // preset WITH tees, a second pick of the same course and a course just
+        // imported all answer true to both halves.
+        // THE GRID STAYS SYNCHRONOUS, THE TEES CATCH UP (2026-10-08).
+        //
+        // The first version of this fix gated the whole thing on the tees as
+        // well, and course_grid_edit_test.js and handicap_index_test.js went red
+        // immediately - correctly. They call selectCourse and read the grid on
+        // the NEXT line, exactly as a tap does, and the comment above this
+        // function has warned since Wave 38 that deferring the repaint by a
+        // microtask costs precisely those two tests. A preset's card is in hand
+        // and must still paint now.
+        //
+        // So the CARD decides whether to wait, as it always did, and the TEES
+        // are fetched behind it when they are missing. syncTeeRatingFromCourse
+        // fills the round select and repairs the golfer rows, so the dropdowns
+        // appear a moment later without the grid ever being held back.
+        if (courseCardInHand(id)) {
+            handleCourseChange();
+            if (!courseTeesInHand(id)) {
+                ensureCourseCard(id).then((rec) => {
+                    if (rec && rec.tees) syncTeeRatingFromCourse(id, { keepSelection: true });
+                });
+            }
+            return;
+        }
         ensureCourseCard(id).then(() => { handleCourseChange(); });
     }
 
@@ -7429,6 +7478,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         setTeePanelShown(true);
         fillTeeSelect(choices, preferred);
         applySelectedTee();
+        // AND THE ROWS ALREADY ON SCREEN (2026-10-08). The tees arrive one
+        // network read after the rows on every cold path, so whichever came
+        // second used to decide whether a golfer got a Tee dropdown at all.
+        // This is the one place the select is ever filled, so repairing here
+        // covers every path into Players - new Game Day, Same as last week,
+        // Help me set this up, Edit Round Setup, a trip round and a paste -
+        // rather than six call sites each remembering to do it.
+        if (typeof refreshRowTeeControls === 'function') refreshRowTeeControls();
     }
 
     function handicapReviewLine() {
@@ -8082,14 +8139,71 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // The tee one row is set to, as the shape handicap.js and player-tees.js read.
     // The tee names THIS course offers, for the paste parser. Nothing else is a
     // tee: a trailing word that is not one of these is part of the golfer's name.
+    // A TEE NAME FROM A PASTE, TURNED INTO THE KEY A ROW CARRIES (2026-10-08).
+    // roster-paste.js has parsed "Zack Carrano 6 blue" into player.teeName since
+    // 2026-10-05 and NOTHING in this page ever read it: previewPastedPlayers
+    // passed the tee names in, commitPastedPlayers did not, and the feature was
+    // thrown away at the last step. The three paste tests in the suite all call
+    // the PARSER, so every one of them was green throughout.
+    //
+    // Matched against the same trailing segment roundTeeNames() reports, so the
+    // two cannot drift: the option text is "Men · Blue".
+    function teeKeyForTeeName(name) {
+        const sel = document.getElementById('tee-rating-select');
+        if (!sel || !sel.options || !name) return '';
+        const want = String(name).trim().toLowerCase();
+        const nameOf = (opt) => {
+            const parts = String(opt.textContent || '').split('\u00b7');
+            return parts[parts.length - 1].trim();
+        };
+        for (let i = 0; i < sel.options.length; i++) {
+            if (nameOf(sel.options[i]).toLowerCase() === want) return sel.options[i].value;
+        }
+        // THE LAST WORD, when exactly one tee ends in it. See roundTeeNames.
+        let hit = '';
+        for (let i = 0; i < sel.options.length; i++) {
+            const last = nameOf(sel.options[i]).split(/\s+/).pop().toLowerCase();
+            if (last !== want) continue;
+            if (hit) return '';
+            hit = sel.options[i].value;
+        }
+        return hit;
+    }
+
+    // REAL TEE NAMES ARE COMPOUND, AND A GOLFER WRITES THE COLOUR (2026-10-08).
+    // Caledonia's six rated sets are "Pintail Black", "Pintail Blue" and so on -
+    // measured on the live record - so a tee sheet written the way Manny writes
+    // it, "Zack Carrano 6 blue", matched NOTHING: the tee stayed in the golfer's
+    // name and every pasted row took the default tee. Found on the iOS Simulator
+    // against the real database; the Chrome check could not see it, because its
+    // fixture invented tees called Blue and White and so agreed with itself.
+    //
+    // So the list the parser splits on carries the full names AND the last word
+    // of each, and a last word only when exactly ONE tee ends in it. Two tees
+    // ending in "Blue" make "blue" ambiguous, and an ambiguous word is part of
+    // the golfer's name - the same answer the parser already gives to a word it
+    // does not recognise.
     function roundTeeNames() {
         const sel = document.getElementById('tee-rating-select');
         if (!sel || !sel.options) return [];
-        return Array.prototype.map.call(sel.options, o => {
+        const full = Array.prototype.map.call(sel.options, o => {
             const t = String(o.textContent || '');
             const parts = t.split('\u00b7');
             return parts[parts.length - 1].trim();
         }).filter(Boolean);
+        const seen = {};
+        full.forEach((n) => {
+            const w = n.split(/\s+/).pop().toLowerCase();
+            seen[w] = (seen[w] || 0) + 1;
+        });
+        const aliases = [];
+        full.forEach((n) => {
+            const w = n.split(/\s+/).pop();
+            if (!w || w.toLowerCase() === n.toLowerCase()) return;
+            if (seen[w.toLowerCase()] !== 1) return;
+            if (aliases.indexOf(w) === -1) aliases.push(w);
+        });
+        return full.concat(aliases);
     }
 
     function rowTeeRating(row) {
@@ -8201,6 +8315,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // switch, delete, paste) hands it back to addPlayerRow. Absent control
             // (flights off) -> no key, the same as a round that never had flights.
             if (flightBtn) entry.flight = flightBtn.getAttribute('data-flight') === 'B' ? 'B' : 'A';
+            // THE TEE RIDES ALONG TOO (2026-10-08), in the { tee: { teeKey } }
+            // shape appendPlayerFrom already reads back. Without this every
+            // rebuild - a format switch, a deleted golfer, a paste - put the
+            // whole roster back on the round's default tee, and the save reads
+            // the ROW, so it silently changed what got stored. The key is taken
+            // off the attribute rather than the select because
+            // refreshRowTeeControls uses that attribute to restore a tee when it
+            // builds a control for a row that had none.
+            const teeKeyOnRow = row.getAttribute('data-tee-key')
+                || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
+            if (teeKeyOnRow) entry.tee = { teeKey: teeKeyOnRow };
             list.push(entry);
         });
         return list;
@@ -9331,7 +9456,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // at once instead of one blank one. Existing players are never replaced or cleared.
     function commitPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, groups } = parsePlayerPasteText(text);
+        // THE SAME ARGUMENT THE PREVIEW PASSES. Without it the parser cannot
+        // know a tee name from a surname, so "Zack Carrano 6 blue" set no tee.
+        const { validPlayers, groups } = parsePlayerPasteText(text, roundTeeNames());
         if (validPlayers.length === 0) return;
 
         // THE EMPTY ROW ON ARRIVAL. Step 5 opens with one blank row, and it was
@@ -9365,7 +9492,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
 
         validPlayers.forEach(p => {
-            existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true, flight: p.flight });
+            const entry = { name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true, flight: p.flight };
+            // "Name 6 Blue" SETS THE TEE. A name the round does not offer leaves
+            // the tee alone, and the row takes the round's default - the same as
+            // a line with no tee on it.
+            const teeKey = p.teeName ? teeKeyForTeeName(p.teeName) : '';
+            if (teeKey) entry.tee = { teeKey: teeKey };
+            existingData.push(entry);
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
@@ -10129,8 +10262,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // The shared record DOES have them (53 rated tee sets were loaded on
             // 2026-10-08), so this asks for the record whenever the tees are
             // missing, whatever the card says.
-            const needsTees = data.activeCourseKey
-                && !courseTeeChoices(courseRecordForTees(data.activeCourseKey)).length;
+            // THROUGH THE SHARED HELPER since 2026-10-08. This was the inline
+            // copy, and selectCourse not having one is why build 17 still had
+            // the defect on four of the five paths into Players.
+            const needsTees = data.activeCourseKey && !courseTeesInHand(data.activeCourseKey);
             handleCourseChange();
             if (data.teeRating) applyStoredTeeRating(data.teeRating);
             if (needsCard || needsTees) {
