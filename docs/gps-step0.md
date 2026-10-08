@@ -214,3 +214,34 @@ with a separate worker.
   320 px wide, with four digits.
 - **No WebGL** (very old devices only): the numbers still work on the plain
   panel, without a map.
+
+### 7b. Polish (2026-10-07, from Manny's phone screenshots)
+
+- **Zoom button** (top-left): 1x -> 2x -> 3x -> 1x. Each step zooms around
+  the target, or around the golfer's dot when there is no target, and keeps
+  the hole's tee-to-green turn. 2x is one zoom level in and 3x is log2(3)
+  levels in, never past the imagery's limit (18 on USGS, 20 with Esri). On a
+  short par 3 with USGS only, 3x can stop at 18. Recenter goes back to 1x.
+- **Distances on the lines:** small dark pills, one on the yellow line (tee or
+  golfer -> target) and one on the white line (target -> green center). A pill
+  slides along its line, then off to either side, to the first spot that
+  covers nothing: not the target or its label, the green, a pin, the dot, the
+  tee, a control or the attribution. If there is no such spot, it hides. The
+  same numbers stay under FRONT / CENTER / BACK.
+- **Target ring to scale:** 10 yd radius (20 yds across) on the ground, drawn
+  at the map's scale, so it grows and shrinks with the zoom. "20 yd" (or
+  "18 m") is shown beside it. The touch area never shrinks below 48 px.
+- **No pull-down on GPS:** `overscroll-behavior: none` on the page and
+  `touch-action: none` on the map. iOS also needs the page's `touchmove`
+  refused while GPS is showing. MapLibre still gets every gesture. There is no
+  left/right hole swipe on the GPS side to keep; holes change with the arrows.
+  Bets scrolls as before.
+- **"Measuring from tee"** moved to a small label at the bottom-left, above the
+  attribution bar. It used to cover the green.
+- **Tee in view:** the bottom margin is the attribution bar's measured height
+  plus 24 px. The fixed 36 px let the two-line Esri credit cover the tee. The
+  view also re-fits when the screen size or the attribution changes, until the
+  golfer moves the map. A hole changed while Bets is showing is framed when
+  GPS shows again (a hidden map has no size to fit it into).
+- Checked by `tools/gps-check.js`, arms `polish` and `esrtee`, plus the osm
+  and off-hole arms.

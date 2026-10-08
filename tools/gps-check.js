@@ -136,6 +136,8 @@ const READ = `JSON.stringify((function () {
   var vis = function (s) { var e = o && o.querySelector(s); return !!(e && e.offsetParent !== null); };
   var rect = function (s) { var e = o && o.querySelector(s); if (!e) return null; var r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; };
   var attr = o && o.querySelector('.maplibregl-ctrl-attrib');
+  var box = function (e) { if (!e || e.offsetParent === null) return null; var r = e.getBoundingClientRect(); if (!r.width) return null; return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) }; };
+  var q = function (s) { return o && o.querySelector(s); };
   var mapEl = o && o.querySelector('.gps-map');
   var ds = mapEl ? mapEl.dataset : {};
   var big = o ? [].slice.call(o.querySelectorAll('.gps-big')).map(function (e) { var r = e.getBoundingClientRect(); return { text: e.innerText.trim(), over: e.scrollWidth > e.clientWidth + 1, l: Math.round(r.left), r: Math.round(r.right) }; }) : [];
@@ -160,6 +162,14 @@ const READ = `JSON.stringify((function () {
            attribution: attr ? (attr.innerText || '').trim() : null,
            attributionOnScreen: !!(ar && ar.width > 0 && ar.height > 0 && ar.bottom <= innerHeight && ar.top >= 0),
            tilesLoaded: Number(ds.tilesLoaded || 0),
+           zoomBtn: vis('.gps-zoom') ? t('.gps-zoom') : null,
+           pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
+           ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
+           ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
+           boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(attr), map: box(mapEl),
+                    back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
+           teePx: ds.teePx ? ds.teePx.split(',').map(Number) : null,
+           greenBox: ds.greenBox ? ds.greenBox.split(',').map(Number) : null,
            map: !!(o && o.querySelector('.maplibregl-canvas')),
            watches: window.__geo ? Object.keys(window.__geo.active).length : -1,
            watchCalls: window.__geo ? window.__geo.watch : -1,
@@ -207,6 +217,60 @@ function leaks(r, me) {
 // The harness records each request as its URL string.
 const urlOf = (q) => String((q && q.url) || q || '');
 const dist = (a, b) => (a && b) ? Math.round(Math.hypot(a.x - b.x, a.y - b.y)) : -1;
+// ---- the polish of 2026-10-07: pills, ring, zoom, no pull, the tee in view ----
+const hitBox = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t);
+const greenPage = (g) => (g.greenBox && g.boxes.map) ? { l: g.greenBox[0] + g.boxes.map.l, t: g.greenBox[1] + g.boxes.map.t, r: g.greenBox[2] + g.boxes.map.l, b: g.greenBox[3] + g.boxes.map.t } : null;
+const mid = (b) => b ? { x: (b.l + b.r) / 2, y: (b.t + b.b) / 2 } : null;
+const lastNum = (t) => { const m = /(\d+|—)$/.exec(t || ''); return m ? m[1] : null; };
+function segDist(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L));
+    return Math.hypot(p.x - a.x - k * dx, p.y - a.y - k * dy);
+}
+// Pills: the right numbers, ON their lines, covering nothing that matters.
+function pillFails(tag, g, required) {
+    const f = [];
+    const from = mid(g.boxes.dot || g.boxes.tee), tgt = mid(g.boxes.target), ctr = mid(g.boxes.mid);
+    const want = { to: lastNum(g.toHere), on: lastNum(g.hereCenter) };
+    const ends = { to: [from, tgt], on: [tgt, ctr] };
+    g.pills.forEach((p) => {
+        if (!p.box) { if (required) f.push(`${tag}: the ${p.k === 'to' ? 'yellow' : 'white'}-line pill is not shown`); return; }
+        if (p.text !== want[p.k]) f.push(`${tag}: ${p.k} pill says "${p.text}", the readout says "${want[p.k]}"`);
+        const [a, b] = ends[p.k];
+        const reach = Math.hypot(p.box.r - p.box.l, p.box.b - p.box.t) / 2 + 8;
+        if (a && b && segDist(mid(p.box), a, b) > reach) f.push(`${tag}: the ${p.k} pill is off its line by ${Math.round(segDist(mid(p.box), a, b))}px`);
+        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib'].filter((k) => hitBox(p.box, g.boxes[k]));
+        if (hitBox(p.box, greenPage(g))) bad.push('green');
+        if (bad.length) f.push(`${tag}: the ${p.k} pill covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
+    });
+    if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two pills overlap');
+    return f;
+}
+// The tee AND the back of the green fully on screen, the tee clear of the attribution bar.
+function teeInView(tag, g) {
+    const f = [], m = g.boxes.map, at = g.boxes.attrib;
+    if (!m || !at || !g.teePx) return [tag + ': cannot read the frame: ' + JSON.stringify([m, at, g.teePx])];
+    const teeY = m.t + g.teePx[1];
+    if (teeY + 8 > at.t - 8) f.push(`${tag}: the tee (y ${teeY}) is not clear above the attribution bar (top ${at.t})`);
+    if (g.teePx[0] < 8 || g.teePx[0] > m.r - m.l - 8) f.push(`${tag}: the tee is off the side of the map (x ${g.teePx[0]})`);
+    const gb = greenPage(g);
+    if (!gb || gb.t < m.t + 4 || (g.boxes.back && g.boxes.back.t < m.t)) f.push(`${tag}: the back of the green is cut off: ` + JSON.stringify([gb, g.boxes.back, m.t]));
+    return f;
+}
+// THE RING IS 20 YARDS ACROSS ON THE GROUND, inline: 512px tiles, metres per px.
+const RING_YD = 20;
+const ringPxAt = (lat, zoom) => 2 * Math.round(RING_YD / 2 * 0.9144 / (40075016.686 * Math.cos(lat * Math.PI / 180) / (512 * 2 ** zoom)) * 1e3) / 1e3;
+const PULL = (where) => `(function () { var t = ${where}; var e = new TouchEvent('touchmove', { cancelable: true, bubbles: true }); t.dispatchEvent(e);
+  var m = document.querySelector('#gps-overlay .gps-map');
+  return JSON.stringify({ pull: e.defaultPrevented, lock: document.documentElement.classList.contains('gps-lock'),
+    ob: getComputedStyle(document.documentElement).overscrollBehaviorY, bodyOb: getComputedStyle(document.body).overscrollBehaviorY,
+    mapTA: m ? getComputedStyle(m).touchAction : null, scrollY: Math.round(scrollY) }); })()`;
+// A tap 22px below the front pin: on the map, through MapLibre's own events.
+const TAP_SHORT_OF_GREEN = `(function () { var f = document.querySelector('#gps-overlay .gps-pin-front').getBoundingClientRect();
+  var c = document.querySelector('#gps-overlay .maplibregl-canvas'), x = f.left + f.width / 2, y = f.bottom + 22;
+  ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 })); });
+  return 'tapped'; })()`;
+const touch = (type, pts) => ({ cdp: { method: 'Input.dispatchTouchEvent', params: { type, touchPoints: pts } } });
 const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name, reason: r.reason }, null, 1)); process.exit(2); } };
 
 (async () => {
@@ -249,6 +313,8 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (!gps.recenter) fails.push('osm: no Recenter button');
         if (dist(recentered.centerPin, gps.centerPin) > 3) fails.push('osm: Recenter did not restore the hole view: ' + JSON.stringify([gps.centerPin, panned.centerPin, recentered.centerPin]));
         if (gps.maxZoom !== 18) fails.push('osm: max zoom ' + gps.maxZoom + ' with USGS only (expected 18)');
+        fails.push(...teeInView('osm', gps), ...pillFails('osm', gps, true));
+        if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
         if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !/💰 Bets/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the toggle is not on screen: ' + arrive.toggle);
         if (arrive.side !== 'bets' || arrive.gpsShown) fails.push('osm: a fresh phone did not land on Bets');
         if (arrive.watchCalls !== 0) fails.push('osm: a location watch ran before GPS was shown');
@@ -360,7 +426,10 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
     const vf = await arm('verif', 'thistle_stewart_mackay', 'org-1', 'ok', TME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
         { tap: '.gps-fix-green' }, { sleep: 300 }, { expression: READ },
-        ...mapTap(200, 300), { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
+        // On the green, well away from the golfer (halfway down the hole): the
+        // privacy check below looks for the golfer's spot in every write, so a
+        // tap that lands on it would read as a leak.
+        ...mapTap(200, 130), { tap: '.gps-save' }, { sleep: 500 }, { expression: READ },
     ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' } });
     out.verify = vf; bail(out, vf);
     {
@@ -392,7 +461,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 
     // ---- precache, then offline from the phone's cache ---------------------------
     const p1 = await arm('pre', 'caledonia', null, 'ok', ME, 4.6, [
-        { sleep: 9000 }, { expression: COUNT_USGS }, { sleep: 800 }, { expression: READ },
+        // Waited for, not slept on: the pre-cache starts 4 s after the round opens
+        // and fetches 24 real USGS tiles. A fixed 9 s ran out on a loaded machine
+        // (measured 2026-10-08: 3 of 6 runs at load 12-35 stored 0 by then).
+        { waitFor: `!!localStorage.getItem('hardpan_usgs_done_v1_caledonia')`, timeout: 40000 },
+        { sleep: 300 }, { expression: COUNT_USGS }, { sleep: 800 }, { expression: READ },
     ], { profileDir: profile });
     out.precache = p1; bail(out, p1);
     const p2 = await arm('pre', 'caledonia', null, 'ok', ME, 4.6, [
@@ -440,7 +513,18 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         { tap: '.gps-set-green' }, { sleep: 3000 }, { expression: READ },
         ...mapTap(90, 200), { tap: '.gps-save' }, { sleep: 3000 }, { expression: READ },
     ], { preScript: sensor('ok', pl[0], pl[1], 5) + ESRI_CFG });
+    // The Esri credit makes the attribution bar two lines: the tee must stay clear of it.
+    const et = await arm('esrtee', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3000 }, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ESRI_CFG });
     esriSrv.close();
+    out.esriTee = et; bail(out, et);
+    {
+        const g = et.reads[0];
+        if (!/Powered by Esri/.test(g.attribution || '')) fails.push('esri-tee: no Esri credit: ' + g.attribution);
+        if (!(g.boxes.attrib && g.boxes.attrib.b - g.boxes.attrib.t > 20)) fails.push('esri-tee: the credit did not wrap - this arm proves nothing: ' + JSON.stringify(g.boxes.attrib));
+        fails.push(...teeInView('esri-tee', g));
+    }
     out.esri = e; bail(out, e);
     {
         const [measuring, pinning, saved] = e.reads;
@@ -471,6 +555,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         if (!/^Tee → here: \d+$/.test(g.toHere || '')) fails.push('off-hole: target readout ' + g.toHere);
         if (!g.teePin || !g.centerPin || !(g.teePin.y > g.centerPin.y) || Math.abs(g.teePin.x - g.centerPin.x) > 3) fails.push('off-hole: tee not straight below the green: ' + JSON.stringify([g.teePin, g.centerPin]));
         if (g.acc !== 'You are off this hole') fails.push('off-hole: accuracy line ' + g.acc);
+        const fr = g.boxes.from, at = g.boxes.attrib, mp = g.boxes.map;
+        if (!fr || !at || !mp || fr.l > mp.l + 16 || fr.b > at.t || fr.t < mp.t + (mp.b - mp.t) / 2) fails.push('off-hole: "Measuring from tee" is not small at the bottom-left above the attribution: ' + JSON.stringify([fr, at, mp]));
+        else if ((fr.b - fr.t) > 24) fails.push('off-hole: the label is not small (' + (fr.b - fr.t) + 'px tall)');
+        if (hitBox(fr, greenPage(g)) || hitBox(fr, g.boxes.back) || hitBox(fr, g.boxes.tee)) fails.push('off-hole: the label covers the green or the tee');
+        fails.push(...teeInView('off-hole', g), ...pillFails('off-hole', g, true));
     }
 
     // ---- the numbers fit: 320 px (the narrowest iPhone), real and 4-digit values ----
@@ -486,13 +575,62 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         g.big.forEach((b) => { if (b.over || b.l < 0 || b.r > g.vw) fails.push(`fit (${what}, 320px): "${b.text}" overflows: ` + JSON.stringify(b)); });
     });
 
+    // ---- polish: zoom 1x/2x/3x, the ring to scale, pills, no pull-down --------------
+    const po = await arm('polish', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },   // 0 1x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 1 2x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 2 3x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 3 1x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 4 2x
+        { tap: '.gps-recenter' }, { sleep: 500 }, { expression: READ },            // 5 Recenter -> 1x
+        { expression: TAP_SHORT_OF_GREEN }, { sleep: 500 }, { expression: READ },  // 5b target just short of the green
+        { expression: PULL(`document.querySelector('#gps-overlay .gps-panel')`) },   // 6 a pull on GPS
+        touch('touchStart', [{ x: 300, y: 300 }]), touch('touchMove', [{ x: 300, y: 360 }]), touch('touchMove', [{ x: 300, y: 430 }]),
+        touch('touchMove', [{ x: 300, y: 500 }]), touch('touchEnd', []), { sleep: 700 }, { expression: READ },  // 7 a finger drag pans the map
+        { tap: '.gps-units' }, { sleep: 300 }, { expression: READ },               // 8 meters
+        { tap: '.gps-units' }, { sleep: 200 },
+        { tap: '.gps-side-bets' }, { sleep: 400 }, { expression: PULL('document.body') },  // 9 Bets scrolls as before
+    ]);
+    out.polish = po; bail(out, po);
+    {
+        const [z1, z2, z3, z1b, z2b, rc, short, pull, dragged, meters, bets] = po.reads;
+        // Just short of the green, the white line's midpoint is ON the green: its
+        // pill has to move off it (or hide). The yellow pill still shows.
+        if (!short.boxes.target || !short.boxes.front || short.boxes.target.t > short.boxes.front.b + 40) fails.push('polish: the target did not land just short of the green: ' + JSON.stringify([short.boxes.target, short.boxes.front]));
+        fails.push(...pillFails('polish short of the green', short, false));
+        if (!(short.pills.find((p) => p.k === 'to') || {}).box) fails.push('polish short of the green: the yellow-line pill is not shown');
+        const near = (a, b, d) => Math.abs(a - b) <= d;
+        const cap = z1.maxZoom;
+        [[z1, '1x', z1.zoom], [z2, '2x', Math.min(z1.zoom + 1, cap)], [z3, '3x', Math.min(z1.zoom + Math.log2(3), cap)], [z1b, '1x', z1.zoom], [z2b, '2x', Math.min(z1.zoom + 1, cap)], [rc, '1x', z1.zoom]].forEach(([g, lbl, z], k) => {
+            if (g.zoomBtn !== lbl) fails.push(`polish ${k}: zoom button "${g.zoomBtn}", expected ${lbl}`);
+            if (!near(g.zoom, z, 0.02)) fails.push(`polish ${k}: zoom ${g.zoom}, expected ${z.toFixed(2)}`);
+            if (g.bearing !== 102) fails.push(`polish ${k}: the hole's turn was lost: bearing ${g.bearing}`);
+            const want = ringPxAt(H1.mid[0], g.zoom);
+            if (!near(g.ringPx, Math.max(6, Math.round(want)), 2)) fails.push(`polish ${k}: ring ${g.ringPx}px across, 20 yds is ${want.toFixed(1)}px at zoom ${g.zoom}`);
+            if (g.ringLbl !== '20 yd') fails.push(`polish ${k}: ring label "${g.ringLbl}"`);
+            const tc = mid(g.boxes.target);
+            if (!g.boxes.ringLbl || !tc || g.boxes.ringLbl.l < tc.x + g.ringPx / 2) fails.push(`polish ${k}: the ring label is not beside the ring`);
+            fails.push(...pillFails('polish ' + k, g, lbl === '1x'));
+            if (g.toHere !== z1.toHere) fails.push(`polish ${k}: zooming moved the target: ${g.toHere}`);
+        });
+        if (dist(z2.target, z3.target) > 2) fails.push('polish: 2x -> 3x did not zoom around the target: ' + JSON.stringify([z2.target, z3.target]));
+        if (!(z2.ringPx > z1.ringPx * 1.8)) fails.push(`polish: the ring did not grow with the zoom: ${z1.ringPx} -> ${z2.ringPx}`);
+        if (dist(rc.centerPin, z1.centerPin) > 3) fails.push('polish: Recenter did not go back to the 1x hole view');
+        if (!pull.pull || !pull.lock || pull.ob !== 'none' || pull.bodyOb !== 'none' || pull.mapTA !== 'none') fails.push('polish: GPS does not stop the page pulling: ' + JSON.stringify(pull));
+        if (!(dragged.centerPin && rc.centerPin && dragged.centerPin.y - rc.centerPin.y > 100)) fails.push('polish: a finger drag did not pan the map: ' + JSON.stringify([rc.centerPin, dragged.centerPin]));
+        if (dragged.scrollY !== 0) fails.push('polish: the page scrolled under a map drag: ' + dragged.scrollY);
+        if (meters.ringLbl !== '18 m') fails.push('polish: ring label in meters "' + meters.ringLbl + '"');
+        if (bets.pull || bets.lock) fails.push('polish: Bets is still locked after leaving GPS: ' + JSON.stringify(bets));
+        out.polishSummary = { zooms: [z1, z2, z3, z1b, z2b, rc].map((g) => [g.zoomBtn, g.zoom, g.ringPx]), pills: z1.pills.map((p) => p.text), pull, bets };
+    }
+
     // ---- privacy, every arm ------------------------------------------------------
-    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME]].forEach(([r, me]) => {
+    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
     // Every arm but `esri` (which has a stand-in key) runs with NO key, and must ask Esri for nothing.
-    const esri = [a, i, b, c, d, p1, p2, vf, fh, ft].reduce((n, r) => n + r.requests.filter((q) => /arcgis\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, vf, fh, ft, po].reduce((n, r) => n + r.requests.filter((q) => /arcgis\.com/i.test(urlOf(q))).length, 0);
     // No key in gps-config.js, so Esri must not have been asked for anything.
     if (esri !== 0) fails.push('esri: ' + esri + ' requests with no key configured');
 
@@ -509,6 +647,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
         attribution: a.reads[1] && a.reads[1].attribution,
         esriRequests: esri,
         esriPinning: out.esriSummary,
+        polish: out.polishSummary,
         fails,
     };
     console.log(JSON.stringify(summary, null, 1));
