@@ -4376,7 +4376,13 @@
 // which activate below leaves alone (docs/gps-step0.md). A Consumer build
 // (GPS_ENABLED=0) removes this block and the files. A device on v316 has no GPS.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v317-gps';
+// GPS:BEGIN
+// Moved to v318 FOR THE GPS POLISH (gps-v1, 2026-10-08): gps-view.js gained the
+// 1x/2x/3x zoom, distance pills, the 20-yd ring and the no-pull rules. An
+// installed iPhone app paints from its cache first, so without a new key it would
+// keep the old GPS screen. HardPan builds only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v318-gps-polish';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
