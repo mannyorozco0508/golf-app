@@ -102,10 +102,43 @@
 
     // THE DECISION TABLE, and it is deliberately the same shape as
     // email-link-auth.js planCompletion(). user: { uid, isAnonymous } or null.
-    function planOauth(user) {
+    // WHICH PROVIDERS ARE ALREADY ON THIS ACCOUNT. providerData is the SDK's own
+    // list; a missing or odd shape reads as "none", which errs towards linking
+    // rather than towards switching accounts.
+    function linkedProviders(user) {
+        var out = [];
+        var list = (user && user.providerData) || [];
+        for (var i = 0; i < list.length; i++) {
+            var id = list[i] && list[i].providerId;
+            if (id) out.push(String(id));
+        }
+        return out;
+    }
+
+    // THE RULE IS ABOUT THE PROVIDER, NOT ABOUT ANONYMITY (Build 12,
+    // 2026-10-08). This read:
+    //
+    //     if (!user.isAnonymous) return { action: 'sign-in', reason: 'already-linked' };
+    //
+    // and "already-linked" was the wrong name for it. A golfer signed in with
+    // EMAIL has no Apple provider attached, so tapping Continue with Apple ran
+    // signInWithCredential and SWITCHED him to whatever account that Apple
+    // identity belongs to - which is how Manny ended up with a stray
+    // privaterelay account while his email account kept all his rounds.
+    //
+    // So: a user with the provider already on them signs in; a user WITHOUT it
+    // links. `which` is optional and, when it is absent, every old caller gets
+    // exactly the answer it got before - asserted as a control in
+    // oauth_link_to_account_test.js.
+    function planOauth(user, which) {
         if (!user || !user.uid) return { action: 'sign-in', reason: 'no-user' };
-        if (!user.isAnonymous) return { action: 'sign-in', reason: 'already-linked' };
-        return { action: 'link', reason: 'anonymous' };
+        if (user.isAnonymous) return { action: 'link', reason: 'anonymous' };
+        if (!which) return { action: 'sign-in', reason: 'already-linked' };
+        var want = PROVIDERS[which] || which;
+        if (linkedProviders(user).indexOf(String(want)) !== -1) {
+            return { action: 'sign-in', reason: 'already-linked' };
+        }
+        return { action: 'link', reason: 'provider-not-linked' };
     }
 
     // A link that fails because the credential already belongs to somebody is the
@@ -138,8 +171,15 @@
         return NOTE_FRESH;
     }
 
-    function messageFor(err) {
+    // THAT PROVIDER IS ON ANOTHER ACCOUNT. On a DELIBERATE "Link Apple" tap this
+    // must not become an account switch: adopting is precisely the move that
+    // made the stray account, and it is never what "link this to my account"
+    // asked for. So it refuses, names the problem, and promises nothing.
+    var NOTE_LINK_TAKEN = 'That Apple or Google account is already attached to a different account in this app, so it cannot be linked to this one. Nothing was changed. Sign in with that account instead, or remove it from the other one first.';
+
+    function messageFor(err, opts) {
         var code = err && err.code;
+        if (opts && opts.deliberateLink && isAdoptSignal(err)) return NOTE_LINK_TAKEN;
         if (code === 'auth/operation-not-allowed' || code === 'auth/configuration-not-found') return NOTE_NOT_ENABLED;
         if (code === 'auth/popup-blocked') return NOTE_POPUP_BLOCKED;
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
@@ -215,22 +255,27 @@
     // ONE ENTRY POINT. Returns { uid, note, preserved } or rejects with a coded
     // error; never leaves a half-signed-in state behind, because link failures fall
     // through to a full sign-in and nothing else is written on the way.
-    function signIn(which) {
+    // `opts.deliberateLink` is set by the Account sheet's "Link Apple" /
+    // "Link Google" buttons: the golfer is attaching a provider to the account
+    // they are already in, so being moved to a different account instead is a
+    // failure, not a fallback.
+    function signIn(which, opts) {
         // The one wrapper: whatever fails, the code is logged once, then rethrown
         // unchanged so the caller still decides what the screen says.
-        return signInAttempt(which).then(null, function (err) {
+        return signInAttempt(which, opts).then(null, function (err) {
             logFailure(which, err);
             throw err;
         });
     }
 
-    function signInAttempt(which) {
+    function signInAttempt(which, opts) {
+        var deliberate = !!(opts && opts.deliberateLink);
         var auth = authInstance();
         if (!auth) return Promise.reject(Object.assign(new Error('sdk-absent'), { code: 'sdk-absent' }));
         var provider = providerFor(which);
         if (!provider) return Promise.reject(Object.assign(new Error('no-provider'), { code: 'no-provider' }));
         var before = snapshot(auth.currentUser);
-        var plan = planOauth(auth.currentUser);
+        var plan = planOauth(auth.currentUser, which);
 
         function finish(cred) {
             var after = snapshot((cred && cred.user) || auth.currentUser);
@@ -247,6 +292,10 @@
                 if (plan.action === 'link' && auth.currentUser) {
                     return Promise.resolve(auth.currentUser.linkWithCredential(credential))
                         .then(finish, function (err) {
+                            // A DELIBERATE LINK NEVER ADOPTS. The golfer asked to
+                            // attach this provider to the account they are in; being
+                            // moved to a different account instead is the defect.
+                            if (deliberate) throw err;
                             if (!isAdoptSignal(err)) throw err;
                             // THE CREDENTIAL ON THE ERROR, WHEN THERE IS ONE. Firebase
                             // attaches it to credential-already-in-use and
@@ -267,6 +316,7 @@
         if (plan.action === 'link' && auth.currentUser) {
             return Promise.resolve(auth.currentUser.linkWithPopup(provider))
                 .then(finish, function (err) {
+                    if (deliberate) throw err;          // see the native path above
                     if (!isAdoptSignal(err)) throw err;
                     return popupSignIn();
                 });
@@ -276,6 +326,8 @@
 
     window.oauthSignin = {
         PROVIDERS: PROVIDERS,
+        linkedProviders: linkedProviders,
+        NOTE_LINK_TAKEN: NOTE_LINK_TAKEN,
         planOauth: planOauth,
         isAdoptSignal: isAdoptSignal,
         noteFor: noteFor,
