@@ -4565,6 +4565,60 @@ the dark state; `my_groups_test.js` holds the feature.
   and qr-codes.js's note about never receiving `organizerToken` tripped their
   own guards the same way; those assertions read comment-stripped source now.
 
+- **MYRTLE: FOURSOMES ON THE DAY, AND THE RECAP AS AN IMAGE (2026-10-08, `main`
+  `12c13b0`).** Cache `golfapp-v320-recapimage` / `consumer-v155-recapimage`.
+  1.0.7 build 10 unchanged. All ten money goldens byte-identical.
+
+  **SET THE FOURSOMES FROM THE PHONE** (`golfapp-v319-foursomes`). The Players
+  step could change group SIZES but not WHO was in which group - a golfer's
+  foursome is their POSITION in the roster and the only control on a row was
+  delete. Every row now has up/down arrows and a "Move to Group N" picker. The
+  arithmetic is `rosterMove()` / `rosterMoveToGroup()` in grouping.js, pure, and
+  IDS RIDE WITH THE GOLFERS (`captureCurrentPlayerInputs` reads rows in DOM
+  order carrying each row's id). QR codes and group links follow because they
+  read the same boundaries. `roster_order_test.js` 13 tests (1/12 red) and
+  `tools/players-step-check.js`, which taps the arrows and reads back the order
+  the SAVE would capture.
+
+  **THE RECAP AS AN IMAGE** (`golfapp-v320-recapimage`). One tap draws the
+  rendered recap card to a canvas and hands the PNG to the iOS share sheet -
+  2160x2916, measured. It reads the CARD, not the engines, so it cannot tell a
+  different story (native-export.js's rule). No library: Canvas 2D, long names
+  measured and ellipsised, the amount never cut. `shareBytes()` is lifted out of
+  native-export.js's PDF chain so there is ONE write-and-share path.
+  `trip_recap_image_test.js` 9 tests (0/9 red) and
+  `tools/trip-recap-image-check.js`, which taps the button and decodes the PNG.
+
+  **THE PER-GOLFER TEE PICKER WAS NEVER MISSING - that was my error.** I
+  reported it gone; it shipped 2026-10-05 (`2c251b3`) and is byte-for-byte
+  present. What was missing was in MY harness: a stand-in database with
+  `global_courses: {}` left `courseTeeChoices()` with no rated tees, so the
+  round-level tee panel stayed hidden and `appendTeeControl()` had no options to
+  copy. An empty fixture and a deleted feature look identical from outside.
+  `tools/players-step-check.js` now loads a real course record and asserts the
+  OPTION TEXTS on all 24 rows; deleting the one `appendTeeControl` call makes it
+  fail with six faults.
+
+  **AND THE ROUND-MENU SWIPE RED WAS A MODAL, FOR THREE WAVES.**
+  `round_menu_swipe_test.js` reported "the swipe up did not open it" on main. Its
+  fixture opened a BARE multi-group link, which raises "How are you joining this
+  round?" - and that dialog correctly swallows gestures aimed at the page
+  beneath it, so the test was dispatching touches into a dialog. Measured on a
+  byte-identical index.html: bare link, sheet top 782 before AND after; with
+  `&group=1`, 782 -> 208 and open. Two of its passing tests were vacuous while it
+  lasted. The arrivals carry `&group=1` now and a new guard refuses to let the
+  file mean anything while a modal is up.
+
+  **MYRTLE TRIP VWNPW6 DATA, written with Manny's approval:** the phantom
+  "Group" golfer (id 101, hcp 1) deleted from all 7 rounds -> 24 golfers and six
+  clean foursomes; an organizer link added to each round; rated tee sets loaded
+  for all 7 courses (53 sets - 6 courses from the provider Caledonia came from,
+  and Man O' War's four from its published scorecard cross-checked against two
+  sources, because the provider only carries the Maryland course of that name).
+  Both Thistle rounds shared one course key and are different layouts, so each
+  got its own record carrying ITS OWN existing card and was repointed - without
+  it one Thistle round showed the other's tees.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY
