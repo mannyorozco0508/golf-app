@@ -4391,7 +4391,12 @@
 // are never stored by this worker: cross-origin, so the fetch handler below never
 // sees them; gps-view.js keeps the last reading in localStorage. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v319-gps-arcs';
+// GPS:BEGIN
+// Moved to v320 (Wave 1, same day): gps-view.js changed after v319 reached the
+// preview - arc spacing by zoom, labels clear of the line, banners in the bottom
+// row. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v320-gps-arcs';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
