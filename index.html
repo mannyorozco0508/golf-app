@@ -97,6 +97,15 @@
          final" all draw from it. Pure; reads scores the way the engines do. -->
     <script src="score-gaps.js"></script>
     <script src="card-is-in.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- HardPan GPS (gps-v1). HardPan builds only: GPS_ENABLED=0 removes this
+         block, and the GPS files are not shipped (tools/gps-flag.js). The math,
+         the tile key and the GPS side; Leaflet and the course greens load the
+         first time GPS is shown, so the Bets side boots exactly as before. -->
+    <script src="gps-geo.js"></script>
+    <script src="gps-config.js"></script>
+    <script src="gps-view.js"></script>
+    <!-- GPS:END -->
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -3280,6 +3289,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (currentViewedHole === null || !holeNumbers.includes(currentViewedHole)) {
             currentViewedHole = holeNumbers[0]; // safe fallback, refined below once scores are known
         }
+        // GPS:BEGIN
+        gpsFollowHoleView();
+        // GPS:END
 
         const row = document.getElementById(`hole-row-${currentViewedHole}`);
         const positionText = `Hole ${currentViewedHole} of ${holeNumbers.length}`;
@@ -6047,6 +6059,62 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         close: function () { /* deliberately nothing: the decision is forced */ }
     });
 
+    // GPS:BEGIN
+    // ---- 📍 GPS ⇄ 💰 BETS (HardPan only; GPS_ENABLED=0 removes this block) ----
+    // The scorecard's whole contact with GPS. The scorecard OWNS the hole: the
+    // GPS side's Prev/Next call the same goToAdjacentHole as the card's, and
+    // every render hands the hole to GPS, so both sides are always on one hole.
+    // GPS is handed the round to READ pins from and exactly one writer - a
+    // green pin through durableWrite - and never the golfer's position.
+    function gpsCourseKey() {
+        if (!window.HardPanGeo || !currentData) return null;
+        const k = String(currentData.activeCourseKey || '');
+        const loop = /_27$/.test(k) || !!(typeof nineHoleLoops !== 'undefined' && nineHoleLoops && nineHoleLoops[k]);
+        return window.HardPanGeo.courseGpsKey(currentData.activeCourseKey, currentData.courseName, loop);
+    }
+    function gpsHolePar(hole) {
+        const meta = ((currentData && currentData.courseData) || []).find(h => parseInt(h.hole, 10) === Number(hole));
+        return meta ? meta.par : null;
+    }
+    function gpsStepHole(dir) {
+        goToAdjacentHole(dir);
+        // The KP question gates leaving a KP hole and is answered on the card,
+        // under the GPS side - so show the card when it is up.
+        const kp = document.getElementById('kp-force-overlay');
+        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets');
+    }
+    let gpsPrecacheAsked = false;
+    function gpsFollowHoleView() {
+        const g = window.HardPanGps;
+        if (!g || !currentMode || !currentData) return;
+        const key = gpsCourseKey();
+        if (!key) return;
+        const par = gpsHolePar(currentViewedHole);
+        if (!g.isMounted()) {
+            const base = 'events/' + currentMode + '/gpsPins/';
+            g.mount({
+                courseKey: key, eventCode: currentMode, hole: currentViewedHole, par: par, round: currentData,
+                db: (typeof db !== 'undefined') ? db : null,
+                // Fixing a green somebody already set is the organizer's call; the
+                // FIRST green on an unmapped hole can be set by anyone on the card.
+                canFix: roundOwnerHere(),
+                writeRoundPin: (k, pin) => durableWrite(base + k, 'set', pin, base + k),
+                stepHole: gpsStepHole
+            });
+        } else {
+            g.setHole(currentViewedHole, par);
+            g.roundUpdated(currentData);
+        }
+        // The round opened WITH SIGNAL: store the course's USGS imagery on the
+        // phone for later. Sized from the course, never from the golfer.
+        if (!gpsPrecacheAsked && navigator.onLine !== false) {
+            gpsPrecacheAsked = true;
+            const pins = Object.values(currentData.gpsPins || {}).map(p => p && p.mid).filter(Boolean);
+            setTimeout(() => { try { g.precacheCourse(key, pins); } catch (e) {} }, 4000);
+        }
+    }
+
+    // GPS:END
     // ONE PLACE THAT CHANGES THE HOLE, so Prev, Next and the 1-18 picker cannot
     // disagree about the gate. commitPendingScore runs BEFORE the gate is evaluated:
     // the fourth golfer's score, typed and not yet left, is what makes the hole

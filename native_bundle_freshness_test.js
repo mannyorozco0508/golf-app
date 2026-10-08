@@ -84,7 +84,10 @@ const declared = name => {
     return [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
 };
 // FILES_TO_SYNC is literally SHARED_SHELL.concat(CONSUMER_SHELL) in the script.
-const FILES = declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL'));
+// gps-v1: the six GPS files sit in CONSUMER_SHELL inside a GPS block, and the
+// native app never ships them, so they are not part of this list.
+const GPS_FILES = declared('GPS_SHELL');
+const FILES = declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL')).filter(f => !GPS_FILES.includes(f));
 // The other product. Nothing in this list may be inside the golfer's app.
 const TOURNAMENT_ONLY = declared('TOURNAMENT_SHELL').filter(f => !FILES.includes(f));
 
@@ -93,6 +96,18 @@ const TOURNAMENT_ONLY = declared('TOURNAMENT_SHELL').filter(f => !FILES.includes
 const CAPACITOR_OWN = ['cordova.js', 'cordova_plugins.js', 'capacitor.config.json'];
 
 const sha = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+
+// HARDPAN GPS (gps-v1). The native app is CONSUMER ONLY (decision 2026-10-07):
+// sync-mobile-web.js leaves GPS_SHELL out and removes every GPS block from what
+// it copies (tools/gps-flag.js). So each shipped file is held to its repo twin
+// AS THAT SYNC WRITES IT - index.html minus its GPS blocks - and a GPS file
+// found in a native bundle is drift: the "carries nothing the repo does not
+// ship" test below names it.
+const gpsFlag = require('./tools/gps-flag.js');
+const filesFor = () => FILES;
+const expectedSha = (f) => gpsFlag.isText(f)
+    ? crypto.createHash('sha256').update(gpsFlag.applyFlag(read(f), false, f)).digest('hex')
+    : sha(path.join(REPO_ROOT, f));
 const RESYNC = 'node sync-mobile-web.js && npx cap sync ios';
 
 // Present means "the directory exists AND has files in it". An empty directory is
@@ -116,10 +131,10 @@ const ABSENT_REASON = 'ios/App/App/public/ does not exist - this tree has never 
 // failure naming one file out of nine sends somebody to fix one file.
 function compare(dir) {
     const missing = [], differing = [];
-    FILES.forEach(f => {
+    filesFor(dir).forEach(f => {
         const shipped = path.join(dir, f);
         if (!fs.existsSync(shipped)) { missing.push(f); return; }
-        if (sha(shipped) !== sha(path.join(REPO_ROOT, f))) differing.push(f);
+        if (sha(shipped) !== expectedSha(f, dir)) differing.push(f);
     });
     return { missing, differing };
 }
@@ -184,7 +199,7 @@ describe('THE NATIVE BUNDLE MATCHES THE REPO', () => {
         { skip: NAT.present ? false : ABSENT_REASON }, () => {
         const { differing } = compare(NATIVE);
         const detail = differing.map(f => {
-            const a = sha(path.join(REPO_ROOT, f)).slice(0, 12);
+            const a = expectedSha(f, NATIVE).slice(0, 12);
             const b = sha(path.join(NATIVE, f)).slice(0, 12);
             return '    ' + f + '\n      repo   ' + a + '\n      bundle ' + b;
         }).join('\n');
@@ -244,7 +259,7 @@ describe('THE NATIVE BUNDLE MATCHES THE REPO', () => {
     // was edited by hand or a sync was interrupted.
     test('the bundle carries nothing the repo does not ship',
         { skip: NAT.present ? false : ABSENT_REASON }, () => {
-        const extra = NAT.entries.filter(f => !FILES.includes(f) && !CAPACITOR_OWN.includes(f));
+        const extra = NAT.entries.filter(f => !filesFor(NATIVE).includes(f) && !CAPACITOR_OWN.includes(f));
         assert.deepEqual(extra, [],
             'the bundle contains ' + extra.length + ' file(s) that are neither declared '
             + 'in ' + SYNC_SCRIPT + ' nor written by Capacitor: ' + extra.join(', ')
@@ -305,7 +320,7 @@ describe('THE ANDROID BUNDLE MATCHES THE REPO', () => {
         { skip: AND.present ? false : ANDROID_ABSENT }, () => {
         const { differing } = compare(ANDROID);
         const detail = differing.map(f => {
-            const a = sha(path.join(REPO_ROOT, f)).slice(0, 12);
+            const a = expectedSha(f, ANDROID).slice(0, 12);
             const b = sha(path.join(ANDROID, f)).slice(0, 12);
             return '    ' + f + '\n      repo    ' + a + '\n      android ' + b;
         }).join('\n');
@@ -335,7 +350,7 @@ describe('THE ANDROID BUNDLE MATCHES THE REPO', () => {
 
     test('the Android bundle carries nothing the repo does not ship',
         { skip: AND.present ? false : ANDROID_ABSENT }, () => {
-        const extra = AND.entries.filter(f => !FILES.includes(f) && !CAPACITOR_OWN_ANDROID.includes(f));
+        const extra = AND.entries.filter(f => !filesFor(ANDROID).includes(f) && !CAPACITOR_OWN_ANDROID.includes(f));
         assert.deepEqual(extra, [],
             'the Android bundle contains ' + extra.length + ' file(s) that are neither '
             + 'declared in ' + SYNC_SCRIPT + ' nor written by Capacitor: ' + extra.join(', ')

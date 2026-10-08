@@ -60,6 +60,7 @@
     <tr><td>Hole-by-hole scores, handicaps, and the games and stakes your group selected</td><td>This is the app's entire function.</td></tr>
     <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our Cloudflare Worker to golfcourseapi.com, only to look up a published reference scorecard. This is text you type, not your phone's location. Used for that lookup. Not sold.</td></tr>
     <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
+    <tr><td>Green locations for the GPS screen, in the HardPan app (a point a golfer tapped on the map as the center, front or back of a green)</td><td>So every golfer on that course sees the same green. This is a spot on the course somebody chose by tapping the map, never where that golfer was standing.</td></tr>
     <tr><td>Round codes and group numbers</td><td>To keep one foursome's card separate from another's.</td></tr>
     <tr><td>Preferences and recent codes saved on your device</td><td>So the app can remember your dark-mode choice, prefill your last roster, offer to resume your last round or trip, and remember which player is you. This stays on your device and is never sent anywhere.</td></tr>
 </table>
@@ -67,7 +68,7 @@
 <h2>What is never collected</h2>
 <ul>
     <li>No account, password, email address or phone number</li>
-    <li>No device location or GPS</li>
+    <li>No device location or GPS is collected. In the HardPan app, the GPS screen uses your phone's location <strong>on your phone only</strong> - while that screen is showing, and for at most a minute after you switch back to Bets - to show your distance to the green. Your position is never stored or sent to us or anyone else. The bets-only app does not ask for your location at all.</li>
     <li>No contacts, photos, camera or microphone access</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No payment details of any kind — see below</li>
@@ -89,6 +90,7 @@
 
 <h2>Third-party directories</h2>
 <p>Online course search reaches golfcourseapi.com only through our own Cloudflare Worker. That provider receives the search text needed to find a course. We may keep that search text on our proxy for a short time so the same lookup is not repeated. Round scores and player names are not sent to golfcourseapi.</p>
+<p>The GPS screen's satellite picture comes from Esri (ArcGIS) and from the U.S. Geological Survey (USGS, public-domain aerial imagery). Your phone asks them for the map squares of the course you are looking at, the same way any web map works, so they see that request and your internet address. When a round opens with signal, the USGS squares for that course are saved on your phone so the picture still works without signal. Your position, scores and names are not sent to Esri or USGS. Hole and green outlines come from OpenStreetMap and ship inside the app; your phone does not contact OpenStreetMap.</p>
 
 <h2>Children</h2>
 <p>HardPan is not directed at children under 13 and does not knowingly collect information from them. It has no accounts, no messaging, and no profiles.</p>

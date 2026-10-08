@@ -90,7 +90,13 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
     });
 
     test('Consumer contains exactly SHARED + CONSUMER', () => {
-        assert.deepEqual(listing(outDir('consumer')), SHARED.concat(CONSUMER).sort());
+        // gps-v1: dist/consumer is built with GPS_ENABLED unset, which leaves out
+        // GPS_SHELL (in a HardPan tree those six names also sit in CONSUMER_SHELL,
+        // inside a GPS block; in a Consumer tree they are not there at all).
+        const GPS = declared('GPS_SHELL');
+        assert.ok(GPS.length === 6, 'positive: GPS_SHELL parsed');
+        assert.deepEqual(listing(outDir('consumer')), SHARED.concat(CONSUMER).filter(f => !GPS.includes(f)).sort());
+        GPS.forEach(f => assert.ok(!listing(outDir('consumer')).includes(f), 'Consumer ships ' + f));
     });
 
     test('Tournament contains exactly SHARED + TOURNAMENT', () => {
@@ -164,11 +170,18 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
     });
 
     test('copied files are byte-identical to source', () => {
-        // The build copies; it does not transform. Anything else would make the
-        // output something other than the reviewed source.
+        // The build copies; it does not transform - with ONE exception since gps-v1:
+        // these outputs are built with GPS_ENABLED unset, so the reviewed source
+        // they must equal is the source with its GPS blocks removed
+        // (tools/gps-flag.js, the same function the build calls). In a file with
+        // no GPS block that is the source itself, byte for byte.
+        const gpsFlag = require('./tools/gps-flag.js');
+        const expected = (f) => gpsFlag.isText(f)
+            ? crypto.createHash('sha256').update(gpsFlag.applyFlag(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8'), false, f)).digest('hex')
+            : sha(path.join(REPO_ROOT, f));
         ['consumer', 'tournament'].forEach(p =>
             listing(outDir(p)).filter(f => !GENERATED.includes(f)).forEach(f =>
-                assert.equal(sha(path.join(outDir(p), f)), sha(path.join(REPO_ROOT, f)),
+                assert.equal(sha(path.join(outDir(p), f)), expected(f),
                     f + ' was altered on the way into dist/' + p)));
     });
 });

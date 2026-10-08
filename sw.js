@@ -4362,7 +4362,21 @@
 // NO ENGINE FILE MOVED: pool-engine.js keeps the rule that KP money never goes
 // back to the field, and still answers -$5 here; the page stops asking it.
 // A device on v315 still charges for a round nobody played.
-const CACHE_VERSION = 'golfapp-v316-unplayedzero';
+// GPS:BEGIN
+// Moved to v317 FOR HARDPAN GPS (branch gps-v1, rebased onto main after the
+// unplayed-round fix v316; v310, v313 and v316-gps were its numbers before). HardPan builds only: the round
+// screen gains a "📍 GPS | 💰 Bets" toggle - satellite hole, blue dot, big
+// front / center / back, a draggable target. Six files join the shell -
+// gps-geo.js, gps-view.js, gps-config.js, gps-courses.js (the bundled
+// OpenStreetMap greens) and the vendored leaflet.js and leaflet.css - so the
+// GPS side opens with no signal. ESRI TILES ARE NEVER STORED: the fetch handler
+// below never sees them (cross-origin), so only the browser caches them, per
+// Esri's headers, which is all its terms allow. USGS public-domain tiles for the
+// course area ARE stored, by gps-view.js, in their own cache (hardpan-usgs-*),
+// which activate below leaves alone (docs/gps-step0.md). A Consumer build
+// (GPS_ENABLED=0) removes this block and the files. A device on v316 has no GPS.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v317-gps';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4533,6 +4547,19 @@ const SHELL_FILES = [
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
     './offline-queue.js',
+    // GPS:BEGIN
+    // HardPan GPS (v313). index.html loads gps-geo.js, gps-config.js and
+    // gps-view.js (HardPan builds only - GPS_ENABLED=0 drops this block and
+    // the files); gps-view.js loads the course data and Leaflet on first use. All six are precached so
+    // the GPS screen opens on the 14th tee with no bars. Esri tiles are NOT here.
+    // NO APOSTROPHES IN THIS BLOCK.
+    './gps-geo.js',
+    './gps-view.js',
+    './gps-config.js',
+    './gps-courses.js',
+    './leaflet.js',
+    './leaflet.css',
+    // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
     // card itself carries, so a cached shell without it plays 1..18 - which is what
@@ -4654,7 +4681,13 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => Promise.all(
-            keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))
+            // GPS:BEGIN
+            // The course imagery gps-view.js pre-cached is not shell; a new shell
+            // must not throw the 14th tee's satellite view away.
+            keys.filter((key) => key !== CACHE_VERSION && key.indexOf('hardpan-usgs-') !== 0).map((key) => caches.delete(key))
+            // GPS:ELSE
+            // keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))
+            // GPS:END
         ))
     );
     self.clients.claim();

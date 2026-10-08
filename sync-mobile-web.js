@@ -14,7 +14,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const DEST = path.join(ROOT, 'www', 'app');
+// MOBILE_SYNC_DEST / MOBILE_SYNC_PLIST let a test sync into a temporary
+// directory and plist copy, so it never touches the real bundle or Info.plist.
+const DEST = process.env.MOBILE_SYNC_DEST ? path.resolve(process.env.MOBILE_SYNC_DEST) : path.join(ROOT, 'www', 'app');
 
 // ============================================================================
 // PRODUCT SHELL DECLARATIONS
@@ -214,6 +216,23 @@ const CONSUMER_SHELL = [
     // Running money, skins and KP across rounds. season.html and admin.html
     // load season.js. Consumer only.
     'season.html', 'season.js',
+    // GPS:BEGIN
+    // HardPan GPS (gps-v1): the GPS side of the round screen, its course greens and
+    // the vendored Leaflet it loads on first use. In a GPS block, so a Consumer
+    // tree has none of these lines; and listed again in GPS_SHELL below, which is
+    // what the build scripts filter on. NO APOSTROPHES IN THIS BLOCK.
+    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'leaflet.js', 'leaflet.css',
+    // GPS:END
+];
+
+// HARDPAN GPS (gps-v1). Shipped ONLY when GPS_ENABLED=1 (HardPan). The Consumer
+// build (GPS_ENABLED=0, the default) does not copy one of these files, and
+// tools/gps-flag.js removes every GPS block from the files it does copy - so
+// Consumer carries no GPS code, no Leaflet, no course geometry and no tile key.
+// The same six names sit in CONSUMER_SHELL inside a GPS block;
+// gps_wiring_test.js holds the two lists equal. NO APOSTROPHES IN THIS BLOCK.
+const GPS_SHELL = [
+    'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'leaflet.js', 'leaflet.css',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in
@@ -291,7 +310,23 @@ const TOURNAMENT_SHELL = [
 // SHARED_SHELL.concat(TOURNAMENT_SHELL), by the same rule, from the same lists.
 // Nothing here forks an engine: SHARED_SHELL is unchanged and both products keep
 // reading the identical golf rules.
+// THE NATIVE APP IS CONSUMER ONLY (decision 2026-10-07): HardPan, the GPS
+// product, is web-only (a Home Screen icon), so there is NO HardPan iOS build.
+// This script never ships a GPS file, always removes every GPS block, always
+// takes the location permission out of Info.plist - and REFUSES GPS_ENABLED=1
+// rather than quietly ignoring it, so nobody believes they built HardPan for iOS.
+const gpsFlag = require('./tools/gps-flag.js');
+if (gpsFlag.isEnabled(process.env)) {
+    console.error('GPS_ENABLED=1 refused: the iOS/Android app is Consumer only (bets, no GPS).\n'
+        + 'HardPan (GPS) is web-only: GPS_ENABLED=1 node build-shell.js consumer -> dist/hardpan.\n'
+        + 'See docs/gps-builds.md. Nothing was written.');
+    process.exit(1);
+}
+const GPS_ENABLED = false;
 const FILES_TO_SYNC = SHARED_SHELL.concat(CONSUMER_SHELL);
+// What the app ships: never the GPS files.
+const SHIPPED = FILES_TO_SYNC.filter((f) => !GPS_SHELL.includes(f));
+console.log('Building the CONSUMER app (bets only, no GPS, no location permission).');
 
 
 // Wiped before every sync, not merged into. www/app/ is generated output, so a file
@@ -304,14 +339,19 @@ fs.mkdirSync(DEST, { recursive: true });
 
 let copied = 0;
 let missing = [];
-FILES_TO_SYNC.forEach((file) => {
+SHIPPED.forEach((file) => {
     const src = path.join(ROOT, file);
     if (!fs.existsSync(src)) { missing.push(file); return; }
-    fs.copyFileSync(src, path.join(DEST, file));
+    if (gpsFlag.isText(file)) {
+        // The flag is applied on the way in: OFF removes every GPS block.
+        fs.writeFileSync(path.join(DEST, file), gpsFlag.applyFlag(fs.readFileSync(src, 'utf8'), GPS_ENABLED, file));
+    } else {
+        fs.copyFileSync(src, path.join(DEST, file));
+    }
     copied++;
 });
 
-console.log(`Synced ${copied}/${FILES_TO_SYNC.length} files into www/app/`);
+console.log(`Synced ${copied}/${SHIPPED.length} files into www/app/`);
 if (missing.length > 0) {
     console.error('MISSING (not found at repo root, not copied):', missing.join(', '));
     process.exit(1);
@@ -322,7 +362,7 @@ if (missing.length > 0) {
 // loads". Checked against the freshly written copies rather than the source, so this
 // validates the actual bundle that ships.
 let brokenPages = [];
-FILES_TO_SYNC.filter((f) => f.endsWith('.html')).forEach((page) => {
+SHIPPED.filter((f) => f.endsWith('.html')).forEach((page) => {
     const html = fs.readFileSync(path.join(DEST, page), 'utf8');
     const refs = [...html.matchAll(/<script[^>]*\ssrc=["']([^"']+)["']/gi)].map((m) => m[1]);
     refs
@@ -342,3 +382,16 @@ if (brokenPages.length > 0) {
 }
 
 console.log('Bundle verified: every shipped page has every script it loads.');
+
+// NO LOCATION PERMISSION, EVER. App Review questions an app that declares a
+// permission it never uses, and the app has no GPS. Every sync takes
+// NSLocationWhenInUseUsageDescription OUT of Info.plist if anything put it there,
+// and nothing in this repo puts it in. gps_flag_test.js holds the committed plist
+// to that too.
+const PLIST = process.env.MOBILE_SYNC_PLIST ? path.resolve(process.env.MOBILE_SYNC_PLIST) : path.join(ROOT, 'ios', 'App', 'App', 'Info.plist');
+if (fs.existsSync(PLIST)) {
+    const before = fs.readFileSync(PLIST, 'utf8');
+    const after = gpsFlag.plistFor(before, false);
+    if (after !== before) fs.writeFileSync(PLIST, after);
+    console.log('Info.plist: no location permission' + (after !== before ? ' (a stray one was REMOVED)' : ''));
+}

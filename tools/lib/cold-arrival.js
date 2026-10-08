@@ -44,7 +44,8 @@ const CHROME = process.env.CHROME_PATH
 // the value; { cdp: { method, params } } a raw DevTools command; { tap: selector,
 // nth } a real tap at the element's centre; { sleep: ms }; { media } emulated
 // media (pushes nothing); { shot: <path> } a full-page PNG written to that path;
-// { deliver: { path, value } } a SECOND SNAPSHOT to every
+// { drag: selector, dx, dy } a real press-move-release drag from the element's
+// centre (gps-v1); { deliver: { path, value } } a SECOND SNAPSHOT to every
 // value listener on that path (2026-09-18) - pushes { path, listeners, threw }.
 // One snapshot proves the first paint, not the page: a check on a live page
 // delivers at least two on the listener it measures, and bails when the
@@ -512,6 +513,30 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // and getBoundingClientRect are the DOM's, not the page's: this still
                 // calls nothing the page defines. Pushes the point tapped, or a
                 // 'no element' line so a missed selector fails loudly downstream.
+                // { drag: selector, nth, dx, dy, at } - a REAL drag (gps-v1, 2026-10-06):
+                // press, move in steps, release, with the browser's own pointer
+                // sequencing - what a finger does to a draggable map marker or to
+                // the map itself. It starts at the element's centre, or at `at`
+                // ({ fx, fy }, fractions of the element's box) to start on an empty
+                // part of a big element. Like `tap`, it reads the DOM's rect and
+                // calls nothing the page defines. Pushes the start and end points.
+                if (step.drag) {
+                    const find = `(function () { var el = document.querySelectorAll(${JSON.stringify(step.drag)})[${step.nth || 0}]; if (!el) return null; var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height }; })()`;
+                    const f = await rpc(ws, id++, 'Runtime.evaluate', { expression: find, returnByValue: true });
+                    const b = f.result && f.result.result && f.result.result.value;
+                    if (!b || !(b.w > 0 && b.h > 0)) { value.push('no element: ' + step.drag + '[' + (step.nth || 0) + ']'); continue; }
+                    const fx = step.at ? step.at.fx : 0.5, fy = step.at ? step.at.fy : 0.5;
+                    const x0 = Math.round(b.l + b.w * fx), y0 = Math.round(b.t + b.h * fy);
+                    const n = step.steps || 8, dx = step.dx || 0, dy = step.dy || 0;
+                    await rpc(ws, id++, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', buttons: 1, clickCount: 1 });
+                    for (let i = 1; i <= n; i++) {
+                        await rpc(ws, id++, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: Math.round(x0 + dx * i / n), y: Math.round(y0 + dy * i / n), button: 'left', buttons: 1 });
+                        await new Promise(r => setTimeout(r, 16));
+                    }
+                    await rpc(ws, id++, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: x0 + dx, y: y0 + dy, button: 'left', buttons: 0, clickCount: 1 });
+                    value.push('dragged ' + step.drag + ' from ' + x0 + ',' + y0 + ' by ' + dx + ',' + dy);
+                    continue;
+                }
                 if (step.tap) {
                     // SCROLL, SETTLE, THEN MEASURE - IN THAT ORDER (2026-10-04).
                     //

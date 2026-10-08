@@ -35,7 +35,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const DIST = path.join(ROOT, 'dist');
+// BUILD_SHELL_DIST lets a test build into a temporary directory instead of
+// dist/, so it never races another test that reads dist/.
+const DIST = process.env.BUILD_SHELL_DIST ? path.resolve(process.env.BUILD_SHELL_DIST) : path.join(ROOT, 'dist');
 
 // ---------------------------------------------------------------------------
 // MEMBERSHIP — read from the declarations, never restated here
@@ -51,13 +53,25 @@ function declaredList(name) {
 const SHARED = declaredList('SHARED_SHELL');
 const CONSUMER = declaredList('CONSUMER_SHELL');
 const TOURNAMENT = declaredList('TOURNAMENT_SHELL');
+// HardPan GPS: shipped only by a GPS_ENABLED=1 build, and only in the consumer
+// product. See tools/gps-flag.js and docs/gps-builds.md.
+const GPS = declaredList('GPS_SHELL');
+const gpsFlag = require('./tools/gps-flag.js');
+const GPS_ENABLED = gpsFlag.isEnabled(process.env);
 
 // Generated per output, so they are never copied from source.
 const GENERATED = ['sw.js', 'manifest.json'];
 
 const PRODUCTS = {
     consumer: {
-        files: SHARED.concat(CONSUMER),
+        files: SHARED.concat(CONSUMER).filter((f) => GPS_ENABLED || !GPS.includes(f)),
+        // GPS_ENABLED=1 builds the GPS product (GPS + Bets) into dist/hardpan under its
+        // own cache key, so it can never be mistaken for, or evict, the Consumer
+        // shell. GPS_ENABLED=0 (the default) builds Consumer into dist/consumer,
+        // byte for byte the app it built before GPS existed.
+        gps: GPS_ENABLED,
+        outDir: GPS_ENABLED ? 'hardpan' : 'consumer',
+        cacheNameGps: 'consumer-v153-gps',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.
@@ -293,6 +307,11 @@ const PRODUCTS = {
 // list, and the list is derived from what this build actually copied.
 // ---------------------------------------------------------------------------
 
+function cacheNameOf(product) {
+    const spec = PRODUCTS[product];
+    return spec.gps ? spec.cacheNameGps : spec.cacheName;
+}
+
 function serviceWorkerFor(product, shipped) {
     const precache = shipped
         .filter(f => f !== 'sw.js')          // a worker never precaches itself
@@ -311,7 +330,7 @@ function serviceWorkerFor(product, shipped) {
 //
 // The cache key is product-specific so the two deployments cannot evict or serve
 // each other's shell, even if they were ever hosted on one origin by accident.
-const CACHE_VERSION = '${PRODUCTS[product].cacheName}';
+const CACHE_VERSION = '${cacheNameOf(product)}';
 
 const SHELL_FILES = [
 ${precache}
@@ -333,7 +352,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => Promise.all(
-            keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))
+            keys.filter((key) => key !== CACHE_VERSION${PRODUCTS[product].gps ? " && key.indexOf('hardpan-usgs-') !== 0" : ''}).map((key) => caches.delete(key))
         ))
     );
     self.clients.claim();
@@ -426,7 +445,7 @@ function manifestFor(product) {
 function build(product) {
     const spec = PRODUCTS[product];
     if (!spec) throw new Error('unknown product: ' + product);
-    const out = path.join(DIST, product);
+    const out = path.join(DIST, spec.outDir || product);
 
     // Wiped, not merged. A file left from an earlier run is indistinguishable from
     // one that is supposed to be there, and it hides exactly the failure this
@@ -441,7 +460,12 @@ function build(product) {
         if (GENERATED.includes(file)) return;
         const src = path.join(ROOT, file);
         if (!fs.existsSync(src)) { missing.push(file); return; }
-        fs.copyFileSync(src, path.join(out, file));
+        if (gpsFlag.isText(file)) {
+            // GPS_ENABLED=0 removes every GPS block on the way in.
+            fs.writeFileSync(path.join(out, file), gpsFlag.applyFlag(fs.readFileSync(src, 'utf8'), !!spec.gps, file));
+        } else {
+            fs.copyFileSync(src, path.join(out, file));
+        }
         copied.push(file);
     });
 
@@ -471,14 +495,14 @@ function build(product) {
             });
     });
     if (broken.length > 0) {
-        console.error('BUILD IS INCOMPLETE - do not deploy dist/' + product + ':');
+        console.error('BUILD IS INCOMPLETE - do not deploy dist/' + (spec.outDir || product) + ':');
         broken.forEach((b) => console.error('  -', b));
         process.exit(1);
     }
 
-    console.log('Built dist/' + product + ': ' + shipped.length + ' files ('
+    console.log('Built dist/' + (spec.outDir || product) + (spec.gps ? ' (GPS_ENABLED=1)' : '') + ': ' + shipped.length + ' files ('
         + copied.length + ' copied, ' + GENERATED.length + ' generated)');
-    console.log('  cache: ' + spec.cacheName + '  |  start_url: ' + spec.startUrl);
+    console.log('  cache: ' + cacheNameOf(product) + '  |  start_url: ' + spec.startUrl);
     return shipped;
 }
 

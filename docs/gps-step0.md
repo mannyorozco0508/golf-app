@@ -1,0 +1,195 @@
+# HardPan GPS — Step 0 findings (checked 2026-10-06)
+
+Everything below was read from the primary source on 2026-10-06. Quotes are
+verbatim. This is not legal advice; items marked **OPEN** need a decision.
+
+## 1. Esri ArcGIS Location Platform — free tier, attribution, offline
+
+**Free tier: 2,000,000 basemap tiles a month, confirmed.**
+Pricing: "Basemap tiles … requests to basemaps-api.arcgis.com, ibasemaps-api.arcgis.com,
+or static-map-tiles-api.arcgis.com … 2M free then $0.15 per 1,000 tiles."
+— https://location.arcgis.com/pricing/
+
+- Past the free tier with no card on file, service stops; it does not bill:
+  "A payment method is required to enable pay-as-you-go (PAYG) to continue using
+  services beyond the free tier." — https://location.arcgis.com/help/billing/
+- "Usage is not recorded for any basemap tiles that may be cached in your users'
+  web browser." (same page) — browser-cached tiles are free.
+- A free account with no card goes inactive after 12 months with no recorded
+  usage. — https://location.arcgis.com/help/account-management
+
+**Attribution (implemented, always on the map):**
+"Powered by Esri" must be "clearly displayed on the map, application, or in a window
+that is accessible from a menu or button"; data credits must be displayed "directly
+on or at the bottom of the map where it is always visible". For non-Esri libraries,
+"retrieve the copyrightText from the service's metadata and then display the Esri and
+data attribution text manually."
+— https://developers.arcgis.com/documentation/esri-and-data-attribution/interactive-maps/
+
+The World Imagery credit **changed in 2026**: it now reads "Source: Esri, Vantor,
+Earthstar Geographics, and the GIS User Community" (Maxar → Vantor). The app reads
+`copyrightText` from the service at runtime and falls back to that string.
+
+**Offline pre-caching verdict: NOT ALLOWED. Only normal browser caching.**
+
+> "Neither Customer nor Application Users may scrape, download, or extract Resultant
+> Output, nor cache or store Resultant Output except as outlined herein: A. Customer
+> may allow pre-caching of Resultant Output as permitted by the caching headers
+> (HTTP/1.1 standard …) returned by Location Services to the extent necessary for
+> enabling or optimizing the use of the Customer Application."
+> — ArcGIS Location Platform Agreement (rev. 2025-11-21) §3.1(b)(6),
+> https://www.esri.com/content/dam/esrisites/en-us/media/legal/platform/platform-legal.pdf
+
+> "Customer may take Online Services basemaps offline through Esri Content Packages …
+> for use with licensed ArcGIS Runtime applications … Customer may not otherwise
+> scrape, download, or store Data." — Esri Master Agreement E204 §3.2(c)
+
+> "YOU MAY NOT Systematically harvest basemap tiles through any method other than
+> using Esri Content Packages." — Esri items FAQ (2025-04-21)
+
+So, as the brief said: **no Esri prefetch, and no app-side storage at all**
+(confirmed 2026-10-07; proven by `gps_esri_never_cached_test.js` and
+`tools/gps-esri-cache-check.js`, see `docs/gps-builds.md` decision 6). Offline
+imagery comes from USGS instead (section 1b). What the app does with Esri:
+- Tiles are requested only for what is on screen, and only while online.
+- They are cross-origin, so `sw.js` never touches them (its fetch handler returns early
+  for any other origin — `gps_wiring_test.js` holds that). They sit only in the
+  browser's HTTP cache, under Esri's own `Cache-Control` headers.
+- No payment method on the ArcGIS account, by decision (2026-10-06). Past the
+  2M free tiles Esri stops answering. The GPS side notices after 4 failed
+  tiles with none loaded, drops the Esri layer, and shows USGS.
+- With neither Esri nor cached USGS tiles available, the screen shows the hole line, the green
+  shape, the F/C/B pins, the blue dot and the yardages on a plain dark-green background, with
+  "No satellite view here without signal — yardages still work."
+
+## 1b. USGS Imagery Only — the offline layer (checked 2026-10-06)
+
+- Endpoint: `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`.
+  No key and no account.
+- **Native to z16.** The service metadata gives `maxScale: 9027.98` (1:9,028 = z16),
+  and z17 answers HTTP 404 (measured). Past z16, Leaflet enlarges the z16
+  tiles, so the picture is softer than Esri's when zoomed in close.
+- Licence: "Map services and data downloaded from The National Map are free and
+  in the public domain … there are no use restrictions on these services"
+  (USGS FAQ, https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map;
+  read via search, because usgs.gov blocked a direct fetch with a CloudFront 403).
+  The service metadata itself has `exportTilesAllowed: true`, with up to 100,000
+  tiles per export.
+- Credit (from the service's own `copyrightText`): "USDA, USGS The National Map:
+  Orthoimagery". It is always on the map.
+- Headers: `Access-Control-Allow-Origin: *` and `Cache-Control: max-age=86400`.
+  About 25 KB per 256 px JPEG.
+- **Pre-cache:** when a round opens with signal, `gps-view.js` stores the
+  course area's tiles at z13–z16 in Cache Storage (`hardpan-usgs-v1`). The area
+  comes from course data (OSM holes and any greens golfers set), never from the
+  golfer's position. Each course is fetched once per 30 days, four requests at a
+  time, with a hard cap of 400 tiles. Measured: Caledonia 24 tiles, True Blue 32,
+  PineHills 30, Tri-Mountain 15, a Thistle pairing 36, so under 1 MB per course.
+  `sw.js` leaves `hardpan-usgs-*` alone when the shell updates.
+- A course with no OSM data and no golfer-set green has no known area, so it
+  isn't pre-cached. Its satellite view works online only until a green is set.
+- Esri's tiles are drawn on top when there is a key and signal. Under a working
+  Esri layer, USGS reads only from the phone's cache and makes no requests.
+
+## 2. API key — scope and origins
+
+- Scope: one privilege, **Basemaps** (`premium:user:basemaps`). That covers
+  `ibasemaps-api.arcgis.com` World Imagery. (The newer static-tiles service has
+  **no satellite style** — "Only satellite labels" — so it is not an option.)
+- Endpoint used: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=KEY`
+  (256 px tiles; answers "Token Required" without a key).
+- **The keyless `server.arcgisonline.com` endpoint is NOT used.** It is licensed under
+  the Master Agreement: "If you do not have Esri software, you must purchase an ArcGIS
+  Online subscription." — https://www.esri.com/content/dam/arcgisonline/docs/tou_summary.pdf
+- Referrer restriction: "By setting the Allowed Referrers … limit their use to only
+  authorize requests coming from specific origins … Wildcard domains are supported on
+  HTTPS only." — https://developers.arcgis.com/documentation/security-and-authentication/faq/
+  Set: `https://golf-app-5a5.pages.dev` (+ any custom domain).
+- **Moot since 2026-10-07: HardPan is web-only, so no key is used inside the iOS app** (the exact referrers are in `docs/gps-builds.md`). Kept for the record: **iOS app origin.** Esri's docs only show http(s) origins. A tile `<img>` sends
+  a `Referer`, not `Origin`, and a `capacitor://localhost` page may send none. Whether a
+  referrer-restricted key works inside the native app is **unverified** and needs a
+  real-device test. If it fails: a second basemaps-only key for iOS with a usage alert,
+  or a tile proxy. Legacy API keys were retired 2026-06-27; create an **API key
+  credential**.
+- **Where the key goes:** `gps-config.js` → `esriKey: ''`. It is empty in this branch.
+  Empty = plain-background mode, fully usable. A browser map key is public by design;
+  the scope + referrers are the protection.
+
+## 3. Overpass API
+
+> "less than 10,000 queries per day and download less than 1 GB data per day" … for
+> regular applications "less than 100 queries fetching less 10 MB of data per day" …
+> "Be sure to check that your app or website adds User-Agent or Referer headers … that
+> uniquely identify your app." … "Commercial use should use self-hosted or paid
+> Overpass servers." — https://wiki.openstreetmap.org/wiki/Overpass_API
+
+What the app does: **phones never call Overpass.** `tools/gps-import-osm.js` runs by
+hand, one query per course, with a `User-Agent` naming HardPan and a contact, a 10 s
+gap between courses, and writes `gps-courses.js`, which ships with the app and is
+precached. This round of six courses cost 15 queries total (6 were wasted by a shell
+quoting bug in the measurement script and returned empty). **OPEN:** "commercial use
+should use self-hosted or paid" — a handful of hand-run imports is far inside the
+numbers, but if course import is ever automated it should go through a paid or
+self-hosted instance.
+
+**Departure from the brief, deliberately:** the brief said "store the result in the
+Firebase course record". The Myrtle courses are presets with **no** `global_courses`
+record, and writing one would (a) add a permanent entry every client can see — the
+Tournament picker lists every key — and (b) make admin.html prefer it over the preset
+card. So OSM data ships as a file instead (same effect: queried once, read from local
+storage, works offline from first launch). Golfer pins go to Firebase (§5).
+
+## 4. OSM — attribution and share-alike
+
+- Attribution (on the map at all times): "© OpenStreetMap contributors" linking to
+  https://www.openstreetmap.org/copyright. "Credit OpenStreetMap and its contributors"
+  and "make clear that the data is available under the Open Database License".
+  — https://www.openstreetmap.org/copyright, https://osmfoundation.org/wiki/Licence/Attribution_Guidelines
+- `gps-courses.js` is a **Derivative Database** of OSM and carries the ODbL notice in
+  its header. The repo is public, which satisfies "offer the derivative database".
+- Share-alike and golfer taps: the Collective Database guideline treats combined data
+  as separate "so long as the data used for a particular data type is either all OSM
+  or all non-OSM within the same regional cut"; the Horizontal Layers guideline says
+  mixing OSM and non-OSM for the same feature type triggers share-alike.
+  **What the app does:** OSM data lives only in `gps-courses.js` (field `osm`); golfer
+  taps live only in Firebase (`events/<code>/gpsPins`, `course_gps/<key>/pins`) and are
+  never written into the OSM file. A pin on an OSM-mapped hole is an *override*, not an
+  edit of OSM data. `gps_geo_test.js` asserts the bundled file holds only `osm` fields.
+
+## 5. Esri terms vs. golfer-tapped greens: DECIDED 2026-10-07
+
+Esri §3.1(d)(3) limits Resultant Output to "visualization purposes", and a
+shared green tapped on Esri imagery is arguably data derived from it.
+**Decision: setting a green always uses the USGS layer, never Esri**, even when
+Esri is on. While a green is being set, the Esri layer and its credit come off
+the map and USGS (public domain) is the picture, then they go back. Measured in
+`tools/gps-check.js` (the `esri` arm, with a stand-in Esri layer).
+
+## 6. Where pins are stored, and the rule I did NOT touch
+
+- **Works today:** `events/<code>/gpsPins/h<N>` — on the round, existing rules allow it,
+  written through the offline queue, so everyone in that round sees it and it survives
+  a dead zone.
+- **Shared across future rounds:** `course_gps/<courseKey>/pins/h<N>`. The root
+  `$other` rule refuses this path today, and the app ignores the refusal. The
+  rule that would open it is **proposed, not applied and not published**
+  (decision 2026-10-07): `docs/gps-rules-proposal.json`, with the exact diff in
+  `docs/gps-rules-proposal.diff`. Any signed-in round member (a live round at
+  that course) can set an EMPTY green; only the organizer of the round named in
+  the pin (`ev`) can change one; nobody can delete. The same proposal adds a
+  `.validate` to the round copy so only the organizer changes an existing
+  round pin. Known limit: a code holder can still DELETE a round pin, because
+  the round grants write at its top level. `gps_rules_proposal_test.js` checks
+  every case and the limit.
+
+## 7. Rotation (tee at the bottom, green at the top): north-up for now
+
+Leaflet 1.9 can't rotate a map. The only rotation option is the third-party
+`leaflet-rotate` plugin, which works by patching Leaflet's own pointer, drag
+and tap handling. That's the same code the draggable target relies on (drag the
+target, pan everywhere else, tap to jump). I can't prove it on an iPhone from
+here, and a target that is off by a rotation would give confident wrong
+yardages. So the map stays **north-up**. If you want rotation, the safe path is
+a separate wave: vendor the plugin behind a setting that's off by default, and
+test drag, pan and tap on a real iPhone before turning it on.
+
