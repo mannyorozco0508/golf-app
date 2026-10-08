@@ -4367,7 +4367,13 @@
 // admin.html: an organizer holds the phone up on the first tee and each
 // scorekeeper scans their own group's code. Drawn on the phone, no network.
 // A device on v316 has no QR codes at all.
-const CACHE_VERSION = 'golfapp-v318-qrcodes';
+// Moved to v319. SETTING THE FOURSOMES ON THE DAY. The Players step gained
+// up/down arrows and a "Move to Group N" picker on every golfer, because a
+// golfer's foursome is their POSITION in the roster and the step could only
+// change group SIZES - so putting four named people together meant deleting and
+// re-adding them on a phone. grouping.js gained the two pure moves;
+// admin.html moves the rows to match. A device on v318 cannot set a foursome.
+const CACHE_VERSION = 'golfapp-v319-foursomes';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
