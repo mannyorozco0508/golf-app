@@ -174,7 +174,14 @@ describe('THE SOURCE: ONE COMPARISON, IN THE GATE', () => {
     });
 
     test('organizerEvidence lives in the gate and isRoundOrganizer uses it, so they cannot drift', () => {
-        assert.match(GATE, /function organizerEvidence\(data, uid, token\)/);
+        // RE-PINNED 2026-10-08: organizerEvidence gained a FOURTH argument - the
+        // round's TRIP record - so a trip's organizer is the organizer of its
+        // rounds (Manny's rule; the trip holds the round codes, so a round could
+        // not find its trip at all). Every existing caller still passes three and
+        // keeps exactly the answers it had: trip_organizer_inherits_test.js asserts
+        // that as a control, and that an unowned trip or a signed-out visitor
+        // grants nothing.
+        assert.match(GATE, /function organizerEvidence\(data, uid, token, trip\)/);
         // organizer-gate.js exports through one object literal, not module.exports.x = x -
         // my first version of this assertion described a style the file does not use.
         assert.match(GATE, /organizerEvidence: organizerEvidence,/);

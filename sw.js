@@ -4379,7 +4379,14 @@
 // trip-recap-image.js; the share goes through native-export.js's existing
 // Filesystem + Share chain rather than a second one. A device on v319 has only
 // a card to screenshot.
-const CACHE_VERSION = 'golfapp-v320-recapimage';
+// Moved to v321. FINISHING EMAIL SIGN-IN INSIDE THE NATIVE APP. Manny on
+// TestFlight tapped the link in the email and it opened the WEB app, leaving
+// the native app anonymous and him a spectator on rounds his own account owns.
+// The paste field was already there and a pasted link already worked; what was
+// missing was any sentence telling him not to tap the link, and a BARE CODE was
+// refused. Both fixed. Plus: a trip's organizer is now the organizer of its
+// rounds. A device on v320 still sends him to the website to sign in.
+const CACHE_VERSION = 'golfapp-v321-nativesignin';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

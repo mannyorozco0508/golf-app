@@ -381,6 +381,7 @@
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        .email-link-hint { font-size: 0.82rem; line-height: 1.5; color: var(--text-muted); margin: 10px 0 6px; }
         .email-link-card { text-align: left; max-width: 420px; margin: 0 auto 16px auto; padding: 12px 14px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
         /* ACCOUNT (Option A). The email-link card moved off the lobby and into a
            panel behind this link; inside the panel it is the whole content, so it
@@ -1188,8 +1189,15 @@ html {
             <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
             <button type="submit" id="email-link-send" class="btn-primary">Email me a sign-in link</button>
         </form>
-        <label for="email-link-paste">Paste the link from the email</label>
-        <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link" aria-label="Sign-in link from the email">
+        <!-- FINISH IT HERE, AND SAY SO (2026-10-08). Manny on TestFlight: he
+             tapped the link in the email and it opened the WEB app, leaving the
+             native app anonymous and him a spectator on his own rounds. The
+             paste field was already here and a pasted link already worked - what
+             was missing was anything telling him not to tap it. Tapping is the
+             obvious action and it is the one that fails. -->
+        <p id="email-link-paste-hint" class="email-link-hint">In the app, <strong>don&rsquo;t tap the link</strong> in the email &mdash; it opens the website and signs you in there instead. Copy the link (press and hold it &rarr; Copy), or just read the code off the end of it, and finish here.</p>
+        <label for="email-link-paste">Paste the link, or type the code</label>
+        <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link or type the code" aria-label="Sign-in link or code from the email">
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
     </section>
