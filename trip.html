@@ -33,6 +33,9 @@
     <script src="pwa-boot.js" defer></script>
     <!-- Same native print failure as the Receipt; same shared fix. -->
     <script src="native-export.js"></script>
+    <!-- THE RECAP AS AN IMAGE: layout and canvas. Reads the rendered card, so it
+         cannot disagree with it. -->
+    <script src="trip-recap-image.js"></script>
     <script src="text-safe.js"></script>
     <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
          refusals and failures are inline and persistent, receipts float. Shared
@@ -760,8 +763,9 @@ html {
     <!-- TWO WAYS TO SHARE. The text recap pastes into a group chat; the visual one
          is the thing somebody screenshots. Both read the same cached state, so they
          cannot tell different stories about the same trip. -->
-    <button class="btn-primary" onclick="openTripRecap()">📸 Trip Recap Card</button>
-    <button class="btn-primary" onclick="shareRecap()">📤 Share Trip Recap (Text)</button>
+    <button class="btn-primary" onclick="shareTripRecapImage(this)">📸 Share Trip Recap</button>
+    <button class="btn-outline" onclick="openTripRecap()">👁️ Preview the card</button>
+    <button class="btn-outline" onclick="shareRecap()">📤 Share as text instead</button>
     <p style="font-size:0.72rem; color:var(--text-muted); text-align:center; margin-top:6px;">Standings, settlement, and awards in one message for the group chat.</p>
 
     <hr class="section-divider">
@@ -4634,6 +4638,83 @@ html {
         const el = document.getElementById('trip-recap-overlay');
         if (el) el.style.display = 'flex';
     }
+    // ---- ONE TAP: THE RECAP, AS AN IMAGE, IN THE SHARE SHEET ---------------
+    //
+    // Manny's ask. What existed was a card to SCREENSHOT and a text share; the
+    // image is what actually gets posted to a group chat.
+    //
+    // IT DRAWS THE RENDERED CARD. renderTripRecapCard() runs first and the
+    // image is read back off it - native-export.js's rule, so the image cannot
+    // tell a different story from the card or the Receipt. The overlay is
+    // opened too: the golfer sees exactly what they are about to send, and on
+    // the web (where a share sheet may not exist) the card is the fallback.
+    //
+    // THE SHARE ITSELF GOES THROUGH RattleExport.shareBytes, the same
+    // Filesystem + Share chain the PDF uses - the one that took three builds to
+    // get right on a device.
+    function shareTripRecapImage(btn) {
+        if (cachedRoundResults.length === 0) {
+            uiRefuse('\u26A0\uFE0F Link at least one round with scores before making a recap.');
+            return;
+        }
+        renderTripRecapCard();
+        const card = document.getElementById('trip-recap-card');
+        const model = (typeof tripRecapModel === 'function' && typeof tripRecapExtract === 'function')
+            ? tripRecapModel(tripRecapExtract(card)) : null;
+        if (!model) {
+            // tripRecapModel returns null for a refused or empty recap rather
+            // than drawing a trip name on a blank card - which in a group chat
+            // is worse than sending nothing.
+            openTripRecap();
+            uiRefuse('\u26A0\uFE0F There is nothing to put in a recap image yet.');
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        if (!tripRecapDraw(model, canvas)) { openTripRecap(); return; }
+        const name = 'trip-recap-' + String(tripData.name || 'trip')
+            .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() + '.png';
+        const was = btn ? btn.innerHTML : '';
+        if (btn) btn.innerHTML = '\u23F3 Building\u2026';
+        const done = () => { if (btn) btn.innerHTML = was; };
+
+        // NATIVE FIRST: base64 to the shared chain, which writes to CACHE and
+        // hands the file to the iOS share sheet.
+        const native = window.RattleExport && window.RattleExport.isNative
+            && window.RattleExport.isNative() && window.RattleExport.shareBytes;
+        if (native) {
+            const b64 = canvas.toDataURL('image/png').split(',')[1] || '';
+            window.RattleExport.shareBytes(name, b64, 'Trip Recap')
+                .then(done)
+                .catch((e) => {
+                    done();
+                    const msg = String((e && (e.message || e)) || '');
+                    // A dismissed sheet is a choice, not a failure.
+                    if (/cancel/i.test(msg)) return;
+                    openTripRecap();
+                    uiRefuse('\u26A0\uFE0F Could not open the share sheet. The card is on screen \u2014 screenshot it.');
+                });
+            return;
+        }
+        // WEB: the Web Share API with a file where it exists (iOS Safari has
+        // it), and a download where it does not. Both end with the card on
+        // screen, so there is always a way to get the thing.
+        canvas.toBlob((blob) => {
+            if (!blob) { done(); openTripRecap(); return; }
+            const file = (typeof File === 'function') ? new File([blob], name, { type: 'image/png' }) : null;
+            if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+                navigator.share({ files: [file], title: 'Trip Recap' })
+                    .then(done).catch(done);
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); done(); }, 1200);
+        }, 'image/png');
+    }
+
     function closeTripRecap() {
         const el = document.getElementById('trip-recap-overlay');
         if (el) el.style.display = 'none';

@@ -4373,7 +4373,13 @@
 // change group SIZES - so putting four named people together meant deleting and
 // re-adding them on a phone. grouping.js gained the two pure moves;
 // admin.html moves the rows to match. A device on v318 cannot set a foursome.
-const CACHE_VERSION = 'golfapp-v319-foursomes';
+// Moved to v320. THE TRIP RECAP AS AN IMAGE. One tap on the trip screen draws
+// the recap - standings, who pays who, awards - onto a canvas and hands the PNG
+// to the iOS share sheet, for the group chat. New precached file
+// trip-recap-image.js; the share goes through native-export.js's existing
+// Filesystem + Share chain rather than a second one. A device on v319 has only
+// a card to screenshot.
+const CACHE_VERSION = 'golfapp-v320-recapimage';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4420,6 +4426,8 @@ const SHELL_FILES = [
     // sheet and the controller for both pages.
     './qr-encode.js',
     './qr-codes.js',
+    // The trip recap drawn as a PNG for the group chat - trip.html loads it.
+    './trip-recap-image.js',
     // Every page that can START something loads this: it issues the code and
     // checks it is free first. Precached, or the first offline launch cannot
     // open the setup screen at all.

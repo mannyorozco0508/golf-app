@@ -283,9 +283,17 @@ describe('OPENING AND CLOSING', () => {
     });
 
     test('the text share is still offered', () => {
+        // THE CLAIM IS UNCHANGED - a golfer can still send the recap as text -
+        // but the label moved when the IMAGE became the primary share
+        // (2026-10-08): "📸 Share Trip Recap" is the button now and the text one
+        // reads "Share as text instead". Matching the old words would have
+        // forced the new feature to keep a label that no longer describes the
+        // screen; matching the HANDLER is what this test is actually about.
         const src = read('trip.html');
-        assert.match(src, /onclick="shareRecap\(\)"/);
-        assert.match(src, /Share Trip Recap \(Text\)/);
+        assert.match(src, /onclick="shareRecap\(\)"/, 'the text share handler is gone');
+        assert.match(src, /Share as text instead/, 'nothing on screen offers the text share');
+        // AND THE IMAGE SHARE IS THE PRIMARY ONE, which is the change.
+        assert.match(src, /onclick="shareTripRecapImage\(this\)"/, 'the image share is not wired');
     });
 });
 
