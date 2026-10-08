@@ -4117,7 +4117,12 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   `CURRENT_PROJECT_VERSION` 5 -> 6 on Debug and Release. It was superseded the same
   day and **cancelled in App Store Connect** rather than reviewed; nothing about it
   shipped. Its contents are a subset of build 7's.
-- **1.0.6 BUILD 9 IS SET AND READY TO ARCHIVE (2026-10-07, `main` `2fe31b2`).**
+- **1.0.6 BUILD 8 IS LIVE ON THE STORE (approved and released 2026-10-07,
+  ~6:16 PM PT, Ready for Distribution).** That closes the 1.0.6 train: the next
+  upload cannot reuse it, which is why build 9 is now 1.0.7.
+
+- **1.0.7 BUILD 9 IS SET AND READY TO ARCHIVE (2026-10-07, `main` `95fee23` or
+  later).**
   `CURRENT_PROJECT_VERSION` 9 on Debug and Release, `MARKETING_VERSION` 1.0.6,
   Release signing with `App/AppRelease.entitlements` (aps-environment production
   + Sign in with Apple). `build-shell`, `sync-mobile-web` and `cap sync ios` all
@@ -4125,13 +4130,15 @@ is not a runaway detector but no ceiling at all - the provider's whole day is sp
   index.html, admin.html, sw.js and offline-queue.js, and both pages in the
   bundle load the queue.
 
-  **ASK BEFORE ARCHIVING: has 1.0.6 been APPROVED?** Build 7 was uploaded and
-  submitted on 2026-10-05 with Manual Release held, and nothing in this repo can
-  see App Store Connect. MARKETING_VERSION is left at 1.0.6 per Manny's standing
-  instruction; if 1.0.6 has been approved (or released), build 9 needs 1.0.7
-  instead and the stamp has to change before the archive.
+  ANSWERED 2026-10-07: 1.0.6 WAS approved and released (build 8), so the stamp
+  moved. `MARKETING_VERSION` 1.0.7 and `CURRENT_PROJECT_VERSION` 9 on BOTH Debug
+  and Release - verified two of each in the project file. The build number does
+  not restart at 1 for a new marketing version and does not need to; 9 simply
+  carries on. ANDROID IS UNTOUCHED and still ships 1.0.6 (`versionName` in
+  android/app/build.gradle, pinned by android_release_test.js) - the two trains
+  move separately.
 
-  **BUILD 9 = BUILD 8 + OFFLINE MODE.** Every score and KP answer is written to a
+  **1.0.7 BUILD 9 = 1.0.6 BUILD 8 (now live) + OFFLINE MODE.** Every score and KP answer is written to a
   durable queue on the phone (`offline-queue.js`) BEFORE it is sent, replayed in
   order when signal returns, and removed only when the server confirms it.
   Measured first: Firebase's own queue is an in-memory array, so before this a
