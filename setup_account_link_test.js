@@ -119,8 +119,27 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         // unwraps percent-encoded text so Gmail's own redirect yields the code,
         // and setStatus takes a reveal flag so a refusal scrolls into view -
         // measured at 390x844, the status line was at top 832 of 844.
+        // RE-PINNED 2026-10-08 (EVERY TAP SHOWS IT REGISTERED; was
+        // c1fe17214ff02239...). The change is ADDITIVE and typeof-guarded
+        // throughout: submitSend and submitPaste call tapBusy / tapDone /
+        // tapFail so the BUTTON says what it is doing and what happened, and
+        // submitPaste resolves its button BEFORE its first return - the
+        // unparseable-paste exit and the catch used to speak only through
+        // setStatus, so pasting the wrong thing left Finish sign-in completely
+        // silent. That is Manny's "Finish sign-in does NOTHING" verbatim, and
+        // tools/tap-feedback-check.js is what caught it, in Chrome.
+        //
+        // NO AUTH LOGIC MOVED, and the three paths were re-measured rather than
+        // re-pinned on the strength of the diff looking harmless:
+        //   held-note flush       setStatus with no element on the page still
+        //                         leaves lastNote === the note
+        //   uid-preserving link   planCompletion({isAnonymous:true}) still
+        //                         answers action 'link'
+        //   second-device adopt   migrationNote still gives an ADOPTED uid and
+        //                         the SAME uid different words
+        // email_link_auth_test.js is 19/19 green against it.
         // was 0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a
-        assert.equal(sha('email-link-auth.js'), 'c1fe17214ff02239faa5b1f74434c3bf6ea13163a0001aa2abc0aad73dd2018f',
+        assert.equal(sha('email-link-auth.js'), '7c421eb50161dc5f43cd40cf7fcaffc007d6b44a2ec8a67a2c9c1d3b4e46325b',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

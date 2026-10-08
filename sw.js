@@ -4431,7 +4431,16 @@
 // stayed empty and appendTeeControl() returned early. Tees are a separate need
 // now, and rows built before the record arrives get their dropdown when it does.
 // A device on v325 cannot put two golfers on different tees.
-const CACHE_VERSION = 'golfapp-v326-teedropdown';
+// Moved to v327. A BUTTON THAT LOOKS DEAD GETS TAPPED AGAIN, AND THEN
+// REPORTED AS BROKEN. Three "it does nothing" reports in two days: once the app
+// genuinely did nothing, twice it answered 24px below the fold - a refusal
+// measured at top 832 of an 844px viewport. tap-feedback.js makes a tap
+// visible: a pressed state, what it is DOING on the button, and the result line
+// written beside the button and scrolled into view. The silent path found while
+// building it was submitPaste's early return - paste the wrong thing and Finish
+// sign-in said nothing at all, which is the complaint verbatim.
+// A device on v326 still has silent buttons on the account sheet.
+const CACHE_VERSION = 'golfapp-v327-tapfeedback';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4478,6 +4487,8 @@ const SHELL_FILES = [
     // sheet and the controller for both pages.
     './qr-encode.js',
     './qr-codes.js',
+    // Every tap shows it registered - admin.html and index.html both load it.
+    './tap-feedback.js',
     // The trip recap drawn as a PNG for the group chat - trip.html loads it.
     './trip-recap-image.js',
     // Every page that can START something loads this: it issues the code and

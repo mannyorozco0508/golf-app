@@ -451,11 +451,22 @@
         if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
         var input = document.getElementById('email-link-input');
         var email = input ? input.value : '';
+        // THE BUTTON ITSELF SAYS SO (2026-10-08), and the answer names the NEXT
+        // STEP rather than only reporting success: the thing that went wrong on
+        // a phone three times running was a golfer not knowing what to do with
+        // the email once it arrived.
+        var send = document.getElementById('email-link-send');
+        if (typeof tapBusy === 'function') tapBusy(send, '\u23F3 Sending\u2026');
         setStatus('Sending the link…');
         whenReady().then(function () { return sendLink(email); }).then(function (sent) {
             publish(sent);
+            if (typeof tapDone === 'function') {
+                tapDone(send, '\u2713 Email sent \u2014 copy the link from Gmail '
+                    + '(press and hold \u2192 Copy Link) and paste it below, then tap Finish sign-in.');
+            }
         }, function (err) {
             setStatus(messageFor(err));
+            if (typeof tapFail === 'function') tapFail(send, messageFor(err));
         });
         return false;
     }
@@ -588,6 +599,13 @@
     //   3. a link built around whatever code can be read out of it, carrying
     //      the page's apiKey
     function submitPaste() {
+        // RESOLVED BEFORE THE FIRST RETURN. Measured in Chrome on 2026-10-08:
+        // every path below used to speak through setStatus alone, and the two
+        // that leave early - an unparseable paste, and the catch - left the
+        // BUTTON silent. That is "Finish sign-in does NOTHING" exactly: the
+        // golfer pastes the wrong thing, the button does not move, and the one
+        // sentence explaining why is a status line further up the card.
+        var fin = document.getElementById('email-link-finish');
         try {
             var paste = document.getElementById('email-link-paste');
             var typed = paste ? String(paste.value || '').trim() : '';
@@ -602,21 +620,29 @@
             if (!href) href = pageUrl();
             if (!actionUrlFromPaste(href) && !isEmailLink(href)) {
                 setStatus(NOTE_PASTE, { reveal: true });
+                if (typeof tapFail === 'function') tapFail(fin, NOTE_PASTE);
                 return;
             }
             var input = document.getElementById('email-link-input');
             var email = input ? input.value : '';
+            // THE BUTTON SAYS IT TOO (2026-10-08): the status line alone was the
+            // thing Manny could not see, twice. tap-feedback.js is optional - a
+            // page without it behaves exactly as before.
+            if (typeof tapBusy === 'function') tapBusy(fin, '\u23F3 Signing in\u2026');
             setStatus('Finishing sign-in\u2026');
             whenReady().then(function () { return completeLink(href, email); }).then(function (result) {
                 publish(result);
+                if (typeof tapDone === 'function') tapDone(fin, '\u2713 Signed in');
             }, function (err) {
                 setStatus(messageFor(err), { reveal: true });
+                if (typeof tapFail === 'function') tapFail(fin, messageFor(err));
             });
         } catch (e) {
             // THE CATCH SPEAKS. A missing element, an SDK that is not there, a
             // string the URL parser throws on - any of them used to leave the
             // button looking dead.
             setStatus(messageFor(e) || NOTE_PASTE, { reveal: true });
+            if (typeof tapFail === 'function') tapFail(fin, messageFor(e) || NOTE_PASTE);
         }
     }
 

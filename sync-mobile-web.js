@@ -45,6 +45,7 @@ const DEST = path.join(ROOT, 'www', 'app');
 // write. Two answers to any of those is a correctness bug, not a style choice.
 const SHARED_SHELL = [
     'qr-encode.js', 'qr-codes.js',
+    'tap-feedback.js',
     'trip-recap-image.js',
     'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html

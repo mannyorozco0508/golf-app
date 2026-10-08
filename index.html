@@ -91,6 +91,9 @@
          byte-identical copy until the shared-core wave; four copies of that rule, with
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
+    <!-- Every tap shows it registered: pressed state, what it is doing, and
+         the answer next to the button, scrolled into view. -->
+    <script src="tap-feedback.js"></script>
     <script src="grouping.js"></script>
     <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
          qr-codes.js builds the list, the sheet and the swipe. Both are in the
@@ -380,6 +383,12 @@
            progress, then its presses. Reads top-to-bottom on a phone in one glance. */
         /* THE ORGANIZER'S GROUP PICKER (2026-10-08), in the element that used to
            carry the read-only sentence. Thumb-sized, wraps at 390px. */
+        /* EVERY TAP SHOWS IT REGISTERED (2026-10-08) - see tap-feedback.js. */
+        button:active, .is-pressed { transform: scale(0.98); filter: brightness(0.92); }
+        .is-pressed { opacity: 0.85; }
+        .tap-note { font-size: 0.86rem; line-height: 1.45; margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px; }
+        .tap-note-ok { background: var(--nassau-box-bg); border: 1px solid var(--brand-green); color: var(--text-main); }
+        .tap-note-fail { background: var(--nassau-box-bg); border: 1px solid var(--accent-red); color: var(--text-main); }
         .org-score-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: center; }
         .org-score-label { font-size: 0.82rem; color: var(--text-muted); margin-right: 2px; }
         .org-score-pick {
@@ -8401,7 +8410,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <div class="glb-title">Scorekeeper Links</div>
             <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
             ${rows}
-            <button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet()">📷 Show QR code</button>
+            <button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet(this)">📷 Show QR code</button>
             ${organizerRow}
         </div>`;
         panel.style.display = 'block';
@@ -8443,11 +8452,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // No round, no codes. currentMode is the game code.
         if (!currentMode || typeof qrOpenSheet !== 'function') { mount.innerHTML = ''; return; }
         mount.innerHTML = '<button type="button" class="btn-outline qr-open-btn" '
-            + 'onclick="openRoundQrSheet()">\uD83D\uDCF7 Show QR code</button>';
+            + 'onclick="openRoundQrSheet(this)">\uD83D\uDCF7 Show QR code</button>';
     }
 
-    function openRoundQrSheet() {
+    function openRoundQrSheet(btn) {
         if (typeof qrOpenSheet !== 'function') return;
+        // The sheet opens over the page, so the feedback is the pressed state
+        // and a line only when nothing opens - a receipt for something the
+        // golfer is already looking at would be noise.
+        if (btn && typeof tapBusy === 'function') tapBusy(btn, '\u23F3 Building codes\u2026');
         // THE ROSTER AND THE CODE, NOT THE ROUND RECORD. currentData holds
         // organizerToken; qr-codes.js is never given it, which is what makes
         // "no organizer link in a QR" a property of the interface rather than a
@@ -8463,7 +8476,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         });
         // The same refusal as admin.html, in the same words: nothing was drawn,
         // so it does not float away like something that worked.
-        if (!n && typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
+        if (btn && typeof tapRestore === 'function') tapRestore(btn);
+        if (!n) {
+            if (btn && typeof tapFail === 'function') tapFail(btn, 'No codes to show for this round yet.');
+            else if (typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
+        }
     }
 
     function copyGroupLinkFromScorecard(url, groupNum, btn) {

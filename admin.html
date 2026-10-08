@@ -78,6 +78,9 @@
          byte-identical copy until the shared-core wave; four copies of that rule, with
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
+    <!-- Every tap shows it registered: pressed state, what it is doing, and
+         the answer next to the button, scrolled into view. -->
+    <script src="tap-feedback.js"></script>
     <script src="grouping.js"></script>
     <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
          qr-codes.js builds the list, the sheet and the swipe. Both are in the
@@ -381,6 +384,18 @@
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        /* EVERY TAP SHOWS IT REGISTERED (2026-10-08). A pressed state on every
+           button in the app, and a result line that stays until the next tap -
+           a self-dismissing receipt is exactly what a golfer misses while
+           looking at the keyboard. */
+        button:active, .is-pressed { transform: scale(0.98); filter: brightness(0.92); }
+        .is-pressed { opacity: 0.85; }
+        .tap-note {
+            font-size: 0.86rem; line-height: 1.45; margin: 8px 0 4px;
+            padding: 8px 10px; border-radius: 8px;
+        }
+        .tap-note-ok { background: var(--nassau-box-bg); border: 1px solid var(--brand-green); color: var(--text-main); }
+        .tap-note-fail { background: var(--warn-bg, var(--nassau-box-bg)); border: 1px solid var(--accent-red); color: var(--text-main); }
         .email-link-hint { font-size: 0.82rem; line-height: 1.5; color: var(--text-muted); margin: 10px 0 6px; }
         .email-link-card { text-align: left; max-width: 420px; margin: 0 auto 16px auto; padding: 12px 14px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
         /* ACCOUNT (Option A). The email-link card moved off the lobby and into a
@@ -1187,7 +1202,7 @@ html {
         <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
             <label for="email-link-input">Email</label>
             <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
-            <button type="submit" id="email-link-send" class="btn-primary">Email me a sign-in link</button>
+            <button type="submit" id="email-link-send" class="btn-primary" onclick="return true;">Email me a sign-in link</button>
         </form>
         <!-- FINISH IT HERE, AND SAY SO (2026-10-08). Manny on TestFlight: he
              tapped the link in the email and it opened the WEB app, leaving the
@@ -8195,6 +8210,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // shared by the batch rebuild in renderPlayerList and the single add/remove actions below,
     // so the header never goes stale relative to however many rows are actually on screen.
     function renderPlayerListHeaderAndWarning(existingDataLength) {
+        // WHAT THE NUMBER IN THAT COLUMN IS CALLED (2026-10-08). All three
+        // branches below said the literal "Index", so a Strokes round - the
+        // DEFAULT for a new round - put "Index" over numbers the app uses
+        // exactly as typed. The box's own placeholder has followed the switch
+        // since Wave 37; the heading above it was missed, which is the same
+        // defect handicap-labels.js exists to kill. One source now answers both.
+        const hcpHead = handicapSetupBoxLabel();
         const format = document.getElementById("game-format-select").value;
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const headerRow = document.getElementById("player-header-row");
@@ -8218,14 +8240,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (format === 'ryder') {
             headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
             headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
             const flt = flightsEnabledNow();
             headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
         }
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
@@ -8380,36 +8402,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function oauthLinkTap(which) {
         if (!oauthReady()) return setTextOnce(document.getElementById('oauth-link-status'),
             'Sign-in is not ready yet. Wait a moment and try again.');
-        var a = document.getElementById('oauth-link-apple'), g = document.getElementById('oauth-link-google');
-        if (a) a.disabled = true; if (g) g.disabled = true;
-        setTextOnce(document.getElementById('oauth-link-status'), 'Opening\u2026');
+        var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
+        tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-link-status'),
-                'Linked. Next time, one tap on this account.');
+            tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
+                + ' linked \u2014 next time it is one tap on this account.');
             refreshAccountState();
             syncOauthLinkRow();
         }, function (err) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-link-status'),
-                window.oauthSignin.messageFor(err, { deliberateLink: true }));
+            tapFail(btn, window.oauthSignin.messageFor(err, { deliberateLink: true }));
         });
     }
 
     function oauthTap(which) {
-        if (!oauthReady()) return setTextOnce(document.getElementById('oauth-status'),
-            'Sign-in is not ready yet. Wait a moment and try again.');
-        var a = document.getElementById('oauth-apple'), g = document.getElementById('oauth-google');
-        if (a) a.disabled = true; if (g) g.disabled = true;
-        setTextOnce(document.getElementById('oauth-status'), 'Opening\u2026');
+        var btn = document.getElementById(which === 'apple' ? 'oauth-apple' : 'oauth-google');
+        if (!oauthReady()) {
+            tapFail(btn, 'Sign-in is not ready yet. Wait a moment and try again.');
+            return;
+        }
+        // THE TAP IS VISIBLE BEFORE THE WORK FINISHES, and the answer lands
+        // next to the button and is scrolled into view - the two things missing
+        // every time Manny reported a button as doing nothing.
+        tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which).then(function (r) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-status'), r.note || '');
+            tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
+                + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
             refreshAccountState();
             if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
         }, function (err) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-status'), window.oauthSignin.messageFor(err));
+            tapFail(btn, window.oauthSignin.messageFor(err));
         });
     }
     // The email card is the FALLBACK, shown only when asked for. It is unchanged
@@ -10635,6 +10656,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const list = document.getElementById('player-list');
         if (!list) return;
         const label = handicapSetupBoxLabel();
+        // THE HEADING TOO, not just the boxes under it: until this, flipping the
+        // switch rewrote every placeholder and left the column head saying the
+        // other thing, on the same screen.
+        if (typeof renderPlayerListHeaderAndWarning === 'function') {
+            renderPlayerListHeaderAndWarning(list.querySelectorAll('.player-row').length);
+        }
         list.querySelectorAll('.p-hcp-input').forEach(box => {
             if (box.getAttribute('placeholder') !== label) box.setAttribute('placeholder', label);
         });
