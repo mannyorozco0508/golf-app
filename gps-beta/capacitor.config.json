@@ -1,0 +1,11 @@
+{
+  "appId": "com.rattlegolf.gpsbeta",
+  "appName": "HardPan GPS Beta",
+  "webDir": "www",
+  "ios": {
+    "path": "ios",
+    "includePlugins": [
+      "@capacitor/geolocation"
+    ]
+  }
+}

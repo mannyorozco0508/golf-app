@@ -55,6 +55,10 @@ TRANSFORM.forEach((f) => {
 });
 const gone = GPS_SHELL.filter((f) => fs.existsSync(path.join(OUT, f)));
 if (gone.length) git(OUT, ['rm', '-q', '--'].concat(gone));
+// HARDPAN-ONLY, NOT SHELL FILES: the separate GPS beta app (gps-beta/, its own
+// Capacitor project) and its build tool. A Consumer tree has neither.
+const HARDPAN_ONLY = ['gps-beta', 'tools/build-gps-beta.js'].filter((f) => fs.existsSync(path.join(OUT, f)));
+if (HARDPAN_ONLY.length) git(OUT, ['rm', '-q', '-r', '--'].concat(HARDPAN_ONLY));
 fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(OUT, 'node_modules'));
 console.log(`Consumer tree at ${OUT}: ${rewritten} files had GPS blocks removed, ${gone.length} GPS files removed.`);
 console.log(`Now: cd ${OUT} && npm test`);

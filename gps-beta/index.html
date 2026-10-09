@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>HardPan GPS Beta</title>
+<!--
+  HARDPAN GPS BETA (Myrtle trip, Oct 12-16 2026) - a separate TestFlight app,
+  com.rattlegolf.gpsbeta. YARDAGES ONLY.
+
+  TRIP SAFETY, BY CONSTRUCTION: this page never loads Firebase - there is no
+  database client in the app at all, so nothing can be written to a round, a
+  score, a green or a pin. The GPS screen is mounted with no round and no
+  database; a green set by GPS is kept on this phone only (localStorage).
+  No Enter Score, no Card. Online: Esri satellite; no signal: the USGS imagery
+  this app saved for the trip courses (Esri's terms forbid storing Esri tiles).
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #0b0f0c; color: #f4f4ef; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #beta-home { padding: calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0; color: #d9f99d; }
+  .sub { margin: 6px 0 20px; color: #a7b3aa; font-size: 14px; line-height: 1.4; }
+  .course { display: block; width: 100%; text-align: left; margin: 0 0 12px; padding: 16px; border-radius: 16px; border: 1px solid rgba(217,249,157,.18);
+            background: rgba(12,18,14,.9); color: inherit; font: inherit; cursor: pointer; }
+  .course b { display: block; font-size: 18px; }
+  .course span { display: block; margin-top: 4px; font-size: 13px; color: #a7b3aa; }
+  .course em { display: block; margin-top: 6px; font-size: 12px; font-style: normal; color: #fbbf24; }
+  #offline { margin-top: 18px; font-size: 13px; color: #a7b3aa; line-height: 1.4; }
+  /* The GPS screen in the beta: no Card, no Enter Score, no GPS | Bets toggle.
+     The › button becomes "Next hole". */
+  #gps-side-toggle, #gps-overlay .gps-side-bets { display: none !important; }
+  #gps-overlay .gps-scorebox .gps-score-next { flex: 1 1 auto; width: auto; border-left: 0; font-size: 18px; }
+</style>
+<script src="course-data.js"></script>
+<script src="gps-geo.js"></script>
+<script src="gps-config.js"></script>
+<script src="gps-view.js"></script>
+</head>
+<body>
+<div id="beta-home">
+  <h1>HardPan GPS Beta</h1>
+  <p class="sub">Yardages only, for the Myrtle trip. Nothing here is saved to your round or sent anywhere - keep scoring in HardPan.</p>
+  <div id="courses"></div>
+  <div id="offline"></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // THE TRIP COURSES, from the live trip rounds (read 2026-10-08): Day 1
+  // NA4EZB Caledonia, Day 2 KHPSL4 True Blue, Day 3 3MKUCF Pine Lakes.
+  var COURSES = [
+    { key: 'caledonia', day: 'Day 1' },
+    { key: 'trueblue', day: 'Day 2' },
+    { key: 'pinelakes', day: 'Day 3', note: 'Holes 1-9 have no mapped green: stand on the green and use Tools → Set the green (kept on this phone).' }
+  ];
+  var LAST = 'hpbeta_last_v1';
+  var cur = null;
+
+  function preset(key) { return (typeof coursePresets !== 'undefined' && coursePresets[key]) || { name: key, data: [] }; }
+  function holes(key) { return preset(key).data || []; }
+  function meta(key, n) { return holes(key).filter(function (h) { return Number(h.hole) === Number(n); })[0] || null; }
+  function save() { try { localStorage.setItem(LAST, JSON.stringify(cur)); } catch (e) {} }
+
+  function setHole(n) {
+    var hs = holes(cur.key);
+    if (n < 1) n = hs.length;
+    if (n > hs.length) n = 1;
+    cur.hole = n; save();
+    var m = meta(cur.key, n);
+    window.HardPanGps.setHole(n, m ? m.par : null);
+  }
+
+  function open(key, hole) {
+    var g = window.HardPanGps;
+    if (g.isMounted()) g.unmount();
+    cur = { key: key, hole: hole || 1 }; save();
+    var m = meta(key, cur.hole);
+    g.mount({
+      courseKey: key, eventCode: 'BETA', hole: cur.hole, par: m ? m.par : null,
+      // NO ROUND, NO DATABASE: the GPS screen has nothing to write to.
+      round: null, db: null, writeRoundPin: null, openScore: null,
+      // Set / fix a green by GPS is allowed - it stays on this phone.
+      canFix: true,
+      holeMeta: function (n) { var h = meta(key, n); return h ? { par: h.par, si: h.hcpIndex, yards: h.yardage || null } : null; },
+      holeList: function () { return holes(key).map(function (h) { return Number(h.hole); }); },
+      gotoHole: setHole,
+      stepHole: function (d) { setHole(cur.hole + d); }
+    });
+    var next = document.querySelector('#gps-overlay .gps-score-next');
+    if (next) next.textContent = 'Next hole ›';
+    g.showSide('gps');
+  }
+
+  // Back (top-left on the map) shows this page again: the GPS side hides.
+  function renderHome() {
+    var box = document.getElementById('courses');
+    box.innerHTML = COURSES.map(function (c) {
+      var p = preset(c.key);
+      return '<button class="course" data-key="' + c.key + '"><b>' + p.name + '</b><span>' + c.day + ' · ' + holes(c.key).length + ' holes</span>'
+        + (c.note ? '<em>' + c.note + '</em>' : '') + '</button>';
+    }).join('');
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest('button.course');
+      if (b) open(b.getAttribute('data-key'), 1);
+    });
+  }
+
+  // OFFLINE MAPS: with signal, save the USGS imagery (public domain) for every
+  // trip course, once - the GPS screen then has a satellite picture with no
+  // bars. Esri's tiles are never stored (its terms forbid it).
+  function precacheAll() {
+    var el = document.getElementById('offline');
+    if (navigator.onLine === false) { el.textContent = 'No signal: offline maps will be saved next time you have signal.'; return; }
+    var done = 0, ok = 0;
+    el.textContent = 'Saving offline maps for the trip courses…';
+    var next = function (i) {
+      if (i >= COURSES.length) { el.textContent = 'Offline maps saved: ' + ok + ' of ' + COURSES.length + ' courses (USGS imagery).'; return; }
+      Promise.resolve(window.HardPanGps.precacheCourse(COURSES[i].key)).then(function (r) {
+        if (r && (r.ok || r.reason === 'fresh')) ok++;
+        done++;
+        next(i + 1);
+      }, function () { next(i + 1); });
+    };
+    next(0);
+  }
+
+  // AT A TRIP COURSE: open it. The position is compared ON THE PHONE with the
+  // bundled course data and goes nowhere else.
+  function nearestCourse(pt) {
+    var best = null;
+    COURSES.forEach(function (c) {
+      var o = window.HardPanGeo.osmCourse(window.HardPanGpsCourses || {}, c.key);
+      var b = window.HardPanGeo.courseBounds(o, [], 0);
+      if (!b) return;
+      var mid = [(b.south + b.north) / 2, (b.west + b.east) / 2];
+      var d = window.HardPanGeo.haversineMeters(pt, mid);
+      if (d < 3000 && (!best || d < best.d)) best = { key: c.key, d: d };
+    });
+    return best;
+  }
+  // The native plugin when it is there (one permission prompt, the app's own),
+  // the browser's otherwise.
+  function getPosition(ok) {
+    var C = window.Capacitor, P = C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.Geolocation;
+    if (P && typeof P.getCurrentPosition === 'function') { P.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 }).then(ok, function () {}); return; }
+    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(ok, function () {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  }
+  function openNearby() {
+    getPosition(function (pos) {
+      if (cur) return;
+      var s = document.createElement('script');
+      s.src = 'gps-courses.js';
+      s.onload = function () { var n = nearestCourse([pos.coords.latitude, pos.coords.longitude]); if (n && !cur) open(n.key, 1); };
+      document.head.appendChild(s);
+    });
+  }
+
+  renderHome();
+  precacheAll();
+  var last = null;
+  try { last = JSON.parse(localStorage.getItem(LAST) || 'null'); } catch (e) {}
+  if (last && last.key && COURSES.some(function (c) { return c.key === last.key; })) open(last.key, last.hole || 1);
+  else openNearby();
+})();
+</script>
+</body>
+</html>
