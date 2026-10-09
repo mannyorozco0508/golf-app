@@ -50,7 +50,9 @@
 //
 //     0 PASS / 12 FAIL
 //
-// BASELINE COUNT DELTA: +1 the linking case added in Build 12 (2026-10-08) - a
+// BASELINE COUNT DELTA: +3 the linking case added in Build 12 (2026-10-08), and two
+// on 2026-10-09 (a rejected token says which check failed; a sign-in that works
+// clears every earlier failure note). The Build 12 one: a
 // signed-in user WITHOUT that provider must LINK it rather than be switched to
 // whatever account owns it. It is the other half of the test above it, and the
 // half that was broken: planOauth inferred "already linked" from isAnonymous

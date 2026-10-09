@@ -649,10 +649,14 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
     test('the native-only failures say what they are: a rejected token, and no signal', () => {
         const { o } = fakeSeam({});
         const bad = o.messageFor(err('auth/invalid-credential'));
-        assert.equal(o.messageFor(err('auth/missing-or-invalid-nonce')), bad,
-            'a nonce mismatch and a rejected token are the same story to the golfer');
+        const nonce = o.messageFor(err('auth/missing-or-invalid-nonce'));
+        // The same sentence to the golfer - and since 2026-10-09 each ends with its
+        // own code (and Firebase's message), so a phone says WHICH check failed.
+        const head = (t) => t.replace(/ \(auth\/[^)]*\)$/, '');
+        assert.equal(head(nonce), head(bad), 'a nonce mismatch and a rejected token are the same story to the golfer');
         assert.ok(/token was rejected/.test(bad), bad);
-        assert.ok(!/\(auth\//.test(bad), 'it is mapped, so no code is appended');
+        assert.match(bad, /\(auth\/invalid-credential[:)]/, 'the code is appended');
+        assert.match(nonce, /\(auth\/missing-or-invalid-nonce[^)]*\)$/, 'the code is appended');
         assert.ok(/No connection/.test(o.messageFor(err('auth/network-request-failed'))));
     });
 

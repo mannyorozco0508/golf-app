@@ -184,6 +184,7 @@
         var msg = String((err && err.message) || '').replace(/^Firebase:\s*/i, '').replace(/\s*\(auth\/[a-z-]+\)\.?\s*$/i, '')
             .replace(/eyJ[A-Za-z0-9_\-\.]{10,}/g, '[token]').trim();
         if (msg.length > 180) msg = msg.slice(0, 177) + '...';
+        if (msg === code) msg = '';
         return (code || msg) ? ' (' + code + (msg ? ': ' + msg : '') + ')' : '';
     }
 
