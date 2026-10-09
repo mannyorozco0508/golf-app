@@ -213,7 +213,8 @@ const READ = `JSON.stringify((function () {
            zoomBtn: vis('.gps-zoom') ? q('.gps-zoom').getAttribute('data-zoom') : null,
            pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), at: e.getAttribute('data-at'), size: parseFloat(getComputedStyle(e).fontSize), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
-           ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
+           // textContent: since build 6 the label may step aside (visibility hidden) for a number.
+           ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').textContent || '').trim() : null,
            ringIn: box(q('.gps-ring-in')), ringLine: (function () { var l = q('.gps-ring-line'), t = q('.gps-target'); return l && l.offsetParent !== null ? { w: parseFloat(l.style.width), deg: t ? Number(t.getAttribute('data-line-deg')) : null } : null; })(),
            sideNote: (function () { var n = document.querySelector('#gps-side-toggle .gps-side-note'); return n && n.style.display !== 'none' ? n.textContent : null; })(),
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(cr), map: box(mapEl),
