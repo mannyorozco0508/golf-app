@@ -62,7 +62,13 @@ test('its own app: bundle id, name, team, 0.2 (6), entitlements, Firebase guard'
     assert.ok(/didRegisterForRemoteNotificationsWithDeviceToken/.test(read('ios/App/App/AppDelegate.swift')), 'push tokens reach the plugin');
     const plist = read('ios/App/App/Info.plist');
     assert.ok(/<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>[^<]{40,}<\/string>/.test(plist), 'a clear When-In-Use reason');
-    assert.ok(!/NSLocationAlways/.test(plist), 'never Always');
+    // ITMS-90683: the AlwaysAndWhenInUse DESCRIPTION is present (Apple asks for it),
+    // but the app never asks for Always: no background location mode, no old
+    // NSLocationAlwaysUsageDescription, and the text says While-open only.
+    assert.ok(/<key>NSLocationAlwaysAndWhenInUseUsageDescription<\/key>\s*<string>[^<]*only uses your location while the app is open[^<]*<\/string>/.test(plist), 'the description Apple asks for, honest');
+    assert.ok(!/<key>NSLocationAlwaysUsageDescription<\/key>/.test(plist), 'no old Always key');
+    assert.ok(!/UIBackgroundModes[\s\S]*location/.test(plist), 'no background location');
+    assert.ok(!/requestAlwaysAuthorization|requestPermissions\(\{[^}]*always/i.test(require('fs').readFileSync(require('path').join(ROOT, 'gps-view.js'), 'utf8')), 'the app never asks for Always');
     assert.ok(/<key>CFBundleDisplayName<\/key>\s*<string>HardPan GPS<\/string>/.test(plist));
     assert.ok(!/HardPan GPS Beta/.test(plist), 'the old name is gone');
     assert.ok(/<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/.test(plist));

@@ -22,6 +22,11 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- ITMS-90683 (Apple's warning on builds 2-5): the location plugin's binary
+	     can ask for "Always", so Apple wants this key present. HardPan GPS never
+	     asks for Always - only When In Use - and the text says so. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>HardPan GPS only uses your location while the app is open, to show your yardages to the green. It never tracks you in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>HardPan GPS uses your location only while the app is open, to show your yardages to the green. It is not sent anywhere unless you choose to set a green where you are standing.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
