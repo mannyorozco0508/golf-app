@@ -113,3 +113,15 @@ test('the app writes what the proposal accepts: the course copy carries `ev`', (
     if (!v) return;   // Consumer tree: no GPS side to check
     assert.ok(/Object\.assign\(\{\}, pin, \{ ev: S\.eventCode \}\)/.test(v), 'savePin stamps the round code on the course copy');
 });
+
+test('course_gps/<key>/osm (build 5): a signed-in phone fills an EMPTY lookup; nobody changes it', () => {
+    const rec = { v: 1, src: 'osm-lookup', at: NOW - 1000, holes: { 1: { osm: { mid: [47.2, -122.57] } } } };
+    assert.strictEqual(can('golfer', '/course_gps/gca_50bc8qqa/osm', rec), true, 'empty: any signed-in phone');
+    assert.strictEqual(can(null, '/course_gps/gca_50bc8qqa/osm', rec), false, 'signed out: no');
+    assert.strictEqual(can('golfer', '/course_gps/gca_50bc8qqa/osm', Object.assign({}, rec, { src: 'typed' })), false, 'only a lookup');
+    const withOsm = JSON.parse(JSON.stringify(DATA));
+    withOsm.course_gps.gca_50bc8qqa = { osm: rec };
+    assert.strictEqual(targaryen.database(proposedRules(), withOsm).as({ uid: 'org', provider: 'anonymous' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, false, 'once there, nobody overwrites it');
+    // And the LIVE rules (unchanged) refuse it - the app treats that as fine.
+    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'golfer' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, false);
+});

@@ -8,6 +8,10 @@
           ".write": "auth != null && newData.exists() && newData.child('ev').isString() && root.child('events/' + newData.child('ev').val() + '/players').exists() && root.child('events/' + newData.child('ev').val() + '/activeCourseKey').isString() && $courseKey.beginsWith(root.child('events/' + newData.child('ev').val() + '/activeCourseKey').val()) && (!data.exists() || auth.uid === root.child('events/' + newData.child('ev').val() + '/ownerUid').val())",
           ".validate": "$hole.matches(/^h([1-9]|1[0-9]|2[0-7])$/) && newData.hasChildren(['mid', 'at', 'ev']) && newData.child('mid/lat').isNumber() && newData.child('mid/lat').val() >= -90 && newData.child('mid/lat').val() <= 90 && newData.child('mid/lng').isNumber() && newData.child('mid/lng').val() >= -180 && newData.child('mid/lng').val() <= 180 && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000"
         }
+      },
+      "osm": {
+        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['v', 'src', 'holes', 'at']) && newData.child('src').val() === 'osm-lookup' && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000"
       }
     }
   },

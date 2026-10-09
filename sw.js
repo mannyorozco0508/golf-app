@@ -4561,7 +4561,13 @@
 // Moved to v339 (gps-flow, 2026-10-09): gps-view.js remembers the side (GPS or
 // the Card) per round, so every new round opens on GPS. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v339-gps-landing';
+// GPS:BEGIN
+// Moved to v340 (gps-flow, 2026-10-09): any course - an OpenStreetMap lookup
+// for a course with nothing bundled; no data, no GPS landing; never a map of the
+// golfer's street; the double-ring target; numbers that hug it. gps-view.js,
+// gps-geo.js and index.html's GPS block changed. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v340-gps-anycourse';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

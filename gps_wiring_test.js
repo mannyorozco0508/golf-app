@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v339-gps-landing'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v340-gps-anycourse'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -252,7 +252,8 @@ test('build 3 look: no arcs, no center line, no green fill or outline, nothing y
     const css = v.slice(v.indexOf('var CSS'));
     assert.ok(!/#facc15|#fde68a/i.test(v), 'nothing yellow on the map');
     assert.ok(!/\.gps-ring::before|\.gps-ring::after/.test(css), 'no crosshair');
-    assert.ok(/lbl\.style\.display = S\.view === 'green' \? '' : 'none';/.test(v), '"20 yd" only in the Green view');
+    // Build 5 (Manny, 2026-10-09) brought "20 yd" back to the hole view, at the end of the width line.
+    assert.ok(/lbl\.setAttribute\('data-end'/.test(v), '"20 yd" at one end of the width line');
     assert.ok(/#gps-overlay:not\(\.gps-basic-mode\) \.gps-sub,#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar, no "Tee -> target" pill');
     assert.ok(/class="gps-pop-info"/.test(v), 'the accuracy / source line is in the credits');
 });
@@ -273,4 +274,33 @@ test('build 5 landing: the Card choice is remembered per round, so every new rou
     assert.ok(/if \(r\.round != null && \(!S \|\| r\.round !== S\.eventCode\)\) return null;/.test(v), 'another round\'s choice is not this round\'s');
     // The landing still respects a choice made in THIS round, and denied location.
     assert.ok(/if \(storedSide\(\) === 'bets'\) return;/.test(v));
+});
+
+test('build 5, any course: the OpenStreetMap lookup asks from the COURSE point, keeps clean holes, shares best-effort', { skip }, () => {
+    const v = read('gps-view.js'), g = read('gps-geo.js');
+    const sec = v.slice(v.indexOf('// ---- ANY COURSE: AN OPENSTREETMAP LOOKUP'), v.indexOf('// ONE writer for a pin.'));
+    assert.ok(/var pt = S\.courseLoc;/.test(sec) && !/fix\b/.test(sec), 'the course point, never the golfer (no fix in the lookup)');
+    assert.ok(/db\.ref\('global_courses\/' \+ key \+ '\/location'\)/.test(sec), 'the location comes from the course directory');
+    assert.ok(/G\.golfCoursesQuery\(pt\)/.test(sec) && /G\.pickGolfCourse\(/.test(sec) && /G\.cleanLookupHoles\(/.test(sec), 'the shared pure parts');
+    assert.ok(/course_gps\/' \+ key \+ '\/osm'\)\.set\(rec\)/.test(sec) && /w\.then\(null, function \(\) \{\}\)/.test(sec), 'shared best-effort; a refusal is fine');
+    assert.ok(/LOOKUP_RETRY_NONE_MS = 7 \* 24 \* 3600 \* 1000/.test(sec), 'nothing found: not asked again for a week');
+    assert.ok(/!pointInRing\(o\.end, o\.green\)/.test(g) && /delete o\.par;/.test(g), 'kept only when the hole line ends in its green; OSM par dropped');
+});
+
+test('build 5, no data = no GPS landing; never centred on the golfer off the course', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/if \(!holeHasData\(S\.hole\)\) return;/.test(v), 'no green for this hole: the round stays on the Card');
+    assert.ok(/if \(cc && G\.haversineMeters\(fix\.pt, cc\) <= 3000\)/.test(v), 'the dot framing only at the course');
+    assert.ok(/No GPS map for this course yet/.test(v), 'no location: a note, not a map of the street');
+    const blocks = read('index.html').split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
+    assert.ok(/window\.HardPanGps\.holeHasData\(currentViewedHole\)/.test(blocks), 'after Enter Score: back to GPS only with data');
+});
+
+test('build 5 target: two rings, one width line square to the shot, "20 yd" in both views; numbers in the safe area', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/<span class="gps-ring"><\/span><span class="gps-ring-in"><\/span><span class="gps-ring-line"><\/span><span class="gps-ring-lbl"><\/span>/.test(v));
+    assert.ok(/ang = Math\.atan2\(b\.y - a\.y, b\.x - a\.x\) \* 180 \/ Math\.PI \+ 90;/.test(v), 'square to the shot line');
+    assert.ok(/line\.style\.width = d \+ 'px'/.test(v), 'the line is the circle\'s width - a true 20 yds');
+    assert.ok(!/lbl\.style\.display = S\.view === 'green'/.test(v), 'the label is no longer Green-view only');
+    assert.ok(/rc\.t < safeTop \|\| rc\.r > W - M \|\| rc\.b > safeBot/.test(v), 'numbers stay between the top panel and the bottom row');
 });

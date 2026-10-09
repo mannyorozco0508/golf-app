@@ -6243,7 +6243,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             goToAdjacentHole(1);
             const kp = document.getElementById('kp-force-overlay');
             if (kp && kp.style.display === 'flex') return;
-            if (window.HardPanGps) window.HardPanGps.showSide('gps', { remember: false });
+            // Build 5: back to GPS only when the next hole has a green to measure to.
+            if (window.HardPanGps && (!window.HardPanGps.holeHasData || window.HardPanGps.holeHasData(currentViewedHole))) window.HardPanGps.showSide('gps', { remember: false });
         }, 0);
     });
     let gpsPrecacheAsked = false;

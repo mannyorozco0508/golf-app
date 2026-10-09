@@ -30,3 +30,12 @@
          }
        }
      },
+
+# BUILD 5 (2026-10-09), added to the proposal above (still NOT applied, NOT published):
+# course_gps/$courseKey/osm - an OpenStreetMap lookup one phone made, shared so the
+# next phone does not ask Overpass again. Any signed-in user may FILL it while it is
+# empty; nobody may change or delete it once there.
+#      "osm": {
+#        ".write": "auth != null && !data.exists() && newData.exists()",
+#        ".validate": "newData.hasChildren(['v', 'src', 'holes', 'at']) && newData.child('src').val() === 'osm-lookup' && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000"
+#      }

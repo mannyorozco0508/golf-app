@@ -214,6 +214,8 @@ const READ = `JSON.stringify((function () {
            pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), at: e.getAttribute('data-at'), size: parseFloat(getComputedStyle(e).fontSize), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
            ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
+           ringIn: box(q('.gps-ring-in')), ringLine: (function () { var l = q('.gps-ring-line'), t = q('.gps-target'); return l && l.offsetParent !== null ? { w: parseFloat(l.style.width), deg: t ? Number(t.getAttribute('data-line-deg')) : null } : null; })(),
+           sideNote: (function () { var n = document.querySelector('#gps-side-toggle .gps-side-note'); return n && n.style.display !== 'none' ? n.textContent : null; })(),
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(cr), map: box(mapEl),
                     top: box(q('.gps-top')), sub: box(q('.gps-sub')), right: box(q('.gps-right')), recenterB: box(q('.gps-recenter')), toPill: box(q('.gps-target-row')), bottom: box(q('.gps-bottom')),
                     back: box(q('.gps-pin-back')), front: box(q('.gps-pin-front')), mid: box(q('.gps-pin-mid')), tee: box(q('.gps-pin-tee')), dot: box(q('.gps-dot')) },
@@ -272,6 +274,8 @@ const mapTap = (x, y) => [{ cdp: { method: 'Input.dispatchMouseEvent', params: {
 
 async function arm(name, key, ownerUid, mode, me, acc, steps, extra) {
     const code = 'GPS' + name.toUpperCase().slice(0, 5);
+    // Progress on stderr (stdout is the JSON result), so a hang names its arm.
+    process.stderr.write('arm ' + name + ' ' + new Date().toISOString().slice(11, 19) + '\n');
     // No check reaches a real outside service: not the weather service, not the
     // elevation service, not Esri. The arms that need one bring a stand-in.
     extra = Object.assign({}, extra || {});
@@ -350,10 +354,30 @@ function pillFails(tag, g, required) {
             } else if (p.at !== 'left' && p.at !== 'right') f.push(`${tag}: the ${p.k} number is placed "${p.at}"`);
         }
         const bad = ['ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
+        // BUILD 5: inside the safe area - below the top panel, above the bottom row.
+        if (g.boxes.top && p.box.t < g.boxes.top.b) bad.push('the status bar / top panel area');
+        if (g.boxes.bottom && p.box.b > g.boxes.bottom.t) bad.push('the bottom row area');
         if (hitBox(p.box, greenPage(g))) bad.push('green');
         if (bad.length) f.push(`${tag}: the ${p.k} number covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
     if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two numbers overlap');
+    return f;
+}
+// BUILD 5 TARGET: two rings ~4 px apart (outer = 20 yds), one line straight across
+// (the same 20 yds), square to the shot - in the hole view the shot runs up the
+// screen, so the line is level - and "20 yd" at one end of it, off the rings.
+function targetFails(tag, g, level) {
+    const f = [], tc = mid(g.boxes.target), R = (g.ringPx || 0) / 2;
+    if (!tc || !g.ringPx) return [tag + ': no target'];
+    if (g.ringPx >= 20) {
+        if (!g.ringIn) f.push(tag + ': no inner ring');
+        else { const ri = (g.ringIn.r - g.ringIn.l) / 2, gap = R - ri; if (gap < 3 || gap > 8) f.push(`${tag}: rings ${gap.toFixed(1)} px apart (want about 4-6)`); }
+    }
+    if (!g.ringLine || Math.abs(g.ringLine.w - g.ringPx) > 1) f.push(tag + ': the width line is not the circle\'s width: ' + JSON.stringify([g.ringLine, g.ringPx]));
+    if (level && g.ringLine && Math.abs(g.ringLine.deg) > 12) f.push(`${tag}: the width line is not square to the shot (${g.ringLine.deg} deg)`);
+    const lb = g.boxes.ringLbl;
+    if (!lb || !/^(20 yd|18 m)$/.test(g.ringLbl || '')) f.push(tag + ': no "20 yd" label: ' + JSON.stringify([g.ringLbl, lb]));
+    else { const nx = Math.max(lb.l, Math.min(tc.x, lb.r)), ny = Math.max(lb.t, Math.min(tc.y, lb.b)); if (Math.hypot(nx - tc.x, ny - tc.y) < R) f.push(tag + ': the "20 yd" label sits on the ring'); }
     return f;
 }
 // Wave 1 arcs: the right set, a label for (nearly) every one, each label at the
@@ -423,7 +447,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 //   /epqs?x=&y=                USGS EPQS: heights for known course points, else
 //                              the service's "no data" (-1000000).
 //   /points/.., /gridpoints/.. the National Weather Service (as before).
-const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [] };
+const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [], overpass: [] };
+// BUILD 5 stand-in Overpass: "the golf courses near here" answers one course named
+// "Chambers Bay Golf Course"; its holes and greens are Caledonia's saved extract
+// (the geometry the logic is checked on - the name is only what the lookup picks by).
+const OSM_CAL = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'gps-osm', 'caledonia.json'), 'utf8'));
 const BROKEN = new Set();
 const ELEV = {};                     // "lat,lng" (5 dp) -> feet
 const TILEPNG = fs.readFileSync(path.join(__dirname, '..', 'icon-192.png'));
@@ -438,6 +466,19 @@ function startStandIn() {
                 (SEEN.esri[m[1]] = SEEN.esri[m[1]] || []).push(+m[2]);
                 if (/^DENY/.test(m[1]) || BROKEN.has(m[1])) { r.writeHead(403, Object.assign({ 'Content-Type': 'application/json' }, h)); return r.end('{"error":{"code":403,"message":"Invalid token"}}'); }
                 r.writeHead(200, Object.assign({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }, h)); return r.end(TILEPNG);
+            }
+            if (/^\/overpass/.test(q.url) && q.method === 'POST') {
+                let body = ''; q.on('data', (c) => { body += c; }); q.on('end', () => {
+                    const query = decodeURIComponent(body.replace(/^data=/, '').replace(/\+/g, ' '));
+                    SEEN.overpass.push(query);
+                    r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
+                    if (/leisure"="golf_course/.test(query)) return r.end(JSON.stringify({ elements: [
+                        { type: 'way', id: 4242, tags: { leisure: 'golf_course', name: 'Fircrest Golf Club' }, center: { lat: 47.23, lon: -122.51 } },
+                        { type: 'way', id: 4343, tags: { leisure: 'golf_course', name: 'Chambers Bay Golf Course' }, center: { lat: 47.2, lon: -122.57 } }] }));
+                    if (/way\(4343\)/.test(query)) return r.end(JSON.stringify({ osm3s: { timestamp_osm_base: '2026-10-09T00:00:00Z' }, elements: OSM_CAL.elements }));
+                    return r.end(JSON.stringify({ elements: [] }));
+                });
+                return;
             }
             if ((m = /^\/ctl\/break\/([A-Za-z0-9-]+)/.exec(q.url))) { BROKEN.add(m[1]); r.writeHead(200, h); return r.end('broken'); }
             // GOOGLE MAP TILES API stand-in: a session, 2D tiles, the viewport's copyright.
@@ -482,6 +523,7 @@ function CFG(o) {
     if (o.nws) c.nwsBase = SO;
     if (o.epqs) c.epqsUrl = SO + '/epqs?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
     if (o.paywall != null) c.paywall = o.paywall;
+    if (o.overpass) c.overpassUrl = SO + '/overpass';
     if (o.google) { c.googleKey = o.google; c.googleBase = SO; c.imagery = 'esri'; c.imageryPro = 'google'; }
     return `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return ${JSON.stringify(c)}; }, set: function () {} });`;
 }
@@ -610,10 +652,12 @@ function usgsFallbackFails(tag, g, why) {
     }
 
     // ---- unmapped -------------------------------------------------------------
-    // The golfer's spot is an arbitrary point in Myrtle Beach; Pine Lakes ships no
-    // OSM greens, so only one thing about it matters - the tapped green is far
-    // from it, so the privacy scan cannot mistake one for the other.
-    const pl = [33.7111, -78.8869];
+    // The golfer stands AT Pine Lakes (about 400 m from the middle of its mapped
+    // back nine, where the unmapped front nine is): since build 5 the map frames the
+    // golfer only when they are at the course - 4 km away it shows the course, and a
+    // tapped green there is too far to measure from. The tapped green is still well
+    // away from the golfer, so the privacy scan cannot mistake one for the other.
+    const pl = [33.7290, -78.8500];
     const b = await arm('unmap', 'pinelakes', null, 'ok', pl, 20, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },
         { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-set-green' }, { sleep: 200 }, { tap: '.gps-tap-fallback' }, { sleep: 200 }, { expression: READ },
@@ -838,8 +882,8 @@ function usgsFallbackFails(tag, g, why) {
             if (g.bearing !== 102) fails.push(`polish ${k}: the hole's turn was lost: bearing ${g.bearing}`);
             const want = ringPxAt(H1.mid[0], g.zoom);
             if (!near(g.ringPx, Math.max(6, Math.round(want)), 2)) fails.push(`polish ${k}: ring ${g.ringPx}px across, 20 yds is ${want.toFixed(1)}px at zoom ${g.zoom}`);
-            // BUILD 3: the "20 yd" label is only in the Green view.
-            if (g.boxes.ringLbl) fails.push(`polish ${k}: the ring label shows in the hole view`);
+            // BUILD 5: double ring + width line, "20 yd" in the hole view too.
+            fails.push(...targetFails('polish ' + k, g, true));
             fails.push(...arcFails('polish ' + k, g));
             fails.push(...pillFails('polish ' + k, g, lbl === '1x'));
             if (g.toHere !== z1.toHere) fails.push(`polish ${k}: zooming moved the target: ${g.toHere}`);
@@ -1251,7 +1295,7 @@ function usgsFallbackFails(tag, g, why) {
         // BUILD 3: "20 yd" beside the ring in the Green view only; in meters "18 m".
         { const tc = mid(g1.boxes.target); if (g1.ringLbl !== '20 yd' || !g1.boxes.ringLbl || !tc || g1.boxes.ringLbl.l < tc.x + g1.ringPx / 2) fails.push('green: the "20 yd" label is not beside the ring: ' + JSON.stringify([g1.ringLbl, g1.boxes.ringLbl])); }
         if (gm.boxes.ringLbl && gm.ringLbl !== '18 m') fails.push('green (meters): ring label ' + gm.ringLbl);
-        if (h0.boxes.ringLbl || h5.boxes.ringLbl) fails.push('green: the ring label shows in the hole view');
+        fails.push(...targetFails('green hole view', h0, true), ...targetFails('green view', g1, false));
         fails.push(...arcFails('green view', g1));
         g1.greenLbls.forEach((x) => { const near = { f: g1.boxes.front, c: g1.boxes.mid, b: g1.boxes.back }[x.k]; if (near && x.box && Math.abs((x.box.t + x.box.b) / 2 - (near.t + near.b) / 2) > 30) fails.push('green: label ' + x.text + ' is not beside its point'); });
         if (!dimsIn(g1.greenDims, G_DEPTH, G_WIDTH, 'yds')) fails.push(`green: "${g1.greenDims}", inline ${G_DEPTH} deep x ${G_WIDTH} wide`);
@@ -1351,6 +1395,46 @@ function usgsFallbackFails(tag, g, why) {
         out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
     }
 
+    // ---- BUILD 5: ANY COURSE (Chambers Bay, nothing bundled) ----------------------
+    // The golfer is at HOME (Camas, WA - 150 km away). With the course's directory
+    // location and Overpass blocked: the round stays on the Card, and 📍 GPS shows
+    // the COURSE, not the golfer's street. With no location at all: a note on the
+    // Card side, no map. With the stand-in Overpass: the lookup finds the holes and
+    // the round lands on GPS. Overpass is asked for the COURSE point, never the golfer's.
+    const HOME = [45.5946, -122.404], CB = { latitude: 47.2003276, longitude: -122.5707511, city: 'University Place', state: 'WA' };
+    const cbDb = (name, loc) => ({ events: { ['GPS' + name.toUpperCase().slice(0, 5)]: round('wa_chambers') }, global_courses: loc ? { wa_chambers: { name: 'Chambers Bay', location: loc } } : {} });
+    const ov0 = SEEN.overpass.length;
+    const nd = await arm('nodat', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 7000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 4000 }, { expression: READ }],
+        { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('nodat', CB), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
+    out.noData = nd; bail(out, nd);
+    const nl = await arm('noloc', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 6000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 2500 }, { expression: READ }],
+        { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('noloc', null), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
+    out.noLocation = nl; bail(out, nl);
+    const lk = await arm('lookp', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 12000 }, { expression: READ },
+        { expression: `JSON.stringify({ lk: (function(){ var v = JSON.parse(localStorage.getItem('hardpan_osm_v1_wa_chambers') || 'null'); return v ? { n: Object.keys(v.holes).length, osm: v.osm, name: v.name } : null; })() })` }],
+        { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY', overpass: true }), db: cbDb('lookp', CB) });
+    out.lookup = lk; bail(out, lk);
+    {
+        const [n0, n1] = nd.reads, [l0, l1] = nl.reads, [k0, k1] = lk.reads;
+        if (n0.side !== 'bets' || n0.gpsShown) fails.push('any course: no data, yet it landed on GPS: ' + JSON.stringify([n0.side, n0.gpsShown]));
+        const cen = n1.mapCenter;   // [lng, lat]
+        if (!n1.gpsShown || !cen) fails.push('any course: 📍 GPS did not open the map: ' + JSON.stringify([n1.gpsShown, cen]));
+        else {
+            const dCourse = inlineHaversineM([cen[1], cen[0]], [CB.latitude, CB.longitude]), dHome = inlineHaversineM([cen[1], cen[0]], HOME);
+            if (dCourse > 3000 || dHome < 50000) fails.push(`any course: the map is ${Math.round(dCourse)} m from the course and ${Math.round(dHome)} m from the golfer's home - it must show the course`);
+        }
+        if (l0.side !== 'bets' || l0.gpsShown) fails.push('no location: landed on GPS');
+        if (l1.gpsShown || !/No GPS map for this course yet/.test(l1.sideNote || '')) fails.push('no location: 📍 GPS should leave a note on the Card, not open a map: ' + JSON.stringify([l1.gpsShown, l1.sideNote]));
+        const lkInfo = JSON.parse(lk.raw.find((v) => typeof v === 'string' && v.startsWith('{"lk"')) || '{}').lk;
+        if (!lkInfo || lkInfo.n < 9 || lkInfo.osm !== 'way/4343') fails.push('lookup: the stand-in course was not looked up and kept: ' + JSON.stringify(lkInfo));
+        if (k0.side !== 'gps' || !k0.gpsShown || !/^\d+$/.test(k0.m || '')) fails.push('lookup: with greens found, the round did not land on GPS with numbers: ' + JSON.stringify([k0.side, k0.gpsShown, k0.m]));
+        const asked = SEEN.overpass.slice(ov0);
+        if (asked.length !== 2) fails.push('lookup: expected 2 Overpass queries (the courses near, then ours), got ' + asked.length);
+        if (asked.some((qq) => qq.indexOf(HOME[0].toFixed(2)) !== -1 && qq.indexOf(String(HOME[1]).slice(0, 7)) !== -1)) fails.push('lookup: the golfer\'s position went to Overpass');
+        if (!asked.length || !/golf_course"\]\(47\.17/.test(asked[0])) fails.push('lookup: the first query was not a box around the COURSE: ' + asked[0]);
+        out.anyCourseSummary = { noData: [n0.side, n1.mapCenter], noLocation: [l1.gpsShown, l1.sideNote], lookup: [k0.side, k0.m, lkInfo], overpass: asked.length };
+    }
+
     // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
     const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
     const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
@@ -1379,7 +1463,7 @@ function usgsFallbackFails(tag, g, why) {
         const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Drag-the-target yardages', 'Wind', 'Plays-like yardage', 'Not now'];
         if (/Edit Pin/.test(f1.sheet || '')) fails.push('free: the sheet still offers Edit Pin');
         if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
-        if (/\$|\/year|trial|Coming soon$/.test(f1.sheet.replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));
+        if (/\$|\/year|trial|Coming soon$/.test((f1.sheet || '').replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));
         if (f2.sheet) fails.push('free: "Not now" did not close the sheet');
         if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
@@ -1434,7 +1518,7 @@ function usgsFallbackFails(tag, g, why) {
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
-        green: out.greenSummary, layout: out.layoutSummary, flow: out.flowSummary, google: out.googleSummary, googleBudget: out.googleBudget,
+        green: out.greenSummary, layout: out.layoutSummary, flow: out.flowSummary, anyCourse: out.anyCourseSummary, google: out.googleSummary, googleBudget: out.googleBudget,
         esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
         esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,

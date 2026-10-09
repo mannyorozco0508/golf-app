@@ -665,7 +665,49 @@
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
 
+    // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
+    // Shared by the app (gps-view.js lookupCourse) and tools/gps-coverage.js, so
+    // the phone and the coverage report pick the same course and keep the same holes.
+    // The words of a course name that tell it apart ("Chambers Bay Golf Club" ->
+    // chambers, bay).
+    function courseNameWords(n) {
+        return String(n || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(function (w) {
+            return w.length > 2 && !/^(golf|club|course|courses|country|the|and|links|resort|at|of|gc|cc|stadium|north|south|east|west)$/.test(w);
+        });
+    }
+    // The Overpass query for the golf courses in a ~2.5 km box around a course point.
+    function golfCoursesQuery(pt) {
+        var dLat = 0.0225, dLng = 0.0225 / Math.max(0.2, Math.cos(pt[0] * Math.PI / 180));
+        var bb = [(pt[0] - dLat).toFixed(4), (pt[1] - dLng).toFixed(4), (pt[0] + dLat).toFixed(4), (pt[1] + dLng).toFixed(4)].join(',');
+        return '[out:json][timeout:25];nwr["leisure"="golf_course"](' + bb + ');out tags center;';
+    }
+    // Ours among them: the best name match; with no name match, the only one there.
+    function pickGolfCourse(elements, name) {
+        var words = courseNameWords(name);
+        var cands = (elements || []).filter(function (e) { return e.type === 'way' || e.type === 'relation'; });
+        var score = function (e) { var nw = courseNameWords(e.tags && e.tags.name); return words.filter(function (w) { return nw.indexOf(w) !== -1; }).length; };
+        cands.sort(function (a, b) { return score(b) - score(a); });
+        return cands.length && (score(cands[0]) > 0 || cands.length === 1) ? cands[0] : null;
+    }
+    function courseHolesQuery(c) {
+        return '[out:json][timeout:40];' + c.type + '(' + c.id + ')->.c;.c map_to_area->.a;(nwr["golf"="hole"](area.a);nwr["golf"="green"](area.a););out geom;';
+    }
+    // The holes to keep: matched, and the hole line ends INSIDE its green (the
+    // importer's rule). OSM's par is dropped - par comes from our card.
+    function cleanLookupHoles(elements) {
+        var r = osmToCourseGps(elements || [], {}), holes = {};
+        Object.keys(r.holes || {}).forEach(function (n) {
+            var o = r.holes[n].osm;
+            if (!o || !o.green || !o.end || !pointInRing(o.end, o.green)) return;
+            delete o.par;
+            holes[n] = r.holes[n];
+        });
+        return { holes: holes, counts: r.counts };
+    }
+
     var api = {
+        courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
+        courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

@@ -311,7 +311,9 @@
     }
     function osmRecord(key) {
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
-        return G.osmCourse(all, key);
+        // Bundled first; else what an OpenStreetMap lookup found for this course
+        // (this phone's, or the shared one) - see ANY COURSE below.
+        return G.osmCourse(all, key) || lookedUp(key);
     }
     function holeKey(n) { return 'h' + n; }
 
@@ -350,9 +352,118 @@
             db.ref('course_gps/' + key).once('value').then(function (snap) {
                 var v = snap && typeof snap.val === 'function' ? snap.val() : null;
                 if (v) cacheWrite(key, v);
+                // A lookup another phone shared (build 5).
+                if (v && v.osm && v.osm.holes && S && S.courseKey === key) { S.osmShared = v.osm; lsSet(OSM_LOOKUP + key, v.osm); }
                 if (S && S.courseKey === key) { if (v) S.courseRec = v; render(); }
             }, function () { /* no rule yet, or offline: the cache and the round carry it */ });
         } catch (e) {}
+    }
+
+    // ---- ANY COURSE: AN OPENSTREETMAP LOOKUP (build 5, 2026-10-09) --------------
+    // A course with no bundled GPS data (gps-courses.js) is looked up in
+    // OpenStreetMap: the golf=hole and golf=green features inside THAT course's
+    // area only, as tools/gps-import-osm.js does for the bundled ones. Found from
+    // the COURSE's own location in the course directory (global_courses/<key>/
+    // location) - never the golfer's position (see PRIVACY above). Two small
+    // Overpass queries per course per phone, ever: the golf courses within 2.5 km
+    // of that point (ours picked by name), then its holes and greens. A hole is
+    // kept only when its line ends inside its green, as the importer keeps them;
+    // OSM's par is never used. The answer is kept on this phone and offered to
+    // the shared record course_gps/<key>/osm so the next phone has it - refused
+    // until that path has a rule (docs/gps-rules-proposal.json), which is fine:
+    // each phone then asks once. Nothing found: asked again after a week; an
+    // error or no signal: after a day.
+    var OSM_LOOKUP = 'hardpan_osm_v1_', COURSE_LOC = 'hardpan_course_loc_v1_';
+    // Two public Overpass servers: the second only when the first is busy (both
+    // answer a browser; both are free, no key).
+    var OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+    var LOOKUP_RETRY_NONE_MS = 7 * 24 * 3600 * 1000, LOOKUP_RETRY_ERR_MS = 3600 * 1000;
+    function overpassUrls() { return cfg().overpassUrl ? [String(cfg().overpassUrl)] : OVERPASS_URLS; }
+    function lookedUp(key) {
+        if (S && S.courseKey === key && S.osmShared && S.osmShared.holes) return S.osmShared;
+        var v = lsGet(OSM_LOOKUP + key);
+        return v && v.holes && Object.keys(v.holes).length ? v : null;
+    }
+    // The course's point: this phone's copy, the bundled holes, or the directory.
+    function courseCenter() {
+        if (S && S.courseLoc) return S.courseLoc;
+        var rec = S && osmRecord(S.courseKey), pts = [];
+        if (rec && rec.holes) Object.keys(rec.holes).forEach(function (n) { var o = rec.holes[n].osm; if (o && o.mid) pts.push(o.mid); });
+        if (!pts.length) return null;
+        return [pts.reduce(function (a, q) { return a + q[0]; }, 0) / pts.length, pts.reduce(function (a, q) { return a + q[1]; }, 0) / pts.length];
+    }
+    function loadCourseLocation(done) {
+        var key = S.courseKey, mine = S;
+        var fin = function () { if (S === mine) S.locPending = false; if (done) done(S === mine ? S.courseLoc : null); };
+        var c = lsGet(COURSE_LOC + key);
+        if (c && isFinite(c.lat) && isFinite(c.lng)) { S.courseLoc = [c.lat, c.lng]; fin(); return; }
+        if (!S.db || typeof S.db.ref !== 'function') { fin(); return; }
+        S.locPending = true;
+        try {
+            S.db.ref('global_courses/' + key + '/location').once('value').then(function (snap) {
+                var L = snap && typeof snap.val === 'function' ? snap.val() : null;
+                var lat = L && Number(L.latitude != null ? L.latitude : L.lat), lng = L && Number(L.longitude != null ? L.longitude : (L.lng != null ? L.lng : L.lon));
+                if (L && isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng)) {
+                    lsSet(COURSE_LOC + key, { lat: lat, lng: lng });
+                    if (S === mine) S.courseLoc = [lat, lng];
+                }
+                fin();
+            }, fin);
+        } catch (e) { fin(); }
+    }
+    function overpass(q) {
+        var urls = overpassUrls();
+        var one = function (i) {
+            return fetch(urls[i], { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) })
+                .then(function (r) { if (!r.ok) throw new Error('overpass ' + r.status); return r.json(); })
+                .catch(function (e) { if (i + 1 < urls.length) return one(i + 1); throw e; });
+        };
+        return one(0);
+    }
+    function lookupCourse(done) {
+        var fin = function (found) { if (done) { var d = done; done = null; d(found); } };
+        if (!S || typeof fetch !== 'function') { fin(false); return; }
+        var key = S.courseKey, mine = S;
+        var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
+        if (G.osmCourse(all, key) || lookedUp(key)) { fin(true); return; }
+        var tried = lsGet(OSM_LOOKUP + 'tried_' + key);
+        if (tried && Date.now() - tried.at < (tried.none ? LOOKUP_RETRY_NONE_MS : LOOKUP_RETRY_ERR_MS)) { fin(false); return; }
+        if (S.osmInFlight) { fin(false); return; }
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
+        var pt = S.courseLoc;
+        if (!pt) { fin(false); return; }
+        S.osmInFlight = true;
+        var cname = (S.round && S.round.courseName) || '';
+        var mark = function (none) { lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: !!none }); mine.osmInFlight = false; };
+        overpass(G.golfCoursesQuery(pt)).then(function (j) {
+            var pick = G.pickGolfCourse(j && j.elements, cname);
+            if (!pick) return null;
+            return overpass(G.courseHolesQuery(pick)).then(function (k) { return { course: pick, raw: k }; });
+        }).then(function (got) {
+            if (!got) { mark(true); fin(false); return; }
+            var holes = G.cleanLookupHoles(got.raw.elements).holes;
+            if (!Object.keys(holes).length) { mark(true); fin(false); return; }
+            var rec = { v: 1, src: 'osm-lookup', osm: got.course.type + '/' + got.course.id, name: (got.course.tags && got.course.tags.name) || '',
+                        osmBase: (got.raw.osm3s && got.raw.osm3s.timestamp_osm_base) || null, at: Date.now(), holes: holes };
+            lsSet(OSM_LOOKUP + key, rec);
+            mark(false);
+            if (mine.db && typeof mine.db.ref === 'function') {
+                try { var w = mine.db.ref('course_gps/' + key + '/osm').set(rec); if (w && typeof w.then === 'function') w.then(null, function () {}); } catch (e) {}
+            }
+            if (S === mine) { S.needsFrame = true; render(); }
+            fin(true);
+        }).catch(function () { mark(false); fin(false); });
+    }
+    // Does this hole have a green (or a tee) to measure to?
+    function holeHasData(n) {
+        if (!S || !G) return false;
+        var osm = osmRecord(S.courseKey);
+        var r = G.resolveHole(osm && osm.holes ? osm.holes[String(n == null ? S.hole : n)] : null, pinsFor(n == null ? S.hole : n));
+        return !!(r && (r.mid || r.tee));
+    }
+    function courseHasAnyData() {
+        var osm = S && osmRecord(S.courseKey);
+        return !!(osm && osm.holes && Object.keys(osm.holes).length);
     }
 
     // ONE writer for a pin. The round copy goes through the page's durable queue
@@ -982,10 +1093,13 @@
             S.framed = 'hole';
             S.camera = cam;
         } else if (first || (S.framed === 'hole' && !resolved())) {
-            // The world view only when there is NO hole to show - not because one
-            // fit failed (the next frame tries again).
-            S.map.jumpTo({ center: [0, 20], zoom: 2, bearing: 0, padding: viewPad() });
-            S.framed = null; S.camera = null;
+            // No hole to show (not merely a fit that failed - the next frame tries
+            // again): the COURSE, from its location (build 5); the world view only
+            // when even that is unknown. Never the golfer's street.
+            var cc = courseCenter();
+            if (cc) { S.map.jumpTo({ center: ll(cc), zoom: 15.5, bearing: 0, padding: viewPad() }); S.framed = 'course'; }
+            else { S.map.jumpTo({ center: [0, 20], zoom: 2, bearing: 0, padding: viewPad() }); S.framed = null; }
+            S.camera = null;
         }
         // Back to 1x, and the view is the hole's own again (a resize or a taller
         // attribution bar may re-fit it until the golfer moves the map).
@@ -1114,9 +1228,16 @@
         marker('dot', showDot ? fix.pt : null, function () { var e = document.createElement('div'); e.className = 'gps-dot'; e.style.pointerEvents = 'none'; return e; });
         if (fix && !S.framed && S.map) {
             // A hole with no data: the golfer has to see the ground around them to
-            // tap the green. This is the one view framed on the dot.
-            S.map.jumpTo({ center: ll(fix.pt), zoom: 17, bearing: 0 });
-            S.framed = 'dot';
+            // tap the green - but ONLY when they are AT the course (build 5: never a
+            // map of their street). Off the course: the course itself.
+            var cc = courseCenter();
+            if (cc && G.haversineMeters(fix.pt, cc) <= 3000) {
+                S.map.jumpTo({ center: ll(fix.pt), zoom: 17, bearing: 0 });
+                S.framed = 'dot';
+            } else if (cc) {
+                S.map.jumpTo({ center: ll(cc), zoom: 15.5, bearing: 0 });
+                S.framed = 'course';
+            }
         }
     }
 
@@ -1173,7 +1294,7 @@
         if (!S.targetMarker) {
             var el = document.createElement('div');
             el.className = 'gps-target';
-            el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-lbl"></span>';
+            el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-in"></span><span class="gps-ring-line"></span><span class="gps-ring-lbl"></span>';
             var m = new (ML().Marker)({ element: el, draggable: true, anchor: 'center' }).setLngLat(ll(S.target)).addTo(S.map);
             m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; });
             m.on('drag', function () {
@@ -1182,6 +1303,8 @@
                 S.target = [p.lat, p.lng];
                 drawTargetLines();
                 targetReadout();
+                // The width line turns with the shot line, and stays a true 20 yds.
+                sizeTarget();
                 placePills();
             });
             m.on('dragend', function () {
@@ -1216,19 +1339,40 @@
         el.setAttribute('data-ring-px', String(d));
         var ring = el.querySelector('.gps-ring');
         if (ring) { ring.style.width = d + 'px'; ring.style.height = d + 'px'; }
+        // BUILD 5 TARGET: two thin rings, tight together (the outer one IS the 20 yd
+        // circle, the inner one ~4 px inside it), and ONE line straight across,
+        // edge to edge, square to the shot line - the 20 yd width. "20 yd" sits at
+        // one end of it, in the hole view and the Green view alike.
+        var inner = el.querySelector('.gps-ring-in'), di = d - 2 * (4 + 2);
+        if (inner) { inner.style.display = di >= 8 ? '' : 'none'; inner.style.width = di + 'px'; inner.style.height = di + 'px'; }
+        var ang = 0;                  // the width line's angle on screen, degrees
+        try {
+            var o = origin(resolved());
+            if (o && o.pt) {
+                var a = S.map.project(ll(o.pt)), b = S.map.project(ll(S.target));
+                if (Math.hypot(b.x - a.x, b.y - a.y) > 2) ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
+            }
+        } catch (e) {}
+        ang = ((ang % 180) + 180) % 180;  // a line has no direction: 0..180
+        if (ang > 90) ang -= 180;          // -90..90, so its "right" end is the one to the right
+        var line = el.querySelector('.gps-ring-line');
+        if (line) { line.style.width = d + 'px'; line.style.transform = 'translate(-50%,-50%) rotate(' + ang.toFixed(1) + 'deg)'; }
+        el.setAttribute('data-line-deg', ang.toFixed(1));
         var lbl = el.querySelector('.gps-ring-lbl');
         if (lbl) {
-            lbl.style.display = S.view === 'green' ? '' : 'none';
+            lbl.style.display = '';
             var w = units() === 'm' ? Math.round(2 * TARGET_RADIUS_YD * G.M_PER_YD) + ' m' : (2 * TARGET_RADIUS_YD) + ' yd';
             if (lbl.textContent !== w) lbl.textContent = w;
-            var left = box / 2 + d / 2 + 6;
-            // Near the right edge (the circle dragged over there): the label goes on
-            // the circle's left, so it is never cut off.
-            if (S.view === 'green') {
-                var mr = el.getBoundingClientRect(), wr = S.el.getBoundingClientRect(), lw = lbl.offsetWidth || 44;
-                if (mr.width && mr.left + left + lw > wr.right - 8) left = box / 2 - d / 2 - 6 - lw;
-            }
-            lbl.style.left = Math.round(left) + 'px';
+            var lw = lbl.offsetWidth || 36, lh = lbl.offsetHeight || 14;
+            var ux = Math.cos(ang * Math.PI / 180), uy = Math.sin(ang * Math.PI / 180);
+            // At the right-hand end of the line; near the right edge of the screen, the left-hand end.
+            var mr = el.getBoundingClientRect(), wr = S.el.getBoundingClientRect(), sgn = 1;
+            var reach = d / 2 + 4 + Math.abs(ux) * lw / 2 + Math.abs(uy) * lh / 2;
+            if (mr.width && mr.left + box / 2 + ux * reach + lw / 2 > wr.right - 8) sgn = -1;
+            var cx = box / 2 + sgn * ux * reach, cy = box / 2 + sgn * uy * reach;
+            lbl.style.left = Math.round(cx - lw / 2) + 'px'; lbl.style.top = Math.round(cy - lh / 2) + 'px';
+            lbl.style.transform = 'none';
+            lbl.setAttribute('data-end', sgn > 0 ? 'right' : 'left');
         }
     }
 
@@ -1412,6 +1556,11 @@
         // and move with it while it is dragged. No room there: the side (right, then
         // left). Never over the ring, F / C / B, the green or a panel; if nothing
         // fits, the number is not drawn rather than covering something.
+        // BUILD 5: never under the status bar or the top panel, never over the
+        // bottom row: the numbers live between the two.
+        var topR = rectOf(S.el.querySelector('.gps-top'), wrapR), botR = rectOf(S.el.querySelector('.gps-bottom'), wrapR);
+        var safeTop = Math.max(M, topR ? topR.b + M : 0);
+        var safeBot = Math.min(H - M, botR ? botR.t - M : H);
         var put = function (pill, where, text) {
             if (text === '\u2014') return;
             pill.textContent = text;
@@ -1423,7 +1572,7 @@
             var tries = where === 'above' ? [above, right, left] : [below, right, left];
             for (var i = 0; i < tries.length; i++) {
                 var c = tries[i], rc = { l: c.x - w / 2, t: c.y - h / 2, r: c.x + w / 2, b: c.y + h / 2 };
-                if (rc.l < M || rc.t < M || rc.r > W - M || rc.b > H - M) continue;
+                if (rc.l < M || rc.t < safeTop || rc.r > W - M || rc.b > safeBot) continue;
                 if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
                 pill.style.left = Math.round(rc.l) + 'px'; pill.style.top = Math.round(rc.t) + 'px';
                 pill.style.visibility = '';
@@ -2088,6 +2237,8 @@
         // card's own Next button (hole_view_landing_test caught it).
         + '#gps-side-toggle{position:fixed;left:50%;transform:translateX(-50%);z-index:55;display:flex;bottom:calc(70px + env(safe-area-inset-bottom));' + PANEL + 'border-radius:999px;padding:3px;font-family:' + FONT + ';}'
         + 'body.gps-side-gps #gps-side-toggle{display:none;}'
+        + '#gps-side-toggle .gps-side-note{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(300px,86vw);'
+        +   'background:rgba(11,15,12,.92);color:#f4f4ef;font:600 13px/1.35 ' + FONT + ';padding:8px 12px;border-radius:12px;text-align:center;}'
         + '#gps-side-toggle button{font-family:inherit;font-weight:800;font-size:15px;line-height:1;color:#0b0f0c;background:#d9f99d;border:0;border-radius:999px;padding:10px 16px;min-height:42px;cursor:pointer;}'
         + 'body.has-gps-toggle #main-content{padding-bottom:132px !important;}'
         + '#gps-overlay{position:fixed;inset:0;z-index:10050;display:none;background:#0b0f0c;color:#f4f4ef;font-family:' + FONT + ';--gps-attrib-h:20px;--gps-top-b:110px;}'
@@ -2236,8 +2387,12 @@
         // size on the ground (sizeTarget), a crosshair through it, its width beside it.
         + '.gps-target{width:48px;height:48px;position:relative;background:transparent;cursor:grab;touch-action:none;}'
         + '.gps-target .gps-ring{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);box-sizing:border-box;'
-        // BUILD 3: a THIN all-white circle, no crosshair, still 20 yds on the ground.
-        +   'border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.25);}'
+        // BUILD 5: two thin white rings (outer = the true 20 yds) and the width line, each with a faint dark edge.
+        +   'border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 1px rgba(0,0,0,.22);}'
+        + '.gps-target .gps-ring-in{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);box-sizing:border-box;border:1.5px solid #ffffff;border-radius:50%;'
+        +   'box-shadow:0 0 0 1px rgba(0,0,0,.22),inset 0 0 0 1px rgba(0,0,0,.18);pointer-events:none;}'
+        + '.gps-target .gps-ring-line{position:absolute;left:50%;top:50%;height:2px;background:#ffffff;transform:translate(-50%,-50%);'
+        +   'box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none;}'
         + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#ffffff;'
         +   'font:700 10px/1 ' + FONT + ';padding:2px 5px;border-radius:999px;white-space:nowrap;}'
         // FREE: no map - the numbers, large, with Enter Score and the upgrade link.
@@ -2313,7 +2468,28 @@
         el.classList.toggle('gps-basic-mode', !S.pro);
 
         // The golfer's own choice of side: remembered, and the landing leaves it be.
-        on(tg, '.gps-side-gps', function () { S.userChoseSide = true; showSide('gps'); });
+        on(tg, '.gps-side-gps', function () {
+            S.userChoseSide = true;
+            // BUILD 5: no data AND no course location -> no map of the golfer's
+            // street: a short note on the Card side instead.
+            var done = false;
+            var open = function () {
+                if (!S || done) return;
+                done = true;
+                // Only when the course data HAS loaded and says nothing, and there is no
+                // course location either. Anything unknown: open the map, as before.
+                if (window.HardPanGpsCourses && !courseHasAnyData() && !courseCenter()) { cardNote('No GPS map for this course yet - its location is not in the course list.'); return; }
+                showSide('gps');
+            };
+            // The bundled courses load on first use: read them first. Only a course
+            // with no data waits (briefly) for its location. Never more than 3 s.
+            setTimeout(open, 3000);
+            loadCourses(function () {
+                if (!S) return;
+                S.loadingCourses = false;
+                if (S.locPending && !courseHasAnyData()) setTimeout(open, 1500); else open();
+            });
+        });
         on(el, '.gps-side-bets', function () { S.userChoseSide = true; showSide('bets'); });
         on(el, '.gps-back', function () { S.userChoseSide = true; showSide('bets'); });
         var ci = el.querySelector('.gps-credit-i');
@@ -2390,6 +2566,7 @@
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onPageHide);
         loadCourseRecord();
+        loadCourseLocation();
         // After the card has drawn (mount runs inside its render), and never able
         // to throw into it.
         setTimeout(function () { try { land(); } catch (e) {} }, 0);
@@ -2428,12 +2605,28 @@
             loadCourses(function () {
                 if (S !== mine || S.userChoseSide || S.side === 'gps') return;
                 S.loadingCourses = false;
-                var r = resolved();
-                if (!r || (!r.mid && !r.tee)) return;
-                S.autoLanded = true;
-                showSide('gps');
+                // BUILD 5: NO DATA = NO GPS LANDING. A course with nothing bundled is
+                // looked up first (its location, then OpenStreetMap); still nothing
+                // for this hole -> the round stays on the Card.
+                var go = function () {
+                    if (S !== mine || S.userChoseSide || S.side === 'gps') return;
+                    if (!holeHasData(S.hole)) return;
+                    S.autoLanded = true;
+                    showSide('gps');
+                };
+                if (holeHasData(S.hole)) { go(); return; }
+                loadCourseLocation(function () { lookupCourse(function () { go(); }); });
             });
         });
+    }
+    function cardNote(text) {
+        if (!S) return;
+        var n = S.toggle.querySelector('.gps-side-note');
+        if (!n) { n = document.createElement('div'); n.className = 'gps-side-note'; n.setAttribute('role', 'status'); S.toggle.appendChild(n); }
+        n.textContent = text;
+        n.style.display = '';
+        clearTimeout(S.noteTimer);
+        S.noteTimer = setTimeout(function () { if (n) n.style.display = 'none'; }, 5000);
     }
     function locationDenied(done) {
         try {
@@ -2522,6 +2715,9 @@
         isMounted: function () { return !!S; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,
+        // Build 5: does hole n have a green (or tee) to measure to? The card asks
+        // before it hands a hole back to GPS.
+        holeHasData: function (n) { try { return holeHasData(n); } catch (e) { return false; } },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
