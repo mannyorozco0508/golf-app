@@ -4466,7 +4466,11 @@
 // player list, HCP, Go to Round, the receipt button) merged into the GPS branch
 // on top of v342-gps-smarttarget; above players-compact's own v342. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v343-gps-compact';
+// GPS:BEGIN
+// Moved to v344 (gps-flow build 7, 2026-10-09): the two numbers ride their own
+// lines in every view, a center dot in the target, F / C / B 25% bigger. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v344-gps-linenums';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

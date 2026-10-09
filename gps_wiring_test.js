@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v343-gps-compact'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v344-gps-linenums'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -298,7 +298,7 @@ test('build 5, no data = no GPS landing; never centred on the golfer off the cou
 
 test('build 5 target: two rings, one width line square to the shot, "20 yd" in both views; numbers in the safe area', { skip }, () => {
     const v = read('gps-view.js');
-    assert.ok(/<span class="gps-ring"><\/span><span class="gps-ring-in"><\/span><span class="gps-ring-line"><\/span><span class="gps-ring-lbl"><\/span>/.test(v));
+    assert.ok(/<span class="gps-ring"><\/span><span class="gps-ring-in"><\/span><span class="gps-ring-line"><\/span>(<span class="gps-ring-dot"><\/span>)?<span class="gps-ring-lbl"><\/span>/.test(v));
     assert.ok(/ang = Math\.atan2\(b\.y - a\.y, b\.x - a\.x\) \* 180 \/ Math\.PI \+ 90;/.test(v), 'square to the shot line');
     assert.ok(/line\.style\.width = d \+ 'px'/.test(v), 'the line is the circle\'s width - a true 20 yds');
     assert.ok(!/lbl\.style\.display = S\.view === 'green'/.test(v), 'the label is no longer Green-view only');
@@ -344,4 +344,14 @@ test('build 6 smart default target, on the bundled holes: par 3 center; 260 alon
     // Par comes from the CARD: gps-view hands defaultTarget S.par.
     assert.ok(/G\.defaultTarget\(\{\s*par: S\.par,/.test(read('gps-view.js')));
     assert.ok(/'\.gps-recenter', function \(\) \{ if \(S\) \{ S\.targetMoved = false; S\.target = null; \}/.test(read('gps-view.js')), 'Recenter resets it');
+});
+
+test('build 7: the numbers ride their own lines (shrinking before sliding), a center dot, F / C / B 25% bigger', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/var SIZES = \[44, 38, 32\], TS = \[0\.5,/.test(v), 'the middle first, 44 -> 38 -> 32 px');
+    assert.ok(/for \(var i = 0; i < TS\.length; i\+\+\) \{\s*for \(var j = 0; j < SIZES\.length; j\+\+\)/.test(v), 'shrink at a spot before moving along the line');
+    assert.ok(/put\(pOn, P\(eOn\), P\(aim\),/.test(v) && /put\(pTo, P\(o\.pt\), P\(eTo\),/.test(v), 'each number on its own line');
+    assert.ok(/place\(rc2, SIZES\[SIZES\.length - 1\], 'line-crowded'\)/.test(v), 'with no clear spot it still stays on its line');
+    assert.ok(/<span class="gps-ring-dot"><\/span>/.test(v) && /\.gps-target \.gps-ring-dot\{[^}]*width:14px;height:14px;/.test(v), 'the center dot');
+    assert.ok(/\.gps-pin\{width:20px;height:20px;/.test(v) && /\.gps-green-lbl\{[^}]*font:800 15px/.test(v), 'F / C / B bigger');
 });

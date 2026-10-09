@@ -1314,7 +1314,7 @@
         if (!S.targetMarker) {
             var el = document.createElement('div');
             el.className = 'gps-target';
-            el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-in"></span><span class="gps-ring-line"></span><span class="gps-ring-lbl"></span>';
+            el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-in"></span><span class="gps-ring-line"></span><span class="gps-ring-dot"></span><span class="gps-ring-lbl"></span>';
             var m = new (ML().Marker)({ element: el, draggable: true, anchor: 'center' }).setLngLat(ll(S.target)).addTo(S.map);
             m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; });
             m.on('drag', function () {
@@ -1472,7 +1472,7 @@
             if (!it.pt) { el.style.display = 'none'; return; }
             el.textContent = it.text; el.style.display = ''; el.style.visibility = 'hidden';
             var q = S.map.project(ll(it.pt)), w = el.offsetWidth, h = el.offsetHeight;
-            var x = q.x + 14, y = q.y - h / 2;
+            var x = q.x + 16, y = q.y - h / 2;
             placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
             el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
             placed.push({ l: x, t: y, r: x + w, b: y + h });
@@ -1569,68 +1569,95 @@
         var lblRect = rectOf(lblEl, wrapR), lblObs = null;
         if (lblRect) { add(lblRect, M); lblObs = obstacles[obstacles.length - 1]; }
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
-        // BUILD 6: with the target ON the green's center (a par 3, or close in) the
-        // only number is the distance to it, and every spot beside the circle is on
-        // the green - so then the green itself is not an obstacle (F / C / B still are).
-        var aimNow = aimAt(r), onCenter = !!(aimNow && S.target && G.haversineMeters(S.target, aimNow) <= TARGET_RADIUS_YD * G.M_PER_YD);
-        if (r && r.green && r.green.length && !onCenter) {
-            var g = r.green.map(P), gb = { l: Infinity, t: Infinity, r: -Infinity, b: -Infinity };
-            g.forEach(function (q) { gb.l = Math.min(gb.l, q.x); gb.r = Math.max(gb.r, q.x); gb.t = Math.min(gb.t, q.y); gb.b = Math.max(gb.b, q.y); });
-            add(gb, M);
-        }
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
-        // BUILD 5 (Manny's phone: "too small, too far apart"): like Golfshot, the two
-        // numbers sit right against the circle - what's LEFT (circle -> green) just
-        // ABOVE it, the distance TO the circle just BELOW it - a few px off the ring,
-        // and move with it while it is dragged. No room there: the side (right, then
-        // left). Never over the ring, F / C / B, the green or a panel; if nothing
-        // fits, the number is not drawn rather than covering something.
-        // BUILD 5: never under the status bar or the top panel, never over the
-        // bottom row: the numbers live between the two.
+        // F / C / B and their number pills (Green view) are placed FIRST, so the two
+        // distances can stay clear of them.
+        placeGreenLabels();
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-green-lbl'), function (el) { if (el.style.display !== 'none') add(rectOf(el, wrapR), 2); });
+        // Never under the status bar or the top panel, never over the bottom row.
         var topR = rectOf(S.el.querySelector('.gps-top'), wrapR), botR = rectOf(S.el.querySelector('.gps-bottom'), wrapR);
         var safeTop = Math.max(M, topR ? topR.b + M : 0);
         var safeBot = Math.min(H - M, botR ? botR.t - M : H);
-        var put = function (pill, where, text) {
-            if (text === '\u2014') return;
+        // BUILD 7 (Manny's phone, zoom + Green view: "193" left of the circle, "19"
+        // above it): each number sits ON ITS OWN LINE, as drawn - "to target" on the
+        // you / tee -> circle line, "what's left" on the circle -> green-center line -
+        // on the part of that line that is on screen. The middle first; where that is
+        // covered, the number SHRINKS (44 -> 38 -> 32 px) before it slides along its
+        // line. It never leaves its line: with no clear spot at all it still sits on
+        // the line, at 32 px. (The "20 yd" label steps aside before that.)
+        var ringM = TARGET_RADIUS_YD * G.M_PER_YD;
+        var edgeOf = function (from, to) {
+            if (!from || !to || G.haversineMeters(from, to) <= ringM * 1.05) return null;
+            return G.destination(to, G.bearingDeg(to, from), ringM);
+        };
+        // The part of a-b inside the safe box (Liang-Barsky), or null.
+        var clip = function (a, b) {
+            var x0 = M, y0 = safeTop, x1 = W - M, y1 = safeBot, dx = b.x - a.x, dy = b.y - a.y, t0 = 0, t1 = 1;
+            var pp = [-dx, dx, -dy, dy], qq = [a.x - x0, x1 - a.x, a.y - y0, y1 - a.y];
+            for (var i = 0; i < 4; i++) {
+                if (pp[i] === 0) { if (qq[i] < 0) return null; continue; }
+                var rr = qq[i] / pp[i];
+                if (pp[i] < 0) { if (rr > t1) return null; if (rr > t0) t0 = rr; }
+                else { if (rr < t0) return null; if (rr < t1) t1 = rr; }
+            }
+            return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
+        };
+        var SIZES = [44, 38, 32], TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.22, 0.78, 0.12, 0.88];
+        var put = function (pill, a, b, text) {
+            if (text === '—' || !a || !b) return;
+            var seg = clip(a, b);
+            if (!seg) return;                       // its line is not on screen at all
             pill.textContent = text;
             pill.style.visibility = 'hidden'; pill.style.display = '';
-            var w = pill.offsetWidth, h = pill.offsetHeight, d = R + GAP + 2;
-            var above = { x: t.x, y: t.y - d - h / 2 }, below = { x: t.x, y: t.y + d + h / 2 };
-            var right = { x: t.x + d + w / 2, y: where === 'above' ? t.y - h / 2 : t.y + h / 2 };
-            var left = { x: t.x - d - w / 2, y: right.y };
-            // Then above (below) but shifted to one side, still against the ring - a
-            // circle near an edge, with the Green button or the "20 yd" label beside it.
-            var vy = where === 'above' ? above.y : below.y;
-            var tries = [where === 'above' ? above : below, right, left];
-            [0, 8, 16].forEach(function (k) {
-                tries.push({ x: t.x - R - GAP - w / 2 - k, y: vy, at: where + '-left' });
-                tries.push({ x: t.x + R + GAP + w / 2 + k, y: vy, at: where + '-right' });
-            });
-            for (var i = 0; i < tries.length; i++) {
-                var c = tries[i], rc = { l: c.x - w / 2, t: c.y - h / 2, r: c.x + w / 2, b: c.y + h / 2 };
-                if (rc.l < M || rc.t < safeTop || rc.r > W - M || rc.b > safeBot) continue;
-                if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
+            var at = function (tt) { return { x: seg[0].x + (seg[1].x - seg[0].x) * tt, y: seg[0].y + (seg[1].y - seg[0].y) * tt }; };
+            var rectAt = function (c, w, h) { return { l: c.x - w / 2, t: c.y - h / 2, r: c.x + w / 2, b: c.y + h / 2 }; };
+            var inBounds = function (rc) { return !(rc.l < M || rc.t < safeTop || rc.r > W - M || rc.b > safeBot); };
+            var place = function (rc, sz, how) {
                 pill.style.left = Math.round(rc.l) + 'px'; pill.style.top = Math.round(rc.t) + 'px';
                 pill.style.visibility = '';
-                pill.setAttribute('data-at', c.at || (i === 0 ? where : (i === 1 ? 'right' : 'left')));
+                pill.setAttribute('data-at', how); pill.setAttribute('data-size', String(sz));
                 obstacles.push(rc);
-                return;
+            };
+            for (var i = 0; i < TS.length; i++) {
+                for (var j = 0; j < SIZES.length; j++) {
+                    pill.style.fontSize = SIZES[j] + 'px';
+                    var w = pill.offsetWidth, h = pill.offsetHeight, rc = rectAt(at(TS[i]), w, h);
+                    if (!inBounds(rc)) continue;
+                    if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
+                    place(rc, SIZES[j], 'line');
+                    return;
+                }
             }
-            // No room: the "20 yd" label gives way, once, and the number tries again.
+            // Still no room: the "20 yd" label gives way, once, and the number tries again.
             if (lblObs && obstacles.indexOf(lblObs) !== -1) {
                 obstacles.splice(obstacles.indexOf(lblObs), 1);
                 lblEl.style.visibility = 'hidden';
-                return put(pill, where, text);
+                return put(pill, a, b, text);
             }
-            pill.style.display = 'none';
+            // ALWAYS SHOWN, ON ITS LINE: the middle of its visible part, at 32 px,
+            // nudged along the line only to stay inside the screen.
+            pill.style.fontSize = SIZES[SIZES.length - 1] + 'px';
+            var w2 = pill.offsetWidth, h2 = pill.offsetHeight;
+            for (var k = 0; k < TS.length; k++) {
+                var rc2 = rectAt(at(TS[k]), w2, h2);
+                if (inBounds(rc2)) { place(rc2, SIZES[SIZES.length - 1], 'line-crowded'); return; }
+            }
+            place(rectAt(at(0.5), w2, h2), SIZES[SIZES.length - 1], 'line-crowded');
         };
         var aim = aimAt(r);
-        // The target ON the green's center (a par 3, or close in): nothing is left,
-        // so only the distance to it is shown.
-        if (aim && G.haversineMeters(S.target, aim) > TARGET_RADIUS_YD * G.M_PER_YD) put(pOn, 'above', G.shownDistance(G.haversineMeters(S.target, aim), u));
-        if (o) put(pTo, 'below', G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+        var onCenter = !!(aim && G.haversineMeters(S.target, aim) <= TARGET_RADIUS_YD * G.M_PER_YD);
+        // What's left, on the circle -> green-center line (not on a par 3 / close-in
+        // default: the target IS the center, and the single distance is enough).
+        if (aim && !onCenter) {
+            var eOn = edgeOf(aim, S.target);
+            if (eOn) put(pOn, P(eOn), P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));
+        }
+        // To the target, on the you / tee -> circle line (the incoming line).
+        if (o) {
+            var eTo = edgeOf(o.pt, S.target);
+            if (eTo) put(pTo, P(o.pt), P(eTo), G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+        }
         placeArcLabels(obstacles);
-        placeGreenLabels();
     }
 
     // ---- WIND (Wave 1) ----------------------------------------------------------
@@ -2411,7 +2438,8 @@
         + '#gps-overlay .gps-arc-lbl{position:absolute;font:700 10px/1 ' + FONT + ';color:#fff;text-shadow:0 0 2px #000,0 0 3px #000;white-space:nowrap;}'
         + '#gps-overlay .gps-arc-lbl-pin{color:#ffffff;}'
         + '#gps-overlay .gps-green-lbls{position:absolute;inset:0;pointer-events:none;z-index:2;}'
-        + '#gps-overlay .gps-green-lbl{position:absolute;background:rgba(11,15,12,.86);color:#fff;font:800 12px/1 ' + FONT + ';padding:3px 6px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
+        // BUILD 7: the F / C / B number pills about 25% bigger (12 -> 15 px).
+        + '#gps-overlay .gps-green-lbl{position:absolute;background:rgba(11,15,12,.86);color:#fff;font:800 15px/1 ' + FONT + ';padding:4px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         + '#gps-overlay .gps-green-lbl-p{color:#fca5a5;border:1px solid rgba(239,68,68,.7);}'
         + '#gps-overlay .gps-btn.gps-off{opacity:.45;}'
         + '#gps-overlay .gps-tap-fallback{flex:1 1 100%;min-height:32px;color:#c8d1ca;text-decoration:underline;font-size:13px;font-weight:600;}'
@@ -2424,7 +2452,8 @@
         // MapLibre centers a marker on its ELEMENT's box, so every marker element
         // has an explicit size (an unsized one drew the crosshair 24px down and
         // right of its point - measured in the first MapLibre screenshot).
-        + '.gps-pin{width:16px;height:16px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #111;font:700 9px/1 sans-serif;color:#111;}'
+        // BUILD 7: F / C / B about 25% bigger (16 -> 20 px), still compact.
+        + '.gps-pin{width:20px;height:20px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #111;font:800 11px/1 sans-serif;color:#111;}'
         + '.gps-pin-mid{background:#ffffff;}.gps-pin-front{background:#bef264;}.gps-pin-back{background:#fca5a5;}'
         + '.gps-pin-draft{outline:3px solid #ffffff;}'
         // The target: a touch area of at least 48px, the ring drawn at its real
@@ -2435,6 +2464,10 @@
         +   'border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 1px rgba(0,0,0,.22);}'
         + '.gps-target .gps-ring-in{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);box-sizing:border-box;border:1.5px solid #ffffff;border-radius:50%;'
         +   'box-shadow:0 0 0 1px rgba(0,0,0,.22),inset 0 0 0 1px rgba(0,0,0,.18);pointer-events:none;}'
+        // BUILD 7: a small solid dot at the target's exact center, about the size of
+        // the F / C / B markers - white, a thin dark edge - in every view.
+        + '.gps-target .gps-ring-dot{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;'
+        +   'background:#ffffff;border:1.5px solid rgba(11,15,12,.85);box-sizing:border-box;box-shadow:0 0 0 1px rgba(255,255,255,.35);pointer-events:none;z-index:2;}'
         + '.gps-target .gps-ring-line{position:absolute;left:50%;top:50%;height:2px;background:#ffffff;transform:translate(-50%,-50%);'
         +   'box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none;}'
         + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#ffffff;'

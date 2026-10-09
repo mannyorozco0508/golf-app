@@ -215,7 +215,7 @@ const READ = `JSON.stringify((function () {
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
            // textContent: since build 6 the label may step aside (visibility hidden) for a number.
            ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').textContent || '').trim() : null,
-           ringIn: box(q('.gps-ring-in')), ringLine: (function () { var l = q('.gps-ring-line'), t = q('.gps-target'); return l && l.offsetParent !== null ? { w: parseFloat(l.style.width), deg: t ? Number(t.getAttribute('data-line-deg')) : null } : null; })(),
+           ringIn: box(q('.gps-ring-in')), ringDot: box(q('.gps-ring-dot')), ringLine: (function () { var l = q('.gps-ring-line'), t = q('.gps-target'); return l && l.offsetParent !== null ? { w: parseFloat(l.style.width), deg: t ? Number(t.getAttribute('data-line-deg')) : null } : null; })(),
            sideNote: (function () { var n = document.querySelector('#gps-side-toggle .gps-side-note'); return n && n.style.display !== 'none' ? n.textContent : null; })(),
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(cr), map: box(mapEl),
                     top: box(q('.gps-top')), sub: box(q('.gps-sub')), right: box(q('.gps-right')), recenterB: box(q('.gps-recenter')), toPill: box(q('.gps-target-row')), bottom: box(q('.gps-bottom')),
@@ -332,36 +332,28 @@ function segDist(p, a, b) {
 }
 // Pills: the right numbers, ON their lines, covering nothing that matters.
 function pillFails(tag, g, required) {
-    // BUILD 5: the two numbers hug the circle - what's left just ABOVE it, the
-    // distance to it just BELOW (or beside it when there is no room) - 44 px, and
-    // never over the ring, F / C / B, the green or a panel.
+    // BUILD 7: each number sits ON ITS OWN LINE - "to target" on the you / tee ->
+    // circle line, "what's left" on the circle -> green-center line - at 44 px, or
+    // shrunk to 38 / 32 px before it slides along the line; never off its line,
+    // never over the ring, F / C / B or a panel.
     const f = [];
-    const tc = mid(g.boxes.target), R = (g.ringPx || 0) / 2;
+    const from = mid(g.boxes.dot || g.boxes.tee), tc = mid(g.boxes.target), ctr = mid(g.boxes.mid), R = (g.ringPx || 0) / 2;
     const want = { to: lastNum(g.toHere), on: lastNum(g.hereCenter) };
+    const ends = { to: [from, tc], on: [tc, ctr] };
     g.pills.forEach((p) => {
-        // BUILD 6: with the target ON the green's center there is nothing left, and
-        // that number is (rightly) not drawn.
         if (!p.box) { if (required && !(p.k === 'on' && want.on === '0')) f.push(`${tag}: the ${p.k === 'to' ? 'to-target' : 'what\'s-left'} number is not shown`); return; }
         if (p.text !== want[p.k]) f.push(`${tag}: ${p.k} number says "${p.text}", the readout says "${want[p.k]}"`);
-        if (!(p.size >= 44)) f.push(`${tag}: the ${p.k} number is ${p.size}px, not 44`);
-        if (tc) {
-            // The gap between the ring and the number's nearest edge: 0 (no overlap) to 16 px.
+        if (!(p.size >= 32)) f.push(`${tag}: the ${p.k} number is ${p.size}px (32 at the least)`);
+        if (!/^line/.test(p.at || '')) f.push(`${tag}: the ${p.k} number is placed "${p.at}", not on its line`);
+        const [a, b] = ends[p.k];
+        if (a && b) { const d = segDist(mid(p.box), a, b); if (d > 4) f.push(`${tag}: the ${p.k} number is ${Math.round(d)}px off its line`); }
+        if (tc && p.at === 'line') {
             const nx = Math.max(p.box.l, Math.min(tc.x, p.box.r)), ny = Math.max(p.box.t, Math.min(tc.y, p.box.b));
-            const gap = Math.hypot(nx - tc.x, ny - tc.y) - R;
-            if (gap < 0) f.push(`${tag}: the ${p.k} number covers the circle`);
-            else if (gap > (String(p.at || '').indexOf('-') !== -1 ? 30 : 16)) f.push(`${tag}: the ${p.k} number is ${Math.round(gap)}px off the circle, not hugging it`);
-            const wantAt = p.k === 'on' ? 'above' : 'below';
-            if (p.at === wantAt || String(p.at || '').indexOf(wantAt + '-') === 0) {
-                const ok = p.k === 'on' ? p.box.b <= tc.y - R + 1 : p.box.t >= tc.y + R - 1;
-                if (!ok) f.push(`${tag}: the ${p.k} number is not ${wantAt} the circle`);
-            } else if (p.at !== 'left' && p.at !== 'right') f.push(`${tag}: the ${p.k} number is placed "${p.at}"`);
+            if (Math.hypot(nx - tc.x, ny - tc.y) < R - 1) f.push(`${tag}: the ${p.k} number covers the circle`);
         }
-        const bad = ['ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
-        // BUILD 5: inside the safe area - below the top panel, above the bottom row.
+        const bad = p.at === 'line' ? ['ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k])) : [];
         if (g.boxes.top && p.box.t < g.boxes.top.b) bad.push('the status bar / top panel area');
         if (g.boxes.bottom && p.box.b > g.boxes.bottom.t) bad.push('the bottom row area');
-        // (The green is fair game only when the target sits on its center - build 6.)
-        if (hitBox(p.box, greenPage(g)) && want.on !== '0') bad.push('green');
         if (bad.length) f.push(`${tag}: the ${p.k} number covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
     if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two numbers overlap');
@@ -378,6 +370,8 @@ function targetFails(tag, g, level) {
         else { const ri = (g.ringIn.r - g.ringIn.l) / 2, gap = R - ri; if (gap < 3 || gap > 8) f.push(`${tag}: rings ${gap.toFixed(1)} px apart (want about 4-6)`); }
     }
     if (!g.ringLine || Math.abs(g.ringLine.w - g.ringPx) > 1) f.push(tag + ': the width line is not the circle\'s width: ' + JSON.stringify([g.ringLine, g.ringPx]));
+    // BUILD 7: the center dot, at the exact center, about F / C / B size.
+    { const d = g.ringDot, dm = mid(d); if (!d || !dm || Math.hypot(dm.x - tc.x, dm.y - tc.y) > 1.5 || (d.r - d.l) < 12 || (d.r - d.l) > 18) f.push(tag + ': no center dot at the target\'s center: ' + JSON.stringify(d)); }
     if (level && g.ringLine && Math.abs(g.ringLine.deg) > 12) f.push(`${tag}: the width line is not square to the shot (${g.ringLine.deg} deg)`);
     const lb = g.boxes.ringLbl;
     if (!lb || !/^(20 yd|18 m)$/.test(g.ringLbl || '')) f.push(tag + ': no "20 yd" label: ' + JSON.stringify([g.ringLbl, lb]));
