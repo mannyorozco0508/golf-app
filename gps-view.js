@@ -374,9 +374,12 @@
     // each phone then asks once. Nothing found: asked again after a week; an
     // error or no signal: after a day.
     var OSM_LOOKUP = 'hardpan_osm_v1_', COURSE_LOC = 'hardpan_course_loc_v1_';
-    // Two public Overpass servers: the second only when the first is busy (both
-    // answer a browser; both are free, no key).
-    var OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+    // Two public Overpass servers, free, no key. overpass-api.de refuses requests
+    // from a browser (HTTP 406 for any browser user-agent, measured 2026-10-09), so
+    // the mirror that answers browsers goes first; the main one is the fallback.
+    // Courses OSM maps well are BUNDLED instead (tools/gps-import-osm.js), so this
+    // lookup is only for the rest.
+    var OVERPASS_URLS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter'];
     var LOOKUP_RETRY_NONE_MS = 7 * 24 * 3600 * 1000, LOOKUP_RETRY_ERR_MS = 3600 * 1000;
     function overpassUrls() { return cfg().overpassUrl ? [String(cfg().overpassUrl)] : OVERPASS_URLS; }
     function lookedUp(key) {

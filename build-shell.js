@@ -79,7 +79,8 @@ const PRODUCTS = {
         // v172 (gps-flow, 2026-10-09): main (consumer-v164) merged into the GPS branch.
         // v173 (gps-flow, 2026-10-09): the side is remembered per round (every new round opens on GPS).
         // v174 (gps-flow, 2026-10-09): any course (OSM lookup), no-data landing, the new target.
-        cacheNameGps: 'consumer-v174-gps-anycourse',
+        // v175 (gps-flow, 2026-10-09): five more bundled courses from OpenStreetMap.
+        cacheNameGps: 'consumer-v175-gps-osmcourses',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

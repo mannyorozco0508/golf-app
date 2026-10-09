@@ -4567,7 +4567,13 @@
 // golfer's street; the double-ring target; numbers that hug it. gps-view.js,
 // gps-geo.js and index.html's GPS block changed. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v340-gps-anycourse';
+// GPS:BEGIN
+// Moved to v341 (gps-flow, 2026-10-09): gps-courses.js gains five directory
+// courses from OpenStreetMap (Chambers Bay, Founders Club, Atlanta Athletic Club,
+// Canyon Lakes, Las Colinas) and wa_chambers as Chambers Bay; gps-view.js asks
+// the Overpass mirror first. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v341-gps-osmcourses';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

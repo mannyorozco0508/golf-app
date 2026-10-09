@@ -91,10 +91,21 @@ const COURSES = [
     // Scottsdale (Wave 1, 2026-10-08): the Arizona test course. OSM way
     // 78388948 is "TPC Scottsdale Stadium Course".
     { key: 'az_tpc_stadium', file: 'tpc_scottsdale_stadium', osm: 'way(78388948)', preset: 'az_tpc_stadium' },
+    // BUILD 5 (2026-10-09): directory courses (global_courses, no built-in preset)
+    // that OpenStreetMap maps well, found by tools/gps-coverage.js. Bundled so a
+    // phone never has to ask Overpass for them (overpass-api.de refuses browser
+    // requests). Pars from gps-osm/directory-pars.json - our card, never OSM's.
+    { key: 'gca_50bc8qqa', file: 'chambers_bay', osm: 'way(26787026)', parsFrom: 'directory' },
+    { key: 'gca_3ytyrse7', file: 'founders_club_pawleys', osm: 'relation(4856975)', parsFrom: 'directory' },
+    { key: 'gca_be9xgn5w', file: 'atlanta_athletic_club', osm: 'way(34768247)', parsFrom: 'directory' },
+    { key: 'gca_f0s28j10', file: 'canyon_lakes_kennewick', osm: 'relation(19187969)', parsFrom: 'directory' },
+    { key: 'gca_m817km7j', file: 'las_colinas_queen_creek', osm: 'relation(2958121)', parsFrom: 'directory' },
     { nines: true, file: 'thistle', osm: 'relation(21283499)', base: 'thistle_27',
       loops: { cameron: 'cameron', stewart: 'stewart', mackay: 'mckay' },
       nineNotes: { stewart: STEWART_NOTE } },
 ];
+
+const ALIASES = { wa_chambers: 'gca_50bc8qqa' };
 
 function loadCourseData() {
     const src = fs.readFileSync(path.join(ROOT, 'course-data.js'), 'utf8');
@@ -163,7 +174,9 @@ function build(rawDir) {
         const fetched = raw.osm3s && raw.osm3s.timestamp_osm_base || null;
         if (!c.nines) {
             const r = geo.osmToCourseGps(raw.elements, { holeFilter: c.holeFilter, holeNumber: c.holeNumber });
-            const pars = cd.coursePresets[c.preset].data.map((h) => h.par);
+            const pars = c.parsFrom === 'directory'
+                ? JSON.parse(fs.readFileSync(path.join(RAW_DIR, 'directory-pars.json'), 'utf8'))[c.key].pars
+                : cd.coursePresets[c.preset].data.map((h) => h.par);
             const verify = {};
             if (c.allNote) Object.keys(r.holes).forEach((n) => { verify[n] = c.allNote.replace('REF', String(Number(n) - 9)).replace('HOLE', String(n)); });
             const holes = finish(c.key, r.holes, pars, verify);
@@ -200,6 +213,9 @@ function build(rawDir) {
             });
         });
     });
+    // The same course under an older directory key: a reference, not a copy
+    // (Chambers Bay's built-in preset wa_chambers, still on older rounds).
+    Object.keys(ALIASES).forEach((k) => { if (records[ALIASES[k]]) records[k] = { v: 1, compose: [ALIASES[k]] }; });
     return { records, report, problems, drops };
 }
 

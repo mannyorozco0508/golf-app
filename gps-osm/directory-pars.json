@@ -1,0 +1,118 @@
+{
+ "_comment": "Pars (and nothing else) of directory courses that have no built-in preset, read from global_courses on 2026-10-09 for tools/gps-import-osm.js: par comes from our card, never from OSM.",
+ "gca_50bc8qqa": {
+  "name": "Chambers Bay Golf Club",
+  "pars": [
+   4,
+   4,
+   3,
+   5,
+   4,
+   4,
+   4,
+   5,
+   3,
+   4,
+   4,
+   4,
+   5,
+   4,
+   3,
+   4,
+   3,
+   5
+  ]
+ },
+ "gca_3ytyrse7": {
+  "name": "Founders Club At Pawleys Island",
+  "pars": [
+   4,
+   4,
+   3,
+   4,
+   3,
+   5,
+   4,
+   4,
+   5,
+   5,
+   3,
+   5,
+   4,
+   4,
+   4,
+   3,
+   4,
+   4
+  ]
+ },
+ "gca_be9xgn5w": {
+  "name": "Atlanta Athletic Club (Highlands)",
+  "pars": [
+   4,
+   5,
+   4,
+   3,
+   5,
+   4,
+   3,
+   4,
+   4,
+   4,
+   4,
+   5,
+   4,
+   4,
+   3,
+   4,
+   3,
+   5
+  ]
+ },
+ "gca_f0s28j10": {
+  "name": "Canyon Lakes Golf Course",
+  "pars": [
+   4,
+   4,
+   5,
+   3,
+   4,
+   4,
+   3,
+   4,
+   5,
+   4,
+   4,
+   3,
+   5,
+   4,
+   5,
+   4,
+   3,
+   4
+  ]
+ },
+ "gca_m817km7j": {
+  "name": "Las Colinas Golf Club",
+  "pars": [
+   5,
+   4,
+   4,
+   4,
+   5,
+   3,
+   4,
+   3,
+   4,
+   4,
+   3,
+   5,
+   4,
+   3,
+   5,
+   4,
+   3,
+   4
+  ]
+ }
+}
