@@ -4433,7 +4433,11 @@
 // a key). gps-view.js and gps-config.js changed after v331 reached the preview.
 // Google tiles are never stored by this worker (cross-origin). HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v332-gps-google';
+// GPS:BEGIN
+// Moved to v333 (2026-10-08): gps-config.js says why Google stays off (no key).
+// HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v333-gps-googleoff';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

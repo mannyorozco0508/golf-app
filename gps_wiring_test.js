@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v332-gps-google'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v333-gps-googleoff'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -151,7 +151,11 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'googleKey', 'imagery', 'imageryPro', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase) in the shipped config');
     assert.strictEqual(cfg.imagery, 'esri', 'Esri stays the default');
-    assert.strictEqual(cfg.googleKey, '', 'no Google key is added by the app (Manny supplies it)');
+    // GOOGLE STAYS OFF (2026-10-08): its terms forbid offline storage and use
+    // with a non-Google map, and this app falls back to Esri / USGS.
+    assert.strictEqual(cfg.googleKey, '', 'Google must stay off: no key in the shipped config');
+    assert.notStrictEqual(cfg.imagery, 'google'); assert.notStrictEqual(cfg.imageryPro, 'google');
+    assert.ok(/No Use\s*\/\/\s*With Non-Google Maps|No Use With Non-Google Maps/.test(c) && /NEVER ship a build that\s*\/\/\s*can show Google/.test(c), 'the reason is written next to the setting');
     // The key appears in this one file only.
     const k = cfg.esriKey;
     ['gps-view.js', 'gps-geo.js', 'index.html', 'sw.js', 'tools/gps-check.js', 'docs/gps-step0.md', 'docs/gps-builds.md'].forEach((f) => {

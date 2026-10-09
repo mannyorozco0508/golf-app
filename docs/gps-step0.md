@@ -518,3 +518,13 @@ of any other app.
   users, offline, while setting greens). Ask Google before shipping it.
 - **Tile budget:** holes 1–18 at 1x + 3x in the check made about 208 Google
   tile requests (Esri: about 218), plus one viewport call per settled move.
+- **DECISION 2026-10-08 (Manny): Google stays OFF.** A terms review of the Map
+  Tiles API found two rules that rule it out:
+  - no offline use, pre-fetching or storing;
+  - "No Use With Non-Google Maps" (3.2.3(e)), which conflicts with our Esri /
+    USGS fallback in the same app.
+
+  The code is dormant (empty key). `gps-config.js` carries the reason, and
+  `gps_wiring_test.js` fails if a Google key is set. Never ship a build that
+  can show Google and Esri / USGS in the same app. The plan stays Esri online,
+  USGS offline.
