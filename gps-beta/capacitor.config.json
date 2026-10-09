@@ -1,11 +1,38 @@
 {
   "appId": "com.rattlegolf.gpsbeta",
-  "appName": "HardPan GPS Beta",
+  "appName": "HardPan GPS",
   "webDir": "www",
   "ios": {
     "path": "ios",
     "includePlugins": [
+      "@capacitor/filesystem",
+      "@capacitor/share",
+      "@capacitor-firebase/authentication",
+      "@capacitor/push-notifications",
+      "@capacitor-firebase/messaging",
       "@capacitor/geolocation"
     ]
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageTraits": {
+          "@capacitor-firebase/authentication": ["Google"]
+        }
+      }
+    }
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "providers": ["apple.com", "google.com"],
+      "skipNativeAuth": true
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "FirebaseMessaging": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
   }
 }

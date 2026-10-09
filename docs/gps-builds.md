@@ -75,6 +75,27 @@ There is no flag to set. `GPS_ENABLED=1 node sync-mobile-web.js` is
 The bundle is the pre-GPS bundle except for one line, the shared shell cache
 version. Its `index.html` is byte-identical to `main`'s (sha `92a63164…`, main 82d98b4).
 
+### The HardPan GPS TestFlight app (`gps-beta/`, com.rattlegolf.gpsbeta)
+
+A **separate** iOS app with its own Capacitor project; the Consumer app's
+`ios/` and `sync-mobile-web.js` are not involved (and still refuse GPS).
+
+- **Build 3** (0.1): yardage-only, no Firebase, the Myrtle trip. Its source is
+  the git tag **`gps-beta-b3`**: `git checkout gps-beta-b3 && node
+  tools/build-gps-beta.js && cd gps-beta && npx cap sync ios`.
+- **Build 4 on** (0.2): the Consumer app exactly (the same `SHARED_SHELL` +
+  `CONSUMER_SHELL` lists, the same Firebase project and database) plus GPS,
+  display name **HardPan GPS**, internal TestFlight only:
+
+```bash
+node tools/build-gps-app.js && cd gps-beta && npm install && npx cap sync ios
+node tools/ios-google-urlscheme.js --root gps-beta   # once GoogleService-Info.plist is in
+```
+
+`gps-beta/ios/App/App/GoogleService-Info.plist` must be the Firebase iOS app
+registered for **com.rattlegolf.gpsbeta**: a Release build (Archive) refuses
+any other (the "Firebase config is for this app" build phase).
+
 ### Web: `build-shell.js`
 
 ```bash

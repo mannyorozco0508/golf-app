@@ -1,12 +1,17 @@
 {
-  "name": "hardpan-gps-beta",
-  "version": "0.1.0",
+  "name": "hardpan-gps-app",
+  "version": "0.2.0",
   "private": true,
-  "description": "HardPan GPS Beta (com.rattlegolf.gpsbeta) - a separate TestFlight app for the Myrtle trip. Yardages only, no database. Web content: node ../tools/build-gps-beta.js; native: npx cap sync ios.",
+  "description": "HardPan GPS (com.rattlegolf.gpsbeta), TestFlight build 4 on: the Consumer app (bets, scorecard, sign-in, the same database) plus GPS. Web content: node ../tools/build-gps-app.js; native: npx cap sync ios. Build 3 (yardage-only, no database) is the git tag gps-beta-b3.",
   "dependencies": {
+    "@capacitor-firebase/authentication": "8.5.2",
+    "@capacitor-firebase/messaging": "8.5.2",
     "@capacitor/cli": "8.5.1",
     "@capacitor/core": "8.5.1",
+    "@capacitor/filesystem": "8.1.3",
+    "@capacitor/geolocation": "^8.0.0",
     "@capacitor/ios": "8.5.1",
-    "@capacitor/geolocation": "^8.0.0"
+    "@capacitor/push-notifications": "8.1.3",
+    "@capacitor/share": "8.0.1"
   }
 }

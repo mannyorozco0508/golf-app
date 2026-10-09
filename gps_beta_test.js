@@ -1,16 +1,19 @@
 // ============================================================================
-// HARDPAN GPS BETA (com.rattlegolf.gpsbeta) - THE TRIP-SAFETY PROMISES, PINNED
-// (2026-10-08, Myrtle trip Oct 12-16)
+// HARDPAN GPS (com.rattlegolf.gpsbeta) - THE MERGED APP'S PROMISES, PINNED
+// Build 4 on, 0.2 (2026-10-09). Build 3 (yardage-only, no database) is the git
+// tag gps-beta-b3 and is rebuilt from there.
 //
-// A separate TestFlight app in gps-beta/, its own Capacitor project. What it
-// promises, and what this file holds it to:
-//   - YARDAGES ONLY: the page loads no Firebase and mounts the GPS screen with
-//     no round and no database, so it cannot write a score, a green or a pin;
-//     no Enter Score, no Card.
-//   - ITS OWN APP: bundle com.rattlegolf.gpsbeta, "HardPan GPS Beta", team
-//     A2Z95T64UU, 0.1 (3), When-In-Use location only, a privacy manifest, the
-//     native Geolocation plugin and nothing else (no Firebase, no push).
-//   - The Consumer app's ios/ is not touched (its own test files pin it).
+// The SAME TestFlight app (no new app, no new bundle id), now the full app:
+//   - THE CONSUMER APP EXACTLY, PLUS GPS: tools/build-gps-app.js ships the
+//     SHARED_SHELL + CONSUMER_SHELL lists read from sync-mobile-web.js, with the
+//     GPS flag on - so home, setup, players, bets, the scorecard, sign-in and the
+//     Firebase web SDK (the same database) are the Consumer app's own files.
+//   - ITS OWN APP: bundle com.rattlegolf.gpsbeta, "HardPan GPS", team A2Z95T64UU,
+//     0.2 (4), When-In-Use location only, Sign in with Apple and push entitlements,
+//     the Consumer app's five native plugins plus Geolocation, Google but no
+//     Facebook, and an Archive that refuses a Firebase config for another bundle.
+//   - The Consumer app's ios/ and sync-mobile-web.js are not touched (their own
+//     tests pin them; sync-mobile-web.js still refuses GPS_ENABLED=1).
 // ============================================================================
 'use strict';
 const { test } = require('node:test');
@@ -24,60 +27,47 @@ const ON = fs.existsSync(BETA) && fs.existsSync(path.join(ROOT, 'gps-view.js'));
 const skip = ON ? false : 'no gps-beta in this tree';
 const read = (f) => fs.readFileSync(path.join(BETA, f), 'utf8');
 
-test('the beta page loads no database client and mounts with no round and no database', { skip }, () => {
-    const page = read('index.html');
-    const scripts = (page.match(/<script[^>]+src="([^"]+)"/g) || []).map((s) => /src="([^"]+)"/.exec(s)[1]);
-    assert.deepStrictEqual(scripts.sort(), ['course-data.js', 'gps-config.js', 'gps-geo.js', 'gps-view.js', 'trip-cards.js'], 'exactly the GPS scripts and the trip cards');
-    assert.ok(!/firebase|durableWrite|offline-queue/i.test(page.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\/.*$/gm, '')), 'no database code in the page');
-    assert.ok(/round: null, db: null, writeRoundPin: null, openScore: null/.test(page), 'mounted with nothing to write to');
-    assert.ok(/#gps-side-toggle, #gps-overlay \.gps-side-bets \{ display: none !important; \}/.test(page), 'no Card, no GPS | Bets toggle');
+test('the app is the Consumer app plus GPS: the same declared lists, GPS on, nothing restated', { skip }, () => {
+    const b = fs.readFileSync(path.join(ROOT, 'tools', 'build-gps-app.js'), 'utf8');
+    assert.ok(/declaredList\('SHARED_SHELL'\)\.concat\(declaredList\('CONSUMER_SHELL'\)\)\.concat\(GPS\)/.test(b), 'the Consumer lists, from sync-mobile-web.js');
+    assert.ok(/gpsFlag\.applyFlag\(fs\.readFileSync\(src, 'utf8'\), true, file\)/.test(b), 'GPS on');
+    assert.ok(!/ios\/App\/App\/Info\.plist|path\.join\(ROOT, 'ios'/.test(b), 'never writes the Consumer app\'s ios/');
+    // The yardage-only page and its trip cards are gone from this tree (tag gps-beta-b3).
+    assert.ok(!fs.existsSync(path.join(BETA, 'index.html')) && !fs.existsSync(path.join(BETA, 'trip-cards.js')));
+    assert.ok(!fs.existsSync(path.join(ROOT, 'tools', 'build-gps-beta.js')));
+    // The Consumer app's own sync still refuses to build GPS.
+    assert.ok(/GPS_ENABLED=1 refused/.test(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8')));
 });
 
-test('the beta build copies the GPS files and nothing that writes', { skip }, () => {
-    const b = fs.readFileSync(path.join(ROOT, 'tools', 'build-gps-beta.js'), 'utf8');
-    assert.ok(/const FILES = \['gps-geo\.js', 'gps-view\.js', 'gps-config\.js', 'gps-courses\.js', 'maplibre-gl\.js', 'maplibre-gl\.css', 'course-data\.js'\];/.test(b));
-    assert.ok(/FORBIDDEN = \/firebase\|durableWrite\|offline-queue\/i/.test(b));
-});
-
-test('its own app: bundle id, name, team, 0.1 (3), location When-In-Use only, privacy manifest', { skip }, () => {
+test('its own app: bundle id, name, team, 0.2 (4), entitlements, Firebase guard', { skip }, () => {
     const cap = JSON.parse(read('capacitor.config.json'));
     assert.strictEqual(cap.appId, 'com.rattlegolf.gpsbeta');
-    assert.strictEqual(cap.appName, 'HardPan GPS Beta');
-    assert.deepStrictEqual(cap.ios.includePlugins, ['@capacitor/geolocation'], 'the native location plugin and nothing else');
+    assert.strictEqual(cap.appName, 'HardPan GPS');
+    assert.deepStrictEqual(cap.ios.includePlugins, ['@capacitor/filesystem', '@capacitor/share', '@capacitor-firebase/authentication',
+        '@capacitor/push-notifications', '@capacitor-firebase/messaging', '@capacitor/geolocation'], 'the Consumer app\'s five plus Geolocation');
+    assert.deepStrictEqual(cap.experimental.ios.spm.packageTraits['@capacitor-firebase/authentication'], ['Google'], 'no Facebook SDK');
+    assert.strictEqual(cap.plugins.FirebaseAuthentication.skipNativeAuth, true, 'the JS layer owns the session, as in the Consumer app');
     const pbx = read('ios/App/App.xcodeproj/project.pbxproj');
     assert.strictEqual((pbx.match(/PRODUCT_BUNDLE_IDENTIFIER = com\.rattlegolf\.gpsbeta;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/DEVELOPMENT_TEAM = A2Z95T64UU;/g) || []).length, 2);
-    assert.strictEqual((pbx.match(/MARKETING_VERSION = 0\.1;/g) || []).length, 2);
-    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 3;/g) || []).length, 2, 'build 3 (the clean map, manual wind)');
-    assert.ok(/PrivacyInfo\.xcprivacy in Resources/.test(pbx), 'the privacy manifest ships in the app');
+    assert.strictEqual((pbx.match(/MARKETING_VERSION = 0\.2;/g) || []).length, 2);
+    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 4;/g) || []).length, 2, 'build 4 (the merged app)');
+    assert.ok(/CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/.test(pbx) && /CODE_SIGN_ENTITLEMENTS = App\/AppRelease\.entitlements;/.test(pbx));
+    assert.ok(/GoogleService-Info\.plist in Resources/.test(pbx), 'the Firebase iOS config ships in the app');
+    assert.ok(/Firebase config is for this app/.test(pbx) && /CONFIGURATION\}\\" = \\"Release\\"/.test(pbx) && /Print BUNDLE_ID/.test(pbx), 'an Archive refuses a config for another bundle');
+    ['App.entitlements', 'AppRelease.entitlements'].forEach((e) => {
+        const x = read('ios/App/App/' + e);
+        assert.ok(/com\.apple\.developer\.applesignin/.test(x) && /aps-environment/.test(x), e);
+    });
+    assert.ok(/didRegisterForRemoteNotificationsWithDeviceToken/.test(read('ios/App/App/AppDelegate.swift')), 'push tokens reach the plugin');
     const plist = read('ios/App/App/Info.plist');
     assert.ok(/<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>[^<]{40,}<\/string>/.test(plist), 'a clear When-In-Use reason');
     assert.ok(!/NSLocationAlways/.test(plist), 'never Always');
+    assert.ok(/<key>CFBundleDisplayName<\/key>\s*<string>HardPan GPS<\/string>/.test(plist));
+    assert.ok(!/HardPan GPS Beta/.test(plist), 'the old name is gone');
     assert.ok(/<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/.test(plist));
-    assert.ok(/<string>HardPan GPS Beta<\/string>/.test(plist));
     const pm = read('ios/App/App/PrivacyInfo.xcprivacy');
-    assert.ok(/<key>NSPrivacyTracking<\/key>\s*<false\/>/.test(pm) && /<key>NSPrivacyCollectedDataTypes<\/key>\s*<array\/>/.test(pm));
+    assert.ok(/<key>NSPrivacyTracking<\/key>\s*<false\/>/.test(pm) && /NSPrivacyCollectedDataTypeEmailAddress/.test(pm), 'no tracking; sign-in data declared');
     const pkg = read('ios/App/CapApp-SPM/Package.swift');
-    assert.ok(/CapacitorGeolocation/.test(pkg) && !/Firebase|Push/i.test(pkg), 'no Firebase or push in the beta binary');
-});
-
-test('the trip: seven rounds with their cards, every course in the GPS bundle, no round codes', { skip }, () => {
-    const sbx = { window: {} };
-    require('vm').runInNewContext(read('trip-cards.js'), sbx);
-    const trip = sbx.window.TRIP_CARDS;
-    assert.strictEqual(trip.length, 7);
-    const gps = require('./gps-courses.js');
-    const geo = require('./gps-geo.js');
-    trip.forEach((r) => {
-        assert.strictEqual(r.holes.length, 18, r.name);
-        r.holes.forEach(([h, par, si]) => assert.ok(h >= 1 && h <= 18 && par >= 3 && par <= 5 && si >= 1 && si <= 18, r.name + ' #' + h));
-        const o = geo.osmCourse(gps, r.gpsKey);
-        assert.ok(o && o.holes && Object.keys(o.holes).length >= 9, 'GPS data for ' + r.name + ' (' + r.gpsKey + ')');
-    });
-    assert.strictEqual(JSON.stringify(trip.map((r) => r.gpsKey)), JSON.stringify(['caledonia', 'trueblue', 'pinelakes', 'pinehills', 'thistle_27_cameron_stewart', 'thistle_27_mackay_cameron', 'manofwar']));
-    // Read read-only from the live trip; nothing that joins a round or the trip ships.
-    const src = read('trip-cards.js');
-    ['P7S2BE', 'NT9WTD', '5KKBX5', '58Y3FK', 'BZ5SFR', 'QV6SJM', 'HDZKEL', 'VWNPW6'].forEach((c) => assert.ok(src.indexOf(c) === -1, 'a code ships in the beta: ' + c));
-    // Man O' War from OpenStreetMap: The Wizard's holes are not mixed in.
-    assert.strictEqual(Object.keys(gps.manofwar.holes).length, 18);
+    assert.ok(/CapacitorGeolocation/.test(pkg) && /CapacitorFirebaseAuthentication", path: [^\n]*traits: \["Google"\]/.test(pkg) && !/acebook/.test(pkg));
 });
