@@ -186,6 +186,8 @@ const READ = `JSON.stringify((function () {
            creditLine: cr && cr.offsetParent !== null ? (cr.innerText || '').replace(/\\s+/g, ' ').trim() : null,
            creditPop: vis('.gps-credit-pop') ? (q('.gps-credit-pop').innerText || '').replace(/\\s+/g, ' ').trim() : null,
            creditBg: cr ? getComputedStyle(cr).backgroundColor : null,
+           google: ds.google || null, googleLoads: Number(ds.googleLoads || 0), googleSrcMax: ds.googleSrcMax ? Number(ds.googleSrcMax) : null, usgsVis: ds.usgsVis || null,
+           googleLogo: (function () { var l = q('.gps-google-logo'); if (!l || l.offsetParent === null) return null; var b = l.getBoundingClientRect(); return { h: Math.round(b.height), alt: l.alt, svg: l.src.indexOf('data:image/svg+xml;base64,') === 0, l: Math.round(b.left), t: Math.round(b.top), b: Math.round(b.bottom) }; })(),
            tilesLoaded: Number(ds.tilesLoaded || 0),
            zoomBtn: vis('.gps-zoom') ? t('.gps-zoom') : null,
            pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
@@ -252,7 +254,7 @@ async function arm(name, key, ownerUid, mode, me, acc, steps, extra) {
     // No check reaches a real outside service: not the weather service, not the
     // elevation service, not Esri. The arms that need one bring a stand-in.
     extra = Object.assign({}, extra || {});
-    extra.blockUrls = (extra.blockUrls || []).concat(['*api.weather.gov*', '*epqs.nationalmap.gov*', '*arcgis.com*', '*arcgisonline.com*']);
+    extra.blockUrls = (extra.blockUrls || []).concat(['*api.weather.gov*', '*epqs.nationalmap.gov*', '*arcgis.com*', '*arcgisonline.com*', '*googleapis.com*']);
     const query = extra.query || '';
     delete extra.query;
     const res = await arriveCold(Object.assign({
@@ -393,7 +395,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 //   /epqs?x=&y=                USGS EPQS: heights for known course points, else
 //                              the service's "no data" (-1000000).
 //   /points/.., /gridpoints/.. the National Weather Service (as before).
-const SEEN = { esri: {}, epqs: [], nws: [] };
+const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [] };
 const BROKEN = new Set();
 const ELEV = {};                     // "lat,lng" (5 dp) -> feet
 const TILEPNG = fs.readFileSync(path.join(__dirname, '..', 'icon-192.png'));
@@ -410,6 +412,24 @@ function startStandIn() {
                 r.writeHead(200, Object.assign({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }, h)); return r.end(TILEPNG);
             }
             if ((m = /^\/ctl\/break\/([A-Za-z0-9-]+)/.exec(q.url))) { BROKEN.add(m[1]); r.writeHead(200, h); return r.end('broken'); }
+            // GOOGLE MAP TILES API stand-in: a session, 2D tiles, the viewport's copyright.
+            if (/^\/v1\/createSession\?key=/.test(q.url)) {
+                let body = ''; q.on('data', (c) => { body += c; }); q.on('end', () => {
+                    SEEN.gSession.push({ url: q.url, body });
+                    r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
+                    r.end(JSON.stringify({ session: 'SESSION-STANDIN', expiry: String(Math.floor(Date.now() / 1000) + 14 * 86400), tileWidth: 256, tileHeight: 256, imageFormat: 'jpeg' }));
+                });
+                return;
+            }
+            if ((m = /^\/v1\/2dtiles\/(\d+)\/(\d+)\/(\d+)\?session=([^&]+)&key=([^&]+)/.exec(q.url))) {
+                (SEEN.gTiles[m[5]] = SEEN.gTiles[m[5]] || []).push(+m[1]);
+                r.writeHead(200, Object.assign({ 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }, h)); return r.end(TILEPNG);
+            }
+            if (/^\/tile\/v1\/viewport\?/.test(q.url)) {
+                SEEN.gVp.push(q.url);
+                r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
+                return r.end(JSON.stringify({ copyright: 'Imagery ©2026 Stand-in Google', maxZoomRects: [] }));
+            }
             if (/^\/epqs\?/.test(q.url)) {
                 SEEN.epqs.push(q.url);
                 const u = new URL(q.url, 'http://x');
@@ -434,6 +454,7 @@ function CFG(o) {
     if (o.nws) c.nwsBase = SO;
     if (o.epqs) c.epqsUrl = SO + '/epqs?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
     if (o.paywall != null) c.paywall = o.paywall;
+    if (o.google) { c.googleKey = o.google; c.googleBase = SO; c.imagery = 'esri'; c.imageryPro = 'google'; }
     return `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return ${JSON.stringify(c)}; }, set: function () {} });`;
 }
 const ESRI_CREDIT = 'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> | Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community';
@@ -1005,6 +1026,49 @@ function usgsFallbackFails(tag, g, why) {
         if (o2.esri !== 'visible' || o2.maxZoom !== 21) fails.push('esri offline: Esri was not tried again when the signal came back: ' + JSON.stringify([o2.esri, o2.maxZoom]));
     }
 
+    // ---- GOOGLE SATELLITE (optional): the rules, then the budget ----------------------
+    const G_READY = { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.google === 'visible' && Number(m.dataset.googleLoads) > 0); })()`, timeout: 20000 };
+    const gProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-google-profile-'));
+    const gs0 = SEEN.gSession.length;
+    const go = await arm('googl', 'caledonia', 'org-1', 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, G_READY, { sleep: 2000 }, { expression: READ },                              // 0 Google the picture
+        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 600 }, { expression: READ },          // 1 fixing by GPS: not Google
+        { tap: '.gps-tap-fallback' }, { sleep: 600 }, { expression: READ },                                               // 2 tap fallback: not Google
+        { tap: '.gps-cancel' }, { sleep: 1200 }, { expression: READ },                                                    // 3 back: Google again
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, G_READY, { sleep: 800 }, { expression: READ },   // 4 reload: same session
+    ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' }, preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ google: 'CHECK-G' }), profileDir: gProfile });
+    out.google = go; bail(out, go);
+    {
+        const [g0, g1, g2, g3, g4] = go.reads;
+        if (g0.google !== 'visible' || g0.esri !== 'off' || g0.usgsVis !== 'none') fails.push('google: not the only picture - ' + JSON.stringify([g0.google, g0.esri, g0.usgsVis]));
+        if (!g0.googleLogo || g0.googleLogo.h < 16 || g0.googleLogo.h > 19 || g0.googleLogo.alt !== 'Google Maps' || !g0.googleLogo.svg) fails.push('google: the logo - ' + JSON.stringify(g0.googleLogo));
+        if (!/Imagery ©2026 Stand-in Google/.test(g0.creditLine || '')) fails.push('google: the copyright line is not on the map: ' + JSON.stringify(g0.creditLine));
+        if (g0.googleLogo && g0.boxes.bottom && g0.googleLogo.t - g0.boxes.bottom.b < 10) fails.push('google: less than 10px clear above the logo');
+        if (g0.maxZoom !== 21 || g0.googleSrcMax !== 19) fails.push('google: zoom ' + JSON.stringify([g0.maxZoom, g0.googleSrcMax]));
+        [[g1, 'fixing by GPS'], [g2, 'tap fallback']].forEach(([g, n]) => { if (g.google !== 'none' || g.usgsVis !== 'visible' || g.googleLogo) fails.push(`google: still the picture while ${n}: ` + JSON.stringify([g.google, g.usgsVis])); });
+        if (g3.google !== 'visible' || g3.usgsVis !== 'none') fails.push('google: did not come back after Cancel: ' + JSON.stringify([g3.google, g3.usgsVis]));
+        const sess = SEEN.gSession.slice(gs0);
+        if (sess.length !== 1 || !/"mapType":"satellite"/.test(sess[0].body)) fails.push('google: sessions ' + JSON.stringify(sess));
+        if (g4.google !== 'visible') fails.push('google: after a reload ' + g4.google);
+        const zs = SEEN.gTiles['CHECK-G'] || [];
+        if (!zs.length || Math.max(...zs) > 19) fails.push('google: tiles asked to z' + Math.max(...zs));
+        if (SEEN.gVp.some((u) => u.indexOf(ME[0].toFixed(4)) !== -1 && u.indexOf(ME[1].toFixed(4)) !== -1)) fails.push('google: the viewport request names the golfer');
+        out.googleSummary = { sessions: sess.length, tiles: zs.length, viewportCalls: SEEN.gVp.length, credit: g0.creditLine };
+    }
+    try { fs.rmSync(gProfile, { recursive: true, force: true }); } catch (e) {}
+    // The budget, Google: holes 1-18, 1x then 3x, the same as Esri's.
+    const gBudget = [{ tap: '.gps-side-gps' }, WAIT_MAP, G_READY];
+    for (let h = 1; h <= 18; h++) {
+        gBudget.push({ sleep: 1500 }, { tap: '.gps-zoom' }, { sleep: 400 }, { tap: '.gps-zoom' }, { sleep: 1500 }, { expression: READ }, { tap: '.gps-zoom' }, { sleep: 300 });
+        if (h < 18) gBudget.push({ tap: '.gps-next' }, { sleep: 400 });
+    }
+    const gb = await arm('gbudg', 'caledonia', null, 'ok', ME, 4.6, gBudget, { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ google: 'CHECK-GB' }) });
+    out.gBudget = gb; bail(out, gb);
+    {
+        if (gb.reads.length !== 18 || gb.reads.some((g) => g.google !== 'visible')) fails.push('google budget: Google not the picture on all 18');
+        out.googleBudget = { tileRequests: (SEEN.gTiles['CHECK-GB'] || []).length, dataLoads: gb.reads[gb.reads.length - 1].googleLoads, viewportCalls: SEEN.gVp.length };
+    }
+
     // ---- THE TILE BUDGET: holes 1-18, 1x then 3x on each ------------------------------
     const budgetSteps = [{ tap: '.gps-side-gps' }, WAIT_MAP];
     for (let h = 1; h <= 18; h++) {
@@ -1245,7 +1309,7 @@ function usgsFallbackFails(tag, g, why) {
 
     // ---- privacy, every arm ------------------------------------------------------
     [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [gg, ME],
-     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME]].forEach(([r, me]) => {
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
@@ -1255,7 +1319,7 @@ function usgsFallbackFails(tag, g, why) {
     });
     // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
     // Esri hosts are never asked - a check must not spend the free tier.
-    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly, go, gb].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
     if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
@@ -1274,7 +1338,7 @@ function usgsFallbackFails(tag, g, why) {
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
-        green: out.greenSummary, layout: out.layoutSummary,
+        green: out.greenSummary, layout: out.layoutSummary, google: out.googleSummary, googleBudget: out.googleBudget,
         esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
         esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,

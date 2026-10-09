@@ -103,6 +103,57 @@
     // a "working Esri layer" can be measured without a key. Unset in every build.
     function esriTileUrl() { return String(cfg().esriTileUrl || '') || TILES.keyedUrl; }
 
+    // ---- GOOGLE SATELLITE (optional, 2026-10-08) ----------------------------------
+    // Google Map Tiles API, 2D satellite, as a second imagery source. gps-config.js:
+    //   imagery: 'esri' | 'google'     (everyone; default 'esri')
+    //   imageryPro: 'esri' | 'google'  (HardPan GPS users; overrides imagery)
+    //   googleKey: ''                  (empty = Google off, whatever is chosen)
+    // GOOGLE'S RULES, kept here: its tiles are never stored (only the browser's
+    // own HTTP cache, under Google's headers) and never pre-fetched; it is NEVER
+    // the picture while a green is set (no content may be created from it); the
+    // "Google Maps" logo (Google's own file, unmodified) and Google's copyright
+    // line for the area on screen are always on the map with it; and it is never
+    // shown together with another map - USGS underneath is hidden while Google
+    // is the picture, and comes back only when Google is off (offline, failed,
+    // or a green being set).
+    var GOOGLE = {
+        base: 'https://tile.googleapis.com',
+        // Google's tiles are asked for to z19 at most; the map enlarges past it.
+        maxNativeZoom: 19,
+        sessionKey: 'hardpan_gsession_v1',
+        // The "Google Maps" logo with a light outline - Google's own file from its
+        // attribution asset package, unmodified (for busy backgrounds like imagery).
+        logo: 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI2LjUuMCwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHdpZHRoPSIxMDVweCIgaGVpZ2h0PSIyMnB4IiB2aWV3Qm94PSIwIDAgMTA1IDIyIiBlbmFibGUtYmFja2dyb3VuZD0ibmV3IDAgMCAxMDUgMjIiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8ZyBpZD0iTG9nbyI+Cgk8ZyBpZD0iT3V0bGluZSIgb3BhY2l0eT0iMC44Ij4KCQk8cGF0aCBmaWxsPSIjRkZGRkZGIiBkPSJNNTkuNzcsMTEuNDRsLTAuOTMtMi4zMmMtMC4xNi0wLjQtMC4zNi0wLjgxLTAuNjEtMS4yMmMtMC4yNi0wLjQyLTAuNi0wLjg1LTEuMDEtMS4yNwoJCQljLTAuNDktMC41LTEuMS0wLjktMS44LTEuMmMtMC43MS0wLjMtMS40OS0wLjQ2LTIuMy0wLjQ2Yy0xLjE2LDAtMi4yNSwwLjMtMy4xOSwwLjg3VjAuNDhoLTUuOTh2NC43N0g0MgoJCQljLTAuNTQtMC4xOC0xLjEyLTAuMjctMS43Mi0wLjI3Yy0xLjY4LDAtMy4yMSwwLjY2LTQuNDQsMS45MmMtMC4wOSwwLjA5LTAuMTgsMC4xOS0wLjI2LDAuMjljLTAuMS0wLjEyLTAuMjEtMC4yNC0wLjMzLTAuMzUKCQkJYy0xLjI2LTEuMjMtMi44MS0xLjg2LTQuNi0xLjg2Yy0xLjc3LDAtMy4zNiwwLjY0LTQuNiwxLjg2Yy0wLjExLDAuMTEtMC4yMiwwLjIyLTAuMzIsMC4zNGMtMC4xLTAuMTItMC4yMS0wLjIzLTAuMzItMC4zNAoJCQljLTEuMjYtMS4yMy0yLjgxLTEuODYtNC42LTEuODZjLTEuNTUsMC0yLjkxLDAuNDYtNC4wNiwxLjM4aC0yLjQ3bDIuNDYtMi40NmwtMS40OC0xLjQxQzEzLjUzLDAuODMsMTEuNDYsMCw5LjA4LDAKCQkJQzYuNjIsMCw0LjQ3LDAuODgsMi43LDIuNjJDMC45MSw0LjM4LDAsNi41MSwwLDguOThzMC45MSw0LjYxLDIuNyw2LjM2YzEuNzgsMS43NCwzLjkzLDIuNjIsNi4zOSwyLjYyCgkJCWMyLjU2LDAsNC42OC0wLjg3LDYuMjgtMi41NGMwLjA0LTAuMDQsMC4wOC0wLjA4LDAuMTItMC4xM2MwLjIxLDAuMjksMC40NCwwLjU2LDAuNywwLjgxYzEuMjQsMS4yMiwyLjgzLDEuODYsNC42LDEuODYKCQkJYzEuOCwwLDMuMzQtMC42Miw0LjYtMS44NmMwLjExLTAuMTEsMC4yMi0wLjIyLDAuMzItMC4zNGMwLjEsMC4xMiwwLjIxLDAuMjMsMC4zMiwwLjM0YzEuMjQsMS4yMiwyLjgzLDEuODYsNC42LDEuODYKCQkJYzEuMjYsMCwyLjQtMC4zMSwzLjQtMC45MmwwLjQ1LDEuMDdjMC40MywxLjAyLDEuMTMsMS45MSwyLjA4LDIuNjZjMS4wNCwwLjgxLDIuMywxLjIzLDMuNzUsMS4yM2MxLjc4LDAsMy4yOS0wLjU4LDQuNDctMS43MwoJCQljMC43MS0wLjY5LDEuMjEtMS41NSwxLjUtMi41OGgzLjY0di0wLjY3YzEsMC42MiwyLjE2LDAuOTQsMy40MiwwLjk0YzEuMywwLDIuNDQtMC4zMiwzLjM5LTAuOTRjMC44NS0wLjU1LDEuNTMtMS4yMSwyLjAyLTEuOTQKCQkJbDEuMTEtMS42NmwtMS44Ny0xLjI1TDU5Ljc3LDExLjQ0eiIvPgoJCTxwYXRoIGZpbGw9IiNGRkZGRkYiIGQ9Ik0xMDUsMTAuMTFsLTAuNzQtMS44NGMtMC40Mi0xLjA1LTEuMTMtMS44Ni0yLjEtMi40M2MtMC44OS0wLjUxLTEuODktMC43Ny0yLjk4LTAuNzcKCQkJYy0xLjMxLDAtMi40OCwwLjM1LTMuNDgsMS4wNWMtMC4yNCwwLjE3LTAuNDUsMC4zNi0wLjY1LDAuNTZjLTEuMTEtMS4wNS0yLjQ2LTEuNjEtMy45NS0xLjYxYy0wLjYzLDAtMS4yMiwwLjA5LTEuNzgsMC4yN2gtNC42MwoJCQl2MC42Yy0wLjkzLTAuNTgtMi0wLjg3LTMuMjEtMC44N2MtMS4yNiwwLTIuMzQsMC4zMS0zLjIyLDAuOVYxLjVoLTQuNzNsLTMuMTEsNS40NWwtMy4xLTUuNDVINjIuNnYxNi4xOWg1LjU3VjE1LjFoMC42NWgzLjI0CgkJCWgwLjY1djIuNTloNS41N3YtMC4zN2MwLjc3LDAuNDIsMS42NSwwLjY0LDIuNjIsMC42NGMwLjY0LDAsMS4yMy0wLjA5LDEuNzgtMC4yN2gyLjAzdjMuNjhoNS41N3YtMy40NgoJCQljMC4yNywwLjA0LDAuNTYsMC4wNiwwLjg0LDAuMDZjMS41LDAsMi44Ny0wLjU3LDMuOTgtMS42NGMwLjIsMC4yLDAuNDIsMC4zOSwwLjY1LDAuNTZjMC45NiwwLjcyLDIuMTQsMS4wOCwzLjUxLDEuMDgKCQkJYzEuNDMsMCwyLjY1LTAuNCwzLjYzLTEuMmMxLjA4LTAuODgsMS42Ni0yLjA3LDEuNjYtMy40MmMwLTAuOTctMC4zMi0xLjg5LTAuOTMtMi42NkwxMDUsMTAuMTF6Ii8+Cgk8L2c+Cgk8ZyBpZD0iSW5uZXJfdGV4dCI+CgkJPGc+CgkJCTxwYXRoIGZpbGw9IiM0NzQ3NDciIGQ9Ik05LjA4LDguMzV2MS45aDQuNThjLTAuMTQsMS4wNC0wLjQ4LDEuODQtMS4wNCwyLjRjLTAuOTQsMC45My0yLjExLDEuNC0zLjUzLDEuNAoJCQkJYy0xLjQsMC0yLjU4LTAuNDktMy41NS0xLjQ4Yy0wLjk3LTAuOTgtMS40Ni0yLjE4LTEuNDYtMy41OWMwLTEuNDEsMC40OC0yLjYsMS40NS0zLjU5QzYuNSw0LjQsNy42OCwzLjkxLDkuMDgsMy45MQoJCQkJYzEuMzMsMCwyLjQ3LDAuNDUsMy40NCwxLjM2bDEuMzUtMS4zNUMxMi41MywyLjY0LDEwLjkzLDIsOS4wOCwyQzcuMTUsMiw1LjQ5LDIuNjgsNC4wOSw0LjA1QzIuNyw1LjQyLDIsNy4wNiwyLDguOTgKCQkJCWMwLDEuOTIsMC43LDMuNTYsMi4wOSw0LjkzYzEuNCwxLjM3LDMuMDYsMi4wNSw0Ljk5LDIuMDVjMiwwLDMuNjMtMC42NSw0Ljg3LTEuOTZjMS4xLTEuMSwxLjY1LTIuNTksMS42NS00LjQ2CgkJCQljMC0wLjQ1LTAuMDMtMC44NS0wLjEtMS4xOUg5LjA4eiIvPgoJCQk8cGF0aCBmaWxsPSIjNDc0NzQ3IiBkPSJNNDIuNzIsNy45N2gtMC4wN2MtMC4yNC0wLjI5LTAuNTctMC41My0wLjk4LTAuNzJjLTAuNDItMC4xOS0wLjg4LTAuMjktMS4zOS0wLjI5CgkJCQljLTEuMTQsMC0yLjE1LDAuNDQtMy4wMSwxLjMyYy0wLjg2LDAuODgtMS4yOSwxLjk0LTEuMjksMy4xOWMwLDEuMjQsMC40MywyLjMsMS4yOSwzLjE3YzAuODYsMC44NywxLjg2LDEuMzEsMy4wMSwxLjMxCgkJCQljMS4wMiwwLDEuODEtMC4zNCwyLjM3LTEuMDJoMC4wN3YwLjY1YzAsMC44NS0wLjIxLDEuNTEtMC42NCwxLjk2Yy0wLjQyLDAuNDUtMS4wMSwwLjY4LTEuNzYsMC42OGMtMC41NSwwLTEuMDItMC4xNi0xLjQxLTAuNDgKCQkJCWMtMC4zOC0wLjMxLTAuNjctMC42OS0wLjg1LTEuMTJsLTEuNzIsMC43MmMwLjI5LDAuNzEsMC43OCwxLjMzLDEuNDYsMS44NmMwLjY4LDAuNTMsMS41MiwwLjgsMi41MiwwLjgKCQkJCWMxLjI1LDAsMi4yNy0wLjM5LDMuMDctMS4xN2MwLjgtMC43OCwxLjItMS45NSwxLjItMy41MlY3LjI0aC0xLjg3VjcuOTd6IE00Mi4xNiwxMy40MmMtMC40NiwwLjUxLTEuMDMsMC43Ny0xLjcxLDAuNzcKCQkJCWMtMC42OSwwLTEuMjgtMC4yNi0xLjc3LTAuNzhjLTAuNDktMC41MS0wLjczLTEuMTYtMC43My0xLjkzYzAtMC43OCwwLjI0LTEuNDQsMC43My0xLjk2YzAuNDktMC41MiwxLjA4LTAuNzgsMS43Ny0wLjc4CgkJCQljMC42OCwwLDEuMjUsMC4yNiwxLjcxLDAuNzljMC40NiwwLjUyLDAuNjksMS4xOCwwLjY5LDEuOTZDNDIuODUsMTIuMjYsNDIuNjIsMTIuOSw0Mi4xNiwxMy40MnoiLz4KCQkJPHBhdGggZmlsbD0iIzQ3NDc0NyIgZD0iTTIwLjgsNi45N2MtMS4yNiwwLTIuMzMsMC40My0zLjIsMS4yOXMtMS4zMSwxLjkzLTEuMzEsMy4yMWMwLDEuMjgsMC40NCwyLjM1LDEuMzEsMy4yMQoJCQkJczEuOTQsMS4yOSwzLjIsMS4yOXMyLjMzLTAuNDMsMy4yLTEuMjljMC44OC0wLjg2LDEuMzEtMS45MywxLjMxLTMuMjFjMC0xLjI4LTAuNDQtMi4zNS0xLjMxLTMuMjFTMjIuMDYsNi45NywyMC44LDYuOTd6CgkJCQkgTTIyLjU5LDEzLjQyYy0wLjUsMC41MS0xLjEsMC43Ny0xLjc5LDAuNzdzLTEuMjktMC4yNS0xLjc5LTAuNzdjLTAuNS0wLjUyLTAuNzUtMS4xNy0wLjc1LTEuOTVjMC0wLjgsMC4yNS0xLjQ1LDAuNzQtMS45NgoJCQkJYzAuNS0wLjUxLDEuMS0wLjc3LDEuOC0wLjc3UzIyLjEsOSwyMi42LDkuNTFjMC40OSwwLjUxLDAuNzQsMS4xNywwLjc0LDEuOTZDMjMuMzQsMTIuMjUsMjMuMDksMTIuOSwyMi41OSwxMy40MnoiLz4KCQkJPHJlY3QgeD0iNDUuOTUiIHk9IjIuNDgiIGZpbGw9IiM0NzQ3NDciIHdpZHRoPSIxLjk4IiBoZWlnaHQ9IjEzLjIxIi8+CgkJCTxwYXRoIGZpbGw9IiM0NzQ3NDciIGQ9Ik01My4zNCwxNC4yYy0wLjk5LDAtMS43MS0wLjQ1LTIuMTgtMS4zNmw2LjAxLTIuNDlsLTAuMi0wLjUxYy0wLjExLTAuMy0wLjI2LTAuNTktMC40NC0wLjg5CgkJCQljLTAuMTgtMC4yOS0wLjQyLTAuNi0wLjczLTAuOTFjLTAuMzEtMC4zMi0wLjY5LTAuNTctMS4xNi0wLjc3Yy0wLjQ3LTAuMi0wLjk3LTAuMy0xLjUyLTAuM2MtMS4xOSwwLTIuMTksMC40Mi0zLjAxLDEuMjYKCQkJCWMtMC44MiwwLjg0LTEuMjMsMS45Mi0xLjIzLDMuMjRjMCwxLjI3LDAuNDMsMi4zNCwxLjI4LDMuMmMwLjg1LDAuODYsMS45MSwxLjI5LDMuMTgsMS4yOWMwLjkxLDAsMS42OC0wLjIsMi4yOS0wLjYKCQkJCWMwLjYzLTAuNDEsMS4xMS0wLjg3LDEuNDUtMS4zOGwtMS41My0xLjAyQzU0Ljk5LDEzLjc5LDU0LjI1LDE0LjIsNTMuMzQsMTQuMnogTTUxLjU2LDkuNDNjMC41MS0wLjQ4LDEuMDUtMC43MiwxLjYzLTAuNzIKCQkJCWMwLjM5LDAsMC43MywwLjA4LDEuMDQsMC4yNmMwLjMxLDAuMTgsMC41MiwwLjQxLDAuNjMsMC42OWwtNC4wMiwxLjY3QzUwLjgyLDEwLjU0LDUxLjA2LDkuOSw1MS41Niw5LjQzeiIvPgoJCQk8cGF0aCBmaWxsPSIjNDc0NzQ3IiBkPSJNMzAuNjUsNi45N2MtMS4yNiwwLTIuMzMsMC40My0zLjIsMS4yOXMtMS4zMSwxLjkzLTEuMzEsMy4yMWMwLDEuMjgsMC40NCwyLjM1LDEuMzEsMy4yMQoJCQkJczEuOTQsMS4yOSwzLjIsMS4yOWMxLjI2LDAsMi4zMy0wLjQzLDMuMi0xLjI5YzAuODctMC44NiwxLjMxLTEuOTMsMS4zMS0zLjIxYzAtMS4yOC0wLjQ0LTIuMzUtMS4zMS0zLjIxUzMxLjkxLDYuOTcsMzAuNjUsNi45NwoJCQkJeiBNMzIuNDQsMTMuNDJjLTAuNSwwLjUxLTEuMSwwLjc3LTEuNzksMC43N3MtMS4yOS0wLjI1LTEuNzktMC43N2MtMC41LTAuNTItMC43NS0xLjE3LTAuNzUtMS45NWMwLTAuOCwwLjI1LTEuNDUsMC43NC0xLjk2CgkJCQljMC41LTAuNTEsMS4xLTAuNzcsMS44LTAuNzdjMC43MSwwLDEuMzEsMC4yNiwxLjgsMC43N3MwLjc0LDEuMTcsMC43NCwxLjk2QzMzLjE5LDEyLjI1LDMyLjk0LDEyLjksMzIuNDQsMTMuNDJ6Ii8+CgkJPC9nPgoJCTxnPgoJCQk8cG9seWdvbiBmaWxsPSIjNDc0NzQ3IiBwb2ludHM9IjcwLjQ4LDEwLjkyIDcwLjQxLDEwLjkyIDY2LjE3LDMuNSA2NC42LDMuNSA2NC42LDE1LjY5IDY2LjE3LDE1LjY5IDY2LjE3LDguNDUgNjYuMSw2LjQxIAoJCQkJNjYuMTcsNi40MSA2OS45OCwxMy4xIDcwLjksMTMuMSA3NC43Miw2LjQxIDc0Ljc5LDYuNDEgNzQuNzIsOC40NSA3NC43MiwxNS42OSA3Ni4yOSwxNS42OSA3Ni4yOSwzLjUgNzQuNzIsMy41IAkJCSIvPgoJCQk8cGF0aCBmaWxsPSIjNDc0NzQ3IiBkPSJNODEuNSw3LjA3Yy0wLjkzLDAtMS42OCwwLjIxLTIuMjUsMC42NFM3OC4zLDguNiw3OC4xMSw5LjFsMS40NCwwLjYxYzAuMTQtMC4zOCwwLjM5LTAuNjcsMC43Ni0wLjg5CgkJCQljMC4zNi0wLjIxLDAuNzgtMC4zMiwxLjIzLTAuMzJjMC42MSwwLDEuMTMsMC4xOCwxLjU1LDAuNTVjMC40MiwwLjM3LDAuNjMsMC44NiwwLjYzLDEuNDd2MC4yNGMtMC41OS0wLjM0LTEuMzQtMC41MS0yLjI2LTAuNTEKCQkJCWMtMS4wNCwwLTEuOTEsMC4yNS0yLjYxLDAuNzdjLTAuNzEsMC41Mi0xLjA2LDEuMjMtMS4wNiwyLjE0YzAsMC44NCwwLjI5LDEuNTIsMC44OSwyLjAzYzAuNTksMC41MSwxLjMzLDAuNzcsMi4yMiwwLjc3CgkJCQljMS4yMSwwLDIuMTItMC40NywyLjc1LTEuNDNoMC4wN3YxLjE2aDEuNXYtNS4wNGMwLTEuMTQtMC4zNi0yLjAyLTEuMDYtMi42NEM4My40NSw3LjM4LDgyLjU3LDcuMDcsODEuNSw3LjA3eiBNODIuOTIsMTMuODEKCQkJCWMtMC41MywwLjQ4LTEuMTEsMC43Mi0xLjc2LDAuNzJjLTAuNDYsMC0wLjg2LTAuMTItMS4yMS0wLjM1Yy0wLjM1LTAuMjQtMC41My0wLjU2LTAuNTMtMC45N2MwLTAuNDQsMC4xOS0wLjgzLDAuNTgtMS4xNgoJCQkJczAuOTYtMC40OSwxLjcyLTAuNDljMC44OCwwLDEuNTUsMC4xOCwxLjk5LDAuNTRDODMuNzEsMTIuNzYsODMuNDUsMTMuMzMsODIuOTIsMTMuODF6Ii8+CgkJCTxwYXRoIGZpbGw9IiM0NzQ3NDciIGQ9Ik05MS4xMiw3LjA4Yy0wLjYzLDAtMS4yLDAuMTQtMS43MSwwLjQxYy0wLjUsMC4yNy0wLjg4LDAuNjEtMS4xMywxLjAyaC0wLjA3VjcuMzVoLTEuNXYxMi4wMmgxLjU3di0zLjY4CgkJCQlsLTAuMDctMS4xNmgwLjA3YzAuMjUsMC40MSwwLjYyLDAuNzUsMS4xMywxLjAyYzAuNSwwLjI3LDEuMDcsMC40MSwxLjcxLDAuNDFjMS4wOCwwLDIuMDEtMC40MiwyLjc5LTEuMjYKCQkJCWMwLjc5LTAuODUsMS4xOC0xLjkxLDEuMTgtMy4xN2MwLTEuMjYtMC40LTIuMzItMS4xOC0zLjE3QzkzLjEzLDcuNTEsOTIuMiw3LjA4LDkxLjEyLDcuMDh6IE05Mi43MywxMy43CgkJCQljLTAuNTIsMC41NS0xLjE0LDAuODMtMS44NywwLjgzYy0wLjczLDAtMS4zNi0wLjI3LTEuODgtMC44MmMtMC41MS0wLjU1LTAuNzctMS4yOC0wLjc3LTIuMnMwLjI1LTEuNjYsMC43Ny0yLjIKCQkJCWMwLjUxLTAuNTUsMS4xNC0wLjgyLDEuODgtMC44MmMwLjcyLDAsMS4zNSwwLjI4LDEuODcsMC44M2MwLjUyLDAuNTUsMC43OCwxLjI4LDAuNzgsMi4xOUM5My41MSwxMi40Miw5My4yNSwxMy4xNSw5Mi43MywxMy43eiIKCQkJCS8+CgkJCTxwYXRoIGZpbGw9IiM0NzQ3NDciIGQ9Ik0xMDEuOTYsMTEuODRjLTAuMzgtMC40NS0wLjk2LTAuNzYtMS43NC0wLjk0bC0xLjY1LTAuMzljLTAuNzQtMC4xNy0xLjExLTAuNDktMS4xMS0wLjk3CgkJCQljMC0wLjMzLDAuMTYtMC41OSwwLjQ4LTAuNzhzMC43MS0wLjI5LDEuMTgtMC4yOWMwLjk3LDAsMS42LDAuMzcsMS45MSwxLjExbDEuMzYtMC41NmMtMC4yNS0wLjYzLTAuNjYtMS4xLTEuMjQtMS40NAoJCQkJYy0wLjU4LTAuMzMtMS4yNC0wLjUtMS45OC0wLjVjLTAuODksMC0xLjY3LDAuMjMtMi4zMiwwLjY5Yy0wLjY1LDAuNDYtMC45OCwxLjA2LTAuOTgsMS44YzAsMC42NSwwLjI0LDEuMTYsMC43MiwxLjU0CgkJCQlzMC45OSwwLjYzLDEuNTIsMC43N2wxLjY5LDAuNDFjMC43NiwwLjIsMS4xNCwwLjU3LDEuMTQsMS4xMWMwLDAuMzUtMC4xNiwwLjYzLTAuNDcsMC44NWMtMC4zMSwwLjIxLTAuNzEsMC4zMi0xLjIsMC4zMgoJCQkJYy0xLjA2LDAtMS44Mi0wLjUzLTIuMjYtMS41N2wtMS40LDAuNThjMC4yOSwwLjY4LDAuNzMsMS4yNSwxLjM0LDEuN2MwLjYxLDAuNDUsMS4zOCwwLjY4LDIuMzEsMC42OGMwLjk2LDAsMS43NS0wLjI1LDIuMzQtMC43NQoJCQkJYzAuNjEtMC41LDAuOTItMS4xMiwwLjkyLTEuODdDMTAyLjUyLDEyLjc4LDEwMi4zMywxMi4yOCwxMDEuOTYsMTEuODR6Ii8+CgkJPC9nPgoJPC9nPgo8L2c+Cjwvc3ZnPgo='
+    };
+    function googleKey() { return String(cfg().googleKey || ''); }
+    function googleBase() { return String(cfg().googleBase || '') || GOOGLE.base; }
+    function imageryChoice() {
+        var c = cfg();
+        var pick = (S && S.pro && c.imageryPro) ? c.imageryPro : (c.imagery || 'esri');
+        return (pick === 'google' && googleKey()) ? 'google' : 'esri';
+    }
+    // A session token (Google: valid two weeks, usable by any client) - kept on
+    // the phone and renewed a day before it runs out. It names nothing about the
+    // golfer: the request says only "satellite, en-US, US".
+    function googleSession(done) {
+        var saved = null;
+        try { saved = JSON.parse(localStorage.getItem(GOOGLE.sessionKey) || 'null'); } catch (e) {}
+        if (saved && saved.session && saved.key === googleKey().slice(-6) && saved.expiry * 1000 - Date.now() > 86400000) { done(saved.session); return; }
+        if (typeof fetch !== 'function') { done(null); return; }
+        fetch(googleBase() + '/v1/createSession?key=' + encodeURIComponent(googleKey()), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mapType: 'satellite', language: 'en-US', region: 'US' })
+        }).then(function (r) { if (!r.ok) throw new Error('session ' + r.status); return r.json(); }).then(function (j) {
+            if (!j || !j.session) throw new Error('no session');
+            try { localStorage.setItem(GOOGLE.sessionKey, JSON.stringify({ session: j.session, expiry: Number(j.expiry) || 0, key: googleKey().slice(-6) })); } catch (e) {}
+            done(j.session);
+        }).catch(function () { done(null); });
+    }
+    function googleSource(session) {
+        return { type: 'raster', tiles: [googleBase() + '/v1/2dtiles/{z}/{x}/{y}?session=' + encodeURIComponent(session) + '&key=' + encodeURIComponent(googleKey())],
+                 tileSize: 256, maxzoom: GOOGLE.maxNativeZoom, attribution: 'Google Maps' };
+    }
+
     // ---- HARDPAN GPS PRO: THE ONE CHECK (Wave 2, 2026-10-08) -----------------
     // Free: the numbers (FRONT / CENTER / BACK, accuracy, Enter Score) and no map.
     // Pro: everything else - the satellite hole, arcs, target, Edit Pin, wind,
@@ -422,7 +473,11 @@
     }
     function canSetHere() { var y = yardsFromGreen(); return gpsGoodEnough() && (y == null || y <= GREEN_NEAR_YD); }
     // Esri on the map: z21 (z19 tiles, enlarged). USGS: z18 (z16 tiles, enlarged).
-    function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && !tapMode()) ? TILES.maxZoom : 18; }
+    function maxZoomNow() {
+        if (!S) return 18;
+        if (S.googleOn) return (!S.googleFailed && S.mode === 'measure') ? TILES.maxZoom : 18;
+        return (S.esriOn && !S.esriFailed && !tapMode()) ? TILES.maxZoom : 18;
+    }
 
     // ---- ESRI STOPS ANSWERING: USGS TAKES OVER ----------------------------------
     // Four Esri tile errors IN A ROW (a tile that loads resets the count) hand the
@@ -442,8 +497,19 @@
             reportMapState();
         }
     }
-    function onOffline() { dropEsri('offline'); }
+    function dropGoogle(why) {
+        if (!S || !S.googleOn || S.googleFailed) return;
+        S.googleFailed = true; S.googleFailWhy = why; S.googleFailAt = S.gErrRun || 0;
+        syncImageryForMode();
+        refreshUsgs();
+    }
+    function onOffline() { dropEsri('offline'); dropGoogle('offline'); }
     function onOnline() {
+        if (S && S.googleOn && S.googleFailed && S.googleFailWhy === 'offline' && !S.googleRetried && S.map && S.map.getSource('google')) {
+            S.googleRetried = true; S.googleFailed = false; S.googleFailWhy = null; S.gErrRun = 0;
+            syncImageryForMode();
+            return;
+        }
         if (!S || !S.esriFailed || S.esriFailWhy !== 'offline' || S.esriRetried || !S.map || !S.map.getSource('esri')) return;
         S.esriRetried = true;
         S.esriFailed = false; S.esriFailWhy = null; S.esriErrRun = 0;
@@ -460,9 +526,13 @@
         var el = S.el.querySelector('.gps-map');
         if (!ml || !el) { S.map = null; if (el) el.classList.add('gps-no-tiles'); return; }
         addUsgsProtocol(ml);
-        var key = esriKey();
+        S.imagery = imageryChoice();
+        S.googleOn = S.imagery === 'google';
+        // Google chosen: Esri is not on the map at all (no Google with another map).
+        var key = S.googleOn ? '' : esriKey();
         S.esriOn = !!key;
         var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        S.googleFailed = S.googleOn && offline; S.googleFailWhy = S.googleFailed ? 'offline' : null; S.gErrRun = 0;
         S.esriFailed = !key || offline;
         S.esriFailWhy = !key ? 'no-key' : (offline ? 'offline' : null);
         S.esriErrRun = 0;
@@ -477,7 +547,8 @@
         };
         var layers = [
             { id: 'bg', type: 'background', paint: { 'background-color': '#1d3b2a' } },
-            { id: 'usgs', type: 'raster', source: 'usgs' },
+            // Hidden from the start when Google is to be the picture (never two maps).
+            { id: 'usgs', type: 'raster', source: 'usgs', layout: { visibility: (S.googleOn && !S.googleFailed) ? 'none' : 'visible' } },
             { id: 'hole-line', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'line'], paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.45 } },
             { id: 'green-fill', type: 'fill', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'fill-color': '#4ade80', 'fill-opacity': 0.28 } },
             { id: 'green-edge', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'line-color': '#d9f99d', 'line-width': 2 } },
@@ -520,6 +591,10 @@
         map.on('error', function (e) {
             if (!S || S.map !== map) return;
             var sid = e && e.sourceId;
+            if (sid === 'google') {
+                S.gErrRun = (S.gErrRun || 0) + 1;
+                if (S.gErrRun >= ESRI_ERRS_TO_FAIL) dropGoogle('errors');
+            }
             if (sid === 'esri') {
                 // Esri is not answering - in a row, however many tiles loaded before.
                 S.esriErrs = (S.esriErrs || 0) + 1;
@@ -532,9 +607,10 @@
         map.on('data', function (e) {
             if (!S || S.map !== map || !e || e.dataType !== 'source' || !e.tile) return;
             if (e.sourceId === 'esri') { S.esriLoads = (S.esriLoads || 0) + 1; S.esriErrRun = 0; }
-            if (e.sourceId === 'usgs' || e.sourceId === 'esri') { S.tileLoads++; syncNoTiles(); reportMapState(); }
+            if (e.sourceId === 'google') { S.googleLoads = (S.googleLoads || 0) + 1; S.gErrRun = 0; }
+            if (e.sourceId === 'usgs' || e.sourceId === 'esri' || e.sourceId === 'google') { S.tileLoads++; syncNoTiles(); reportMapState(); }
         });
-        map.on('moveend', function () { if (S && S.map === map) reportMapState(); });
+        map.on('moveend', function () { if (S && S.map === map) { reportMapState(); googleCopyrightSoon(); } });
         // A move the golfer made (a pan or a pinch) - not one this file made.
         map.on('movestart', function (e) { if (S && S.map === map && e && e.originalEvent) S.userMoved = true; });
         // The pills and the ring follow the map as it moves and zooms.
@@ -557,6 +633,7 @@
         map.on('load', function () {
             if (!S || S.map !== map) return;
             S.styleReady = true;
+            if (S.googleOn) addGoogleLayer();
             limitToCourse();
             frameHole(true);
             render();
@@ -581,6 +658,13 @@
         el.setAttribute('data-esri-fail-at', S.esriFailed && S.esriFailWhy === 'errors' ? String(S.esriFailAt) : '');
         var es = S.map.getSource('esri');
         el.setAttribute('data-esri-src-max', es ? String(es.maxzoom) : '');
+        var gs = S.map.getSource('google');
+        el.setAttribute('data-google', !S.googleOn ? 'off' : (S.googleFailed ? 'failed' : (S.map.getLayer('google') ? (S.map.getLayoutProperty('google', 'visibility') || 'visible') : 'pending')));
+        el.setAttribute('data-google-why', S.googleFailWhy || '');
+        el.setAttribute('data-google-loads', String(S.googleLoads || 0));
+        el.setAttribute('data-google-src-max', gs ? String(gs.maxzoom) : '');
+        el.setAttribute('data-google-vp', String(S.googleVp || 0));
+        el.setAttribute('data-usgs-vis', S.map.getLayer('usgs') ? (S.map.getLayoutProperty('usgs', 'visibility') || 'visible') : '');
         el.setAttribute('data-tiles-loaded', String(S.tileLoads || 0));
         el.setAttribute('data-max-zoom', String(S.map.getMaxZoom()));
         el.setAttribute('data-bearing', String(Math.round(S.map.getBearing())));
@@ -601,12 +685,63 @@
         syncLayoutVars();
         maybeRefit();
     }
+    // Google's layer goes in once a session is in hand (from the phone, or a fresh
+    // one). No session (a bad key, no signal): USGS is the picture.
+    function addGoogleLayer() {
+        var mine = S;
+        googleSession(function (session) {
+            if (S !== mine || !S.map) return;
+            if (!session) { S.googleFailed = true; S.googleFailWhy = S.googleFailWhy || 'session'; syncImageryForMode(); refreshUsgs(); return; }
+            try {
+                if (!S.map.getSource('google')) {
+                    S.map.addSource('google', googleSource(session));
+                    S.map.addLayer({ id: 'google', type: 'raster', source: 'google', layout: { visibility: 'none' } }, 'hole-line');
+                }
+            } catch (e) {}
+            syncImageryForMode();
+            googleCopyrightSoon();
+        });
+    }
+    // GOOGLE'S COPYRIGHT LINE for the area on screen (its viewport endpoint), asked
+    // after the map settles, not on every frame. The area asked about is the map's
+    // view - the hole - not the golfer.
+    var gcTimer = null;
+    function googleCopyrightSoon() {
+        if (!S || !S.googleOn || S.googleFailed || !S.map || !S.map.getSource('google')) return;
+        if (gcTimer) clearTimeout(gcTimer);
+        var mine = S;
+        gcTimer = setTimeout(function () {
+            gcTimer = null;
+            if (S !== mine || !S.map || typeof fetch !== 'function') return;
+            var src = S.map.getSource('google'), b = S.map.getBounds(), z = Math.min(Math.round(S.map.getZoom()), GOOGLE.maxNativeZoom);
+            var m = /session=([^&]+)/.exec((src && src.tiles && src.tiles[0]) || '');
+            if (!m) return;
+            S.googleVp = (S.googleVp || 0) + 1;
+            // The edges ROUNDED OUTWARD to 0.01 deg (~1 km): the copyright is per area,
+            // and a 3x view's edge sat on the golfer's own latitude to 4 places
+            // (the check's privacy scan caught it).
+            var out = function (v, up) { return (up ? Math.ceil(v * 100) : Math.floor(v * 100)) / 100; };
+            fetch(googleBase() + '/tile/v1/viewport?session=' + m[1] + '&key=' + encodeURIComponent(googleKey()) + '&zoom=' + z
+                + '&north=' + out(b.getNorth(), true).toFixed(2) + '&south=' + out(b.getSouth(), false).toFixed(2) + '&east=' + out(b.getEast(), true).toFixed(2) + '&west=' + out(b.getWest(), false).toFixed(2))
+                .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+                    if (S !== mine || !j || typeof j.copyright !== 'string') return;
+                    S.googleCopyright = j.copyright;
+                    syncCredit();
+                }, function () {});
+        }, 700);
+    }
     // The credit line names the picture on screen: Esri when its layer shows,
     // else USGS. ⓘ shows every line.
+    function googleShown() { return !!(S && S.map && S.map.getLayer('google') && S.map.getLayoutProperty('google', 'visibility') === 'visible'); }
     function syncCredit() {
         if (!S || !S.map) return;
         var esriShown = !!(S.map.getLayer('esri') && S.map.getLayoutProperty('esri', 'visibility') !== 'none' && !S.esriFailed);
-        txt('.gps-credit-txt', esriShown ? 'Powered by Esri' : 'USGS');
+        var g = googleShown();
+        // With Google: its logo and its copyright line, on the map, unhidden.
+        var logo = S.el.querySelector('.gps-google-logo');
+        if (logo) logo.style.display = g ? '' : 'none';
+        txt('.gps-credit-txt', g ? (S.googleCopyright || 'Google') : (esriShown ? 'Powered by Esri' : 'USGS'));
+        S.el.classList.toggle('gps-credit-google', g);
         var pop = S.el.querySelector('.gps-credit-pop');
         if (pop && pop.style.display !== 'none') fillCredits();
     }
@@ -678,6 +813,17 @@
         // Only a green set by TAPPING the photo uses USGS (the fallback link). A
         // green set by GPS keeps the sharp Esri photo: nothing is taken from it.
         var pinning = tapMode();
+        if (S.googleOn) {
+            // GOOGLE: the picture only while measuring - never while ANY green is set
+            // (no content may be made from it) - and never with another map under it.
+            var gWant = (S.mode === 'measure' && !S.googleFailed && S.map.getLayer('google')) ? 'visible' : 'none';
+            if (S.map.getLayer('google') && S.map.getLayoutProperty('google', 'visibility') !== gWant) S.map.setLayoutProperty('google', 'visibility', gWant);
+            var uWant = gWant === 'visible' ? 'none' : 'visible';
+            if (S.map.getLayer('usgs') && (S.map.getLayoutProperty('usgs', 'visibility') || 'visible') !== uWant) {
+                S.map.setLayoutProperty('usgs', 'visibility', uWant);
+                if (uWant === 'visible') refreshUsgs();
+            }
+        }
         if (S.map.getLayer('esri')) {
             var want = (pinning || S.esriFailed) ? 'none' : 'visible';
             if (S.map.getLayoutProperty('esri', 'visibility') !== want) {
@@ -1772,7 +1918,7 @@
         + '</div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
-        + '<div class="gps-credit"><span class="gps-credit-txt"></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
+        + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
         + '<div class="gps-credit-pop gps-float" style="display:none" role="dialog" aria-label="Map credits"></div>'
         // FREE (no HardPan GPS): the way to the upgrade.
         + '<div class="gps-basic"><button type="button" class="gps-get-pro">Get HardPan GPS</button></div>'
@@ -1850,7 +1996,7 @@
         + '#gps-overlay .gps-target-row{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-radius:999px;font-weight:800;font-size:15px;color:#facc15;white-space:nowrap;}'
         + '#gps-overlay .gps-to-plays{font-size:13px;color:#fde68a;font-weight:700;}'
         + '#gps-overlay .gps-to-plays:empty{display:none;}'
-        + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 8px);display:flex;align-items:stretch;gap:8px;height:54px;}'
+        + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 10px);display:flex;align-items:stretch;gap:8px;height:54px;}'
         + '#gps-overlay .gps-side-bets,#gps-overlay .gps-tools{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
         + '#gps-overlay .gps-ico{font-size:20px;line-height:1;color:#d9f99d;}'
         + '#gps-overlay .gps-cap{font-size:11px;font-weight:700;color:#c8d1ca;}'
@@ -1882,6 +2028,11 @@
         + '#gps-overlay .maplibregl-ctrl-bottom-right{display:none !important;}'
         + '#gps-overlay .gps-credit{position:absolute;z-index:6;left:12px;bottom:calc(env(safe-area-inset-bottom) + 3px);display:flex;align-items:center;gap:4px;'
         +   'font:600 10.5px/1.2 ' + FONT + ';color:#f4f4ef;text-shadow:0 0 2px #000,0 0 4px #000;white-space:nowrap;}'
+        // The Google logo: 18px high (Google: 16-19dp), clear space 10px around it
+        // (5px below), never covered: the bottom row sits 10px above it.
+        + '#gps-overlay .gps-google-logo{height:18px;width:auto;margin:0 10px 0 0;flex:0 0 auto;}'
+        + '#gps-overlay.gps-credit-google .gps-credit{bottom:calc(env(safe-area-inset-bottom) + 5px);left:10px;right:10px;white-space:normal;}'
+        + '#gps-overlay.gps-credit-google .gps-credit-txt{flex:1 1 auto;min-width:0;}'
         + '#gps-overlay .gps-credit-i{font-size:13px;line-height:1;padding:2px 4px;min-height:22px;color:#f4f4ef;text-shadow:inherit;}'
         + '#gps-overlay .gps-credit-pop{position:absolute;z-index:40;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 26px);padding:10px 12px;font-size:12px;line-height:1.45;color:#f4f4ef;}'
         + '#gps-overlay .gps-credit-pop a{color:#d9f99d;}'

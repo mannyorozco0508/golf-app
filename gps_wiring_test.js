@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v331-gps-greennear'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v332-gps-google'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -149,7 +149,9 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'googleKey', 'imagery', 'imageryPro', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase) in the shipped config');
+    assert.strictEqual(cfg.imagery, 'esri', 'Esri stays the default');
+    assert.strictEqual(cfg.googleKey, '', 'no Google key is added by the app (Manny supplies it)');
     // The key appears in this one file only.
     const k = cfg.esriKey;
     ['gps-view.js', 'gps-geo.js', 'index.html', 'sw.js', 'tools/gps-check.js', 'docs/gps-step0.md', 'docs/gps-builds.md'].forEach((f) => {
@@ -221,4 +223,19 @@ test('setting a green by GPS: Esri stays up; only the tap fallback is USGS; ±5 
     assert.ok(/Set by tapping \(lower detail\)/.test(v), 'the fallback link is there');
     assert.ok(/if \(!S \|\| !canSetHere\(\)\) return;/.test(v), 'Set does nothing below ±5 yds or away from the green');
     assert.ok(/function canSetHere\(\) \{ var y = yardsFromGreen\(\); return gpsGoodEnough\(\) && \(y == null \|\| y <= GREEN_NEAR_YD\); \}/.test(v));
+});
+
+test('Google satellite: off without a key; never stored, never for greens, never with another map; logo shown', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/return \(pick === 'google' && googleKey\(\)\) \? 'google' : 'esri';/.test(v), 'no key = Esri');
+    assert.ok(/mapType: 'satellite', language: 'en-US', region: 'US'/.test(v), 'a satellite session');
+    assert.ok(/\/v1\/2dtiles\/\{z\}\/\{x\}\/\{y\}\?session=/.test(v), 'the 2D tile URL with the session');
+    // Never stored: the only Cache Storage write is still the USGS pre-cache.
+    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('// ---- THE HOLE VIEW'));
+    assert.ok(!/google|2dtiles/i.test(pre), 'the pre-cache never touches Google');
+    // Never for greens, never with USGS under it.
+    assert.ok(/var gWant = \(S\.mode === 'measure' && !S\.googleFailed && S\.map\.getLayer\('google'\)\) \? 'visible' : 'none';/.test(v));
+    assert.ok(/var uWant = gWant === 'visible' \? 'none' : 'visible';/.test(v));
+    // Google's own logo file, unmodified, alt "Google Maps".
+    assert.ok(/class="gps-google-logo" alt="Google Maps"/.test(v) && /logo: 'data:image\/svg\+xml;base64,/.test(v));
 });

@@ -480,3 +480,41 @@ of any other app.
     OpenStreetMap contributors — taken from MapLibre's own attribution for
     the sources on the map.
   - A tap anywhere closes it.
+
+### 7g. Google satellite, optional (2026-10-08) — OFF until a key is set
+
+- **Settings in `gps-config.js`:**
+  - `imagery` — everyone's picture; default `'esri'`.
+  - `imageryPro` — HardPan GPS users' picture.
+  - `googleKey` — empty means Google is off whatever is chosen. No key is
+    included; Manny supplies it.
+  - Free users have no map at all, so in practice `imageryPro` decides.
+- **How it loads:**
+  - Map Tiles API 2D satellite. A session (`POST /v1/createSession`,
+    `{mapType:'satellite', language:'en-US', region:'US'}`) is kept on the
+    phone and renewed a day before its two weeks run out.
+  - Tiles come from `/v1/2dtiles/{z}/{x}/{y}?session=…&key=…`, z19 at most;
+    the map enlarges to z21.
+  - Four errors in a row, or no signal, hand over to USGS — the same logic as
+    Esri.
+- **Google's rules, as built:**
+  1. **Logo:** the "Google Maps" logo, Google's own light-outline file,
+     unmodified, 18px high (16–19dp required), with 10px clear above. Alt text
+     "Google Maps".
+  2. **Copyright:** Google's copyright line for the area on screen, from the
+     viewport endpoint, shown on the map next to the logo. The viewport is
+     asked with its edges rounded outward to 0.01°, so it never names the
+     golfer's spot.
+  3. **No storing:** never stored or pre-fetched; only the browser's HTTP cache,
+     under Google's own headers.
+  4. **No greens from Google:** never the picture while a green is set (by GPS
+     or by tapping).
+  5. **No other map with it:** never shown with another map. USGS is hidden
+     under it, Esri is not on the map at all, and USGS appears only when
+     Google is off.
+- **Open question for Manny / counsel:** Google's main agreement says Google
+  content must not be used "with or near a non-Google Map in a Customer
+  Application". The app as a whole also offers Esri and USGS maps (to other
+  users, offline, while setting greens). Ask Google before shipping it.
+- **Tile budget:** holes 1–18 at 1x + 3x in the check made about 208 Google
+  tile requests (Esri: about 218), plus one viewport call per settled move.
