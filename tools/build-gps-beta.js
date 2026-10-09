@@ -5,6 +5,7 @@
 //
 // Builds gps-beta/www (git-ignored) from the GPS files of this tree:
 //   gps-beta/index.html -> www/index.html   (the yardage-only page)
+//   gps-beta/trip-cards.js                  (the trip's courses and cards)
 //   gps-geo.js, gps-view.js, gps-config.js, gps-courses.js,
 //   maplibre-gl.js, maplibre-gl.css, course-data.js
 // and NOTHING ELSE: no Firebase SDK, no scorecard, no service worker. The app
@@ -31,6 +32,9 @@ fs.mkdirSync(OUT, { recursive: true });
 const page = fs.readFileSync(path.join(BETA, 'index.html'), 'utf8');
 if (/<script[^>]+src="[^"]*firebase/i.test(page)) { console.error('gps-beta/index.html loads Firebase - refused'); process.exit(1); }
 fs.writeFileSync(path.join(OUT, 'index.html'), page);
+// The trip's courses and cards (read read-only from the live trip): no round
+// codes, no golfers.
+fs.copyFileSync(path.join(BETA, 'trip-cards.js'), path.join(OUT, 'trip-cards.js'));
 FILES.forEach((f) => {
     const src = path.join(ROOT, f);
     if (!fs.existsSync(src)) { console.error('missing ' + f + ' - build from a HardPan (GPS) tree'); process.exit(1); }

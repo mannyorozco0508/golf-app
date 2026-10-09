@@ -74,8 +74,8 @@ const PRODUCTS = {
         // HardPan (dist/hardpan) moved to v157 for GPS Wave 2 (2026-10-08): Esri
         // live, plays like, the free / Pro split - gps-view.js, gps-geo.js and
         // gps-config.js changed. Consumer's own key below does not move.
-        // v167 (same day): Google stays off; gps-config.js says why.
-        cacheNameGps: 'consumer-v167-gps-googleoff',
+        // v168 (2026-10-09): Man O' War joins the bundled courses.
+        cacheNameGps: 'consumer-v168-gps-manowar',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

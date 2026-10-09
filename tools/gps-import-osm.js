@@ -82,6 +82,12 @@ const COURSES = [
     { key: 'pinehills', file: 'myrtlewood', osm: 'relation(18885507)', preset: 'pinehills',
       holeFilter: (t) => /pine\s*hills/i.test(String(t['golf:course:name'] || '')) },
     { key: 'swwa_trimountain', file: 'tri_mountain', osm: 'way(149674375)', preset: 'swwa_trimountain' },
+    // Man O' War (Myrtle trip Day 4, 2026-10-16): OSM way 23375416 is ONE area
+    // for two courses, "The Wizard / Man O' War". Man O' War's 18 are tagged
+    // ref="Man O'War N" (or ref=N, name="Man O'War N"); The Wizard's say
+    // "Wizard N" and are left out.
+    { key: 'manofwar', file: 'man_o_war', osm: 'way(23375416)', preset: 'manofwar',
+      holeNumber: (t) => { const m = (String(t.ref || '') + ' ' + String(t.name || '')).match(/man\s*o\W*\s*war\s*(\d{1,2})\b/i); return m ? parseInt(m[1], 10) : null; } },
     // Scottsdale (Wave 1, 2026-10-08): the Arizona test course. OSM way
     // 78388948 is "TPC Scottsdale Stadium Course".
     { key: 'az_tpc_stadium', file: 'tpc_scottsdale_stadium', osm: 'way(78388948)', preset: 'az_tpc_stadium' },

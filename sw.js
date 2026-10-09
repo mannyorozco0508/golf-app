@@ -4437,7 +4437,11 @@
 // Moved to v333 (2026-10-08): gps-config.js says why Google stays off (no key).
 // HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v333-gps-googleoff';
+// GPS:BEGIN
+// Moved to v334 (2026-10-09): gps-courses.js gained Man O' War (OSM way
+// 23375416, its 18 of the Wizard / Man O' War area). HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v334-gps-manowar';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
