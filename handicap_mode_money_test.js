@@ -363,12 +363,13 @@ describe('4. CONTROLS', () => {
 // ===========================================================================
 describe('5. THE LABELS FOLLOW THE MODE', () => {
 
-    test('one builder names the box, and it says Strokes on a strokes round', () => {
+    // "HCP" since players-compact (2026-10-09, Manny): it is the golfer's handicap.
+    test('one builder names the box, and it says HCP on a strokes round', () => {
         const L = loadJsFile('handicap-labels.js');
-        assert.equal(L.handicapBoxPlaceholder({ handicapBasis: 'as-entered' }), 'Strokes');
+        assert.equal(L.handicapBoxPlaceholder({ handicapBasis: 'as-entered' }), 'HCP');
         assert.equal(L.handicapBoxPlaceholder({ handicapBasis: 'ghin-index' }), 'Index');
         assert.equal(L.handicapBoxPlaceholder({}), 'Index', 'a legacy round is an Index round');
-        assert.equal(L.handicapColumnLabel({ handicapBasis: 'as-entered' }), 'Strokes');
+        assert.equal(L.handicapColumnLabel({ handicapBasis: 'as-entered' }), 'HCP');
     });
 
     test('the SETUP row no longer hardcodes "Index"', () => {
@@ -391,7 +392,7 @@ describe('5. THE LABELS FOLLOW THE MODE', () => {
         assert.equal(sb.handicapSetupBoxLabel(), 'Index');
         sel.value = 'as-entered';
         sb.handicapBasisChanged();
-        assert.equal(sb.handicapSetupBoxLabel(), 'Strokes');
+        assert.equal(sb.handicapSetupBoxLabel(), 'HCP');
     });
 
     test('the toggle says what Manny says: strokes as typed, or an index adjusted by tee', () => {

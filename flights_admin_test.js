@@ -218,22 +218,28 @@ describe('4.2 THE ROW CONTROL AND ITS PLUMBING', () => {
         assert.deepEqual(G(sb), ['A', 'A']);
     });
 
-    test('ADDENDUM B: a plain row gets a sixth column (grid column 3, header "Flt"); a TEAM row gets a second line spanning the row', async () => {
+    // THE COMPACT LIST (players-compact, 2026-10-09): the flight control is on the
+    // row's slim SECOND line for every format (handle | name | HCP | tee | x stays
+    // one line at 320 px), inside .p-extra-line, with no grid column of its own.
+    test('ADDENDUM B (compact): every row carries the flight on its second line; the first line stays handle | name | HCP | tee | x', async () => {
         const sb = await wizard('FLT014');
         addGolfer(sb, 'Ann');
         run(sb, 'setFlightsEnabled(true)');
-        const plain = run(sb, '(function () { var r = document.querySelectorAll(".player-row")[0]; var b = r.querySelector(".p-flight-input"); return { cols: r.style.gridTemplateColumns, col: b.style.gridColumn, line: !!r.querySelector(".p-flight-line") }; })()');
-        assert.equal(J(plain).cols, '2fr 1fr 0.7fr 38px');
-        assert.equal(J(plain).col, '3');
-        assert.equal(J(plain).line, false);
-        assert.match(run(sb, "document.getElementById('player-header-row').innerHTML"), /<span>Flt<\/span>/);
-        assert.equal(run(sb, "document.getElementById('player-header-row').style.gridTemplateColumns"), '2fr 1fr 0.7fr 38px');
+        const plain = run(sb, '(function () { var r = document.querySelectorAll(".player-row")[0]; var b = r.querySelector(".p-flight-input"); return { cols: r.style.gridTemplateColumns || "", col: b.style.gridColumn || "", line: !!r.querySelector(".p-flight-line"), extra: !!(b.closest && b.closest(".p-extra-line")), compact: r.classList.contains("p-compact") }; })()');
+        assert.equal(J(plain).cols, '', 'the columns come from .p-compact, not an inline template');
+        assert.equal(J(plain).col, '');
+        assert.equal(J(plain).line, true);
+        assert.equal(J(plain).extra, true);
+        assert.equal(J(plain).compact, true);
+        assert.match(run(sb, "document.getElementById('player-header-row').innerHTML"), /<span>Name<\/span>/);
         // a team format: the same golfer, the same tag, a second line instead
         fillForm(sb, 'bestball'); run(sb, 'handleFormatChange();');
-        const team = run(sb, '(function () { var r = document.querySelectorAll(".player-row")[0]; var l = r.querySelector(".p-flight-line"); return { cols: r.style.gridTemplateColumns, line: !!l, span: l ? l.style.gridColumn : null, tag: r.querySelector(".p-flight-input").getAttribute("data-flight") }; })()');
-        assert.equal(J(team).cols, '1.8fr 0.8fr 1.2fr 38px', 'no column added on a team row');
+        const team = run(sb, '(function () { var r = document.querySelectorAll(".player-row")[0]; var l = r.querySelector(".p-flight-line"); return { cols: r.style.gridTemplateColumns || "", line: !!l, extra: !!(l && l.closest(".p-extra-line")), team: !!(r.querySelector(".p-team-input") && r.querySelector(".p-team-input").closest(".p-extra-line")), tag: r.querySelector(".p-flight-input").getAttribute("data-flight") }; })()');
+        assert.equal(J(team).cols, '', 'no inline column template on a team row either');
         assert.equal(J(team).line, true);
-        assert.equal(J(team).span, '1 / -1');
+        assert.equal(J(team).extra, true, 'the flight is on the second line');
+        // (One golfer on a team format draws no team picker; when there is one it is on this same line.)
+        assert.ok(J(team).team === true || !run(sb, '!!document.querySelectorAll(".player-row")[0].querySelector(".p-team-input")'), 'a team picker off the second line');
         assert.equal(J(team).tag, 'A');
         assert.ok(!/<span>Flt<\/span>/.test(run(sb, "document.getElementById('player-header-row').innerHTML")), 'no header column when there is no column');
     });
@@ -425,16 +431,13 @@ describe('4.4 COPY THAT IS BEHAVIOUR', () => {
 // row 82px tall against a 40px flightless row). Both axes are now explicit,
 // and this pins them so dropping either goes red here, not only under Chrome.
 // ---------------------------------------------------------------------------
-describe('6b THE PLAIN-ROW CONTROL SITS ON THE NAME\'S LINE: grid column 3, grid row 1', () => {
-    test('the source sets both axes, and a rendered plain row carries both', async () => {
-        const fn = ADMIN.slice(ADMIN.indexOf('function appendFlightControl('), ADMIN.indexOf('\n    // COPY THAT IS BEHAVIOUR'));
-        assert.match(fn, /btn\.style\.gridColumn = '3';/);
-        assert.match(fn, /btn\.style\.gridRow = '1';/, 'without an explicit row the auto-placed delete button takes column 3 and the control drops to a second line');
+describe('6b THE FLIGHT CONTROL SITS ON THE SECOND LINE (compact list, 2026-10-09)', () => {
+    test('a rendered plain row puts it in .p-extra-line with no grid placement of its own', async () => {
         const sb = await wizard('FLT060');
         addGolfer(sb, 'Ann');
         run(sb, 'setFlightsEnabled(true)');
-        const placed = J(run(sb, '(function () { var b = document.querySelectorAll(".player-row")[0].querySelector(".p-flight-input"); return { col: b.style.gridColumn, row: b.style.gridRow }; })()'));
-        assert.deepEqual(placed, { col: '3', row: '1' });
+        const placed = J(run(sb, '(function () { var b = document.querySelectorAll(".player-row")[0].querySelector(".p-flight-input"); return { col: b.style.gridColumn || "", row: b.style.gridRow || "", extra: !!b.closest(".p-extra-line") }; })()'));
+        assert.deepEqual(placed, { col: '', row: '', extra: true });
     });
     test('the second-line control on a TEAM row spans the row and sets no column of its own', async () => {
         const sb = await wizard('FLT061');

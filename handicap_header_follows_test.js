@@ -40,7 +40,8 @@ describe('THE HEADER FOLLOWS THE SWITCH', () => {
         const fn = ADMIN.slice(at, ADMIN.indexOf('\n    function ', at + 10));
         assert.ok(fn.length > 400, 'the builder did not slice - this test is guarding nothing');
         const headers = [...fn.matchAll(/headerRow\.innerHTML = `([^`]*)`/g)].map((m) => m[1]);
-        assert.equal(headers.length, 3, 'expected three header branches, found ' + headers.length);
+        // ONE header since the compact list (players-compact, 2026-10-09): NAME · HCP · TEE for every format.
+        assert.equal(headers.length, 1, 'expected the one compact header, found ' + headers.length);
         headers.forEach((h, i) => {
             assert.doesNotMatch(h, /<span>Index<\/span>/,
                 'header branch ' + (i + 1) + ' still hardcodes Index: ' + h);
@@ -73,7 +74,7 @@ describe('THE HEADER FOLLOWS THE SWITCH', () => {
         // handicap-labels.js owns them; if that ever changes, this says so
         // rather than letting the header drift to a third spelling.
         const labels = read('handicap-labels.js');
-        assert.match(labels, /'as-entered' \? 'Strokes' : 'Index'/,
-            'handicapBoxPlaceholder no longer answers Strokes/Index');
+        assert.match(labels, /'as-entered' \? 'HCP' : 'Index'/,
+            'handicapBoxPlaceholder no longer answers HCP/Index');
     });
 });
