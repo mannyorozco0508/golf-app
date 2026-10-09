@@ -4461,7 +4461,19 @@
 // that carry the tees stay (14 sets and 20 sets). Their CARDS stay in
 // coursePresets, because 37 saved rounds point at those keys.
 // A device on v329 still lists both courses twice.
-const CACHE_VERSION = 'golfapp-v330-onecourseentry';
+// Moved to v342. A WAY BACK INTO THE ROUND FROM THE MATCHES PAGE, and the
+// Receipt button put back inside its card. Once a side bet is set up this page
+// is the last setup step and the biggest button on it went to Final Results -
+// the END of a round. There is now a primary button under it: "Start Round"
+// until somebody posts a score, "Go to Round" after, carrying ?group= or the
+// organizer's own "Score for" pick so nobody lands on another group's card.
+// The Receipt link was the only <a> among four .btn-primary controls and an <a>
+// does not get border-box from the UA sheet, so it rendered 24px wider than its
+// siblings and hung 23px out of the card at 390 AND 320 - measured, now fixed
+// by naming box-sizing once.
+// A device on v330 has no way forward from Matches, and a Receipt button that
+// sticks out of the card.
+const CACHE_VERSION = 'golfapp-v342-gotoround';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

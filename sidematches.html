@@ -220,7 +220,16 @@
         .ledger-table th { background: var(--brand-navy); color: white; }
         .val-pos { color: var(--accent-teal); font-weight: bold; }
         .val-neg { color: var(--accent-red); font-weight: bold; }
-        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+        /* box-sizing MEASURED, NOT ASSUMED (2026-10-09). "Final Results & Receipt"
+           stuck 23px out of the card on an iPhone, at 390 AND at 320. It is the
+           only <a> among four .btn-primary controls in that card, and a <button>
+           gets box-sizing:border-box from the UA stylesheet while an <a> does
+           not - so width:100% plus 12px of padding each side made the anchor
+           exactly 24px wider than its siblings (324 against 300 at 390px; 254
+           against 230 at 320px). Saying it here makes every .btn-primary one
+           box, whatever element it is written on.
+           tools/matches-card-layout-check.js measures it. */
+        .btn-primary { width: 100%; box-sizing: border-box; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
         .btn-danger-sm { background-color: var(--bg-card); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         .btn-outline-sm { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         /* THE CUP, FOLDED (UI Wave 10). On a plain arrival at the Matches tab the whole
@@ -446,6 +455,17 @@ html {
             <!-- Was window.print(), which printed this page's own side-match maths as if it were
                  an authoritative payout. There is ONE settlement document, and this opens it. -->
         <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+        <!-- THE WAY BACK INTO THE ROUND (2026-10-09). Once a side bet is set up
+             this page is the last setup step, and the biggest button on the card
+             used to send a golfer to Final Results - the END of a round, not the
+             start of one. This is the one that goes and plays.
+             NOT .nav-link, deliberately: that rewriter carries ?group= from this
+             URL and nothing else, and an ORGANIZER arrives here with no group in
+             the URL and a "Score for: Group N" pick in localStorage. The href is
+             built in smSyncGoToRound() so both cases land on the right card.
+             The HardPan GPS build sends this same link to the GPS screen through
+             its own landing rule, so there is no GPS branch here to drift. -->
+        <a class="btn-primary" id="sm-go-round" href="index.html" style="margin-top:8px; display:block; text-align:center; text-decoration:none;">▶ Start Round</a>
     </div>
 </div>
 
@@ -937,6 +957,46 @@ html {
             guides.forEach(a => { a.href = href; });
         })();
 
+        // THE WAY BACK INTO THE ROUND (2026-10-09).
+        //
+        // "Has this round started" is settlement-engine's own question and this
+        // page already loads that file, so it is ASKED rather than re-derived:
+        // computeRoundFinish().started is "at least one golfer with at least one
+        // hole", the same predicate the Receipt uses to decide whether it may
+        // say Final. No money file changes for this - it is read.
+        //
+        // WHICH GROUP, in order: the group on THIS page's URL (a group
+        // scorekeeper's link, explicit), then the organizer's "Score for: Group
+        // N" pick that index.html stores under golfapp_org_group_<CODE>, then
+        // nothing. Getting that order wrong sends a golfer to somebody else's
+        // card.
+        function smSyncGoToRound() {
+            const el = document.getElementById('sm-go-round');
+            if (!el) return;
+            let started = false;
+            try {
+                if (typeof computeRoundFinish === 'function') {
+                    started = !!computeRoundFinish(currentData,
+                        (currentData && currentData.courseData) || [],
+                        (currentData && currentData.scores) || {}).started;
+                }
+            } catch (e) { started = false; }
+            el.innerHTML = started ? 'Go to Round' : '\u25B6 Start Round';
+            let href = 'index.html?game=' + currentMode;
+            let g = urlParams.get('group');
+            if (!g) {
+                // EVERY localStorage TOUCH IS WRAPPED: a private window throws on
+                // access, and a button that cannot be built is worse than one
+                // that forgets a group.
+                try { g = localStorage.getItem('golfapp_org_group_' + currentMode) || null; } catch (e) { g = null; }
+            }
+            if (g) href += '&group=' + g;
+            // setAttribute, not el.href: the property does not write the
+            // attribute back in the suite's DOM, so a test reading the link the
+            // way the markup carries it saw an empty string on a working page.
+            el.setAttribute('href', href);
+        }
+
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             // THE TRIP'S OWNER, when this round belongs to a trip. Does nothing
@@ -948,6 +1008,9 @@ html {
             // not be re-shown. Hiding is applied by the arrival and nothing here
             // touches display.
             renderSideMatches();
+            // ON EVERY SNAPSHOT, so the label follows the round: the first score
+            // posted turns "Start Round" into "Go to Round" without a reload.
+            smSyncGoToRound();
             // THE CUP SURFACE RENDERS ON DATA, like everything else on this page.
             //
             // It did not. Every renderRyderCupSetup() call sat inside an rc* handler -
