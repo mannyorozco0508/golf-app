@@ -568,7 +568,7 @@
             grid-template-columns: 30px minmax(0, 1fr) 50px 76px 34px !important;
             column-gap: 6px; row-gap: 4px;
         }
-        .player-row.p-compact { position: relative; margin-bottom: 6px; align-items: center; }
+        .player-row.p-compact { position: relative; margin-bottom: 5px; align-items: center; row-gap: 2px; }
         .player-row.p-compact > input, .player-row.p-compact select { margin: 0; }
         .p-compact .p-drag { grid-column: 1; grid-row: 1; width: 30px; height: 38px; padding: 0; margin: 0;
             border: 0; background: transparent; color: var(--text-muted); font-size: 1.25rem; line-height: 1;
@@ -580,8 +580,11 @@
         .p-compact .btn-del { grid-column: 5; grid-row: 1; height: 36px; }
         .p-compact .p-extra-line { grid-column: 2 / -1; grid-row: 2; display: flex; align-items: center; gap: 6px;
             flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); }
-        .p-compact .p-extra-line select { width: auto; min-width: 64px; padding: 4px 6px; font-size: 0.78rem; height: 30px; }
-        .p-compact .p-extra-line .p-flight-input { min-height: 30px !important; min-width: 30px !important; }
+        .p-compact .p-extra-line select { width: auto; min-width: 64px; padding: 2px 6px; font-size: 0.76rem; height: 26px; }
+        /* A slim chip line, so a foursome with flights on still fits in a third of the screen. */
+        .p-compact .p-extra-line { min-height: 22px; line-height: 1; }
+        .p-compact .p-extra-line .p-flight-input { min-height: 22px !important; min-width: 28px !important; height: 22px;
+            padding: 0 6px !important; font-size: 0.72rem !important; line-height: 1 !important; border-radius: 6px !important; }
         .p-compact .p-flight-line { display: contents !important; }
         .p-tee-pick { position: relative; display: block; height: 38px; border: 1px solid var(--border-mid);
             border-radius: 6px; background: var(--bg-card); }
