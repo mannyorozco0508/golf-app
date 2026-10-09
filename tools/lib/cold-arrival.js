@@ -330,6 +330,14 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // actually is. Pass a directory to keep it, and the caller owns deleting it.
 // Default behaviour is unchanged: no option, throwaway profile, removed on exit.
 async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, webgl }) {
+    // A PHONE THAT LAST LEFT ON THE CARD (HardPan GPS flow, 2026-10-09). A HardPan
+    // round opens on GPS unless the phone last left on the scorecard; every check
+    // here is about the card (or taps 📍 GPS itself), so arrivals start as that
+    // phone. A check of the GPS landing sets window.__freshPhone first. A Consumer
+    // tree has no GPS side and this key means nothing to it.
+    if (!/__freshPhone\s*=\s*true/.test(preScript || '')) {
+        preScript = "try { if (!localStorage.getItem('hardpan_round_side')) localStorage.setItem('hardpan_round_side', 'bets'); } catch (e) {}\n" + (preScript || '');
+    }
     const keepProfile = !!profileDir;
     const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (keepProfile) {

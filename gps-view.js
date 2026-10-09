@@ -383,6 +383,10 @@
         st.waiters.push(done);
         if (st.state === 'loading') return;
         st.state = 'loading';
+        // A page with no <head> (a test's minimal DOM) gets no script, not a throw:
+        // nothing GPS does may break the card it runs beside.
+        var parent = document.head || document.documentElement;
+        if (!parent || typeof parent.appendChild !== 'function' || typeof document.createElement !== 'function') { st.state = 'failed'; st.waiters = []; done(); return; }
         var sc = document.createElement('script');
         sc.src = src; sc.async = true;
         var fin = function (ok) {
@@ -392,7 +396,7 @@
         };
         sc.onload = function () { fin(true); };
         sc.onerror = function () { fin(false); };
-        document.head.appendChild(sc);
+        parent.appendChild(sc);
     }
     // MAPLIBRE GL JS 5.24.0 (vendored, BSD-3) - a WebGL map that ROTATES, which
     // Leaflet cannot: every hole opens tee at the bottom, green at the top.
@@ -2225,7 +2229,9 @@
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onPageHide);
         loadCourseRecord();
-        land();
+        // After the card has drawn (mount runs inside its render), and never able
+        // to throw into it.
+        setTimeout(function () { try { land(); } catch (e) {} }, 0);
         return true;
     }
 
