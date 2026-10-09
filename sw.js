@@ -4362,6 +4362,105 @@
 // NO ENGINE FILE MOVED: pool-engine.js keeps the rule that KP money never goes
 // back to the field, and still answers -$5 here; the page stops asking it.
 // A device on v315 still charges for a round nobody played.
+// Moved to v318 (v317 is held by the gps-v1 branch). QR CODES (Wave 1). Two new precached files - qr-encode.js
+// (vendored, MIT) and qr-codes.js - plus the sheet on index.html and
+// admin.html: an organizer holds the phone up on the first tee and each
+// scorekeeper scans their own group's code. Drawn on the phone, no network.
+// A device on v316 has no QR codes at all.
+// Moved to v319. SETTING THE FOURSOMES ON THE DAY. The Players step gained
+// up/down arrows and a "Move to Group N" picker on every golfer, because a
+// golfer's foursome is their POSITION in the roster and the step could only
+// change group SIZES - so putting four named people together meant deleting and
+// re-adding them on a phone. grouping.js gained the two pure moves;
+// admin.html moves the rows to match. A device on v318 cannot set a foursome.
+// Moved to v320. THE TRIP RECAP AS AN IMAGE. One tap on the trip screen draws
+// the recap - standings, who pays who, awards - onto a canvas and hands the PNG
+// to the iOS share sheet, for the group chat. New precached file
+// trip-recap-image.js; the share goes through native-export.js's existing
+// Filesystem + Share chain rather than a second one. A device on v319 has only
+// a card to screenshot.
+// Moved to v321. FINISHING EMAIL SIGN-IN INSIDE THE NATIVE APP. Manny on
+// TestFlight tapped the link in the email and it opened the WEB app, leaving
+// the native app anonymous and him a spectator on rounds his own account owns.
+// The paste field was already there and a pasted link already worked; what was
+// missing was any sentence telling him not to tap the link, and a BARE CODE was
+// refused. Both fixed. Plus: a trip's organizer is now the organizer of its
+// rounds. A device on v320 still sends him to the website to sign in.
+// Moved to v322. FINISH SIGN-IN DID NOTHING, AND IT WAS TWO FAULTS AT ONCE.
+// Manny on build 11 pasted a fresh link copied from Gmail and got no error and
+// no sign-in. Measured: (1) Gmail's "Copy Link" hands over its OWN redirect -
+// google.com/url?q=<the real link, percent-encoded> - so "oobCode=" was present
+// only as "oobCode%3D" and the parse failed; he pasted the whole link and was
+// told to paste the whole link. (2) The refusal rendered at top 832 of an 844px
+// viewport - 24px off the bottom of the screen - so there was no way to see it.
+// A pasted link is unwrapped now (bounded, string-only, nothing fetched), and a
+// refusal scrolls itself into view. A device on v321 still looks dead.
+// Moved to v323. BUILD 12: PORTRAIT ONLY, AND LINKING APPLE TO THE ACCOUNT YOU
+// ARE ALREADY IN. planOauth treated any non-anonymous user as "already linked"
+// whatever providers were actually on them - so a golfer signed in with EMAIL
+// tapping Continue with Apple was SWITCHED to whatever account that Apple
+// identity belonged to, which is how a stray privaterelay account appeared
+// while his email account kept all 38 of his rounds. The rule is about the
+// PROVIDER now, and the Account sheet has deliberate Link Apple / Link Google
+// buttons that refuse rather than adopt. A device on v322 still switches.
+// Moved to v324. FINISH SIGN-IN WAS A NO-OP ON THE DEVICE, AND THE HARNESS WAS
+// WHY IT SURVIVED A GREEN SUITE. For a bare code (and anything not already a
+// link) submitPaste synthesised one - with NO apiKey. Firebase's real
+// isSignInWithEmailLink requires it, so on a phone it answered false for all
+// three input shapes; in the test harness there is no real SDK and the fallback
+// regex said yes. The email also arrives WRAPPED as
+// /__/auth/links?link=<encoded action URL>, which is not an action URL at all.
+// Now: the inner action URL is preferred, a synthesised link carries the page's
+// apiKey, and submitPaste is wrapped end to end so no failure is silent.
+// A device on v323 has a dead Finish sign-in button.
+// Moved to v325. THE ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND. Both the
+// scorecard badge and every score box were decided by POSITION ALONE -
+// players.length > 4 && no ?group= - with no organizer check in either, so the
+// owner of a 24-golfer round was told "Read-only. Ask the organizer for your
+// group's link." about himself, and had no way from the scorecard to Players.
+// Now: one canScoreBox() predicate shared by the badge, the banner and the
+// inputs; a "Score for: Group N" picker for the organizer, remembered per
+// round; Edit Round Setup at the TOP of the Round Menu; and the Matches/Bets
+// page asks the same question instead of reading the URL.
+// A device on v324 shows its own organizer a read-only card.
+// Moved to v326. NO TEE DROPDOWN ON ANY GOLFER ROW. "In hand" answers a
+// question about the CARD - pars and stroke indexes - and every Myrtle course is
+// a bundled preset in course-data.js carrying 18 holes and NO TEES. So
+// courseCardInHand() said yes, ensureCourseCard() never ran, globalCourses kept
+// a {name} stub, courseTeeChoices() found nothing, the round-level tee select
+// stayed empty and appendTeeControl() returned early. Tees are a separate need
+// now, and rows built before the record arrives get their dropdown when it does.
+// A device on v325 cannot put two golfers on different tees.
+// Moved to v327. A BUTTON THAT LOOKS DEAD GETS TAPPED AGAIN, AND THEN
+// REPORTED AS BROKEN. Three "it does nothing" reports in two days: once the app
+// genuinely did nothing, twice it answered 24px below the fold - a refusal
+// measured at top 832 of an 844px viewport. tap-feedback.js makes a tap
+// visible: a pressed state, what it is DOING on the button, and the result line
+// written beside the button and scrolled into view. The silent path found while
+// building it was submitPaste's early return - paste the wrong thing and Finish
+// sign-in said nothing at all, which is the complaint verbatim.
+// A device on v326 still has silent buttons on the account sheet.
+// Moved to v329. NO TEE DROPDOWN ON FOUR MORE PATHS. Build 16 fixed the saved
+// round and wrote the test INLINE in that one function, so every other door into
+// Players kept the defect: a NEW Game Day, the coach, and a trip round all drew
+// their first row before the tees arrived and nothing repaired it. The question
+// is now asked once - courseTeesInHand - and filling the round tee select
+// repairs the rows already on screen, which is the one place every path passes
+// through. Also: a rebuild (format switch, delete, paste) dropped every golfer's
+// tee because the capture never read it, and "Zack Carrano 6 blue" set no tee at
+// all - the parser had been handed the names since October and nothing read the
+// answer. Caledonia's tees are "Mallard Blue" and "Pintail Black", so a colour on
+// its own now resolves when exactly one tee ends in it.
+// A device on v327 has no Tee dropdown on a new round. (v328 was already
+// taken by the gps-wave2 branch, which is why this is v329.)
+// Moved to v330. ONE ENTRY PER COURSE IN THE PICKER. "Camas Meadows Golf Club"
+// and "Chambers Bay" were hard-coded in courseDirectory AND present in
+// global_courses, and the hard-coded copy was the one with NO rated tees - so
+// each course showed twice and tapping the built-in one gave a round that could
+// never offer a per-golfer tee. The two entries are gone; the shared records
+// that carry the tees stay (14 sets and 20 sets). Their CARDS stay in
+// coursePresets, because 37 saved rounds point at those keys.
+// A device on v329 still lists both courses twice.
 // GPS:BEGIN
 // Moved to v317 FOR HARDPAN GPS (branch gps-v1, rebased onto main after the
 // unplayed-round fix v316; v310, v313 and v316-gps were its numbers before). HardPan builds only: the round
@@ -4451,7 +4550,14 @@
 // app (no arcs, thin white circle and lines, numbers on the lines, manual wind),
 // carried over from gps-wave2's v336. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v337-gps-flowclean';
+// GPS:BEGIN
+// Moved to v338 (gps-flow, 2026-10-09): main (v330, 1.0.8 build 19 - one entry
+// per course, the Tee dropdown, foursomes on the day, QR codes, the trip recap
+// image, tap feedback, organizer and sign-in fixes) merged INTO the GPS branch,
+// so the HardPan shell carries main's files and the GPS ones. Above main's v330
+// and gps-flow's v337. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v338-gps-flowmain';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4493,6 +4599,15 @@ const SHELL_FILES = [
     // link and every group-scoped write is measured against. Four pages load it;
     // an offline launch without it would not degrade, it would break the page.
     './grouping.js',
+    // THE QR CODES (Wave 1): drawn on the phone, so both files are precached.
+    // qr-encode.js is vendored upstream (MIT); qr-codes.js holds the list, the
+    // sheet and the controller for both pages.
+    './qr-encode.js',
+    './qr-codes.js',
+    // Every tap shows it registered - admin.html and index.html both load it.
+    './tap-feedback.js',
+    // The trip recap drawn as a PNG for the group chat - trip.html loads it.
+    './trip-recap-image.js',
     // Every page that can START something loads this: it issues the code and
     // checks it is free first. Precached, or the first offline launch cannot
     // open the setup screen at all.

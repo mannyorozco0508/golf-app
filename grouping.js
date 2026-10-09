@@ -148,3 +148,65 @@ function canLinkSeeWager(participantIds, lockedGroup, groupOf) {
     const map = groupOf || {};
     return ids.some(id => String(map[id]) === String(lockedGroup));
 }
+
+// ===========================================================================
+// SETTING THE FOURSOMES ON THE DAY (2026-10-08)
+//
+// THE ROSTER ORDER IS THE GROUPING. computeGroupBoundaries above slices the
+// roster into foursomes by POSITION, and admin.html's
+// captureCurrentPlayerInputs() reads the player rows in DOM order carrying each
+// row's id - so "move this golfer into group 3" is an array operation, and it
+// belongs here beside the function that decides what a group is.
+//
+// IDS RIDE WITH THE GOLFERS, NEVER WITH THE SLOT. A golfer's id is what binds
+// their scores to them (player_id_stability_test.js exists for that reason), so
+// these functions move ENTRIES and renumber nothing.
+// ===========================================================================
+
+// One step, or any step: the entry at `from` ends up at `to`, everything else
+// closes up behind it. Out-of-range leaves the list alone rather than wrapping -
+// a thumb on the Up arrow of the first golfer should do nothing, not send him
+// to the bottom of the sheet.
+function rosterMove(list, from, to) {
+    var out = (list || []).slice();
+    var f = Number(from), t = Number(to);
+    if (!(f >= 0 && f < out.length)) return out;
+    if (!(t >= 0 && t < out.length)) return out;
+    if (f === t) return out;
+    var moved = out.splice(f, 1)[0];
+    out.splice(t, 0, moved);
+    return out;
+}
+
+// MOVE TO GROUP N, landing LAST in that group.
+//
+// Why last rather than first: an organizer filling a foursome taps three names
+// in the order they think of them, and "last" makes the result the order they
+// tapped. Landing first would reverse it.
+//
+// A fixed group size means somebody is displaced - that is inherent to a
+// position-based grouping and is what the dividers already show: the golfer who
+// was last in group N becomes first in group N+1. Nothing is lost.
+function rosterMoveToGroup(list, from, group, overrides) {
+    var out = (list || []).slice();
+    var f = Number(from);
+    var g = Number(group);
+    if (!(f >= 0 && f < out.length)) return out;
+    var bounds = computeGroupBoundaries(out.length, overrides || {});
+    var target = null;
+    for (var i = 0; i < bounds.length; i++) if (bounds[i].group === g) target = bounds[i];
+    if (!target) return out;
+    // ALREADY THERE IS A NO-OP, not a reshuffle: tapping a golfer's own group
+    // must not move the three people around him.
+    if (f >= target.startIdx && f < target.startIdx + target.size) return out;
+    // ONE RULE, BOTH DIRECTIONS, and the first version of this was two rules
+    // with an off-by-one in the backwards case. Take the golfer out, then insert
+    // at the index he should FINISH at: in the shortened list the insertion
+    // index and the final index are the same number, whichever side he came
+    // from. Moving the last golfer to group 1 lands him at 3; moving the first
+    // to group 2 lands him at 7. No direction test needed.
+    var last = target.startIdx + target.size - 1;
+    var moved = out.splice(f, 1)[0];
+    out.splice(last, 0, moved);
+    return out;
+}

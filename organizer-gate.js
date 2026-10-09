@@ -151,16 +151,31 @@
     // when there is real evidence, and must NOT hand them to every scorekeeper of a legacy
     // round. Deliberately the only place the comparison is written, so the two predicates
     // cannot drift.
-    function organizerEvidence(data, uid, token) {
+    // `trip` is the round's TRIP record when it has one, and it is the fourth
+    // argument on purpose: every existing caller passes three and keeps exactly
+    // the answers it had, which is asserted as a control in
+    // trip_organizer_inherits_test.js.
+    //
+    // A TRIP'S ORGANIZER IS THE ORGANIZER OF ITS ROUNDS (2026-10-08, Manny).
+    // The trip holds the round codes, not the other way round, so a round could
+    // not find its trip at all; each round in a trip now carries tripCode and
+    // the caller hands the trip's ownerUid in. One stamp on the trip covers
+    // every round in it - including a round a playing partner sets up and links,
+    // which would otherwise show its own trip's organizer as a spectator.
+    //
+    // THE ROUND'S OWN OWNER IS CHECKED FIRST, so nothing about an owned round
+    // changes, and a trip with no owner or a signed-out visitor grants nothing.
+    function organizerEvidence(data, uid, token, trip) {
         if (!data || typeof data !== 'object') return null;
         if (data.ownerUid && uid && String(uid) === String(data.ownerUid)) return 'uid';
         if (data.organizerToken && token && String(token) === String(data.organizerToken)) return 'token';
+        if (trip && trip.ownerUid && uid && String(uid) === String(trip.ownerUid)) return 'trip';
         return null;
     }
 
-    function isRoundOrganizer(data, uid, token) {
+    function isRoundOrganizer(data, uid, token, trip) {
         if (!data || typeof data !== 'object') return false;
-        if (organizerEvidence(data, uid, token)) return true;
+        if (organizerEvidence(data, uid, token, trip)) return true;
         // A round that records no owner and no token is open, as it always was. This is the
         // arm that is NOT evidence - see organizerEvidence above.
         if (!data.ownerUid && !data.organizerToken) return true;

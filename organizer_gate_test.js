@@ -221,10 +221,22 @@ describe('THE SEAM (source, comments stripped)', () => {
         // RE-PINNED 2026-09-21 (v189): index.html and game.html load organizer-gate.js
         // for isRoundOrganizer (the organizer doors) - a pure predicate; neither page
         // calls ensureOrganizer or writes organizers/<uid>. organizer_door_test.js.
-        ['leaderboard.html', 'settlement.html', 'shared.html', 'sidematches.html', 'skins.html', 'stats.html', 'tournament.html', 'tournament-scorecard.html'].forEach(p => {
+        ['leaderboard.html', 'settlement.html', 'shared.html', 'skins.html', 'stats.html', 'tournament.html', 'tournament-scorecard.html'].forEach(p => {
             assert.ok(!/organizer-gate/.test(read(p)), p + ' does not load the gate');
         });
-        ['index.html', 'game.html'].forEach(p => {
+        // sidematches.html JOINED THE PREDICATE-ONLY LIST (2026-10-08), and the
+        // constraint this test actually protects is unchanged: a page may read
+        // the predicate, never write the trial.
+        //
+        // WHY IT HAD TO. The Matches/Bets page decided organizer-ness from the
+        // URL alone - `return !isMultiGroupRound` when there is no ?group= -
+        // which was true before the gate existed and false after it: on a
+        // multi-group round the bare link is exactly what a SPECTATOR holds, so
+        // the real organizer got no controls at all. Manny, signed in as the
+        // owner of a 24-golfer round, had none. It asks the same question
+        // index.html asks now, through the same module, so the two screens
+        // cannot disagree about who somebody is.
+        ['index.html', 'game.html', 'sidematches.html'].forEach(p => {
             const src = stripComments(read(p));
             assert.ok(/organizer-gate\.js/.test(read(p)), p + ' loads the gate');
             assert.ok(!/ensureOrganizer|organizers\//.test(src), p + ' only reads the predicate - never the trial write');

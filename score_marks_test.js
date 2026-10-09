@@ -324,7 +324,7 @@ describe('NOTHING ELSE CHANGED', () => {
 
     test('group locking on the input is unaffected', () => {
         const idx = read('index.html');
-        assert.ok(idx.includes('const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);
+        assert.ok(idx.includes('const isLocked = !canScoreBox(p.id, playerGroupMap, isMultiGroupRound);')   /* v191: a retired round locks every box first; the group rule is unchanged after it */);   /* RE-PINNED 2026-10-08 (THE ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND). The old expression decided by POSITION ALONE, so the owner of a 24-golfer round opening it on a bare link had every box disabled and was told to ask the organizer for a group link - about himself. One predicate, canScoreBox(), now answers for the badge, the banner AND the inputs, so they cannot disagree. A scorekeeper's ?group= link behaves exactly as before; what is added is the organizer's own chosen group. STILL IDENTITY-BLIND in the sense this rule means it: canScoreBox does not read meId or resolvedMeId - measured - and canReachSetup() is the organizer gate, which the Group Links test beside this one already calls identity-blind. */
     });
 });
 

@@ -149,14 +149,19 @@ describe('WHAT DID NOT CHANGE', () => {
     test('an import named exactly like a directory entry lands on the DIRECTORY key, so the picker shows one row, not a shadow', () => {
         // The key rule (course_import_test.js) is what prevents a second physical
         // course from shadowing a directory entry under a gca_ key. Followed here
-        // through the picker: import "Camas Meadows Golf Club" -> key
-        // swwa_camasmeadows -> one row for "camas meadows", from the directory.
+        // through the picker: import "Tri-Mountain Golf Course" -> key
+        // swwa_trimountain -> one row for "tri-mountain", from the directory.
+        //
+        // THE EXAMPLE WAS CAMAS MEADOWS until 2026-10-08, when that entry left
+        // courseDirectory as a tee-less duplicate of a shared record with 14
+        // rated tee sets. The rule is unchanged; it just needs a course the
+        // directory still carries.
         const sb = page({});
-        const key = vm.runInContext("importedCourseKey({ id: 'zzzz9999', course_name: 'Camas Meadows Golf Club' }, globalCourses)", sb);
-        assert.equal(key, 'swwa_camasmeadows', 'a same-named import must reuse the directory key');
-        vm.runInContext(`globalCourses = { '${key}': { name: 'Camas Meadows Golf Club', data: ${JSON.stringify(PROBE.data)} } }`, sb);
-        const rows = type(sb, 'camas meadows');
-        assert.equal(rows.filter(r => (r.textContent || '') === 'Camas Meadows Golf Club').length, 1, JSON.stringify(texts(rows)));
+        const key = vm.runInContext("importedCourseKey({ id: 'zzzz9999', course_name: 'Tri-Mountain Golf Course' }, globalCourses)", sb);
+        assert.equal(key, 'swwa_trimountain', 'a same-named import must reuse the directory key');
+        vm.runInContext(`globalCourses = { '${key}': { name: 'Tri-Mountain Golf Course', data: ${JSON.stringify(PROBE.data)} } }`, sb);
+        const rows = type(sb, 'tri-mountain');
+        assert.equal(rows.filter(r => (r.textContent || '') === 'Tri-Mountain Golf Course').length, 1, JSON.stringify(texts(rows)));
     });
     test('the filter in source names both prefixes and nothing else - gca_ everywhere, comm_ off the shell (re-pinned 2026-09-19)', () => {
         const src = read(PAGE);

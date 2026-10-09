@@ -55,18 +55,21 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- PORTRAIT-ONLY ON iPAD IS ONLY LEGAL ALONGSIDE THIS (2026-10-08).
+	     App Store Connect rejected build 12 with error 90474: an iPad app that
+	     supports multitasking must accept all four orientations, because Slide
+	     Over and Split View can hand it any of them. Opting out of
+	     multitasking is what lets both orientation lists below stay portrait.
+	     portrait_only_test.js asserts this key and those lists TOGETHER. -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>

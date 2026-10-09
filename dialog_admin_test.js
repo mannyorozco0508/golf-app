@@ -433,8 +433,13 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // card yet..." - whatever produced it (course_card_guard_test.js). The
         // builder's own refusal reuses the existing "Course card problem" call, so
         // it adds no message. A refusal, because nothing is written.
-        assert.equal(refuse + fail + toast, 65,
-            'the alerts should still be 65 messages, got '
+        // 66 SINCE THE QR SHEET (2026-10-07, Wave 1, was 65): openRoundQrSheet
+        // says one thing - "No codes to show for this round yet." - when the
+        // builder returns an empty list, which is a round with no code. A toast
+        // rather than a refusal: nothing was refused, there is simply nothing
+        // to draw yet, and the button is not dead the next time.
+        assert.equal(refuse + fail + toast, 66,
+            'the alerts should still be 66 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

@@ -73,7 +73,7 @@ There is no flag to set. `GPS_ENABLED=1 node sync-mobile-web.js` is
 **refused**:
 *"the iOS/Android app is Consumer only (bets, no GPS) … Nothing was written."*
 The bundle is the pre-GPS bundle except for one line, the shared shell cache
-version. Its `index.html` is byte-identical to `main`'s (sha `92a63164…`, main 82d98b4).
+version. Its `index.html` is byte-identical to `main`'s (sha `0bbcaf20…`, main 387cf89, merged into gps-flow 2026-10-09).
 
 ### The HardPan GPS TestFlight app (`gps-beta/`, com.rattlegolf.gpsbeta)
 
@@ -100,7 +100,7 @@ any other (the "Firebase config is for this app" build phase).
 
 ```bash
 node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v152-unplayedzero, unchanged from main)
-GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v171-gps-flowclean)
+GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v172-gps-flowmain)
 node build-shell.js tournament               # Tournaments never ship GPS, whatever the flag says
 ```
 

@@ -40,10 +40,11 @@ const flag = require('./tools/gps-flag.js');
 const ROOT = __dirname;
 const ON_TREE = fs.existsSync(path.join(ROOT, 'gps-view.js'));
 const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPanGeo\b|leaflet|maplibre|arcgis|nationalmap|watchPosition|getCurrentPosition|geolocation|NSLocation|📍 GPS|gps-side/;
-// sha256 of index.html at main 82d98b4 (the card guards) - the tree gps-v1 was
-// rebased onto on 2026-10-07 (second time). Before: d697ea55 (04f5fd1), 8ea54ad0 (7a6c3f5).
-// After the next rebase, re-pin it to that main's index.html.
-const PRE_GPS_INDEX_SHA = '92a6316444896908566bf3622ee1f3578c59d8c514c354a9b87112fa3ba9d2f2';
+// sha256 of index.html at main 387cf89 (one entry per course, 1.0.8 build 19) -
+// merged into gps-flow on 2026-10-09. Before: 92a63164 (82d98b4), d697ea55
+// (04f5fd1), 8ea54ad0 (7a6c3f5). After the next rebase or merge of main, re-pin
+// it to that main's index.html.
+const PRE_GPS_INDEX_SHA = '0bbcaf204245bbfff598410b55befc2df3f5cfc3562bddf219e2d451763a29fa';
 const GPS_SHELL = (() => {
     const m = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8'));
     return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
@@ -130,8 +131,8 @@ test('Consumer source: index.html with its GPS blocks removed IS the pre-GPS ind
 test('CONSUMER WEB BUILD (build-shell.js, flag unset): no GPS files, no GPS code, the pre-GPS scorecard', () => {
     const dir = buildWeb(undefined);
     noGps(dir, 'dist/consumer');
-    assert.ok(/const CACHE_VERSION = 'consumer-v152-unplayedzero';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
-        'the Consumer cache key did not move: nothing a Consumer device holds changed');
+    assert.ok(/const CACHE_VERSION = 'consumer-v164-onecourseentry';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
+        'the Consumer cache key is main\'s (387cf89): nothing a Consumer device holds differs from main');
 });
 
 test('CONSUMER NATIVE BUILD (sync-mobile-web.js, flag unset): no GPS, and a stray location permission REMOVED', () => {
@@ -147,7 +148,7 @@ test('HARDPAN WEB BUILD (GPS_ENABLED=1): the GPS files and the toggle, in dist/h
     GPS_SHELL.forEach((f) => assert.ok(fs.existsSync(path.join(web, f)), 'dist/hardpan is missing ' + f));
     assert.ok(/<script src="gps-view\.js"><\/script>/.test(fs.readFileSync(path.join(web, 'index.html'), 'utf8')));
     assert.ok(/📍 GPS/.test(fs.readFileSync(path.join(web, 'gps-view.js'), 'utf8')), 'the toggle');
-    assert.ok(/const CACHE_VERSION = 'consumer-v171-gps-flowclean';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
+    assert.ok(/const CACHE_VERSION = 'consumer-v172-gps-flowmain';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
 });
 
 test('THERE IS NO HARDPAN APP BUILD: sync-mobile-web.js refuses GPS_ENABLED=1 and writes nothing', () => {

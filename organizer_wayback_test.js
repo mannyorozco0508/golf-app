@@ -242,8 +242,15 @@ describe('THE SOURCE: ONE SENTENCE, AND NOTHING ELSE MOVED', () => {
 
     test('the gate itself is untouched by this wave', () => {
         // The three arms are v189 and Wave 22 work. This wave adds copy, nothing more.
-        assert.match(GATE, /function isRoundOrganizer\(data, uid, token\)/);
-        assert.match(GATE, /function organizerEvidence\(data, uid, token\)/);
+        // RE-PINNED 2026-10-08: isRoundOrganizer gained the same fourth argument
+        // and hands it straight to organizerEvidence. The open-round arm and the
+        // token arm are untouched, asserted as controls in
+        // trip_organizer_inherits_test.js.
+        assert.match(GATE, /function isRoundOrganizer\(data, uid, token, trip\)/);
+        // RE-PINNED 2026-10-08 with isRoundOrganizer above: the fourth argument
+        // is the round's TRIP record, and a three-argument call still answers
+        // exactly as it did.
+        assert.match(GATE, /function organizerEvidence\(data, uid, token, trip\)/);
         assert.match(GATE, /function rememberOrganizerToken\(/);
         assert.match(GATE, /var TOKEN_KEY = 'golfapp_organizer_';/);
     });

@@ -91,7 +91,15 @@
          byte-identical copy until the shared-core wave; four copies of that rule, with
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
+    <!-- Every tap shows it registered: pressed state, what it is doing, and
+         the answer next to the button, scrolled into view. -->
+    <script src="tap-feedback.js"></script>
     <script src="grouping.js"></script>
+    <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
+         qr-codes.js builds the list, the sheet and the swipe. Both are in the
+         offline shell: the code is drawn on the phone with no signal. -->
+    <script src="qr-encode.js"></script>
+    <script src="qr-codes.js"></script>
     <!-- score-gaps.js (v192): the one builder for "a hole inside a card is blank" -
          the outlined box, the banner, the Board's flag and the money pages' "Not
          final" all draw from it. Pure; reads scores the way the engines do. -->
@@ -382,6 +390,23 @@
         /* ---- Match card ---------------------------------------------------------
            A match is a small card, not a table row: name and stake, one plain sentence,
            progress, then its presses. Reads top-to-bottom on a phone in one glance. */
+        /* THE ORGANIZER'S GROUP PICKER (2026-10-08), in the element that used to
+           carry the read-only sentence. Thumb-sized, wraps at 390px. */
+        /* EVERY TAP SHOWS IT REGISTERED (2026-10-08) - see tap-feedback.js. */
+        button:active, .is-pressed { transform: scale(0.98); filter: brightness(0.92); }
+        .is-pressed { opacity: 0.85; }
+        .tap-note { font-size: 0.86rem; line-height: 1.45; margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px; }
+        .tap-note-ok { background: var(--nassau-box-bg); border: 1px solid var(--brand-green); color: var(--text-main); }
+        .tap-note-fail { background: var(--nassau-box-bg); border: 1px solid var(--accent-red); color: var(--text-main); }
+        .org-score-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: center; }
+        .org-score-label { font-size: 0.82rem; color: var(--text-muted); margin-right: 2px; }
+        .org-score-pick {
+            min-height: 38px; padding: 6px 12px; margin: 0;
+            border: 1px solid var(--border-mid); border-radius: 8px;
+            background: var(--bg-card); color: var(--text-main);
+            font-size: 0.84rem; font-weight: bold; width: auto;
+        }
+        .org-score-pick.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
         .match-card {
             padding: 10px 12px; border-top: 1px solid var(--border-light);
         }
@@ -1381,6 +1406,69 @@
         .lm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .lm-title, .lm-card-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .lm-sub { font-size: 0.68rem; color: var(--text-secondary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* ---- THE QR SHEET (Wave 1, 2026-10-07) --------------------------------
+           An organizer holds the phone up on the first tee and each scorekeeper
+           scans their own group. So the code is as big as the screen allows, the
+           label is under it, and swiping moves to the next group.
+
+           FULL SCREEN AND OPAQUE, deliberately: a camera a metre away needs
+           contrast and no clutter, and position:fixed with its own background
+           means the hole underneath cannot show through a translucent panel.
+
+           ALWAYS LIGHT-ON-DARK-FRAME, NEVER THEMED. The code itself is drawn
+           black on white at both themes - a scanner reads dark modules on a
+           light ground, and an inverted QR is one many cameras refuse. Only the
+           frame around it follows the theme. */
+        .qr-sheet {
+            position: fixed; inset: 0; z-index: 1200; display: none;
+            flex-direction: column; align-items: center;
+            background: var(--bg-main); padding: 10px 14px 18px;
+            /* The notch and the home bar, so neither eats the close button nor
+               the dots. */
+            padding-top: calc(10px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+        .qr-sheet.open { display: flex; }
+        .qr-sheet-head { width: 100%; max-width: 560px; display: flex; align-items: flex-start; gap: 10px; }
+        .qr-round-name { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main); line-height: 1.25; overflow-wrap: break-word; }
+        .qr-course-name { font-size: 0.8rem; color: var(--text-muted); }
+        .qr-close {
+            flex: 0 0 auto; width: 44px; height: 44px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            background: var(--bg-card); color: var(--text-main); font-size: 1.1rem; line-height: 1;
+        }
+        /* THE TRACK IS THE SWIPE SURFACE. One slide at a time, translated by JS;
+           overflow hidden so the neighbours are not half visible and mistaken
+           for the code being scanned. */
+        .qr-track { position: relative; flex: 1 1 auto; width: 100%; max-width: 560px; overflow: hidden; }
+        .qr-slide {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            transition: transform 220ms ease, opacity 180ms ease;
+        }
+        .qr-sheet.dragging .qr-slide { transition: none; }
+        /* The code: as big as the shorter side allows, white ground included, so
+           the quiet zone is part of the white and not the page behind it. */
+        .qr-art {
+            width: min(84vw, 62vh); height: min(84vw, 62vh);
+            background: #ffffff; border-radius: 10px; padding: 0;
+            box-shadow: 0 2px 10px var(--shadow-color);
+        }
+        .qr-art svg { display: block; border-radius: 10px; }
+        .qr-slide-label { font-size: 1.3rem; font-weight: 800; color: var(--text-main); }
+        .qr-slide-sub { font-size: 0.85rem; color: var(--text-muted); text-align: center; max-width: 86vw; }
+        .qr-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+        .qr-arrow {
+            width: 44px; height: 44px; margin: 0; padding: 0; border-radius: 50%;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-size: 1.4rem; line-height: 1;
+        }
+        .qr-arrow:disabled { opacity: 0.35; }
+        .qr-dots { display: flex; gap: 7px; }
+        .qr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); }
+        .qr-dot.on { background: var(--brand-green); }
+        .qr-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .qr-open-btn { width: 100%; }
         .lm-seg { padding: 4px 0; border-bottom: 1px solid var(--border-faint); }
         .lm-seg:last-child { border-bottom: none; }
         .lm-seg-row { display: flex; align-items: baseline; gap: 8px; }
@@ -1841,6 +1929,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
     <div class="scorecard-main" id="scorecard-main">
     <div class="group-filter-bar" id="group-filter-container"></div>
+    <!-- SHOW QR CODE (Wave 1, 2026-10-07). A static mount, like every other
+         block the Round Menu owns: buildRoundSheet MOVES these elements into the
+         sheet rather than rebuilding them, so the id, the handler and the
+         renderer all survive the move. Filled by renderQrShareButton(). -->
+    <!-- EDIT ROUND SETUP, AT THE TOP OF THE ROUND MENU (2026-10-08). Manny,
+         signed in as the owner, had NO way from the scorecard to Players - so no
+         way to set foursomes or tees on the day. It existed only inside
+         #group-filter-container, which is a different view. Filled by
+         renderSetupEntry(), organizer only. -->
+    <div id="setup-entry-mount"></div>
+    <div id="qr-share-mount"></div>
     <div id="group-links-panel" style="display:none;"></div>
     <!-- PASTE-TO-CLAIM (v200): on a BARE link whose doors are hidden, the device
          that was set up somewhere else pastes the organizer link and unlocks
@@ -2537,6 +2636,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             const incoming = snapshot.val();
+            // THE TRIP'S OWNER, IF THIS ROUND BELONGS TO A TRIP. Fired here
+            // because this is where the round record arrives; requestTripOwner
+            // does nothing twice and nothing at all without a tripCode.
+            if (incoming && incoming.tripCode) {
+                currentData = currentData || {};
+                currentData.tripCode = incoming.tripCode;
+                requestTripOwner();
+            }
             // AN EMPTY ANSWER WHILE OFFLINE IS NOT AN ANSWER (2026-10-06). The
             // page used to take whatever arrived, and with a locally hydrated
             // round that would mean a null snapshot WIPING a card the golfer is
@@ -6586,12 +6693,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // behind a handle is what a golfer touches once a round: the theme, the
         // code, the nav, the Dots selector, the way out and the way to delete.
         var ROUND_SHEET_BLOCKS = [
+            'setup-entry-mount',        // Edit Round Setup (organizer) - FIRST, by Manny's instruction
             'header-controls-row',      // Dark Mode, History
             'header-box',               // the game code, the course and the round name
             'app-nav-wrap',             // Leaderboard, Bets, Results, Matches, Home...
             'dot-context-row',          // the Dots: selector, on rounds that have one
             'view-mode-toggle',         // Hole View / Full Card
             'group-filter-container',   // All Players, Edit round setup, Players
+            'qr-share-mount',           // Show QR code (every golfer, not just the organizer)
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
         ];
@@ -8172,13 +8281,90 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // bare link that is the old behaviour and stays. On a group link it would hand the doors
     // to whoever was passed the link for their foursome, which is the thing the group lock
     // was guarding against in the first place. organizerEvidence() is that narrower test.
+    // THE ROUND'S TRIP, WHEN IT HAS ONE (2026-10-08). A trip's organizer is the
+    // organizer of its rounds - Manny's rule - and the trip holds the round
+    // codes, not the other way round, so the round could not find its trip at
+    // all. A round in a trip now carries tripCode, and this is the one read
+    // that turns it into an owner.
+    //
+    // ONE READ, ONCE, AND NEVER ON A ROUND WITHOUT A tripCode. It is a `once`
+    // rather than a listener because a trip does not change owner mid-round,
+    // and the gate is re-evaluated anyway: renderScorecard runs again when the
+    // read lands, exactly as it does when the uid arrives.
+    let currentTripRecord = null;
+    let tripOwnerRequested = '';
+    function requestTripOwner() {
+        const code = currentData && currentData.tripCode;
+        if (!code || tripOwnerRequested === String(code)) return;
+        tripOwnerRequested = String(code);
+        try {
+            db.ref('trips/' + code + '/ownerUid').once('value').then((snap) => {
+                const owner = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!owner) return;
+                currentTripRecord = { ownerUid: String(owner) };
+                // The gate may have said "spectator" before this landed, for the
+                // same reason it does before the uid lands. Re-render so the
+                // answer is not stuck on the first paint.
+                if (currentData && currentData.players) renderScorecard();
+            }, () => {});
+        } catch (e) { /* no socket: the round's own ownerUid still decides */ }
+    }
+
+    // ---- THE ORGANIZER IS NEVER A SPECTATOR ON HIS OWN ROUND (2026-10-08) --
+    //
+    // Manny, signed in as the owner, opening Myrtle Day 1 through "Open a round
+    // you already have" - a BARE link, no ?group=. The delete control appeared,
+    // so the organizer gate knew him; and the scorecard told him "Read-only. Ask
+    // the organizer for your group's link to enter scores."
+    //
+    // Both the badge and every score box were decided by POSITION ALONE -
+    // `players.length > 4 && !hasGroupLock` - with no organizer check in
+    // either. So on any round above a foursome without a group link, every
+    // viewer was a spectator, the owner included.
+    //
+    // THE ORGANIZER PICKS A GROUP rather than getting all 24 cards at once: a
+    // mis-tap across six foursomes is a wrong score on somebody else's card,
+    // and the group picker is the same shape a scorekeeper link already has.
+    // The choice is remembered per round, so a reload does not send him back to
+    // a locked card.
+    var ORG_GROUP_KEY_PREFIX = 'golfapp_org_group_';
+    function organizerScoreGroupKey() { return ORG_GROUP_KEY_PREFIX + String(currentMode || ''); }
+    function organizerScoreGroup() {
+        if (!canReachSetup()) return null;
+        try {
+            var v = localStorage.getItem(organizerScoreGroupKey());
+            return v ? Number(v) : null;
+        } catch (e) { return null; }
+    }
+    function setOrganizerScoreGroup(group) {
+        try {
+            if (group === null || group === undefined || group === '') localStorage.removeItem(organizerScoreGroupKey());
+            else localStorage.setItem(organizerScoreGroupKey(), String(group));
+        } catch (e) { /* private mode: it holds for this render */ }
+        renderScorecard();
+    }
+
+    // MAY I TYPE IN THIS BOX? One predicate, so the badge, the banner and the
+    // inputs cannot disagree - which is exactly how the organizer came to be
+    // shown a read-only card he was also the owner of.
+    function canScoreBox(playerId, groupOf, multiGroup) {
+        if (roundSuperseded()) return false;
+        if (!multiGroup) return true;
+        var g = groupOf ? groupOf[playerId] : null;
+        if (hasGroupLock) return String(g) === String(lockedGroup);
+        var mine = organizerScoreGroup();
+        if (mine && canReachSetup()) return String(g) === String(mine);
+        return false;
+    }
+
     function canReachSetup() {
         if (!window.organizerGate || typeof window.organizerGate.isRoundOrganizer !== 'function') return false;
         const uid = (window.authBootState && window.authBootState.uid) || null;
         const token = window.organizerGate.heldOrganizerToken(currentMode, organizerTokenParam);
+        const trip = currentTripRecord;
         if (hasGroupLock && typeof window.organizerGate.organizerEvidence === 'function'
-            && !window.organizerGate.organizerEvidence(currentData, uid, token)) return false;
-        return window.organizerGate.isRoundOrganizer(currentData, uid, token);
+            && !window.organizerGate.organizerEvidence(currentData, uid, token, trip)) return false;
+        return window.organizerGate.isRoundOrganizer(currentData, uid, token, trip);
     }
     // ---- WHO MAY DELETE A ROUND (2026-10-04) --------------------------------
     //
@@ -8350,9 +8536,77 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <div class="glb-title">Scorekeeper Links</div>
             <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
             ${rows}
+            <button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet(this)">📷 Show QR code</button>
             ${organizerRow}
         </div>`;
         panel.style.display = 'block';
+    }
+
+    // ---- SHOW QR CODE ------------------------------------------------------
+    //
+    // IN THE ROUND MENU, FOR EVERYONE. Manny asked for it on the Round Menu and
+    // on the organizer's share screen; the Round Menu belongs to whoever has
+    // the round open, and a scorekeeper holding up their own group's code for
+    // the next player to scan is the same job. Nothing here is organizer-only
+    // because nothing here carries anything an organizer has and a golfer does
+    // not: the codes are the group links and the leaderboard.
+    //
+    // THE LIST AND THE SHEET COME FROM qr-codes.js, which both this page and
+    // admin.html call - so there is one swipe, one layout and one list.
+    // EDIT ROUND SETUP, FOR THE ORGANIZER, AT THE TOP OF THE MENU.
+    //
+    // Same gate as every other organizer door - canReachSetup(), which is the
+    // owner uid, a held organizer token, or the trip-organizer inheritance - so
+    // this cannot disagree with the delete control the way the scorecard's
+    // read-only banner did.
+    function renderSetupEntry() {
+        const mount = document.getElementById('setup-entry-mount');
+        if (!mount) return;
+        if (!currentMode || !canReachSetup()) { mount.innerHTML = ''; return; }
+        let href = 'admin.html?game=' + encodeURIComponent(currentMode);
+        if (currentData && currentData.organizerToken) {
+            href += '&organizer=' + encodeURIComponent(currentData.organizerToken);
+        }
+        mount.innerHTML = '<a class="btn-outline qr-open-btn" style="display:block; text-align:center; '
+            + 'text-decoration:none; margin-bottom:10px;" href="' + href + '">'
+            + '\u270F\uFE0F Edit Round Setup \u00B7 Players, Tees, Groups</a>';
+    }
+
+    function renderQrShareButton() {
+        const mount = document.getElementById('qr-share-mount');
+        if (!mount) return;
+        // No round, no codes. currentMode is the game code.
+        if (!currentMode || typeof qrOpenSheet !== 'function') { mount.innerHTML = ''; return; }
+        mount.innerHTML = '<button type="button" class="btn-outline qr-open-btn" '
+            + 'onclick="openRoundQrSheet(this)">\uD83D\uDCF7 Show QR code</button>';
+    }
+
+    function openRoundQrSheet(btn) {
+        if (typeof qrOpenSheet !== 'function') return;
+        // The sheet opens over the page, so the feedback is the pressed state
+        // and a line only when nothing opens - a receipt for something the
+        // golfer is already looking at would be noise.
+        if (btn && typeof tapBusy === 'function') tapBusy(btn, '\u23F3 Building codes\u2026');
+        // THE ROSTER AND THE CODE, NOT THE ROUND RECORD. currentData holds
+        // organizerToken; qr-codes.js is never given it, which is what makes
+        // "no organizer link in a QR" a property of the interface rather than a
+        // promise about code. shareBaseUrl() is the same base every copied link
+        // uses, so the code and the link are the same string.
+        const n = qrOpenSheet({
+            code: currentMode,
+            players: currentData.players || [],
+            groupSizeOverrides: currentData.groupSizeOverrides || {},
+            baseUrl: shareBaseUrl(),
+            roundName: currentData.eventName || 'This round',
+            courseName: currentData.courseName || ''
+        });
+        // The same refusal as admin.html, in the same words: nothing was drawn,
+        // so it does not float away like something that worked.
+        if (btn && typeof tapRestore === 'function') tapRestore(btn);
+        if (!n) {
+            if (btn && typeof tapFail === 'function') tapFail(btn, 'No codes to show for this round yet.');
+            else if (typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
+        }
     }
 
     function copyGroupLinkFromScorecard(url, groupNum, btn) {
@@ -11266,6 +11520,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // this function does - which is right, because a DOM write before it can
         // take the caret out of the box a golfer is typing in.
         renderEndRoundControl();
+        // THE QR BUTTON IS RENDERED HERE, on the same beat and for the same
+        // reason: it needs currentMode and the roster, and the first paint has
+        // neither. A render function nothing calls is this project's most
+        // repeated defect - a priced Auto Press label that 37 tests called
+        // themselves and no code path ever did - so the call site matters more
+        // than the function. qr_share_entry_test.js arrives at the page the way
+        // a golfer does and taps, without naming either one.
+        if (typeof renderSetupEntry === 'function') renderSetupEntry();
+        if (typeof renderQrShareButton === 'function') renderQrShareButton();
         const historyModal = document.getElementById("history-modal-overlay");
         if (historyModal && historyModal.style.display === "flex") {
             renderHistoryList();
@@ -11298,14 +11561,43 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         const lockBadge = document.getElementById("group-lock-badge");
         const spectatorBanner = document.getElementById("spectator-hint-banner");
+        // THE ORGANIZER IS NEVER TOLD TO ASK THE ORGANIZER (2026-10-08). This
+        // block went straight from "no group link" to "Spectator View
+        // (Read-Only)" on any round above a foursome, without ever asking who
+        // was looking - so the owner of a 24-golfer round was shown the
+        // read-only sentence about himself. The read-only path is still here,
+        // unchanged, for somebody who really is read-only.
+        const orgGroup = organizerScoreGroup();
         if (lockedGroup) {
             lockBadge.textContent = `🔒 Scorekeeper: Group ${lockedGroup} Only`;
             lockBadge.style.display = "inline-block";
             if (spectatorBanner) spectatorBanner.style.display = "none";
+        } else if (isMultiGroupRound && canReachSetup()) {
+            // THE ORGANIZER. A picker instead of a refusal: he chooses which
+            // foursome he is entering, and the boxes for that group unlock.
+            lockBadge.textContent = orgGroup
+                ? `✏️ Organizer: scoring Group ${orgGroup}`
+                : `✏️ Organizer: pick a group to score`;
+            lockBadge.style.display = "inline-block";
+            if (spectatorBanner) {
+                const opts = groupBoundaries.map(b =>
+                    `<button type="button" class="org-score-pick${String(b.group) === String(orgGroup) ? ' on' : ''}"`
+                    + ` onclick="setOrganizerScoreGroup(${b.group})">Group ${b.group}</button>`).join('');
+                spectatorBanner.innerHTML = '<div class="org-score-row">'
+                    + '<span class="org-score-label">Score for:</span>' + opts
+                    + (orgGroup ? '<button type="button" class="org-score-pick" onclick="setOrganizerScoreGroup(null)">Done</button>' : '')
+                    + '</div>';
+                spectatorBanner.style.display = "block";
+            }
         } else if (isMultiGroupRound) {
             lockBadge.textContent = `👁️ Spectator View (Read-Only)`;
             lockBadge.style.display = "inline-block";
-            if (spectatorBanner) spectatorBanner.style.display = "block";
+            if (spectatorBanner) {
+                // THE SENTENCE IS PUT BACK, because the organizer branch above
+                // replaces this element's innerHTML.
+                spectatorBanner.innerHTML = '\uD83D\uDC41\uFE0F Read-only. Ask the organizer for your group\u2019s link to enter scores.';
+                spectatorBanner.style.display = "block";
+            }
         } else {
             lockBadge.style.display = "none";
             if (spectatorBanner) spectatorBanner.style.display = "none";
@@ -11751,7 +12043,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 // circle different holes.
                 const markClass = (typeof scoreMarkClass === 'function') ? scoreMarkClass(scoreVal, h.par) : '';
 
-                const isLocked = roundSuperseded() || (isMultiGroupRound && (!hasGroupLock || playerGroupMap[p.id] !== lockedGroup));
+                // ONE PREDICATE, shared with the badge and the banner above
+                // (2026-10-08). This read `isMultiGroupRound && (!hasGroupLock
+                // || ...)` - position only - so the organizer on a bare link had
+                // every box disabled on a round he owns.
+                const isLocked = !canScoreBox(p.id, playerGroupMap, isMultiGroupRound);
                 // data-player-id / data-hole name the box, so focus can find "the same
                 // box" again after a rebuild (see restoreScoreFocus) - by identity,
                 // never by element or position.

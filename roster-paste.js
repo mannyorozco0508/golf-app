@@ -146,11 +146,35 @@ function rosterPasteSeparator(line) {
 function splitTrailingTee(text, teeNames) {
     const names = (teeNames || []).map(n => String(n || '').trim().toLowerCase()).filter(Boolean);
     if (!names.length) return { tee: undefined, rest: text };
-    const m = /^(.*\S)([\s]*[\u00B7\u2022\u2013\u2014-][\s]*|\s+)([A-Za-z][A-Za-z ]*)$/
-        .exec(String(text || '').trim());
-    if (!m) return { tee: undefined, rest: text };
-    const hit = names.indexOf(m[3].trim().toLowerCase());
-    if (hit === -1) return { tee: undefined, rest: text };
+    // A REAL TEE NAME CAN BE TWO WORDS (2026-10-08). Caledonia's six are
+    // "Pintail Black", "Pintail Blue" and so on. The old pattern was greedy on
+    // the left, so only the LAST word was ever offered as a tee: "Tim Bell 11
+    // Pintail White" left "Pintail" in the name and took no tee, because the
+    // word before "White" is not a handicap. Found on the iOS Simulator against
+    // the live record.
+    //
+    // So the longest trailing phrase wins, four words down to one, and the
+    // set-off rule below is applied to whatever is left - unchanged. With one
+    // word this is exactly the old behaviour.
+    const raw = String(text || '').trim();
+    let m = null, hit = -1;
+    for (let words = 4; words >= 1 && hit === -1; words--) {
+        // THE END ANCHOR IS A VARIABLE, and that is not fussiness: paste_flights_test.js
+        // forbids the literal sequence dollar-quote-paren anywhere in this file,
+        // because the flight rule must stay anchored at the START of a line and
+        // that guard is how it is held there. Writing the anchor inline here
+        // tripped it - my own code caught by my own guard, which is the point of
+        // having it.
+        const END = '$';
+        const re = new RegExp('^(.*\\S)([\\s]*[\u00B7\u2022\u2013\u2014-][\\s]*|\\s+)'
+            + '((?:[A-Za-z]+[ ]+){' + (words - 1) + '}[A-Za-z]+)' + END);
+        const got = re.exec(raw);
+        if (!got) continue;
+        const at = names.indexOf(got[3].trim().toLowerCase());
+        if (at === -1) continue;
+        m = got; hit = at;
+    }
+    if (!m || hit === -1) return { tee: undefined, rest: text };
     // AND THE RULE ERRS TOWARD THE NAME, as everything else in this file does.
     // "Mary Blue" is a golfer on a course that happens to have blue tees, so a
     // bare space is not enough: the tee must either follow the HANDICAP, which

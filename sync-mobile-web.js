@@ -46,6 +46,9 @@ const DEST = process.env.MOBILE_SYNC_DEST ? path.resolve(process.env.MOBILE_SYNC
 // the global_courses schema behind it are one directory both products read and
 // write. Two answers to any of those is a correctness bug, not a style choice.
 const SHARED_SHELL = [
+    'qr-encode.js', 'qr-codes.js',
+    'tap-feedback.js',
+    'trip-recap-image.js',
     'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.

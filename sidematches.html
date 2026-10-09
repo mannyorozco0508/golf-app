@@ -18,6 +18,12 @@
          creates window.authReady now, signs in after the parse, never blocks render.
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
+    <!-- THE ONE ORGANIZER GATE (2026-10-08). This page decided organizer-ness
+         from the URL alone - "no ?group= means the organizer" - which was true
+         before the gate existed and false afterwards: on a multi-group round the
+         bare link is what spectators hold too, so the real organizer got
+         nothing. Now it asks the same question index.html asks. -->
+    <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
          cannot drift on what a side match's hole range means. -->
@@ -933,6 +939,9 @@ html {
 
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
+            // THE TRIP'S OWNER, when this round belongs to a trip. Does nothing
+            // twice and nothing at all without a tripCode.
+            if (typeof smRequestTripOwner === 'function') smRequestTripOwner();
             document.getElementById("main-title").textContent = `⚔️ Matches (${currentData.eventName || "Live Round"})`;
             // Written before smApplyRyderArrival runs below, and rewritten on every
             // snapshot after it - so setting the text is fine, but the element must
@@ -1878,6 +1887,37 @@ html {
         return !hasGroupLock;
     }
 
+    // IS THIS DEVICE THE ROUND'S ORGANIZER? The same evidence index.html uses -
+    // the owner uid, a held organizer token, or the trip-organizer inheritance -
+    // so the Matches tab cannot disagree with the scorecard about who somebody
+    // is. Before this, "no ?group=" was the whole test, and on a multi-group
+    // round that is exactly what a spectator holds.
+    let smTripRecord = null;
+    let smTripAsked = '';
+    function smRequestTripOwner() {
+        const code = currentData && currentData.tripCode;
+        if (!code || smTripAsked === String(code)) return;
+        smTripAsked = String(code);
+        try {
+            db.ref('trips/' + code + '/ownerUid').once('value').then((snap) => {
+                const owner = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!owner) return;
+                smTripRecord = { ownerUid: String(owner) };
+                if (typeof renderAll === 'function') renderAll();
+            }, () => {});
+        } catch (e) { /* no socket: the round's own ownerUid still decides */ }
+    }
+    function isRoundOrganizerHere() {
+        if (!window.organizerGate || typeof window.organizerGate.organizerEvidence !== 'function') {
+            // No gate loaded: fall back to what this page always did.
+            return !hasGroupLock;
+        }
+        const uid = (window.authBootState && window.authBootState.uid) || null;
+        const token = (typeof window.organizerGate.heldOrganizerToken === 'function')
+            ? window.organizerGate.heldOrganizerToken(currentMode, urlParams.get('organizer')) : null;
+        return !!window.organizerGate.organizerEvidence(currentData, uid, token, smTripRecord);
+    }
+
     // The raw STORED match, so permission is checked against the real
     // participants rather than against whatever happens to be rendered.
     function sideMatchById(key) {
@@ -1925,8 +1965,11 @@ html {
         if (!hasGroupLock) {
             // A single-group round has no meaningful spectator distinction - the bare
             // link IS the organizer's. On a multi-group round the same URL is what
-            // spectators hold, so it grants nothing.
-            return !isMultiGroupRound;
+            // spectators hold, so it grants nothing BY ITSELF - but a signed-in
+            // organizer is not a spectator, and asking is now possible
+            // (2026-10-08). Manny, signed in as the owner of a 24-golfer round,
+            // had no controls on the Matches tab for exactly this reason.
+            return !isMultiGroupRound || isRoundOrganizerHere();
         }
 
         if (!sideMatch) return false;

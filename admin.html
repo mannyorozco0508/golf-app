@@ -78,7 +78,15 @@
          byte-identical copy until the shared-core wave; four copies of that rule, with
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
+    <!-- Every tap shows it registered: pressed state, what it is doing, and
+         the answer next to the button, scrolled into view. -->
+    <script src="tap-feedback.js"></script>
     <script src="grouping.js"></script>
+    <!-- THE QR CODES. qr-encode.js is vendored upstream and never edited;
+         qr-codes.js builds the list, the sheet and the swipe. Both are in the
+         offline shell: the code is drawn on the phone with no signal. -->
+    <script src="qr-encode.js"></script>
+    <script src="qr-codes.js"></script>
     <script src="code-issuer.js"></script>
     <!-- THE ROUNDS THIS PHONE ALREADY HAS. Home is the start_url, so a Home
          Screen icon opens here with no signal - and offline the only thing it
@@ -376,6 +384,19 @@
         .wizard-review-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--border-faint); font-size: 0.9rem; }
         .wizard-review-row .wr-label { color: var(--text-muted); }
         .organizer-standing { text-align: center; font-size: 0.82rem; font-weight: bold; color: var(--brand-green); margin: 0 0 10px 0; }
+        /* EVERY TAP SHOWS IT REGISTERED (2026-10-08). A pressed state on every
+           button in the app, and a result line that stays until the next tap -
+           a self-dismissing receipt is exactly what a golfer misses while
+           looking at the keyboard. */
+        button:active, .is-pressed { transform: scale(0.98); filter: brightness(0.92); }
+        .is-pressed { opacity: 0.85; }
+        .tap-note {
+            font-size: 0.86rem; line-height: 1.45; margin: 8px 0 4px;
+            padding: 8px 10px; border-radius: 8px;
+        }
+        .tap-note-ok { background: var(--nassau-box-bg); border: 1px solid var(--brand-green); color: var(--text-main); }
+        .tap-note-fail { background: var(--warn-bg, var(--nassau-box-bg)); border: 1px solid var(--accent-red); color: var(--text-main); }
+        .email-link-hint { font-size: 0.82rem; line-height: 1.5; color: var(--text-muted); margin: 10px 0 6px; }
         .email-link-card { text-align: left; max-width: 420px; margin: 0 auto 16px auto; padding: 12px 14px; border: 1px solid var(--border-mid); border-radius: 10px; background: var(--bg-card); }
         /* ACCOUNT (Option A). The email-link card moved off the lobby and into a
            panel behind this link; inside the panel it is the whole content, so it
@@ -438,6 +459,69 @@
         .preset-btn { padding: 10px 4px; border-radius: 8px; border: 2px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: all 0.15s ease; }
         .preset-btn.active { border-color: var(--brand-green); background: var(--nassau-box-bg); color: var(--brand-green); }
 
+        /* ---- THE QR SHEET (Wave 1, 2026-10-07) --------------------------------
+           An organizer holds the phone up on the first tee and each scorekeeper
+           scans their own group. So the code is as big as the screen allows, the
+           label is under it, and swiping moves to the next group.
+
+           FULL SCREEN AND OPAQUE, deliberately: a camera a metre away needs
+           contrast and no clutter, and position:fixed with its own background
+           means the hole underneath cannot show through a translucent panel.
+
+           ALWAYS LIGHT-ON-DARK-FRAME, NEVER THEMED. The code itself is drawn
+           black on white at both themes - a scanner reads dark modules on a
+           light ground, and an inverted QR is one many cameras refuse. Only the
+           frame around it follows the theme. */
+        .qr-sheet {
+            position: fixed; inset: 0; z-index: 1200; display: none;
+            flex-direction: column; align-items: center;
+            background: var(--bg-main); padding: 10px 14px 18px;
+            /* The notch and the home bar, so neither eats the close button nor
+               the dots. */
+            padding-top: calc(10px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        }
+        .qr-sheet.open { display: flex; }
+        .qr-sheet-head { width: 100%; max-width: 560px; display: flex; align-items: flex-start; gap: 10px; }
+        .qr-round-name { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main); line-height: 1.25; overflow-wrap: break-word; }
+        .qr-course-name { font-size: 0.8rem; color: var(--text-muted); }
+        .qr-close {
+            flex: 0 0 auto; width: 44px; height: 44px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 50%;
+            background: var(--bg-card); color: var(--text-main); font-size: 1.1rem; line-height: 1;
+        }
+        /* THE TRACK IS THE SWIPE SURFACE. One slide at a time, translated by JS;
+           overflow hidden so the neighbours are not half visible and mistaken
+           for the code being scanned. */
+        .qr-track { position: relative; flex: 1 1 auto; width: 100%; max-width: 560px; overflow: hidden; }
+        .qr-slide {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            transition: transform 220ms ease, opacity 180ms ease;
+        }
+        .qr-sheet.dragging .qr-slide { transition: none; }
+        /* The code: as big as the shorter side allows, white ground included, so
+           the quiet zone is part of the white and not the page behind it. */
+        .qr-art {
+            width: min(84vw, 62vh); height: min(84vw, 62vh);
+            background: #ffffff; border-radius: 10px; padding: 0;
+            box-shadow: 0 2px 10px var(--shadow-color);
+        }
+        .qr-art svg { display: block; border-radius: 10px; }
+        .qr-slide-label { font-size: 1.3rem; font-weight: 800; color: var(--text-main); }
+        .qr-slide-sub { font-size: 0.85rem; color: var(--text-muted); text-align: center; max-width: 86vw; }
+        .qr-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+        .qr-arrow {
+            width: 44px; height: 44px; margin: 0; padding: 0; border-radius: 50%;
+            border: 1px solid var(--border-mid); background: var(--bg-card);
+            color: var(--text-main); font-size: 1.4rem; line-height: 1;
+        }
+        .qr-arrow:disabled { opacity: 0.35; }
+        .qr-dots { display: flex; gap: 7px; }
+        .qr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); }
+        .qr-dot.on { background: var(--brand-green); }
+        .qr-hint { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; }
+        .qr-open-btn { width: 100%; }
         .group-link-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--accent-red); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
         /* The whole-round link's row (2026-09-20): the group row's look, NOT its class -
            tools/round-share-check.js counts .group-link-row to prove the group links
@@ -458,6 +542,20 @@
         .grid-stroke { grid-template-columns: 2fr 1fr 38px; }
         .grid-team { grid-template-columns: 1.8fr 0.8fr 1.2fr 38px; }
         .grid-ryder { grid-template-columns: 1.5fr 0.7fr 1fr 1fr 38px; }
+
+        /* THE ROW'S OWN ORDER CONTROLS (2026-10-08). A golfer's foursome is
+           their position in the roster, so this is how an organizer sets the
+           foursomes on the day: two arrows and a group picker, on their own
+           full-width line under the row. */
+        .p-order-wrap { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+        .p-order-label { font-size: 0.75rem; color: var(--text-muted); }
+        .p-order-btn {
+            width: 34px; min-height: 34px; margin: 0; padding: 0;
+            border: 1px solid var(--border-mid); border-radius: 7px;
+            background: var(--bg-card); color: var(--brand-green);
+            font-size: 0.78rem; line-height: 1; cursor: pointer;
+        }
+        .p-group-input { width: auto; min-width: 92px; margin: 0 0 0 auto; padding: 6px 4px; font-size: 0.76rem; }
 
         .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
@@ -1104,12 +1202,35 @@ html {
         <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
             <label for="email-link-input">Email</label>
             <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
-            <button type="submit" id="email-link-send" class="btn-primary">Email me a sign-in link</button>
+            <button type="submit" id="email-link-send" class="btn-primary" onclick="return true;">Email me a sign-in link</button>
         </form>
-        <label for="email-link-paste">Paste the link from the email</label>
-        <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link" aria-label="Sign-in link from the email">
+        <!-- FINISH IT HERE, AND SAY SO (2026-10-08). Manny on TestFlight: he
+             tapped the link in the email and it opened the WEB app, leaving the
+             native app anonymous and him a spectator on his own rounds. The
+             paste field was already here and a pasted link already worked - what
+             was missing was anything telling him not to tap it. Tapping is the
+             obvious action and it is the one that fails. -->
+        <p id="email-link-paste-hint" class="email-link-hint">In the app, <strong>don&rsquo;t tap the link</strong> in the email &mdash; it opens the website and signs you in there instead. Copy the link (press and hold it &rarr; Copy), or just read the code off the end of it, and finish here.</p>
+        <label for="email-link-paste">Paste the link, or type the code</label>
+        <input id="email-link-paste" type="text" autocomplete="off" placeholder="Paste the link or type the code" aria-label="Sign-in link or code from the email">
         <button type="button" id="email-link-finish" class="btn-outline" onclick="emailLinkAuth.submitPaste()">Finish sign-in</button>
         <p id="email-link-status" role="status"></p>
+    </section>
+    <!-- LINK APPLE OR GOOGLE TO THE ACCOUNT YOU ARE ALREADY IN (Build 12,
+         2026-10-08). Manny signed in with email, tapped "Continue with Apple",
+         and was SWITCHED to a new privaterelay account instead of having Apple
+         attached to his - because planOauth treated any non-anonymous user as
+         "already linked" whatever providers were actually on them. These
+         buttons are the deliberate version: they LINK, and they refuse rather
+         than adopt if that Apple or Google account belongs to someone else.
+         Shown only to a signed-in email account that does not already have the
+         provider - syncOauthLinkRow decides. -->
+    <section id="oauth-link-card" class="email-link-card" style="display:none;">
+        <h2>One tap next time</h2>
+        <p id="oauth-link-lead">Attach Apple or Google to this account, and signing in on a new phone is one tap &mdash; no email, no link to paste.</p>
+        <button type="button" id="oauth-link-apple" class="btn-primary" onclick="oauthLinkTap('apple')">&#63743;&nbsp; Link Apple</button>
+        <button type="button" id="oauth-link-google" class="btn-outline" onclick="oauthLinkTap('google')">Link Google</button>
+        <p id="oauth-link-status" role="status"></p>
     </section>
     <!-- SIGN OUT AND DELETE ACCOUNT (Wave 34). Required by App Review 5.1.1(v):
          an app that lets somebody create an account has to let them delete it from
@@ -3247,6 +3368,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // after Save, beside the links they are already sending: the link that makes
         // any other device - Safari on the same phone, a Mac, a second phone - the
         // organizer of this round. Worded so nobody sends it to the group chat.
+        // SHOW QR CODE, on the organizer's own share screen (Wave 1, 2026-10-07).
+        //
+        // BEFORE the organizer-link block on purpose: the codes are the things
+        // that get held up to the group, and the organizer link is the one
+        // thing that must never be one. qr-codes.js is handed the roster and
+        // the code, never this round record - which is where organizerToken is.
+        html += '<div class="rr-qr-box" style="margin-top:14px;">'
+            + '<button type="button" class="btn-outline qr-open-btn" onclick="openRoundQrSheet()">'
+            + '\uD83D\uDCF7 Show QR code</button>'
+            + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
+            + 'Hold the phone up on the first tee \u2014 each scorekeeper scans their own group. '
+            + 'Swipe for the next one. Works with no signal.</div>'
+            + '</div>';
         if (data && data.organizerToken) {
             html += '<div class="rr-organizer-link" style="margin-top:14px;">'
                 + '<div class="wr-label" style="margin-bottom:4px;">Your own devices</div>'
@@ -3664,6 +3798,27 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!rec) return false;
         const keys = Object.keys(rec);
         return !(keys.length === 1 && keys[0] === 'name');
+    }
+    // TEES ARE A SEPARATE NEED FROM THE CARD, AND THE QUESTION IS ASKED ONCE
+    // (2026-10-08). courseCardInHand answers about the CARD - pars and stroke
+    // indexes - and every Myrtle course, Caledonia included, is a bundled preset
+    // in course-data.js carrying 18 holes and NO TEES. So the card was "in
+    // hand", nothing was ever fetched, and the shared record's rated tees (6 for
+    // Caledonia) were never read: the round-level tee select stayed empty and
+    // appendTeeControl returned early on every golfer row.
+    //
+    // Build 16 fixed that for loadModeData with a check written INLINE in that
+    // one function, and Manny found build 17 still broken on the new-round path.
+    // A rule in one function is not a rule. This is the one both gates call.
+    function courseTeesInHand(key) {
+        if (!key) return true;
+        return courseTeeChoices(courseRecordForTees(key)).length > 0;
+    }
+    // THE CARD AND THE TEES. ensureCard memoizes per key in course-index.js, so
+    // a course that genuinely has no rated tees costs ONE read and then answers
+    // from the same promise - a miss cannot turn into a read on every pick.
+    function courseFullyInHand(key) {
+        return courseCardInHand(key) && courseTeesInHand(key);
     }
     const ensureCourseCard = (key) => courseIndex.ensureCard(key);
 
@@ -6686,7 +6841,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // DO NOT WAIT AT ALL: a directory preset, a nine-hole loop, a second pick
         // of the same course and a course just imported are all already in hand,
         // and those stay exactly as synchronous as they were.
-        if (courseCardInHand(id)) { handleCourseChange(); return; }
+        // THE TEES COUNT AS PART OF "IN HAND" (2026-10-08). This asked
+        // courseCardInHand alone, so picking Caledonia on a NEW round took the
+        // synchronous path, never read the record, and left every golfer row
+        // without a Tee dropdown. The common cases are still synchronous: a
+        // preset WITH tees, a second pick of the same course and a course just
+        // imported all answer true to both halves.
+        // THE GRID STAYS SYNCHRONOUS, THE TEES CATCH UP (2026-10-08).
+        //
+        // The first version of this fix gated the whole thing on the tees as
+        // well, and course_grid_edit_test.js and handicap_index_test.js went red
+        // immediately - correctly. They call selectCourse and read the grid on
+        // the NEXT line, exactly as a tap does, and the comment above this
+        // function has warned since Wave 38 that deferring the repaint by a
+        // microtask costs precisely those two tests. A preset's card is in hand
+        // and must still paint now.
+        //
+        // So the CARD decides whether to wait, as it always did, and the TEES
+        // are fetched behind it when they are missing. syncTeeRatingFromCourse
+        // fills the round select and repairs the golfer rows, so the dropdowns
+        // appear a moment later without the grid ever being held back.
+        if (courseCardInHand(id)) {
+            handleCourseChange();
+            if (!courseTeesInHand(id)) {
+                ensureCourseCard(id).then((rec) => {
+                    if (rec && rec.tees) syncTeeRatingFromCourse(id, { keepSelection: true });
+                });
+            }
+            return;
+        }
         ensureCourseCard(id).then(() => { handleCourseChange(); });
     }
 
@@ -7295,6 +7478,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         setTeePanelShown(true);
         fillTeeSelect(choices, preferred);
         applySelectedTee();
+        // AND THE ROWS ALREADY ON SCREEN (2026-10-08). The tees arrive one
+        // network read after the rows on every cold path, so whichever came
+        // second used to decide whether a golfer got a Tee dropdown at all.
+        // This is the one place the select is ever filled, so repairing here
+        // covers every path into Players - new Game Day, Same as last week,
+        // Help me set this up, Edit Round Setup, a trip round and a paste -
+        // rather than six call sites each remembering to do it.
+        if (typeof refreshRowTeeControls === 'function') refreshRowTeeControls();
     }
 
     function handicapReviewLine() {
@@ -7784,6 +7975,132 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // rendered at all and the row is byte-identical to before this existed.
     // DEFAULT IS THE ROUND'S TEE, which is what makes a same-tee round save
     // exactly what it saved yesterday: the select matches, so nothing is stored.
+    // ---- SETTING THE FOURSOMES ON THE DAY (2026-10-08) --------------------
+    //
+    // Manny, before a 24-man Myrtle trip: the Players step could change group
+    // SIZES but not WHO was in which group, because a golfer's foursome is
+    // their POSITION in the roster and the only control on a row was delete.
+    // Putting four named people together meant deleting and re-adding them in
+    // order, on a phone, on a tee box.
+    //
+    // THE ARITHMETIC IS NOT HERE. grouping.js owns rosterMove() and
+    // rosterMoveToGroup() - it already owns what a group IS - and
+    // roster_order_test.js holds them against a 24-man field, including that no
+    // id is lost or duplicated by any move. This function moves DOM nodes to
+    // match, and nothing else.
+    //
+    // IDS RIDE WITH THE ROWS. captureCurrentPlayerInputs() reads the rows in
+    // DOM order and takes each row's own id with it, so reordering rows changes
+    // the foursomes and binds no golfer to a different number.
+    function appendOrderControl(row) {
+        // A FULL-WIDTH LINE UNDER THE ROW, the same shape appendTeeControl uses:
+        // .player-row is a GRID with a fixed column template per format, so an
+        // extra child would land in an implicit cell and squeeze the handicap
+        // box. gridColumn 1 / -1 gives the controls their own line instead.
+        const wrap = document.createElement('div');
+        wrap.className = 'p-order-wrap';
+        wrap.style.gridColumn = '1 / -1';
+        const btn = (glyph, label, fn) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'p-order-btn';
+            b.textContent = glyph;
+            b.setAttribute('aria-label', label);
+            b.onclick = fn;
+            return b;
+        };
+        const label = document.createElement('span');
+        label.className = 'p-order-label';
+        label.textContent = 'Order';
+        wrap.appendChild(label);
+        wrap.appendChild(btn('\u25B2', 'Move this golfer up', function () { moveRowBy(row, -1); }));
+        wrap.appendChild(btn('\u25BC', 'Move this golfer down', function () { moveRowBy(row, 1); }));
+        // MOVE TO GROUP N, as a select rather than a menu: on a phone the native
+        // picker is one tap and needs no layout of ours, and it reads out the
+        // group names to a screen reader for free.
+        const sel = document.createElement('select');
+        sel.className = 'p-group-input';
+        sel.setAttribute('aria-label', 'Move this golfer to a group');
+        sel.onchange = function () { moveRowToGroup(row, sel.value); };
+        wrap.appendChild(sel);
+        row.appendChild(wrap);
+    }
+
+    // The group select is filled from the CURRENT boundaries, so it offers the
+    // groups that exist rather than a guess - and it is refilled by
+    // renderGroupDividers(), which already runs after every resize, add, delete
+    // and paste.
+    function syncRowGroupSelects() {
+        const listContainer = document.getElementById('player-list');
+        if (!listContainer) return;
+        const rows = Array.from(listContainer.querySelectorAll('.player-row'));
+        const bounds = computeGroupBoundaries(rows.length, groupSizeOverrides);
+        rows.forEach((row, idx) => {
+            const sel = row.querySelector('.p-group-input');
+            if (!sel) return;
+            let mine = 1;
+            bounds.forEach(b => { if (idx >= b.startIdx && idx < b.startIdx + b.size) mine = b.group; });
+            // ONE GROUP MEANS NOTHING TO MOVE BETWEEN, so the control goes away
+            // rather than offering a move to the group you are already in.
+            if (bounds.length <= 1) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+            sel.style.display = '';
+            const want = bounds.map(b => b.group).join(',') + '|' + mine;
+            if (sel.getAttribute('data-filled') === want) return;
+            sel.innerHTML = bounds.map(b =>
+                '<option value="' + b.group + '"' + (b.group === mine ? ' selected' : '') + '>'
+                + 'Group ' + b.group + '</option>').join('');
+            sel.setAttribute('data-filled', want);
+        });
+    }
+
+    function playerRowsNow() {
+        const listContainer = document.getElementById('player-list');
+        return listContainer ? Array.from(listContainer.querySelectorAll('.player-row')) : [];
+    }
+
+    // THE DOM IS REORDERED TO MATCH THE ANSWER, not instead of it: grouping.js
+    // is asked where the row should go, and the node is moved there. A rebuild
+    // would throw away every input the organizer has typed but not saved.
+    function applyRowOrder(nextOrder) {
+        const listContainer = document.getElementById('player-list');
+        if (!listContainer) return;
+        nextOrder.forEach(row => listContainer.appendChild(row));
+        if (typeof renderGroupDividers === 'function') renderGroupDividers();
+        if (typeof refreshMultiGroupMoneyRule === 'function') refreshMultiGroupMoneyRule();
+        if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
+    }
+
+    function moveRowBy(row, delta) {
+        const rows = playerRowsNow();
+        const from = rows.indexOf(row);
+        if (from === -1) return;
+        applyRowOrder(rosterMove(rows, from, from + delta));
+    }
+
+    function moveRowToGroup(row, group) {
+        const rows = playerRowsNow();
+        const from = rows.indexOf(row);
+        if (from === -1) return;
+        applyRowOrder(rosterMoveToGroup(rows, from, Number(group), groupSizeOverrides));
+    }
+
+    // THE ROWS THAT WERE BUILT BEFORE THE TEES ARRIVED (2026-10-08). The
+    // per-row dropdown is COPIED from the round-level select at the moment
+    // addPlayerRow runs, so a roster drawn before the shared course record came
+    // back has no dropdowns at all - and nothing redrew them when it did. This
+    // adds the control to any row still missing it, keeping whatever tee the row
+    // already carried.
+    function refreshRowTeeControls() {
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        Array.from(list.querySelectorAll('.player-row')).forEach((row) => {
+            if (row.querySelector('.p-tee-input')) return;
+            const line = row.querySelector('.p-tee-line');
+            if (line) line.remove();
+            appendTeeControl(row, row.getAttribute('data-tee-key') || undefined);
+        });
+    }
+
     function appendTeeControl(row, teeKey) {
         const src = document.getElementById('tee-rating-select');
         if (!src || !src.options || src.options.length < 2) return;
@@ -7803,6 +8120,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
             ? teeKey : (src.value || '');
         sel.value = want;
+        // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
+        // builds a control for a row that had none.
+        row.setAttribute('data-tee-key', want || '');
+        sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
         sel.onchange = function () { if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
         const line = document.createElement('div');
         line.className = 'p-tee-line';
@@ -7818,14 +8139,71 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // The tee one row is set to, as the shape handicap.js and player-tees.js read.
     // The tee names THIS course offers, for the paste parser. Nothing else is a
     // tee: a trailing word that is not one of these is part of the golfer's name.
+    // A TEE NAME FROM A PASTE, TURNED INTO THE KEY A ROW CARRIES (2026-10-08).
+    // roster-paste.js has parsed "Zack Carrano 6 blue" into player.teeName since
+    // 2026-10-05 and NOTHING in this page ever read it: previewPastedPlayers
+    // passed the tee names in, commitPastedPlayers did not, and the feature was
+    // thrown away at the last step. The three paste tests in the suite all call
+    // the PARSER, so every one of them was green throughout.
+    //
+    // Matched against the same trailing segment roundTeeNames() reports, so the
+    // two cannot drift: the option text is "Men · Blue".
+    function teeKeyForTeeName(name) {
+        const sel = document.getElementById('tee-rating-select');
+        if (!sel || !sel.options || !name) return '';
+        const want = String(name).trim().toLowerCase();
+        const nameOf = (opt) => {
+            const parts = String(opt.textContent || '').split('\u00b7');
+            return parts[parts.length - 1].trim();
+        };
+        for (let i = 0; i < sel.options.length; i++) {
+            if (nameOf(sel.options[i]).toLowerCase() === want) return sel.options[i].value;
+        }
+        // THE LAST WORD, when exactly one tee ends in it. See roundTeeNames.
+        let hit = '';
+        for (let i = 0; i < sel.options.length; i++) {
+            const last = nameOf(sel.options[i]).split(/\s+/).pop().toLowerCase();
+            if (last !== want) continue;
+            if (hit) return '';
+            hit = sel.options[i].value;
+        }
+        return hit;
+    }
+
+    // REAL TEE NAMES ARE COMPOUND, AND A GOLFER WRITES THE COLOUR (2026-10-08).
+    // Caledonia's six rated sets are "Pintail Black", "Pintail Blue" and so on -
+    // measured on the live record - so a tee sheet written the way Manny writes
+    // it, "Zack Carrano 6 blue", matched NOTHING: the tee stayed in the golfer's
+    // name and every pasted row took the default tee. Found on the iOS Simulator
+    // against the real database; the Chrome check could not see it, because its
+    // fixture invented tees called Blue and White and so agreed with itself.
+    //
+    // So the list the parser splits on carries the full names AND the last word
+    // of each, and a last word only when exactly ONE tee ends in it. Two tees
+    // ending in "Blue" make "blue" ambiguous, and an ambiguous word is part of
+    // the golfer's name - the same answer the parser already gives to a word it
+    // does not recognise.
     function roundTeeNames() {
         const sel = document.getElementById('tee-rating-select');
         if (!sel || !sel.options) return [];
-        return Array.prototype.map.call(sel.options, o => {
+        const full = Array.prototype.map.call(sel.options, o => {
             const t = String(o.textContent || '');
             const parts = t.split('\u00b7');
             return parts[parts.length - 1].trim();
         }).filter(Boolean);
+        const seen = {};
+        full.forEach((n) => {
+            const w = n.split(/\s+/).pop().toLowerCase();
+            seen[w] = (seen[w] || 0) + 1;
+        });
+        const aliases = [];
+        full.forEach((n) => {
+            const w = n.split(/\s+/).pop();
+            if (!w || w.toLowerCase() === n.toLowerCase()) return;
+            if (seen[w.toLowerCase()] !== 1) return;
+            if (aliases.indexOf(w) === -1) aliases.push(w);
+        });
+        return full.concat(aliases);
     }
 
     function rowTeeRating(row) {
@@ -7937,6 +8315,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // switch, delete, paste) hands it back to addPlayerRow. Absent control
             // (flights off) -> no key, the same as a round that never had flights.
             if (flightBtn) entry.flight = flightBtn.getAttribute('data-flight') === 'B' ? 'B' : 'A';
+            // THE TEE RIDES ALONG TOO (2026-10-08), in the { tee: { teeKey } }
+            // shape appendPlayerFrom already reads back. Without this every
+            // rebuild - a format switch, a deleted golfer, a paste - put the
+            // whole roster back on the round's default tee, and the save reads
+            // the ROW, so it silently changed what got stored. The key is taken
+            // off the attribute rather than the select because
+            // refreshRowTeeControls uses that attribute to restore a tee when it
+            // builds a control for a row that had none.
+            const teeKeyOnRow = row.getAttribute('data-tee-key')
+                || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
+            if (teeKeyOnRow) entry.tee = { teeKey: teeKeyOnRow };
             list.push(entry);
         });
         return list;
@@ -7946,6 +8335,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // shared by the batch rebuild in renderPlayerList and the single add/remove actions below,
     // so the header never goes stale relative to however many rows are actually on screen.
     function renderPlayerListHeaderAndWarning(existingDataLength) {
+        // WHAT THE NUMBER IN THAT COLUMN IS CALLED (2026-10-08). All three
+        // branches below said the literal "Index", so a Strokes round - the
+        // DEFAULT for a new round - put "Index" over numbers the app uses
+        // exactly as typed. The box's own placeholder has followed the switch
+        // since Wave 37; the heading above it was missed, which is the same
+        // defect handicap-labels.js exists to kill. One source now answers both.
+        const hcpHead = handicapSetupBoxLabel();
         const format = document.getElementById("game-format-select").value;
         const nassauType = document.getElementById("nassau-type") ? document.getElementById("nassau-type").value : "team";
         const headerRow = document.getElementById("player-header-row");
@@ -7969,14 +8365,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (format === 'ryder') {
             headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
         } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
             headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
         } else {
             const flt = flightsEnabledNow();
             headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>Index</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
+            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
         }
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
@@ -8103,20 +8499,63 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function oauthReady() {
         return !!(window.oauthSignin && typeof window.oauthSignin.signIn === 'function');
     }
-    function oauthTap(which) {
-        if (!oauthReady()) return setTextOnce(document.getElementById('oauth-status'),
+    // WHO SEES THE LINK ROW. A signed-in account that does NOT already carry the
+    // provider - so an anonymous organizer (who gets the ordinary one-tap card)
+    // and an account that already has Apple attached are both left alone. The
+    // per-button hiding matters: offering "Link Apple" to somebody who already
+    // linked Apple is an invitation to a refusal.
+    function syncOauthLinkRow() {
+        var card = document.getElementById('oauth-link-card');
+        if (!card) return;
+        var u = null;
+        try { u = window.firebase && firebase.auth && firebase.auth().currentUser; } catch (e) { u = null; }
+        var linked = (window.oauthSignin && typeof oauthSignin.linkedProviders === 'function')
+            ? oauthSignin.linkedProviders(u) : [];
+        var signedInNotAnon = !!(u && u.uid && !u.isAnonymous);
+        var a = document.getElementById('oauth-link-apple');
+        var g = document.getElementById('oauth-link-google');
+        var hasApple = linked.indexOf('apple.com') !== -1;
+        var hasGoogle = linked.indexOf('google.com') !== -1;
+        if (a) a.style.display = (signedInNotAnon && !hasApple) ? '' : 'none';
+        if (g) g.style.display = (signedInNotAnon && !hasGoogle) ? '' : 'none';
+        card.style.display = (signedInNotAnon && (!hasApple || !hasGoogle)) ? 'block' : 'none';
+    }
+
+    // THE DELIBERATE LINK. Same module, same one sign-in path, with the flag
+    // that stops it adopting somebody else's account on
+    // credential-already-in-use - which is the move that made the stray one.
+    function oauthLinkTap(which) {
+        if (!oauthReady()) return setTextOnce(document.getElementById('oauth-link-status'),
             'Sign-in is not ready yet. Wait a moment and try again.');
-        var a = document.getElementById('oauth-apple'), g = document.getElementById('oauth-google');
-        if (a) a.disabled = true; if (g) g.disabled = true;
-        setTextOnce(document.getElementById('oauth-status'), 'Opening\u2026');
+        var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
+        tapBusy(btn, '\u23F3 Opening\u2026');
+        window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
+            tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
+                + ' linked \u2014 next time it is one tap on this account.');
+            refreshAccountState();
+            syncOauthLinkRow();
+        }, function (err) {
+            tapFail(btn, window.oauthSignin.messageFor(err, { deliberateLink: true }));
+        });
+    }
+
+    function oauthTap(which) {
+        var btn = document.getElementById(which === 'apple' ? 'oauth-apple' : 'oauth-google');
+        if (!oauthReady()) {
+            tapFail(btn, 'Sign-in is not ready yet. Wait a moment and try again.');
+            return;
+        }
+        // THE TAP IS VISIBLE BEFORE THE WORK FINISHES, and the answer lands
+        // next to the button and is scrolled into view - the two things missing
+        // every time Manny reported a button as doing nothing.
+        tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which).then(function (r) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-status'), r.note || '');
+            tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
+                + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
             refreshAccountState();
             if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
         }, function (err) {
-            if (a) a.disabled = false; if (g) g.disabled = false;
-            setTextOnce(document.getElementById('oauth-status'), window.oauthSignin.messageFor(err));
+            tapFail(btn, window.oauthSignin.messageFor(err));
         });
     }
     // The email card is the FALLBACK, shown only when asked for. It is unchanged
@@ -8460,6 +8899,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             setTextOnce(document.getElementById('oauth-lead'),
                 'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email.');
         }
+        // THE LINK ROW IS DECIDED HERE, on the same beat as everything else
+        // about the account. A render function nothing calls is this project's
+        // most repeated defect - a priced Auto Press label that 37 tests called
+        // themselves and no code path ever did - so the call site matters more
+        // than the function. refreshAccountState already runs on every auth
+        // change and when the panel opens.
+        if (typeof syncOauthLinkRow === 'function') syncOauthLinkRow();
     }
 
     function previewPastedPlayers() {
@@ -9010,7 +9456,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // at once instead of one blank one. Existing players are never replaced or cleared.
     function commitPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, groups } = parsePlayerPasteText(text);
+        // THE SAME ARGUMENT THE PREVIEW PASSES. Without it the parser cannot
+        // know a tee name from a surname, so "Zack Carrano 6 blue" set no tee.
+        const { validPlayers, groups } = parsePlayerPasteText(text, roundTeeNames());
         if (validPlayers.length === 0) return;
 
         // THE EMPTY ROW ON ARRIVAL. Step 5 opens with one blank row, and it was
@@ -9044,7 +9492,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
 
         validPlayers.forEach(p => {
-            existingData.push({ name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true, flight: p.flight });
+            const entry = { name: p.name, hcp: p.hcp, team: '', squad: existingData.length % 2 === 0 ? 'red' : 'blue', playingForMoney: true, flight: p.flight };
+            // "Name 6 Blue" SETS THE TEE. A name the round does not offer leaves
+            // the tee alone, and the row takes the round's default - the same as
+            // a line with no tee on it.
+            const teeKey = p.teeName ? teeKeyForTeeName(p.teeName) : '';
+            if (teeKey) entry.tee = { teeKey: teeKey };
+            existingData.push(entry);
         });
         document.getElementById("player-list").innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
@@ -9796,11 +10250,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // course is a directory preset, a nine-hole loop, or already fetched
             // takes no extra work at all.
             const needsCard = data.activeCourseKey && !courseCardInHand(data.activeCourseKey);
+            // TEES ARE A SEPARATE NEED FROM THE CARD (2026-10-08). "In hand"
+            // answers a question about the CARD - pars and stroke indexes - and
+            // every Myrtle course is a bundled preset in course-data.js, which
+            // carries 18 holes and NO TEES. So courseCardInHand said yes,
+            // ensureCourseCard never ran, globalCourses kept only a {name} stub,
+            // courseTeeChoices found nothing, the round-level tee select stayed
+            // empty, and appendTeeControl returned early - no Tee dropdown on any
+            // golfer row. Manny had no way to put golfers on different tees.
+            //
+            // The shared record DOES have them (53 rated tee sets were loaded on
+            // 2026-10-08), so this asks for the record whenever the tees are
+            // missing, whatever the card says.
+            // THROUGH THE SHARED HELPER since 2026-10-08. This was the inline
+            // copy, and selectCourse not having one is why build 17 still had
+            // the defect on four of the five paths into Players.
+            const needsTees = data.activeCourseKey && !courseTeesInHand(data.activeCourseKey);
             handleCourseChange();
             if (data.teeRating) applyStoredTeeRating(data.teeRating);
-            if (needsCard) {
+            if (needsCard || needsTees) {
                 ensureCourseCard(data.activeCourseKey).then((rec) => {
-                    if (!rec || !rec.data) return;
+                    // A RECORD WITH TEES AND NO CARD IS STILL WORTH HAVING: the
+                    // early return used to require rec.data, so a shared record
+                    // that answered with tees for a course whose card was already
+                    // in hand was thrown away - which is this exact bug.
+                    if (!rec) return;
+                    if (rec.tees) {
+                        syncTeeRatingFromCourse(data.activeCourseKey, { keepSelection: true });
+                        if (data.teeRating) applyStoredTeeRating(data.teeRating);
+                        refreshRowTeeControls();
+                    }
+                    if (!rec.data) return;
                     // handleCourseChange repaints only when the course IDENTITY
                     // changes, and it has not - the key was set before the first
                     // call. Clearing it is what makes the real card replace the
@@ -10275,6 +10755,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         `;
         if (flightsOn) appendFlightControl(row, flight, flightAsLine);
         appendTeeControl(row, teeKey);
+        appendOrderControl(row);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -10310,6 +10791,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const list = document.getElementById('player-list');
         if (!list) return;
         const label = handicapSetupBoxLabel();
+        // THE HEADING TOO, not just the boxes under it: until this, flipping the
+        // switch rewrote every placeholder and left the column head saying the
+        // other thing, on the same screen.
+        if (typeof renderPlayerListHeaderAndWarning === 'function') {
+            renderPlayerListHeaderAndWarning(list.querySelectorAll('.player-row').length);
+        }
         list.querySelectorAll('.p-hcp-input').forEach(box => {
             if (box.getAttribute('placeholder') !== label) box.setAttribute('placeholder', label);
         });
@@ -10391,6 +10878,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const playerCount = rows.length;
         const boundaries = computeGroupBoundaries(playerCount, groupSizeOverrides);
 
+        // BEFORE THE EARLY RETURN, deliberately. On a single group there are no
+        // dividers to draw AND no group to move between - so the select must be
+        // HIDDEN rather than left showing whatever the last multi-group state
+        // put in it, which is what a return above this line caused.
+        syncRowGroupSelects();
         if (boundaries.length <= 1) return; // single group, no need to label it
 
         boundaries.forEach((b, gIdx) => {
@@ -10457,6 +10949,28 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // canonical one inside the app, where location.origin is capacitor://
         // localhost and useless to whoever is sent the link.
         return shareBaseUrl() + page;
+    }
+
+    // ONE CALL, THE SHARED SHEET. Same function name as index.html's, same
+    // arguments, and the list and swipe both come from qr-codes.js - so there is
+    // nothing here for the two screens to disagree about.
+    function openRoundQrSheet() {
+        if (typeof qrOpenSheet !== 'function') return;
+        const data = currentSavedRound || {};
+        const n = qrOpenSheet({
+            code: currentMode,
+            players: data.players || [],
+            groupSizeOverrides: data.groupSizeOverrides || {},
+            baseUrl: shareBaseUrl(),
+            roundName: data.eventName || 'This round',
+            courseName: data.courseName || ''
+        });
+        // A REFUSAL, NOT A TOAST, and that is this page's own rule rather than a
+        // preference: dialog_admin_test.js caps the floating messages and says
+        // why - a toast is a RECEIPT OF A COMPLETED WRITE, and nothing happened
+        // here. Nothing was drawn, so it must stay on screen and not float away
+        // like something that worked.
+        if (!n && typeof uiRefuse === 'function') uiRefuse('No codes to show for this round yet.');
     }
 
     function scorecardUrlFor(gameCode, groupNum) {

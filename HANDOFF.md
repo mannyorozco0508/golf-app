@@ -4508,6 +4508,346 @@ the dark state; `my_groups_test.js` holds the feature.
   `consumer-v150-unplayedzero`. 1.0.7 build 10 is unchanged - still READY TO
   ARCHIVE, now with this fix in the bundle.
 
+- **QR CODES ARE LIVE (Wave 1, 2026-10-07, `main`).** An organizer holds the
+  phone up on the first tee and each scorekeeper scans their own group.
+
+  WHERE: "Show QR code" in the Round Menu on the scorecard (every golfer, not
+  just the organizer), on the Scorekeeper Links panel, and on Round Ready's
+  share screen in admin.html. Full-screen sheet, one code per group, swipe or
+  tap the arrows between them, plus a Watch code at the end.
+
+  WHAT EACH CODE IS: `index.html?game=CODE&group=N` per group - the SAME string
+  that group's Copy button hands out - and `leaderboard.html?game=CODE` for
+  Watch. **The organizer link is never a QR**, and that is a property of the
+  interface rather than a promise: `qr-codes.js` is handed the code, the roster
+  and a base URL, never the round record that holds `organizerToken`.
+
+  OFFLINE: `qr-encode.js` is qrcode-generator 2.0.4 (Kazuhiko Arase, MIT),
+  vendored unmodified with its provenance in the header, audited for network
+  and eval calls (none), and precached with `qr-codes.js` - so the code is
+  drawn on the phone in a dead zone. 58 KB, 2,297 lines.
+
+  GUARDS. `qr_targets_test.js` (12 tests; 0 pass / 12 fail against main, which
+  proves nothing per assertion because the file was absent, then 11 / 1 with
+  the builder present and the pages unwired). And
+  `tools/qr-decode-check.js`, which is the one that matters: it opens the
+  scorecard, swipes the Round Menu open with a real touch gesture, taps the
+  button, photographs each code and decodes it with **Apple's Vision
+  framework** - an independent decoder, not our own encoder read back. 9 faults
+  against the pre-wave pages, 0 after. It also opens the DECODED URLs and
+  counts inputs, so "read-only" is measured: Watch shows 0 score inputs,
+  Group 2 shows 76 of 76 editable and exactly its own four golfers.
+
+  **WHAT MANNY MUST SET UP for "opens the app if installed".** Today a scan
+  opens the WEB link. There are no Universal Links or App Links in this repo at
+  all - measured: no `associated-domains` entitlement, no
+  `apple-app-site-association`, no `assetlinks.json`, no Android intent
+  filters. Making a scan open the installed app needs, and none of it can be
+  guessed: (1) Associated Domains enabled for the App ID in the Apple Developer
+  portal and the entitlement added to both configurations - which changes
+  signing, so it was NOT done unilaterally before an archive; (2)
+  `/.well-known/apple-app-site-association` served from
+  golf-app-5a5.pages.dev carrying `TEAMID.com.rattlegolf.app`; (3) the Android
+  intent filter plus `/.well-known/assetlinks.json` carrying the SHA-256
+  fingerprint of `~/rattle-keys/rattle-upload.jks`. Give me the Team ID and the
+  keystore fingerprint and this is a small wave on its own.
+
+  Cache `golfapp-v318-qrcodes` / `consumer-v153-qrcodes` - v317 is held by the
+  gps-v1 branch. Shell count 74 -> 76. 1.0.7 build 10 unchanged.
+
+  MY OWN FAULTS, LOGGED, all three the same shape - a comment tripping a guard
+  that reads source: my sw.js note inside `SHELL_FILES` contained the word
+  "app's", and `shell_declarations_test.js` reads filenames by extracting
+  quoted strings, so the apostrophe opened a string that swallowed the next
+  entry and reported a correct manifest as broken. The parser strips comments
+  now (line comments first, then block - the order `bundle_manifest_test.js`
+  learned the hard way). The vendoring header's "no fetch, no XMLHttpRequest"
+  and qr-codes.js's note about never receiving `organizerToken` tripped their
+  own guards the same way; those assertions read comment-stripped source now.
+
+- **MYRTLE: FOURSOMES ON THE DAY, AND THE RECAP AS AN IMAGE (2026-10-08, `main`
+  `12c13b0`).** Cache `golfapp-v320-recapimage` / `consumer-v155-recapimage`.
+  1.0.7 build 10 unchanged. All ten money goldens byte-identical.
+
+  **SET THE FOURSOMES FROM THE PHONE** (`golfapp-v319-foursomes`). The Players
+  step could change group SIZES but not WHO was in which group - a golfer's
+  foursome is their POSITION in the roster and the only control on a row was
+  delete. Every row now has up/down arrows and a "Move to Group N" picker. The
+  arithmetic is `rosterMove()` / `rosterMoveToGroup()` in grouping.js, pure, and
+  IDS RIDE WITH THE GOLFERS (`captureCurrentPlayerInputs` reads rows in DOM
+  order carrying each row's id). QR codes and group links follow because they
+  read the same boundaries. `roster_order_test.js` 13 tests (1/12 red) and
+  `tools/players-step-check.js`, which taps the arrows and reads back the order
+  the SAVE would capture.
+
+  **THE RECAP AS AN IMAGE** (`golfapp-v320-recapimage`). One tap draws the
+  rendered recap card to a canvas and hands the PNG to the iOS share sheet -
+  2160x2916, measured. It reads the CARD, not the engines, so it cannot tell a
+  different story (native-export.js's rule). No library: Canvas 2D, long names
+  measured and ellipsised, the amount never cut. `shareBytes()` is lifted out of
+  native-export.js's PDF chain so there is ONE write-and-share path.
+  `trip_recap_image_test.js` 9 tests (0/9 red) and
+  `tools/trip-recap-image-check.js`, which taps the button and decodes the PNG.
+
+  **THE PER-GOLFER TEE PICKER WAS NEVER MISSING - that was my error.** I
+  reported it gone; it shipped 2026-10-05 (`2c251b3`) and is byte-for-byte
+  present. What was missing was in MY harness: a stand-in database with
+  `global_courses: {}` left `courseTeeChoices()` with no rated tees, so the
+  round-level tee panel stayed hidden and `appendTeeControl()` had no options to
+  copy. An empty fixture and a deleted feature look identical from outside.
+  `tools/players-step-check.js` now loads a real course record and asserts the
+  OPTION TEXTS on all 24 rows; deleting the one `appendTeeControl` call makes it
+  fail with six faults.
+
+  **AND THE ROUND-MENU SWIPE RED WAS A MODAL, FOR THREE WAVES.**
+  `round_menu_swipe_test.js` reported "the swipe up did not open it" on main. Its
+  fixture opened a BARE multi-group link, which raises "How are you joining this
+  round?" - and that dialog correctly swallows gestures aimed at the page
+  beneath it, so the test was dispatching touches into a dialog. Measured on a
+  byte-identical index.html: bare link, sheet top 782 before AND after; with
+  `&group=1`, 782 -> 208 and open. Two of its passing tests were vacuous while it
+  lasted. The arrivals carry `&group=1` now and a new guard refuses to let the
+  file mean anything while a modal is up.
+
+  **MYRTLE TRIP VWNPW6 DATA, written with Manny's approval:** the phantom
+  "Group" golfer (id 101, hcp 1) deleted from all 7 rounds -> 24 golfers and six
+  clean foursomes; an organizer link added to each round; rated tee sets loaded
+  for all 7 courses (53 sets - 6 courses from the provider Caledonia came from,
+  and Man O' War's four from its published scorecard cross-checked against two
+  sources, because the provider only carries the Maryland course of that name).
+  Both Thistle rounds shared one course key and are different layouts, so each
+  got its own record carrying ITS OWN existing card and was repointed - without
+  it one Thistle round showed the other's tees.
+
+- **1.0.7 BUILD 11 IS SET AND READY TO ARCHIVE (2026-10-08, `main` `b968691` or
+  later).**
+  `CURRENT_PROJECT_VERSION` 11 on Debug AND Release - verified two of each in the
+  project file - and `MARKETING_VERSION` stays 1.0.7. Release signs with
+  `App/AppRelease.entitlements` (aps-environment **production** + Sign in with
+  Apple); Debug keeps **development**, which is the pair that matters because one
+  file for both is how a TestFlight build registers on the wrong APNs gateway and
+  silently never receives.
+
+  **BUILD 11 = BUILD 10 PLUS:**
+  - **Roster reorder** - up/down arrows and "Move to Group N" on every golfer on
+    the Players step, so the foursomes can be set on the day from the phone. QR
+    codes and group links follow. (`golfapp-v319-foursomes`)
+  - **The trip recap as an image** - one tap draws the rendered recap card to a
+    canvas and hands a 2160x2916 PNG to the iOS share sheet.
+    (`golfapp-v320-recapimage`)
+  - **The round-menu swipe test fixed** - a TEST fix, no app change: its fixture
+    opened a bare multi-group link and was dispatching touches into the "How are
+    you joining this round?" dialog.
+  - **Man O' War tee data** - DATA ONLY, written to the live database, no code.
+
+  `build-shell`, `sync-mobile-web` and `cap sync ios` all run; repo = www/app =
+  `ios/App/App/public` verified by sha for sw.js, admin.html, index.html,
+  trip.html, trip-recap-image.js, grouping.js, native-export.js, qr-codes.js and
+  qr-encode.js, and native_bundle_freshness_test.js is green. Cache
+  `golfapp-v320-recapimage` / `consumer-v155-recapimage`. ANDROID IS UNTOUCHED
+  and still ships versionCode 2 - the two trains move separately.
+
+- **1.0.7 BUILD 12 IS SET AND READY TO ARCHIVE (2026-10-08, `main`).**
+  `CURRENT_PROJECT_VERSION` 12 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7, Release signs with `App/AppRelease.entitlements`. Cache
+  `golfapp-v323-linkprovider` / `consumer-v158-linkprovider`. All ten money
+  goldens byte-identical.
+
+  **PORTRAIT ONLY, EVERYWHERE.** `UISupportedInterfaceOrientations` and
+  `UISupportedInterfaceOrientations~ipad` are both a single portrait entry (the
+  iPad list carried four, upside-down included), and Android's MainActivity is
+  `screenOrientation="portrait"`. `portrait_only_test.js` holds both files and
+  also refuses the word Landscape anywhere in Info.plist, because a new key
+  with a landscape value would pass a list check and still rotate.
+
+  **LINKING APPLE OR GOOGLE TO THE ACCOUNT YOU ARE ALREADY IN**, and this is the
+  defect behind Manny's stray account. `planOauth` read `if (!user.isAnonymous)
+  return 'sign-in'` with the reason "already-linked" - and that was an
+  inference, not a fact: a golfer signed in with EMAIL has no Apple provider on
+  him, so tapping Continue with Apple ran `signInWithCredential` and SWITCHED
+  him to whatever account that Apple identity belonged to. Measured in the
+  project's own auth: `h8Axnef...` carries exactly one provider (password) and a
+  **founder pass**, owns **38 rounds**, and there are four apple.com accounts,
+  three on privaterelay addresses. THE RULE IS ABOUT THE PROVIDER NOW: a user
+  without it links, a user with it signs in. The Account sheet has deliberate
+  **Link Apple / Link Google** buttons which pass `deliberateLink`, and on
+  `credential-already-in-use` they REFUSE with their own message instead of
+  adopting - adopting is the exact move that made the stray account.
+
+  **THE STRAY RELAY ACCOUNT, `xujB3BjfOjdc61jJy5RVODZxv7c2`
+  (`89gphwy4ch@privaterelay.appleid.com`, created and last used 2026-10-07) -
+  PLANNED, NOT DELETED.** Audited read-only: `organizers/<uid>` is **null** (no
+  trial, no pass), it owns **0 rounds** and **0 trips**, and carries **1 push
+  token**. So there is nothing on it to lose, and it is the thing standing in
+  the way: Manny's Apple identity is attached to it, so `linkWithCredential`
+  from his email account will fail `credential-already-in-use` until it is
+  removed. RECOMMENDATION: delete that one auth user (Firebase console ->
+  Authentication -> that row -> Delete), then Link Apple succeeds. Manny's call;
+  nothing was deleted.
+
+  **SESSION PERSISTENCE** is the SDK default (`local`, IndexedDB with a
+  localStorage fallback) - no `setPersistence` call anywhere - and auth-boot asks
+  `onAuthStateChanged` FIRST, signing in anonymously only when no persisted user
+  answers. That is the right shape, and whether a WKWebView on
+  capacitor://localhost keeps it across a kill and a phone restart is MANNY'S
+  TEST on the build: a harness cannot prove it.
+
+  Also in build 12: the paste-wrapper fix (`de24141`) - Gmail's Copy Link
+  redirect now yields the code, and a refusal scrolls into view instead of
+  rendering 24px below the fold.
+
+- **1.0.7 BUILD 13 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). BUILD 12
+  WAS REJECTED ON UPLOAD AND ITS NUMBER IS BURNED.**
+
+  App Store Connect refused build 12 with **error 90474**: an iPad app that
+  supports multitasking must declare all four orientations, because Slide Over
+  and Split View can hand it any of them. My portrait-only change set
+  `UISupportedInterfaceOrientations~ipad` to portrait **without opting out of
+  multitasking**, so the upload was rejected - the archive exists, so 12 cannot
+  be reused.
+
+  THE FIX, and it keeps portrait-only everywhere:
+  `<key>UIRequiresFullScreen</key><true/>` in `ios/App/App/Info.plist`. Both
+  orientation lists stay a single portrait entry. `plutil -lint` passes on the
+  hand-edited plist.
+
+  `portrait_only_test.js` now asserts the KEY AND ITS VALUE alongside the lists
+  (6 tests; the new one red first), because the two only make sense together: an
+  edit that removed the opt-out while leaving the lists portrait-only would pass
+  every other assertion in that file and fail at the only place that matters, an
+  upload.
+
+  `CURRENT_PROJECT_VERSION` 13 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7. THREE FILES CHANGED AND NOTHING ELSE: the plist, the project file and
+  that test. sw.js, database.rules.json and every money engine are untouched -
+  no cache bump, because no shell file moved - and the 1.0.7 review, Firebase
+  and the engines were not touched.
+
+- **1.0.7 BUILD 14 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). FINISH
+  SIGN-IN WAS A NO-OP ON THE DEVICE, AND THE TEST HARNESS IS WHY IT SURVIVED A
+  GREEN SUITE.**
+
+  Manny on 1.0.7 (13), iPhone 17 Pro: paste the emailed link, or the oobCode, or
+  a fresh link's code - tap Finish sign-in - nothing. No sign-in and no error.
+
+  **THE CAUSE.** For anything that is not already a sign-in link, `submitPaste`
+  synthesised one with `linkForCode` - and that link carried **no apiKey**.
+  Firebase's real `isSignInWithEmailLink` parses an action URL and the key is
+  part of that shape, so on a device it answered **false** for all three input
+  shapes. In the harness there is no real SDK, so `isEmailLink` fell through to
+  its own regex, answered **true**, and every test passed. THE HARNESS WAS MORE
+  PERMISSIVE THAN THE RUNTIME, which is the only way this survives a green
+  suite - and it is worth remembering next time a native-only failure appears.
+
+  **AND THE EMAIL ARRIVES WRAPPED:**
+  `https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=<URL-encoded action
+  URL>`. The wrapper is not an action URL and the SDK will not take it. The
+  inner one is, and it already carries the apiKey - so that is what is used now,
+  Firebase's own URL untouched rather than anything reassembled.
+
+  **AND NO FAILURE IS SILENT.** `submitPaste` is wrapped end to end: the
+  synchronous work sits in a try, the catch puts a sentence on screen, and both
+  promise arms do. Measured in the Account panel at 390x844 - the wrapped link,
+  the bare code and the inner action URL all now reach completion with a message
+  at top 706 of 844, and rubbish and an empty field both refuse clearly in the
+  same place.
+
+  `email_link_native_paste_test.js` is 19 tests, baseline **3 pass / 16 fail**
+  against the pre-wave files; the three are don't-regress pins and the header
+  says so. Cache `golfapp-v324-signinparse` / `consumer-v159-signinparse`.
+  `CURRENT_PROJECT_VERSION` 14 on Debug AND Release, `MARKETING_VERSION` stays
+  1.0.7. database.rules.json and all ten money engines byte-identical; the 1.0.7
+  review and Firebase were not touched.
+
+- **1.0.7 BUILD 15 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). THE
+  ORGANIZER WAS A SPECTATOR ON HIS OWN ROUND.**
+
+  Manny on build 14, signed in as the owner, opening Myrtle Day 1 through "Open
+  a round you already have" - a BARE link. The delete control appeared, so the
+  organizer gate knew him. But the Round Menu had no Edit Round Setup, and the
+  scorecard said "Read-only. Ask the organizer for your group's link to enter
+  scores." To the organizer. About himself.
+
+  **THE CAUSE, and it was the same line twice.** Both the badge and every score
+  box were decided by POSITION ALONE - `players.length > 4 && no ?group=` - with
+  no organizer check in either. On any round above a foursome without a group
+  link, every viewer was a spectator, the owner included. The delete control was
+  right because it asks a different question; those two never asked it.
+
+  **THE FIX.** One predicate, `canScoreBox()`, now answers for the badge, the
+  banner and the inputs, so they cannot disagree. The organizer gets a
+  **"Score for: Group N" picker** where the read-only sentence used to be,
+  remembered per round so a reload does not lock him out again - a picker rather
+  than all 24 cards at once, because a mis-tap across six foursomes is a wrong
+  score on somebody else's card. **Edit Round Setup is the FIRST item in the
+  Round Menu** for the organizer, carrying the organizer token in its href.
+  Measured in the browser on the real P7S2BE as the real owner: setup entry
+  present, read-only sentence gone, badge "Organizer: pick a group to score",
+  and after picking Group 2, **76 of 456 boxes editable**. A true spectator on
+  the same round still gets the sentence and 0 editable.
+
+  **THE AUDIT (job 3).** trip.html and leaderboard.html gate no controls on the
+  group lock at all. skins.html and settlement.html use it only for scoping.
+  **sidematches.html (Bets/Matches) had the same defect**: `canPressSideMatch`
+  returned `!isMultiGroupRound` on a bare link, with the comment "the same URL
+  is what spectators hold, so it grants nothing" - true before the gate existed.
+  It now asks the same question index.html asks, through the same module, with
+  the trip-organizer inheritance included. organizer_gate_test.js's four-page
+  rule became five with the reason recorded; the constraint it actually protects
+  (read the predicate, never write the trial) is asserted for sidematches too.
+
+  `CURRENT_PROJECT_VERSION` 15 on both configurations, 1.0.7 unchanged. Cache
+  `golfapp-v325-organizercontrols` / `consumer-v160-organizercontrols`.
+  database.rules.json and all ten money engines byte-identical.
+
+- **1.0.7 BUILD 16 IS SET AND READY TO ARCHIVE (2026-10-08, `main`). NO TEE
+  DROPDOWN ON ANY GOLFER ROW - PROVED AND FIXED ON THE iOS SIMULATOR.**
+
+  **THE CAUSE, and it was not native at all.** `courseCardInHand()` answers a
+  question about the CARD - pars and stroke indexes - and EVERY Myrtle course is
+  a bundled preset in course-data.js carrying 18 holes and **no tees**. So the
+  card was "in hand", `ensureCourseCard()` never ran, `globalCourses` kept only
+  a `{ name }` stub, `courseTeeChoices()` found nothing, the round-level tee
+  select stayed empty, and `appendTeeControl()` returned early on every row. No
+  CSP problem, no REST problem, no Capacitor problem.
+
+  **AND MY BROWSER CHECK COULD NEVER HAVE CAUGHT IT**: its fixture pre-loaded
+  the whole course record, tees included, into `global_courses` - which is not
+  what the running app has. A fixture more generous than reality is the same
+  class of fault as the apiKey one in build 14, two days running.
+
+  **THE FIX.** Tees are a separate need from the card: `needsTees` asks whether
+  the active course has any RATED tees in hand and fetches the shared record
+  when it does not, whatever the card says. The early return that required
+  `rec.data` would have thrown away a record that answered with tees and no
+  card - this exact bug - so it keeps tees first. And
+  `refreshRowTeeControls()` gives the dropdown to rows that were drawn before
+  the record came back, keeping each row's stored tee via `data-tee-key`.
+
+  **PROVED ON THE SIMULATOR, NOT A BROWSER** (Manny's instruction): built with
+  `xcodebuild` for iPhone 17 Pro Max, installed and launched, and driven to the
+  Players step of the real P7S2BE through the organizer link. Measured on screen
+  in the native WKWebView: **24 rows, 24 TEE DROPDOWNS**, each listing all six
+  Caledonia tees (Pintail Black, Mallard Blue, Wood Duck White, Redhead Red, and
+  the two Women's), round tee select 6, 48 order arrows, 24 group pickers. The
+  Review step also showed **"Slope 144, Course Rating 71.4, Par 70"** - Pintail
+  Black - so the shared record loads natively. The probe was injected into the
+  BUNDLE ONLY (gitignored) and removed afterwards; the repo never carried it.
+
+  **GHIN INDEX OR STROKES - REPORTED, NOT CHANGED.** All seven Myrtle rounds
+  carry **no `handicapBasis` field at all** and had no `teeRating`. The two
+  defaults disagree: `handicapBasisOf()` in handicap-labels.js returns
+  `ghin-index` when the field is absent, while the setup screen's own select
+  defaults to `as-entered` (Strokes). On the simulator the box label read
+  **"Index"**. Saving stores the TYPED number either way - the conversion in
+  `previewStrokes()` is a preview, not the save - but the basis and tee rating
+  the round then carries are what the nets are computed through. **Manny's
+  call.**
+
+  `CURRENT_PROJECT_VERSION` 16 on both configurations, 1.0.7 unchanged. Cache
+  `golfapp-v326-teedropdown` / `consumer-v161-teedropdown`. All ten money
+  engines and database.rules.json byte-identical.
+
 ## Known open items
 
 - **OPEN 2026-09-30 — "CHANGE KP" JUMPS THE PAGE IN CHROME ON iPHONE, AND ONLY

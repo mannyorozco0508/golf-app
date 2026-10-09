@@ -16,9 +16,18 @@
 //   interchangeable 9-hole loops) that combine into an 18-hole round.
 // ============================================================================
 
-    const courseDirectory = [
+    // TWO COURSES ARE DELIBERATELY NOT IN THIS LIST (2026-10-08, Manny's call).
+// "Camas Meadows Golf Club" (swwa_camasmeadows) and "Chambers Bay"
+// (wa_chambers) were here AND in global_courses, and the hard-coded copy was
+// the one with no rated tees - so the picker showed each course twice and the
+// built-in entry could never offer a per-golfer tee. The shared records with
+// the tees (gca_p5mcq4dm, 14 sets; gca_50bc8qqa, 20 sets) are listed instead.
+//
+// THEIR CARDS STAY IN coursePresets BELOW, and that is not tidiness: 37 saved
+// rounds point at those two keys. Only the picker ENTRY is gone.
+// course_picker_no_duplicates_test.js holds all three halves of that.
+const courseDirectory = [
         { group: "🌲 SW Washington, Gorge & Portland (Camas Area)", items: [
-            { id: "swwa_camasmeadows", name: "Camas Meadows Golf Club" },
             { id: "swwa_trimountain", name: "Tri-Mountain Golf Course" },
             { id: "swwa_lewisriver", name: "Lewis River Golf Course" },
             { id: "swwa_mintvalley", name: "Mint Valley Golf Course" },
@@ -103,7 +112,6 @@
             { id: "az_superstition", name: "Superstition Mountain" }
         ]},
         { group: "🌲 Washington (Seattle / Tacoma Top 50)", items: [
-            { id: "wa_chambers", name: "Chambers Bay" },
             { id: "wa_gold_olympic", name: "Gold Mountain (Olympic)" },
             { id: "wa_gold_cascade", name: "Gold Mountain (Cascade)" },
             { id: "wa_homecourse", name: "The Home Course" },

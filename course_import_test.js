@@ -138,15 +138,22 @@ describe('2. A NAME MATCH WRITES TO THE DIRECTORY KEY, AND THE PANEL SAYS SO', (
     // because the directory carries no city or state and cannot verify that a
     // name match is the same physical course.
 
-    const CAMAS = { id: 'aaaa1111', club_name: 'Camas Meadows Golf Club',
-        course_name: 'Camas Meadows Golf Club',
-        location: { city: 'Camas', state: 'WA', address: '4105 NW Camas Meadows Dr, Camas, WA' },
+    // THE FIXTURE MOVED, THE RULE DID NOT (2026-10-08). This was Camas Meadows,
+    // and that entry has deliberately left courseDirectory - it was a tee-less
+    // duplicate of a shared record that has 14 rated sets. The rule under test
+    // is "an import named exactly like a DIRECTORY entry fills that entry
+    // instead of creating a gca_ shadow", so it needs a course that is still in
+    // the directory: Tri-Mountain, which is also in global_courses with 10 tee
+    // sets and is not going anywhere.
+    const CAMAS = { id: 'aaaa1111', club_name: 'Tri-Mountain Golf Course',
+        course_name: 'Tri-Mountain Golf Course',
+        location: { city: 'Ridgefield', state: 'WA', address: '1701 NW 299th St, Ridgefield, WA' },
         tees: { male: 4 } };
 
     test('an exact directory name match uses the DIRECTORY key, not a gca_ one', () => {
         const keyFor = need('importedCourseKey');
         const k = keyFor(CAMAS, {});
-        assert.equal(k, 'swwa_camasmeadows',
+        assert.equal(k, 'swwa_trimountain',
             'an import whose name matches a directory entry must fill that entry in rather '
             + 'than create a second record for the same course. Got ' + k);
     });

@@ -76,7 +76,8 @@ const PRODUCTS = {
         // gps-config.js changed. Consumer's own key below does not move.
         // v169 (gps-flow, 2026-10-09): the round opens on GPS; Enter Score returns to it.
         // v171 (gps-flow, 2026-10-09): the clean map and the manual wind (gps-wave2's v170).
-        cacheNameGps: 'consumer-v171-gps-flowclean',
+        // v172 (gps-flow, 2026-10-09): main (consumer-v164) merged into the GPS branch.
+        cacheNameGps: 'consumer-v172-gps-flowmain',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.
@@ -154,7 +155,7 @@ const PRODUCTS = {
         // cards on the page under it, the rest behind one handle.
         // Moved to v151 for the two card guards (admin.html): a round can no longer
         // be saved with no holes. v150 is held by gps-v1. A device on v149 can.
-        cacheName: 'consumer-v152-unplayedzero',
+        cacheName: 'consumer-v164-onecourseentry',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
