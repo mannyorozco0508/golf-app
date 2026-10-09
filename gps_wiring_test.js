@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v329-gps-greengps'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v331-gps-greennear'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -219,5 +219,6 @@ test('setting a green by GPS: Esri stays up; only the tap fallback is USGS; ±5 
     assert.ok(/function tapMode\(\) \{ return !!S && \['setMid', 'confirmMid', 'setFront', 'setBack', 'confirmAll'\]/.test(v), 'only the photo-tap modes are tap modes');
     assert.ok(/var pinning = tapMode\(\);/.test(v), 'syncImageryForMode hides Esri only for the tap fallback');
     assert.ok(/Set by tapping \(lower detail\)/.test(v), 'the fallback link is there');
-    assert.ok(/if \(!S \|\| !gpsGoodEnough\(\)\) return;/.test(v), 'Set does nothing below ±5 yds');
+    assert.ok(/if \(!S \|\| !canSetHere\(\)\) return;/.test(v), 'Set does nothing below ±5 yds or away from the green');
+    assert.ok(/function canSetHere\(\) \{ var y = yardsFromGreen\(\); return gpsGoodEnough\(\) && \(y == null \|\| y <= GREEN_NEAR_YD\); \}/.test(v));
 });

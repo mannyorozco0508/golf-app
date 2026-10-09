@@ -412,6 +412,15 @@
     var GREEN_GPS_YD = 5;
     function tapMode() { return !!S && ['setMid', 'confirmMid', 'setFront', 'setBack', 'confirmAll'].indexOf(S.mode) !== -1; }
     function gpsGoodEnough() { return !!(fix && isFinite(fix.acc) && Math.round(fix.acc / G.M_PER_YD) <= GREEN_GPS_YD); }
+    // ... and ON (or near) the green being fixed: within 100 yds of the green the
+    // hole has now - a golfer 150 yds down the fairway must not save the green
+    // where they stand. A hole with no green yet has nothing to be near.
+    var GREEN_NEAR_YD = 100;
+    function yardsFromGreen() {
+        var r = resolved();
+        return (fix && r && r.mid) ? G.haversineMeters(fix.pt, r.mid) / G.M_PER_YD : null;
+    }
+    function canSetHere() { var y = yardsFromGreen(); return gpsGoodEnough() && (y == null || y <= GREEN_NEAR_YD); }
     // Esri on the map: z21 (z19 tiles, enlarged). USGS: z18 (z16 tiles, enlarged).
     function maxZoomNow() { return (S && S.esriOn && !S.esriFailed && !tapMode()) ? TILES.maxZoom : 18; }
 
@@ -1546,11 +1555,13 @@
         // The green, set / fixed / undone.
         var noGreen = !r || !r.mid;
         var setting = S.mode !== 'measure';
-        var gpsOk = gpsGoodEnough();
+        var gpsOk = canSetHere();
         var accYd = fix ? Math.round(fix.acc / G.M_PER_YD) : null;
-        var waitGps = !fix ? 'Finding you…' : 'GPS ±' + accYd + ' yds - needs ±' + GREEN_GPS_YD + ' or better';
+        var away = yardsFromGreen();
+        var waitGps = !fix ? 'Finding you…' : (!gpsGoodEnough() ? 'GPS ±' + accYd + ' yds - needs ±' + GREEN_GPS_YD + ' or better'
+            : 'Walk to the green - ' + Math.round(away) + ' yds away');
         var banner = '';
-        if (S.mode === 'gpsMid') banner = gpsOk ? 'Stand on the MIDDLE of the green, then Set center' : waitGps;
+        if (S.mode === 'gpsMid') banner = gpsOk ? 'Stand on the middle of the green' : waitGps;
         else if (S.mode === 'gpsFront') banner = gpsOk ? 'Stand on the FRONT edge (optional)' : waitGps;
         else if (S.mode === 'gpsBack') banner = gpsOk ? 'Stand on the BACK edge (optional)' : waitGps;
         else if (S.mode === 'setMid') banner = 'Tap the CENTER of the green';
@@ -2021,7 +2032,7 @@
         // front / back - their deliberate choice, made with the button, and the
         // only time a position goes into a green (see PRIVACY above).
         on(el, '.gps-gps-set', function () {
-            if (!S || !gpsGoodEnough()) return;
+            if (!S || !canSetHere()) return;
             var here = [fix.pt[0], fix.pt[1]];
             if (S.mode === 'gpsMid') { S.draft = { mid: here, gps: true }; S.mode = 'gpsConfirmMid'; }
             else if (S.mode === 'gpsFront') { S.draft.front = here; S.mode = 'gpsBack'; }

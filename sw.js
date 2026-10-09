@@ -4423,7 +4423,12 @@
 // Esri photo, one credit line with ⓘ - gps-view.js and index.html's GPS block
 // changed after v328 reached the preview. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v329-gps-greengps';
+// GPS:BEGIN
+// Moved to v331 (2026-10-08): setting a green by GPS needs the golfer within
+// 100 yds of the green; gps-view.js changed after v329 reached the preview.
+// Above main's v330 (and consumer-v165 above main's v164). HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v331-gps-greennear';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

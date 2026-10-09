@@ -829,6 +829,7 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 1500 }, { expression: READ },                                       // 0
         { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-fix-green' }, { sleep: 400 }, { expression: READ },          // 1 GPS ±10: Set is off
         { tap: '.gps-gps-set' }, { sleep: 300 }, { expression: READ },                                                    // 2 a tap on it does nothing
+        { expression: `window.__moveTo(${ME[0]}, ${ME[1]}, 3)` }, { sleep: 500 }, { tap: '.gps-gps-set' }, { sleep: 300 }, { expression: READ }, // 2b ±3 but 151 yds out: still off
         { expression: `window.__moveTo(${GMID[0]}, ${GMID[1]}, 3)` }, { sleep: 500 }, { expression: READ },             // 3 on the green, ±3
         { tap: '.gps-gps-set' }, { sleep: 400 }, { expression: READ },                                                    // 4 center set
         { tap: '.gps-addedges' }, { sleep: 300 },
@@ -838,11 +839,12 @@ function usgsFallbackFails(tag, g, why) {
     ], { auth: { uid: 'org-1', isAnonymous: false, email: 'o@example.com' }, preScript: sensor('ok', ME[0], ME[1], 9) + CFG({ esri: 'OK-GPSGREEN' }) });
     out.gpsGreen = gg; bail(out, gg);
     {
-        const [q0, q1, q2, q3, q4, q5, q6] = gg.reads;
+        const [q0, q1, q2, q2b, q3, q4, q5, q6] = gg.reads;
+        if (!q2b.gpsSet || q2b.gpsSet.disabled !== true || q2b.banner !== 'Walk to the green - ' + EXPECT.center + ' yds away' || q2b.addEdges) fails.push('gps green: ±3 yds but down the fairway - ' + JSON.stringify([q2b.gpsSet, q2b.banner]));
         if (!q0.fix || q0.set) fails.push('gps green: Fix the green not offered to the organizer: ' + JSON.stringify([q0.fix, q0.set]));
         if (!q1.gpsSet || q1.gpsSet.text !== 'Set center' || q1.gpsSet.disabled !== true || !/^GPS ±10 yds - needs ±5 or better$/.test(q1.banner) || !q1.tapFallback) fails.push('gps green: at ±10 yds - ' + JSON.stringify([q1.gpsSet, q1.banner, q1.tapFallback]));
         if (q2.banner !== q1.banner || q2.addEdges) fails.push('gps green: a tap on a disabled Set did something');
-        if (!q3.gpsSet || q3.gpsSet.disabled || q3.banner !== 'Stand on the MIDDLE of the green, then Set center') fails.push('gps green: at ±3 yds on the green - ' + JSON.stringify([q3.gpsSet, q3.banner]));
+        if (!q3.gpsSet || q3.gpsSet.disabled || q3.banner !== 'Stand on the middle of the green') fails.push('gps green: at ±3 yds on the green - ' + JSON.stringify([q3.gpsSet, q3.banner]));
         if (q4.banner !== 'Save this green for hole 1?' || !q4.addEdges || !q4.saveGreen) fails.push('gps green: after Set center - ' + JSON.stringify([q4.banner, q4.addEdges, q4.saveGreen]));
         if (q5.banner !== 'Save this green for hole 1?' || !q5.saveGreen || q5.addEdges) fails.push('gps green: after front and back - ' + JSON.stringify([q5.banner, q5.saveGreen]));
         // THE SHARP PHOTO THE WHOLE TIME: nothing is taken from it.
@@ -973,8 +975,11 @@ function usgsFallbackFails(tag, g, why) {
     // ---- Esri breaks MID-ROUND (tiles loaded first): USGS takes over ---------------
     const eb = await arm('esrib', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },                                          // 0 Esri drawing
-        { expression: `fetch('${SO}/ctl/break/OK-BREAK').then(function () { return 'broke'; })` }, { sleep: 300 },
-        { tap: '.gps-zoom' }, { sleep: 800 }, { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                   // 1 new tiles refused
+        { expression: `(window.__t0 = Number(document.querySelector('#gps-overlay .gps-map').dataset.tilesLoaded || 0), fetch('${SO}/ctl/break/OK-BREAK').then(function () { return 'broke'; }))` }, { sleep: 300 },
+        { tap: '.gps-zoom' }, { sleep: 800 }, { tap: '.gps-zoom' },
+        // USGS tiles come from the network after the hand-over: waited for, not slept on.
+        { waitFor: `(function () { var m = document.querySelector('#gps-overlay .gps-map'); return m && m.dataset.esri === 'failed' && Number(m.dataset.tilesLoaded) > window.__t0; })()`, timeout: 15000 },
+        { sleep: 300 }, { expression: READ },                                                                                // 1 new tiles refused
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-BREAK' }) });
     out.esriBreak = eb; bail(out, eb);
     {
