@@ -4470,7 +4470,12 @@
 // Moved to v344 (gps-flow build 7, 2026-10-09): the two numbers ride their own
 // lines in every view, a center dot in the target, F / C / B 25% bigger. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v344-gps-linenums';
+// GPS:BEGIN
+// Moved to v345 (gps-flow build 7, 2026-10-09): the wind dial (a bottom sheet),
+// live NWS wind always on (the station's latest observation), and the Apple
+// sign-in fix (one Apple token, one Firebase call). HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v345-gps-wind';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

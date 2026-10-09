@@ -767,6 +767,44 @@
         var from = di * 22.5;
         return { mph: mph, fromDeg: from, toDeg: (from + 180) % 360 };
     }
+    // BUILD 7 - LIVE WIND: the nearest station's LATEST OBSERVATION (what was
+    // actually measured), api.weather.gov/stations/{id}/observations/latest. Its
+    // properties carry quantities: windSpeed / windGust { unitCode
+    // 'wmoUnit:km_h-1' (or m_s-1, kt), value }, windDirection { value: degrees
+    // FROM }, temperature { 'wmoUnit:degC' }, timestamp. Returns { mph, gustMph,
+    // fromDeg, toDeg, tempF, obsAt } - calm is mph 0 - or null when the station
+    // did not report a wind speed (then the hourly forecast is the backup).
+    function nwsMph(q) {
+        if (!q || typeof q.value !== 'number' || !isFinite(q.value)) return null;
+        var u = String(q.unitCode || '');
+        var mph = /m_s-1$/.test(u) ? q.value * 2.236936 : /kt$|knot/i.test(u) ? q.value * 1.150779 : /mi_h-1|mph/i.test(u) ? q.value : q.value * 0.621371;
+        return Math.round(mph);
+    }
+    function parseNwsObservation(props) {
+        if (!props) return null;
+        var mph = nwsMph(props.windSpeed);
+        if (mph == null) return null;
+        var dir = props.windDirection && typeof props.windDirection.value === 'number' && isFinite(props.windDirection.value) ? ((props.windDirection.value % 360) + 360) % 360 : null;
+        if (dir == null && mph > 0) return null;       // a speed with no direction cannot drive the arrow
+        var from = dir == null ? 0 : dir;
+        var gust = nwsMph(props.windGust);
+        var t = props.temperature && typeof props.temperature.value === 'number' && isFinite(props.temperature.value) ? props.temperature : null;
+        var tempF = t ? Math.round((/degF$/.test(String(t.unitCode || '')) ? t.value : t.value * 9 / 5 + 32) * 10) / 10 : null;
+        var at = Date.parse(props.timestamp || '');
+        return { mph: mph, gustMph: gust != null && gust > mph ? gust : null, fromDeg: from, toDeg: (from + 180) % 360, tempF: tempF, obsAt: isFinite(at) ? at : null };
+    }
+    // "W", "NNE": the 16-point name of a compass direction (degrees).
+    function compassName(deg) {
+        return COMPASS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+    }
+    // THE WIND DIAL: the angle of a finger at (x, y) around a dial centered at
+    // (cx, cy), clockwise from straight up, snapped to `step` degrees (5).
+    function dialDeg(cx, cy, x, y, step) {
+        var a = Math.atan2(x - cx, cy - y) * 180 / Math.PI;
+        var st = step || 5;
+        return ((Math.round(a / st) * st) % 360 + 360) % 360;
+    }
+
     // TEMPERATURE from the same NWS hourly period: { temperature: 72,
     // temperatureUnit: "F" } (or "C", converted). null when it is not a number.
     function parseNwsTempF(period) {
@@ -847,7 +885,7 @@
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
-        destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind,
+        destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,

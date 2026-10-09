@@ -522,6 +522,32 @@ test('parseNwsWind: NWS hourly windSpeed / windDirection -> mph and the way it b
         .forEach((p) => assert.strictEqual(geo.parseNwsWind(p), null, JSON.stringify(p)));
 });
 
+test('build 7 live wind: parseNwsObservation - the station\'s measured wind and gusts, in mph', () => {
+    const o = geo.parseNwsObservation({ timestamp: '2026-10-09T18:51:00+00:00', windDirection: { unitCode: 'wmoUnit:degree_(angle)', value: 270 },
+        windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 19.3 }, windGust: { unitCode: 'wmoUnit:km_h-1', value: 32.2 }, temperature: { unitCode: 'wmoUnit:degC', value: 20 } });
+    assert.deepStrictEqual(o, { mph: 12, gustMph: 20, fromDeg: 270, toDeg: 90, tempF: 68, obsAt: Date.parse('2026-10-09T18:51:00+00:00') });
+    // m/s and knots too; a gust no stronger than the wind is not a gust.
+    assert.strictEqual(geo.parseNwsObservation({ windDirection: { value: 0 }, windSpeed: { unitCode: 'wmoUnit:m_s-1', value: 5 } }).mph, 11);
+    assert.strictEqual(geo.parseNwsObservation({ windDirection: { value: 0 }, windSpeed: { unitCode: 'wmoUnit:kt', value: 10 } }).mph, 12);
+    assert.strictEqual(geo.parseNwsObservation({ windDirection: { value: 90 }, windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 20 }, windGust: { unitCode: 'wmoUnit:km_h-1', value: 20 } }).gustMph, null);
+    // Calm: 0 mph with no direction is a reading; a speed with no direction is not.
+    assert.strictEqual(geo.parseNwsObservation({ windDirection: { value: null }, windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 0 } }).mph, 0);
+    [null, {}, { windSpeed: { value: null } }, { windDirection: { value: null }, windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 12 } }]
+        .forEach((p) => assert.strictEqual(geo.parseNwsObservation(p), null, JSON.stringify(p)));
+});
+
+test('build 7 wind dial: dialDeg snaps a finger\'s angle to 5 degrees, clockwise from up; compassName', () => {
+    assert.strictEqual(geo.dialDeg(100, 100, 100, 0), 0);
+    assert.strictEqual(geo.dialDeg(100, 100, 200, 100), 90);
+    assert.strictEqual(geo.dialDeg(100, 100, 100, 200), 180);
+    assert.strictEqual(geo.dialDeg(100, 100, 0, 100), 270);
+    const a = 47 * Math.PI / 180;
+    assert.strictEqual(geo.dialDeg(0, 0, Math.sin(a) * 50, -Math.cos(a) * 50), 45);
+    const b = 358 * Math.PI / 180;
+    assert.strictEqual(geo.dialDeg(0, 0, Math.sin(b) * 50, -Math.cos(b) * 50), 0, '358 snaps to 0, not 360');
+    assert.deepStrictEqual([0, 90, 270, 315, 202.5, 359].map(geo.compassName), ['N', 'E', 'W', 'NW', 'SSW', 'N']);
+});
+
 // ---- WAVE 2 (2026-10-08): PLAYS LIKE ------------------------------------------
 // Every expected number below is worked by hand from the formula in the
 // handoff, not by calling the function: D = 150 yds unless said.

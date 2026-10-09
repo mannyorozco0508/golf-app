@@ -187,6 +187,7 @@
     var watchKind = null;  // 'web' | 'cap'
     var watchGen = 0;      // bumps on every stop, so a late Capacitor id is cleared, not kept
     var idleTimer = null;  // the 60 s stop after switching to Bets
+    var windTimer = null;  // the wind's 1-minute tick (age on the box, 10-minute refresh)
     var fix = null;        // { pt: [lat, lng], acc: metres } - NEVER persisted, NEVER sent
 
     function units() {
@@ -1578,6 +1579,9 @@
         var topR = rectOf(S.el.querySelector('.gps-top'), wrapR), botR = rectOf(S.el.querySelector('.gps-bottom'), wrapR);
         var safeTop = Math.max(M, topR ? topR.b + M : 0);
         var safeBot = Math.min(H - M, botR ? botR.t - M : H);
+        // The wind sheet (build 7) is a floor too while it is open.
+        var wsR = rectOf(S.el.querySelector('.gps-wind-sheet'), wrapR);
+        if (wsR) safeBot = Math.min(safeBot, wsR.t - M);
         // BUILD 7 (Manny's phone, zoom + Green view: "193" left of the circle, "19"
         // above it): each number sits ON ITS OWN LINE, as drawn - "to target" on the
         // you / tee -> circle line, "what's left" on the circle -> green-center line -
@@ -1660,15 +1664,22 @@
         placeArcLabels(obstacles);
     }
 
-    // ---- WIND (Wave 1) ----------------------------------------------------------
-    // The National Weather Service's hourly forecast (api.weather.gov - free, no
-    // key, US only) for the COURSE: a point from the bundled course data, to 3
-    // decimals - never the golfer's position (see PRIVACY above). Asked for only
-    // while the GPS side is showing, at most every 15 minutes per course (the
-    // answer is kept on the phone); the NWS grid point for the course is kept for
-    // a week. The box shows the last reading up to an hour old; with no reading
-    // (offline, outside the US, any error) it is quietly not there.
-    var WIND_FRESH_MS = 15 * 60 * 1000, WIND_SHOW_MS = 60 * 60 * 1000, NWS_POINT_MS = 7 * 24 * 3600 * 1000;
+    // ---- WIND (Wave 1; LIVE, ALWAYS ON in build 7) ------------------------------
+    // The National Weather Service (api.weather.gov - free, no key, US only) for
+    // the COURSE: a point from the bundled course data, to 3 decimals - never the
+    // golfer's position (see PRIVACY above). LIVE WIND IS THE DEFAULT:
+    //   1. /points/{course} -> the course's forecast grid and its observation
+    //      stations (kept a week);
+    //   2. the nearest station's LATEST OBSERVATION - the wind and gusts actually
+    //      measured - when it is under 2 hours old;
+    //   3. else the hourly forecast's first period (the backup).
+    // Asked right away when GPS opens or the hole changes (unless the reading is
+    // under a minute old) and again every 10 minutes while GPS is showing. The box
+    // shows "12 g 20 mph" and "updated 4 min ago". Offline the last reading is
+    // shown with its age up to an hour, then "Wind –". Outside the US (NWS says
+    // 404 for the point) the box is not there at all.
+    var WIND_FRESH_MS = 10 * 60 * 1000, WIND_SHOW_MS = 60 * 60 * 1000, NWS_POINT_MS = 7 * 24 * 3600 * 1000;
+    var WIND_KICK_MS = 60 * 1000, OBS_MAX_AGE_MS = 2 * 3600 * 1000, WIND_TICK_MS = 60 * 1000;
     function nwsBase() {
         var c = (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {};
         return c.nwsBase || 'https://api.weather.gov';
@@ -1685,27 +1696,35 @@
     function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     function windKey() { return 'hardpan_wind_v1_' + S.courseKey; }
-    // ---- MANUAL WIND (build 3) ---------------------------------------------------
-    // Tap the wind box: set it yourself - where it blows, relative to the hole (8
-    // arrows, up = toward the green), and mph. Kept on this phone only, for today
-    // (local date); tomorrow it is gone and the live reading is back. Stored as a
-    // compass direction, so the arrow stays right on every other hole.
-    var MANUAL_WIND = 'hardpan_wind_manual_v1';
+    // ---- MANUAL WIND (build 3; THE DIAL and THIS HOLE ONLY in build 7) -----------
+    // Tap the wind box: a sheet from the bottom with a dial - drag the arrow to
+    // where the wind blows (up = toward the green), snapped to 5 degrees - and mph
+    // (- / +, a 0-40 slider). Kept on this phone only, for THIS HOLE of this course
+    // today: the next hole is back on live wind, and so is tomorrow. Stored as a
+    // compass direction.
+    var MANUAL_WIND = 'hardpan_wind_manual_v2';
+    var WIND_MAX_MPH = 40;
     function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
     function manualWind() {
         var m = lsGet(MANUAL_WIND);
         if (!m || m.day !== today() || typeof m.toDeg !== 'number' || typeof m.mph !== 'number') return null;
+        if (!S || m.course !== S.courseKey || m.hole !== S.hole) return null;
         return m;
     }
-    // The wind that drives the box and "plays ~": today's manual one, else the
+    function clearManualWind() { try { localStorage.removeItem(MANUAL_WIND); } catch (x) {} }
+    // The live reading while it may still be shown (up to an hour old), or null.
+    function liveWind() {
+        var live = lsGet(windKey());
+        return live && Date.now() - live.at <= WIND_SHOW_MS ? live : null;
+    }
+    // The wind that drives the box and "plays ~": this hole's manual one, else the
     // live reading up to an hour old. null: none.
     function effectiveWind() {
-        var live = lsGet(windKey()), fresh = !!(live && Date.now() - live.at <= WIND_SHOW_MS);
-        var m = manualWind();
-        var tempF = fresh && typeof live.tempF === 'number' ? live.tempF : null;
+        var live = liveWind(), m = manualWind();
+        var tempF = live && typeof live.tempF === 'number' ? live.tempF : null;
         if (m) return { mph: m.mph, toDeg: m.toDeg, fromDeg: (m.toDeg + 180) % 360, tempF: tempF, manual: true };
-        if (fresh && !live.none) return { mph: live.mph, toDeg: live.toDeg, fromDeg: live.fromDeg, tempF: tempF };
-        return fresh ? { none: true, tempF: tempF } : null;
+        if (live && !live.none) return { mph: live.mph, gustMph: live.gustMph || null, toDeg: live.toDeg, fromDeg: live.fromDeg, tempF: tempF, at: live.at, src: live.src };
+        return live ? { none: true, outside: !!live.outside, tempF: tempF } : null;
     }
     // The hole's direction: tee -> green (the hole view turns the map to it).
     function holeBearing() {
@@ -1713,75 +1732,207 @@
         if (r && r.tee && r.mid) return G.bearingDeg(r.tee, r.mid);
         return S.camera ? S.camera.bearing : (S.map ? S.map.getBearing() : 0);
     }
-    var WIND_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
-    function openWindPop() {
-        if (!S) return;
-        var pop = S.el.querySelector('.gps-wind-pop');
-        if (!pop) return;
-        var w = effectiveWind(), hb = holeBearing();
-        // Start from what is showing now (manual or live), in 8 steps relative to the hole.
-        S.windDraft = {
-            rel: w && !w.none ? Math.round((((w.toDeg - hb) % 360 + 360) % 360) / 45) % 8 : 0,
-            mph: w && !w.none ? w.mph : 0
-        };
-        syncWindPop();
-        pop.style.display = '';
+    function ageText(at) {
+        var min = Math.floor(Math.max(0, Date.now() - at) / 60000);
+        return min < 1 ? 'updated just now' : 'updated ' + min + ' min ago';
     }
-    function closeWindPop() { var pop = S && S.el.querySelector('.gps-wind-pop'); if (pop) pop.style.display = 'none'; }
-    function syncWindPop() {
-        var pop = S && S.el.querySelector('.gps-wind-pop');
-        if (!pop || !S.windDraft) return;
-        Array.prototype.forEach.call(pop.querySelectorAll('[data-rel]'), function (b) {
-            b.classList.toggle('gps-on', Number(b.getAttribute('data-rel')) === S.windDraft.rel);
-        });
-        var n = pop.querySelector('.gps-wp-mph');
-        if (n) n.textContent = S.windDraft.mph + ' mph';
-        var live = pop.querySelector('.gps-wp-live');
-        if (live) live.style.display = manualWind() ? '' : 'none';
+    function windWords(mph, fromDeg) {
+        return mph > 0 ? 'From ' + G.compassName(fromDeg) + ' · ' + mph + ' mph' : 'Calm · 0 mph';
+    }
+    function windSheet() { return S && S.el.querySelector('.gps-wind-sheet'); }
+    function windSheetOpen() { var w = windSheet(); return !!(w && w.style.display !== 'none'); }
+    function openWindSheet() {
+        var sh = windSheet();
+        if (!sh) return;
+        draftFromShowing();
+        syncWindSheet();
+        sh.style.display = '';
+        keepClearOfSheet();
+        placePills();
+    }
+    // The dial opens on what is showing now: the manual wind, else the live one.
+    function draftFromShowing() {
+        var w = effectiveWind(), hb = holeBearing();
+        S.windDraft = {
+            rel: w && !w.none ? Math.round((((w.toDeg - hb) % 360 + 360) % 360) / 5) * 5 % 360 : 0,
+            mph: w && !w.none ? Math.min(WIND_MAX_MPH, w.mph) : 0
+        };
+    }
+    // THE SHEET NEVER COVERS THE TARGET OR THE NUMBERS: when the circle or the
+    // green would sit under it, the map slides up (and back on Done).
+    function keepClearOfSheet() {
+        var sh = windSheet();
+        if (!S.map || !sh) return;
+        var wrapR = S.el.getBoundingClientRect(), top = sh.getBoundingClientRect().top - wrapR.top;
+        var r = resolved(), pts = [];
+        if (S.target) pts.push(S.target);
+        if (r && r.mid) pts.push(r.mid);
+        var low = -Infinity;
+        pts.forEach(function (p) { try { low = Math.max(low, S.map.project(ll(p)).y); } catch (e) {} });
+        var dy = Math.round(low - (top - 72));
+        if (isFinite(dy) && dy > 0) { try { S.map.panBy([0, dy], { animate: false }); S.windPan = (S.windPan || 0) + dy; } catch (e) {} }
+    }
+    function closeWindSheet() {
+        var sh = windSheet();
+        if (!sh || sh.style.display === 'none') return;
+        sh.style.display = 'none';
+        if (S.windPan && S.map) { try { S.map.panBy([0, -S.windPan], { animate: false }); } catch (e) {} }
+        S.windPan = 0;
+        placePills();
+    }
+    function syncWindSheet() {
+        var sh = windSheet();
+        if (!sh || !S.windDraft) return;
+        var d = S.windDraft, m = manualWind(), live = effectiveWind();
+        var arrow = sh.querySelector('.gps-dial-arrow');
+        if (arrow) arrow.style.transform = 'rotate(' + d.rel + 'deg)';
+        var dial = sh.querySelector('.gps-dial');
+        var toDeg = Math.round((holeBearing() + d.rel) % 360), fromDeg = (toDeg + 180) % 360;
+        if (dial) { dial.setAttribute('data-rel', String(d.rel)); dial.setAttribute('aria-valuenow', String(d.rel)); dial.setAttribute('aria-valuetext', windWords(d.mph, fromDeg)); }
+        var read = sh.querySelector('.gps-ws-read');
+        if (read) read.textContent = windWords(d.mph, fromDeg) + (!m && live && live.gustMph ? ' · gusts ' + live.gustMph : '');
+        var n = sh.querySelector('.gps-ws-mph');
+        if (n) n.textContent = String(d.mph);
+        var sl = sh.querySelector('.gps-ws-slider');
+        if (sl && String(sl.value) !== String(d.mph)) sl.value = String(d.mph);
+        var st = sh.querySelector('.gps-ws-state');
+        if (st) st.textContent = m ? 'Manual · this hole only' : (live && !live.none ? 'Live · ' + ageText(live.at) : 'No live wind - set it here');
+        var lb = sh.querySelector('.gps-ws-live');
+        if (lb) lb.style.display = m ? '' : 'none';
     }
     function saveManualWind() {
         if (!S || !S.windDraft) return;
-        lsSet(MANUAL_WIND, { day: today(), mph: S.windDraft.mph, toDeg: Math.round((holeBearing() + S.windDraft.rel * 45) % 360) });
+        lsSet(MANUAL_WIND, { day: today(), course: S.courseKey, hole: S.hole, mph: S.windDraft.mph, toDeg: Math.round((holeBearing() + S.windDraft.rel) % 360) });
         syncWind();
+        syncWindSheet();
     }
-    function windPopClick(e) {
+    function setDraftMph(v) {
+        S.windDraft.mph = Math.max(0, Math.min(WIND_MAX_MPH, Math.round(Number(v) || 0)));
+        saveManualWind();
+    }
+    function windSheetClick(e) {
         var b = e.target && e.target.closest ? e.target.closest('button') : null;
         if (!b || !S || !S.windDraft) return;
         e.preventDefault();
-        if (b.hasAttribute('data-rel')) { S.windDraft.rel = Number(b.getAttribute('data-rel')); saveManualWind(); }
-        else if (b.classList.contains('gps-wp-minus')) { S.windDraft.mph = Math.max(0, S.windDraft.mph - 1); saveManualWind(); }
-        else if (b.classList.contains('gps-wp-plus')) { S.windDraft.mph = Math.min(60, S.windDraft.mph + 1); saveManualWind(); }
-        else if (b.classList.contains('gps-wp-live')) { try { localStorage.removeItem(MANUAL_WIND); } catch (x) {} closeWindPop(); syncWind(); return; }
-        else if (b.classList.contains('gps-wp-done')) { closeWindPop(); return; }
-        syncWindPop();
+        if (b.classList.contains('gps-ws-minus')) setDraftMph(S.windDraft.mph - 1);
+        else if (b.classList.contains('gps-ws-plus')) setDraftMph(S.windDraft.mph + 1);
+        else if (b.classList.contains('gps-ws-live')) { clearManualWind(); draftFromShowing(); syncWind(); syncWindSheet(); }
+        else if (b.classList.contains('gps-ws-done')) closeWindSheet();
+    }
+    // DRAG THE ARROW: the finger's angle around the dial's center, 5-degree steps.
+    function bindDial(sh) {
+        var dial = sh.querySelector('.gps-dial');
+        var sl = sh.querySelector('.gps-ws-slider');
+        if (sl) sl.addEventListener('input', function () { if (S && S.windDraft) setDraftMph(sl.value); });
+        if (!dial) return;
+        var dragging = false;
+        var at = function (e) {
+            if (!S || !S.windDraft) return;
+            var b = dial.getBoundingClientRect();
+            var rel = G.dialDeg(b.left + b.width / 2, b.top + b.height / 2, e.clientX, e.clientY, 5);
+            if (rel === S.windDraft.rel && manualWind()) return;
+            S.windDraft.rel = rel;
+            saveManualWind();
+        };
+        dial.addEventListener('pointerdown', function (e) {
+            dragging = true;
+            try { dial.setPointerCapture(e.pointerId); } catch (x) {}
+            e.preventDefault();
+            at(e);
+        });
+        dial.addEventListener('pointermove', function (e) { if (dragging) at(e); });
+        var end = function () { dragging = false; };
+        dial.addEventListener('pointerup', end);
+        dial.addEventListener('pointercancel', end);
+        dial.addEventListener('keydown', function (e) {
+            if (!S || !S.windDraft) return;
+            var k = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 5 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -5 : 0;
+            if (!k) return;
+            e.preventDefault();
+            S.windDraft.rel = ((S.windDraft.rel + k) % 360 + 360) % 360;
+            saveManualWind();
+        });
     }
     function fetchWind() {
         if (!S || S.windInFlight || typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         var pt = coursePoint();
         if (!pt) return;
-        var mine = S, key = windKey(), ptKey = 'hardpan_nws_point_v1_' + S.courseKey;
+        var mine = S, key = windKey(), ptKey = 'hardpan_nws_point_v2_' + S.courseKey;
         var hdr = { headers: { Accept: 'application/geo+json' } };
+        // NWS hands back absolute URLs; a stand-in base (the checks) keeps its own host.
+        var local = function (u) { return nwsBase() !== 'https://api.weather.gov' ? String(u).replace(/^https:\/\/api\.weather\.gov/, nwsBase()) : String(u); };
+        var get = function (u) {
+            return fetch(local(u), hdr).then(function (r) {
+                if (r.status === 404) { var e = new Error('nws 404'); e.notFound = true; throw e; }
+                if (!r.ok) throw new Error('nws ' + r.status);
+                return r.json();
+            });
+        };
         S.windInFlight = true;
+        S.windAskedAt = Date.now();
         var done = function () { mine.windInFlight = false; };
-        var cachedPt = lsGet(ptKey);
-        var hourly = (cachedPt && cachedPt.url && Date.now() - cachedPt.at < NWS_POINT_MS) ? Promise.resolve(cachedPt.url)
-            : fetch(nwsBase() + '/points/' + pt[0] + ',' + pt[1], hdr).then(function (r) { if (!r.ok) throw new Error('nws ' + r.status); return r.json(); })
-                .then(function (j) { var u = j && j.properties && j.properties.forecastHourly; if (!u) throw new Error('no hourly'); lsSet(ptKey, { at: Date.now(), url: u }); return u; });
-        hourly.then(function (u) {
-            // NWS hands back an absolute URL; a stand-in base (the checks) keeps its own host.
-            if (nwsBase() !== 'https://api.weather.gov') u = u.replace(/^https:\/\/api\.weather\.gov/, nwsBase());
-            return fetch(u, hdr);
-        }).then(function (r) { if (!r.ok) throw new Error('nws ' + r.status); return r.json(); }).then(function (j) {
-            var per = j && j.properties && j.properties.periods && j.properties.periods[0];
-            var w = G.parseNwsWind(per);
-            // The same reading's temperature, for plays like - no second request.
-            var tf = G.parseNwsTempF(per);
-            lsSet(key, w ? { at: Date.now(), mph: w.mph, toDeg: w.toDeg, fromDeg: w.fromDeg, tempF: tf } : { at: Date.now(), none: true, tempF: tf });
+        var cached = lsGet(ptKey);
+        if (cached && Date.now() - cached.at >= NWS_POINT_MS) cached = null;
+        if (cached && cached.outside) {
+            lsSet(key, { at: Date.now(), none: true, outside: true });
+            done(); if (S === mine) syncWind();
+            return;
+        }
+        var point = cached && cached.hourly ? Promise.resolve(cached)
+            : get(nwsBase() + '/points/' + pt[0] + ',' + pt[1]).then(function (j) {
+                var p = (j && j.properties) || {};
+                if (!p.forecastHourly) throw new Error('no hourly');
+                var c = { at: Date.now(), hourly: p.forecastHourly, stations: p.observationStations || null };
+                lsSet(ptKey, c);
+                return c;
+            }, function (e) {
+                // NWS answers 404 for a point outside the US: no wind for this course.
+                if (e && e.notFound) lsSet(ptKey, { at: Date.now(), outside: true });
+                throw e;
+            });
+        var hourlyReading = function (c) {
+            return get(c.hourly).then(function (j) {
+                var per = j && j.properties && j.properties.periods && j.properties.periods[0];
+                var w = G.parseNwsWind(per), tf = G.parseNwsTempF(per);
+                return w ? { at: Date.now(), src: 'hourly', mph: w.mph, gustMph: null, toDeg: w.toDeg, fromDeg: w.fromDeg, tempF: tf } : { at: Date.now(), none: true, tempF: tf };
+            });
+        };
+        point.then(function (c) {
+            // The nearest station (the first NWS lists), kept with the point.
+            var station = c.station ? Promise.resolve(c.station) : !c.stations ? Promise.reject(new Error('no stations'))
+                : get(c.stations).then(function (j) {
+                    var f = j && j.features && j.features[0];
+                    var id = f && (f.id || (f.properties && f.properties['@id']));
+                    if (!id) throw new Error('no station');
+                    c.station = id; lsSet(ptKey, c);
+                    return id;
+                });
+            return station.then(function (id) { return get(id + '/observations/latest'); }).then(function (j) {
+                var o = G.parseNwsObservation(j && j.properties);
+                if (!o || (o.obsAt != null && Date.now() - o.obsAt > OBS_MAX_AGE_MS)) throw new Error('no fresh observation');
+                return { at: Date.now(), src: 'obs', obsAt: o.obsAt, mph: o.mph, gustMph: o.gustMph, toDeg: o.toDeg, fromDeg: o.fromDeg, tempF: o.tempF };
+            }).then(null, function () { return hourlyReading(c); });
+        }).then(function (rec) {
+            lsSet(key, rec);
             done();
             if (S === mine) syncWind();
-        }).catch(function () { done(); if (S === mine) { S.windFailedAt = Date.now(); syncWind(); } });
+        }).catch(function (e) {
+            if (e && e.notFound) lsSet(key, { at: Date.now(), none: true, outside: true });
+            done();
+            if (S === mine) { S.windFailedAt = Date.now(); syncWind(); }
+        });
     }
+    // Every minute WHILE GPS IS SHOWING: the age on the box ticks, and a reading
+    // 10 minutes old is asked for again. Started by showSide('gps'), stopped on
+    // Bets and on unmount. unref() where there is one (Node): a page run inside a
+    // test's vm must never be kept alive by it.
+    function startWindTick() {
+        stopWindTick();
+        windTimer = setInterval(function () { if (S && S.side === 'gps') syncWind(); else stopWindTick(); }, WIND_TICK_MS);
+        if (windTimer && typeof windTimer.unref === 'function') windTimer.unref();
+    }
+    function stopWindTick() { if (windTimer) { clearInterval(windTimer); windTimer = null; } }
     function syncWind() {
         if (!S) return;
         var box = S.el.querySelector('.gps-wind');
@@ -1790,19 +1941,27 @@
         if (!S.pro) { box.style.display = 'none'; return; }
         syncPlays();
         var w = lsGet(windKey()), now = Date.now();
-        var stale = !w || now - w.at > WIND_FRESH_MS;
-        // Ask again when stale - but not more than once a minute after a failure.
-        if (S.side === 'gps' && stale && !(S.windFailedAt && now - S.windFailedAt < 60000)) fetchWind();
+        // Right away on opening GPS or a new hole (S.windKick), else every 10 minutes;
+        // not more than once a minute after a failure.
+        var want = S.windKick ? WIND_KICK_MS : WIND_FRESH_MS;
+        var stale = !w || now - w.at > want;
+        if (S.side === 'gps' && stale && !(S.windFailedAt && now - S.windFailedAt < 60000)) { S.windKick = false; fetchWind(); }
+        else if (S.side === 'gps') S.windKick = false;
         var ew = effectiveWind();
-        // BUILD 3: the box is always there on the GPS side - tap it to set the wind.
-        // No reading and nothing set: "Wind" with a dash.
+        // Outside the US: no wind box at all.
+        if (ew && ew.outside) { box.style.display = 'none'; closeWindSheet(); return; }
+        // The box is always there on the GPS side - tap it to set the wind. No
+        // reading and nothing set (or the last one is over an hour old): "Wind –".
         box.style.display = S.side === 'gps' ? '' : 'none';
         box.classList.toggle('gps-wind-manual', !!(ew && ew.manual));
         var has = !!(ew && !ew.none);
         box.classList.toggle('gps-wind-empty', !has);
-        if (!has) { txt('.gps-wind-mph', 'Wind –'); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
+        box.classList.toggle('gps-wind-calm', has && ew.mph === 0);
+        box.classList.toggle('gps-wind-tagged', has);
+        if (!has) { txt('.gps-wind-mph', 'Wind –'); txt('.gps-wind-tag', ''); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
         w = ew;
-        txt('.gps-wind-mph', w.mph + ' mph');
+        txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + (w.gustMph ? ' g ' + w.gustMph : '') + ' mph');
+        txt('.gps-wind-tag', w.manual ? 'manual' : ageText(w.at));
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
         // is straight up), which is how the map is turned in the hole's view.
@@ -1810,7 +1969,8 @@
         var rot = Math.round(((w.toDeg - bearing) % 360 + 360) % 360);
         arrow.style.transform = 'rotate(' + rot + 'deg)';
         box.setAttribute('data-rot', String(rot));
-        box.setAttribute('aria-label', 'Wind ' + w.mph + ' mph from ' + ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(w.fromDeg / 22.5) % 16] + (w.manual ? ', set by you' : '') + '. Tap to set it.');
+        box.setAttribute('aria-label', 'Wind ' + (w.mph === 0 ? 'calm' : w.mph + ' mph' + (w.gustMph ? ' gusting ' + w.gustMph : '') + ' from ' + G.compassName(w.fromDeg)) + (w.manual ? ', set by you for this hole' : ', ' + ageText(w.at)) + '. Tap to set it.');
+        if (windSheetOpen()) syncWindSheet();
     }
 
     // ---- PLAYS LIKE (Wave 2) -----------------------------------------------------
@@ -2233,7 +2393,7 @@
         + '</div>'
         // RIGHT SIDE STACK: wind, zoom, the green view.
         + '<div class="gps-right">'
-        +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag">manual</span></div>'
+        +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
         +   '<button type="button" class="gps-zoom gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
         + '</div>'
@@ -2272,17 +2432,20 @@
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
         + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
         + '<div class="gps-credit-pop gps-float" style="display:none" role="dialog" aria-label="Map credits"></div>'
-        // MANUAL WIND (build 3): 8 arrows around the mph, relative to the hole.
-        + '<div class="gps-wind-pop gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
-        +   '<div class="gps-wp-title">Wind <small>arrow = where it blows · up = toward the green</small></div>'
-        +   '<div class="gps-wp-grid">'
-        +     [7, 0, 1, 6, -1, 2, 5, 4, 3].map(function (k) {
-                  return k < 0 ? '<div class="gps-wp-mph"></div>'
-                      : '<button type="button" data-rel="' + k + '" aria-label="Wind blowing ' + ['toward the green', 'toward the green and right', 'right', 'back and right', 'back toward the tee', 'back and left', 'left', 'toward the green and left'][k] + '">' + WIND_ARROWS[k] + '</button>';
-              }).join('')
+        // THE WIND DIAL (build 7): a sheet from the bottom. Drag the arrow to where
+        // the wind blows (up, at the green flag, = toward the green); mph under it.
+        + '<div class="gps-wind-sheet gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
+        +   '<div class="gps-ws-head"><div class="gps-ws-title">Wind<small class="gps-ws-state"></small></div>'
+        +     '<button type="button" class="gps-ws-live">Use live wind</button><button type="button" class="gps-ws-done">Done</button></div>'
+        +   '<div class="gps-dial" tabindex="0" role="slider" aria-label="Where the wind blows - up is toward the green" aria-valuemin="0" aria-valuemax="355">'
+        +     '<span class="gps-dial-green" aria-hidden="true"><svg viewBox="0 0 12 16" width="11" height="15"><path d="M2 1v14" stroke="#ffffff" stroke-width="1.6"/><path d="M2.8 1.5h8l-2.4 2.6 2.4 2.6h-8z" fill="#4ade80"/></svg>green</span>'
+        +     '<span class="gps-dial-ticks" aria-hidden="true"></span>'
+        +     '<span class="gps-dial-arrow" aria-hidden="true"><svg viewBox="0 0 40 150" width="40" height="150"><path d="M20 146V30" stroke="#93c5fd" stroke-width="7" stroke-linecap="round"/><path d="M20 4L37 36H3z" fill="#93c5fd"/><circle cx="20" cy="146" r="5" fill="#93c5fd"/></svg></span>'
+        +     '<span class="gps-dial-hub" aria-hidden="true"></span>'
         +   '</div>'
-        +   '<div class="gps-wp-row"><button type="button" class="gps-wp-minus" aria-label="1 mph less">−</button><button type="button" class="gps-wp-plus" aria-label="1 mph more">+</button></div>'
-        +   '<div class="gps-wp-row"><button type="button" class="gps-wp-live">Use live wind</button><button type="button" class="gps-wp-done">Done</button></div>'
+        +   '<div class="gps-ws-read" aria-live="polite"></div>'
+        +   '<div class="gps-ws-row"><button type="button" class="gps-ws-minus" aria-label="1 mph less">\u2212</button><span class="gps-ws-mph"></span><span class="gps-ws-unit">mph</span><button type="button" class="gps-ws-plus" aria-label="1 mph more">+</button></div>'
+        +   '<input type="range" class="gps-ws-slider" min="0" max="40" step="1" value="0" aria-label="Wind speed, mph">'
         + '</div>'
         // FREE (no HardPan GPS): the way to the upgrade.
         + '<div class="gps-basic"><button type="button" class="gps-get-pro">Get HardPan GPS</button></div>'
@@ -2361,18 +2524,29 @@
         + '#gps-overlay .gps-wind{cursor:pointer;position:relative;}'
         + '#gps-overlay .gps-wind-empty .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tag{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font:700 9px/1 ' + FONT + ';color:#c8d1ca;letter-spacing:.02em;}'
-        + '#gps-overlay .gps-wind-manual .gps-wind-tag{display:block;}'
-        + '#gps-overlay .gps-wind-manual{padding-bottom:12px !important;}'
-        + '#gps-overlay .gps-wind-pop{position:absolute;z-index:45;right:8px;top:var(--gps-top-b);width:236px;padding:12px;box-sizing:border-box;color:#f4f4ef;}'
-        + '#gps-overlay .gps-wp-title{font:800 15px/1.2 ' + FONT + ';margin-bottom:8px;}'
-        + '#gps-overlay .gps-wp-title small{display:block;font-weight:500;font-size:11px;color:#c8d1ca;margin-top:2px;}'
-        + '#gps-overlay .gps-wp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}'
-        + '#gps-overlay .gps-wind-pop button{min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 20px/1 ' + FONT + ';}'
-        + '#gps-overlay .gps-wind-pop button.gps-on{background:#ffffff;color:#0b0f0c;}'
-        + '#gps-overlay .gps-wp-mph{display:flex;align-items:center;justify-content:center;font:900 15px/1 ' + FONT + ';text-align:center;}'
-        + '#gps-overlay .gps-wp-row{display:flex;gap:6px;margin-top:8px;}'
-        + '#gps-overlay .gps-wp-row button{flex:1 1 0;font-size:15px;}'
-        + '#gps-overlay .gps-wp-minus,#gps-overlay .gps-wp-plus{font-size:24px !important;}'
+        + '#gps-overlay .gps-wind-tagged .gps-wind-tag{display:block;}'
+        + '#gps-overlay .gps-wind-manual .gps-wind-tag{color:#fbbf24;}'
+        + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
+        + '#gps-overlay .gps-wind-tagged{padding-bottom:13px !important;}'
+        + '#gps-overlay .gps-wind-sheet{position:absolute;z-index:46;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;border-radius:18px 18px 0 0;padding:10px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;color:#f4f4ef;display:flex;flex-direction:column;align-items:center;gap:8px;}'
+        + '#gps-overlay .gps-ws-head{align-self:stretch;display:flex;align-items:center;gap:8px;}'
+        + '#gps-overlay .gps-ws-title{flex:1 1 auto;font:800 17px/1.15 ' + FONT + ';}'
+        + '#gps-overlay .gps-ws-title small{display:block;font:600 12px/1.2 ' + FONT + ';color:#c8d1ca;margin-top:2px;}'
+        + '#gps-overlay .gps-wind-sheet button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 14px;cursor:pointer;}'
+        + '#gps-overlay .gps-wind-sheet .gps-ws-done{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;}'
+        + '#gps-overlay .gps-dial{position:relative;width:184px;height:184px;border-radius:50%;flex:0 0 auto;touch-action:none;cursor:grab;background:radial-gradient(circle,rgba(255,255,255,.04) 0 58%,rgba(255,255,255,.12) 58% 100%);border:2px solid rgba(255,255,255,.55);box-sizing:border-box;margin-top:10px;}'
+        + '#gps-overlay .gps-dial:focus-visible{outline:3px solid #93c5fd;outline-offset:3px;}'
+        + '#gps-overlay .gps-dial-ticks{position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(from -1deg,rgba(255,255,255,.7) 0 2deg,transparent 2deg 45deg);-webkit-mask:radial-gradient(circle,transparent 0 80px,#000 80px);mask:radial-gradient(circle,transparent 0 80px,#000 80px);pointer-events:none;}'
+        + '#gps-overlay .gps-dial-green{position:absolute;left:50%;top:-12px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;padding:3px 7px 3px 5px;border-radius:999px;background:#14532d;border:1px solid #4ade80;color:#d9f99d;font:800 11px/1 ' + FONT + ';pointer-events:none;white-space:nowrap;z-index:2;}'
+        + '#gps-overlay .gps-dial-arrow{position:absolute;left:50%;top:50%;width:40px;height:150px;margin:-75px 0 0 -20px;transform-origin:50% 50%;pointer-events:none;}'
+        + '#gps-overlay .gps-dial-arrow svg{display:block;}'
+        + '#gps-overlay .gps-dial-hub{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#ffffff;border:1.5px solid rgba(11,15,12,.85);box-sizing:border-box;pointer-events:none;}'
+        + '#gps-overlay .gps-ws-read{font:800 18px/1.2 ' + FONT + ';text-align:center;}'
+        + '#gps-overlay .gps-ws-row{display:flex;align-items:center;gap:10px;}'
+        + '#gps-overlay .gps-ws-row button{width:56px;font-size:24px !important;}'
+        + '#gps-overlay .gps-ws-mph{min-width:44px;text-align:right;font:900 28px/1 ' + FONT + ';font-variant-numeric:tabular-nums;}'
+        + '#gps-overlay .gps-ws-unit{font:700 14px/1 ' + FONT + ';color:#c8d1ca;margin-right:6px;}'
+        + '#gps-overlay .gps-ws-slider{align-self:stretch;width:auto;accent-color:#93c5fd;height:28px;margin:0;}'
         + '#gps-overlay .gps-green-view{font-size:13px;white-space:nowrap;}'
         // The magnifier: "+" in it at the hole view, "-" once zoomed in.
         + '#gps-overlay .gps-zoom svg{display:block;}'
@@ -2538,7 +2712,7 @@
             openScore: opts.openScore || null,
             holeMeta: opts.holeMeta || null, holeList: opts.holeList || null, gotoHole: opts.gotoHole || null,
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
-            geoError: null, framed: null, mapRequested: false, loadingCourses: !window.HardPanGpsCourses,
+            geoError: null, framed: null, mapRequested: false, windKick: true, windPan: 0, loadingCourses: !window.HardPanGpsCourses,
             // Decided once per round, by the one check (hasGpsPro).
             pro: hasGpsPro()
         };
@@ -2593,9 +2767,9 @@
         on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
         on(el, '.gps-zoom', cycleZoom);
         on(el, '.gps-green-view', toggleGreenView);
-        on(el, '.gps-wind', function () { var p = S && S.el.querySelector('.gps-wind-pop'); if (p && p.style.display !== 'none') closeWindPop(); else openWindPop(); });
-        var wpop = el.querySelector('.gps-wind-pop');
-        if (wpop) wpop.addEventListener('click', windPopClick);
+        on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
+        var wsheet = el.querySelector('.gps-wind-sheet');
+        if (wsheet) { wsheet.addEventListener('click', windSheetClick); bindDial(wsheet); }
         on(el, '.gps-score', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
         on(el, '.gps-get-pro', openSheet);
         on(el, '.gps-sheet-close', closeSheet);
@@ -2730,6 +2904,8 @@
         closeMenus();
         if (side === 'gps') {
             if (!S.pro && !sheetSeen()) openSheet();
+            S.windKick = true;
+            startWindTick();
             ensureMap();
             if (S.map) { try { S.map.resize(); } catch (e) {} if (S.needsFrame) frameHole(false); }
             startWatch();
@@ -2738,6 +2914,8 @@
             // Kept running for IDLE_STOP_MS, so a quick look at Bets and back
             // does not cost a fresh fix; then stopped.
             closeSheet();
+            closeWindSheet();
+            stopWindTick();
             clearIdle();
             if (isWatching()) idleTimer = setTimeout(function () { idleTimer = null; stopWatch(); }, IDLE_STOP_MS);
         }
@@ -2753,6 +2931,8 @@
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;
+        // A manual wind was for the hole just left: back to live wind, asked again.
+        clearManualWind(); closeWindSheet(); S.windKick = true;
         S.target = null; S.targetMoved = false;
         S.framed = null;
         frameHole(false);
@@ -2768,6 +2948,7 @@
 
     function unmount() {
         stopWatch();
+        stopWindTick();
         fix = null;
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);

@@ -190,9 +190,12 @@ const READ = `JSON.stringify((function () {
            hereCenter: q('.gps-target-row') && q('.gps-target-row').style.display !== 'none' && !o.classList.contains('gps-basic-mode') ? tx('.gps-here-center') : '',
            units: t('.gps-units'), src: tx('.gps-src'), subShown: vis('.gps-sub'), targetRowShown: vis('.gps-target-row'),
            popInfo: vis('.gps-pop-info') ? tx('.gps-pop-info') : null,
-           windManual: !!(q('.gps-wind') && q('.gps-wind').classList.contains('gps-wind-manual')), windPop: vis('.gps-wind-pop'),
-           windOn: q('.gps-wind-pop') ? ([].slice.call(q('.gps-wind-pop').querySelectorAll('[data-rel].gps-on')).map(function (b) { return b.getAttribute('data-rel'); })[0] || null) : null,
-           windLive: vis('.gps-wp-live'),
+           windManual: !!(q('.gps-wind') && q('.gps-wind').classList.contains('gps-wind-manual')), windSheet: vis('.gps-wind-sheet'),
+           windDial: q('.gps-dial') ? q('.gps-dial').getAttribute('data-rel') : null, windLive: vis('.gps-ws-live'),
+           windMph: vis('.gps-wind') ? tx('.gps-wind-mph') : null, windTag: vis('.gps-wind') ? tx('.gps-wind-tag') : null,
+           windRead: vis('.gps-wind-sheet') ? tx('.gps-ws-read') : null, windState: vis('.gps-wind-sheet') ? tx('.gps-ws-state') : null,
+           windSlider: q('.gps-ws-slider') ? q('.gps-ws-slider').value : null, windSheetBox: box(q('.gps-wind-sheet')),
+           windGreenBox: box(q('.gps-dial-green')), windDialBox: box(q('.gps-dial')),
            pillStyle: (function () { var p = q('.gps-pill-to'); if (!p) return null; var c = getComputedStyle(p); return { bg: c.backgroundColor, color: c.color, size: parseFloat(c.fontSize), weight: c.fontWeight, shadow: c.textShadow !== 'none' }; })(),
            ringStyle: (function () { var r = q('.gps-ring'); if (!r) return null; var c = getComputedStyle(r), b = getComputedStyle(r, '::before'); return { color: c.borderTopColor, width: parseFloat(c.borderTopWidth), cross: b.content !== 'none' && b.content !== 'normal' }; })(),
            set: avail('.gps-set-green'), fix: avail('.gps-fix-green'), undo: avail('.gps-undo-green'),
@@ -444,8 +447,11 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 //                              (the free tier used up mid-round, the key expired).
 //   /epqs?x=&y=                USGS EPQS: heights for known course points, else
 //                              the service's "no data" (-1000000).
-//   /points/.., /gridpoints/.. the National Weather Service (as before).
+//   /points/.., /gridpoints/.., /stations/..  the National Weather Service: the
+//                              point, its stations, the latest observation, the
+//                              hourly forecast (build 7). /__nws/<mode> switches it.
 const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [], overpass: [] };
+const NWS = { mode: 'ok' };
 // BUILD 5 stand-in Overpass: "the golf courses near here" answers one course named
 // "Wildwood Golf Course" (and one that is not ours); its holes and greens are Caledonia's saved extract
 // (the geometry the logic is checked on - the name is only what the lookup picks by).
@@ -504,9 +510,27 @@ function startStandIn() {
                 r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
                 return r.end(JSON.stringify({ location: { x: +u.searchParams.get('x'), y: +u.searchParams.get('y') }, value: k in ELEV ? ELEV[k] : -1000000 }));
             }
+            // The page can switch the stand-in mid-arm: /__nws/ok | stale | down | outside.
+            if (/^\/__mark\/\w+$/.test(q.url)) { SEEN.nws.push(q.url); r.writeHead(200, Object.assign({ 'Content-Type': 'text/plain' }, h)); return r.end('ok'); }
+            const ctl = /^\/__nws\/(ok|stale|down|outside)$/.exec(q.url);
+            if (ctl) { NWS.mode = ctl[1]; r.writeHead(200, Object.assign({ 'Content-Type': 'text/plain' }, h)); return r.end(NWS.mode); }
             SEEN.nws.push(q.url);
             const hj = Object.assign({ 'Content-Type': 'application/geo+json' }, h);
-            if (/^\/points\/-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q.url)) { r.writeHead(200, hj); return r.end(JSON.stringify({ properties: { forecastHourly: 'https://api.weather.gov/gridpoints/XXX/1,2/forecast/hourly' } })); }
+            if (NWS.mode === 'down') { r.writeHead(503, h); return r.end(); }
+            if (/^\/points\/-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(q.url)) {
+                // Outside the US NWS answers 404 for the point.
+                if (NWS.mode === 'outside') { r.writeHead(404, hj); return r.end(JSON.stringify({ title: 'Data Unavailable For Requested Point' })); }
+                r.writeHead(200, hj); return r.end(JSON.stringify({ properties: { forecastHourly: 'https://api.weather.gov/gridpoints/XXX/1,2/forecast/hourly', observationStations: 'https://api.weather.gov/gridpoints/XXX/1,2/stations' } }));
+            }
+            if (q.url === '/gridpoints/XXX/1,2/stations') { r.writeHead(200, hj); return r.end(JSON.stringify({ features: [{ id: 'https://api.weather.gov/stations/KXXX', properties: { stationIdentifier: 'KXXX' } }, { id: 'https://api.weather.gov/stations/KYYY' }] })); }
+            // The LATEST OBSERVATION: from the NW, 19.3 km/h (12 mph) gusting 32.2 (20).
+            // 'stale': three hours old, so the hourly forecast is the backup.
+            if (q.url === '/stations/KXXX/observations/latest') {
+                r.writeHead(200, hj);
+                return r.end(JSON.stringify({ properties: { timestamp: new Date(Date.now() - (NWS.mode === 'stale' ? 180 : 20) * 60000).toISOString(),
+                    windDirection: { unitCode: 'wmoUnit:degree_(angle)', value: 315 }, windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 19.3 },
+                    windGust: { unitCode: 'wmoUnit:km_h-1', value: 32.2 }, temperature: { unitCode: 'wmoUnit:degC', value: 16.1111 } } }));
+            }
             if (q.url === '/gridpoints/XXX/1,2/forecast/hourly') { r.writeHead(200, hj); return r.end(JSON.stringify({ properties: { periods: [{ windSpeed: '5 to 12 mph', windDirection: 'NW', temperature: 61, temperatureUnit: 'F' }] } })); }
             r.writeHead(404, h); r.end();
         });
@@ -972,58 +996,118 @@ function usgsFallbackFails(tag, g, why) {
         if (sc.dump.writes.some((x) => !/^events\/GPSSCORE\/(scores|auditLog|scoresVerified)\b/.test(x.path))) fails.push('score: unexpected writes: ' + JSON.stringify(sc.dump.writes.map((x) => x.path)));
     }
 
-    // ---- wind -------------------------------------------------------------------
+    // ---- wind (build 7: LIVE, ALWAYS ON; THE DIAL; MANUAL FOR THIS HOLE ONLY) ----
+    // The stand-in NWS answers the point, its stations, the latest observation
+    // (from the NW, 12 mph gusting 20) and the hourly forecast. The page drops a
+    // marker into the request log (/__mark/<n>) so each step's requests can be
+    // counted.
     const windProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-wind-profile-'));
     const nws0 = nwsSeen.length;
+    const WKEY = 'hardpan_wind_v1_caledonia';
+    const AGE = (min) => ({ expression: `(function(){var w=JSON.parse(localStorage.getItem('${WKEY}'));if(!w)return 'no wind reading';w.at=Date.now()-${min}*60000;localStorage.setItem('${WKEY}',JSON.stringify(w));return 'aged ${min}';})()` });
+    const MARK = (n) => ({ expression: `fetch('${SO}/__mark/${n}').then(function(){return 'mark ${n}'})` });
+    const NWSMODE = (m) => ({ expression: `fetch('${SO}/__nws/${m}').then(function(){return 'nws ${m}'})` });
+    const RERENDER = [{ tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 1500 }];
+    const DRAG = (deg) => ({ expression: `(function(){var d=document.querySelector('#gps-overlay .gps-dial'),r=d.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,a=${deg}*Math.PI/180;var p=function(t,x,y){d.dispatchEvent(new PointerEvent(t,{clientX:x,clientY:y,pointerId:7,bubbles:true,isPrimary:true}))};p('pointerdown',cx,cy-70);for(var i=1;i<=8;i++){var f=a*i/8;p('pointermove',cx+70*Math.sin(f),cy-70*Math.cos(f));}p('pointerup',cx+70*Math.sin(a),cy-70*Math.cos(a));return 'dragged ${deg}'})()` });
+    const SLIDE = (v) => ({ expression: `(function(){var s=document.querySelector('#gps-overlay .gps-ws-slider');s.value='${v}';s.dispatchEvent(new Event('input',{bubbles:true}));return 'slid ${v}'})()` });
+    const WAIT_MPH = { waitFor: `/mph/.test((document.querySelector('.gps-wind-mph') || {}).textContent || '')`, timeout: 15000 };
+    const RELOAD = [{ expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }];
+    NWS.mode = 'ok';
     const wd = await arm('wind', 'caledonia', null, 'ok', ME, 4.6, [
-        { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `/mph/.test((document.querySelector('.gps-wind-mph') || {}).textContent || '')`, timeout: 15000 }, { expression: READ }, // 0
-        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 1 reload: from the phone
-        { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));if(!w)return 'no wind reading';w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
-        { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
-        // MANUAL WIND (build 3): tap the box, "into the face" (down arrow), +3 mph.
-        { tap: '.gps-wind' }, { sleep: 300 }, { expression: READ },                                              // 3 popup open
-        { tap: '.gps-wind-pop [data-rel="4"]' }, { sleep: 150 }, { tap: '.gps-wp-plus' }, { sleep: 100 }, { tap: '.gps-wp-plus' }, { sleep: 100 }, { tap: '.gps-wp-plus' }, { sleep: 200 },
-        { tap: '.gps-wp-done' }, { sleep: 300 }, { expression: READ },                                           // 4 manual 15 into the face
-        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 5 still manual after a reload
-        { tap: '.gps-score-next' }, { sleep: 1200 }, { expression: READ },                                       // 6 hole 2: same compass wind, turned with the hole
-        { tap: '.gps-wind' }, { sleep: 300 }, { tap: '.gps-wp-live' }, { sleep: 400 }, { expression: READ },     // 7 "Use live wind"
-        { expression: `(function(){localStorage.setItem('hardpan_wind_manual_v1',JSON.stringify({day:'2026-1-1',mph:20,toDeg:0}));return 'yesterday';})()` },
-        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 8 set on another day: gone
+        { tap: '.gps-side-gps' }, WAIT_MAP, WAIT_MPH, { expression: READ },                                     // 0 live: the observation
+        ...RELOAD, { expression: READ }, MARK('a'),                                                             // 1 reload: from the phone
+        AGE(11), ...RERENDER, { expression: READ }, MARK('b'),                                                  // 2 11 min old: asked again
+        { tap: '.gps-wind' }, { sleep: 600 }, { expression: READ },                                             // 3 the dial, on the live wind
+        DRAG(180), { sleep: 150 }, { tap: '.gps-ws-plus' }, { sleep: 100 }, { tap: '.gps-ws-plus' }, { sleep: 100 }, { tap: '.gps-ws-plus' }, { sleep: 300 }, { expression: READ }, // 4 into the face, 15
+        SLIDE(22), { sleep: 300 }, { expression: READ },                                                        // 5 the slider: 22
+        { tap: '.gps-ws-done' }, { sleep: 500 }, { expression: READ },                                          // 6 Done
+        ...RELOAD, { expression: READ },                                                                         // 7 still manual on this hole
+        AGE(2), MARK('c'), { tap: '.gps-next' }, { sleep: 1800 }, { expression: READ }, MARK('d'),              // 8 hole 2: live again, asked right away
+        { tap: '.gps-prev' }, { sleep: 1500 }, { expression: READ },                                            // 9 back on hole 1: the manual wind is gone
+        { tap: '.gps-wind' }, { sleep: 500 }, DRAG(90), { sleep: 300 }, { tap: '.gps-ws-live' }, { sleep: 500 }, { expression: READ }, // 10 "Use live wind"
+        { tap: '.gps-ws-done' }, { sleep: 300 },
+        { expression: `(function(){localStorage.setItem('hardpan_wind_manual_v2',JSON.stringify({day:'2026-1-1',course:'caledonia',hole:1,mph:20,toDeg:0}));return 'yesterday';})()` },
+        ...RELOAD, { expression: READ },                                                                         // 11 set on another day: gone
+        NWSMODE('down'), AGE(50), ...RERENDER, { expression: READ },                                            // 12 offline 50 min: the last reading, with its age
+        AGE(61), ...RERENDER, { expression: READ },                                                             // 13 over an hour: "Wind -"
+        { tap: '.gps-wind' }, { sleep: 500 }, { expression: READ }, { tap: '.gps-ws-done' }, NWSMODE('ok'),    // 14 still settable by hand
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, profileDir: windProfile });
+    NWS.mode = 'ok';
     out.wind = wd; bail(out, wd);
-    const nwsAfterFirst = nwsSeen.slice(nws0);
+    const nwsWind = nwsSeen.slice(nws0);
     const wo = await arm('windoff', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3000 }, { expression: READ },
-    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, blockUrls: ['*' + SO.replace('http://', '') + '/points*', '*' + SO.replace('http://', '') + '/gridpoints*'] });
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, blockUrls: ['*' + SO.replace('http://', '') + '/points*', '*' + SO.replace('http://', '') + '/gridpoints*', '*' + SO.replace('http://', '') + '/stations*'] });
     out.windOff = wo; bail(out, wo);
+    // The forecast as the BACKUP: the station's observation is three hours old.
+    NWS.mode = 'stale';
+    const nwsF0 = nwsSeen.length;
+    const wf = await arm('windfc', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, WAIT_MPH, { sleep: 500 }, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG });
+    const nwsFc = nwsSeen.slice(nwsF0);
+    // Outside the US: NWS has no point - no wind box at all.
+    NWS.mode = 'outside';
+    const nwsO0 = nwsSeen.length;
+    const wu = await arm('windusa', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 3500 }, { expression: READ }, ...RERENDER, { expression: READ },
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG });
+    const nwsOut = nwsSeen.slice(nwsO0);
+    NWS.mode = 'ok';
+    out.windFc = wf; bail(out, wf); out.windUsa = wu; bail(out, wu);
     {
-        const [w0, w1, w2] = wd.reads;
-        if (!/^↑\s*12 mph$/.test(w0.wind || '')) fails.push('wind: box reads ' + JSON.stringify(w0.wind));
-        if (w0.windRot !== windRotFor(w0.bearing)) fails.push(`wind: arrow turned ${w0.windRot}, expected ${windRotFor(w0.bearing)} (to the SE, on a map turned ${w0.bearing})`);
-        const wb = w0.windBox, at = w0.boxes.attrib, mp = w0.boxes.map;
-        // Redesign: top of the right-hand stack, under the top panel.
-        if (!wb || !at || !w0.boxes.top || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2 || wb.t < w0.boxes.top.b || wb.t > w0.boxes.top.b + 30) fails.push('wind: not at the top of the right-hand stack: ' + JSON.stringify([wb, w0.boxes.top]));
-        if (hitBox(wb, w0.scoreBox)) fails.push('wind: covers the score button');
-        const pts = nwsAfterFirst.filter((u) => u.startsWith('/points/'));
-        const hourly = nwsAfterFirst.filter((u) => u.startsWith('/gridpoints/'));
-        const want = `/points/${Math.round(H1.mid[0] * 1e3) / 1e3},${Math.round(H1.mid[1] * 1e3) / 1e3}`;
-        if (pts.length !== 1 || pts[0] !== want) fails.push(`wind: NWS asked ${JSON.stringify(pts)}, expected once for the COURSE point ${want}`);
-        if (hourly.length !== 2) fails.push(`wind: hourly forecast asked ${hourly.length} times (expected 2: first look, then 16 minutes later; NOT on the reload)`);
-        if (w1.wind !== w0.wind) fails.push('wind: not shown from the phone after a reload: ' + w1.wind);
-        if (w2.wind !== w0.wind) fails.push('wind: lost when refreshed: ' + w2.wind);
-        if (nwsAfterFirst.some((u) => u.indexOf(ME[0].toFixed(3)) !== -1 && u.indexOf(ME[1].toFixed(3)) !== -1 && want.indexOf(ME[0].toFixed(3)) === -1)) fails.push('wind: the golfer\'s position went to the weather service');
-        // BUILD 3: with no reading the box stays, to tap and set it yourself.
-        if (wo.reads[0].wind !== 'Wind –' || wo.reads[0].windManual) fails.push('wind: with no weather service the box reads ' + JSON.stringify(wo.reads[0].wind));
-        const [, , , m3, m4, m5, m6, m7, m8] = wd.reads;
+        const r = wd.reads;
+        const [w0, w1, w2, d3, d4, d5, d6, d7, h8, h9, l10, y11, o12, o13, o14] = r;
         const hb = (n) => inlineBearing(table.caledonia.holes[n].osm.tee, table.caledonia.holes[n].osm.mid);
-        if (!m3.windPop || m3.windOn !== String(Math.round(((((WIND_TO - hb('1')) % 360) + 360) % 360) / 45) % 8)) fails.push('wind: the popup did not open on the live wind: ' + JSON.stringify([m3.windPop, m3.windOn, m3.bearing]));
-        if (m3.windLive) fails.push('wind: "Use live wind" offered with no manual wind set');
-        if (m4.windPop || !m4.windManual || !/^↑\s*15 mph\s*manual$/.test(m4.wind || '') || Math.abs(Number(m4.windRot) - 180) > 2) fails.push('wind: manual 15 mph into the face - ' + JSON.stringify([m4.windPop, m4.windManual, m4.wind, m4.windRot]));
-        if (m5.wind !== m4.wind || !m5.windManual) fails.push('wind: the manual wind did not survive a reload: ' + JSON.stringify([m5.wind, m5.windManual]));
-        const wantRot6 = String(Math.round((((Math.round(hb('1') + 180) - m6.bearing) % 360) + 360) % 360));
-        if (!m6.windManual || Math.abs(Number(m6.windRot) - Number(wantRot6)) > 2) fails.push(`wind: hole 2 arrow ${m6.windRot}, expected ${wantRot6} (the same compass wind)`);
-        if (m7.windManual || m7.wind !== w0.wind || m7.windPop) fails.push('wind: "Use live wind" did not go back: ' + JSON.stringify([m7.windManual, m7.wind]));
-        if (m8.windManual || m8.wind !== w0.wind) fails.push('wind: a manual wind from another day is still used: ' + JSON.stringify([m8.windManual, m8.wind]));
+        const COMP = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+        const compass = (d) => COMP[Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
+        const between = (a, b) => { const i = nwsWind.indexOf('/__mark/' + a), j = b ? nwsWind.indexOf('/__mark/' + b) : nwsWind.length; return nwsWind.slice(i + 1, j).filter((u) => !/^\/__/.test(u)); };
+        const first = nwsWind.slice(0, nwsWind.indexOf('/__mark/a')).filter((u) => !/^\/__/.test(u));
+        const want = `/points/${Math.round(H1.mid[0] * 1e3) / 1e3},${Math.round(H1.mid[1] * 1e3) / 1e3}`;
+        const OBS = '/stations/KXXX/observations/latest';
+        // LIVE: the measured wind and gusts, the age, the arrow.
+        if (w0.windMph !== '12 g 20 mph') fails.push('wind: box reads ' + JSON.stringify(w0.windMph) + ' (expected the observation: 12 g 20 mph)');
+        if (w0.windTag !== 'updated just now') fails.push('wind: the age reads ' + JSON.stringify(w0.windTag));
+        if (w0.windRot !== windRotFor(w0.bearing)) fails.push(`wind: arrow turned ${w0.windRot}, expected ${windRotFor(w0.bearing)} (to the SE, on a map turned ${w0.bearing})`);
+        const wb = w0.windBox, mp = w0.boxes.map;
+        if (!wb || !w0.boxes.top || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2 || wb.t < w0.boxes.top.b || wb.t > w0.boxes.top.b + 30) fails.push('wind: not at the top of the right-hand stack: ' + JSON.stringify([wb, w0.boxes.top]));
+        if (hitBox(wb, w0.scoreBox)) fails.push('wind: covers the score button');
+        if (JSON.stringify(first) !== JSON.stringify([want, '/gridpoints/XXX/1,2/stations', OBS])) fails.push(`wind: first look asked ${JSON.stringify(first)}, expected the COURSE point ${want}, its stations, the latest observation (and nothing on the reload)`);
+        if (w1.windMph !== w0.windMph) fails.push('wind: not shown from the phone after a reload: ' + w1.windMph);
+        if (JSON.stringify(between('a', 'b')) !== JSON.stringify([OBS]) || w2.windTag !== 'updated just now') fails.push('wind: 11 minutes old was not asked again (once, the observation only): ' + JSON.stringify([between('a', 'b'), w2.windTag]));
+        if (nwsWind.some((u) => u.indexOf(ME[0].toFixed(3)) !== -1 && u.indexOf(ME[1].toFixed(3)) !== -1 && want.indexOf(ME[0].toFixed(3)) === -1)) fails.push('wind: the golfer\'s position went to the weather service');
+        // THE DIAL: a sheet from the bottom, on the live wind, never over the target or the numbers.
+        const rel0 = String(Math.round((((135 - w2.bearing) % 360 + 360) % 360) / 5) * 5 % 360);
+        if (!d3.windSheet || d3.windDial !== rel0 || d3.windLive || d3.windRead !== 'From NW · 12 mph · gusts 20' || d3.windState !== 'Live · updated just now') fails.push('wind: the dial did not open on the live wind: ' + JSON.stringify([d3.windSheet, d3.windDial, rel0, d3.windLive, d3.windRead, d3.windState]));
+        const sh = d3.windSheetBox;
+        if (!sh || sh.l > 0 || sh.r < 390 || sh.b < 840 || sh.t < 300) fails.push('wind: the dial is not a sheet from the bottom: ' + JSON.stringify(sh));
+        if (sh && d3.target && d3.target.b > sh.t) fails.push('wind: the sheet covers the target: ' + JSON.stringify([d3.target, sh]));
+        (d3.pills || []).forEach((p) => { if (sh && p.box && p.box.b > sh.t) fails.push('wind: the sheet covers a number: ' + JSON.stringify([p, sh])); });
+        const g = d3.windGreenBox, dl = d3.windDialBox;
+        if (!g || !dl || Math.abs((g.l + g.r) / 2 - (dl.l + dl.r) / 2) > 2 || g.t > dl.t + 4) fails.push('wind: no green flag at the top of the dial: ' + JSON.stringify([g, dl]));
+        // DRAGGED into the face, 15 mph: manual, the box turned with it, the words a weather app uses.
+        const intoFace = 'From ' + compass(hb('1')) + ' · ';
+        if (!d4.windManual || d4.windDial !== '180' || d4.windMph !== '15 mph' || d4.windTag !== 'manual' || Math.abs(Number(d4.windRot) - 180) > 2 || d4.windRead !== intoFace + '15 mph' || d4.windState !== 'Manual · this hole only' || !d4.windLive || d4.windSlider !== '15') fails.push('wind: drag into the face, 15 mph - ' + JSON.stringify([d4.windManual, d4.windDial, d4.windMph, d4.windTag, d4.windRot, d4.windRead, intoFace, d4.windState, d4.windLive, d4.windSlider]));
+        if (d5.windMph !== '22 mph' || d5.windSlider !== '22' || d5.windRead !== intoFace + '22 mph') fails.push('wind: the slider - ' + JSON.stringify([d5.windMph, d5.windSlider, d5.windRead]));
+        if (d6.windSheet || !d6.windManual || d6.windMph !== '22 mph') fails.push('wind: Done - ' + JSON.stringify([d6.windSheet, d6.windManual, d6.windMph]));
+        if (w0.plays && d6.plays === w0.plays) fails.push('wind: plays ~ did not follow the manual wind: ' + d6.plays);
+        if (!d7.windManual || d7.windMph !== '22 mph') fails.push('wind: the manual wind did not survive a reload on its hole: ' + JSON.stringify([d7.windManual, d7.windMph]));
+        // THE NEXT HOLE: back on live wind, and asked right away.
+        if (!/^Hole 2\b/.test(h8.title || '') || h8.windManual || h8.windMph !== '12 g 20 mph') fails.push('wind: hole 2 is not back on live wind: ' + JSON.stringify([h8.title, h8.windManual, h8.windMph]));
+        if (JSON.stringify(between('c', 'd')) !== JSON.stringify([OBS])) fails.push('wind: a new hole did not ask right away: ' + JSON.stringify(between('c', 'd')));
+        if (!/^Hole 1\b/.test(h9.title || '') || h9.windManual) fails.push('wind: back on hole 1 the manual wind came back: ' + JSON.stringify([h9.title, h9.windManual]));
+        if (!l10.windSheet || l10.windManual || l10.windLive || !/^Live · /.test(l10.windState || '') || l10.windMph !== '12 g 20 mph') fails.push('wind: "Use live wind" did not go back: ' + JSON.stringify([l10.windSheet, l10.windManual, l10.windState, l10.windMph]));
+        if (y11.windManual || y11.windMph !== '12 g 20 mph') fails.push('wind: a manual wind from another day is still used: ' + JSON.stringify([y11.windManual, y11.windMph]));
+        // OFFLINE: the last reading with its age up to an hour, then "Wind -" (still settable).
+        if (o12.windMph !== '12 g 20 mph' || o12.windTag !== 'updated 50 min ago') fails.push('wind: offline at 50 minutes - ' + JSON.stringify([o12.windMph, o12.windTag]));
+        if (o13.windMph !== 'Wind –' || o13.windTag) fails.push('wind: offline past an hour - ' + JSON.stringify([o13.windMph, o13.windTag]));
+        if (!o14.windSheet) fails.push('wind: with no reading the dial does not open');
+        if (wo.reads[0].windMph !== 'Wind –' || wo.reads[0].windManual) fails.push('wind: with no weather service the box reads ' + JSON.stringify(wo.reads[0].windMph));
+        // THE BACKUP: the hourly forecast when the observation is too old.
+        const f0 = wf.reads[0];
+        if (f0.windMph !== '12 mph' || f0.windRot !== windRotFor(f0.bearing) || !nwsFc.includes(OBS) || !nwsFc.includes('/gridpoints/XXX/1,2/forecast/hourly')) fails.push('wind: the forecast backup - ' + JSON.stringify([f0.windMph, f0.windRot, nwsFc]));
+        // OUTSIDE THE US: no box, and nothing asked after the point.
+        if (wu.reads.some((x) => x.windMph != null || x.wind != null) || nwsOut.filter((u) => !/^\/__/.test(u)).some((u) => !u.startsWith('/points/'))) fails.push('wind: outside the US - ' + JSON.stringify([wu.reads.map((x) => x.windMph), nwsOut]));
     }
     try { fs.rmSync(windProfile, { recursive: true, force: true }); } catch (e) {}
 
@@ -1056,7 +1140,7 @@ function usgsFallbackFails(tag, g, why) {
         if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
         fails.push(...arcFails(tag, g), ...teeInView(tag, g), ...pillFails(tag, g, true));
         if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
-        if (!/12 mph/.test(g.wind || '') || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.wind} turned ${g.windRot} (expected ${windRotFor(g.bearing)})`);
+        if (g.windMph !== '12 g 20 mph' || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.windMph} turned ${g.windRot} (expected 12 g 20 mph, ${windRotFor(g.bearing)})`);
         if (g.midLbl !== 'CENTER' || g.editPinEl) fails.push(`${tag}: Edit Pin is still on the screen: ` + JSON.stringify([g.midLbl, g.editPinEl]));
         if (cr.dump.writes.length) fails.push(`${tag}: just looking wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
     }
@@ -1489,18 +1573,18 @@ function usgsFallbackFails(tag, g, why) {
     SRV.close();
 
     // ---- privacy, every arm ------------------------------------------------------
-    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [gg, ME],
+    [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [wf, ME], [wu, ME], [gg, ME],
      [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME], [fl, ME], [fu, pl], [fd, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
     // EDIT PIN IS GONE: no arm writes today's pin (events/<code>/pinLocs) any more.
-    [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].forEach((r) => {
+    [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, wf, wu, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly].forEach((r) => {
         if (r.dump.writes.some((x) => /pinLocs/.test(x.path))) fails.push(r.name + ': wrote a pinLocs record');
     });
     // Wave 2: every arm's Esri is the stand-in (refusing, by default). The real
     // Esri hosts are never asked - a check must not spend the free tier.
-    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly, go, gb].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
+    const esri = [a, i, b, c, d, p1, p2, e, vf, fh, ft, po, et, sc, wd, wo, wf, wu, gg, ex, eb, eo, bu, pa, pa2, fr, cl, gv, ly, go, gb].reduce((n, r) => n + r.requests.filter((q) => /arcgis(online)?\.com/i.test(urlOf(q))).length, 0);
     if (esri !== 0) fails.push('esri: ' + esri + ' requests reached a real Esri host');
 
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}

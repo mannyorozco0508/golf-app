@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v344-gps-linenums'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v345-gps-wind'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -258,14 +258,42 @@ test('build 3 look: no arcs, no center line, no green fill or outline, nothing y
     assert.ok(/class="gps-pop-info"/.test(v), 'the accuracy / source line is in the credits');
 });
 
-test('manual wind: on this phone only, today only, and it drives plays ~', { skip }, () => {
+test('manual wind: on this phone only, THIS HOLE today only, and it drives plays ~', { skip }, () => {
     const v = read('gps-view.js');
-    assert.ok(/var MANUAL_WIND = 'hardpan_wind_manual_v1';/.test(v));
+    assert.ok(/var MANUAL_WIND = 'hardpan_wind_manual_v2';/.test(v));
     assert.ok(/if \(!m \|\| m\.day !== today\(\)/.test(v), 'gone the next day');
-    const sec = v.slice(v.indexOf('// ---- MANUAL WIND (build 3)'), v.indexOf('function fetchWind('));
+    assert.ok(/if \(!S \|\| m\.course !== S\.courseKey \|\| m\.hole !== S\.hole\) return null;/.test(v), 'this hole of this course only');
+    assert.ok(/S\.mode = 'measure'; S\.draft = null;\s*\/\/[^\n]*\n\s*clearManualWind\(\); closeWindSheet\(\); S\.windKick = true;/.test(v), 'a new hole: back on live wind, asked right away');
+    const sec = v.slice(v.indexOf('// ---- MANUAL WIND (build 3'), v.indexOf('function fetchWind('));
     assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|\.ref\(|db\./.test(sec), 'the manual wind is never sent anywhere');
-    assert.ok(/var w = effectiveWind\(\), has = !!\(w && !w\.none\);/.test(v), 'plays ~ uses the manual wind');
-    assert.ok(/Use live wind/.test(v) && /gps-wind-tag">manual</.test(v));
+    assert.ok(/var w = effectiveWind\(\), has = !!\(w && !w\.none\);/.test(v), 'plays ~ uses whatever wind is showing');
+    assert.ok(/Use live wind/.test(v) && /txt\('\.gps-wind-tag', w\.manual \? 'manual' : ageText\(w\.at\)\)/.test(v));
+});
+
+test('build 7 wind dial: a sheet from the bottom, drag any angle in 5s, green at the top, mph 0-40, Done', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/class="gps-wind-sheet gps-float"/.test(v) && /\.gps-wind-sheet\{position:absolute;z-index:46;left:0;right:0;bottom:0;/.test(v), 'a bottom sheet');
+    assert.ok(!/gps-wind-pop|data-rel="' \+ k/.test(v), 'the 8-arrow grid is gone');
+    assert.ok(/G\.dialDeg\(b\.left \+ b\.width \/ 2, b\.top \+ b\.height \/ 2, e\.clientX, e\.clientY, 5\)/.test(v), 'the finger\'s angle, 5-degree steps');
+    assert.ok(/class="gps-dial-green"[^']*green<\/span>/.test(v), 'the green flag at the top of the dial');
+    assert.ok(/class="gps-ws-slider" min="0" max="40"/.test(v) && /var WIND_MAX_MPH = 40;/.test(v), 'a 0-40 slider');
+    assert.ok(/'From ' \+ G\.compassName\(fromDeg\) \+ ' (·|\\u00b7) ' \+ mph \+ ' mph'/.test(v), '"From W · 12 mph"');
+    assert.ok(/function keepClearOfSheet\(\)/.test(v) && /if \(wsR\) safeBot = Math\.min\(safeBot, wsR\.t - M\);/.test(v), 'never over the target or the numbers');
+});
+
+test('build 7 live wind: the station\'s latest observation first, the hourly forecast as backup, every 10 minutes, course point only', { skip }, () => {
+    const v = read('gps-view.js');
+    const sec = v.slice(v.indexOf('// ---- WIND (Wave 1; LIVE, ALWAYS ON in build 7)'), v.indexOf('// ---- PLAYS LIKE (Wave 2)'));
+    assert.ok(/var WIND_FRESH_MS = 10 \* 60 \* 1000, WIND_SHOW_MS = 60 \* 60 \* 1000/.test(sec), '10-minute refresh, shown up to an hour');
+    assert.ok(/get\(id \+ '\/observations\/latest'\)/.test(sec) && /\.then\(null, function \(\) \{ return hourlyReading\(c\); \}\)/.test(sec), 'observation, then the forecast');
+    assert.ok(/get\(nwsBase\(\) \+ '\/points\/' \+ pt\[0\] \+ ',' \+ pt\[1\]\)/.test(sec) && /var pt = coursePoint\(\);/.test(sec), 'the course point');
+    assert.ok(!/\bfix\b|coords|watchPosition/.test(sec), 'never the golfer\'s position');
+    assert.ok(/if \(e && e\.notFound\) lsSet\(ptKey, \{ at: Date\.now\(\), outside: true \}\);/.test(sec) && /if \(ew && ew\.outside\) \{ box\.style\.display = 'none';/.test(sec), 'outside the US: no box');
+    assert.ok(/windTimer = setInterval\(/.test(sec) && /stopWindTick\(\);/.test(v.slice(v.indexOf('function unmount('))), 'the tick stops with the view');
+    assert.ok(/if \(windTimer && typeof windTimer\.unref === 'function'\) windTimer\.unref\(\);/.test(sec), 'never keeps a test process alive');
+    const show = v.slice(v.indexOf('function showSide('), v.indexOf('function showSide(') + 1500);
+    assert.ok(/S\.windKick = true;\s*startWindTick\(\);/.test(show) && /closeWindSheet\(\);\s*stopWindTick\(\);/.test(show), 'only while GPS is showing');
+    assert.ok(/w\.mph \+ \(w\.gustMph \? ' g ' \+ w\.gustMph : ''\) \+ ' mph'/.test(sec), '"12 g 20 mph"');
 });
 
 test('build 5 landing: the Card choice is remembered per round, so every new round opens on GPS', { skip }, () => {
