@@ -355,3 +355,30 @@ test('build 7: the numbers ride their own lines (shrinking before sliding), a ce
     assert.ok(/<span class="gps-ring-dot"><\/span>/.test(v) && /\.gps-target \.gps-ring-dot\{[^}]*width:14px;height:14px;/.test(v), 'the center dot');
     assert.ok(/\.gps-pin\{width:20px;height:20px;/.test(v) && /\.gps-green-lbl\{[^}]*font:800 15px/.test(v), 'F / C / B bigger');
 });
+
+test('build 7: F / B follow the golfer\'s live angle - 100 yds right of the green, pin high: front = right edge, back = left edge, on the golfer -> center line; they move with every fix', { skip }, () => {
+    const G = require('./gps-geo.js'), T = require('./gps-courses.js');
+    const h = G.osmCourse(T, 'caledonia').holes['1'].osm;
+    const r = { mid: h.mid, green: h.green, useGreenForEdges: true, tee: h.tee };
+    const axis = G.bearingDeg(h.tee, h.mid);                       // the line of play
+    const me = G.destination(h.mid, axis + 90, 100 * G.M_PER_YD);  // 100 yds to the RIGHT, pin high
+    const n = G.holeNumbers(me, r);
+    assert.ok(n && n.front && n.back, 'front and back from the golfer');
+    // Both on the golfer -> green-center line.
+    const proj = (p) => { const k = Math.cos(h.mid[0] * Math.PI / 180); return [(p[1] - h.mid[1]) * k * 111320, (p[0] - h.mid[0]) * 110540]; };
+    const onLine = (p) => { const a = proj(me), b = [0, 0], q = proj(p); const cross = Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / Math.hypot(b[0] - a[0], b[1] - a[1]); return cross; };
+    assert.ok(onLine(n.front) < 0.5 && onLine(n.back) < 0.5, 'front and back sit on the golfer -> center line: ' + [onLine(n.front), onLine(n.back)]);
+    // Front is the near (RIGHT) edge, back the far (LEFT) edge - not the tee's front and back.
+    assert.ok(n.frontM < n.middleM && n.middleM < n.backM, 'front < center < back from the golfer');
+    const side = (p) => Math.sin((G.bearingDeg(h.mid, p) - axis) * Math.PI / 180);   // + = right of the line of play
+    assert.ok(side(n.front) > 0.9 && side(n.back) < -0.9, 'front on the right edge, back on the left: ' + [side(n.front), side(n.back)]);
+    const teeN = G.holeNumbers(h.tee, r);
+    assert.ok(G.haversineMeters(teeN.front, n.front) > 5, 'not the tee\'s front');
+    // A new fix (the golfer walks 30 yds toward the green): new front and back.
+    const me2 = G.destination(me, G.bearingDeg(me, h.mid), 30 * G.M_PER_YD), n2 = G.holeNumbers(me2, r);
+    assert.ok(Math.abs(n2.frontM - (n.frontM - 30 * G.M_PER_YD)) < 2, 'front moves with the golfer');
+    // The screen asks with the LIVE origin on every fix (render on each position).
+    const v = read('gps-view.js');
+    assert.ok(/var nums = r \? G\.holeNumbers\(o \? o\.pt : null, r\) : null;\s*marker\('front', nums && nums\.front/.test(v), 'the F / B markers come from the live origin');
+    assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy \};\s*S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
+});
