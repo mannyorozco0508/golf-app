@@ -119,9 +119,10 @@ describe('2. ONE NAME FOR THE BOX, FROM handicap-labels.js', () => {
         const sb = arrive();
         vm.runInContext("document.getElementById('handicap-basis-select').value = 'as-entered'; refreshHandicapNote();", sb);
         const text = noteText(sb);
-        assert.match(text, /Strokes/, 'the note does not name the mode');
+        // The box is "HCP" since players-compact (2026-10-09).
+        assert.match(text, /HCP|Strokes/, 'the note does not name the mode');
         assert.ok(!/Index/.test(text), 'a Strokes round still says Index: ' + text);
-        assert.equal(vm.runInContext('handicapSetupBoxLabel()', sb), 'Strokes');
+        assert.equal(vm.runInContext('handicapSetupBoxLabel()', sb), 'HCP');
     });
 
     test('a GHIN round says Index, and still explains an unrated tee', () => {

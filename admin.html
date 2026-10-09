@@ -557,6 +557,56 @@
         }
         .p-group-input { width: auto; min-width: 92px; margin: 0 0 0 auto; padding: 6px 4px; font-size: 0.76rem; }
 
+        /* THE COMPACT PLAYER LIST (players-compact, 2026-10-09). One row per golfer,
+           like a table: drag handle | name | HCP | tee | x. Team, squad and flight
+           (when the format has them) sit on a slim second line, so a foursome fits
+           in about a third of an iPhone screen and nothing scrolls sideways at
+           320 px. The order controls (Move up / Move down / Move to Group) are a
+           small menu behind the handle; dragging the handle reorders. Every control
+           keeps its old class, so everything that reads the rows is unchanged. */
+        .player-row.p-compact, #player-header-row.p-compact {
+            grid-template-columns: 30px minmax(0, 1fr) 50px 76px 34px !important;
+            column-gap: 6px; row-gap: 4px;
+        }
+        .player-row.p-compact { position: relative; margin-bottom: 5px; align-items: center; row-gap: 2px; }
+        .player-row.p-compact > input, .player-row.p-compact select { margin: 0; }
+        .p-compact .p-drag { grid-column: 1; grid-row: 1; width: 30px; height: 38px; padding: 0; margin: 0;
+            border: 0; background: transparent; color: var(--text-muted); font-size: 1.25rem; line-height: 1;
+            cursor: grab; touch-action: none; border-radius: 6px; }
+        .p-compact .p-drag:focus-visible { outline: 2px solid var(--brand-green); }
+        .p-compact .p-name-input { grid-column: 2; grid-row: 1; min-width: 0; height: 38px; }
+        .p-compact .p-hcp-input { grid-column: 3; grid-row: 1; min-width: 0; height: 38px; text-align: center; padding-left: 2px; padding-right: 2px; }
+        .p-compact .p-tee-line { grid-column: 4; grid-row: 1; margin: 0 !important; min-width: 0; }
+        .p-compact .btn-del { grid-column: 5; grid-row: 1; height: 36px; }
+        .p-compact .p-extra-line { grid-column: 2 / -1; grid-row: 2; display: flex; align-items: center; gap: 6px;
+            flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); }
+        .p-compact .p-extra-line select { width: auto; min-width: 64px; padding: 2px 6px; font-size: 0.76rem; height: 26px; }
+        /* A slim chip line, so a foursome with flights on still fits in a third of the screen. */
+        .p-compact .p-extra-line { min-height: 22px; line-height: 1; }
+        .p-compact .p-extra-line .p-flight-input { min-height: 22px !important; min-width: 28px !important; height: 22px;
+            padding: 0 6px !important; font-size: 0.72rem !important; line-height: 1 !important; border-radius: 6px !important; }
+        .p-compact .p-flight-line { display: contents !important; }
+        .p-tee-pick { position: relative; display: block; height: 38px; border: 1px solid var(--border-mid);
+            border-radius: 6px; background: var(--bg-card); }
+        .p-tee-short { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            padding: 0 14px 0 4px; font-size: 0.82rem; font-weight: 600; color: var(--text-main, inherit);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+        .p-tee-short::after { content: '\25BE'; position: absolute; right: 4px; font-size: 0.7rem; color: var(--text-muted); }
+        .p-tee-pick .p-tee-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .p-sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .p-compact .p-order-wrap { position: absolute; top: calc(100% - 2px); left: 0; z-index: 30; display: none;
+            flex-direction: column; align-items: stretch; gap: 4px; margin: 0; padding: 8px; min-width: 170px;
+            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+        .p-compact.p-menu-open .p-order-wrap { display: flex; }
+        .p-compact .p-order-wrap .p-order-btn { width: auto; min-height: 38px; padding: 0 10px; text-align: left; font-size: 0.85rem; }
+        .p-compact .p-order-wrap .p-group-input { margin: 0; width: 100%; }
+        .p-compact .p-order-label { font-weight: 600; }
+        .player-row.p-dragging { opacity: .9; z-index: 40; box-shadow: 0 8px 20px rgba(0,0,0,.2); background: var(--bg-card); border-radius: 8px; }
+        #tee-everyone-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 0.82rem; }
+        #tee-everyone-row label { font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        #tee-everyone { width: auto; min-width: 0; flex: 1 1 auto; margin: 0; }
+
         .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
@@ -2150,7 +2200,8 @@ html {
         </div>
     </div>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
-    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
+    <div id="tee-everyone-row" style="display:none;"><label for="tee-everyone">Tee for everyone</label><select id="tee-everyone" onchange="setTeeForEveryone(this.value)"></select></div>
+    <div id="player-header-row" class="p-compact" style="font-weight:bold; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
@@ -7999,7 +8050,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // box. gridColumn 1 / -1 gives the controls their own line instead.
         const wrap = document.createElement('div');
         wrap.className = 'p-order-wrap';
-        wrap.style.gridColumn = '1 / -1';
+        wrap.setAttribute('role', 'menu');
         const btn = (glyph, label, fn) => {
             const b = document.createElement('button');
             b.type = 'button';
@@ -8011,10 +8062,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         };
         const label = document.createElement('span');
         label.className = 'p-order-label';
-        label.textContent = 'Order';
+        label.textContent = 'Move';
         wrap.appendChild(label);
-        wrap.appendChild(btn('\u25B2', 'Move this golfer up', function () { moveRowBy(row, -1); }));
-        wrap.appendChild(btn('\u25BC', 'Move this golfer down', function () { moveRowBy(row, 1); }));
+        // In the compact list these sit in the handle's menu, so they say what they do.
+        wrap.appendChild(btn('\u25B2 Move up', 'Move this golfer up', function () { moveRowBy(row, -1); row.classList.remove('p-menu-open'); }));
+        wrap.appendChild(btn('\u25BC Move down', 'Move this golfer down', function () { moveRowBy(row, 1); row.classList.remove('p-menu-open'); }));
         // MOVE TO GROUP N, as a select rather than a menu: on a phone the native
         // picker is one tap and needs no layout of ours, and it reads out the
         // group names to a screen reader for free.
@@ -8117,24 +8169,163 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             });
             sel.appendChild(opt);
         }
+        // A new golfer takes "Tee for everyone" when it has been set; otherwise the round's tee.
+        const everyone = document.getElementById('tee-everyone');
+        const everyoneKey = (everyone && everyone.value && Array.prototype.some.call(sel.options, o => o.value === everyone.value)) ? everyone.value : '';
         const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
-            ? teeKey : (src.value || '');
+            ? teeKey : (everyoneKey || src.value || '');
         sel.value = want;
         // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
         // builds a control for a row that had none.
         row.setAttribute('data-tee-key', want || '');
         sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
-        sel.onchange = function () { if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
+        sel.onchange = function () { syncTeeShort(sel); if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
+        sel.setAttribute('aria-label', 'Tee');
+        // COMPACT: the tee is the 4th column of the row. The closed control shows a
+        // SHORT name ("Blue"); the native picker still lists the full names, and the
+        // option text (what the save reads) is unchanged.
         const line = document.createElement('div');
         line.className = 'p-tee-line';
-        line.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-muted); margin-top:4px;';
-        line.style.gridColumn = '1 / -1';
         const label = document.createElement('span');
+        label.className = 'p-sr';
         label.textContent = 'Tee';
         line.appendChild(label);
-        line.appendChild(sel);
+        const pick = document.createElement('span');
+        pick.className = 'p-tee-pick';
+        const short = document.createElement('span');
+        short.className = 'p-tee-short';
+        short.setAttribute('aria-hidden', 'true');
+        pick.appendChild(short);
+        pick.appendChild(sel);
+        line.appendChild(pick);
+        row.appendChild(line);
+        syncTeeShort(sel);
+    }
+
+    // "Men · Pintail Blue" -> "Blue"; the last word unless two tees share it, then
+    // the whole tee name; a women's tee gets a W in front.
+    function shortTeeLabel(optText, allTexts) {
+        const seg = (t) => { const parts = String(t || '').split('\u00b7'); return parts[parts.length - 1].trim(); };
+        const name = seg(optText);
+        const last = name.split(/\s+/).pop();
+        const clash = (allTexts || []).filter((t) => seg(t) !== name && seg(t).split(/\s+/).pop().toLowerCase() === last.toLowerCase()).length > 0;
+        const women = /^\s*(women|ladies|female)/i.test(String(optText || ''));
+        return (women ? 'W ' : '') + (clash ? name : last);
+    }
+    function syncTeeShort(sel) {
+        if (!sel) return;
+        const pick = sel.parentNode, short = pick && pick.querySelector ? pick.querySelector('.p-tee-short') : null;
+        if (!short) return;
+        const all = Array.prototype.map.call(sel.options, o => o.textContent);
+        const opt = sel.options[sel.selectedIndex];
+        short.textContent = opt ? shortTeeLabel(opt.textContent, all) : '';
+    }
+
+    // TEE FOR EVERYONE: one picker above the list sets every golfer's tee at once;
+    // any golfer's own tee can still differ afterwards. Shown only when the course
+    // has more than one rated tee, like the per-golfer control.
+    function syncTeeEveryone() {
+        const wrap = document.getElementById('tee-everyone-row');
+        const ev = document.getElementById('tee-everyone');
+        const src = document.getElementById('tee-rating-select');
+        if (!wrap || !ev) return;
+        if (!src || !src.options || src.options.length < 2) { wrap.style.display = 'none'; return; }
+        wrap.style.display = '';
+        const want = Array.prototype.map.call(src.options, o => o.value + '|' + o.textContent).join('\n');
+        if (ev.getAttribute('data-filled') !== want) {
+            const keep = ev.value;
+            ev.innerHTML = '<option value="">Set all…</option>' + Array.prototype.map.call(src.options, o =>
+                '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.textContent) + '</option>').join('');
+            ev.setAttribute('data-filled', want);
+            if (keep) ev.value = keep;
+        }
+    }
+    function setTeeForEveryone(key) {
+        if (!key) return;
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        list.querySelectorAll('.player-row').forEach((row) => {
+            const sel = row.querySelector('.p-tee-input');
+            if (!sel || !Array.prototype.some.call(sel.options, o => o.value === key)) return;
+            sel.value = key;
+            row.setAttribute('data-tee-key', key);
+            syncTeeShort(sel);
+        });
+        if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
+    }
+
+    // TEAM / SQUAD / FLIGHT on a slim second line, so the first line stays
+    // handle | name | HCP | tee | x at any phone width.
+    function compactExtraLine(row) {
+        const items = [];
+        ['.p-team-input', '.p-squad-input'].forEach((sel) => { const el = row.querySelector(sel); if (el) items.push([el, sel === '.p-team-input' ? 'Team' : 'Squad']); });
+        const fl = row.querySelector('.p-flight-line');
+        if (!items.length && !fl) return;
+        const line = document.createElement('div');
+        line.className = 'p-extra-line';
+        items.forEach(([el, lbl]) => {
+            const l = document.createElement('span');
+            l.textContent = lbl;
+            line.appendChild(l);
+            el.style.gridColumn = ''; el.style.gridRow = '';
+            line.appendChild(el);
+        });
+        if (fl) line.appendChild(fl);
         row.appendChild(line);
     }
+
+    // DRAG THE HANDLE TO REORDER; TAP IT FOR THE MENU (Move up / Move down / Move
+    // to group). The move itself is grouping.js's rosterMove, the same one the
+    // arrows use, so a drag can never lose or duplicate a golfer.
+    function closeRowMenus(except) {
+        document.querySelectorAll('.player-row.p-menu-open').forEach((r) => { if (r !== except) r.classList.remove('p-menu-open'); });
+    }
+    function attachRowDrag(row) {
+        const h = row.querySelector('.p-drag');
+        if (!h) return;
+        let start = null;
+        h.addEventListener('pointerdown', function (e) {
+            if (e.button !== undefined && e.button !== 0) return;
+            start = { y: e.clientY, moved: false, id: e.pointerId };
+            try { h.setPointerCapture(e.pointerId); } catch (x) {}
+        });
+        h.addEventListener('pointermove', function (e) {
+            if (!start || e.pointerId !== start.id) return;
+            const dy = e.clientY - start.y;
+            if (!start.moved && Math.abs(dy) < 6) return;
+            if (!start.moved) { start.moved = true; closeRowMenus(); row.classList.add('p-dragging'); }
+            row.style.transform = 'translateY(' + dy + 'px)';
+            e.preventDefault();
+        });
+        const end = function (e) {
+            if (!start || (e && e.pointerId !== start.id)) return;
+            const moved = start.moved, y = e ? e.clientY : start.y;
+            start = null;
+            row.classList.remove('p-dragging');
+            row.style.transform = '';
+            if (!moved) return;
+            const rows = playerRowsNow();
+            const from = rows.indexOf(row);
+            let to = rows.length - 1;
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i].getBoundingClientRect();
+                if (y < r.top + r.height / 2) { to = i > from ? i - 1 : i; break; }
+            }
+            if (from !== -1 && to !== from) applyRowOrder(rosterMove(rows, from, to));
+        };
+        h.addEventListener('pointerup', end);
+        h.addEventListener('pointercancel', end);
+        h.addEventListener('click', function (e) {
+            e.preventDefault();
+            const open = !row.classList.contains('p-menu-open');
+            closeRowMenus(row);
+            row.classList.toggle('p-menu-open', open);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (!e.target || !e.target.closest || e.target.closest('.p-drag') || e.target.closest('.p-order-wrap')) return;
+        closeRowMenus();
+    });
 
     // The tee one row is set to, as the shape handicap.js and player-tees.js read.
     // The tee names THIS course offers, for the paste parser. Nothing else is a
@@ -8363,17 +8554,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             warningBox.style.display = 'none';
         }
 
-        if (format === 'ryder') {
-            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
-            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
-        } else {
-            const flt = flightsEnabledNow();
-            headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
-        }
+        // THE COMPACT LIST: one header for every format - NAME · HCP · TEE. Team,
+        // squad and flight are labelled on each golfer's second line.
+        void format; void moneyHeaderHtml; void showMoneyCheckbox;
+        headerRow.classList.add('p-compact');
+        headerRow.style.gridTemplateColumns = '';
+        const teeHead = (document.getElementById('tee-rating-select') && document.getElementById('tee-rating-select').options.length > 1) ? 'Tee' : '';
+        headerRow.innerHTML = `<span></span><span>Name</span><span style="text-align:center">${hcpHead}</span><span style="text-align:center">${teeHead}</span><span></span>`;
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
         // the hint too. The hint is about where group games are chosen, which is worth
@@ -10741,7 +10928,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         let moneyCheckboxHtml = "";
 
         const row = document.createElement("div");
-        row.className = "player-row";
+        row.className = "player-row p-compact";
         // Stamped at creation and never recomputed. An id passed in comes from a
         // saved round or from the row this one is replacing during a rebuild; only a
         // genuinely new row mints one.
@@ -10758,8 +10945,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const flightsOn = flightsEnabledNow();
         const flightAsLine = !!(teamFieldHtml || squadFieldHtml);
         const flightColumn = (flightsOn && !flightAsLine) ? " 0.7fr" : "";
-        row.style.gridTemplateColumns = baseColumns + flightColumn + (showMoneyCheckbox ? " 46px" : "") + " 38px";
+        // THE COMPACT LIST: the columns come from .p-compact (handle | name | HCP |
+        // tee | x); baseColumns / flightColumn are kept for the record but no longer
+        // set inline. Team, squad and flight move to a second line below.
+        void baseColumns; void flightColumn;
         row.innerHTML = `
+            <button type="button" class="p-drag" aria-label="Move ${escapeHtml(name || 'this golfer')}: drag, or tap for Move up, Move down and Move to group" title="Drag to reorder - tap for more">&#8801;</button>
             <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
             <input type="text" class="p-hcp-input" placeholder="${handicapSetupBoxLabel()}" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
@@ -10767,9 +10958,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             ${moneyCheckboxHtml}
             <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
-        if (flightsOn) appendFlightControl(row, flight, flightAsLine);
+        // Always on the second line in the compact list (asLine = true).
+        if (flightsOn) appendFlightControl(row, flight, true);
+        void flightAsLine;
         appendTeeControl(row, teeKey);
         appendOrderControl(row);
+        compactExtraLine(row);
+        attachRowDrag(row);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -10821,11 +11016,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const basis = (el && el.value === 'ghin-index') ? 'ghin-index' : 'as-entered';
         return (typeof handicapBoxPlaceholder === 'function')
             ? handicapBoxPlaceholder({ handicapBasis: basis })
-            : (basis === 'as-entered' ? 'Strokes' : 'Index');
+            : (basis === 'as-entered' ? 'HCP' : 'Index');
     }
 
     function updateCount() { 
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
+        syncTeeEveryone();
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
         refreshFlightsCount();

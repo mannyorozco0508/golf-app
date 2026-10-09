@@ -131,8 +131,8 @@ test('Consumer source: index.html with its GPS blocks removed IS the pre-GPS ind
 test('CONSUMER WEB BUILD (build-shell.js, flag unset): no GPS files, no GPS code, the pre-GPS scorecard', () => {
     const dir = buildWeb(undefined);
     noGps(dir, 'dist/consumer');
-    assert.ok(/const CACHE_VERSION = 'consumer-v164-onecourseentry';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
-        'the Consumer cache key is main\'s (387cf89): nothing a Consumer device holds differs from main');
+    assert.ok(/const CACHE_VERSION = 'consumer-v165-gotoround';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
+        'the Consumer cache key is players-compact\'s (0b5d332, merged in): nothing a Consumer device holds differs from it');
 });
 
 test('CONSUMER NATIVE BUILD (sync-mobile-web.js, flag unset): no GPS, and a stray location permission REMOVED', () => {
@@ -148,7 +148,7 @@ test('HARDPAN WEB BUILD (GPS_ENABLED=1): the GPS files and the toggle, in dist/h
     GPS_SHELL.forEach((f) => assert.ok(fs.existsSync(path.join(web, f)), 'dist/hardpan is missing ' + f));
     assert.ok(/<script src="gps-view\.js"><\/script>/.test(fs.readFileSync(path.join(web, 'index.html'), 'utf8')));
     assert.ok(/📍 GPS/.test(fs.readFileSync(path.join(web, 'gps-view.js'), 'utf8')), 'the toggle');
-    assert.ok(/const CACHE_VERSION = 'consumer-v176-gps-smarttarget';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
+    assert.ok(/const CACHE_VERSION = 'consumer-v177-gps-compact';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
 });
 
 test('THERE IS NO HARDPAN APP BUILD: sync-mobile-web.js refuses GPS_ENABLED=1 and writes nothing', () => {

@@ -81,7 +81,8 @@ const PRODUCTS = {
         // v174 (gps-flow, 2026-10-09): any course (OSM lookup), no-data landing, the new target.
         // v175 (gps-flow, 2026-10-09): five more bundled courses from OpenStreetMap.
         // v176 (build 6, 2026-10-09): the smart default target; hole lines and fairways.
-        cacheNameGps: 'consumer-v176-gps-smarttarget',
+        // v177 (build 6, 2026-10-09): players-compact merged in.
+        cacheNameGps: 'consumer-v177-gps-compact',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.
@@ -159,7 +160,7 @@ const PRODUCTS = {
         // cards on the page under it, the rest behind one handle.
         // Moved to v151 for the two card guards (admin.html): a round can no longer
         // be saved with no holes. v150 is held by gps-v1. A device on v149 can.
-        cacheName: 'consumer-v164-onecourseentry',
+        cacheName: 'consumer-v165-gotoround',
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and betting tracker',
