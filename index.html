@@ -6092,22 +6092,29 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function gpsGotoHole(hole) {
         goToHole(Number(hole));
         const kp = document.getElementById('kp-force-overlay');
-        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets');
+        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets', { remember: false });
     }
     function gpsStepHole(dir) {
         goToAdjacentHole(dir);
         // The KP question gates leaving a KP hole and is answered on the card,
         // under the GPS side - so show the card when it is up.
         const kp = document.getElementById('kp-force-overlay');
-        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets');
+        if (kp && kp.style.display === 'flex') window.HardPanGps.showSide('bets', { remember: false });
     }
     // THE SCORE BUTTON ON THE MAP (Wave 1): the card's own score entry for this
     // hole - the Bets side, the first empty box - so a score typed from GPS is
     // saved by exactly the code that saves every other score. No new data path.
     // Focused inside the tap, so the phone's keyboard opens.
+    // ... and AFTER IT IS SAVED (gps-flow, 2026-10-09): once every box for that
+    // hole is filled and the last one saved (the card's own change -> saveScore,
+    // the offline queue, unchanged), the card moves to the next hole the way its
+    // own Next does and GPS comes back on it. The KP question, when the hole has
+    // one, comes first, on the card. Leaving the card any other way cancels this.
+    let gpsScoreFrom = null;
     function gpsOpenScore(hole) {
         const g = window.HardPanGps;
-        if (g) g.showSide('bets');
+        gpsScoreFrom = Number(hole);
+        if (g) g.showSide('bets', { remember: false });
         const all = Array.from(document.querySelectorAll('.score-input[data-hole="' + Number(hole) + '"]:not([disabled])'));
         const box = all.find(i => !String(i.value || '').trim()) || all[0];
         if (box) {
@@ -6115,6 +6122,23 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             try { box.focus(); } catch (e) {}
         }
     }
+    document.addEventListener('change', (e) => {
+        if (gpsScoreFrom == null || !e.target || !e.target.classList || !e.target.classList.contains('score-input')) return;
+        // After the save's own re-render (it is synchronous) - read the boxes it drew.
+        setTimeout(() => {
+            const h = gpsScoreFrom;
+            if (h == null || currentViewMode !== 'hole' || Number(currentViewedHole) !== h) { gpsScoreFrom = null; return; }
+            const boxes = Array.from(document.querySelectorAll('#hole-view-card .score-input[data-hole="' + h + '"]:not([disabled])'));
+            if (!boxes.length || boxes.some((b) => !String(b.value || '').trim())) return;
+            const a = document.activeElement;
+            if (a && a.classList && a.classList.contains('score-input')) return;   // still typing
+            gpsScoreFrom = null;
+            goToAdjacentHole(1);
+            const kp = document.getElementById('kp-force-overlay');
+            if (kp && kp.style.display === 'flex') return;
+            if (window.HardPanGps) window.HardPanGps.showSide('gps', { remember: false });
+        }, 0);
+    });
     let gpsPrecacheAsked = false;
     function gpsFollowHoleView() {
         const g = window.HardPanGps;

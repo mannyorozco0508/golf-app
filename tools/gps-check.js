@@ -118,6 +118,10 @@ if (String(Math.round(inlineHaversineM(ME, H1.mid) / 0.9144)) !== EXPECT.center)
 
 function sensor(mode, lat, lng, acc) {
     return `(function () {
+      // A PHONE THAT LAST LEFT ON THE CARD (gps-flow): every arm starts on the
+      // scorecard and taps 📍 GPS, as it always has. The flow arms set
+      // window.__freshPhone first: a phone that has never chosen, which lands on GPS.
+      try { if (!window.__freshPhone && !localStorage.getItem('hardpan_round_side')) localStorage.setItem('hardpan_round_side', 'bets'); } catch (e) {}
       // Page errors, recorded: an arm that fails reads WHY (Wave 2 redesign).
       window.__errs = [];
       window.addEventListener('error', function (e) { window.__errs.push(String(e && e.message) + ' @' + (e && e.lineno)); });
@@ -1255,6 +1259,43 @@ function usgsFallbackFails(tag, g, why) {
         out.layoutSummary = { bounds: l0.bounds, centers: [l0.mapCenter, l1.mapCenter, l2.mapCenter], zoom: [l0.zoom, l2.zoom, l3.zoom], meta: [l0.holeMeta, l5.holeMeta] };
     }
 
+    // ---- THE FLOW (gps-flow, 2026-10-09): a round opens on GPS; Enter Score saves
+    // through the card and comes back to GPS on the next hole ----------------------
+    const FRESH = 'window.__freshPhone = true;';
+    const typeScore = (d) => [{ cdp: { method: 'Input.insertText', params: { text: d } } }, { sleep: 350 }];
+    const fl = await arm('flow', 'caledonia', null, 'ok', ME, 4.6, [
+        WAIT_MAP, { sleep: 1200 }, { expression: READ },                                                // 0 landed: GPS, hole 1
+        { tap: '.gps-score' }, { sleep: 600 }, { expression: READ },                                    // 1 the card, hole 1's first box
+        ...typeScore('4'), ...typeScore('5'), ...typeScore('3'), ...typeScore('6'), { sleep: 1500 }, { expression: READ }, // 2 all four saved -> GPS hole 2
+        // The writes are recorded per page: read them before the reload below.
+        { expression: `'FLOWW' + JSON.stringify(window.__coldWrites || [])` },
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1200 }, { expression: READ },             // 3 reopened: GPS again
+        { tap: '.gps-side-bets' }, { sleep: 500 }, { expression: 'location.reload()' }, { sleep: 5000 }, { expression: READ }, // 4 left on the Card: the Card
+    ], { preScript: FRESH + sensor('ok', ME[0], ME[1], 4.6) });
+    out.flow = fl; bail(out, fl);
+    const fu = await arm('flowu', 'pinelakes', null, 'ok', pl, 5, [{ sleep: 6000 }, { expression: READ }], { preScript: FRESH + sensor('ok', pl[0], pl[1], 5) });
+    out.flowUnmapped = fu; bail(out, fu);
+    const fd = await arm('flowd', 'caledonia', null, 'denied', ME, 5, [{ sleep: 7000 }, { expression: READ }], { preScript: FRESH + sensor('denied', ME[0], ME[1], 5) });
+    out.flowDenied = fd; bail(out, fd);
+    {
+        const [f0, f1, f2, f3, f4] = fl.reads;
+        if (f0.side !== 'gps' || !f0.gpsShown || f0.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('flow: a fresh phone did not land on GPS hole 1: ' + JSON.stringify([f0.side, f0.gpsShown, f0.title]));
+        if (f1.side !== 'bets' || !f1.active || !/score-input/.test(f1.active.cls) || f1.active.hole !== '1') fails.push('flow: Enter Score did not open hole 1\'s box: ' + JSON.stringify([f1.side, f1.active]));
+        const fw = fl.raw.find((v) => typeof v === 'string' && v.startsWith('FLOWW'));
+        const flWrites = fw ? JSON.parse(fw.slice(5)) : [];
+        const sw = flWrites.filter((x) => new RegExp('^events/' + fl.code + '/scores/').test(x.path));
+        const vals = sw.map((x) => x.value).sort().join(',');
+        if (sw.length < 4 || vals !== '3,4,5,6') fails.push('flow: the four scores were not saved through the card: ' + JSON.stringify(sw.map((x) => [x.path, x.value])));
+        if (flWrites.concat(fl.dump.writes).some((x) => !new RegExp('^events/' + fl.code + '/(scores|auditLog|scoresVerified)\\b').test(x.path))) fails.push('flow: unexpected writes ' + JSON.stringify(flWrites.map((x) => x.path)));
+        if (f2.side !== 'gps' || !f2.gpsShown || !/^Hole 2/.test(f2.title || '') || f2.cardHole !== 'Hole 2') fails.push('flow: after the last score, not back on GPS at hole 2: ' + JSON.stringify([f2.side, f2.title, f2.cardHole]));
+        if (f3.side !== 'gps' || !f3.gpsShown) fails.push('flow: reopening the round did not land on GPS: ' + JSON.stringify([f3.side, f3.gpsShown]));
+        if (f4.side !== 'bets' || f4.gpsShown) fails.push('flow: left on the Card, the reopened round did not stay on the Card: ' + JSON.stringify([f4.side, f4.gpsShown]));
+        if (fu.reads[0].side !== 'bets' || fu.reads[0].gpsShown) fails.push('flow: a hole with no GPS data landed on GPS: ' + JSON.stringify([fu.reads[0].side, fu.reads[0].title]));
+        if (fd.reads[0].side !== 'bets' || fd.reads[0].gpsShown) fails.push('flow: location denied landed on GPS: ' + JSON.stringify([fd.reads[0].side]));
+        if (fd.dump.storage.hardpan_round_side === 'bets') fails.push('flow: denied location was remembered as a choice of the Card');
+        out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
+    }
+
     // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
     const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
     const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
@@ -1309,7 +1350,7 @@ function usgsFallbackFails(tag, g, why) {
 
     // ---- privacy, every arm ------------------------------------------------------
     [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [gg, ME],
-     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME]].forEach(([r, me]) => {
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME], [fl, ME], [fu, pl], [fd, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });
@@ -1338,7 +1379,7 @@ function usgsFallbackFails(tag, g, why) {
         esriPinning: out.esriSummary,
         polish: out.polishSummary,
         courses: out.courses,
-        green: out.greenSummary, layout: out.layoutSummary, google: out.googleSummary, googleBudget: out.googleBudget,
+        green: out.greenSummary, layout: out.layoutSummary, flow: out.flowSummary, google: out.googleSummary, googleBudget: out.googleBudget,
         esri3x: out.esri3xSummary, esriTileBudget: out.budgetSummary, plays: out.playsSummary, free: out.freeSummary,
         esriRefusedRequests: Object.keys(SEEN.esri).filter((k) => /^DENY/.test(k)).reduce((n, k) => n + SEEN.esri[k].length, 0),
         fails,

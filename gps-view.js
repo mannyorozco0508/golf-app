@@ -195,6 +195,10 @@
     function setUnits(u) {
         try { localStorage.setItem(UNITS_KEY, u === 'm' ? 'm' : 'yd'); } catch (e) {}
     }
+    // What this phone last LEFT ON: 'gps', 'bets' (the Card), or null (never).
+    function storedSide() {
+        try { var v = localStorage.getItem(SIDE_KEY); return v === 'gps' || v === 'bets' ? v : null; } catch (e) { return null; }
+    }
     function lastSide() {
         try { return localStorage.getItem(SIDE_KEY) === 'gps' ? 'gps' : 'bets'; } catch (e) { return 'bets'; }
     }
@@ -229,6 +233,9 @@
             if (gen !== watchGen || !S) return;
             S.geoError = (err && (err.code === 1 || /denied|permission/i.test(String(err.message || '')))) ? 'denied'
                 : (err && err.code === 3) ? 'timeout' : 'unavailable';
+            // LANDED HERE BY ITSELF and location is off: the scorecard, as before
+            // GPS - not a GPS side that can only say "location is off".
+            if (S.geoError === 'denied' && S.autoLanded && !S.userChoseSide && S.side === 'gps') { showSide('bets', { remember: false }); return; }
             render();
         };
         var cap = capGeo();
@@ -2143,9 +2150,10 @@
         };
         el.classList.toggle('gps-basic-mode', !S.pro);
 
-        on(tg, '.gps-side-gps', function () { showSide('gps'); });
-        on(el, '.gps-side-bets', function () { showSide('bets'); });
-        on(el, '.gps-back', function () { showSide('bets'); });
+        // The golfer's own choice of side: remembered, and the landing leaves it be.
+        on(tg, '.gps-side-gps', function () { S.userChoseSide = true; showSide('gps'); });
+        on(el, '.gps-side-bets', function () { S.userChoseSide = true; showSide('bets'); });
+        on(el, '.gps-back', function () { S.userChoseSide = true; showSide('bets'); });
         var ci = el.querySelector('.gps-credit-i');
         if (ci) ci.addEventListener('click', function (e) { e.preventDefault(); toggleCredits(e); });
         // Tap anywhere (the map included) closes the credits.
@@ -2217,7 +2225,7 @@
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onPageHide);
         loadCourseRecord();
-        if (lastSide() === 'gps') showSide('gps');
+        land();
         return true;
     }
 
@@ -2240,11 +2248,43 @@
         loadMapLibre(function () { if (S === mine) { buildMap(); render(); } });
     }
 
-    function showSide(side) {
+    // THE LANDING (gps-flow, 2026-10-09): a round that starts or is reopened
+    // opens on GPS, for the hole the card is on - unless this phone last LEFT
+    // ON THE CARD (remembered), location is denied, or the hole has no GPS data
+    // (no green and no tee): then the scorecard, as before GPS.
+    function land() {
+        if (!S || !S.pro) { if (storedSide() === 'gps') showSide('gps'); return; }
+        if (storedSide() === 'bets') return;
+        var mine = S;
+        locationDenied(function (denied) {
+            if (S !== mine || denied || S.userChoseSide) return;
+            loadCourses(function () {
+                if (S !== mine || S.userChoseSide || S.side === 'gps') return;
+                S.loadingCourses = false;
+                var r = resolved();
+                if (!r || (!r.mid && !r.tee)) return;
+                S.autoLanded = true;
+                showSide('gps');
+            });
+        });
+    }
+    function locationDenied(done) {
+        try {
+            if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                navigator.permissions.query({ name: 'geolocation' }).then(function (st) { done(!!st && st.state === 'denied'); }, function () { done(false); });
+                return;
+            }
+        } catch (e) {}
+        done(false);
+    }
+
+    // opts.remember false: a visit to the card that is not the golfer leaving
+    // GPS (Enter Score, the KP question) - the next landing is still GPS.
+    function showSide(side, opts) {
         if (!S) return false;
         side = side === 'gps' ? 'gps' : 'bets';
         S.side = side;
-        rememberSide(side);
+        if (!opts || opts.remember !== false) rememberSide(side);
         document.body.classList.toggle('gps-side-gps', side === 'gps');
         document.documentElement.classList.toggle('gps-lock', side === 'gps');
         var a = S.toggle.querySelector('.gps-side-gps');
