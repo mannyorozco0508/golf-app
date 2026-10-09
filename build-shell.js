@@ -77,7 +77,8 @@ const PRODUCTS = {
         // v169 (gps-flow, 2026-10-09): the round opens on GPS; Enter Score returns to it.
         // v171 (gps-flow, 2026-10-09): the clean map and the manual wind (gps-wave2's v170).
         // v172 (gps-flow, 2026-10-09): main (consumer-v164) merged into the GPS branch.
-        cacheNameGps: 'consumer-v172-gps-flowmain',
+        // v173 (gps-flow, 2026-10-09): the side is remembered per round (every new round opens on GPS).
+        cacheNameGps: 'consumer-v173-gps-landing',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

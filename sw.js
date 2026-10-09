@@ -4557,7 +4557,11 @@
 // so the HardPan shell carries main's files and the GPS ones. Above main's v330
 // and gps-flow's v337. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v338-gps-flowmain';
+// GPS:BEGIN
+// Moved to v339 (gps-flow, 2026-10-09): gps-view.js remembers the side (GPS or
+// the Card) per round, so every new round opens on GPS. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v339-gps-landing';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

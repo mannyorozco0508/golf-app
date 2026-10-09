@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v338-gps-flowmain'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v339-gps-landing'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -265,4 +265,12 @@ test('manual wind: on this phone only, today only, and it drives plays ~', { ski
     assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|\.ref\(|db\./.test(sec), 'the manual wind is never sent anywhere');
     assert.ok(/var w = effectiveWind\(\), has = !!\(w && !w\.none\);/.test(v), 'plays ~ uses the manual wind');
     assert.ok(/Use live wind/.test(v) && /gps-wind-tag">manual</.test(v));
+});
+
+test('build 5 landing: the Card choice is remembered per round, so every new round opens on GPS', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/localStorage\.setItem\(SIDE_KEY, S && S\.eventCode \? side \+ '\|' \+ S\.eventCode : side\)/.test(v), 'stored with the round code');
+    assert.ok(/if \(r\.round != null && \(!S \|\| r\.round !== S\.eventCode\)\) return null;/.test(v), 'another round\'s choice is not this round\'s');
+    // The landing still respects a choice made in THIS round, and denied location.
+    assert.ok(/if \(storedSide\(\) === 'bets'\) return;/.test(v));
 });

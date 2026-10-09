@@ -83,6 +83,9 @@ A **separate** iOS app with its own Capacitor project; the Consumer app's
 - **Build 3** (0.1): yardage-only, no Firebase, the Myrtle trip. Its source is
   the git tag **`gps-beta-b3`**: `git checkout gps-beta-b3 && node
   tools/build-gps-beta.js && cd gps-beta && npx cap sync ios`.
+- **Build 5** (0.2): build 4 plus its own icon (option B: the HardPan ball with
+  "HP" and a green location pin; `ios/App`'s HardPan icon is untouched) and the
+  side remembered per round (every new round opens on GPS).
 - **Build 4 on** (0.2): the Consumer app exactly (the same `SHARED_SHELL` +
   `CONSUMER_SHELL` lists, the same Firebase project and database) plus GPS,
   display name **HardPan GPS**, internal TestFlight only:
@@ -100,7 +103,7 @@ any other (the "Firebase config is for this app" build phase).
 
 ```bash
 node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v152-unplayedzero, unchanged from main)
-GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v172-gps-flowmain)
+GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v173-gps-landing)
 node build-shell.js tournament               # Tournaments never ship GPS, whatever the flag says
 ```
 

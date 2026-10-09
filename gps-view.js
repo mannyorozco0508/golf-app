@@ -195,15 +195,27 @@
     function setUnits(u) {
         try { localStorage.setItem(UNITS_KEY, u === 'm' ? 'm' : 'yd'); } catch (e) {}
     }
-    // What this phone last LEFT ON: 'gps', 'bets' (the Card), or null (never).
+    // What this phone last LEFT ON in THIS round: 'gps', 'bets' (the Card), or null.
+    // BUILD 5 (2026-10-09): remembered PER ROUND ("bets|QLDLPD"), so leaving one
+    // round on the Card never makes the next round open on the Card - every new
+    // round opens on GPS. A value with no round (written before build 5, or by the
+    // checks) still counts for any round.
+    function sideRecord() {
+        try {
+            var v = String(localStorage.getItem(SIDE_KEY) || ''), m = /^(gps|bets)(?:\|(.*))?$/.exec(v);
+            return m ? { side: m[1], round: m[2] == null ? null : m[2] } : null;
+        } catch (e) { return null; }
+    }
     function storedSide() {
-        try { var v = localStorage.getItem(SIDE_KEY); return v === 'gps' || v === 'bets' ? v : null; } catch (e) { return null; }
+        var r = sideRecord();
+        if (!r) return null;
+        if (r.round != null && (!S || r.round !== S.eventCode)) return null;
+        return r.side;
     }
-    function lastSide() {
-        try { return localStorage.getItem(SIDE_KEY) === 'gps' ? 'gps' : 'bets'; } catch (e) { return 'bets'; }
-    }
+    function lastSide() { return storedSide() === 'gps' ? 'gps' : 'bets'; }
     function rememberSide(side) {
-        try { localStorage.setItem(SIDE_KEY, side === 'gps' ? 'gps' : 'bets'); } catch (e) {}
+        side = side === 'gps' ? 'gps' : 'bets';
+        try { localStorage.setItem(SIDE_KEY, S && S.eventCode ? side + '|' + S.eventCode : side); } catch (e) {}
     }
 
     // ---- LOCATION WATCH -----------------------------------------------------

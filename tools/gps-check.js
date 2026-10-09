@@ -575,7 +575,7 @@ function usgsFallbackFails(tag, g, why) {
         if (shown.watches !== 1) fails.push('osm: foreground on GPS did not restart the watch');
         // Remembered side.
         if (!reloaded || reloaded.side !== 'gps' || !reloaded.gpsShown) fails.push('osm: the last side (GPS) was not remembered across a reload');
-        if (a.dump.storage.hardpan_round_side !== 'gps') fails.push('osm: side not stored');
+        if (!/^gps(\|.*)?$/.test(a.dump.storage.hardpan_round_side || '')) fails.push('osm: side not stored');
         if (a.dump.writes.length) fails.push('osm: just looking wrote ' + a.dump.writes.map((w) => w.path).join(', '));
     }
 
@@ -1307,6 +1307,9 @@ function usgsFallbackFails(tag, g, why) {
         { expression: `'FLOWW' + JSON.stringify(window.__coldWrites || [])` },
         { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1200 }, { expression: READ },             // 3 reopened: GPS again
         { tap: '.gps-side-bets' }, { sleep: 500 }, { expression: 'location.reload()' }, { sleep: 5000 }, { expression: READ }, // 4 left on the Card: the Card
+        { expression: `'SIDEV' + localStorage.getItem('hardpan_round_side')` },
+        // BUILD 5: a Card choice made in ANOTHER round does not stop this one landing on GPS.
+        { expression: `(localStorage.setItem('hardpan_round_side', 'bets|OTHER1'), location.reload(), 'other')` }, { sleep: 4000 }, WAIT_MAP, { sleep: 1200 }, { expression: READ }, // 5 GPS
     ], { preScript: FRESH + sensor('ok', ME[0], ME[1], 4.6) });
     out.flow = fl; bail(out, fl);
     const fu = await arm('flowu', 'pinelakes', null, 'ok', pl, 5, [{ sleep: 6000 }, { expression: READ }], { preScript: FRESH + sensor('ok', pl[0], pl[1], 5) });
@@ -1314,7 +1317,10 @@ function usgsFallbackFails(tag, g, why) {
     const fd = await arm('flowd', 'caledonia', null, 'denied', ME, 5, [{ sleep: 7000 }, { expression: READ }], { preScript: FRESH + sensor('denied', ME[0], ME[1], 5) });
     out.flowDenied = fd; bail(out, fd);
     {
-        const [f0, f1, f2, f3, f4] = fl.reads;
+        const [f0, f1, f2, f3, f4, f5] = fl.reads;
+        const sv = fl.raw.find((v) => typeof v === 'string' && v.startsWith('SIDEV'));
+        if (sv !== 'SIDEVbets|' + fl.code) fails.push('flow: the Card choice was not remembered for this round only: ' + sv);
+        if (!f5 || f5.side !== 'gps' || !f5.gpsShown) fails.push('flow: a Card choice from another round kept this round on the Card: ' + JSON.stringify(f5 && [f5.side, f5.gpsShown]));
         if (f0.side !== 'gps' || !f0.gpsShown || f0.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('flow: a fresh phone did not land on GPS hole 1: ' + JSON.stringify([f0.side, f0.gpsShown, f0.title]));
         if (f1.side !== 'bets' || !f1.active || !/score-input/.test(f1.active.cls) || f1.active.hole !== '1') fails.push('flow: Enter Score did not open hole 1\'s box: ' + JSON.stringify([f1.side, f1.active]));
         const fw = fl.raw.find((v) => typeof v === 'string' && v.startsWith('FLOWW'));
@@ -1328,7 +1334,7 @@ function usgsFallbackFails(tag, g, why) {
         if (f4.side !== 'bets' || f4.gpsShown) fails.push('flow: left on the Card, the reopened round did not stay on the Card: ' + JSON.stringify([f4.side, f4.gpsShown]));
         if (fu.reads[0].side !== 'bets' || fu.reads[0].gpsShown) fails.push('flow: a hole with no GPS data landed on GPS: ' + JSON.stringify([fu.reads[0].side, fu.reads[0].title]));
         if (fd.reads[0].side !== 'bets' || fd.reads[0].gpsShown) fails.push('flow: location denied landed on GPS: ' + JSON.stringify([fd.reads[0].side]));
-        if (fd.dump.storage.hardpan_round_side === 'bets') fails.push('flow: denied location was remembered as a choice of the Card');
+        if (/^bets/.test(fd.dump.storage.hardpan_round_side || '')) fails.push('flow: denied location was remembered as a choice of the Card');
         out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
     }
 
