@@ -201,6 +201,133 @@
         return r.map(roundPt);
     }
     function roundPt(p) { return [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]; }
+    // A hole line, thinned: a point is dropped when it is within 2 m of the straight
+    // line between its kept neighbours (Douglas-Peucker). Doglegs keep their corner.
+    function simplifyLine(line) {
+        var pts = (line || []).filter(function (p) { return p && isFinite(p[0]) && isFinite(p[1]); });
+        if (pts.length <= 2) return pts;
+        var proj = projector(pts[0]), xy = pts.map(proj.fwd), keep = {};
+        keep[0] = keep[pts.length - 1] = true;
+        (function dp(a, b) {
+            var best = -1, bi = -1, ax = xy[a], bx = xy[b], dx = bx[0] - ax[0], dy = bx[1] - ax[1], L = Math.sqrt(dx * dx + dy * dy) || 1;
+            for (var i = a + 1; i < b; i++) {
+                var d = Math.abs(dy * xy[i][0] - dx * xy[i][1] + bx[0] * ax[1] - bx[1] * ax[0]) / L;
+                if (d > best) { best = d; bi = i; }
+            }
+            if (best > 2) { keep[bi] = true; dp(a, bi); dp(bi, b); }
+        })(0, pts.length - 1);
+        return pts.filter(function (p, i) { return keep[i]; });
+    }
+    var MAX_FAIRWAY_VERTICES = 40;
+    function compactFairway(ring) {
+        var r = cleanRing(ring);
+        if (r.length > MAX_FAIRWAY_VERTICES) {
+            var step = r.length / MAX_FAIRWAY_VERTICES, kept = [];
+            for (var i = 0; i < MAX_FAIRWAY_VERTICES; i++) kept.push(r[Math.floor(i * step)]);
+            r = kept;
+        }
+        return r.map(function (p) { return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]; });
+    }
+
+    // ---- THE DEFAULT TARGET (build 6, 2026-10-09) ------------------------------
+    // Where the target sits before the golfer touches it. Manny's rules:
+    //   par 3                      -> the green's center
+    //   par 4 / 5 from the tee     -> DEFAULT_SHOT_YD along the hole's own line
+    //                                 (doglegs followed), never closer than
+    //                                 MIN_LEFT_YD to the green's center
+    //   on the hole (GPS)          -> DEFAULT_SHOT_YD along the line from the
+    //                                 golfer, or the green's center within
+    //                                 GREEN_REACH_YD of it
+    //   a fairway mapped for it    -> moved to the nearest point inside it
+    // Par is the CARD's. DEFAULT_SHOT_YD is ONE constant so My Clubs can later
+    // put the golfer's own driver carry in its place.
+    var DEFAULT_SHOT_YD = 260, MIN_LEFT_YD = 60, GREEN_REACH_YD = 280;
+    // Walk `meters` along `line`, starting where `from` projects onto it. Past the
+    // end: the end.
+    function pointAlongHole(line, from, meters) {
+        if (!line || line.length < 2) return null;
+        var proj = projector(line[0]), xy = line.map(proj.fwd), f = proj.fwd(from || line[0]);
+        var segs = [], total = 0;
+        for (var i = 1; i < xy.length; i++) {
+            var a = xy[i - 1], b = xy[i], len = Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+            segs.push({ a: a, b: b, len: len, from: total }); total += len;
+        }
+        var bestD = Infinity, start = 0;
+        segs.forEach(function (sg) {
+            var dx = sg.b[0] - sg.a[0], dy = sg.b[1] - sg.a[1];
+            var u = sg.len ? Math.max(0, Math.min(1, ((f[0] - sg.a[0]) * dx + (f[1] - sg.a[1]) * dy) / (sg.len * sg.len))) : 0;
+            var x = sg.a[0] + u * dx - f[0], y = sg.a[1] + u * dy - f[1], d = Math.sqrt(x * x + y * y);
+            if (d < bestD) { bestD = d; start = sg.from + u * sg.len; }
+        });
+        var want = Math.min(total, start + Math.max(0, meters));
+        for (var k = 0; k < segs.length; k++) {
+            var s2 = segs[k];
+            if (want <= s2.from + s2.len || k === segs.length - 1) {
+                var u2 = s2.len ? Math.max(0, Math.min(1, (want - s2.from) / s2.len)) : 0;
+                return proj.inv([s2.a[0] + u2 * (s2.b[0] - s2.a[0]), s2.a[1] + u2 * (s2.b[1] - s2.a[1])]);
+            }
+        }
+        return line[line.length - 1];
+    }
+    // How far along `line` from where `from` projects to its end, in metres.
+    function lengthAlong(line, from) {
+        if (!line || line.length < 2) return 0;
+        var total = 0;
+        for (var i = 1; i < line.length; i++) total += haversineMeters(line[i - 1], line[i]);
+        return Math.max(0, total * (1 - alongLine(from, line).t));
+    }
+    // Inside a fairway already: unchanged. Otherwise the nearest point on the
+    // nearest fairway's edge, moved 3 m inside it.
+    function snapToFairway(pt, rings) {
+        if (!pt || !rings || !rings.length) return pt;
+        if (rings.some(function (r) { return pointInRing(pt, r); })) return pt;
+        var proj = projector(pt), best = null;
+        rings.forEach(function (ring) {
+            var xy = ring.map(proj.fwd);
+            for (var i = 1; i < xy.length; i++) {
+                var a = xy[i - 1], b = xy[i], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+                var u = L2 ? Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / L2)) : 0;
+                var x = a[0] + u * dx, y = a[1] + u * dy, d = Math.sqrt(x * x + y * y);
+                if (!best || d < best.d) best = { d: d, x: x, y: y, ring: ring };
+            }
+        });
+        if (!best) return pt;
+        var c = proj.fwd(polygonCentroid(best.ring)), vx = c[0] - best.x, vy = c[1] - best.y, vl = Math.sqrt(vx * vx + vy * vy) || 1;
+        var inside = proj.inv([best.x + vx / vl * 3, best.y + vy / vl * 3]);
+        return pointInRing(inside, best.ring) ? inside : proj.inv([best.x, best.y]);
+    }
+    // o: { par, tee, mid, line?, fairway?, from: 'me' | 'tee', pt, shotYd? }
+    function defaultTarget(o) {
+        if (!o || !o.mid) return null;
+        if (Number(o.par) === 3) return o.mid;
+        var shotM = (o.shotYd || DEFAULT_SHOT_YD) * M_PER_YD;
+        var line = (o.line && o.line.length >= 2) ? o.line : (o.tee ? [o.tee, o.mid] : null);
+        if (!line) return o.mid;
+        var start = o.from === 'me' && o.pt ? o.pt : (o.tee || line[0]);
+        // A back tee (or a golfer) BEHIND where the drawn line starts: the walk
+        // starts from them, not from the line's first point - otherwise "260 along
+        // the line" lands 260 past the line's start, further than 260 from the tee.
+        var a0 = alongLine(start, line);
+        if (a0.t === 0 && a0.d > 5) line = [start].concat(line);
+        var alongM;
+        if (o.from === 'me' && o.pt) {
+            if (haversineMeters(o.pt, o.mid) <= GREEN_REACH_YD * M_PER_YD) return o.mid;
+            alongM = shotM;
+        } else {
+            // The hole's length from the tee: along its line to the line's end, then
+            // on to the green's center.
+            var lenM = lengthAlong(line, start) + haversineMeters(line[line.length - 1], o.mid);
+            alongM = Math.min(shotM, lenM - MIN_LEFT_YD * M_PER_YD);
+            if (alongM <= 0) return o.mid;
+        }
+        var t = pointAlongHole(line, start, alongM) || o.mid;
+        // Never closer than MIN_LEFT_YD to the green (a short line, a snap).
+        t = snapToFairway(t, o.fairway);
+        if (haversineMeters(t, o.mid) < MIN_LEFT_YD * M_PER_YD && o.from !== 'me') return pointAlongHole(line, start, Math.max(0, alongM)) || o.mid;
+        return t;
+    }
+
+
 
     // ---- OSM -> HOLE RECORDS ------------------------------------------------
     //
@@ -267,7 +394,7 @@
 
     function osmToCourseGps(elements, opts) {
         opts = opts || {};
-        var holes = [], greens = [], teeBoxes = [], tees = 0, fairways = 0;
+        var holes = [], greens = [], teeBoxes = [], tees = 0, fairways = 0, fairwayRings = [];
         (elements || []).forEach(function (el) {
             var tags = el.tags || {};
             var g = geomOf(el);
@@ -279,7 +406,7 @@
             }
             else if (tags.golf === 'green' && g.length >= 3) greens.push({ ref: holeRef(tags), ring: cleanRing(g), id: el.type + '/' + el.id });
             else if (tags.golf === 'tee') { tees++; teeBoxes.push({ ref: holeRef(tags), at: g.length >= 3 ? polygonCentroid(g) : g[0] }); }
-            else if (tags.golf === 'fairway') fairways++;
+            else if (tags.golf === 'fairway') { fairways++; if (g.length >= 3) fairwayRings.push(cleanRing(g)); }
         });
         greens.forEach(function (gr) { gr.centroid = polygonCentroid(gr.ring); });
 
@@ -313,6 +440,15 @@
             var greenMid = green ? green.centroid : end;
             var back = teeFor(h.line, teeBoxes, greenMid, h.ref);
             var rec = { tee: roundPt(back || h.line[0]), end: roundPt(end), lineM: Math.round(lineM) };
+            // BUILD 6: the hole's own line (so the default target follows a dogleg)
+            // and the fairway polygons that belong to it - those whose middle sits
+            // within 45 m of this hole's line, past its first 5% and before its last.
+            rec.line = simplifyLine(h.line).map(roundPt);
+            var fw = fairwayRings.filter(function (ring) {
+                var c = polygonCentroid(ring), a = alongLine(c, h.line);
+                return a.d <= 45 && a.t > 0.05 && a.t < 0.98;
+            }).map(compactFairway);
+            if (fw.length) rec.fairway = fw;
             if (back) rec.teeFrom = 'tee-box'; else rec.teeFrom = 'line-start';
             if (h.par) rec.par = h.par;
             if (green) {
@@ -707,6 +843,8 @@
 
     var api = {
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
+        defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
+        DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind,

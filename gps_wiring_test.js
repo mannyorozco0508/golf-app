@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v341-gps-osmcourses'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v342-gps-smarttarget'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -309,4 +309,39 @@ test('build 5 target: the shot lines stop at the ring, so the width line never m
     const v = read('gps-view.js');
     assert.ok(/return G\.destination\(to, G\.bearingDeg\(to, from\), ringM\);/.test(v));
     assert.ok(/feature\('to', 'LineString', \[ll\(o\.pt\), ll\(eTo\)\]\)/.test(v) && /feature\('on', 'LineString', \[ll\(eOn\), ll\(aim\)\]\)/.test(v));
+});
+
+test('build 6 smart default target, on the bundled holes: par 3 center; 260 along the line (doglegs); 60 short; 260 from the golfer or the center inside 280', { skip }, () => {
+    const G = require('./gps-geo.js'), T = require('./gps-courses.js');
+    const vm = require('vm'), sb = {};
+    vm.runInNewContext(read('course-data.js') + ';this.p=coursePresets', sb);
+    const yd = (m) => Math.round(m / 0.9144);
+    const hole = (k, n) => G.osmCourse(T, k).holes[String(n)].osm;
+    const def = (k, n, extra) => { const r = hole(k, n); return G.defaultTarget(Object.assign({ par: sb.p[k].data[n - 1].par, tee: r.tee, mid: r.mid, line: r.line, fairway: r.fairway, from: 'tee', pt: r.tee }, extra || {})); };
+    assert.strictEqual(G.DEFAULT_SHOT_YD, 260, 'one constant (My Clubs will replace it)');
+    // Par 3 (Caledonia #3): the green's center.
+    assert.deepStrictEqual(def('caledonia', 3), hole('caledonia', 3).mid);
+    // Par 4 (Caledonia #1): 260 from the tee, in the fairway.
+    const t1 = def('caledonia', 1), h1 = hole('caledonia', 1);
+    assert.ok(Math.abs(yd(G.haversineMeters(h1.tee, t1)) - 260) <= 3, 'Caledonia #1: ' + yd(G.haversineMeters(h1.tee, t1)));
+    assert.ok(h1.fairway.some((r) => G.pointInRing(t1, r)), 'in the fairway');
+    // Par 5 (Caledonia #2, "301 / 301" before): not halfway any more.
+    const t2 = def('caledonia', 2), h2 = hole('caledonia', 2);
+    assert.ok(yd(G.haversineMeters(t2, h2.mid)) > yd(G.haversineMeters(h2.tee, t2)) + 50, 'Caledonia #2 is no longer split 50/50');
+    // Dogleg (Caledonia #13): 260 ALONG the line - the straight distance is shorter.
+    const t13 = def('caledonia', 13), h13 = hole('caledonia', 13);
+    const straight = yd(G.haversineMeters(h13.tee, t13));
+    assert.ok(straight < 258 && straight > 230, 'Caledonia #13 follows the dogleg: ' + straight);
+    // Short par 4: never inside 60 of the green (a line shorter than 320).
+    const shortLine = [h1.tee, G.pointAlongHole(h1.line, h1.tee, 280 * 0.9144)];
+    const ts = G.defaultTarget({ par: 4, tee: h1.tee, mid: shortLine[1], line: shortLine, from: 'tee' });
+    assert.ok(yd(G.haversineMeters(ts, shortLine[1])) >= 59, 'short hole: ' + yd(G.haversineMeters(ts, shortLine[1])));
+    // On the hole: the green's center inside 280, else 260 from the golfer.
+    assert.deepStrictEqual(def('caledonia', 2, { from: 'me', pt: G.pointAlongHole(h2.line, h2.tee, 400 * 0.9144) }), h2.mid);
+    const me = G.pointAlongHole(h2.line, h2.tee, 100 * 0.9144);
+    const tm = def('caledonia', 2, { from: 'me', pt: me });
+    assert.ok(Math.abs(yd(G.haversineMeters(me, tm)) - 260) <= 12, 'from the golfer: ' + yd(G.haversineMeters(me, tm)));
+    // Par comes from the CARD: gps-view hands defaultTarget S.par.
+    assert.ok(/G\.defaultTarget\(\{\s*par: S\.par,/.test(read('gps-view.js')));
+    assert.ok(/'\.gps-recenter', function \(\) \{ if \(S\) \{ S\.targetMoved = false; S\.target = null; \}/.test(read('gps-view.js')), 'Recenter resets it');
 });

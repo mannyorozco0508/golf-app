@@ -39,7 +39,7 @@ test('the app is the Consumer app plus GPS: the same declared lists, GPS on, not
     assert.ok(/GPS_ENABLED=1 refused/.test(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8')));
 });
 
-test('its own app: bundle id, name, team, 0.2 (5), entitlements, Firebase guard', { skip }, () => {
+test('its own app: bundle id, name, team, 0.2 (6), entitlements, Firebase guard', { skip }, () => {
     const cap = JSON.parse(read('capacitor.config.json'));
     assert.strictEqual(cap.appId, 'com.rattlegolf.gpsbeta');
     assert.strictEqual(cap.appName, 'HardPan GPS');
@@ -51,7 +51,7 @@ test('its own app: bundle id, name, team, 0.2 (5), entitlements, Firebase guard'
     assert.strictEqual((pbx.match(/PRODUCT_BUNDLE_IDENTIFIER = com\.rattlegolf\.gpsbeta;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/DEVELOPMENT_TEAM = A2Z95T64UU;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/MARKETING_VERSION = 0\.2;/g) || []).length, 2);
-    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 5;/g) || []).length, 2, 'build 5 (the merged app, per-round landing, its own icon)');
+    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 6;/g) || []).length, 2, 'build 6 (the smart default target)');
     assert.ok(/CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/.test(pbx) && /CODE_SIGN_ENTITLEMENTS = App\/AppRelease\.entitlements;/.test(pbx));
     assert.ok(/GoogleService-Info\.plist in Resources/.test(pbx), 'the Firebase iOS config ships in the app');
     assert.ok(/Firebase config is for this app/.test(pbx) && /CONFIGURATION\}\\" = \\"Release\\"/.test(pbx) && /Print BUNDLE_ID/.test(pbx), 'an Archive refuses a config for another bundle');

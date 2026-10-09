@@ -117,7 +117,7 @@ function loadCourseData() {
 function trim(raw) {
     const keep = (raw.elements || []).filter((e) => {
         const g = e.tags && e.tags.golf;
-        return g === 'hole' || g === 'green' || g === 'tee';
+        return g === 'hole' || g === 'green' || g === 'tee' || g === 'fairway';
     }).map((e) => {
         const o = { type: e.type, id: e.id, tags: e.tags };
         if (e.geometry) o.geometry = e.geometry.map((p) => ({ lat: p.lat, lon: p.lon }));
@@ -129,7 +129,7 @@ function trim(raw) {
 }
 
 async function fetchCourse(c) {
-    const q = `[out:json][timeout:60];\n${c.osm}->.course;\n.course map_to_area->.a;\n(nwr["golf"="hole"](area.a);nwr["golf"="green"](area.a);nwr["golf"="tee"](area.a););\nout geom;`;
+    const q = `[out:json][timeout:60];\n${c.osm}->.course;\n.course map_to_area->.a;\n(nwr["golf"="hole"](area.a);nwr["golf"="green"](area.a);nwr["golf"="tee"](area.a);nwr["golf"="fairway"](area.a););\nout geom;`;
     const res = await fetch(OVERPASS, {
         method: 'POST',
         headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },

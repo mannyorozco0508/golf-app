@@ -4573,7 +4573,12 @@
 // Canyon Lakes, Las Colinas) and wa_chambers as Chambers Bay; gps-view.js asks
 // the Overpass mirror first. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v341-gps-osmcourses';
+// GPS:BEGIN
+// Moved to v342 (gps-flow build 6, 2026-10-09): the smart default target (260
+// along the hole's line, par 3 on the green, in the fairway), Recenter resets it;
+// gps-courses.js gains each hole's line and fairways. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v342-gps-smarttarget';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

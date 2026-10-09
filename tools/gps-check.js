@@ -338,7 +338,9 @@ function pillFails(tag, g, required) {
     const tc = mid(g.boxes.target), R = (g.ringPx || 0) / 2;
     const want = { to: lastNum(g.toHere), on: lastNum(g.hereCenter) };
     g.pills.forEach((p) => {
-        if (!p.box) { if (required) f.push(`${tag}: the ${p.k === 'to' ? 'to-target' : 'what\'s-left'} number is not shown`); return; }
+        // BUILD 6: with the target ON the green's center there is nothing left, and
+        // that number is (rightly) not drawn.
+        if (!p.box) { if (required && !(p.k === 'on' && want.on === '0')) f.push(`${tag}: the ${p.k === 'to' ? 'to-target' : 'what\'s-left'} number is not shown`); return; }
         if (p.text !== want[p.k]) f.push(`${tag}: ${p.k} number says "${p.text}", the readout says "${want[p.k]}"`);
         if (!(p.size >= 44)) f.push(`${tag}: the ${p.k} number is ${p.size}px, not 44`);
         if (tc) {
@@ -601,7 +603,9 @@ function usgsFallbackFails(tag, g, why) {
         if (gps.f !== EXPECT.front || gps.m !== EXPECT.center || gps.b !== EXPECT.back) fails.push(`osm: F/C/B ${gps.f}/${gps.m}/${gps.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (gps.acc !== '±6 yds') fails.push('osm: accuracy ' + gps.acc);
         if (!gps.highAccuracy || gps.watches !== 1) fails.push('osm: watch on GPS: ' + gps.watches + ' high=' + gps.highAccuracy);
-        if (gps.toHere !== 'You → target: ' + EXPECT.half || gps.hereCenter !== 'Target → center: ' + EXPECT.half) fails.push('osm: target did not start halfway: ' + gps.toHere + ' / ' + gps.hereCenter);
+        // BUILD 6: the golfer is 151 yds out - inside 280 - so the target starts ON
+        // the green's center (it used to start halfway).
+        if (gps.toHere !== 'You → target: ' + EXPECT.center || gps.hereCenter !== 'Target → center: 0') fails.push('osm: the target did not start on the green center (within 280): ' + gps.toHere + ' / ' + gps.hereCenter);
         if (!/USDA, USGS The National Map: Orthoimagery/.test(gps.attribution || '') || !/OpenStreetMap contributors/.test(gps.attribution || '') || !gps.attributionOnScreen) fails.push('osm: attribution ' + gps.attribution);
         // Drag the target: it moves, the map does not.
         if (dist(dragged.target, gps.target) < 60) fails.push('osm: the target did not follow the drag: ' + JSON.stringify([gps.target, dragged.target]));

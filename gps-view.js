@@ -1253,15 +1253,23 @@
     }
 
     // ---- THE TARGET -----------------------------------------------------------
-    // A crosshair the golfer drags, or moves by tapping the map. Until they touch
-    // it, it sits halfway between where the numbers are measured from and the
-    // green's center, and follows as they walk; once touched it stays put until
-    // the hole changes. Dragging it does not pan the map (a marker drag belongs to
-    // the marker); a drag anywhere else pans, and two fingers zoom.
+    // A circle the golfer drags, or moves by tapping the map. Until they touch it,
+    // it sits at the SMART DEFAULT (build 6, gps-geo.defaultTarget): a par 3's green
+    // center; on a par 4 / 5, 260 yds along the hole's own line from the tee (never
+    // closer than 60 to the green), or 260 from the golfer when they are on the
+    // hole (the green's center inside 280); in the fairway when one is mapped. Par
+    // is the CARD's (S.par). It follows as they walk; once touched it stays put
+    // until the hole changes or Recenter. Dragging it does not pan the map (a
+    // marker drag belongs to the marker); a drag anywhere else pans.
     function placeTarget(r) {
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
-        var p = (o && center) ? G.midpoint(o.pt, center) : null;
+        if (!o || !center) return;
+        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
+        var p = G.defaultTarget({
+            par: S.par, tee: r.tee, mid: center, line: rec && rec.line, fairway: rec && rec.fairway,
+            from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
+        });
         if (p) S.target = p;
     }
     function drawTargetLines() {
@@ -1595,7 +1603,9 @@
             pill.style.display = 'none';
         };
         var aim = aimAt(r);
-        if (aim) put(pOn, 'above', G.shownDistance(G.haversineMeters(S.target, aim), u));
+        // The target ON the green's center (a par 3, or close in): nothing is left,
+        // so only the distance to it is shown.
+        if (aim && G.haversineMeters(S.target, aim) > TARGET_RADIUS_YD * G.M_PER_YD) put(pOn, 'above', G.shownDistance(G.haversineMeters(S.target, aim), u));
         if (o) put(pTo, 'below', G.shownDistance(G.haversineMeters(o.pt, S.target), u));
         placeArcLabels(obstacles);
         placeGreenLabels();
@@ -2524,7 +2534,8 @@
         on(el, '.gps-next', function () { if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-units', function () { setUnits(units() === 'm' ? 'yd' : 'm'); render(); });
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
-        on(el, '.gps-recenter', function () { frameHole(false); });
+        // Recenter also puts the target back at its default (build 6).
+        on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
         on(el, '.gps-zoom', cycleZoom);
         on(el, '.gps-green-view', toggleGreenView);
         on(el, '.gps-wind', function () { var p = S && S.el.querySelector('.gps-wind-pop'); if (p && p.style.display !== 'none') closeWindPop(); else openWindPop(); });
