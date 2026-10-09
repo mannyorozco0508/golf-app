@@ -81,8 +81,10 @@
 //
 //     17 PASS / 18 FAIL
 //
-// BASELINE COUNT DELTA: +2 - the two PUSH CAPABILITY tests were added on
-// 2026-10-04, after this baseline was measured, and they are not part of it.
+// BASELINE COUNT DELTA: +11 - the two PUSH CAPABILITY tests were added on
+// 2026-10-04, and the nine ONE APPLE TOKEN tests (fresh account, guest -> Apple,
+// Apple already on another account) on 2026-10-09, after this baseline was
+// measured; none of them is part of it.
 // Measured on their own against the build before that work: both RED, because
 // ios/App/App/AppRelease.entitlements did not exist and the Release
 // configuration signed the development entitlement. Controls: pointing Release
@@ -586,11 +588,24 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
         const sandbox = loadJsFile(SEAM);
         const anon = { uid: 'anon-1', isAnonymous: true, email: null };
         const adopted = { uid: 'web-uid-9', isAnonymous: false, email: 'a@b.com' };
+        // THE SERVER'S REPLAY RULE: Firebase refuses an Apple ID token it has already
+        // seen ("Duplicate credential received"). A one-time pendingToken is fine.
+        const seenApple = [];
+        const replay = (cred) => {
+            const t = cred && cred.idToken;
+            if (!t || cred.pendingToken || !(cred.built === 'apple' || cred.providerId === 'apple.com')) return null;
+            if (seenApple.includes(t)) return err('auth/missing-or-invalid-nonce', { message: 'Firebase: Duplicate credential received. Please try again with a new credential. (auth/missing-or-invalid-nonce).' });
+            seenApple.push(t);
+            return null;
+        };
         const user = {
-            uid: anon.uid, isAnonymous: true, email: null,
+            uid: anon.uid, isAnonymous: o.signedInAs ? false : true, email: o.signedInAs || null,
+            providerData: o.providers || [],
             linkWithCredential: (cred) => {
                 calls.push({ fn: 'linkWithCredential', cred: cred });
-                if (o.linkError) return Promise.reject(o.linkError);
+                const dup = replay(cred);
+                if (dup) return Promise.reject(dup);
+                if (o.linkError) return Promise.reject(typeof o.linkError === 'function' ? o.linkError(cred) : o.linkError);
                 return Promise.resolve({ user: { uid: anon.uid, isAnonymous: false, email: 'a@b.com' } });
             },
             linkWithPopup: () => { calls.push({ fn: 'linkWithPopup' }); return Promise.resolve({ user: anon }); }
@@ -599,6 +614,8 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
             currentUser: o.noUser ? null : user,
             signInWithCredential: (cred) => {
                 calls.push({ fn: 'signInWithCredential', cred: cred });
+                const dup = replay(cred);
+                if (dup) return Promise.reject(dup);
                 if (o.signInError) return Promise.reject(o.signInError);
                 return Promise.resolve({ user: adopted });
             },
@@ -610,14 +627,23 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
         authFn.OAuthProvider = function (id) {
             this.providerId = id;
             this.addScope = () => {};
-            this.credential = (arg) => ({ built: 'apple', arg });
+            this.credential = (arg) => ({ built: 'apple', arg, idToken: arg.idToken, nonce: arg.rawNonce });
         };
+        if (o.credentialFromError) authFn.OAuthProvider.credentialFromError = o.credentialFromError;
         sandbox.firebase = { auth: authFn };
         sandbox.window.Capacitor = o.plugin ? { Plugins: { FirebaseAuthentication: o.plugin } } : undefined;
         const logged = [];
         sandbox.console = { error: (m) => logged.push(String(m)), log: () => {}, warn: () => {} };
-        return { o: sandbox.oauthSignin, calls, logged };
+        return { o: sandbox.oauthSignin, calls, logged, seenApple };
     }
+    // A real Apple sheet: every request is a NEW token and a NEW nonce.
+    const freshApple = (log) => {
+        let n = 0;
+        return {
+            signInWithApple: () => { n++; if (log) log.push(n); return Promise.resolve({ credential: { idToken: 'aid-' + n, nonce: 'raw-' + n, providerId: 'apple.com' } }); },
+            signInWithGoogle: () => Promise.resolve({ credential: { idToken: 'gid', accessToken: 'gacc', providerId: 'google.com' } })
+        };
+    };
     const applePlugin = {
         signInWithApple: () => Promise.resolve({ credential: { idToken: 'aid', nonce: 'raw', providerId: 'apple.com' } }),
         signInWithGoogle: () => Promise.resolve({ credential: { idToken: 'gid', accessToken: 'gacc', providerId: 'google.com' } })
@@ -685,14 +711,14 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
         assert.equal(out.preserved, false);
     });
 
-    test('NATIVE ADOPT without a credential on the error still adopts', async () => {
-        const { o, calls } = fakeSeam({
-            plugin: applePlugin,
-            linkError: err('auth/credential-already-in-use')
-        });
+    test('NATIVE ADOPT without a credential on the error asks Apple again - never re-sends the spent token', async () => {
+        const asked = [];
+        const { o, calls } = fakeSeam({ plugin: freshApple(asked), linkError: err('auth/credential-already-in-use') });
         const out = await o.signIn('apple');
-        assert.equal(calls.length, 2);
-        assert.equal(calls[1].cred.built, 'apple', 'falls back to what we presented');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential', 'signInWithCredential']);
+        assert.equal(asked.length, 2, 'a second Apple request, with a new nonce');
+        assert.notEqual(calls[1].cred.idToken, calls[0].cred.idToken, 'the spent token is never presented again');
+        assert.equal(calls[1].cred.nonce, 'raw-2');
         assert.equal(out.note, o.notes.adopted);
     });
 
@@ -723,5 +749,101 @@ describe('A FAILURE SAYS WHICH FAILURE, AND ADOPTING USES THE RIGHT CREDENTIAL',
         assert.equal(logged.length, 1);
         assert.ok(!/SECRET-ID-TOKEN/.test(logged[0]), 'an id token must never reach a log: ' + logged[0]);
         assert.ok(!/SECRET-NONCE/.test(logged[0]), logged[0]);
+    });
+
+    // BUILD 7 (2026-10-09): "auth/missing-or-invalid-nonce: Duplicate credential
+    // received" on Manny's phone. His account already has Apple, Google and email; the
+    // GPS app's guest linked first (spending the Apple token), then the adopt re-sent
+    // THE SAME token. The fake Firebase above refuses a replayed Apple token exactly as
+    // the server does, so each case proves no token or nonce is sent twice.
+    const tokensSent = (calls) => calls.map(c => c.cred && c.cred.idToken).filter(Boolean);
+    const once = (calls) => {
+        const t = calls.filter(c => c.cred && !c.cred.pendingToken).map(c => c.cred.idToken).filter(Boolean);
+        assert.equal(new Set(t).size, t.length, 'an Apple token was sent to Firebase twice: ' + JSON.stringify(t));
+    };
+
+    test('1. FRESH ACCOUNT (nobody signed in): one sign-in, one token', async () => {
+        const { o, calls } = fakeSeam({ plugin: freshApple(), noUser: true });
+        const out = await o.signIn('apple');
+        assert.deepEqual(calls.map(c => c.fn), ['signInWithCredential']);
+        assert.deepEqual(tokensSent(calls), ['aid-1']);
+        assert.equal(out.note, o.notes.fresh);
+    });
+
+    test('2. GUEST -> APPLE, a new link: the guest keeps its uid, one token', async () => {
+        const { o, calls } = fakeSeam({ plugin: freshApple() });
+        const out = await o.signIn('apple');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential']);
+        assert.equal(out.preserved, true);
+        assert.equal(out.note, o.notes.preserved);
+        once(calls);
+    });
+
+    test('3a. APPLE ALREADY ON ANOTHER ACCOUNT (Manny\'s case), error carries a pendingToken: sign in with it', async () => {
+        const asked = [];
+        const onErr = { providerId: 'apple.com', pendingToken: 'pending-1', idToken: 'aid-1' };
+        const { o, calls } = fakeSeam({ plugin: freshApple(asked), linkError: err('auth/credential-already-in-use', { credential: onErr }) });
+        const out = await o.signIn('apple');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential', 'signInWithCredential']);
+        assert.equal(calls[1].cred, onErr, 'Firebase\'s one-time handle');
+        assert.equal(asked.length, 1, 'no second Apple sheet needed');
+        assert.equal(out.note, o.notes.adopted);
+        once(calls);
+    });
+
+    test('3b. the error\'s credential holds the SAME token (what failed on the phone): a fresh Apple request instead', async () => {
+        const asked = [];
+        const { o, calls, seenApple } = fakeSeam({ plugin: freshApple(asked),
+            linkError: (cred) => err('auth/credential-already-in-use', { credential: { built: 'apple', providerId: 'apple.com', idToken: cred.idToken, nonce: cred.nonce } }) });
+        const out = await o.signIn('apple');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential', 'signInWithCredential']);
+        assert.equal(asked.length, 2, 'Apple asked again - the plugin makes a new nonce per request');
+        assert.deepEqual(seenApple, ['aid-1', 'aid-2']);
+        assert.equal(out.note, o.notes.adopted, 'signed in as the account Apple is on; the guest\'s trial and rounds are not copied - the consumer app\'s rule');
+        once(calls);
+    });
+
+    test('3c. the SDK only exposes it via credentialFromError (modular shape): same rule', async () => {
+        const asked = [];
+        let last = null;
+        const { o, calls } = fakeSeam({ plugin: freshApple(asked),
+            linkError: (cred) => { last = cred; return err('auth/credential-already-in-use'); },
+            credentialFromError: () => ({ built: 'apple', providerId: 'apple.com', idToken: last.idToken }) });
+        await o.signIn('apple');
+        assert.equal(asked.length, 2);
+        once(calls);
+    });
+
+    test('3d. account-exists-with-different-credential is the same case', async () => {
+        const { o, calls } = fakeSeam({ plugin: freshApple(), linkError: err('auth/account-exists-with-different-credential') });
+        const out = await o.signIn('apple');
+        assert.equal(out.note, o.notes.adopted);
+        once(calls);
+    });
+
+    test('3e. the golfer cancels the second Apple sheet: nothing is re-sent, the original error is shown', async () => {
+        let n = 0;
+        const plugin = { signInWithApple: () => { n++; return Promise.resolve(n === 1 ? { credential: { idToken: 'aid-1', nonce: 'raw-1' } } : {}); } };
+        const { o, calls } = fakeSeam({ plugin, linkError: err('auth/credential-already-in-use') });
+        let caught = null;
+        try { await o.signIn('apple'); } catch (e) { caught = e; }
+        assert.ok(caught && caught.code === 'auth/credential-already-in-use', caught && caught.code);
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential']);
+    });
+
+    test('a signed-in EMAIL golfer without Apple links, and adopts the same safe way', async () => {
+        const asked = [];
+        const { o, calls } = fakeSeam({ plugin: freshApple(asked), signedInAs: 'm@x.com', providers: [{ providerId: 'password' }],
+            linkError: err('auth/credential-already-in-use') });
+        await o.signIn('apple');
+        assert.equal(asked.length, 2);
+        once(calls);
+    });
+
+    test('Google is unchanged: its token may be presented again', async () => {
+        const { o, calls } = fakeSeam({ plugin: freshApple(), linkError: err('auth/credential-already-in-use') });
+        await o.signIn('google');
+        assert.deepEqual(calls.map(c => c.fn), ['linkWithCredential', 'signInWithCredential']);
+        assert.equal(calls[1].cred.idToken, 'gid');
     });
 });
