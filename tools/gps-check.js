@@ -359,7 +359,8 @@ function pillFails(tag, g, required) {
         // BUILD 5: inside the safe area - below the top panel, above the bottom row.
         if (g.boxes.top && p.box.t < g.boxes.top.b) bad.push('the status bar / top panel area');
         if (g.boxes.bottom && p.box.b > g.boxes.bottom.t) bad.push('the bottom row area');
-        if (hitBox(p.box, greenPage(g))) bad.push('green');
+        // (The green is fair game only when the target sits on its center - build 6.)
+        if (hitBox(p.box, greenPage(g)) && want.on !== '0') bad.push('green');
         if (bad.length) f.push(`${tag}: the ${p.k} number covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
     if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two numbers overlap');

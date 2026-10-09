@@ -1564,7 +1564,11 @@
         add({ l: t.x - R, t: t.y - R, r: t.x + R, b: t.y + R }, GAP);
         add(rectOf(tEl && tEl.querySelector('.gps-ring-lbl'), wrapR), M);
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
-        if (r && r.green && r.green.length) {
+        // BUILD 6: with the target ON the green's center (a par 3, or close in) the
+        // only number is the distance to it, and every spot beside the circle is on
+        // the green - so then the green itself is not an obstacle (F / C / B still are).
+        var aimNow = aimAt(r), onCenter = !!(aimNow && S.target && G.haversineMeters(S.target, aimNow) <= TARGET_RADIUS_YD * G.M_PER_YD);
+        if (r && r.green && r.green.length && !onCenter) {
             var g = r.green.map(P), gb = { l: Infinity, t: Infinity, r: -Infinity, b: -Infinity };
             g.forEach(function (q) { gb.l = Math.min(gb.l, q.x); gb.r = Math.max(gb.r, q.x); gb.t = Math.min(gb.t, q.y); gb.b = Math.max(gb.b, q.y); });
             add(gb, M);
