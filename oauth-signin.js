@@ -177,6 +177,16 @@
     // asked for. So it refuses, names the problem, and promises nothing.
     var NOTE_LINK_TAKEN = 'That Apple or Google account is already attached to a different account in this app, so it cannot be linked to this one. Nothing was changed. Sign in with that account instead, or remove it from the other one first.';
 
+    // " (auth/invalid-credential: The audience in ID Token [...] does not match ...)".
+    // Anything shaped like a token (eyJ...) is cut out, and it is kept short.
+    function credentialDetail(err) {
+        var code = String((err && err.code) || '');
+        var msg = String((err && err.message) || '').replace(/^Firebase:\s*/i, '').replace(/\s*\(auth\/[a-z-]+\)\.?\s*$/i, '')
+            .replace(/eyJ[A-Za-z0-9_\-\.]{10,}/g, '[token]').trim();
+        if (msg.length > 180) msg = msg.slice(0, 177) + '...';
+        return (code || msg) ? ' (' + code + (msg ? ': ' + msg : '') + ')' : '';
+    }
+
     function messageFor(err, opts) {
         var code = err && err.code;
         if (opts && opts.deliberateLink && isAdoptSignal(err)) return NOTE_LINK_TAKEN;
@@ -187,8 +197,14 @@
         if (code === 'sdk-absent' || code === 'no-provider') return NOTE_NOT_READY;
         // An idToken Firebase will not accept, or a nonce that does not match the
         // one inside it. This is the native path's own failure mode.
+        // THE DETAIL IS SHOWN (2026-10-09). On a new bundle (HardPan GPS,
+        // com.rattlegolf.gpsbeta) Apple failed here and Google did not, and this
+        // sentence alone cannot say WHICH check Firebase refused - the audience
+        // (which app the token is for) or the nonce. Firebase's own message names
+        // it ("The audience in ID Token [..] does not match the expected
+        // audience"), so it is appended - the code and that message, never a token.
         if (code === 'auth/invalid-credential' || code === 'auth/missing-or-invalid-nonce'
-            || code === 'auth/invalid-credential-or-provider-id') return NOTE_BAD_CREDENTIAL;
+            || code === 'auth/invalid-credential-or-provider-id') return NOTE_BAD_CREDENTIAL + credentialDetail(err);
         if (code === 'auth/network-request-failed') return NOTE_NO_CONNECTION;
         // The same lesson the preview sign-in fix recorded: an unauthorized ORIGIN is
         // its own failure and must not be reported as a network problem.

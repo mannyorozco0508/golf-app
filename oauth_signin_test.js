@@ -291,3 +291,30 @@ describe('one-tap sign-in keeps the organizer', () => {
         assert.match(fn, /emailFallbackShown/, 'and the fallback state is a boolean, not a style read');
     });
 });
+
+// ---------------------------------------------------------------------------
+// 2026-10-09 (HardPan GPS build 4 on a real iPhone): Apple's token was rejected
+// and Google worked; the sentence alone could not say why, and the red note
+// stayed on the sheet after Google signed in.
+// ---------------------------------------------------------------------------
+test('a rejected token says WHICH check failed - Firebase\'s code and message - and never the token', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, 'oauth-signin.js'), 'utf8');
+    const sb = { window: { location: { hostname: 'x' } }, console };
+    require('vm').runInNewContext(src, sb);
+    const O = sb.window.oauthSignin;
+    const msg = O.messageFor({ code: 'auth/invalid-credential', message: 'Firebase: The audience in ID Token [com.rattlegolf.gpsbeta] does not match the expected audience. (auth/invalid-credential).' });
+    assert.match(msg, /the sign-in token was rejected/);
+    assert.match(msg, /\(auth\/invalid-credential: The audience in ID Token \[com\.rattlegolf\.gpsbeta\] does not match the expected audience\.?\)$/);
+    const jwt = O.messageFor({ code: 'auth/invalid-credential', message: 'bad token eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9.eyJhdWQiOiJ4In0.sig' });
+    assert.ok(!/eyJ/.test(jwt), 'a token reached the screen: ' + jwt);
+});
+
+test('a sign-in that works clears every sign-in failure on the sheet', () => {
+    const admin = require('fs').readFileSync(require('path').join(__dirname, 'admin.html'), 'utf8');
+    assert.match(admin, /function clearSignInFailures\(\)/);
+    const tap = admin.slice(admin.indexOf('function oauthTap('), admin.indexOf('function oauthTap(') + 900);
+    assert.match(tap, /signIn\(which\)\.then\(function \(r\) \{\s*clearSignInFailures\(\);/);
+    const link = admin.slice(admin.indexOf('function oauthLinkTap('), admin.indexOf('function oauthLinkTap(') + 900);
+    assert.match(link, /\.then\(function \(r\) \{\s*clearSignInFailures\(\);/);
+    assert.match(admin, /if \(linked && typeof clearSignInFailures === 'function'\) clearSignInFailures\(\);/, 'the email path clears them too');
+});

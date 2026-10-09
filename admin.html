@@ -8530,6 +8530,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
         tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
+            clearSignInFailures();
             tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
                 + ' linked \u2014 next time it is one tap on this account.');
             refreshAccountState();
@@ -8537,6 +8538,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }, function (err) {
             tapFail(btn, window.oauthSignin.messageFor(err, { deliberateLink: true }));
         });
+    }
+
+    // A SIGN-IN THAT WORKED CLEARS EVERY SIGN-IN FAILURE ON THE SHEET (2026-10-09):
+    // after Google signed Manny in, Apple's red "token was rejected" note was still
+    // above "Signed in as...", saying the opposite of what had just happened.
+    function clearSignInFailures() {
+        var sheet = document.getElementById('account-modal') || document;
+        var notes = sheet.querySelectorAll ? sheet.querySelectorAll('.tap-note-fail') : [];
+        Array.prototype.forEach.call(notes, function (n) { if (n && n.parentNode) n.parentNode.removeChild(n); });
     }
 
     function oauthTap(which) {
@@ -8550,6 +8560,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // every time Manny reported a button as doing nothing.
         tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which).then(function (r) {
+            clearSignInFailures();
             tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
                 + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
             refreshAccountState();
@@ -8879,6 +8890,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function refreshAccountState() {
         const linked = accountIsLinked();
+        // Signed in by any way (Apple, Google, the email link): no failure note from
+        // an earlier attempt stays on the sheet.
+        if (linked && typeof clearSignInFailures === 'function') clearSignInFailures();
         if (typeof syncOauthCard === 'function') syncOauthCard();
         // The beta switch lives in this panel now, so it repaints with the panel -
         // including the moment a sign-in completes without the panel closing (v214's
