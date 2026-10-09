@@ -348,9 +348,9 @@ function pillFails(tag, g, required) {
             const nx = Math.max(p.box.l, Math.min(tc.x, p.box.r)), ny = Math.max(p.box.t, Math.min(tc.y, p.box.b));
             const gap = Math.hypot(nx - tc.x, ny - tc.y) - R;
             if (gap < 0) f.push(`${tag}: the ${p.k} number covers the circle`);
-            else if (gap > 16) f.push(`${tag}: the ${p.k} number is ${Math.round(gap)}px off the circle, not hugging it`);
+            else if (gap > (String(p.at || '').indexOf('-') !== -1 ? 30 : 16)) f.push(`${tag}: the ${p.k} number is ${Math.round(gap)}px off the circle, not hugging it`);
             const wantAt = p.k === 'on' ? 'above' : 'below';
-            if (p.at === wantAt) {
+            if (p.at === wantAt || String(p.at || '').indexOf(wantAt + '-') === 0) {
                 const ok = p.k === 'on' ? p.box.b <= tc.y - R + 1 : p.box.t >= tc.y + R - 1;
                 if (!ok) f.push(`${tag}: the ${p.k} number is not ${wantAt} the circle`);
             } else if (p.at !== 'left' && p.at !== 'right') f.push(`${tag}: the ${p.k} number is placed "${p.at}"`);

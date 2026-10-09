@@ -1562,7 +1562,12 @@
         var t = P(S.target), R = Math.max(3, Number(tEl && tEl.getAttribute('data-ring-px')) / 2 || 10);
         var GAP = 4;
         add({ l: t.x - R, t: t.y - R, r: t.x + R, b: t.y + R }, GAP);
-        add(rectOf(tEl && tEl.querySelector('.gps-ring-lbl'), wrapR), M);
+        // The "20 yd" label is an obstacle - but the numbers matter more: if a
+        // number finds no room, the label steps aside (below) and the number takes it.
+        var lblEl = tEl && tEl.querySelector('.gps-ring-lbl');
+        if (lblEl && lblEl.style.visibility === 'hidden') lblEl.style.visibility = '';
+        var lblRect = rectOf(lblEl, wrapR), lblObs = null;
+        if (lblRect) { add(lblRect, M); lblObs = obstacles[obstacles.length - 1]; }
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
         // BUILD 6: with the target ON the green's center (a par 3, or close in) the
         // only number is the distance to it, and every spot beside the circle is on
@@ -1593,16 +1598,29 @@
             var above = { x: t.x, y: t.y - d - h / 2 }, below = { x: t.x, y: t.y + d + h / 2 };
             var right = { x: t.x + d + w / 2, y: where === 'above' ? t.y - h / 2 : t.y + h / 2 };
             var left = { x: t.x - d - w / 2, y: right.y };
-            var tries = where === 'above' ? [above, right, left] : [below, right, left];
+            // Then above (below) but shifted to one side, still against the ring - a
+            // circle near an edge, with the Green button or the "20 yd" label beside it.
+            var vy = where === 'above' ? above.y : below.y;
+            var tries = [where === 'above' ? above : below, right, left];
+            [0, 8, 16].forEach(function (k) {
+                tries.push({ x: t.x - R - GAP - w / 2 - k, y: vy, at: where + '-left' });
+                tries.push({ x: t.x + R + GAP + w / 2 + k, y: vy, at: where + '-right' });
+            });
             for (var i = 0; i < tries.length; i++) {
                 var c = tries[i], rc = { l: c.x - w / 2, t: c.y - h / 2, r: c.x + w / 2, b: c.y + h / 2 };
                 if (rc.l < M || rc.t < safeTop || rc.r > W - M || rc.b > safeBot) continue;
                 if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
                 pill.style.left = Math.round(rc.l) + 'px'; pill.style.top = Math.round(rc.t) + 'px';
                 pill.style.visibility = '';
-                pill.setAttribute('data-at', i === 0 ? where : (i === 1 ? 'right' : 'left'));
+                pill.setAttribute('data-at', c.at || (i === 0 ? where : (i === 1 ? 'right' : 'left')));
                 obstacles.push(rc);
                 return;
+            }
+            // No room: the "20 yd" label gives way, once, and the number tries again.
+            if (lblObs && obstacles.indexOf(lblObs) !== -1) {
+                obstacles.splice(obstacles.indexOf(lblObs), 1);
+                lblEl.style.visibility = 'hidden';
+                return put(pill, where, text);
             }
             pill.style.display = 'none';
         };
