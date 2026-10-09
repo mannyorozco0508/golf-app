@@ -991,7 +991,7 @@
         // attribution bar may re-fit it until the golfer moves the map).
         S.zoomStep = 0; S.userMoved = false; S.attribAt = attribH();
         S.view = 'hole';
-        txt('.gps-zoom', ZOOM_STEPS[0] + 'x');
+        syncZoomBtn();
         sizeTarget(); placePills(); syncWind();
         var el = S.el.querySelector('.gps-map');
         if (el) {
@@ -1323,11 +1323,25 @@
         }
     }
 
-    // ---- ZOOM: 1x -> 2x -> 3x -> 1x -----------------------------------------------
+    // ---- ZOOM: the magnifier (build 5): hole view -> 2x -> hole view -----------
+    // Was 1x / 2x / 3x. One tap = 2x around the target; the next tap = back to the
+    // hole's own view. Pinch zoom handles anything closer.
     // Around the target (or the golfer's dot when there is no target), keeping the
     // hole's tee-to-green turn. 1x is the hole's own view; Recenter goes back to it.
     // Never past the imagery's closest zoom (maxZoomNow).
-    var ZOOM_STEPS = [1, 2, 3];
+    var ZOOM_STEPS = [1, 2];
+    var MAG_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">'
+        + '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6"/><path class="gps-mag-plus" d="M10.5 7.5v6"/></svg>';
+    function syncZoomBtn() {
+        var b = S && S.el.querySelector('.gps-zoom');
+        if (!b) return;
+        var zoomed = !!S.zoomStep;
+        if (!b.querySelector('svg')) b.innerHTML = MAG_SVG;
+        b.classList.toggle('gps-zoomed', zoomed);
+        b.setAttribute('data-zoom', ZOOM_STEPS[S.zoomStep || 0] + 'x');
+        b.setAttribute('aria-pressed', zoomed ? 'true' : 'false');
+        b.setAttribute('aria-label', zoomed ? 'Back to the hole view' : 'Zoom in 2x around the target');
+    }
     function zoomAround() {
         var o = origin(resolved());
         if (S.target && S.mode === 'measure') return S.target;
@@ -1349,7 +1363,7 @@
             S.map.jumpTo(opts);
         }
         S.zoomStep = next;
-        txt('.gps-zoom', ZOOM_STEPS[next] + 'x');
+        syncZoomBtn();
         sizeTarget(); placePills(); reportMapState();
     }
 
@@ -1379,7 +1393,11 @@
         var M = 4, obstacles = [];
         var add = function (rc, m) { if (rc) obstacles.push({ l: rc.l - m, t: rc.t - m, r: rc.r + m, b: rc.b + m }); };
         var tEl = S.targetMarker && S.targetMarker.getElement();
-        add(rectOf(tEl, wrapR), M);
+        // BUILD 5: the numbers HUG the circle, so the obstacle is the ring itself
+        // (plus a few px), not the marker's larger touch box.
+        var t = P(S.target), R = Math.max(3, Number(tEl && tEl.getAttribute('data-ring-px')) / 2 || 10);
+        var GAP = 4;
+        add({ l: t.x - R, t: t.y - R, r: t.x + R, b: t.y + R }, GAP);
         add(rectOf(tEl && tEl.querySelector('.gps-ring-lbl'), wrapR), M);
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
         if (r && r.green && r.green.length) {
@@ -1388,33 +1406,36 @@
             add(gb, M);
         }
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
-        var put = function (pill, a, b, text) {
-            if (!a || !b || text === '\u2014') return;
+        // BUILD 5 (Manny's phone: "too small, too far apart"): like Golfshot, the two
+        // numbers sit right against the circle - what's LEFT (circle -> green) just
+        // ABOVE it, the distance TO the circle just BELOW it - a few px off the ring,
+        // and move with it while it is dragged. No room there: the side (right, then
+        // left). Never over the ring, F / C / B, the green or a panel; if nothing
+        // fits, the number is not drawn rather than covering something.
+        var put = function (pill, where, text) {
+            if (text === '\u2014') return;
             pill.textContent = text;
             pill.style.visibility = 'hidden'; pill.style.display = '';
-            var w = pill.offsetWidth, h = pill.offsetHeight;
-            var dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-            var nx = -dy / len, ny = dx / len, side = Math.hypot(w, h) / 2 + 6;
-            var ts = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.12, 0.88];
-            for (var i = 0; i < ts.length; i++) {
-                for (var j = 0; j < 3; j++) {
-                    var off = j === 0 ? 0 : (j === 1 ? side : -side);
-                    var cx = a.x + dx * ts[i] + nx * off, cy = a.y + dy * ts[i] + ny * off;
-                    var rc = { l: cx - w / 2, t: cy - h / 2, r: cx + w / 2, b: cy + h / 2 };
-                    if (rc.l < M || rc.t < M || rc.r > W - M || rc.b > H - M) continue;
-                    if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
-                    pill.style.left = Math.round(rc.l) + 'px'; pill.style.top = Math.round(rc.t) + 'px';
-                    pill.style.visibility = '';
-                    obstacles.push(rc);
-                    return;
-                }
+            var w = pill.offsetWidth, h = pill.offsetHeight, d = R + GAP + 2;
+            var above = { x: t.x, y: t.y - d - h / 2 }, below = { x: t.x, y: t.y + d + h / 2 };
+            var right = { x: t.x + d + w / 2, y: where === 'above' ? t.y - h / 2 : t.y + h / 2 };
+            var left = { x: t.x - d - w / 2, y: right.y };
+            var tries = where === 'above' ? [above, right, left] : [below, right, left];
+            for (var i = 0; i < tries.length; i++) {
+                var c = tries[i], rc = { l: c.x - w / 2, t: c.y - h / 2, r: c.x + w / 2, b: c.y + h / 2 };
+                if (rc.l < M || rc.t < M || rc.r > W - M || rc.b > H - M) continue;
+                if (obstacles.some(function (ob) { return hits(rc, ob); })) continue;
+                pill.style.left = Math.round(rc.l) + 'px'; pill.style.top = Math.round(rc.t) + 'px';
+                pill.style.visibility = '';
+                pill.setAttribute('data-at', i === 0 ? where : (i === 1 ? 'right' : 'left'));
+                obstacles.push(rc);
+                return;
             }
             pill.style.display = 'none';
         };
-        var t = P(S.target);
         var aim = aimAt(r);
-        if (aim) put(pOn, t, P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));
-        if (o) put(pTo, P(o.pt), t, G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+        if (aim) put(pOn, 'above', G.shownDistance(G.haversineMeters(S.target, aim), u));
+        if (o) put(pTo, 'below', G.shownDistance(G.haversineMeters(o.pt, S.target), u));
         placeArcLabels(obstacles);
         placeGreenLabels();
     }
@@ -1993,7 +2014,7 @@
         // RIGHT SIDE STACK: wind, zoom, the green view.
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag">manual</span></div>'
-        +   '<button type="button" class="gps-zoom gps-float" aria-label="Zoom 1x, 2x or 3x">1x</button>'
+        +   '<button type="button" class="gps-zoom gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
         + '</div>'
         // LEFT, ABOVE THE SCORECARD: Recenter, and you (or the tee) -> the target.
@@ -2131,6 +2152,10 @@
         + '#gps-overlay .gps-wp-row button{flex:1 1 0;font-size:15px;}'
         + '#gps-overlay .gps-wp-minus,#gps-overlay .gps-wp-plus{font-size:24px !important;}'
         + '#gps-overlay .gps-green-view{font-size:13px;white-space:nowrap;}'
+        // The magnifier: "+" in it at the hole view, "-" once zoomed in.
+        + '#gps-overlay .gps-zoom svg{display:block;}'
+        + '#gps-overlay .gps-zoom.gps-zoomed .gps-mag-plus{display:none;}'
+        + '#gps-overlay .gps-zoom.gps-zoomed{background:rgba(255,255,255,.92);color:#0b0f0c;}'
         // LEFT ROW, BOTTOM ROW, BANNER, ACTIONS
         + '#gps-overlay .gps-leftrow{position:absolute;z-index:5;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;align-items:center;gap:8px;pointer-events:none;}'
         + '#gps-overlay .gps-leftrow > *{pointer-events:auto;}'
@@ -2184,8 +2209,9 @@
         // MAP OVERLAYS: pills, arc labels, green labels, the flag
         + '#gps-overlay .gps-pill{position:absolute;z-index:2;pointer-events:none;background:rgba(11,15,12,.86);color:#fff;font:800 13px/1 ' + FONT + ';padding:4px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         // BUILD 3: the two numbers on the lines - big, bold, white, a dark outline, no box.
-        + '#gps-overlay .gps-pill-to,#gps-overlay .gps-pill-on{background:transparent;border:0;padding:0;color:#ffffff;font:900 26px/1 ' + FONT + ';'
-        +   'text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 6px rgba(0,0,0,.7);}'
+        // BUILD 5: about 1.5x build 3's 26 px, as asked: 44 px, bold white, outlined.
+        + '#gps-overlay .gps-pill-to,#gps-overlay .gps-pill-on{background:transparent;border:0;padding:0;color:#ffffff;font:900 44px/1 ' + FONT + ';letter-spacing:-.01em;'
+        +   'text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 -2px 0 #000,0 2px 0 #000,-2px 0 0 #000,2px 0 0 #000,0 0 8px rgba(0,0,0,.6);}'
         + '#gps-overlay .gps-arc-labels{position:absolute;inset:0;pointer-events:none;z-index:2;}'
         + '#gps-overlay .gps-arc-lbl{position:absolute;font:700 10px/1 ' + FONT + ';color:#fff;text-shadow:0 0 2px #000,0 0 3px #000;white-space:nowrap;}'
         + '#gps-overlay .gps-arc-lbl-pin{color:#ffffff;}'

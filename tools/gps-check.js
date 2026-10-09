@@ -209,8 +209,9 @@ const READ = `JSON.stringify((function () {
            google: ds.google || null, googleLoads: Number(ds.googleLoads || 0), googleSrcMax: ds.googleSrcMax ? Number(ds.googleSrcMax) : null, usgsVis: ds.usgsVis || null,
            googleLogo: (function () { var l = q('.gps-google-logo'); if (!l || l.offsetParent === null) return null; var b = l.getBoundingClientRect(); return { h: Math.round(b.height), alt: l.alt, svg: l.src.indexOf('data:image/svg+xml;base64,') === 0, l: Math.round(b.left), t: Math.round(b.top), b: Math.round(b.bottom) }; })(),
            tilesLoaded: Number(ds.tilesLoaded || 0),
-           zoomBtn: vis('.gps-zoom') ? t('.gps-zoom') : null,
-           pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
+           // BUILD 5: the magnifier carries its step in data-zoom ("1x" hole view, "2x").
+           zoomBtn: vis('.gps-zoom') ? q('.gps-zoom').getAttribute('data-zoom') : null,
+           pills: o ? [].slice.call(o.querySelectorAll('.gps-pill')).map(function (e) { return { k: e.classList.contains('gps-pill-to') ? 'to' : 'on', text: (e.innerText || '').trim(), at: e.getAttribute('data-at'), size: parseFloat(getComputedStyle(e).fontSize), box: e.style.visibility === 'hidden' ? null : box(e) }; }) : [],
            ringPx: q('.gps-target') ? Number(q('.gps-target').dataset.ringPx) : null,
            ringLbl: q('.gps-ring-lbl') ? (q('.gps-ring-lbl').innerText || '').trim() : null,
            boxes: { target: box(q('.gps-target')), ringLbl: box(q('.gps-ring-lbl')), from: box(q('.gps-from')), attrib: box(cr), map: box(mapEl),
@@ -326,21 +327,33 @@ function segDist(p, a, b) {
 }
 // Pills: the right numbers, ON their lines, covering nothing that matters.
 function pillFails(tag, g, required) {
+    // BUILD 5: the two numbers hug the circle - what's left just ABOVE it, the
+    // distance to it just BELOW (or beside it when there is no room) - 44 px, and
+    // never over the ring, F / C / B, the green or a panel.
     const f = [];
-    const from = mid(g.boxes.dot || g.boxes.tee), tgt = mid(g.boxes.target), ctr = mid(g.boxes.mid);
+    const tc = mid(g.boxes.target), R = (g.ringPx || 0) / 2;
     const want = { to: lastNum(g.toHere), on: lastNum(g.hereCenter) };
-    const ends = { to: [from, tgt], on: [tgt, ctr] };
     g.pills.forEach((p) => {
-        if (!p.box) { if (required) f.push(`${tag}: the ${p.k === 'to' ? 'yellow' : 'white'}-line pill is not shown`); return; }
-        if (p.text !== want[p.k]) f.push(`${tag}: ${p.k} pill says "${p.text}", the readout says "${want[p.k]}"`);
-        const [a, b] = ends[p.k];
-        const reach = Math.hypot(p.box.r - p.box.l, p.box.b - p.box.t) / 2 + 8;
-        if (a && b && segDist(mid(p.box), a, b) > reach) f.push(`${tag}: the ${p.k} pill is off its line by ${Math.round(segDist(mid(p.box), a, b))}px`);
-        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
+        if (!p.box) { if (required) f.push(`${tag}: the ${p.k === 'to' ? 'to-target' : 'what\'s-left'} number is not shown`); return; }
+        if (p.text !== want[p.k]) f.push(`${tag}: ${p.k} number says "${p.text}", the readout says "${want[p.k]}"`);
+        if (!(p.size >= 44)) f.push(`${tag}: the ${p.k} number is ${p.size}px, not 44`);
+        if (tc) {
+            // The gap between the ring and the number's nearest edge: 0 (no overlap) to 16 px.
+            const nx = Math.max(p.box.l, Math.min(tc.x, p.box.r)), ny = Math.max(p.box.t, Math.min(tc.y, p.box.b));
+            const gap = Math.hypot(nx - tc.x, ny - tc.y) - R;
+            if (gap < 0) f.push(`${tag}: the ${p.k} number covers the circle`);
+            else if (gap > 16) f.push(`${tag}: the ${p.k} number is ${Math.round(gap)}px off the circle, not hugging it`);
+            const wantAt = p.k === 'on' ? 'above' : 'below';
+            if (p.at === wantAt) {
+                const ok = p.k === 'on' ? p.box.b <= tc.y - R + 1 : p.box.t >= tc.y + R - 1;
+                if (!ok) f.push(`${tag}: the ${p.k} number is not ${wantAt} the circle`);
+            } else if (p.at !== 'left' && p.at !== 'right') f.push(`${tag}: the ${p.k} number is placed "${p.at}"`);
+        }
+        const bad = ['ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
         if (hitBox(p.box, greenPage(g))) bad.push('green');
-        if (bad.length) f.push(`${tag}: the ${p.k} pill covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
+        if (bad.length) f.push(`${tag}: the ${p.k} number covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
-    if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two pills overlap');
+    if (hitBox(g.pills[0] && g.pills[0].box, g.pills[1] && g.pills[1].box)) f.push(tag + ': the two numbers overlap');
     return f;
 }
 // Wave 1 arcs: the right set, a label for (nearly) every one, each label at the
@@ -796,10 +809,10 @@ function usgsFallbackFails(tag, g, why) {
     // ---- polish: zoom 1x/2x/3x, the ring to scale, pills, no pull-down --------------
     const po = await arm('polish', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 800 }, { expression: READ },   // 0 1x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 1 2x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 2 3x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 3 1x
-        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 4 2x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 1 2x (the magnifier)
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 2 back to the hole view
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 3 2x
+        { tap: '.gps-zoom' }, { sleep: 500 }, { expression: READ },                // 4 back to the hole view
         { tap: '.gps-recenter' }, { sleep: 500 }, { expression: READ },            // 5 Recenter -> 1x
         { expression: TAP_SHORT_OF_GREEN }, { sleep: 500 }, { expression: READ },  // 5b target just short of the green
         { expression: PULL(`document.querySelector('#gps-overlay .gps-top')`) },   // 6 a pull on GPS
@@ -819,7 +832,7 @@ function usgsFallbackFails(tag, g, why) {
         if (!(short.pills.find((p) => p.k === 'to') || {}).box) fails.push('polish short of the green: the yellow-line pill is not shown');
         const near = (a, b, d) => Math.abs(a - b) <= d;
         const cap = z1.maxZoom;
-        [[z1, '1x', z1.zoom], [z2, '2x', Math.min(z1.zoom + 1, cap)], [z3, '3x', Math.min(z1.zoom + Math.log2(3), cap)], [z1b, '1x', z1.zoom], [z2b, '2x', Math.min(z1.zoom + 1, cap)], [rc, '1x', z1.zoom]].forEach(([g, lbl, z], k) => {
+        [[z1, '1x', z1.zoom], [z2, '2x', Math.min(z1.zoom + 1, cap)], [z3, '1x', z1.zoom], [z1b, '2x', Math.min(z1.zoom + 1, cap)], [z2b, '1x', z1.zoom], [rc, '1x', z1.zoom]].forEach(([g, lbl, z], k) => {
             if (g.zoomBtn !== lbl) fails.push(`polish ${k}: zoom button "${g.zoomBtn}", expected ${lbl}`);
             if (!near(g.zoom, z, 0.02)) fails.push(`polish ${k}: zoom ${g.zoom}, expected ${z.toFixed(2)}`);
             if (g.bearing !== 102) fails.push(`polish ${k}: the hole's turn was lost: bearing ${g.bearing}`);
@@ -831,7 +844,8 @@ function usgsFallbackFails(tag, g, why) {
             fails.push(...pillFails('polish ' + k, g, lbl === '1x'));
             if (g.toHere !== z1.toHere) fails.push(`polish ${k}: zooming moved the target: ${g.toHere}`);
         });
-        if (dist(z2.target, z3.target) > 2) fails.push('polish: 2x -> 3x did not zoom around the target: ' + JSON.stringify([z2.target, z3.target]));
+        if (dist(z2.target, z1b.target) > 2) fails.push('polish: the magnifier did not zoom around the target the same way twice: ' + JSON.stringify([z2.target, z1b.target]));
+        if (dist(z3.centerPin, z1.centerPin) > 3 || dist(z2b.centerPin, z1.centerPin) > 3) fails.push('polish: the second tap did not go back to the hole view');
         if (!(z2.ringPx > z1.ringPx * 1.8)) fails.push(`polish: the ring did not grow with the zoom: ${z1.ringPx} -> ${z2.ringPx}`);
         if (dist(rc.centerPin, z1.centerPin) > 3) fails.push('polish: Recenter did not go back to the 1x hole view');
         if (!pull.pull || !pull.lock || pull.ob !== 'none' || pull.bodyOb !== 'none' || pull.mapTA !== 'none') fails.push('polish: GPS does not stop the page pulling: ' + JSON.stringify(pull));
@@ -1011,21 +1025,20 @@ function usgsFallbackFails(tag, g, why) {
     // placed (shared data is never derived from Esri imagery).
     const ex = await arm('esrix', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { tap: '.gps-next' }, { sleep: 500 }, { tap: '.gps-next' }, { sleep: 1500 }, { expression: READ },   // 0 hole 3, 1x
-        { tap: '.gps-zoom' }, { sleep: 800 }, { expression: READ },                                                          // 1 2x
-        { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                                                         // 2 3x
+        { tap: '.gps-zoom' }, { sleep: 2500 }, { expression: READ },                                                         // 1 the magnifier: 2x
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-3X' }) });
     out.esri3x = ex; bail(out, ex);
     {
-        const [z1, z2, z3] = ex.reads;
+        const [z1, z3] = ex.reads;   // z3: the closest the magnifier goes (2x since build 5)
         if (z1.title !== 'Hole 3 · Par 3') fails.push('esri 3x: not on the par 3: ' + z1.title);
         if (z1.esri !== 'visible' || z1.maxZoom !== 21) fails.push('esri 3x: Esri not live: ' + JSON.stringify([z1.esri, z1.maxZoom]));
         if (!(z1.attribHtml || '').includes(ESRI_CREDIT)) fails.push('esri 3x: credit ' + JSON.stringify(z1.attribHtml));
-        const want3 = z1.zoom + Math.log2(3);
-        if (Math.abs(z3.zoom - want3) > 0.02 || z3.zoomBtn !== '3x') fails.push(`esri 3x: 3x reached zoom ${z3.zoom}, its full step is ${want3.toFixed(2)} (max ${z3.maxZoom})`);
+        const want3 = Math.min(z1.zoom + 1, z1.maxZoom);
+        if (Math.abs(z3.zoom - want3) > 0.02 || z3.zoomBtn !== '2x') fails.push(`esri zoom: the magnifier reached zoom ${z3.zoom}, its full step is ${want3.toFixed(2)} (max ${z3.maxZoom})`);
         const zs = zOf('OK-3X'), top = Math.max(...zs);
         if (top !== 19 && z3.zoom >= 18) fails.push(`esri 3x: at map zoom ${z3.zoom} the closest Esri tiles asked for were z${top} (expected exactly 19 - never past it)`);
         if (z3.esriSrcMax !== 19) fails.push('esri 3x: source max ' + z3.esriSrcMax);
-        out.esri3xSummary = { zooms: [z1.zoom, z2.zoom, z3.zoom], maxZoom: z1.maxZoom, highestTileZ: top, tileRequests: zs.length };
+        out.esri3xSummary = { zooms: [z1.zoom, z3.zoom], maxZoom: z1.maxZoom, highestTileZ: top, tileRequests: zs.length };
     }
 
     // ---- Esri breaks MID-ROUND (tiles loaded first): USGS takes over ---------------
