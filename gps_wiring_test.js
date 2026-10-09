@@ -304,3 +304,9 @@ test('build 5 target: two rings, one width line square to the shot, "20 yd" in b
     assert.ok(!/lbl\.style\.display = S\.view === 'green'/.test(v), 'the label is no longer Green-view only');
     assert.ok(/rc\.t < safeTop \|\| rc\.r > W - M \|\| rc\.b > safeBot/.test(v), 'numbers stay between the top panel and the bottom row');
 });
+
+test('build 5 target: the shot lines stop at the ring, so the width line never makes a crosshair', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/return G\.destination\(to, G\.bearingDeg\(to, from\), ringM\);/.test(v));
+    assert.ok(/feature\('to', 'LineString', \[ll\(o\.pt\), ll\(eTo\)\]\)/.test(v) && /feature\('on', 'LineString', \[ll\(eOn\), ll\(aim\)\]\)/.test(v));
+});

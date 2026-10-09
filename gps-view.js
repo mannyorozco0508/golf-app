@@ -1266,9 +1266,18 @@
         var feats = [];
         if (S.target && S.mode === 'measure') {
             var r = resolved(), o = origin(r);
-            if (o) feats.push(feature('to', 'LineString', [ll(o.pt), ll(S.target)]));
-            var aim = aimAt(r);
-            if (aim) feats.push(feature('on', 'LineString', [ll(S.target), ll(aim)]));
+            // BUILD 5: both lines stop AT the circle (the outer 20 yd ring), so
+            // with the width line across it the target never reads as a crosshair.
+            var ringM = TARGET_RADIUS_YD * G.M_PER_YD;
+            var edge = function (from, to) {
+                // The point on the ring, on the way from `to` (the target) towards `from`.
+                if (G.haversineMeters(from, to) <= ringM * 1.05) return null;
+                return G.destination(to, G.bearingDeg(to, from), ringM);
+            };
+            var eTo = o && edge(o.pt, S.target);
+            if (eTo) feats.push(feature('to', 'LineString', [ll(o.pt), ll(eTo)]));
+            var aim = aimAt(r), eOn = aim && edge(aim, S.target);
+            if (eOn) feats.push(feature('on', 'LineString', [ll(eOn), ll(aim)]));
         }
         setData('lines', { type: 'FeatureCollection', features: feats });
     }
