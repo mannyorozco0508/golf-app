@@ -449,7 +449,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 //   /points/.., /gridpoints/.. the National Weather Service (as before).
 const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [], overpass: [] };
 // BUILD 5 stand-in Overpass: "the golf courses near here" answers one course named
-// "Chambers Bay Golf Course"; its holes and greens are Caledonia's saved extract
+// "Wildwood Golf Course" (and one that is not ours); its holes and greens are Caledonia's saved extract
 // (the geometry the logic is checked on - the name is only what the lookup picks by).
 const OSM_CAL = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'gps-osm', 'caledonia.json'), 'utf8'));
 const BROKEN = new Set();
@@ -474,7 +474,7 @@ function startStandIn() {
                     r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
                     if (/leisure"="golf_course/.test(query)) return r.end(JSON.stringify({ elements: [
                         { type: 'way', id: 4242, tags: { leisure: 'golf_course', name: 'Fircrest Golf Club' }, center: { lat: 47.23, lon: -122.51 } },
-                        { type: 'way', id: 4343, tags: { leisure: 'golf_course', name: 'Chambers Bay Golf Course' }, center: { lat: 47.2, lon: -122.57 } }] }));
+                        { type: 'way', id: 4343, tags: { leisure: 'golf_course', name: 'Wildwood Golf Course' }, center: { lat: 47.2, lon: -122.57 } }] }));
                     if (/way\(4343\)/.test(query)) return r.end(JSON.stringify({ osm3s: { timestamp_osm_base: '2026-10-09T00:00:00Z' }, elements: OSM_CAL.elements }));
                     return r.end(JSON.stringify({ elements: [] }));
                 });
@@ -1395,23 +1395,24 @@ function usgsFallbackFails(tag, g, why) {
         out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
     }
 
-    // ---- BUILD 5: ANY COURSE (Chambers Bay, nothing bundled) ----------------------
+    // ---- BUILD 5: ANY COURSE (a course with nothing bundled: Wildwood) ----------------------
     // The golfer is at HOME (Camas, WA - 150 km away). With the course's directory
     // location and Overpass blocked: the round stays on the Card, and 📍 GPS shows
     // the COURSE, not the golfer's street. With no location at all: a note on the
     // Card side, no map. With the stand-in Overpass: the lookup finds the holes and
     // the round lands on GPS. Overpass is asked for the COURSE point, never the golfer's.
-    const HOME = [45.5946, -122.404], CB = { latitude: 47.2003276, longitude: -122.5707511, city: 'University Place', state: 'WA' };
-    const cbDb = (name, loc) => ({ events: { ['GPS' + name.toUpperCase().slice(0, 5)]: round('wa_chambers') }, global_courses: loc ? { wa_chambers: { name: 'Chambers Bay', location: loc } } : {} });
+    // The course point is a stand-in (Chambers Bay's coordinates); Chambers Bay itself is bundled since build 5.
+    const HOME = [45.5946, -122.404], CB = { latitude: 47.2003276, longitude: -122.5707511, city: 'Tacoma', state: 'WA' };
+    const cbDb = (name, loc) => ({ events: { ['GPS' + name.toUpperCase().slice(0, 5)]: round('or_wildwood') }, global_courses: loc ? { or_wildwood: { name: 'Wildwood Golf Course', location: loc } } : {} });
     const ov0 = SEEN.overpass.length;
-    const nd = await arm('nodat', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 7000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 4000 }, { expression: READ }],
+    const nd = await arm('nodat', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 7000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 4000 }, { expression: READ }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('nodat', CB), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
     out.noData = nd; bail(out, nd);
-    const nl = await arm('noloc', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 6000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 2500 }, { expression: READ }],
+    const nl = await arm('noloc', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 6000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 2500 }, { expression: READ }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('noloc', null), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
     out.noLocation = nl; bail(out, nl);
-    const lk = await arm('lookp', 'wa_chambers', null, 'ok', HOME, 5, [{ sleep: 12000 }, { expression: READ },
-        { expression: `JSON.stringify({ lk: (function(){ var v = JSON.parse(localStorage.getItem('hardpan_osm_v1_wa_chambers') || 'null'); return v ? { n: Object.keys(v.holes).length, osm: v.osm, name: v.name } : null; })() })` }],
+    const lk = await arm('lookp', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 12000 }, { expression: READ },
+        { expression: `JSON.stringify({ lk: (function(){ var v = JSON.parse(localStorage.getItem('hardpan_osm_v1_or_wildwood') || 'null'); return v ? { n: Object.keys(v.holes).length, osm: v.osm, name: v.name } : null; })() })` }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY', overpass: true }), db: cbDb('lookp', CB) });
     out.lookup = lk; bail(out, lk);
     {
