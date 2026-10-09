@@ -4446,7 +4446,12 @@
 // through the card and comes back to GPS on the next hole. gps-view.js and the
 // GPS block of index.html changed. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v335-gps-flow';
+// GPS:BEGIN
+// Moved to v337 (gps-flow, 2026-10-09): gps-view.js, the clean map of the trip
+// app (no arcs, thin white circle and lines, numbers on the lines, manual wind),
+// carried over from gps-wave2's v336. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v337-gps-flowclean';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

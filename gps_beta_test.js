@@ -8,7 +8,7 @@
 //     no round and no database, so it cannot write a score, a green or a pin;
 //     no Enter Score, no Card.
 //   - ITS OWN APP: bundle com.rattlegolf.gpsbeta, "HardPan GPS Beta", team
-//     A2Z95T64UU, 0.1 (2), When-In-Use location only, a privacy manifest, the
+//     A2Z95T64UU, 0.1 (3), When-In-Use location only, a privacy manifest, the
 //     native Geolocation plugin and nothing else (no Firebase, no push).
 //   - The Consumer app's ios/ is not touched (its own test files pin it).
 // ============================================================================
@@ -39,7 +39,7 @@ test('the beta build copies the GPS files and nothing that writes', { skip }, ()
     assert.ok(/FORBIDDEN = \/firebase\|durableWrite\|offline-queue\/i/.test(b));
 });
 
-test('its own app: bundle id, name, team, 0.1 (1), location When-In-Use only, privacy manifest', { skip }, () => {
+test('its own app: bundle id, name, team, 0.1 (3), location When-In-Use only, privacy manifest', { skip }, () => {
     const cap = JSON.parse(read('capacitor.config.json'));
     assert.strictEqual(cap.appId, 'com.rattlegolf.gpsbeta');
     assert.strictEqual(cap.appName, 'HardPan GPS Beta');
@@ -48,7 +48,7 @@ test('its own app: bundle id, name, team, 0.1 (1), location When-In-Use only, pr
     assert.strictEqual((pbx.match(/PRODUCT_BUNDLE_IDENTIFIER = com\.rattlegolf\.gpsbeta;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/DEVELOPMENT_TEAM = A2Z95T64UU;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/MARKETING_VERSION = 0\.1;/g) || []).length, 2);
-    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 2;/g) || []).length, 2, 'build 2 (the seven trip rounds)');
+    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 3;/g) || []).length, 2, 'build 3 (the clean map, manual wind)');
     assert.ok(/PrivacyInfo\.xcprivacy in Resources/.test(pbx), 'the privacy manifest ships in the app');
     const plist = read('ios/App/App/Info.plist');
     assert.ok(/<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>[^<]{40,}<\/string>/.test(plist), 'a clear When-In-Use reason');

@@ -75,7 +75,8 @@ const PRODUCTS = {
         // live, plays like, the free / Pro split - gps-view.js, gps-geo.js and
         // gps-config.js changed. Consumer's own key below does not move.
         // v169 (gps-flow, 2026-10-09): the round opens on GPS; Enter Score returns to it.
-        cacheNameGps: 'consumer-v169-gps-flow',
+        // v171 (gps-flow, 2026-10-09): the clean map and the manual wind (gps-wave2's v170).
+        cacheNameGps: 'consumer-v171-gps-flowclean',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

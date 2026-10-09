@@ -97,6 +97,12 @@ function inlineHaversineM(a, b) {
     const s = Math.sin(r(b[0] - a[0]) / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(r(b[1] - a[1]) / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(s));
 }
+// Compass bearing a -> b, degrees (the wind check: a manual wind is kept by compass).
+function inlineBearing(a, b) {
+    const r = (d) => d * Math.PI / 180, y = Math.sin(r(b[1] - a[1])) * Math.cos(r(b[0]));
+    const x = Math.cos(r(a[0])) * Math.sin(r(b[0])) - Math.sin(r(a[0])) * Math.cos(r(b[0])) * Math.cos(r(b[1] - a[1]));
+    return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
 // FROM THE TEE (off the hole, or no GPS): center is tee -> green center, derived
 // inline from the data; it is not read off the build.
 const TEE_CENTER = String(Math.round(inlineHaversineM(H1.tee, H1.mid) / 0.9144));
@@ -155,6 +161,9 @@ const READ = `JSON.stringify((function () {
   var o = document.getElementById('gps-overlay');
   var tg = document.getElementById('gps-side-toggle');
   var t = function (s) { var e = o && o.querySelector(s); return e ? (e.innerText || '').trim() : null; };
+  // BUILD 3: the accuracy / source line and the target readout are not on the map
+  // any more (the numbers ride the lines; the line is in the credits) - read their text.
+  var tx = function (s) { var e = o && o.querySelector(s); return e ? (e.textContent || '').trim() : null; };
   var vis = function (s) { var e = o && o.querySelector(s); return !!(e && e.offsetParent !== null); };
   var rect = function (s) { var e = o && o.querySelector(s); if (!e) return null; var r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; };
   var attr = o && o.querySelector('.maplibregl-ctrl-attrib');
@@ -175,10 +184,17 @@ const READ = `JSON.stringify((function () {
            toggleOnScreen: !!(tg && tg.getBoundingClientRect().bottom <= innerHeight && tg.getBoundingClientRect().height > 0),
            side: gpsBtn ? (gpsBtn.getAttribute('aria-pressed') === 'true' ? 'gps' : 'bets') : null,
            title: t('.gps-title'), f: t('.gps-f'), m: t('.gps-m'), b: t('.gps-b'), labels: o ? [].slice.call(o.querySelectorAll('.gps-lbl')).map(function (e) { return e.innerText.trim(); }) : [],
-           acc: t('.gps-acc'), msg: vis('.gps-msg') ? t('.gps-msg') : '', verify: vis('.gps-verify') ? t('.gps-verify') : '',
+           acc: tx('.gps-acc'), msg: vis('.gps-msg') ? t('.gps-msg') : '', verify: vis('.gps-verify') ? t('.gps-verify') : '',
            banner: vis('.gps-banner') ? t('.gps-banner') : '', tilesNote: vis('.gps-tiles-note'),
-           toHere: vis('.gps-target-row') ? t('.gps-to-here') : '', hereCenter: vis('.gps-target-row') ? t('.gps-here-center') : '',
-           units: t('.gps-units'), src: t('.gps-src'),
+           toHere: q('.gps-target-row') && q('.gps-target-row').style.display !== 'none' && !o.classList.contains('gps-basic-mode') ? tx('.gps-to-here') : '',
+           hereCenter: q('.gps-target-row') && q('.gps-target-row').style.display !== 'none' && !o.classList.contains('gps-basic-mode') ? tx('.gps-here-center') : '',
+           units: t('.gps-units'), src: tx('.gps-src'), subShown: vis('.gps-sub'), targetRowShown: vis('.gps-target-row'),
+           popInfo: vis('.gps-pop-info') ? tx('.gps-pop-info') : null,
+           windManual: !!(q('.gps-wind') && q('.gps-wind').classList.contains('gps-wind-manual')), windPop: vis('.gps-wind-pop'),
+           windOn: q('.gps-wind-pop') ? ([].slice.call(q('.gps-wind-pop').querySelectorAll('[data-rel].gps-on')).map(function (b) { return b.getAttribute('data-rel'); })[0] || null) : null,
+           windLive: vis('.gps-wp-live'),
+           pillStyle: (function () { var p = q('.gps-pill-to'); if (!p) return null; var c = getComputedStyle(p); return { bg: c.backgroundColor, color: c.color, size: parseFloat(c.fontSize), weight: c.fontWeight, shadow: c.textShadow !== 'none' }; })(),
+           ringStyle: (function () { var r = q('.gps-ring'); if (!r) return null; var c = getComputedStyle(r), b = getComputedStyle(r, '::before'); return { color: c.borderTopColor, width: parseFloat(c.borderTopWidth), cross: b.content !== 'none' && b.content !== 'normal' }; })(),
            set: avail('.gps-set-green'), fix: avail('.gps-fix-green'), undo: avail('.gps-undo-green'),
            target: rect('.gps-target'), centerPin: rect('.gps-pin-mid'), dot: rect('.gps-dot'), teePin: rect('.gps-pin-tee'),
            from: vis('.gps-from') ? t('.gps-from') : '', recenter: vis('.gps-recenter'),
@@ -320,7 +336,7 @@ function pillFails(tag, g, required) {
         const [a, b] = ends[p.k];
         const reach = Math.hypot(p.box.r - p.box.l, p.box.b - p.box.t) / 2 + 8;
         if (a && b && segDist(mid(p.box), a, b) > reach) f.push(`${tag}: the ${p.k} pill is off its line by ${Math.round(segDist(mid(p.box), a, b))}px`);
-        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'sub', 'right', 'recenterB', 'toPill', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
+        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'tee', 'dot', 'from', 'attrib', 'top', 'right', 'recenterB', 'bottom'].filter((k) => hitBox(p.box, g.boxes[k]));
         if (hitBox(p.box, greenPage(g))) bad.push('green');
         if (bad.length) f.push(`${tag}: the ${p.k} pill covers ${bad.join(', ')}: ` + JSON.stringify(p.box));
     });
@@ -335,23 +351,18 @@ function arcStepRule(lat, zoom) {
     const ppy = ringPxAt(lat, zoom) / RING_YD;
     return { step: [25, 50, 100].find((st) => st * ppy >= 26) || 100, edge: [25, 50, 100].some((st) => Math.abs(st * ppy - 26) < 1) };
 }
-function arcFails(tag, g, totalYd, lat) {
+function arcFails(tag, g) {
+    // BUILD 3 (clean as Golfshot): no yardage arcs and no arc labels, at any zoom.
     const f = [];
-    const rule = arcStepRule(lat == null ? H1.mid[0] : lat, g.zoom);
-    if (g.arcStep !== rule.step && !rule.edge) f.push(`${tag}: arcs every ${g.arcStep} yds at zoom ${g.zoom}, expected every ${rule.step}`);
-    const want = expectArcs(totalYd, g.arcStep);
-    if (g.arcs !== want) f.push(`${tag}: arcs "${g.arcs}", expected "${want}"`);
-    const n = want ? want.split(' ').length : 0;
-    if (g.arcLabels.length < Math.min(n, Math.ceil(n * 0.6))) f.push(`${tag}: only ${g.arcLabels.length} of ${n} arc labels shown`);
-    const lineX = mid(g.boxes.mid) && mid(g.boxes.dot || g.boxes.tee);
-    g.arcLabels.forEach((l) => {
-        if (!/^\d+y( to pin)?$/.test(l.text)) f.push(`${tag}: arc label "${l.text}"`);
-        const c = mid(g.boxes.mid);
-        if (c && l.box && l.box.r > c.x + 2) f.push(`${tag}: arc label "${l.text}" is not at the left end (right edge ${l.box.r}, line x ${Math.round(c.x)})`);
-        const bad = ['target', 'ringLbl', 'back', 'front', 'mid', 'dot', 'tee', 'attrib', 'top', 'sub', 'right', 'recenterB', 'toPill', 'bottom'].filter((k) => hitBox(l.box, g.boxes[k]));
-        g.pills.forEach((p) => { if (hitBox(l.box, p.box)) bad.push('a pill'); });
-        if (bad.length) f.push(`${tag}: arc label "${l.text}" covers ${bad.join(', ')}`);
-    });
+    if (g.arcs) f.push(`${tag}: yardage arcs are back: "${g.arcs}"`);
+    if (g.arcLabels.length) f.push(`${tag}: ${g.arcLabels.length} arc labels shown`);
+    // ... nor the accuracy / source bar, nor the bottom "Tee -> target" pill.
+    if (g.subShown) f.push(`${tag}: the accuracy / source bar is on the map`);
+    if (g.targetRowShown) f.push(`${tag}: the target readout pill is on the map`);
+    // The numbers: big, bold, white, outlined, no box. The circle: thin, white, no crosshair.
+    const ps = g.pillStyle, rs = g.ringStyle;
+    if (ps && (!/rgba\(0, 0, 0, 0\)|transparent/.test(ps.bg) || ps.color !== 'rgb(255, 255, 255)' || ps.size < 22 || Number(ps.weight) < 800 || !ps.shadow)) f.push(`${tag}: the line numbers are not big bold white on no box: ` + JSON.stringify(ps));
+    if (rs && (rs.color !== 'rgb(255, 255, 255)' || rs.width > 2 || rs.cross)) f.push(`${tag}: the target is not a thin white circle: ` + JSON.stringify(rs));
     return f;
 }
 // The tee AND the back of the green fully on screen, the tee clear of the attribution bar.
@@ -518,7 +529,8 @@ function usgsFallbackFails(tag, g, why) {
         fails.push(...usgsFallbackFails('osm (Esri refused)', gps, 'errors'));
         fails.push(...teeInView('osm', gps), ...pillFails('osm', gps, true));
         if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
-        fails.push(...arcFails('osm', gps, ME_CENTER_YD));
+        fails.push(...arcFails('osm', gps));
+        if (!/±6 yds/.test(gps.popInfo || '') && gps.popInfo !== null) fails.push('osm: the credits popup info line: ' + gps.popInfo);
         if (gps.score !== 'Hole 1 · Enter Score') fails.push('osm: score button reads ' + gps.score);
         // Redesign: on the card, ONE "📍 GPS" button; on the map, the Card button back.
         if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the GPS button is not on the card: ' + arrive.toggle);
@@ -695,7 +707,7 @@ function usgsFallbackFails(tag, g, why) {
         if (!p1.dump.storage['hardpan_usgs_done_v1_caledonia']) fails.push('precache: not marked done');
         const off = p2.reads[0];
         if (!(off.tilesLoaded > 0)) fails.push('offline: no satellite tiles drawn from the cache (' + off.tilesLoaded + ')');
-        if (off.arcs !== expectArcs(ME_CENTER_YD, off.arcStep) || !off.arcStep) fails.push('offline: arcs with no signal "' + off.arcs + '"');
+        fails.push(...arcFails('offline', off));
         if (off.tilesNote) fails.push('offline: the no-signal note showed with tiles cached');
         const onlineReq = p1.requests.filter((q) => /basemap\.nationalmap\.gov/.test(urlOf(q))).length;
         if (onlineReq < 24) fails.push('precache: only ' + onlineReq + ' USGS requests seen while storing 24 tiles');
@@ -764,7 +776,7 @@ function usgsFallbackFails(tag, g, why) {
         // Wave 1 (Manny, 2026-10-08): NO "Measuring from tee" on the map.
         if (g.from || g.boxes.from || /Measuring from tee/.test(JSON.stringify(g))) fails.push('off-hole: "Measuring from tee" is still on the map');
         // Arcs from the TEE (inline expectation, not gps-geo's answer).
-        fails.push(...arcFails('off-hole', g, TEE_CENTER_YD));
+        fails.push(...arcFails('off-hole', g));
         fails.push(...teeInView('off-hole', g), ...pillFails('off-hole', g, true));
     }
 
@@ -813,14 +825,13 @@ function usgsFallbackFails(tag, g, why) {
             if (g.bearing !== 102) fails.push(`polish ${k}: the hole's turn was lost: bearing ${g.bearing}`);
             const want = ringPxAt(H1.mid[0], g.zoom);
             if (!near(g.ringPx, Math.max(6, Math.round(want)), 2)) fails.push(`polish ${k}: ring ${g.ringPx}px across, 20 yds is ${want.toFixed(1)}px at zoom ${g.zoom}`);
-            if (g.ringLbl !== '20 yd') fails.push(`polish ${k}: ring label "${g.ringLbl}"`);
-            const tc = mid(g.boxes.target);
-            if (!g.boxes.ringLbl || !tc || g.boxes.ringLbl.l < tc.x + g.ringPx / 2) fails.push(`polish ${k}: the ring label is not beside the ring`);
+            // BUILD 3: the "20 yd" label is only in the Green view.
+            if (g.boxes.ringLbl) fails.push(`polish ${k}: the ring label shows in the hole view`);
+            fails.push(...arcFails('polish ' + k, g));
             fails.push(...pillFails('polish ' + k, g, lbl === '1x'));
             if (g.toHere !== z1.toHere) fails.push(`polish ${k}: zooming moved the target: ${g.toHere}`);
         });
         if (dist(z2.target, z3.target) > 2) fails.push('polish: 2x -> 3x did not zoom around the target: ' + JSON.stringify([z2.target, z3.target]));
-        [z1, z2, z3].forEach((g, k) => { const rule = arcStepRule(H1.mid[0], g.zoom); if (g.arcStep !== rule.step && !rule.edge) fails.push(`polish ${k}: arcs every ${g.arcStep} yds at zoom ${g.zoom}, expected ${rule.step}`); });
         if (!(z2.ringPx > z1.ringPx * 1.8)) fails.push(`polish: the ring did not grow with the zoom: ${z1.ringPx} -> ${z2.ringPx}`);
         if (dist(rc.centerPin, z1.centerPin) > 3) fails.push('polish: Recenter did not go back to the 1x hole view');
         if (!pull.pull || !pull.lock || pull.ob !== 'none' || pull.bodyOb !== 'none' || pull.mapTA !== 'none') fails.push('polish: GPS does not stop the page pulling: ' + JSON.stringify(pull));
@@ -907,10 +918,19 @@ function usgsFallbackFails(tag, g, why) {
     const windProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-wind-profile-'));
     const nws0 = nwsSeen.length;
     const wd = await arm('wind', 'caledonia', null, 'ok', ME, 4.6, [
-        { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `!!(document.querySelector('.gps-wind') && document.querySelector('.gps-wind').style.display !== 'none')`, timeout: 15000 }, { expression: READ }, // 0
+        { tap: '.gps-side-gps' }, WAIT_MAP, { waitFor: `/mph/.test((document.querySelector('.gps-wind-mph') || {}).textContent || '')`, timeout: 15000 }, { expression: READ }, // 0
         { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 1 reload: from the phone
         { expression: `(function(){var k='hardpan_wind_v1_caledonia',w=JSON.parse(localStorage.getItem(k));if(!w)return 'no wind reading';w.at=Date.now()-16*60000;localStorage.setItem(k,JSON.stringify(w));return 'aged';})()` },
         { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 200 }, { tap: '.gps-tools' }, { sleep: 250 }, { tap: '.gps-units' }, { sleep: 1500 }, { expression: READ }, // 2 16 min old: asked again
+        // MANUAL WIND (build 3): tap the box, "into the face" (down arrow), +3 mph.
+        { tap: '.gps-wind' }, { sleep: 300 }, { expression: READ },                                              // 3 popup open
+        { tap: '.gps-wind-pop [data-rel="4"]' }, { sleep: 150 }, { tap: '.gps-wp-plus' }, { sleep: 100 }, { tap: '.gps-wp-plus' }, { sleep: 100 }, { tap: '.gps-wp-plus' }, { sleep: 200 },
+        { tap: '.gps-wp-done' }, { sleep: 300 }, { expression: READ },                                           // 4 manual 15 into the face
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 5 still manual after a reload
+        { tap: '.gps-score-next' }, { sleep: 1200 }, { expression: READ },                                       // 6 hole 2: same compass wind, turned with the hole
+        { tap: '.gps-wind' }, { sleep: 300 }, { tap: '.gps-wp-live' }, { sleep: 400 }, { expression: READ },     // 7 "Use live wind"
+        { expression: `(function(){localStorage.setItem('hardpan_wind_manual_v1',JSON.stringify({day:'2026-1-1',mph:20,toDeg:0}));return 'yesterday';})()` },
+        { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1500 }, { expression: READ },  // 8 set on another day: gone
     ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + NWS_CFG, profileDir: windProfile });
     out.wind = wd; bail(out, wd);
     const nwsAfterFirst = nwsSeen.slice(nws0);
@@ -934,7 +954,18 @@ function usgsFallbackFails(tag, g, why) {
         if (w1.wind !== w0.wind) fails.push('wind: not shown from the phone after a reload: ' + w1.wind);
         if (w2.wind !== w0.wind) fails.push('wind: lost when refreshed: ' + w2.wind);
         if (nwsAfterFirst.some((u) => u.indexOf(ME[0].toFixed(3)) !== -1 && u.indexOf(ME[1].toFixed(3)) !== -1 && want.indexOf(ME[0].toFixed(3)) === -1)) fails.push('wind: the golfer\'s position went to the weather service');
-        if (wo.reads[0].wind !== null) fails.push('wind: shown with no weather service reachable: ' + wo.reads[0].wind);
+        // BUILD 3: with no reading the box stays, to tap and set it yourself.
+        if (wo.reads[0].wind !== 'Wind –' || wo.reads[0].windManual) fails.push('wind: with no weather service the box reads ' + JSON.stringify(wo.reads[0].wind));
+        const [, , , m3, m4, m5, m6, m7, m8] = wd.reads;
+        const hb = (n) => inlineBearing(table.caledonia.holes[n].osm.tee, table.caledonia.holes[n].osm.mid);
+        if (!m3.windPop || m3.windOn !== String(Math.round(((((WIND_TO - hb('1')) % 360) + 360) % 360) / 45) % 8)) fails.push('wind: the popup did not open on the live wind: ' + JSON.stringify([m3.windPop, m3.windOn, m3.bearing]));
+        if (m3.windLive) fails.push('wind: "Use live wind" offered with no manual wind set');
+        if (m4.windPop || !m4.windManual || !/^↑\s*15 mph\s*manual$/.test(m4.wind || '') || Math.abs(Number(m4.windRot) - 180) > 2) fails.push('wind: manual 15 mph into the face - ' + JSON.stringify([m4.windPop, m4.windManual, m4.wind, m4.windRot]));
+        if (m5.wind !== m4.wind || !m5.windManual) fails.push('wind: the manual wind did not survive a reload: ' + JSON.stringify([m5.wind, m5.windManual]));
+        const wantRot6 = String(Math.round((((Math.round(hb('1') + 180) - m6.bearing) % 360) + 360) % 360));
+        if (!m6.windManual || Math.abs(Number(m6.windRot) - Number(wantRot6)) > 2) fails.push(`wind: hole 2 arrow ${m6.windRot}, expected ${wantRot6} (the same compass wind)`);
+        if (m7.windManual || m7.wind !== w0.wind || m7.windPop) fails.push('wind: "Use live wind" did not go back: ' + JSON.stringify([m7.windManual, m7.wind]));
+        if (m8.windManual || m8.wind !== w0.wind) fails.push('wind: a manual wind from another day is still used: ' + JSON.stringify([m8.windManual, m8.wind]));
     }
     try { fs.rmSync(windProfile, { recursive: true, force: true }); } catch (e) {}
 
@@ -965,7 +996,7 @@ function usgsFallbackFails(tag, g, why) {
         out.courses.push(res);
         if (g.title !== `Hole ${tc.hole} · Par ${sb.p[tc.key].data[tc.hole - 1].par}`) fails.push(`${tag}: title ${g.title}`);
         if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
-        fails.push(...arcFails(tag, g, total, hr.mid[0]), ...teeInView(tag, g), ...pillFails(tag, g, true));
+        fails.push(...arcFails(tag, g), ...teeInView(tag, g), ...pillFails(tag, g, true));
         if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
         if (!/12 mph/.test(g.wind || '') || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.wind} turned ${g.windRot} (expected ${windRotFor(g.bearing)})`);
         if (g.midLbl !== 'CENTER' || g.editPinEl) fails.push(`${tag}: Edit Pin is still on the screen: ` + JSON.stringify([g.midLbl, g.editPinEl]));
@@ -1204,6 +1235,11 @@ function usgsFallbackFails(tag, g, why) {
         if (g1.esri !== 'visible' || g1.maxZoom !== 21) fails.push('green: this arm needs Esri on (z21) to prove the fill: ' + JSON.stringify([g1.esri, g1.maxZoom]));
         if (lbl(g1, 'f') !== 'F ' + g1.f || lbl(g1, 'c') !== 'C ' + g1.m || lbl(g1, 'b') !== 'B ' + g1.b || lbl(g1, 'p')) fails.push('green: labels ' + JSON.stringify(g1.greenLbls.map((x) => x.text)) + ' vs F/C/B ' + [g1.f, g1.m, g1.b].join('/'));
         if (g1.f !== EXPECT.front || g1.m !== EXPECT.center || g1.b !== EXPECT.back) fails.push('green: the numbers changed in the green view: ' + [g1.f, g1.m, g1.b].join('/'));
+        // BUILD 3: "20 yd" beside the ring in the Green view only; in meters "18 m".
+        { const tc = mid(g1.boxes.target); if (g1.ringLbl !== '20 yd' || !g1.boxes.ringLbl || !tc || g1.boxes.ringLbl.l < tc.x + g1.ringPx / 2) fails.push('green: the "20 yd" label is not beside the ring: ' + JSON.stringify([g1.ringLbl, g1.boxes.ringLbl])); }
+        if (gm.boxes.ringLbl && gm.ringLbl !== '18 m') fails.push('green (meters): ring label ' + gm.ringLbl);
+        if (h0.boxes.ringLbl || h5.boxes.ringLbl) fails.push('green: the ring label shows in the hole view');
+        fails.push(...arcFails('green view', g1));
         g1.greenLbls.forEach((x) => { const near = { f: g1.boxes.front, c: g1.boxes.mid, b: g1.boxes.back }[x.k]; if (near && x.box && Math.abs((x.box.t + x.box.b) / 2 - (near.t + near.b) / 2) > 30) fails.push('green: label ' + x.text + ' is not beside its point'); });
         if (!dimsIn(g1.greenDims, G_DEPTH, G_WIDTH, 'yds')) fails.push(`green: "${g1.greenDims}", inline ${G_DEPTH} deep x ${G_WIDTH} wide`);
         if (!dimsIn(gm.greenDims, G_DEPTH_M, G_WIDTH_M, 'm')) fails.push(`green (meters): "${gm.greenDims}", inline ${G_DEPTH_M} x ${G_WIDTH_M} m`);
@@ -1321,7 +1357,7 @@ function usgsFallbackFails(tag, g, why) {
         if (f1.hasPro !== false || f1.tier !== 'free') fails.push('free: ?gpstier=free did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
         if (!f0.toggle || !/📍 GPS/.test(f0.toggle)) fails.push('free: the GPS button is not there');
         // NO PRICE until Manny sets one: "HardPan GPS — coming soon", the list, Not now.
-        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Yardage arcs', 'Wind', 'Plays-like yardage', 'Not now'];
+        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Drag-the-target yardages', 'Wind', 'Plays-like yardage', 'Not now'];
         if (/Edit Pin/.test(f1.sheet || '')) fails.push('free: the sheet still offers Edit Pin');
         if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
         if (/\$|\/year|trial|Coming soon$/.test(f1.sheet.replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));

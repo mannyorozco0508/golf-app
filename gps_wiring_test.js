@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v335-gps-flow'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v337-gps-flowclean'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -242,4 +242,27 @@ test('Google satellite: off without a key; never stored, never for greens, never
     assert.ok(/var uWant = gWant === 'visible' \? 'none' : 'visible';/.test(v));
     // Google's own logo file, unmodified, alt "Google Maps".
     assert.ok(/class="gps-google-logo" alt="Google Maps"/.test(v) && /logo: 'data:image\/svg\+xml;base64,/.test(v));
+});
+
+test('build 3 look: no arcs, no center line, no green fill or outline, nothing yellow; two thin white lines', { skip }, () => {
+    const v = read('gps-view.js');
+    ['hole-line', 'green-fill', 'green-edge', 'arc-carry', 'arc-pin'].forEach((id) => assert.ok(v.indexOf("{ id: '" + id + "'") === -1, 'layer ' + id + ' is back'));
+    assert.ok(/S\.arcs = \[\];/.test(v) && !/G\.yardageArcs\(/.test(v), 'no yardage arcs');
+    assert.ok(/\{ id: 'line-to', [^\n]*'line-color': '#ffffff', 'line-width': 1\.6 \}/.test(v) && /\{ id: 'line-on', [^\n]*'line-color': '#ffffff', 'line-width': 1\.6 \}/.test(v), 'two thin white lines');
+    const css = v.slice(v.indexOf('var CSS'));
+    assert.ok(!/#facc15|#fde68a/i.test(v), 'nothing yellow on the map');
+    assert.ok(!/\.gps-ring::before|\.gps-ring::after/.test(css), 'no crosshair');
+    assert.ok(/lbl\.style\.display = S\.view === 'green' \? '' : 'none';/.test(v), '"20 yd" only in the Green view');
+    assert.ok(/#gps-overlay:not\(\.gps-basic-mode\) \.gps-sub,#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar, no "Tee -> target" pill');
+    assert.ok(/class="gps-pop-info"/.test(v), 'the accuracy / source line is in the credits');
+});
+
+test('manual wind: on this phone only, today only, and it drives plays ~', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/var MANUAL_WIND = 'hardpan_wind_manual_v1';/.test(v));
+    assert.ok(/if \(!m \|\| m\.day !== today\(\)/.test(v), 'gone the next day');
+    const sec = v.slice(v.indexOf('// ---- MANUAL WIND (build 3)'), v.indexOf('function fetchWind('));
+    assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|\.ref\(|db\./.test(sec), 'the manual wind is never sent anywhere');
+    assert.ok(/var w = effectiveWind\(\), has = !!\(w && !w\.none\);/.test(v), 'plays ~ uses the manual wind');
+    assert.ok(/Use live wind/.test(v) && /gps-wind-tag">manual</.test(v));
 });
