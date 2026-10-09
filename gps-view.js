@@ -540,8 +540,10 @@
         var sources = {
             usgs: { type: 'raster', tiles: usgsSourceTiles(), tileSize: 256, maxzoom: TILES.usgs.maxNativeZoom,
                     attribution: escapeText(TILES.usgs.attribution) },
-            hole: { type: 'geojson', data: EMPTY, attribution: OSM_ATTRIBUTION },
-            lines: { type: 'geojson', data: EMPTY },
+            hole: { type: 'geojson', data: EMPTY },
+            // The OSM credit rides the lines (always drawn): with no center line or
+            // green outline any more (build 3), 'hole' has no layer to carry it.
+            lines: { type: 'geojson', data: EMPTY, attribution: OSM_ATTRIBUTION },
             arcs: { type: 'geojson', data: EMPTY },
             acc: { type: 'geojson', data: EMPTY }
         };
@@ -549,16 +551,14 @@
             { id: 'bg', type: 'background', paint: { 'background-color': '#1d3b2a' } },
             // Hidden from the start when Google is to be the picture (never two maps).
             { id: 'usgs', type: 'raster', source: 'usgs', layout: { visibility: (S.googleOn && !S.googleFailed) ? 'none' : 'visible' } },
-            { id: 'hole-line', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'line'], paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.45 } },
-            { id: 'green-fill', type: 'fill', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'fill-color': '#4ade80', 'fill-opacity': 0.28 } },
-            { id: 'green-edge', type: 'line', source: 'hole', filter: ['==', ['get', 'k'], 'green'], paint: { 'line-color': '#d9f99d', 'line-width': 2 } },
-            // YARDAGE ARCS: thin white curves across the hole (carry every 25 yds),
-            // dashed for the 100 / 150 / 200-to-the-pin marks.
-            { id: 'arc-carry', type: 'line', source: 'arcs', filter: ['==', ['get', 'k'], 'carry'], paint: { 'line-color': '#ffffff', 'line-width': 1.2, 'line-opacity': 0.75 } },
-            { id: 'arc-pin', type: 'line', source: 'arcs', filter: ['==', ['get', 'k'], 'pin'], paint: { 'line-color': '#fde68a', 'line-width': 1.4, 'line-opacity': 0.9, 'line-dasharray': [3, 2] } },
             { id: 'acc-fill', type: 'fill', source: 'acc', paint: { 'fill-color': '#60a5fa', 'fill-opacity': 0.12 } },
-            { id: 'line-to', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'to'], paint: { 'line-color': '#facc15', 'line-width': 2 } },
-            { id: 'line-on', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'on'], paint: { 'line-color': '#ffffff', 'line-width': 2 } }
+            // BUILD 3 LOOK (2026-10-09, Manny's iPhone test): clean as Golfshot - no
+            // arcs, no center line, no green fill or outline, nothing yellow. Two
+            // thin white lines (golfer or tee -> circle, circle -> green center)
+            // with a faint dark edge so they read on a light fairway.
+            { id: 'line-case', type: 'line', source: 'lines', paint: { 'line-color': '#000000', 'line-width': 3.5, 'line-opacity': 0.35 } },
+            { id: 'line-to', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'to'], paint: { 'line-color': '#ffffff', 'line-width': 1.6 } },
+            { id: 'line-on', type: 'line', source: 'lines', filter: ['==', ['get', 'k'], 'on'], paint: { 'line-color': '#ffffff', 'line-width': 1.6 } }
         ];
         // With a key the Esri layer is always there - hidden while it has failed, so
         // it can come back once if the signal does. A hidden layer asks for nothing.
@@ -695,7 +695,7 @@
             try {
                 if (!S.map.getSource('google')) {
                     S.map.addSource('google', googleSource(session));
-                    S.map.addLayer({ id: 'google', type: 'raster', source: 'google', layout: { visibility: 'none' } }, 'hole-line');
+                    S.map.addLayer({ id: 'google', type: 'raster', source: 'google', layout: { visibility: 'none' } }, 'line-case');
                 }
             } catch (e) {}
             syncImageryForMode();
@@ -749,7 +749,9 @@
         var a = S.el.querySelector('.maplibregl-ctrl-attrib-inner') || S.el.querySelector('.maplibregl-ctrl-attrib');
         var pop = S.el.querySelector('.gps-credit-pop');
         // One line per credit, from MapLibre's own (it lists the sources on the map).
-        if (a && pop) pop.innerHTML = a.innerHTML.split(' | ').map(function (l) { return '<div>' + l + '</div>'; }).join('');
+        if (a && pop) pop.innerHTML = a.innerHTML.split(' | ').map(function (l) { return '<div>' + l + '</div>'; }).join('')
+            // BUILD 3: the accuracy and where the green came from, small, here only.
+            + '<div class="gps-pop-info">' + escapeText([(S.el.querySelector('.gps-acc') || {}).textContent, (S.el.querySelector('.gps-src') || {}).textContent].filter(Boolean).join(' · ')) + '</div>';
     }
     function toggleCredits(e) {
         if (e) e.stopPropagation();
@@ -916,7 +918,7 @@
         // The line under the top panel is held at its full height (28px) even
         // before its text arrives - a frame taken while it was empty let the back
         // of Pine Lakes #10's green slip under it once "±6 yds" filled it.
-        if (tb) top = Math.max(top, tb.bottom - W.top + 8 + 28 + 12);
+        if (tb) top = Math.max(top, tb.bottom - W.top + 12);
         var sb = vis('.gps-sub');
         if (sb) top = Math.max(top, sb.bottom - W.top + 12);
         var bottomEdge = W.bottom - attribH();
@@ -1035,7 +1037,8 @@
         // clear of the pills and the target on the line (30 yds was 26 px on a
         // par 5 seen whole, and half the labels had nowhere to go).
         var ppy = (S.map && aim) ? G.M_PER_YD / metersPerPx(aim[0]) : 1;
-        S.arcs = (S.mode === 'measure' && o && aim) ? G.yardageArcs(o.pt, aim, { step: S.arcStep, halfWidthYd: Math.max(30, 44 / ppy) }) : [];
+        // BUILD 3: no yardage arcs on the map (clean as Golfshot).
+        S.arcs = [];
         setData('arcs', { type: 'FeatureCollection', features: S.arcs.map(function (a) { return feature(a.kind, 'LineString', a.pts.map(ll)); }) });
         var mel = S.el.querySelector('.gps-map');
         if (mel) { mel.setAttribute('data-arcs', S.arcs.map(function (a) { return (a.kind === 'pin' ? 'p' : 'c') + a.yards; }).join(' ')); mel.setAttribute('data-arc-step', String(S.arcStep)); }
@@ -1192,9 +1195,17 @@
         if (ring) { ring.style.width = d + 'px'; ring.style.height = d + 'px'; }
         var lbl = el.querySelector('.gps-ring-lbl');
         if (lbl) {
+            lbl.style.display = S.view === 'green' ? '' : 'none';
             var w = units() === 'm' ? Math.round(2 * TARGET_RADIUS_YD * G.M_PER_YD) + ' m' : (2 * TARGET_RADIUS_YD) + ' yd';
             if (lbl.textContent !== w) lbl.textContent = w;
-            lbl.style.left = Math.round(box / 2 + d / 2 + 6) + 'px';
+            var left = box / 2 + d / 2 + 6;
+            // Near the right edge (the circle dragged over there): the label goes on
+            // the circle's left, so it is never cut off.
+            if (S.view === 'green') {
+                var mr = el.getBoundingClientRect(), wr = S.el.getBoundingClientRect(), lw = lbl.offsetWidth || 44;
+                if (mr.width && mr.left + left + lw > wr.right - 8) left = box / 2 - d / 2 - 6 - lw;
+            }
+            lbl.style.left = Math.round(left) + 'px';
         }
     }
 
@@ -1410,6 +1421,76 @@
     function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     function windKey() { return 'hardpan_wind_v1_' + S.courseKey; }
+    // ---- MANUAL WIND (build 3) ---------------------------------------------------
+    // Tap the wind box: set it yourself - where it blows, relative to the hole (8
+    // arrows, up = toward the green), and mph. Kept on this phone only, for today
+    // (local date); tomorrow it is gone and the live reading is back. Stored as a
+    // compass direction, so the arrow stays right on every other hole.
+    var MANUAL_WIND = 'hardpan_wind_manual_v1';
+    function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+    function manualWind() {
+        var m = lsGet(MANUAL_WIND);
+        if (!m || m.day !== today() || typeof m.toDeg !== 'number' || typeof m.mph !== 'number') return null;
+        return m;
+    }
+    // The wind that drives the box and "plays ~": today's manual one, else the
+    // live reading up to an hour old. null: none.
+    function effectiveWind() {
+        var live = lsGet(windKey()), fresh = !!(live && Date.now() - live.at <= WIND_SHOW_MS);
+        var m = manualWind();
+        var tempF = fresh && typeof live.tempF === 'number' ? live.tempF : null;
+        if (m) return { mph: m.mph, toDeg: m.toDeg, fromDeg: (m.toDeg + 180) % 360, tempF: tempF, manual: true };
+        if (fresh && !live.none) return { mph: live.mph, toDeg: live.toDeg, fromDeg: live.fromDeg, tempF: tempF };
+        return fresh ? { none: true, tempF: tempF } : null;
+    }
+    // The hole's direction: tee -> green (the hole view turns the map to it).
+    function holeBearing() {
+        var r = resolved();
+        if (r && r.tee && r.mid) return G.bearingDeg(r.tee, r.mid);
+        return S.camera ? S.camera.bearing : (S.map ? S.map.getBearing() : 0);
+    }
+    var WIND_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+    function openWindPop() {
+        if (!S) return;
+        var pop = S.el.querySelector('.gps-wind-pop');
+        if (!pop) return;
+        var w = effectiveWind(), hb = holeBearing();
+        // Start from what is showing now (manual or live), in 8 steps relative to the hole.
+        S.windDraft = {
+            rel: w && !w.none ? Math.round((((w.toDeg - hb) % 360 + 360) % 360) / 45) % 8 : 0,
+            mph: w && !w.none ? w.mph : 0
+        };
+        syncWindPop();
+        pop.style.display = '';
+    }
+    function closeWindPop() { var pop = S && S.el.querySelector('.gps-wind-pop'); if (pop) pop.style.display = 'none'; }
+    function syncWindPop() {
+        var pop = S && S.el.querySelector('.gps-wind-pop');
+        if (!pop || !S.windDraft) return;
+        Array.prototype.forEach.call(pop.querySelectorAll('[data-rel]'), function (b) {
+            b.classList.toggle('gps-on', Number(b.getAttribute('data-rel')) === S.windDraft.rel);
+        });
+        var n = pop.querySelector('.gps-wp-mph');
+        if (n) n.textContent = S.windDraft.mph + ' mph';
+        var live = pop.querySelector('.gps-wp-live');
+        if (live) live.style.display = manualWind() ? '' : 'none';
+    }
+    function saveManualWind() {
+        if (!S || !S.windDraft) return;
+        lsSet(MANUAL_WIND, { day: today(), mph: S.windDraft.mph, toDeg: Math.round((holeBearing() + S.windDraft.rel * 45) % 360) });
+        syncWind();
+    }
+    function windPopClick(e) {
+        var b = e.target && e.target.closest ? e.target.closest('button') : null;
+        if (!b || !S || !S.windDraft) return;
+        e.preventDefault();
+        if (b.hasAttribute('data-rel')) { S.windDraft.rel = Number(b.getAttribute('data-rel')); saveManualWind(); }
+        else if (b.classList.contains('gps-wp-minus')) { S.windDraft.mph = Math.max(0, S.windDraft.mph - 1); saveManualWind(); }
+        else if (b.classList.contains('gps-wp-plus')) { S.windDraft.mph = Math.min(60, S.windDraft.mph + 1); saveManualWind(); }
+        else if (b.classList.contains('gps-wp-live')) { try { localStorage.removeItem(MANUAL_WIND); } catch (x) {} closeWindPop(); syncWind(); return; }
+        else if (b.classList.contains('gps-wp-done')) { closeWindPop(); return; }
+        syncWindPop();
+    }
     function fetchWind() {
         if (!S || S.windInFlight || typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
@@ -1448,9 +1529,15 @@
         var stale = !w || now - w.at > WIND_FRESH_MS;
         // Ask again when stale - but not more than once a minute after a failure.
         if (S.side === 'gps' && stale && !(S.windFailedAt && now - S.windFailedAt < 60000)) fetchWind();
-        var showIt = !!(w && !w.none && now - w.at <= WIND_SHOW_MS && S.side === 'gps');
-        box.style.display = showIt ? '' : 'none';
-        if (!showIt) return;
+        var ew = effectiveWind();
+        // BUILD 3: the box is always there on the GPS side - tap it to set the wind.
+        // No reading and nothing set: "Wind" with a dash.
+        box.style.display = S.side === 'gps' ? '' : 'none';
+        box.classList.toggle('gps-wind-manual', !!(ew && ew.manual));
+        var has = !!(ew && !ew.none);
+        box.classList.toggle('gps-wind-empty', !has);
+        if (!has) { txt('.gps-wind-mph', 'Wind –'); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
+        w = ew;
         txt('.gps-wind-mph', w.mph + ' mph');
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
@@ -1459,7 +1546,7 @@
         var rot = Math.round(((w.toDeg - bearing) % 360 + 360) % 360);
         arrow.style.transform = 'rotate(' + rot + 'deg)';
         box.setAttribute('data-rot', String(rot));
-        box.setAttribute('aria-label', 'Wind ' + w.mph + ' mph from ' + ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(w.fromDeg / 22.5) % 16]);
+        box.setAttribute('aria-label', 'Wind ' + w.mph + ' mph from ' + ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(w.fromDeg / 22.5) % 16] + (w.manual ? ', set by you' : '') + '. Tap to set it.');
     }
 
     // ---- PLAYS LIKE (Wave 2) -----------------------------------------------------
@@ -1550,12 +1637,13 @@
         if (nums && nums.onGreen) return null;
         var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
         if (D < PLAYS_MIN_YD) return null;
-        var w = lsGet(windKey()), fresh = !!(w && Date.now() - w.at <= WIND_SHOW_MS);
+        // Today's manual wind (build 3) beats the live reading.
+        var w = effectiveWind(), has = !!(w && !w.none);
         var to = targetPt ? lineElev(r, targetPt) : elevAt(r.mid);
         return G.playsLike({
             yards: D, elevFromFt: originElev(r, o), elevToFt: to,
-            windMph: fresh && !w.none ? w.mph : null, windFromDeg: fresh && !w.none ? w.fromDeg : null,
-            shotBearingDeg: G.bearingDeg(o.pt, aim), tempF: fresh && typeof w.tempF === 'number' ? w.tempF : null
+            windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
+            shotBearingDeg: G.bearingDeg(o.pt, aim), tempF: w && typeof w.tempF === 'number' ? w.tempF : null
         });
     }
     function syncPlays() {
@@ -1881,7 +1969,7 @@
         + '</div>'
         // RIGHT SIDE STACK: wind, zoom, the green view.
         + '<div class="gps-right">'
-        +   '<div class="gps-wind gps-float" style="display:none" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span></div>'
+        +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag">manual</span></div>'
         +   '<button type="button" class="gps-zoom gps-float" aria-label="Zoom 1x, 2x or 3x">1x</button>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
         + '</div>'
@@ -1920,13 +2008,25 @@
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
         + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
         + '<div class="gps-credit-pop gps-float" style="display:none" role="dialog" aria-label="Map credits"></div>'
+        // MANUAL WIND (build 3): 8 arrows around the mph, relative to the hole.
+        + '<div class="gps-wind-pop gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
+        +   '<div class="gps-wp-title">Wind <small>arrow = where it blows · up = toward the green</small></div>'
+        +   '<div class="gps-wp-grid">'
+        +     [7, 0, 1, 6, -1, 2, 5, 4, 3].map(function (k) {
+                  return k < 0 ? '<div class="gps-wp-mph"></div>'
+                      : '<button type="button" data-rel="' + k + '" aria-label="Wind blowing ' + ['toward the green', 'toward the green and right', 'right', 'back and right', 'back toward the tee', 'back and left', 'left', 'toward the green and left'][k] + '">' + WIND_ARROWS[k] + '</button>';
+              }).join('')
+        +   '</div>'
+        +   '<div class="gps-wp-row"><button type="button" class="gps-wp-minus" aria-label="1 mph less">−</button><button type="button" class="gps-wp-plus" aria-label="1 mph more">+</button></div>'
+        +   '<div class="gps-wp-row"><button type="button" class="gps-wp-live">Use live wind</button><button type="button" class="gps-wp-done">Done</button></div>'
+        + '</div>'
         // FREE (no HardPan GPS): the way to the upgrade.
         + '<div class="gps-basic"><button type="button" class="gps-get-pro">Get HardPan GPS</button></div>'
         + '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="HardPan GPS" style="display:none">'
         +   '<div class="gps-sheet-card">'
         +     '<div class="gps-sheet-title">HardPan GPS</div>'
         +     '<div class="gps-sheet-price" style="display:none"></div>'
-        +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Yardage arcs</li><li>Wind</li><li>Plays-like yardage</li></ul>'
+        +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Drag-the-target yardages</li><li>Wind</li><li>Plays-like yardage</li></ul>'
         +     '<button type="button" class="gps-sheet-buy" disabled style="display:none">Coming soon</button>'
         +     '<button type="button" class="gps-sheet-close">Not now</button>'
         +   '</div>'
@@ -1977,24 +2077,43 @@
         + '#gps-overlay .gps-under > *{pointer-events:auto;}'
         + '#gps-overlay .gps-sub{display:flex;gap:8px;font-size:12px;color:#c8d1ca;padding:5px 9px;border-radius:999px;font-weight:600;}'
         + '#gps-overlay .gps-sub .gps-src:empty{display:none;}'
+        // BUILD 3: no "You are off this hole / Green from OpenStreetMap" bar - that
+        // line is in the ⓘ credits now - and no "Tee -> target" pill at the bottom.
+        // (Free has no map and no ⓘ: its accuracy line stays.)
+        + '#gps-overlay:not(.gps-basic-mode) .gps-sub,#gps-overlay .gps-target-row{display:none !important;}'
         + '#gps-overlay .gps-acc.gps-weak{color:#fbbf24;font-weight:800;}'
         + '#gps-overlay .gps-green-dims{color:#d9f99d;font:800 13px/1 ' + FONT + ';padding:7px 10px;border-radius:12px;white-space:nowrap;}'
-        + '#gps-overlay .gps-msg{font-size:14px;line-height:1.35;color:#fde68a;padding:9px 11px;}'
+        + '#gps-overlay .gps-msg{font-size:14px;line-height:1.35;color:#f4f4ef;padding:9px 11px;}'
         // ONE LINE until tapped, so the note never covers the green it is about.
-        + '#gps-overlay .gps-verify{font-size:13px;line-height:1.35;color:#fbbf24;padding:6px 10px;border-left:3px solid #fbbf24;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
+        + '#gps-overlay .gps-verify{font-size:13px;line-height:1.35;color:#f4f4ef;padding:6px 10px;border-left:3px solid #fb923c;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
         + '#gps-overlay .gps-verify.gps-open{white-space:normal;}'
         // RIGHT SIDE STACK
         + '#gps-overlay .gps-right{position:absolute;z-index:5;right:8px;top:var(--gps-top-b);display:flex;flex-direction:column;align-items:flex-end;gap:8px;}'
         + '#gps-overlay .gps-right > *{min-width:56px;min-height:44px;box-sizing:border-box;font-weight:800;font-size:14px;padding:6px 9px;display:flex;align-items:center;justify-content:center;gap:4px;}'
         + '#gps-overlay .gps-wind{font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
         + '#gps-overlay .gps-wind-arrow{display:inline-block;font-size:18px;line-height:1;color:#93c5fd;transform-origin:50% 50%;}'
+        + '#gps-overlay .gps-wind{cursor:pointer;position:relative;}'
+        + '#gps-overlay .gps-wind-empty .gps-wind-arrow{display:none;}'
+        + '#gps-overlay .gps-wind-tag{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font:700 9px/1 ' + FONT + ';color:#c8d1ca;letter-spacing:.02em;}'
+        + '#gps-overlay .gps-wind-manual .gps-wind-tag{display:block;}'
+        + '#gps-overlay .gps-wind-manual{padding-bottom:12px !important;}'
+        + '#gps-overlay .gps-wind-pop{position:absolute;z-index:45;right:8px;top:var(--gps-top-b);width:236px;padding:12px;box-sizing:border-box;color:#f4f4ef;}'
+        + '#gps-overlay .gps-wp-title{font:800 15px/1.2 ' + FONT + ';margin-bottom:8px;}'
+        + '#gps-overlay .gps-wp-title small{display:block;font-weight:500;font-size:11px;color:#c8d1ca;margin-top:2px;}'
+        + '#gps-overlay .gps-wp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}'
+        + '#gps-overlay .gps-wind-pop button{min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 20px/1 ' + FONT + ';}'
+        + '#gps-overlay .gps-wind-pop button.gps-on{background:#ffffff;color:#0b0f0c;}'
+        + '#gps-overlay .gps-wp-mph{display:flex;align-items:center;justify-content:center;font:900 15px/1 ' + FONT + ';text-align:center;}'
+        + '#gps-overlay .gps-wp-row{display:flex;gap:6px;margin-top:8px;}'
+        + '#gps-overlay .gps-wp-row button{flex:1 1 0;font-size:15px;}'
+        + '#gps-overlay .gps-wp-minus,#gps-overlay .gps-wp-plus{font-size:24px !important;}'
         + '#gps-overlay .gps-green-view{font-size:13px;white-space:nowrap;}'
         // LEFT ROW, BOTTOM ROW, BANNER, ACTIONS
         + '#gps-overlay .gps-leftrow{position:absolute;z-index:5;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;align-items:center;gap:8px;pointer-events:none;}'
         + '#gps-overlay .gps-leftrow > *{pointer-events:auto;}'
         + '#gps-overlay .gps-recenter{width:46px;height:46px;font-size:24px;line-height:1;display:flex;align-items:center;justify-content:center;color:#d9f99d;}'
-        + '#gps-overlay .gps-target-row{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-radius:999px;font-weight:800;font-size:15px;color:#facc15;white-space:nowrap;}'
-        + '#gps-overlay .gps-to-plays{font-size:13px;color:#fde68a;font-weight:700;}'
+        + '#gps-overlay .gps-target-row{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-radius:999px;font-weight:800;font-size:15px;color:#ffffff;white-space:nowrap;}'
+        + '#gps-overlay .gps-to-plays{font-size:13px;color:#e5e7eb;font-weight:700;}'
         + '#gps-overlay .gps-to-plays:empty{display:none;}'
         + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 10px);display:flex;align-items:stretch;gap:8px;height:54px;}'
         + '#gps-overlay .gps-side-bets,#gps-overlay .gps-tools{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
@@ -2036,14 +2155,17 @@
         + '#gps-overlay .gps-credit-i{font-size:13px;line-height:1;padding:2px 4px;min-height:22px;color:#f4f4ef;text-shadow:inherit;}'
         + '#gps-overlay .gps-credit-pop{position:absolute;z-index:40;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 26px);padding:10px 12px;font-size:12px;line-height:1.45;color:#f4f4ef;}'
         + '#gps-overlay .gps-credit-pop a{color:#d9f99d;}'
+        + '#gps-overlay .gps-pop-info{margin-top:6px;font-size:10.5px;color:#c8d1ca;}'
+        + '#gps-overlay .gps-pop-info:empty{display:none;}'
         + '#gps-overlay .gps-tiles-note{position:absolute;bottom:calc(var(--gps-attrib-h) + 130px);left:8px;right:8px;z-index:4;text-align:center;font-size:13px;color:#d1d5db;text-shadow:0 0 3px #000;}'
         // MAP OVERLAYS: pills, arc labels, green labels, the flag
         + '#gps-overlay .gps-pill{position:absolute;z-index:2;pointer-events:none;background:rgba(11,15,12,.86);color:#fff;font:800 13px/1 ' + FONT + ';padding:4px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
-        + '#gps-overlay .gps-pill-to{color:#facc15;border:1px solid rgba(250,204,21,.7);}'
-        + '#gps-overlay .gps-pill-on{color:#fff;border:1px solid rgba(255,255,255,.6);}'
+        // BUILD 3: the two numbers on the lines - big, bold, white, a dark outline, no box.
+        + '#gps-overlay .gps-pill-to,#gps-overlay .gps-pill-on{background:transparent;border:0;padding:0;color:#ffffff;font:900 26px/1 ' + FONT + ';'
+        +   'text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 6px rgba(0,0,0,.7);}'
         + '#gps-overlay .gps-arc-labels{position:absolute;inset:0;pointer-events:none;z-index:2;}'
         + '#gps-overlay .gps-arc-lbl{position:absolute;font:700 10px/1 ' + FONT + ';color:#fff;text-shadow:0 0 2px #000,0 0 3px #000;white-space:nowrap;}'
-        + '#gps-overlay .gps-arc-lbl-pin{color:#fde68a;}'
+        + '#gps-overlay .gps-arc-lbl-pin{color:#ffffff;}'
         + '#gps-overlay .gps-green-lbls{position:absolute;inset:0;pointer-events:none;z-index:2;}'
         + '#gps-overlay .gps-green-lbl{position:absolute;background:rgba(11,15,12,.86);color:#fff;font:800 12px/1 ' + FONT + ';padding:3px 6px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         + '#gps-overlay .gps-green-lbl-p{color:#fca5a5;border:1px solid rgba(239,68,68,.7);}'
@@ -2060,16 +2182,14 @@
         // right of its point - measured in the first MapLibre screenshot).
         + '.gps-pin{width:16px;height:16px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid #111;font:700 9px/1 sans-serif;color:#111;}'
         + '.gps-pin-mid{background:#ffffff;}.gps-pin-front{background:#bef264;}.gps-pin-back{background:#fca5a5;}'
-        + '.gps-pin-draft{outline:3px solid #facc15;}'
+        + '.gps-pin-draft{outline:3px solid #ffffff;}'
         // The target: a touch area of at least 48px, the ring drawn at its real
         // size on the ground (sizeTarget), a crosshair through it, its width beside it.
         + '.gps-target{width:48px;height:48px;position:relative;background:transparent;cursor:grab;touch-action:none;}'
         + '.gps-target .gps-ring{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);box-sizing:border-box;'
-        +   'border:3px solid #facc15;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.4);}'
-        + '.gps-target .gps-ring::before,.gps-target .gps-ring::after{content:"";position:absolute;background:#facc15;box-shadow:0 0 0 1px rgba(0,0,0,.4);}'
-        + '.gps-target .gps-ring::before{left:50%;top:-10px;width:3px;margin-left:-1.5px;height:calc(100% + 20px);}'
-        + '.gps-target .gps-ring::after{top:50%;left:-10px;height:3px;margin-top:-1.5px;width:calc(100% + 20px);}'
-        + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#facc15;'
+        // BUILD 3: a THIN all-white circle, no crosshair, still 20 yds on the ground.
+        +   'border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.25);}'
+        + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#ffffff;'
         +   'font:700 10px/1 ' + FONT + ';padding:2px 5px;border-radius:999px;white-space:nowrap;}'
         // FREE: no map - the numbers, large, with Enter Score and the upgrade link.
         + '#gps-overlay .gps-basic{display:none;}'
@@ -2169,6 +2289,9 @@
         on(el, '.gps-recenter', function () { frameHole(false); });
         on(el, '.gps-zoom', cycleZoom);
         on(el, '.gps-green-view', toggleGreenView);
+        on(el, '.gps-wind', function () { var p = S && S.el.querySelector('.gps-wind-pop'); if (p && p.style.display !== 'none') closeWindPop(); else openWindPop(); });
+        var wpop = el.querySelector('.gps-wind-pop');
+        if (wpop) wpop.addEventListener('click', windPopClick);
         on(el, '.gps-score', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
         on(el, '.gps-get-pro', openSheet);
         on(el, '.gps-sheet-close', closeSheet);

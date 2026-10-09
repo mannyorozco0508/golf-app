@@ -4441,7 +4441,12 @@
 // Moved to v334 (2026-10-09): gps-courses.js gained Man O' War (OSM way
 // 23375416, its 18 of the Wizard / Man O' War area). HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v334-gps-manowar';
+// GPS:BEGIN
+// Moved to v336 (2026-10-09): gps-view.js, the clean map of beta build 3 (no
+// arcs, thin white circle and lines, numbers on the lines, manual wind). v335
+// is gps-flow's. Above main's v330. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v336-gps-cleanmap';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -75,7 +75,7 @@ const PRODUCTS = {
         // live, plays like, the free / Pro split - gps-view.js, gps-geo.js and
         // gps-config.js changed. Consumer's own key below does not move.
         // v168 (2026-10-09): Man O' War joins the bundled courses.
-        cacheNameGps: 'consumer-v168-gps-manowar',
+        cacheNameGps: 'consumer-v170-gps-cleanmap',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.
