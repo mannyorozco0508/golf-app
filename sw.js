@@ -4493,7 +4493,12 @@
 // OpenStreetMap at pick time (gps-match.js), one general hole picker for clubs
 // with several courses in one outline, and the one-tap hole-1 choice. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v349-gps-holepick';
+// GPS:BEGIN
+// Moved to v350 (gps-flow, held for build 9, 2026-10-10): a partial course
+// re-checks OpenStreetMap (daily, at once after Search online, Tools > Refresh GPS
+// data); Canyon Lakes 18/18; real TPC Champions / Allenmore pars. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v350-gps-recheck';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

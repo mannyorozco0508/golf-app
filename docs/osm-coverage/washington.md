@@ -71,7 +71,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Kamilche | Salish Cliffs Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w226885836 |
 | Kelso | **Three Rivers Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w305645798 |
 | Kenmore | Inglewood Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w26796837 |
-| Kennewick | Canyon Lakes Golf Course (bundled) | 18/18 | 17/18 | 18/18 | r19187969 |
+| Kennewick | Canyon Lakes Golf Course (bundled) | 18/18 | 18/18 | 18/18 | r19187969 |
 | Kennewick | Zintel Creek Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w27183423 |
 | Kent | Riverbend 18-Hole Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r5316829 |
 | Kirkland | Sand Point Country Club | 18/18 | 17/18 | 18/18 | w955950016 |

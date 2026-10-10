@@ -368,7 +368,7 @@ describe('SERVICE WORKER', () => {
     const sw = read('sw.js');
 
     test('CACHE_VERSION moved to v11', () => {
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v349-gps-holepick';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v350-gps-recheck';/);
         assert.ok(!/const CACHE_VERSION = 'golfapp-v12-course-grid';/.test(sw));
     });
 

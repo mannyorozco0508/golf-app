@@ -20,6 +20,14 @@
     var OSM_LOOKUP = 'hardpan_osm_v1_', CHOICE = 'hardpan_holechoice_v1_';
     var OVERPASS_URLS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter'];
     var RETRY_NONE_MS = 7 * 24 * 3600 * 1000, RETRY_ERR_MS = 3600 * 1000;
+    // A PARTIAL COURSE RE-CHECKS (2026-10-10). Whatever the phone holds for a
+    // course - the bundle or a kept lookup - stops being the last word when it is
+    // missing holes: OpenStreetMap is asked again at most once a day when online
+    // (GPS opening, the course picked in setup), at once when it is picked from
+    // an online search, and whenever the organizer taps Refresh GPS data. The new
+    // answer is kept only when it has MORE holes; a re-check never makes a course
+    // worse. A course with every hole is not re-checked by itself.
+    var CHECKED = 'hardpan_osm_v1_checked_', RECHECK_MS = 24 * 3600 * 1000;
     var pending = {};   // key -> { raw, course, want } while a hole-1 tap is awaited
 
     function G() { return W.HardPanGeo; }
@@ -55,8 +63,12 @@
     function known(key, of, name) {
         var g = G(), all = W.HardPanGpsCourses || {};
         var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name));
-        if (b && b.holes && Object.keys(b.holes).length) return verdict(b.holes, of, { source: 'bundle' });
         var l = lsGet(OSM_LOOKUP + key);
+        // The newer OpenStreetMap data wins - gps-view's osmRecord rule: a lookup
+        // (a re-check after the bundle was built) only when strictly newer.
+        var ta = Date.parse((l && l.osmBase) || ''), tb = Date.parse((b && b.osmBase) || '');
+        if (b && l && l.holes && isFinite(ta) && isFinite(tb) && ta > tb) b = null;
+        if (b && b.holes && Object.keys(b.holes).length) return verdict(b.holes, of, { source: 'bundle' });
         if (l && l.holes && Object.keys(l.holes).length) return verdict(l.holes, of, { source: 'lookup', step: l.pick && l.pick.step, how: l.pick && l.pick.how });
         return null;
     }
@@ -66,8 +78,9 @@
             try { var w = db.ref('course_gps/' + key + '/osm').set(rec); if (w && typeof w.then === 'function') w.then(null, function () {}); } catch (e) {}
         }
     }
-    function finish(key, opts, p, ph) {
+    function finish(key, opts, p, ph, minN) {
         var holes = G().cleanLookupHoles(G().applyHoleSet(p.raw.elements, ph.set)).holes;
+        if (minN && count(holes, p.want.holes) < minN) return verdict(holes, p.want.holes, { source: 'lookup', step: ph.step, how: ph.how, kept: false });
         if (!Object.keys(holes).length) { lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, p.want.holes, { source: 'lookup', step: ph.step, how: ph.how }); }
         var rec = { v: 1, src: 'osm-lookup', osm: p.course.type + '/' + p.course.id, name: (p.course.tags && p.course.tags.name) || '',
                     osmBase: (p.raw.osm3s && p.raw.osm3s.timestamp_osm_base) || null, at: Date.now(), holes: holes,
@@ -76,17 +89,43 @@
         lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
         return verdict(holes, p.want.holes, { source: 'lookup', step: ph.step, how: ph.how });
     }
-    // opts: { key, name, loc: [lat, lng], holes: 18|9, pars: [], yards: [], db, force }
+    // opts: { key, name, loc: [lat, lng], holes: 18|9, pars: [], yards: [], db, force,
+    //         recheck: 'daily' | true }
     // Resolves { status: 'ready'|'partial'|'ask'|'none', n, of, source, step, how,
-    // candidates (ask only) }. Never rejects.
+    // candidates (ask only), rechecked }. Never rejects.
     function match(opts) {
         var key = opts.key, of = opts.holes === 9 ? 9 : 18;
         var have = !opts.force && known(key, of, opts.name);
-        if (have) return Promise.resolve(have);
+        if (have) {
+            var last = lsGet(CHECKED + key);
+            // A partial course once a day (or at once when asked); a complete one only
+            // when the organizer asks for it (Refresh GPS data).
+            var due = opts.loc && G() && typeof fetch === 'function'
+                && !(typeof navigator !== 'undefined' && navigator.onLine === false)
+                && (opts.recheck === true || (have.status === 'partial' && opts.recheck === 'daily' && !(last && Date.now() - last.at < RECHECK_MS)));
+            if (!due) return Promise.resolve(have);
+            lsSet(CHECKED + key, { at: Date.now() });
+            // A daily re-check keeps only MORE holes; an asked-for refresh also takes
+            // the same number of holes from newer data (a green moved in OSM).
+            return lookup(opts, of, opts.recheck === true ? Math.max(1, have.n) : have.n + 1).then(function (r) {
+                if ((r.status === 'ready' || r.status === 'partial') && r.kept !== false && r.n >= (opts.recheck === true ? have.n : have.n + 1)) { r.rechecked = r.n > have.n ? 'better' : 'refreshed'; return r; }
+                var same = {}; Object.keys(have).forEach(function (k) { same[k] = have[k]; });
+                same.rechecked = 'no change';
+                return same;
+            });
+        }
         if (pending[key]) return Promise.resolve({ status: 'ask', n: 0, of: of, candidates: pending[key].candidates, how: pending[key].how });
         if (!G() || typeof fetch !== 'function' || !opts.loc) return Promise.resolve(verdict({}, of, { source: 'none', how: opts.loc ? 'offline' : 'no course location' }));
         var tried = lsGet(OSM_LOOKUP + 'tried_' + key);
-        if (!opts.force && tried && Date.now() - tried.at < (tried.none ? RETRY_NONE_MS : RETRY_ERR_MS)) return Promise.resolve(verdict({}, of, { source: 'none', how: 'looked up recently, nothing found' }));
+        if (!opts.force && !opts.recheck && tried && Date.now() - tried.at < (tried.none ? RETRY_NONE_MS : RETRY_ERR_MS)) return Promise.resolve(verdict({}, of, { source: 'none', how: 'looked up recently, nothing found' }));
+        return lookup(opts, of, 0);
+    }
+    // ONE LOOKUP: the courses near the course point, ours by name, its holes and
+    // greens, this course's holes picked. minN > 0 (a re-check): kept only with at
+    // least that many holes, and a club that would need the hole-1 question is
+    // left as it was rather than asked about again.
+    function lookup(opts, of, minN) {
+        var key = opts.key;
         var want = { name: opts.name || '', holes: of, pars: opts.pars || [], yards: opts.yards || [], nines: opts.nines || ninesFromName(opts.name),
                      choice: lsGet(CHOICE + key) || opts.choice || null };
         return overpass(G().golfCoursesQuery(opts.loc)).then(function (j) {
@@ -94,18 +133,19 @@
             if (!course) return null;
             return overpass(G().courseHolesQuery(course)).then(function (raw) { return { course: course, raw: raw }; });
         }).then(function (got) {
-            if (!got) { lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
+            if (!got) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
             var ph = G().pickHoleSet(got.raw.elements, want);
             var p = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates.length, how: ph.how };
             if (!ph.set && ph.step === 5) {
+                if (minN) return verdict({}, of, { source: 'none', how: ph.how, kept: false });
                 pending[key] = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates, how: ph.how };
                 return { status: 'ask', n: 0, of: of, candidates: ph.candidates, how: ph.how, step: 5 };
             }
-            if (!ph.set) { lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
-            return finish(key, opts, p, ph);
+            if (!ph.set) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
+            return finish(key, opts, p, ph, minN);
         }).catch(function () {
-            lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
-            return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached' });
+            if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
+            return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false });
         });
     }
     // The golfer tapped a hole 1: keep the choice, finish the lookup from what was fetched.

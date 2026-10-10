@@ -435,7 +435,7 @@
         if (!S || !M) { fin(false); return; }
         var key = S.courseKey, mine = S;
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
-        if (osmRecord(key)) { fin(true); return; }
+        if (osmRecord(key)) { recheckCourse('daily'); fin(true); return; }
         if (S.osmInFlight) { fin(false); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
         if (!S.courseLoc) { fin(false); return; }
@@ -447,6 +447,34 @@
             if (S === mine) { S.holeAsk = null; if (ok) { S.needsFrame = true; render(); } }
             fin(ok);
         });
+    }
+    // A PARTIAL COURSE RE-CHECKS OPENSTREETMAP (2026-10-10): once a day when GPS
+    // opens with signal (gps-match.js keeps the answer only with more holes), and
+    // at once from Tools > Refresh GPS data (the organizer). The point is the
+    // course's - our record's, else the middle of its mapped greens - never the
+    // golfer's.
+    function recheckCourse(mode, after) {
+        var M = (typeof window !== 'undefined' && window.HardPanGpsMatch) || null;
+        if (!S || !M || S.recheckInFlight) { if (after) after(null); return; }
+        var w = lookupWant();
+        w.loc = S.courseLoc || courseCenter();
+        w.recheck = mode;
+        if (!w.loc) { if (after) after(null); return; }
+        var mine = S;
+        S.recheckInFlight = true;
+        M.match(w).then(function (r) {
+            mine.recheckInFlight = false;
+            if (S !== mine) return;
+            if (r && (r.rechecked === 'better' || r.rechecked === 'refreshed')) { S.osmShared = null; S.needsFrame = true; render(); }
+            if (after) after(r);
+        });
+    }
+    function flash(text) {
+        if (!S) return;
+        S.flash = text;
+        clearTimeout(S.flashTimer);
+        S.flashTimer = setTimeout(function () { if (S) { S.flash = ''; render(); } }, 5000);
+        render();
     }
     // What the matcher needs about THIS course: its name, point and card.
     function lookupWant() {
@@ -2261,6 +2289,7 @@
         else if (S.mode === 'setFront') banner = 'Tap the FRONT edge (optional)';
         else if (S.mode === 'setBack') banner = 'Tap the BACK edge (optional)';
         else if (S.mode === 'confirmMid' || S.mode === 'confirmAll' || S.mode === 'gpsConfirmMid' || S.mode === 'gpsConfirmAll') banner = 'Save this green for hole ' + S.hole + '?';
+        else if (S.flash) banner = S.flash;
         else if (S.loadingCourses) banner = 'Loading the course…';
         else if (S.holeAsk && S.holeAsk.length) banner = 'More than one course here - tap YOUR hole 1';
         // Never a dead end: it says what to do (anyone on the round can set it).
@@ -2275,6 +2304,7 @@
         // The organizer can change which course's holes a club's outline gave.
         var lk = lookedUp(S.courseKey);
         show('.gps-rechoose', !!S.canFix && !!(lk && lk.pick && lk.pick.candidates > 1));
+        show('.gps-refresh-gps', !!S.canFix && S.pro && !setting);
         // THE SCORE BUTTON: the hole's own score entry, on the card (Bets side).
         // GREEN / HOLE: the green alone, or back to the whole hole.
         show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
@@ -2468,6 +2498,7 @@
         +   '<button type="button" class="gps-menu-item gps-fix-green" style="display:none">Fix the green</button>'
         +   '<button type="button" class="gps-menu-item gps-undo-green" style="display:none">Undo last fix</button>'
         +   '<button type="button" class="gps-menu-item gps-rechoose" style="display:none">Choose hole 1 again</button>'
+        +   '<button type="button" class="gps-menu-item gps-refresh-gps" style="display:none">Refresh GPS data</button>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
         + '</div>'
         // THE HOLE PICKER.
@@ -2805,6 +2836,18 @@
         on(el, '.gps-prev', function () { if (S && S.stepHole) S.stepHole(-1); });
         on(el, '.gps-next', function () { if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-units', function () { setUnits(units() === 'm' ? 'yd' : 'm'); render(); });
+        on(el, '.gps-refresh-gps', function () {
+            if (!S) return;
+            closeMenus();
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) { flash('No signal - Refresh GPS data needs a connection'); return; }
+            flash('Checking OpenStreetMap\u2026');
+            recheckCourse(true, function (r) {
+                if (!r) { flash('Could not check - no course location'); return; }
+                if (r.rechecked === 'better') flash('GPS data updated: ' + r.n + '/' + r.of + ' holes');
+                else if (r.rechecked === 'refreshed') flash('GPS data refreshed: ' + r.n + '/' + r.of + ' holes');
+                else flash('No newer GPS data in OpenStreetMap (' + r.n + '/' + r.of + ' holes)');
+            });
+        });
         on(el, '.gps-rechoose', function () {
             if (!S || !window.HardPanGpsMatch) return;
             closeMenus();

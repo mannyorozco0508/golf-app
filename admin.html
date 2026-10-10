@@ -6407,6 +6407,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // searches through the same proxy, reached by courseApiBase().
         onlineSearchInFlight = true;
         if (rowEl) { rowEl.textContent = '🌐 Searching online…'; rowEl.onclick = null; }
+        // GPS:BEGIN
+        gpsRecheckNext = true;
+        // GPS:END
 
         // AS TYPED FIRST, THEN THE OTHER SPELLINGS (2026-10-05). "Tri Mountain"
         // found nothing online because the provider holds "Tri-Mountain" and
@@ -6719,6 +6722,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     const GPS_COURSE_LOC = 'hardpan_course_loc_v1_';
     const GPS_KEY_STATES = { az: 'AZ', or: 'OR', wa: 'WA', swwa: 'WA', ct: 'CT', fl: 'FL' };
     let gpsSetupSeq = 0;
+    // Set by Search online: the next course picked re-checks OSM at once if partial.
+    let gpsRecheckNext = false;
     function gpsLoadScript(src, ready) {
         if (ready()) return Promise.resolve(true);
         return new Promise((res) => {
@@ -6809,11 +6814,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (y.length === holes && y.reduce((a, b) => a + b, 0) > yards.reduce((a, b) => a + b, 0)) yards = y;
         }));
         const known = M.known(key, holes, name);
-        if (known) { gpsSetupRender(key, known, name); return; }
+        if (known) gpsSetupRender(key, known, name);
+        // Complete: done. PARTIAL: re-check OpenStreetMap - at once after a Search
+        // online in this setup, else at most once a day (gps-match keeps the
+        // answer only with more holes).
+        if (known && known.status !== 'partial') return;
+        const recheck = known ? (gpsRecheckNext ? true : 'daily') : undefined;
+        gpsRecheckNext = false;
         const loc = await gpsSetupLocation(key, name);
         if (mine !== gpsSetupSeq) return;
         if (loc) { try { localStorage.setItem(GPS_COURSE_LOC + key, JSON.stringify({ lat: loc[0], lng: loc[1] })); } catch (e) {} }
-        const r = await M.match({ key, name, loc, holes, pars: card.map((h) => h.par), yards, db });
+        const r = await M.match({ key, name, loc, holes, pars: card.map((h) => h.par), yards, db, recheck });
         if (mine !== gpsSetupSeq) return;
         gpsSetupRender(key, r, name);
     }
