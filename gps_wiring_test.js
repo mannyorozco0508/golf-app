@@ -520,7 +520,7 @@ test('a newer bundle beats an old OSM lookup cached on the phone (and only a str
     const vm = require('vm');
     const v = read('gps-view.js');
     const src = v.slice(v.indexOf('    function osmRecord(key) {'), v.indexOf('    function holeKey(n)'));
-    const sb = { window: { HardPanGpsCourses: { k: { v: 1, osmBase: '2026-10-10T10:30:00Z', holes: { 1: 'bundle' } } } }, G: { osmCourse: (t, k) => t[k] || null }, lookup: null };
+    const sb = { window: { HardPanGpsCourses: { k: { v: 1, osmBase: '2026-10-10T10:30:00Z', holes: { 1: 'bundle' } } } }, G: { osmCourse: (t, k) => (k && t[k]) || null, bundleKeyFor: (t, k) => (t[k] ? k : null) }, lookup: null, S: null };
     vm.createContext(sb);
     vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nthis.osmRecord = osmRecord;', sb);
     sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'old lookup' } };

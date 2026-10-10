@@ -6556,13 +6556,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
     function gpsBadgeLs(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     // The hole numbers that have a usable green, from every source.
-    function gpsBadgeHoles(table, key, rec) {
+    function gpsBadgeBundleKeyByName(table, name) {
+        const stop = { golf: 1, club: 1, course: 1, country: 1, resort: 1, the: 1, and: 1, at: 1, of: 1, links: 1, gc: 1, cc: 1, nc: 1, sc: 1, hole: 1, holes: 1 };
+        const nk = (s) => String(s || '').toLowerCase().replace(/['\u2019`]/g, '').split(/[^a-z0-9]+/).filter((w) => w && !stop[w] && !/^\d+$/.test(w)).join(' ');
+        const names = table && table._names, want = nk(name);
+        if (!names || !want) return null;
+        const hit = Object.keys(names).filter((k) => nk(names[k]) === want);
+        return hit.length === 1 ? hit[0] : null;
+    }
+    function gpsBadgeHoles(table, key, rec, name) {
         const out = new Set();
         const addHoles = (holes, off) => Object.keys(holes || {}).forEach((n) => {
             const h = holes[n], o = h && (h.osm || h);
             if (o && ((Array.isArray(o.green) && o.green.length >= 3) || Array.isArray(o.mid))) out.add(Number(n) + off);
         });
-        const b = table && table[key];
+        // The bundle under this key, else under the course's name (an import of a
+        // bundled course carries its own key - gps-geo.bundleKeyFor's rule).
+        const bk = (table && table[key]) ? key : gpsBadgeBundleKeyByName(table, name);
+        const b = bk && table[bk];
         if (b && b.compose) b.compose.forEach((part, i) => addHoles(table[part] && table[part].holes, 9 * i));
         else if (b) addHoles(b.holes, 0);
         if (rec && rec.osm) addHoles(rec.osm.holes, 0);
@@ -6668,7 +6679,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         title.appendChild(badge);
         const state = ((course && course.location) || {}).state;
         const paint = (rec) => Promise.all([gpsBadgeLoadBundle(), gpsBadgeLoadCoverage(state)]).then(([table, coverage]) => {
-            const holes = gpsBadgeHoles(table, key, rec);
+            const holes = gpsBadgeHoles(table, key, rec, typeof courseDisplayName === 'function' ? courseDisplayName(course) : '');
             let top = 0;
             holes.forEach((n) => { if (n > top) top = n; });
             const known = gpsBadgeHoleCount(key, course, table);
@@ -6797,7 +6808,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const y = (t && Array.isArray(t.holes) ? t.holes : []).map((h) => Number(h && h.yardage) || 0);
             if (y.length === holes && y.reduce((a, b) => a + b, 0) > yards.reduce((a, b) => a + b, 0)) yards = y;
         }));
-        const known = M.known(key, holes);
+        const known = M.known(key, holes, name);
         if (known) { gpsSetupRender(key, known, name); return; }
         const loc = await gpsSetupLocation(key, name);
         if (mine !== gpsSetupSeq) return;

@@ -693,7 +693,7 @@ function usgsFallbackFails(tag, g, why) {
     {
         const [opened, setting, confirm, saved, again] = b.reads;
         if (opened.acc !== 'Weak GPS ±22 yds') fails.push('unmapped: accuracy ' + opened.acc);
-        if (opened.banner !== 'No green mapped for this hole yet' || !opened.set) fails.push('unmapped: no "tap the green" offer');
+        if (opened.banner !== 'No green mapped for this hole yet - Tools \u203a Set the green' || !opened.set) fails.push('unmapped: no "tap the green" offer');
         if (opened.m !== '—') fails.push('unmapped: a center with no green: ' + opened.m);
         if (setting.banner !== 'Tap the CENTER of the green') fails.push('unmapped: banner ' + setting.banner);
         // Wave 1: a banner never covers the buttons, the score button or the wind.

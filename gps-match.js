@@ -52,9 +52,9 @@
         return out;
     }
     // What is already known, with no network: the bundle, then a kept lookup.
-    function known(key, of) {
+    function known(key, of, name) {
         var g = G(), all = W.HardPanGpsCourses || {};
-        var b = g && g.osmCourse(all, key);
+        var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name));
         if (b && b.holes && Object.keys(b.holes).length) return verdict(b.holes, of, { source: 'bundle' });
         var l = lsGet(OSM_LOOKUP + key);
         if (l && l.holes && Object.keys(l.holes).length) return verdict(l.holes, of, { source: 'lookup', step: l.pick && l.pick.step, how: l.pick && l.pick.how });
@@ -81,7 +81,7 @@
     // candidates (ask only) }. Never rejects.
     function match(opts) {
         var key = opts.key, of = opts.holes === 9 ? 9 : 18;
-        var have = !opts.force && known(key, of);
+        var have = !opts.force && known(key, of, opts.name);
         if (have) return Promise.resolve(have);
         if (pending[key]) return Promise.resolve({ status: 'ask', n: 0, of: of, candidates: pending[key].candidates, how: pending[key].how });
         if (!G() || typeof fetch !== 'function' || !opts.loc) return Promise.resolve(verdict({}, of, { source: 'none', how: opts.loc ? 'offline' : 'no course location' }));

@@ -655,3 +655,19 @@ test('pickHoleSet: each club resolves its course by the step it should, on real 
     // One course in the outline (step 1).
     assert.equal(pick('dobson_ranch', { name: 'Dobson Ranch Golf Course' }).step, 1);
 });
+
+test('the bundle by name when a round\'s key differs: the Myrtle trip\'s Thistle rounds, imports of bundled courses', () => {
+    // The trip rounds BZ5SFR / QV6SJM carry the database keys, not the bundle's.
+    assert.equal(geo.bundleKeyFor(table, 'thistle_cameron_stewart', 'Thistle Golf Club (Cameron / Stewart)'), 'thistle_27_cameron_stewart');
+    assert.equal(geo.bundleKeyFor(table, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)'), 'thistle_27_mackay_cameron');
+    assert.equal(Object.keys(geo.osmCourse(table, geo.bundleKeyFor(table, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)')).holes).length, 18);
+    // Order matters: Cameron / Stewart is never the Stewart / Cameron pairing.
+    assert.notEqual(geo.bundleKeyFor(table, 'x', 'Thistle (Stewart / Cameron)'), 'thistle_27_cameron_stewart');
+    // The key wins when the bundle has it; an import of a bundled course finds it by name.
+    assert.equal(geo.bundleKeyFor(table, 'trueblue', 'Anything'), 'trueblue');
+    assert.equal(geo.bundleKeyFor(table, 'gca_new', 'True Blue Golf Club'), 'trueblue');
+    // Ambiguous or unknown: nothing, never a guess.
+    assert.equal(geo.bundleKeyFor(table, 'gca_x', 'Talking Stick Golf Club'), null);
+    assert.equal(geo.bundleKeyFor(table, 'gca_y', 'Nowhere Links'), null);
+    assert.ok(table._names && !table._names.holes, 'the name index is names only (our directory, not OSM)');
+});

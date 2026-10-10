@@ -265,6 +265,26 @@ function build(rawDir) {
     // The same course under an older directory key: a reference, not a copy
     // (Chambers Bay's built-in preset wa_chambers, still on older rounds).
     Object.keys(ALIASES).forEach((k) => { if (records[ALIASES[k]]) records[k] = { v: 1, compose: [ALIASES[k]] }; });
+    // THE NAME INDEX (2026-10-10): each record's course name from OUR directory
+    // (not OSM), so a round whose key differs - an import, an older key - still
+    // finds its course by name (gps-geo.bundleKeyFor). Thistle's pairings are named
+    // the way its rounds name them: "Thistle (Cameron / Stewart)".
+    const dirPars = JSON.parse(fs.readFileSync(path.join(RAW_DIR, 'directory-pars.json'), 'utf8'));
+    const names = {};
+    const cap = (s) => s === 'mackay' ? 'MacKay' : s.charAt(0).toUpperCase() + s.slice(1);
+    COURSES.forEach((c) => {
+        if (c.nines) {
+            const loops = Object.keys(c.loops);
+            loops.forEach((a) => {
+                names[`${c.base}_${a}`] = `Thistle (${cap(a)})`;
+                loops.forEach((b) => { if (a !== b) names[`${c.base}_${a}_${b}`] = `Thistle (${cap(a)} / ${cap(b)})`; });
+            });
+            return;
+        }
+        const nm = c.parsFrom === 'directory' ? (dirPars[c.key] || {}).name : (cd.coursePresets[c.preset] || {}).name;
+        if (nm && records[c.key]) names[c.key] = nm;
+    });
+    records._names = names;
     return { records, report, problems, drops };
 }
 

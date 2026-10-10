@@ -565,6 +565,26 @@
         return k ? k.slice(0, 80) : null;
     }
 
+    // THE BUNDLE BY NAME WHEN THE KEY MISSES (2026-10-10). A round can carry a
+    // course key the bundle does not use for the same course - an import
+    // ("thistle_cameron_stewart" for the bundle's "thistle_27_cameron_stewart"), an
+    // older directory key. The importer writes each record's course name into
+    // table._names; the round's own course name then finds it - the naming words
+    // IN ORDER (so a Cameron / Stewart round never gets the Stewart / Cameron
+    // pairing), and only an unambiguous match counts.
+    var NAME_STOP = { golf: 1, club: 1, course: 1, country: 1, resort: 1, the: 1, and: 1, at: 1, of: 1, links: 1, gc: 1, cc: 1, nc: 1, sc: 1, hole: 1, holes: 1 };
+    function courseNameKey(name) {
+        return String(name || '').toLowerCase().replace(/['\u2019`]/g, '').split(/[^a-z0-9]+/)
+            .filter(function (w) { return w && !NAME_STOP[w] && !/^\d+$/.test(w); }).join(' ');
+    }
+    function bundleKeyFor(table, key, name) {
+        if (table && key && table[key] && key !== '_names') return key;
+        var names = table && table._names, want = courseNameKey(name);
+        if (!names || !want) return null;
+        var hit = Object.keys(names).filter(function (k) { return courseNameKey(names[k]) === want; });
+        return hit.length === 1 ? hit[0] : null;
+    }
+
     // The OSM record for a course key from the bundled table. A 27-hole pairing
     // is stored as { compose: [frontNine, backNine] }: the back nine's holes
     // 1-9 become 10-18 - and so do its verify notes.
@@ -1082,7 +1102,7 @@
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
-        courseGpsKey: courseGpsKey, osmCourse: osmCourse,
+        courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,
         accuracyLabel: accuracyLabel, polygonCentroid: polygonCentroid, pointInRing: pointInRing,

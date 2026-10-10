@@ -319,7 +319,7 @@
         // Ranch: 9 greens in a 10/9 lookup, 18 in the bundle). Both carry the
         // OpenStreetMap timestamp they were read at (osmBase); the lookup is used
         // only when it is strictly newer, so a tie or a missing date is the bundle.
-        var b = G.osmCourse(all, key), l = lookedUp(key);
+        var b = G.osmCourse(all, G.bundleKeyFor(all, key, S && S.courseKey === key && S.round ? S.round.courseName : null)), l = lookedUp(key);
         if (b && l && osmNewer(l.osmBase, b.osmBase)) return l;
         return b || l;
     }
@@ -435,7 +435,7 @@
         if (!S || !M) { fin(false); return; }
         var key = S.courseKey, mine = S;
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
-        if (G.osmCourse(all, key) || lookedUp(key)) { fin(true); return; }
+        if (osmRecord(key)) { fin(true); return; }
         if (S.osmInFlight) { fin(false); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
         if (!S.courseLoc) { fin(false); return; }
@@ -1030,7 +1030,7 @@
             if (mark && mark.at && Date.now() - mark.at < PRECACHE_DAYS * 86400000) return why('fresh');
         } catch (e) {}
         return new Promise(function (resolve) { loadCourses(resolve); }).then(function () {
-            var osm = G.osmCourse(window.HardPanGpsCourses || {}, courseKey);
+            var osm = (S && S.courseKey === courseKey) ? osmRecord(courseKey) : G.osmCourse(window.HardPanGpsCourses || {}, courseKey);
             var b = G.courseBounds(osm, extraPts || [], 150);
             if (!b) return { ok: false, reason: 'no-course-data' };
             var tiles = G.tilesFor(b, TILES.usgs.minPrecacheZoom, TILES.usgs.maxNativeZoom, PRECACHE_CAP);
@@ -2263,7 +2263,8 @@
         else if (S.mode === 'confirmMid' || S.mode === 'confirmAll' || S.mode === 'gpsConfirmMid' || S.mode === 'gpsConfirmAll') banner = 'Save this green for hole ' + S.hole + '?';
         else if (S.loadingCourses) banner = 'Loading the course…';
         else if (S.holeAsk && S.holeAsk.length) banner = 'More than one course here - tap YOUR hole 1';
-        else if (noGreen) banner = 'No green mapped for this hole yet';
+        // Never a dead end: it says what to do (anyone on the round can set it).
+        else if (noGreen) banner = S.pro ? 'No green mapped for this hole yet - Tools \u203a Set the green' : 'No green mapped for this hole yet';
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
 
