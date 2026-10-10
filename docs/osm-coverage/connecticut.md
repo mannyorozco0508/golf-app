@@ -4,15 +4,15 @@ Data © OpenStreetMap contributors, available under the Open Database License (O
 
 Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=golf_course outline is one row, so a 27/36-hole club mapped as separate courses counts once per course.
 
-- **Greens** = golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, capped at the hole count.
+- **Greens** = holes with a green: golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, never fewer than the holes whose line ends on a green (a double green serves two holes), capped at the hole count.
 - **Hole count** = the course's `holes` tag when OSM has one, else 18 (more when its hole lines go past 18). A 9-hole course with no `holes` tag is measured out of 18.
 - **ALL GREENS** = a green for every hole. **PARTIAL** = some. **NONE** = outline only.
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 186 courses — all greens 115, partial 61, none 10 (62% with all greens). Bundle-ready, not yet bundled: 112.
+**Summary:** 186 courses — all greens 121, partial 55, none 10 (65% with all greens). Bundle-ready, not yet bundled: 118.
 
-## ALL GREENS (115)
+## ALL GREENS (121)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -58,8 +58,10 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Greenwich | Tamarack Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43398961 |
 | Groton | Shennecossett Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w507065379 |
 | Hamden | New Haven Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w289318195 |
+| Hamden | The VUE — bundle-ready | 18/18 | 18/18 | 18/18 | w43437100 |
 | Hartford | Goodwin Park Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w307790887 |
 | Hartford | Keney Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w31748968 |
+| Harwinton | Fairview Farm Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w867611148 |
 | Hebron | Blackledge Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43439601 |
 | Hebron | Tallwood Country Club — bundle-ready | 18/18 | 18/18 | 17/18 | w43442270 |
 | Huntington | Brownson Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4097709 |
@@ -92,8 +94,10 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Orange | Race Brook Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r307292 |
 | Pawcatuck | Elmridge Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w43440031 |
 | Pequabuck | Chippanee Golf Club,Inc. — bundle-ready | 18/18 | 18/18 | 0/18 | w43440355 |
+| Pine Orchard | Pine Orchard Yacht & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w401702856 |
 | Plantsville | Southington Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43440837 |
 | Portland | Portland Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w43442431 |
+| Portland | Portland Golf West — bundle-ready | 18/18 | 18/18 | 18/18 | w43439766 |
 | Portland | Quarry Ridge Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w306425747 |
 | Redding | Redding Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43435567 |
 | Ridgefield | Ridgefield Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43434790 |
@@ -125,6 +129,8 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Watertown | The Golf Course at Crestbrook Park — bundle-ready | 18/18 | 18/18 | 18/18 | w306969134 |
 | Watertown | Watertown Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43441893 |
 | West Hartford | Rockledge Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43442079 |
+| West Hartford | Wampanoag Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w28430836 |
+| West Simsbury | Simsbury Farms Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w307668777 |
 | West Suffield | Airways Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w43440682 |
 | Weston | Aspetuck Valley Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4100696 |
 | Westport | Longshore Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w307181062 |
@@ -132,7 +138,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Wilton | Rolling Hills Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w43399864 |
 | Woodbridge | The Tradition Golf Club at Oak Lane | 18/18 | 0/18 | 0/18 | w43437269 |
 
-## PARTIAL (61)
+## PARTIAL (55)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -140,7 +146,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Bethany | Woodhaven Country Club | 9/18 | 9/18 | 9/18 | w43437408 |
 | Brookfield | Sunset Hill Golf Club | 9/18 | 9/18 | 9/18 | w295297478 |
 | Canaan | Canaan Country Club | 9/18 | 9/18 | 9/18 | w43439248 |
-| Candlewood Shores | Candlewood Lake Golf and Country Club | 9/18 | 10/18 | 10/18 | w295297468 |
+| Candlewood Shores | Candlewood Lake Golf and Country Club | 10/18 | 10/18 | 10/18 | w295297468 |
 | Center Groton | (unnamed) | 1/18 | 0/18 | 0/18 | w1510423334 |
 | Colchester | Chanticlair Golf Course | 9/18 | 9/18 | 9/18 | w295297470 |
 | East Berlin | Miner Hills Golf Course & Driving Range | 9/18 | 9/18 | 9/18 | w679211868 |
@@ -152,8 +158,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Greenwich | The Milbrook Club | 10/18 | 9/18 | 9/18 | w43398108 |
 | Guilford | Guilford Lakes Golf Course | 9/18 | 9/18 | 9/18 | w307070525 |
 | Hamden | Sleeping Giant Golf Course | 11/18 | 9/18 | 9/18 | w43438183 |
-| Hamden | The VUE | 17/18 | 18/18 | 18/18 | w43437100 |
-| Harwinton | Fairview Farm Golf Course | 17/18 | 18/18 | 18/18 | w867611148 |
 | Hebron | Bea Practice Facility | 6/18 | 0/18 | 0/18 | w1215640545 |
 | Lakeville | Hotchkiss Golf Course | 10/18 | 9/18 | 9/18 | r10907273 |
 | Litchfield | Stonybrook Golf Course | 10/18 | 10/18 | 10/18 | w43439697 |
@@ -169,18 +173,16 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | North Branford | Twin Lakes Golf Course | 9/18 | 9/18 | 9/18 | w43438018 |
 | Old Saybrook | Fenwick Golf Club | 15/18 | 9/18 | 9/18 | r4100646 |
 | Orange | Homewood Acres Golf Course | 11/18 | 11/18 | 11/18 | w917852085 |
-| Pine Orchard | Pine Orchard Yacht & Country Club | 14/18 | 18/18 | 18/18 | w401702856 |
 | Pomfret | Vineyard Valley Golf Club | 10/18 | 9/18 | 9/18 | w589094637 |
 | Poquonock Bridge | (unnamed) | 1/18 | 0/18 | 0/18 | w1458219375 |
-| Portland | Portland Golf West | 17/18 | 18/18 | 18/18 | w43439766 |
 | Prospect | Highland Greens Golf Course | 9/18 | 9/18 | 9/18 | w295297474 |
 | Quaker Hill | Goose Run Golf Course | 9/18 | 9/18 | 9/18 | w47450903 |
 | Ridgefield | The National Short Course | 9/18 | 9/18 | 9/18 | w1545072881 |
 | Rocky Hill | Rolling Greens Golf Course | 9/18 | 9/18 | 9/18 | r13628098 |
 | Sharon | Sharon Country Club | 13/18 | 9/18 | 9/18 | w43440638 |
-| Shelton | Highland Golf Club | 10/18 | 14/18 | 14/18 | w43437126 |
+| Shelton | Highland Golf Club | 14/18 | 14/18 | 14/18 | w43437126 |
 | Southbury | Gainfield Farms Gold Course | 9/18 | 9/18 | 9/18 | w306447189 |
-| Southbury | Pomperaug Golf Club | 8/18 | 9/18 | 9/18 | w43398545 |
+| Southbury | Pomperaug Golf Club | 9/18 | 9/18 | 9/18 | w43398545 |
 | Stamford | Rockrimmon Country Club | 5/18 | 5/18 | 6/18 | w138546193 |
 | Stepney | Tashua Glen Golf Course | 9/18 | 9/18 | 9/18 | w307524931 |
 | Stratford | Short Beach Golf Course | 9/18 | 9/18 | 9/18 | w307668125 |
@@ -190,11 +192,9 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 186 courses: every leisure=gol
 | Warren | (unnamed) | 3/18 | 0/18 | 0/18 | w1431709487 |
 | Washington | Washington Golf Course | 9/18 | 9/18 | 9/18 | w43439875 |
 | West Hartford | Buena Vista Golf Course | 10/18 | 9/18 | 9/18 | w307042669 |
-| West Hartford | Wampanoag Country Club | 17/18 | 18/18 | 18/18 | w28430836 |
-| West Simsbury | Simsbury Farms Golf Course | 17/18 | 18/18 | 18/18 | w307668777 |
 | Westport | Birchwood Country Club | 15/18 | 9/18 | 9/18 | w43398696 |
 | Winsted | Green Woods Country Club | 10/18 | 10/18 | 10/18 | w43439409 |
-| Wolcott | Farmingbury Hills Golf Course | 11/18 | 13/18 | 13/18 | w43440646 |
+| Wolcott | Farmingbury Hills Golf Course | 13/18 | 13/18 | 13/18 | w43440646 |
 | Woodstock | Harrisville Golf Course | 9/18 | 9/18 | 9/18 | w43439810 |
 | Woodstock | Woodstock Golf Course | 9/18 | 9/18 | 9/18 | w964149271 |
 

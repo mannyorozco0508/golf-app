@@ -6523,7 +6523,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     //   2. the shared record course_gps/<key>: greens fixed by GPS (pins.hN) and
     //      an OpenStreetMap lookup another phone shared (osm.holes) - this phone's
     //      cached copy first, then one read per result, best effort;
-    //   3. this phone's own earlier OpenStreetMap lookup for that course.
+    //   3. this phone's own earlier OpenStreetMap lookup for that course;
+    //   4. the COVERAGE LIST (gps-coverage-<state>.js, 2026-10-10): every
+    //      OpenStreetMap golf course in the areas surveyed, with how many holes
+    //      have a green AND a hole line ending on it - what the phone's one lookup
+    //      can use when the course is opened. Only the searched state's file is
+    //      loaded. So a mapped course never reads "No GPS yet" just because it is
+    //      not bundled.
     // A hole counts when it has a usable green (a green outline or a center).
     // "GPS ✓" every hole, "GPS partial (X/18)", "No GPS yet".
     // OUT OF THE COURSE'S OWN HOLE COUNT whenever it is known (gpsBadgeHoleCount):
@@ -6596,6 +6602,53 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         return null;
     }
+    // THE COVERAGE LIST, one file per state, loaded once, only for a state a
+    // result is in.
+    const GPS_COVERAGE_STATES = ['AZ', 'WA', 'OR', 'CT', 'FL'];
+    const gpsCoverageLoads = {};
+    function gpsBadgeLoadCoverage(state) {
+        const st = String(state || '').trim().toUpperCase();
+        if (GPS_COVERAGE_STATES.indexOf(st) === -1) return Promise.resolve(null);
+        const have = window.HardPanGpsCoverage && window.HardPanGpsCoverage[st];
+        if (have) return Promise.resolve(have);
+        if (gpsCoverageLoads[st]) return gpsCoverageLoads[st];
+        gpsCoverageLoads[st] = new Promise((res) => {
+            const host = document.head || document.body;
+            if (!host || typeof document.createElement !== 'function') { delete gpsCoverageLoads[st]; res(null); return; }
+            const s = document.createElement('script');
+            s.src = 'gps-coverage-' + st.toLowerCase() + '.js';
+            s.onload = () => res((window.HardPanGpsCoverage || {})[st] || null);
+            s.onerror = () => { delete gpsCoverageLoads[st]; res(null); };
+            host.appendChild(s);
+        });
+        return gpsCoverageLoads[st];
+    }
+    // A provider name against OpenStreetMap's: the words that name the course
+    // (not "golf", "club", "resort"...). One name's words must all be in the
+    // other's; the town breaks a tie; still tied means no match - a wrong badge is
+    // worse than none.
+    const GPS_COV_STOP = { golf: 1, course: 1, courses: 1, club: 1, country: 1, resort: 1, the: 1, and: 1, at: 1, of: 1, links: 1, gc: 1, cc: 1 };
+    function gpsCoverageWords(s) {
+        return String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/['\u2019]/g, '')
+            .split(/[^a-z0-9]+/).filter((t) => t && !GPS_COV_STOP[t]);
+    }
+    function gpsCoverageRow(course, list) {
+        if (!list || !Array.isArray(list.rows)) return null;
+        const want = new Set(gpsCoverageWords(courseDisplayName(course)));
+        if (!want.size) return null;
+        const city = String(((course && course.location) || {}).city || '').trim().toLowerCase();
+        let best = null, score = 0, tie = false;
+        list.rows.forEach((r) => {
+            const have = new Set(gpsCoverageWords(r[1]));
+            if (!have.size) return;
+            let both = 0;
+            want.forEach((t) => { if (have.has(t)) both++; });
+            if (both !== want.size && both !== have.size) return;
+            const sc = both / Math.max(want.size, have.size) + (city && String(r[2] || '').toLowerCase() === city ? 1 : 0);
+            if (sc > score) { best = r; score = sc; tie = false; } else if (sc === score) tie = true;
+        });
+        return tie ? null : best;
+    }
     function gpsBadgePaint(el, n, of) {
         const kind = n >= of ? 'full' : n > 0 ? 'partial' : 'none';
         el.dataset.gps = kind;
@@ -6613,7 +6666,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         badge.className = 'gps-badge';
         badge.style.display = 'none';
         title.appendChild(badge);
-        const paint = (rec) => gpsBadgeLoadBundle().then((table) => {
+        const state = ((course && course.location) || {}).state;
+        const paint = (rec) => Promise.all([gpsBadgeLoadBundle(), gpsBadgeLoadCoverage(state)]).then(([table, coverage]) => {
             const holes = gpsBadgeHoles(table, key, rec);
             let top = 0;
             holes.forEach((n) => { if (n > top) top = n; });
@@ -6623,6 +6677,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const of = known ? Math.max(known, top) : (top > 18 ? Math.ceil(top / 9) * 9 : 18);
             let n = 0;
             holes.forEach((h) => { if (h <= of) n++; });
+            // The coverage list, scaled to this course's holes (a row can be one
+            // OSM outline for a 36-hole club): all usable -> all; else a share.
+            const row = n < of ? gpsCoverageRow(course, coverage) : null;
+            if (row && row[5] > 0) {
+                const fromList = row[4] >= row[5] ? of : Math.min(of - 1, Math.round(row[4] * of / row[5]));
+                if (fromList > n) n = fromList;
+            }
             gpsBadgePaint(badge, n, of);
         }).catch(() => { /* a badge never breaks the search */ });
         const cached = gpsBadgeLs(GPS_BADGE_CACHE + key);

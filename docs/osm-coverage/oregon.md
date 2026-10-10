@@ -4,15 +4,15 @@ Data © OpenStreetMap contributors, available under the Open Database License (O
 
 Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=golf_course outline is one row, so a 27/36-hole club mapped as separate courses counts once per course.
 
-- **Greens** = golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, capped at the hole count.
+- **Greens** = holes with a green: golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, never fewer than the holes whose line ends on a green (a double green serves two holes), capped at the hole count.
 - **Hole count** = the course's `holes` tag when OSM has one, else 18 (more when its hole lines go past 18). A 9-hole course with no `holes` tag is measured out of 18.
 - **ALL GREENS** = a green for every hole. **PARTIAL** = some. **NONE** = outline only.
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 193 courses — all greens 77, partial 44, none 72 (40% with all greens). Bundle-ready, not yet bundled: 65.
+**Summary:** 193 courses — all greens 78, partial 43, none 72 (40% with all greens). Bundle-ready, not yet bundled: 62.
 
-## ALL GREENS (77)
+## ALL GREENS (78)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -47,6 +47,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Florence | Sandpines Golf Link — bundle-ready | 18/18 | 18/18 | 17/18 | w304892693 |
 | Gearhart | Gearhart Golf Links — bundle-ready | 18/18 | 18/18 | 18/18 | w158904851 |
 | Gleneden Beach | Salishan Golf Links — bundle-ready | 18/18 | 18/18 | 18/18 | w1049137675 |
+| Gold Beach | (unnamed) — bundle-ready | 18/18 | 18/18 | 18/18 | w917752383 |
 | Grants Pass | Grants Pass Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w283193506 |
 | Gresham | Gresham Golf and Country Club | 18/18 | 0/18 | 0/18 | w142301466 |
 | Gresham | Persimmon Country Club — bundle-ready | 18/18 | 18/18 | 17/18 | w142411196 |
@@ -54,7 +55,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Hillsboro | Meriwether National Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w153474835 |
 | Hillsboro | **The Reserve** ★ | 18/18 | 1/18 | 1/18 | w136348508 |
 | Hood River | (unnamed) | 18/18 | 9/18 | 9/18 | w1255781856 |
-| Hood River | **Indian Creek Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w276425283 |
+| Hood River | **Indian Creek Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w276425283 |
 | Johnson City | Sah-hah-lee Golf Course | 18/18 | 0/18 | 0/18 | w131635984 |
 | Junction City | Shadow HIlls Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w216857843 |
 | Keizer | McNary Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r13030479 |
@@ -62,7 +63,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | La Pine | Quail Run Golf Course — bundle-ready | 18/18 | 18/18 | 0/18 | w355573237 |
 | Lake Oswego | Oswego Lake Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w55682263 |
 | Lyons | Elkhorn Valley Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w635013286 |
-| Maywood Park | **Glendoveer Golf Course** ★ — bundle-ready | 36/36 | 36/36 | 36/36 | w39789766 |
+| Maywood Park | **Glendoveer Golf Course** ★ (bundled) | 36/36 | 36/36 | 36/36 | w39789766 |
 | Maywood Park | Rose City Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r6549434 |
 | Medford | Centennial Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w296591780 |
 | Medford | Rogue Valley Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r3944986 |
@@ -72,7 +73,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Newberg | Chehalem Glenn Golf Course | 18/18 | 0/18 | 0/18 | r14595730 |
 | North Plains | Pumpkin Ridge Golf Club — bundle-ready | 36/36 | 36/36 | 36/36 | w901988733 |
 | Oregon City | Oregon Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r11815308 |
-| Oregon City | **Stone Creek Golf Club** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w188382554 |
+| Oregon City | **Stone Creek Golf Club** ★ (bundled) | 18/18 | 18/18 | 18/18 | w188382554 |
 | Portland | Columbia Edgewater Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w96855100 |
 | Portland | Heron Lakes Great Blue — bundle-ready | 18/18 | 18/18 | 18/18 | r21058472 |
 | Portland | Heron Lakes Greenback — bundle-ready | 18/18 | 18/18 | 18/18 | r21058473 |
@@ -80,7 +81,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Redmond | Eagle Crest Ridge Course — bundle-ready | 18/18 | 18/18 | 0/18 | w1518797803 |
 | Redmond | Juniper Golf Course — bundle-ready | 18/18 | 18/18 | 0/18 | w533468821 |
 | Salem | Salem Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w260668748 |
-| Scappoose | **Wildwood Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w428675780 |
+| Scappoose | **Wildwood Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w428675780 |
 | Seneca | Silvies Ranch — bundle-ready | 18/18 | 18/18 | 0/18 | w904342362 |
 | Sisters | Aspen Lakes Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w842299502 |
 | Sisters | Big Meadow Golf Course | 18/18 | 0/18 | 0/18 | r8004002 |
@@ -94,7 +95,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Waterloo | (unnamed) — bundle-ready | 18/18 | 18/18 | 18/18 | w745491408 |
 | Wood Village | The Pub Courses at Edgefield | 27/27 | 20/27 | 0/27 | w431590846 |
 
-## PARTIAL (44)
+## PARTIAL (43)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -102,7 +103,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Baker City | Baker City Golf Club | 2/18 | 0/18 | 0/18 | w148067474 |
 | Bandon | Bandon Preserve | 14/18 | 13/18 | 6/18 | w674855473 |
 | Bandon | Practice Center | 1/18 | 0/18 | 0/18 | w362513478 |
-| Bandon | Shortys | 16/27 | 19/27 | 19/27 | w1540940976 |
+| Bandon | Shortys | 19/27 | 19/27 | 19/27 | w1540940976 |
 | Bend | Old Back Nine Golf Club | 9/18 | 9/18 | 9/18 | r12705143 |
 | Boring | Greenlea Golf Course | 9/18 | 9/18 | 9/18 | w184099485 |
 | Boring | Mountain View Golf Course | 16/18 | 0/18 | 0/18 | w184099489 |
@@ -112,7 +113,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 193 courses: every leisure=gol
 | Dallas | Cross Creek Golf Course | 4/18 | 4/18 | 4/18 | w738065456 |
 | Eugene | Laurelwood Golf Course | 13/18 | 9/18 | 9/18 | w215481121 |
 | Forest Grove | Sunset Grove Golf Club | 9/18 | 0/18 | 0/18 | w143621082 |
-| Gold Beach | (unnamed) | 10/18 | 18/18 | 18/18 | w917752383 |
 | Hillsboro | Killarney West Golf Course | 9/18 | 0/18 | 0/18 | w153436538 |
 | Hillsboro | McKay Creek Golf Course | 12/18 | 9/18 | 9/18 | w153436531 |
 | Island City | La Grande Country Club | 8/18 | 0/18 | 0/18 | w469780293 |

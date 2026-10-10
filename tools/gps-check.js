@@ -453,7 +453,7 @@ const bail = (out, r) => { if (!r.ok) { console.log(JSON.stringify({ arm: r.name
 const SEEN = { esri: {}, epqs: [], nws: [], gSession: [], gTiles: {}, gVp: [], overpass: [] };
 const NWS = { mode: 'ok' };
 // BUILD 5 stand-in Overpass: "the golf courses near here" answers one course named
-// "Wildwood Golf Course" (and one that is not ours); its holes and greens are Caledonia's saved extract
+// "Camas Meadows Golf Club" (and one that is not ours); its holes and greens are Caledonia's saved extract
 // (the geometry the logic is checked on - the name is only what the lookup picks by).
 const OSM_CAL = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'gps-osm', 'caledonia.json'), 'utf8'));
 const BROKEN = new Set();
@@ -478,7 +478,7 @@ function startStandIn() {
                     r.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, h));
                     if (/leisure"="golf_course/.test(query)) return r.end(JSON.stringify({ elements: [
                         { type: 'way', id: 4242, tags: { leisure: 'golf_course', name: 'Fircrest Golf Club' }, center: { lat: 47.23, lon: -122.51 } },
-                        { type: 'way', id: 4343, tags: { leisure: 'golf_course', name: 'Wildwood Golf Course' }, center: { lat: 47.2, lon: -122.57 } }] }));
+                        { type: 'way', id: 4343, tags: { leisure: 'golf_course', name: 'Camas Meadows Golf Club' }, center: { lat: 47.2, lon: -122.57 } }] }));
                     if (/way\(4343\)/.test(query)) return r.end(JSON.stringify({ osm3s: { timestamp_osm_base: '2026-10-09T00:00:00Z' }, elements: OSM_CAL.elements }));
                     return r.end(JSON.stringify({ elements: [] }));
                 });
@@ -1479,7 +1479,7 @@ function usgsFallbackFails(tag, g, why) {
         out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
     }
 
-    // ---- BUILD 5: ANY COURSE (a course with nothing bundled: Wildwood) ----------------------
+    // ---- BUILD 5: ANY COURSE (a course with nothing bundled: Camas Meadows - Wildwood is bundled since 2026-10-10) ----------------------
     // The golfer is at HOME (Camas, WA - 150 km away). With the course's directory
     // location and Overpass blocked: the round stays on the Card, and 📍 GPS shows
     // the COURSE, not the golfer's street. With no location at all: a note on the
@@ -1487,20 +1487,28 @@ function usgsFallbackFails(tag, g, why) {
     // the round lands on GPS. Overpass is asked for the COURSE point, never the golfer's.
     // The course point is a stand-in (Chambers Bay's coordinates); Chambers Bay itself is bundled since build 5.
     const HOME = [45.5946, -122.404], CB = { latitude: 47.2003276, longitude: -122.5707511, city: 'Tacoma', state: 'WA' };
-    const cbDb = (name, loc) => ({ events: { ['GPS' + name.toUpperCase().slice(0, 5)]: round('or_wildwood') }, global_courses: loc ? { or_wildwood: { name: 'Wildwood Golf Course', location: loc } } : {} });
+    const cbDb = (name, loc) => ({ events: { ['GPS' + name.toUpperCase().slice(0, 5)]: round('swwa_camasmeadows') }, global_courses: loc ? { swwa_camasmeadows: { name: 'Camas Meadows Golf Club', location: loc } } : {} });
     const ov0 = SEEN.overpass.length;
-    const nd = await arm('nodat', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 7000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 4000 }, { expression: READ }],
+    const nd = await arm('nodat', 'swwa_camasmeadows', null, 'ok', HOME, 5, [{ sleep: 7000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 4000 }, { expression: READ }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('nodat', CB), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
     out.noData = nd; bail(out, nd);
-    const nl = await arm('noloc', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 6000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 2500 }, { expression: READ }],
+    const nl = await arm('noloc', 'swwa_camasmeadows', null, 'ok', HOME, 5, [{ sleep: 6000 }, { expression: READ }, { tap: '.gps-side-gps' }, { sleep: 2500 }, { expression: READ }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY' }), db: cbDb('noloc', null), blockUrls: ['*overpass*', '*maps.mail.ru*'] });
     out.noLocation = nl; bail(out, nl);
-    const lk = await arm('lookp', 'or_wildwood', null, 'ok', HOME, 5, [{ sleep: 12000 }, { expression: READ },
-        { expression: `JSON.stringify({ lk: (function(){ var v = JSON.parse(localStorage.getItem('hardpan_osm_v1_or_wildwood') || 'null'); return v ? { n: Object.keys(v.holes).length, osm: v.osm, name: v.name } : null; })() })` }],
+    const lk = await arm('lookp', 'swwa_camasmeadows', null, 'ok', HOME, 5, [{ sleep: 12000 }, { expression: READ },
+        { expression: `JSON.stringify({ lk: (function(){ var v = JSON.parse(localStorage.getItem('hardpan_osm_v1_swwa_camasmeadows') || 'null'); return v ? { n: Object.keys(v.holes).length, osm: v.osm, name: v.name } : null; })() })` },
+        // ONCE, THEN OFFLINE (2026-10-10): open it again - nothing more is asked of
+        // Overpass - and again with the network cut off: the kept copy draws it.
+        { expression: 'location.reload()' }, { sleep: 9000 }, { expression: READ },
+        { cdp: { method: 'Network.enable', params: {} } },
+        { cdp: { method: 'Network.emulateNetworkConditions', params: { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 } } },
+        { expression: 'location.reload()' }, { sleep: 9000 }, { expression: READ }],
         { preScript: FRESH + sensor('ok', HOME[0], HOME[1], 5) + CFG({ esri: 'DENY', overpass: true }), db: cbDb('lookp', CB) });
     out.lookup = lk; bail(out, lk);
     {
-        const [n0, n1] = nd.reads, [l0, l1] = nl.reads, [k0, k1] = lk.reads;
+        const [n0, n1] = nd.reads, [l0, l1] = nl.reads, [k0, k2, k3] = lk.reads.filter((r) => r && r.side !== undefined);
+        if (!k2 || k2.side !== 'gps' || !/^\d+$/.test(k2.m || '')) fails.push('lookup: opened again, the kept copy did not draw it: ' + JSON.stringify(k2 && [k2.side, k2.m]));
+        if (!k3 || k3.side !== 'gps' || !/^\d+$/.test(k3.m || '') || k3.m !== k0.m) fails.push('lookup: OFFLINE, the kept copy did not draw it: ' + JSON.stringify(k3 && [k3.side, k3.m, k0.m]));
         if (n0.side !== 'bets' || n0.gpsShown) fails.push('any course: no data, yet it landed on GPS: ' + JSON.stringify([n0.side, n0.gpsShown]));
         const cen = n1.mapCenter;   // [lng, lat]
         if (!n1.gpsShown || !cen) fails.push('any course: 📍 GPS did not open the map: ' + JSON.stringify([n1.gpsShown, cen]));
@@ -1514,7 +1522,7 @@ function usgsFallbackFails(tag, g, why) {
         if (!lkInfo || lkInfo.n < 9 || lkInfo.osm !== 'way/4343') fails.push('lookup: the stand-in course was not looked up and kept: ' + JSON.stringify(lkInfo));
         if (k0.side !== 'gps' || !k0.gpsShown || !/^\d+$/.test(k0.m || '')) fails.push('lookup: with greens found, the round did not land on GPS with numbers: ' + JSON.stringify([k0.side, k0.gpsShown, k0.m]));
         const asked = SEEN.overpass.slice(ov0);
-        if (asked.length !== 2) fails.push('lookup: expected 2 Overpass queries (the courses near, then ours), got ' + asked.length);
+        if (asked.length !== 2) fails.push('lookup: expected 2 Overpass queries in all (the courses near, then ours - ONCE, not again on reopening), got ' + asked.length);
         if (asked.some((qq) => qq.indexOf(HOME[0].toFixed(2)) !== -1 && qq.indexOf(String(HOME[1]).slice(0, 7)) !== -1)) fails.push('lookup: the golfer\'s position went to Overpass');
         if (!asked.length || !/golf_course"\]\(47\.17/.test(asked[0])) fails.push('lookup: the first query was not a box around the COURSE: ' + asked[0]);
         out.anyCourseSummary = { noData: [n0.side, n1.mapCenter], noLocation: [l1.gpsShown, l1.sideNote], lookup: [k0.side, k0.m, lkInfo], overpass: asked.length };

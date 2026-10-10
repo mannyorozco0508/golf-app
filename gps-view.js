@@ -314,7 +314,18 @@
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // Bundled first; else what an OpenStreetMap lookup found for this course
         // (this phone's, or the shared one) - see ANY COURSE below.
-        return G.osmCourse(all, key) || lookedUp(key);
+        // THE NEWER OSM DATA WINS (2026-10-10): a phone that looked a course up
+        // before it was bundled keeps that copy, and the bundle can be newer (Dobson
+        // Ranch: 9 greens in a 10/9 lookup, 18 in the bundle). Both carry the
+        // OpenStreetMap timestamp they were read at (osmBase); the lookup is used
+        // only when it is strictly newer, so a tie or a missing date is the bundle.
+        var b = G.osmCourse(all, key), l = lookedUp(key);
+        if (b && l && osmNewer(l.osmBase, b.osmBase)) return l;
+        return b || l;
+    }
+    function osmNewer(a, b) {
+        var ta = Date.parse(a || ''), tb = Date.parse(b || '');
+        return isFinite(ta) && isFinite(tb) && ta > tb;
     }
     function holeKey(n) { return 'h' + n; }
 

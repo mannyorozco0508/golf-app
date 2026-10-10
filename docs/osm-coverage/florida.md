@@ -4,15 +4,15 @@ Data © OpenStreetMap contributors, available under the Open Database License (O
 
 Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=golf_course outline is one row, so a 27/36-hole club mapped as separate courses counts once per course.
 
-- **Greens** = golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, capped at the hole count.
+- **Greens** = holes with a green: golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, never fewer than the holes whose line ends on a green (a double green serves two holes), capped at the hole count.
 - **Hole count** = the course's `holes` tag when OSM has one, else 18 (more when its hole lines go past 18). A 9-hole course with no `holes` tag is measured out of 18.
 - **ALL GREENS** = a green for every hole. **PARTIAL** = some. **NONE** = outline only.
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 1964 courses — all greens 407, partial 366, none 1191 (21% with all greens). Bundle-ready, not yet bundled: 323.
+**Summary:** 1964 courses — all greens 411, partial 362, none 1191 (21% with all greens). Bundle-ready, not yet bundled: 326.
 
-## ALL GREENS (407)
+## ALL GREENS (411)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -45,7 +45,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Bonita Springs | Tiburón Golf Club | 36/36 | 35/36 | 36/36 | r5462396 |
 | Bonita Springs | Twin Eagles Golf Club | 18/18 | 17/18 | 18/18 | r13716300 |
 | Bowling Green | **Streamsong Resort - Black Course** ★ — bundle-ready | 18/18 | 18/18 | 0/18 | w1351613366 |
-| Bowling Green | **Streamsong Resort - Red and Blue Courses** ★ — bundle-ready | 36/36 | 36/36 | 21/36 | w1351613365 |
+| Bowling Green | **Streamsong Resort - Red and Blue Courses** ★ (bundled) | 36/36 | 36/36 | 21/36 | w1351613365 |
 | Boynton Beach | Indian Spring Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4064854 |
 | Boynton Beach | Pine Tree Golf Club | 18/18 | 0/18 | 0/18 | w186588759 |
 | Boynton Beach | The Links at Boynton Beach — bundle-ready | 18/18 | 18/18 | 18/18 | w48348053 |
@@ -90,6 +90,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Deerfield Beach | Deer Creek Golf Club | 18/18 | 0/18 | 0/18 | r5464227 |
 | Deerfield Beach | Royal Palm Yacht & Country Club | 18/18 | 3/18 | 3/18 | r5464259 |
 | DeFuniak Springs | (unnamed) — bundle-ready | 18/18 | 18/18 | 18/18 | r15439885 |
+| Deland | Victoria Hills Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4013474 |
 | Delray Beach | Addison Reserve Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4065614 |
 | Delray Beach | Delaire Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4674421 |
 | Deltona | The Deltona Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4013473 |
@@ -113,6 +114,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Fernandina Beach | Amelia River Club — bundle-ready | 18/18 | 18/18 | 18/18 | w91776833 |
 | Fleming Island | Eagle Harbor Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r2019403 |
 | Fleming Island | The Golf Club at Fleming Island — bundle-ready | 18/18 | 18/18 | 18/18 | r3397346 |
+| Fort Lauderdale | Lago Mar Country Club — bundle-ready | 18/18 | 18/18 | 17/18 | w113350091 |
 | Fort Myers | Colonial Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4031383 |
 | Fort Myers | Cross Creek Golf & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4032159 |
 | Fort Myers | Crown Colony Golf & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4029385 |
@@ -287,6 +289,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Orlando | Dubsdread Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r2856835 |
 | Orlando | Fairways Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4053335 |
 | Orlando | Hunter's Creek Golf Club | 18/18 | 17/18 | 18/18 | r4053406 |
+| Orlando | Links Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r19846822 |
 | Orlando | Orange Tree Golf Club | 18/18 | 0/18 | 0/18 | r4053380 |
 | Orlando | Rio Pinar Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r2078044 |
 | Orlando | Shingle Creek Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r1206383 |
@@ -393,6 +396,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | The Villages | Bonifay Country Club (The Villages) — bundle-ready | 18/18 | 18/18 | 18/18 | r4682014 |
 | The Villages | Briarwood & Walnut Grove Courses (The Villages) — bundle-ready | 18/18 | 18/18 | 18/18 | r4682185 |
 | The Villages | Cane Garden Country Club (The Villages) — bundle-ready | 18/18 | 18/18 | 18/18 | r4682042 |
+| The Villages | El Diablo & El Santiago Golf Course (The Villages) — bundle-ready | 18/18 | 18/18 | 18/18 | w331326486 |
 | The Villages | Evans Prairie Country Club (The Villages) — bundle-ready | 18/18 | 18/18 | 18/18 | r16660693 |
 | The Villages | Glenview Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r3390865 |
 | The Villages | Hacienda Hills Golf & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r3390889 |
@@ -424,7 +428,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Winter Park | Interlachen Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r1188923 |
 | Winter Springs | Tuscawilla Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4446663 |
 
-## PARTIAL (366)
+## PARTIAL (362)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -450,7 +454,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Bonita Springs | (unnamed) | 2/18 | 2/18 | 2/18 | w163833016 |
 | Bonita Springs | (unnamed) | 9/18 | 9/18 | 0/18 | r16872592 |
 | Bonita Springs | Quail West Golf & Country Club | 1/18 | 0/18 | 0/18 | r5451821 |
-| Bradenton | Bradenton Country Club | 11/18 | 14/18 | 7/18 | w35168696 |
+| Bradenton | Bradenton Country Club | 14/18 | 14/18 | 7/18 | w35168696 |
 | Bradenton | Esplanade Golf & Country Club | 8/18 | 5/18 | 5/18 | r12130890 |
 | Bradenton | Timber Creek Golf Course | 9/18 | 9/18 | 9/18 | r18984136 |
 | Bradenton | Waterlefe Golf Club | 2/18 | 0/18 | 0/18 | r4019584 |
@@ -458,14 +462,13 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Cape Coral | Hunters Run Executive Golf Course | 9/18 | 9/18 | 9/18 | w303054303 |
 | Champions Gate | Champions Gate Country Club | 1/18 | 1/18 | 1/18 | w406000107 |
 | Charlotte Park | Seminole Lakes Golf Course | 10/18 | 3/18 | 3/18 | r8676722 |
-| Clermont | Clermont National | 16/18 | 17/18 | 18/18 | w1423478895 |
+| Clermont | Clermont National | 17/18 | 17/18 | 18/18 | w1423478895 |
 | Coral Gables | Granada Golf Course | 12/18 | 9/18 | 9/18 | w105418598 |
 | Davenport | Providence Golf Club | 2/18 | 0/18 | 0/18 | w910693851 |
 | Deep Creek | Aileron Golf Club | 3/18 | 1/18 | 0/18 | r2788488 |
 | DeFuniak Springs | (unnamed) | 1/18 | 1/18 | 1/18 | r15439886 |
 | DeFuniak Springs | (unnamed) | 10/18 | 6/18 | 8/18 | r15439887 |
 | DeFuniak Springs | (unnamed) | 3/18 | 1/18 | 1/18 | r15439888 |
-| Deland | Victoria Hills Golf Club | 17/18 | 18/18 | 18/18 | r4013474 |
 | Delray Beach | Mizner Country Club | 17/18 | 9/18 | 10/18 | r4064977 |
 | Dunnellon | Rainbow's End Golf Club | 10/18 | 0/18 | 0/18 | w301824871 |
 | East Lake | (unnamed) | 3/18 | 3/18 | 3/18 | w1196843466 |
@@ -487,7 +490,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Fisher Island | The Links at Fisher Island | 9/18 | 9/18 | 9/18 | r1625893 |
 | Florida City | Ocean Reef - Dolphone Course | 7/18 | 0/18 | 0/18 | w886052447 |
 | Fort Lauderdale | Fort Lauderdale Country Club | 4/36 | 4/36 | 36/36 | w48236807 |
-| Fort Lauderdale | Lago Mar Country Club | 16/18 | 18/18 | 17/18 | w113350091 |
 | Fort Myers | Eastwood Golf Course | 16/18 | 14/18 | 14/18 | w428667924 |
 | Fort Myers | Eastwood Golf Course | 4/18 | 4/18 | 4/18 | w879106663 |
 | Fort Myers | Gateway Golf & Country Club | 3/18 | 0/18 | 0/18 | r4030594 |
@@ -506,7 +508,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Harmony | (unnamed) | 2/18 | 2/18 | 2/18 | w1054959676 |
 | Harmony | (unnamed) | 13/18 | 13/18 | 13/18 | w1054959677 |
 | Hendry Dr | Sweetgum Golf Course (The Villages) | 9/18 | 9/18 | 9/18 | w318753240 |
-| Hobe Sound | Loblolly | 2/18 | 3/18 | 0/18 | r1589171 |
+| Hobe Sound | Loblolly | 3/18 | 3/18 | 0/18 | r1589171 |
 | Hobe Sound | Lost Lake Golf Club | 1/18 | 1/18 | 1/18 | w113627212 |
 | Hollywood | Eco Golf Club | 9/18 | 9/18 | 9/18 | w487531033 |
 | Howey-in-the-Hills | (unnamed) | 5/18 | 3/18 | 2/18 | r16841070 |
@@ -527,7 +529,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Lake Worth | Atlantic National Golf Club | 13/18 | 13/18 | 0/18 | w361359285 |
 | Lake Worth | Fountains Country Club | 10/18 | 2/18 | 3/18 | r4063416 |
 | Lake Worth | Palm Beach National Golf and Country Club | 9/18 | 0/18 | 0/18 | w186771069 |
-| Lake Worth | Poinciana Country Club | 1/18 | 2/18 | 2/18 | w304824638 |
+| Lake Worth | Poinciana Country Club | 2/18 | 2/18 | 2/18 | w304824638 |
 | Lake Worth | The Falls Club of the Palm Beaches | 16/18 | 0/18 | 0/18 | w185479031 |
 | Lake Worth | Winston Trails Golf Club | 13/18 | 0/18 | 0/18 | r4063714 |
 | Lakeland | Grasslands Golf & Country Club | 3/18 | 0/18 | 0/18 | r2688012 |
@@ -539,9 +541,9 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Land O' Lakes | (unnamed) | 2/18 | 2/18 | 2/18 | w1300652842 |
 | Land O' Lakes | (unnamed) | 1/18 | 1/18 | 1/18 | w1300652843 |
 | Largo | Largo Golf Course | 15/18 | 0/18 | 0/18 | w204620019 |
-| Lauderdale Lakes | (unnamed) | 15/18 | 16/18 | 16/18 | r21296836 |
+| Lauderdale Lakes | (unnamed) | 16/18 | 16/18 | 16/18 | r21296836 |
 | Lauderdale Lakes | (unnamed) | 1/18 | 1/18 | 0/18 | r21296837 |
-| Lauderhill | Inverrary Country Club | 1/36 | 2/36 | 2/36 | r2819869 |
+| Lauderhill | Inverrary Country Club | 2/36 | 2/36 | 2/36 | r2819869 |
 | Lely | Hibiscus Golf Club | 3/18 | 2/18 | 1/18 | r5454444 |
 | Lely | Royal Palm Country Club | 1/18 | 0/18 | 0/18 | r5454445 |
 | Lely Resort | Naples Lakes Country Club | 10/18 | 8/18 | 8/18 | r5454167 |
@@ -609,7 +611,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Okeechobee | (unnamed) | 3/18 | 1/18 | 1/18 | w653663491 |
 | Orlando | Grande Vista Golf Club | 9/18 | 9/18 | 9/18 | r1127931 |
 | Orlando | Hawks Landing Golf Club | 4/18 | 0/18 | 0/18 | r4053362 |
-| Orlando | Links Golf Course | 11/18 | 18/18 | 18/18 | r19846822 |
 | Orlando | North Shore Golf Club | 2/18 | 0/18 | 0/18 | r4054123 |
 | Orlo Vista | MetroWest Golf Club | 4/18 | 0/18 | 0/18 | r1767706 |
 | Ormond Beach | Riviera Country Club (Ormond Beach) | 2/18 | 0/18 | 0/18 | w301871116 |
@@ -657,7 +658,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Rotonda | The Palms | 2/18 | 0/18 | 0/18 | w188169213 |
 | Royal Palm Beach | Village Golf Club | 12/18 | 0/18 | 0/18 | r2694848 |
 | Sailfish Point | (unnamed) | 2/18 | 2/18 | 2/18 | r16861231 |
-| Sailfish Point | (unnamed) | 15/18 | 16/18 | 16/18 | r16861236 |
+| Sailfish Point | (unnamed) | 16/18 | 16/18 | 16/18 | r16861236 |
 | Saint James City | (unnamed) | 1/18 | 1/18 | 1/18 | w1234055863 |
 | Saint James City | (unnamed) | 1/18 | 1/18 | 0/18 | w1234055864 |
 | Saint James City | (unnamed) | 2/18 | 2/18 | 2/18 | w1234055870 |
@@ -679,7 +680,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Sarasota | (unnamed) | 2/18 | 0/18 | 0/18 | r16881689 |
 | Sarasota | (unnamed) | 5/18 | 0/18 | 0/18 | r16881690 |
 | Sarasota | The River Club | 16/18 | 0/18 | 0/18 | r12189523 |
-| Seacrest Beach | Origins Golf Club | 10/18 | 11/18 | 11/18 | w888527867 |
+| Seacrest Beach | Origins Golf Club | 11/18 | 11/18 | 11/18 | w888527867 |
 | Seminole | Bardmoor Country Club | 35/36 | 35/36 | 35/36 | w245320197 |
 | Sewall's Point | (unnamed) | 4/18 | 0/18 | 0/18 | r16861232 |
 | Sewall's Point | YCS | 3/18 | 0/18 | 0/18 | r1588912 |
@@ -703,7 +704,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Sugarmill Woods | (unnamed) | 3/18 | 0/18 | 0/18 | r7824026 |
 | Sumterville | (unnamed) | 2/18 | 1/18 | 1/18 | w1547185716 |
 | Sumterville | (unnamed) | 1/18 | 1/18 | 1/18 | w1547240468 |
-| Sumterville | (unnamed) | 6/18 | 8/18 | 8/18 | w1547303905 |
+| Sumterville | (unnamed) | 8/18 | 8/18 | 8/18 | w1547303905 |
 | Sumterville | Bellaire Executive Golf Course | 9/18 | 9/18 | 9/18 | w1544504411 |
 | Sumterville | Red and Gray Fox Executive Golf | 3/18 | 2/18 | 0/18 | w842824129 |
 | Sun City Center | Caloosa Golf & Country Club | 14/18 | 0/18 | 0/18 | w302072954 |
@@ -727,7 +728,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | The Villages | Bonita Pass Golf Course (The Villages) | 9/18 | 9/18 | 9/18 | w252838104 |
 | The Villages | Chula Vista Course (The Villages) | 9/18 | 9/18 | 9/18 | w367588080 |
 | The Villages | Churchill Greens Golf Course (The Villages) | 9/18 | 9/18 | 9/18 | r3390864 |
-| The Villages | El Diablo & El Santiago Golf Course (The Villages) | 16/18 | 18/18 | 18/18 | w331326486 |
 | The Villages | Hawkes Bay Golf course (The Villages) | 9/18 | 9/18 | 9/18 | w252837837 |
 | The Villages | Heron Golf Course (The Villages) | 9/18 | 9/18 | 9/18 | w331455652 |
 | The Villages | Hilltop Golf Course (The Villages) | 9/18 | 9/18 | 9/18 | w252838513 |
@@ -769,10 +769,10 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Village of Golf | The Country Club of Florida | 3/18 | 2/18 | 2/18 | r4064169 |
 | Wellington | Binks Forest Golf Club | 4/18 | 4/18 | 0/18 | r5384102 |
 | Wellington | The Wanderers Club | 13/18 | 12/18 | 0/18 | r4062392 |
-| Wellington | Wycliffe Golf & Country Club | 20/36 | 22/36 | 2/36 | r4063177 |
+| Wellington | Wycliffe Golf & Country Club | 22/36 | 22/36 | 2/36 | r4063177 |
 | West Palm Beach | Mayacoo Lakes Country Club | 5/18 | 0/18 | 0/18 | r3446463 |
 | West Palm Beach | The Breakers Rees Jones Course | 6/18 | 0/18 | 0/18 | r3446383 |
-| West Vero Corridor | Pointe West Country Club | 8/18 | 9/18 | 9/18 | r9868253 |
+| West Vero Corridor | Pointe West Country Club | 9/18 | 9/18 | 9/18 | r9868253 |
 | West Vero Corridor | Pointe West Country Club | 11/18 | 9/18 | 9/18 | r9868254 |
 | Weston | (unnamed) | 9/18 | 9/18 | 9/18 | w951572549 |
 | Weston | Weston Hills Country Club Golf Course | 2/18 | 2/18 | 0/18 | w1111533765 |
@@ -787,7 +787,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Yalaha | (unnamed) | 6/18 | 6/18 | 5/18 | r16841072 |
 | Yalaha | (unnamed) | 2/18 | 1/18 | 1/18 | r16841073 |
 | Yulee | (unnamed) | 1/18 | 1/18 | 1/18 | r15915737 |
-| Zellwood | (unnamed) | 16/18 | 17/18 | 17/18 | w1113608567 |
+| Zellwood | (unnamed) | 17/18 | 17/18 | 17/18 | w1113608567 |
 | Zellwood | (unnamed) | 1/18 | 1/18 | 1/18 | w1126778457 |
 | Zephyrhills | (unnamed) | 1/18 | 1/18 | 1/18 | w1195424725 |
 | Zephyrhills | (unnamed) | 2/18 | 2/18 | 2/18 | w1195424740 |

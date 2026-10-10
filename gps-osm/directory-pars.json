@@ -1,5 +1,5 @@
 {
- "_comment": "Pars (and nothing else) of directory courses that have no built-in preset, read from global_courses on 2026-10-09 for tools/gps-import-osm.js: par comes from our card, never from OSM.",
+ "_comment": "Pars (and nothing else) of directory courses that have no built-in preset, read from global_courses on 2026-10-09 / 2026-10-10 for tools/gps-import-osm.js: par comes from our card, never from OSM.",
  "gca_50bc8qqa": {
   "name": "Chambers Bay Golf Club",
   "pars": [
@@ -113,6 +113,190 @@
    4,
    3,
    4
+  ]
+ },
+ "az_tpc_champions": {
+  "name": "TPC Scottsdale (Champions)",
+  "pars": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4
+  ]
+ },
+ "gca_bwcdmzcy": {
+  "name": "Legacy Golf Resort",
+  "pars": [
+   4,
+   4,
+   4,
+   3,
+   4,
+   5,
+   3,
+   5,
+   4,
+   4,
+   3,
+   4,
+   4,
+   5,
+   3,
+   4,
+   3,
+   5
+  ]
+ },
+ "swwa_mintvalley": {
+  "name": "Mint Valley Golf Course",
+  "pars": [
+   4,
+   5,
+   3,
+   3,
+   4,
+   4,
+   5,
+   3,
+   4,
+   4,
+   5,
+   3,
+   4,
+   4,
+   5,
+   4,
+   3,
+   4
+  ]
+ },
+ "swwa_threerivers": {
+  "name": "Three Rivers Golf Course",
+  "pars": [
+   5,
+   4,
+   3,
+   4,
+   5,
+   4,
+   4,
+   3,
+   4,
+   5,
+   4,
+   4,
+   4,
+   4,
+   3,
+   4,
+   3,
+   5
+  ]
+ },
+ "wa_allenmore": {
+  "name": "Allenmore Golf Course",
+  "pars": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4
+  ]
+ },
+ "wa_meadow_park": {
+  "name": "Meadow Park",
+  "pars": [
+   4,
+   4,
+   4,
+   3,
+   4,
+   4,
+   5,
+   3,
+   4,
+   5,
+   4,
+   4,
+   3,
+   4,
+   4,
+   5,
+   3,
+   4
+  ]
+ },
+ "gca_4ad33747": {
+  "name": "Streamsong Resort (Red)",
+  "pars": [
+   4,
+   5,
+   4,
+   4,
+   4,
+   3,
+   5,
+   3,
+   4,
+   4,
+   4,
+   4,
+   5,
+   3,
+   4,
+   3,
+   4,
+   5
+  ]
+ },
+ "gca_zgkynkan": {
+  "name": "Dobson Ranch Golf Course",
+  "pars": [
+   5,
+   4,
+   4,
+   3,
+   5,
+   4,
+   3,
+   4,
+   5,
+   4,
+   4,
+   3,
+   5,
+   3,
+   4,
+   4,
+   3,
+   5
   ]
  }
 }

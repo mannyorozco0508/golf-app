@@ -21,7 +21,8 @@ const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
-const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css'];
+const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -55,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v347-gps-badgenine'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v348-gps-bundle'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -465,4 +466,66 @@ test('GPS badge on online course search results: bundled greens and course_gps f
     store.hardpan_osm_v1___unknown = JSON.stringify({ holes: nineGreens });
     assert.equal((await badge('__unknown')).textContent, 'GPS partial (9/18)', 'unknown hole count: out of 18');
     assert.equal(store.hardpan_gps_course_v1_gca_partial !== undefined, true, 'the record is kept on the phone for next time (offline)');
+});
+
+test('GPS badge, coverage list: a mapped course that is not bundled never reads "No GPS yet"; only the searched state loads', { skip }, async () => {
+    const vm = require('vm');
+    const a = read('admin.html');
+    const i = a.indexOf('    // THE GPS-MAPPED BADGE');
+    const block = a.slice(a.lastIndexOf('// GPS:BEGIN', i), a.indexOf('// GPS:END', i));
+    const cov = { AZ: require('./gps-coverage-az.js'), FL: require('./gps-coverage-fl.js'), WA: require('./gps-coverage-wa.js') };
+    ['az', 'wa', 'or', 'ct', 'fl'].forEach((st) => {
+        const f = 'gps-coverage-' + st + '.js', d = require('./' + f);
+        assert.ok(Array.isArray(d.rows) && d.rows.length > 100, f + ' has rows');
+        assert.ok(d.rows.every((r) => r.length === 7 && typeof r[0] === 'number' && r[3] <= r[5] && r[4] <= r[3]), f + ': [id, name, city, greens, usable, holes, ready] - no outlines');
+        assert.ok(fs.statSync(path.join(__dirname, f)).size < 300 * 1024, f + ' stays small');
+    });
+    const loaded = [];
+    const sb = {
+        window: { HardPanGpsCourses: require('./gps-courses.js'), HardPanGpsCoverage: {} },
+        localStorage: { getItem: () => null, setItem: () => {} }, globalCourses: {}, importedCourseKey: (c) => 'gca_' + c.id,
+        courseDisplayName: (c) => c.club_name + (c.course_name ? ' (' + c.course_name + ')' : ''),
+        db: { ref: () => ({ once: () => Promise.resolve({ val: () => null }) }) },
+    };
+    sb.document = { head: { appendChild: (el) => { loaded.push(el.src); const st = el.src.match(/gps-coverage-(\w+)\.js/)[1].toUpperCase(); sb.window.HardPanGpsCoverage[st] = cov[st]; setTimeout(el.onload, 0); } },
+        createElement: (t) => (t === 'script' ? {} : { style: {}, dataset: {}, textContent: '' }) };
+    vm.createContext(sb);
+    vm.runInContext(block + '\nthis.addGpsBadge = addGpsBadge; this.gpsCoverageRow = gpsCoverageRow;', sb);
+    const badge = async (c) => { const kids = []; sb.addGpsBadge({ appendChild: (k) => kids.push(k) }, c); for (let k = 0; k < 6; k++) await new Promise((r) => setTimeout(r, 0)); return kids[0].textContent; };
+    // Streamsong Black: bundle-ready in OSM, not bundled, no key of ours -> GPS ✓ from the list.
+    assert.equal(await badge({ id: 'x1', club_name: 'Streamsong Resort', course_name: 'Black', location: { city: 'Bowling Green', state: 'FL' } }), 'GPS \u2713');
+    // FireRock: 6 holes usable in OSM - partial from the list, not "No GPS yet".
+    assert.equal(await badge({ id: 'x2', club_name: 'FireRock Country Club', location: { city: 'Fountain Hills', state: 'AZ' } }), 'GPS partial (6/18)');
+    // We-Ko-Pa: 10 greens but no hole lines - nothing the phone's lookup can use, so honestly "No GPS yet".
+    assert.equal(await badge({ id: 'x6', club_name: 'We-Ko-Pa Golf Club', location: { city: 'Fort McDowell', state: 'AZ' } }), 'No GPS yet');
+    // Dobson Ranch, all 18 mapped (2026-10-10), under a key the bundle does not use: GPS ✓ from the list.
+    assert.equal(await badge({ id: 'x5', club_name: 'Dobson Ranch Golf Course', location: { city: 'Mesa', state: 'AZ' } }), 'GPS \u2713');
+    // Not in OSM at all, and a state the list does not cover: unchanged.
+    assert.equal(await badge({ id: 'x3', club_name: 'Nowhere Links Of Make Believe', location: { city: 'Mesa', state: 'AZ' } }), 'No GPS yet');
+    assert.equal(await badge({ id: 'x4', club_name: 'Pebble Beach Golf Links', location: { city: 'Pebble Beach', state: 'CA' } }), 'No GPS yet');
+    assert.deepEqual(loaded.sort(), ['gps-coverage-az.js', 'gps-coverage-fl.js'], 'only the searched states loaded, once each');
+    // Matching: the course's own words, the town breaks a tie, a tie is no match.
+    const W = { rows: [[1, 'Legacy Golf Resort Phoenix', 'Phoenix', 18, 18, 18, 1], [2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0]] };
+    assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Resort', location: { city: 'Phoenix' } }, W)[0], 1);
+    const W2 = { rows: [[2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0], [3, 'Legacy Golf Club', 'Sun City', 18, 18, 18, 1]] };
+    assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Club', location: { city: 'Mesa' } }, W2), null, 'two Legacy Golf Clubs and no town to tell them apart: no badge from the list');
+    assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Club', location: { city: 'Sun City' } }, W2)[0], 3, 'the town tells them apart');
+    assert.equal(sb.gpsCoverageRow({ club_name: 'Golf Club', location: {} }, W), null, 'no naming words, no match');
+});
+
+test('a newer bundle beats an old OSM lookup cached on the phone (and only a strictly newer lookup beats the bundle)', { skip }, () => {
+    const vm = require('vm');
+    const v = read('gps-view.js');
+    const src = v.slice(v.indexOf('    function osmRecord(key) {'), v.indexOf('    function holeKey(n)'));
+    const sb = { window: { HardPanGpsCourses: { k: { v: 1, osmBase: '2026-10-10T10:30:00Z', holes: { 1: 'bundle' } } } }, G: { osmCourse: (t, k) => t[k] || null }, lookup: null };
+    vm.createContext(sb);
+    vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nthis.osmRecord = osmRecord;', sb);
+    sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'old lookup' } };
+    assert.equal(sb.osmRecord('k').holes[1], 'bundle', 'old lookup, newer bundle: the bundle');
+    sb.lookup = { osmBase: null, holes: { 1: 'undated lookup' } };
+    assert.equal(sb.osmRecord('k').holes[1], 'bundle', 'no date: the bundle');
+    sb.lookup = { osmBase: '2026-10-12T00:00:00Z', holes: { 1: 'newer lookup' } };
+    assert.equal(sb.osmRecord('k').holes[1], 'newer lookup', 'a lookup made after the bundle was built: the lookup');
+    sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'only a lookup' } };
+    assert.equal(sb.osmRecord('none').holes[1], 'only a lookup', 'nothing bundled: the lookup');
 });

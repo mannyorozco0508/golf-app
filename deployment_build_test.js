@@ -91,10 +91,11 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
 
     test('Consumer contains exactly SHARED + CONSUMER', () => {
         // gps-v1: dist/consumer is built with GPS_ENABLED unset, which leaves out
-        // GPS_SHELL (in a HardPan tree those six names also sit in CONSUMER_SHELL,
-        // inside a GPS block; in a Consumer tree they are not there at all).
+        // GPS_SHELL (in a HardPan tree those eleven names also sit in CONSUMER_SHELL,
+        // inside a GPS block; in a Consumer tree they are not there at all). Six
+        // until 2026-10-10, when the five per-state coverage lists joined.
         const GPS = declared('GPS_SHELL');
-        assert.ok(GPS.length === 6, 'positive: GPS_SHELL parsed');
+        assert.ok(GPS.length === 11, 'positive: GPS_SHELL parsed');
         assert.deepEqual(listing(outDir('consumer')), SHARED.concat(CONSUMER).filter(f => !GPS.includes(f)).sort());
         GPS.forEach(f => assert.ok(!listing(outDir('consumer')).includes(f), 'Consumer ships ' + f));
     });

@@ -4,15 +4,15 @@ Data © OpenStreetMap contributors, available under the Open Database License (O
 
 Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=golf_course outline is one row, so a 27/36-hole club mapped as separate courses counts once per course.
 
-- **Greens** = golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, capped at the hole count.
+- **Greens** = holes with a green: golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, never fewer than the holes whose line ends on a green (a double green serves two holes), capped at the hole count.
 - **Hole count** = the course's `holes` tag when OSM has one, else 18 (more when its hole lines go past 18). A 9-hole course with no `holes` tag is measured out of 18.
 - **ALL GREENS** = a green for every hole. **PARTIAL** = some. **NONE** = outline only.
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 268 courses — all greens 134, partial 67, none 67 (50% with all greens). Bundle-ready, not yet bundled: 114.
+**Summary:** 268 courses — all greens 139, partial 62, none 67 (52% with all greens). Bundle-ready, not yet bundled: 113.
 
-## ALL GREENS (134)
+## ALL GREENS (139)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -20,6 +20,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Allyn | LakeLand Village Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r3945014 |
 | Auburn | Auburn Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w831297181 |
 | Auburn | Washington National Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r7111377 |
+| Bainbridge Island | Wing Point Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r15765636 |
 | Bellevue | Glendale Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w161885192 |
 | Bellingham | Bellingham Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w111599950 |
 | Bellingham | Lake Padden Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w54454620 |
@@ -38,6 +39,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Chelan | Lake Chelan Golf Course | 18/18 | 17/18 | 17/18 | w52094369 |
 | College Place | Wine Valley Golf Club — bundle-ready | 18/18 | 18/18 | 17/18 | w436979104 |
 | Cosmopolis | Highland Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w361446393 |
+| Coulee City | Vic Meyers Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w1412316699 |
 | Covington | Meridian Valley Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w26273698 |
 | Deer Park | Deer Park Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w301730123 |
 | Desert Aire | Desert Aire Golf Club | 18/18 | 17/18 | 18/18 | r18622804 |
@@ -67,7 +69,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Hunts Point | Broadmoor Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w159936730 |
 | Indianola | White Horse Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r3799855 |
 | Kamilche | Salish Cliffs Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w226885836 |
-| Kelso | **Three Rivers Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w305645798 |
+| Kelso | **Three Rivers Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w305645798 |
 | Kenmore | Inglewood Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w26796837 |
 | Kennewick | Canyon Lakes Golf Course (bundled) | 18/18 | 17/18 | 18/18 | r19187969 |
 | Kennewick | Zintel Creek Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w27183423 |
@@ -78,8 +80,9 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Lakewood | American Lake Veterans Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w51242040 |
 | Lakewood | Oakbrook Golf & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r417687 |
 | Leavenworth | Leavenworth Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r10695931 |
+| Liberty Lake | Liberty Lake Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w202252172 |
 | Liberty Lake | MeadowWood Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r17823956 |
-| Longview | **Mint Valley Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w806288368 |
+| Longview | **Mint Valley Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w806288368 |
 | Lynnwood | Lynnwood Municipal Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w42103942 |
 | Malaga | Three Lakes Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w35112576 |
 | Manson | Bear Mountain Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w1284936152 |
@@ -106,6 +109,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Port Orchard | Village Greens Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r5293913 |
 | Priest Point | Legion Memorial Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w28925587 |
 | Pullman | Palouse Ridge Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w39515245 |
+| Quincy | Colockum Ridge Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r1020467 |
 | Redmond | The Bellevue Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w29468550 |
 | Redmond | The Golf Club at Redmond Ridge — bundle-ready | 18/18 | 18/18 | 18/18 | r9098120 |
 | Redmond | Willows Run Golf Club — bundle-ready | 36/36 | 36/36 | 36/36 | w42420031 |
@@ -135,9 +139,9 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Spokane | Indian Canyon Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w224773587 |
 | Sudden Valley | Sudden Valley Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w441369095 |
 | Sunnyside | Black Rock Creek Golf Course | 18/18 | 0/18 | 0/18 | w264533604 |
-| Tacoma | **Allenmore Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w23143257 |
+| Tacoma | **Allenmore Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w23143257 |
 | Tacoma | Lake Spanaway Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w296598231 |
-| Tacoma | **Meadow Park Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w22718513 |
+| Tacoma | **Meadow Park Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w22718513 |
 | Tukwila | Foster Golf Links — bundle-ready | 18/18 | 18/18 | 18/18 | w26229384 |
 | Tumwater | Tumwater Valley Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w55412329 |
 | Union | Alderbrook Golf & Yacht Club — bundle-ready | 18/18 | 18/18 | 18/18 | w1565603393 |
@@ -148,34 +152,32 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Warm Beach | Kayak Point Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w54455258 |
 | Washougal | Orchard Hills Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w150261159 |
 | White Center | West Seattle Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w31652508 |
-| Woodland | **Lewis River Golf Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w357058419 |
-| Yelm | **Tahoma Valley Golf and Country Club** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w94252069 |
+| Woodinville | Bear Creek Country Club — bundle-ready | 18/18 | 18/18 | 13/18 | r18145629 |
+| Woodland | **Lewis River Golf Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w357058419 |
+| Yelm | **Tahoma Valley Golf and Country Club** ★ (bundled) | 18/18 | 18/18 | 18/18 | w94252069 |
 
-## PARTIAL (67)
+## PARTIAL (62)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
 | Aberdeen | Grays Harbor Country Club | 10/18 | 9/18 | 9/18 | w374772888 |
 | Arlington | Gleneagle Golf Course | 15/18 | 14/18 | 16/18 | r19187964 |
 | Artondale | Gig Harbor Golf & Country Club | 1/18 | 0/18 | 0/18 | w31153925 |
-| Bainbridge Island | Wing Point Golf Course | 17/18 | 18/18 | 18/18 | r15765636 |
 | Battle Ground | Hartwood Golf Course | 9/18 | 9/18 | 9/18 | w149782942 |
-| Brewster | Quicksands at Gamble Sands | 13/18 | 14/18 | 14/18 | w1551387386 |
+| Brewster | Quicksands at Gamble Sands | 14/18 | 14/18 | 14/18 | w1551387386 |
 | Camas | **Camas Meadows Golf Club** ★ | 2/18 | 2/18 | 2/18 | w150421359 |
-| Carlsborg | Sky Ridge Golf Course | 11/18 | 17/18 | 17/18 | w1328707092 |
+| Carlsborg | Sky Ridge Golf Course | 17/18 | 17/18 | 17/18 | w1328707092 |
 | Carson | **Elk Ridge Golf Course** ★ | 13/18 | 0/18 | 0/18 | w276105262 |
 | Cheney | The Plains | 1/18 | 0/18 | 0/18 | w224772615 |
 | Clinton | Hat Island Golf Club | 9/18 | 9/18 | 0/18 | w547170915 |
 | Colfax | Colfax Golf and Country Club | 11/18 | 9/18 | 9/18 | w261956360 |
 | Colville | Dominion Meadows Golf Course | 4/18 | 0/18 | 0/18 | w243358076 |
-| Coulee City | Vic Meyers Golf Course | 11/18 | 18/18 | 18/18 | w1412316699 |
 | Eastsound | Orcas Island Golf Course | 10/18 | 0/18 | 0/18 | r13192028 |
 | Fairwood | Pine Acres Par 3 | 1/18 | 0/18 | 0/18 | w927264982 |
 | Fircrest | Highlands Golf Course | 11/18 | 9/18 | 9/18 | r3227105 |
 | Hoodsport | Lake Cushman Golf Course | 9/18 | 0/18 | 0/18 | r9570293 |
 | Hunts Point | University of Washington Golf Driving Range | 1/18 | 0/18 | 0/18 | w222719203 |
 | Lake Tapps | Tapps Island Golf Course | 9/18 | 9/18 | 9/18 | r8334775 |
-| Liberty Lake | Liberty Lake Golf Course | 17/18 | 18/18 | 18/18 | w202252172 |
 | Liberty Lake | Trailhead Golf Course | 10/18 | 9/18 | 9/18 | w458994871 |
 | Long Beach | Peninsula Golf Course | 10/18 | 9/18 | 9/18 | w1185599287 |
 | Lynden | Homestead Golf & Country Club | 4/18 | 0/18 | 0/18 | r3945013 |
@@ -190,7 +192,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | Port Hadlock | Discovery Bay Golf Course | 2/18 | 0/18 | 0/18 | w248607191 |
 | Port Townsend | Port Townsend Golf Park | 9/18 | 9/18 | 9/18 | w235691718 |
 | Puyallup | Linden Golf & Country Club | 12/18 | 9/18 | 9/18 | w51617077 |
-| Quincy | Colockum Ridge Golf Course | 17/18 | 18/18 | 18/18 | r1020467 |
 | Quincy | Crescent Bar Resort Golf Course | 9/18 | 9/18 | 9/18 | w260696851 |
 | Quincy | Crescent Bar Resort Golf Course | 9/18 | 0/18 | 0/18 | r6971063 |
 | Redmond | Brae Burn Golf Course | 9/18 | 0/18 | 0/18 | r7202034 |
@@ -220,7 +221,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 268 courses: every leisure=gol
 | White Center | Glen Acres Golf & Country Club | 11/18 | 9/18 | 9/18 | w40823950 |
 | White Center | Rainier Golf & Country Club | 8/18 | 6/18 | 6/18 | w40823946 |
 | Wilbur | Big Bend Golf & Country Club | 10/18 | 0/18 | 0/18 | w242622942 |
-| Woodinville | Bear Creek Country Club | 17/18 | 18/18 | 13/18 | r18145629 |
 | Yakima | Fisher Park Golf Course | 11/18 | 0/18 | 0/18 | w238917179 |
 
 ## NONE (outline only) (67)

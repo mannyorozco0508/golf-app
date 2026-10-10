@@ -83,7 +83,7 @@ const PRODUCTS = {
         // v176 (build 6, 2026-10-09): the smart default target; hole lines and fairways.
         // v177 (build 6, 2026-10-09): players-compact merged in.
         // v178 (build 7, 2026-10-09): numbers on their lines, the center dot, bigger F/C/B.
-        cacheNameGps: 'consumer-v181-gps-badgenine',
+        cacheNameGps: 'consumer-v182-gps-bundle',
         // Moved to v46. email-link-auth.js joined the consumer shell: sign-in
         // that keeps the anonymous uid. A device on v45 has no card and cannot
         // finish a link.

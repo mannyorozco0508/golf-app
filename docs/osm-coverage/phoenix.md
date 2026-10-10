@@ -4,15 +4,15 @@ Data © OpenStreetMap contributors, available under the Open Database License (O
 
 Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=golf_course outline is one row, so a 27/36-hole club mapped as separate courses counts once per course.
 
-- **Greens** = golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, capped at the hole count.
+- **Greens** = holes with a green: golf=green areas inside (or within 250 m of) the course, practice / putting greens left out, never fewer than the holes whose line ends on a green (a double green serves two holes), capped at the hole count.
 - **Hole count** = the course's `holes` tag when OSM has one, else 18 (more when its hole lines go past 18). A 9-hole course with no `holes` tag is measured out of 18.
 - **ALL GREENS** = a green for every hole. **PARTIAL** = some. **NONE** = outline only.
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 198 courses — all greens 89, partial 57, none 52 (45% with all greens). Bundle-ready, not yet bundled: 76.
+**Summary:** 198 courses — all greens 91, partial 55, none 52 (46% with all greens). Bundle-ready, not yet bundled: 74.
 
-## ALL GREENS (89)
+## ALL GREENS (91)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
@@ -45,6 +45,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Goodyear | Tuscany Falls Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r2315628 |
 | Litchfield Park | Wigwam Resort — bundle-ready | 36/36 | 36/36 | 36/36 | r3530156 |
 | Mesa | Arizona Golf Resort — bundle-ready | 18/18 | 18/18 | 18/18 | r3544973 |
+| Mesa | **Dobson Ranch Golf Course** ★ (bundled) | 18/18 | 18/18 | 0/18 | r326342 |
 | Mesa | Las Sendas Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w264385686 |
 | Mesa | Leisure World - Heron Lakes Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r3553230 |
 | Mesa | Longbow Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w263798489 |
@@ -62,7 +63,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Phoenix | Arizona Grand Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w1379363588 |
 | Phoenix | Encanto Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r3521491 |
 | Phoenix | Grand Canyon University Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | w419991381 |
-| Phoenix | **Legacy Golf Resort Phoenix** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | r3547143 |
+| Phoenix | **Legacy Golf Resort Phoenix** ★ (bundled) | 18/18 | 18/18 | 18/18 | r3547143 |
 | Phoenix | Lookout Mountain Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r3545446 |
 | Phoenix | Papago Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w51990955 |
 | Phoenix | Phoenix Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | w33011519 |
@@ -77,9 +78,9 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Scottsdale | Orange Tree Golf Resort — bundle-ready | 18/18 | 18/18 | 18/18 | r11488570 |
 | Scottsdale | Pinnacle Peak Country Club — bundle-ready | 18/18 | 18/18 | 2/18 | r1403725 |
 | Scottsdale | Silverado Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w61414903 |
-| Scottsdale | **Talking Stick Golf Club** ★ — bundle-ready | 36/36 | 36/36 | 20/36 | w61417793 |
+| Scottsdale | **Talking Stick Golf Club** ★ (bundled) | 36/36 | 36/36 | 20/36 | w61417793 |
 | Scottsdale | The Estancia Club — bundle-ready | 18/18 | 18/18 | 18/18 | w1481662037 |
-| Scottsdale | **TPC Scottsdale Champions Course** ★ — bundle-ready | 18/18 | 18/18 | 18/18 | w78388952 |
+| Scottsdale | **TPC Scottsdale Champions Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w78388952 |
 | Scottsdale | **TPC Scottsdale Stadium Course** ★ (bundled) | 18/18 | 18/18 | 18/18 | w78388948 |
 | Scottsdale | Troon North Golf Club — bundle-ready | 36/36 | 36/36 | 36/36 | r1389558 |
 | Scottsdale | Whisper Rock Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w415450177 |
@@ -99,6 +100,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Sun City West | Stardust Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r3525023 |
 | Sun City West | Trail Ridge Golf Course | 18/18 | 15/18 | 15/18 | w170942746 |
 | Sun Lakes | Oakwood Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r3290286 |
+| Surprise | Arizona Traditions Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | w171105188 |
 | Surprise | Cimarron Golf Club — bundle-ready | 18/18 | 18/18 | 9/18 | r2294389 |
 | Surprise | Great Eagle Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r2303260 |
 | Surprise | Sterling Grove Golf Course — bundle-ready | 18/18 | 18/18 | 18/18 | r20304688 |
@@ -106,12 +108,12 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Tempe | Ken McDonald Golf Course | 18/18 | 17/18 | 18/18 | w29098714 |
 | Tempe | Rolling Hills Golf Course (Tempe) | 18/18 | 10/18 | 10/18 | w136688460 |
 
-## PARTIAL (57)
+## PARTIAL (55)
 
 | City | Course | Greens | Hole lines ending at a green | Tees | OSM |
 |---|---|---|---|---|---|
 | Avondale | Coldwater Arizona Golf Club | 1/18 | 0/18 | 0/18 | r3523214 |
-| Chandler | Bear Creek Golf Complex | 31/36 | 32/36 | 36/36 | w243361319 |
+| Chandler | Bear Creek Golf Complex | 32/36 | 32/36 | 36/36 | w243361319 |
 | Fort McDowell | **We-Ko-Pa Golf Club** ★ | 10/18 | 0/18 | 0/18 | w262825784 |
 | Fountain Hills | FireRock Country Club | 6/18 | 6/18 | 6/18 | r3542251 |
 | Gilbert | Greenfield Lakes Golf Course | 1/18 | 0/18 | 0/18 | r3551709 |
@@ -122,7 +124,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Glendale | Palo Verde Golf Course (Phoenix) | 10/18 | 9/18 | 9/18 | w61428068 |
 | Goodyear | Tuscany Falls Golf Club | 14/18 | 9/18 | 9/18 | r16454569 |
 | Mesa | Augusta Ranch Golf Club | 3/18 | 0/18 | 0/18 | r3522742 |
-| Mesa | **Dobson Ranch Golf Course** ★ | 1/18 | 1/18 | 0/18 | r326342 |
 | Mesa | Mesa Country Club Golf Course | 17/18 | 0/18 | 0/18 | w34214033 |
 | Mesa | Royal Palms Golf Course | 9/18 | 9/18 | 9/18 | r3548866 |
 | Mesa | Sunland Village East Golf Club | 1/18 | 0/18 | 0/18 | r67363 |
@@ -162,7 +163,6 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 198 courses: every leisure=gol
 | Sun City West | Corte Bella Golf Club | 17/18 | 0/18 | 0/18 | r2569920 |
 | Sun Lakes | Palo Verde Golf Course | 2/18 | 0/18 | 0/18 | w243361318 |
 | Sun Lakes | Sun Lakes Golf Course | 6/18 | 5/18 | 3/18 | w243361313 |
-| Surprise | Arizona Traditions Golf Club | 17/18 | 18/18 | 18/18 | w171105188 |
 | Surprise | Coyote Lakes Golf Club | 17/18 | 2/18 | 2/18 | w121016115 |
 | Surprise | Desert Springs Golf Club | 8/18 | 8/18 | 6/18 | r2295511 |
 | Surprise | Granite Falls Golf Club - North | 17/18 | 0/18 | 0/18 | r2295497 |

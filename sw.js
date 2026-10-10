@@ -4483,7 +4483,12 @@
 // Moved to v347 (gps-flow, 2026-10-09): the GPS badge counts out of the course's
 // own hole count when it is known (a 9-hole course with 9 greens is GPS ✓). HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v347-gps-badgenine';
+// GPS:BEGIN
+// Moved to v348 (gps-flow, 2026-10-10): sixteen more courses bundled (Dobson Ranch
+// and fifteen OSM maps fully), the coverage lists the GPS badge reads, and the
+// newer of a bundle and a phone's own OSM lookup wins. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v348-gps-bundle';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4675,6 +4680,12 @@ const SHELL_FILES = [
     './gps-courses.js',
     './maplibre-gl.js',
     './maplibre-gl.css',
+    // The setup page's GPS badge reads one of these per searched state (2026-10-10).
+    './gps-coverage-az.js',
+    './gps-coverage-wa.js',
+    './gps-coverage-or.js',
+    './gps-coverage-ct.js',
+    './gps-coverage-fl.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
