@@ -56,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v351-gps-buildnine'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v352-gps-buildten'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -720,6 +720,16 @@ test('GolfAPI matching: same-club courses kept apart, the club name alone is amb
     assert.equal(ids(th), 'M9+C9', 'MacKay (ours) = McKay (theirs), front + back');
     assert.equal(Object.keys(th.record.holes).length, 18);
     assert.deepEqual(th.record.holes['10'].osm.mid, data.courses.C9.h['1'].g.c, 'the back nine\'s hole 1 is hole 10');
+    // A "Search online" pick (build 10, Prestwick): a gca_ key nobody linked, the
+    // provider's own spelling of the name - "Country Club", "CC", "Golf Club" all
+    // name GolfAPI's "Prestwick Golf Course / Prestwick".
+    data.courses.PW = Object.assign(fakeGolfApi('caledonia', 'PW', 'Prestwick Golf Course', 'Prestwick'), { lat: 33.6431, lng: -78.9615 });
+    ['Prestwick Country Club', 'Prestwick CC', 'Prestwick Golf Club', 'Prestwick Country Club - Prestwick'].forEach((n) => {
+        assert.equal(ids(G.golfapiMatch(data, 'gca_987654', n, null, 18)), 'PW', n);
+        assert.equal(ids(G.golfapiMatch(data, 'gca_987654', n, [33.644, -78.962], 18)), 'PW', n + ' (at the course)');
+    });
+    assert.equal(G.golfapiMatch(data, 'gca_987654', 'Prestwick Golf Club', [55.506, -4.62], 18), null, 'Prestwick, Scotland is not Prestwick, Myrtle Beach');
+    assert.equal(G.golfapiMatch(data, 'gca_987654', 'CC', null, 18), null, 'an abbreviation alone names nothing');
     data.links.my_key = 'O';
     assert.equal(ids(G.golfapiMatch(data, 'my_key', 'Anything', null, 18)), 'O', 'an explicit link from the puller wins');
 });
@@ -755,7 +765,8 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
         vm.createContext(sb);
         vm.runInContext(read('gps-geo.js'), sb);
         vm.runInContext(read('gps-match.js'), sb);
-        sb.HardPanGolfApi = { courses: { P: fakeGolfApi('az_talking_piipaash', 'P', 'Talking Stick Golf Club', 'South - Piipaash') }, links: {} };
+        sb.HardPanGolfApi = { courses: { P: fakeGolfApi('az_talking_piipaash', 'P', 'Talking Stick Golf Club', 'South - Piipaash'),
+            PW: Object.assign(fakeGolfApi('caledonia', 'PW', 'Prestwick Golf Course', 'Prestwick'), { lat: 33.6431, lng: -78.9615 }) }, links: {} };
         return sb.HardPanGpsMatch;
     };
     const on = mk({});
@@ -763,6 +774,10 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
     assert.deepEqual([k.source, k.status, k.n], ['golfapi', 'ready', 18]);
     const r = await on.match({ key: 'az_talking_piipaash', name: 'Talking Stick Golf Club (Piipaash)', loc: [33.546, -111.864], holes: 18, recheck: 'pick' });
     assert.equal(r.source, 'golfapi'); assert.equal(fetches, 0, 'a GolfAPI course is never pulled from OpenStreetMap');
+    // "Search online" -> Prestwick (build 10): the import's gca_ key, the provider's name.
+    assert.deepEqual((({ source, status, n }) => [source, status, n])(on.known('gca_987654', 18, 'Prestwick CC')), ['golfapi', 'ready', 18], 'GPS \u2713 ready at pick time');
+    const pw = await on.match({ key: 'gca_987654', name: 'Prestwick Country Club', loc: [33.644, -78.962], holes: 18, recheck: 'pick' });
+    assert.equal(pw.source, 'golfapi'); assert.equal(fetches, 0, 'and never pulled from OpenStreetMap');
     // Kill switch: exactly build 8 - the bundle (OSM) answers.
     const off = mk({ golfapi: false });
     assert.equal(off.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)').source, 'bundle');

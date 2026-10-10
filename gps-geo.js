@@ -1259,7 +1259,9 @@
             var a = nine(m[1]), b = nine(m[2]);
             if (a && b && a !== b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
         }
-        var want = hsWords(name);
+        // "Prestwick CC" is "Prestwick Country Club": a scorecard name's CC / GC
+        // abbreviations name no course (GolfAPI only - the OSM picker keeps its words).
+        var want = hsWords(String(name || '').replace(/\b[cg]c\b/gi, ' '));
         if (!want.length) return null;
         // A pairing's ORDER matters: "(Stewart / Cameron)" is never "Cameron + Stewart".
         var ordered = function (c) {
