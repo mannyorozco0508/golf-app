@@ -51,7 +51,7 @@ test('its own app: bundle id, name, team, 0.2 (7), entitlements, Firebase guard'
     assert.strictEqual((pbx.match(/PRODUCT_BUNDLE_IDENTIFIER = com\.rattlegolf\.gpsbeta;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/DEVELOPMENT_TEAM = A2Z95T64UU;/g) || []).length, 2);
     assert.strictEqual((pbx.match(/MARKETING_VERSION = 0\.2;/g) || []).length, 2);
-    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 10;/g) || []).length, 2, 'build 10 (GolfAPI.io adds Prestwick)');
+    assert.strictEqual((pbx.match(/CURRENT_PROJECT_VERSION = 11;/g) || []).length, 2, 'build 11 (GPS live: any US course from GolfAPI through our Cloud Functions; OpenStreetMap off)');
     assert.ok(/CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/.test(pbx) && /CODE_SIGN_ENTITLEMENTS = App\/AppRelease\.entitlements;/.test(pbx));
     assert.ok(/GoogleService-Info\.plist in Resources/.test(pbx), 'the Firebase iOS config ships in the app');
     assert.ok(/Firebase config is for this app/.test(pbx) && /CONFIGURATION\}\\" = \\"Release\\"/.test(pbx) && /Print BUNDLE_ID/.test(pbx), 'an Archive refuses a config for another bundle');

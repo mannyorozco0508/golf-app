@@ -69,9 +69,13 @@
         var m = g.golfapiMatch(W.HardPanGolfApi, key, name, loc || null, of, W.HardPanGpsCourses || null);
         return m ? verdict(m.record.holes, of, { source: 'golfapi', how: m.how }) : null;
     }
+    // OPENSTREETMAP OFF (gps-live: gps-config.js osm: false): no bundle greens, no
+    // kept lookup, no Overpass - GolfAPI or nothing ("Tools > Set the green").
+    function osmOn() { return cfg().osm !== false; }
     function known(key, of, name, loc) {
         var ga = golfapiKnown(key, of, name, loc);
         if (ga) return ga;
+        if (!osmOn()) return null;
         var g = G(), all = W.HardPanGpsCourses || {};
         var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name));
         var l = lsGet(OSM_LOOKUP + key);
@@ -115,6 +119,15 @@
         var have = !opts.force && known(key, of, opts.name, opts.loc);
         // GolfAPI data: no OpenStreetMap pull for this course - one source per course.
         if (have && have.source === 'golfapi') return Promise.resolve(have);
+        // GPS LIVE: the course from Firebase (gps_links / gps_courses - no GolfAPI
+        // call, no function), else no GPS data. Never OpenStreetMap.
+        if (!osmOn()) {
+            var L = W.HardPanGpsLive;
+            if (!L || !L.on()) return Promise.resolve(verdict({}, of, { source: 'none', how: 'no GPS data' }));
+            return L.ensure(key).then(function () {
+                return known(key, of, opts.name, opts.loc) || verdict({}, of, { source: 'none', how: 'no GPS data' });
+            });
+        }
         if (have) {
             var last = lsGet(CHECKED + key);
             var due = opts.loc && G() && typeof fetch === 'function'

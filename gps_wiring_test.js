@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -56,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v352-gps-buildten'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v353-gps-live'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -150,7 +150,10 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
+    assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
+    assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
     assert.strictEqual(cfg.golfapi, true, 'the GolfAPI kill switch is a plain boolean, on');
     assert.strictEqual(cfg.imagery, 'esri', 'Esri stays the default');
     // GOOGLE STAYS OFF (2026-10-08): its terms forbid offline storage and use
@@ -523,7 +526,7 @@ test('a newer bundle beats an old OSM lookup cached on the phone (and only a str
     const src = v.slice(v.indexOf('    function osmRecord(key) {'), v.indexOf('    function holeKey(n)'));
     const sb = { window: { HardPanGpsCourses: { k: { v: 1, osmBase: '2026-10-10T10:30:00Z', holes: { 1: 'bundle' } } } }, G: { osmCourse: (t, k) => (k && t[k]) || null, bundleKeyFor: (t, k) => (t[k] ? k : null) }, lookup: null, S: null };
     vm.createContext(sb);
-    vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nfunction golfapiFor() { return null; }\nthis.osmRecord = osmRecord;', sb);
+    vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nfunction golfapiFor() { return null; }\nfunction osmOn() { return true; }\nthis.osmRecord = osmRecord;', sb);
     sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'old lookup' } };
     assert.equal(sb.osmRecord('k').holes[1], 'bundle', 'old lookup, newer bundle: the bundle');
     sb.lookup = { osmBase: null, holes: { 1: 'undated lookup' } };
@@ -653,9 +656,10 @@ test('pulls happen at pick time; GPS opening during the round does not pull; the
     const v = read('gps-view.js'), a = read('admin.html');
     assert.ok(/if \(osmRecord\(key\)\) \{ fin\(true\); return; \}/.test(v) && !/recheckCourse\('daily'\)/.test(v), 'no pull on the tee');
     assert.ok(/class="gps-menu-item gps-refresh-gps"[^']*>Refresh GPS data</.test(v) && /show\('\.gps-refresh-gps', !!S\.canFix && S\.pro && !setting\)/.test(v), 'organizer only, in Tools');
-    assert.ok(/on\(el, '\.gps-refresh-gps'[\s\S]{0,400}recheckCourse\(true,/.test(v), 'Refresh pulls now');
+    assert.ok(/on\(el, '\.gps-refresh-gps'[\s\S]{0,1400}recheckCourse\(true,/.test(v), 'Refresh pulls now (OpenStreetMap on)');
+    assert.ok(/on\(el, '\.gps-refresh-gps'[\s\S]{0,400}if \(!osmOn\(\)\) \{[\s\S]{0,300}L\.ensure\(S\.courseKey\)/.test(v), 'OpenStreetMap off: Refresh re-reads the live course, never Overpass');
     assert.ok(/w\.loc = S\.courseLoc \|\| courseCenter\(\);/.test(v), 'from the course point, never the golfer');
-    assert.ok(/if \(known\) gpsSetupRender\(key, known, name\);\s*\n\s*const recheck = known \? 'pick' : undefined;/.test(a), 'setup: the copy at once, then a fresh pull on every pick');
+    assert.ok(/if \(known\) gpsSetupRender\(key, known, name\);\s*\n\s*if \(!gpsOsmOn\(\)\) \{[\s\S]{0,500}return;\s*\n\s*\}\s*\n\s*const recheck = known \? 'pick' : undefined;/.test(a), 'setup: the copy at once, then a fresh pull on every pick (OpenStreetMap on); OpenStreetMap off: GolfAPI only, no pull');
     assert.ok(/\|\| M\.bundleCenter\(key, name\)/.test(a), 'a bundled course with no location in our records still pulls from its greens\' middle');
     assert.ok(!/gpsRecheckNext/.test(a), 'every pick pulls - Search online or the saved list alike');
 });
@@ -783,8 +787,8 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
     assert.equal(off.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)').source, 'bundle');
     const v = read('gps-view.js'), a = read('admin.html'), c = read('gps-config.js');
     assert.ok(/function osmRecord\(key\) \{\s*\n\s*var ga = golfapiFor\(key\);\s*\n\s*if \(ga\) return ga;/.test(v), 'GolfAPI is the only source when there is one');
-    assert.ok(/function golfapiOn\(\) \{ var c = cfg\(\); return c\.golfapi !== false && \(isNative\(\) \|\| !!c\.golfapiFile\); \}/.test(v), 'in the app only; off with the switch');
-    assert.ok(/golfapi: true \};/.test(c), 'the switch, on');
+    assert.ok(/function golfapiOn\(\) \{ var c = cfg\(\); return c\.golfapi !== false && \(isNative\(\) \|\| !!c\.golfapiFile \|\| !!c\.liveTest\); \}/.test(v), 'in the app only; off with the switch');
+    assert.ok(/golfapi: true,/.test(c), 'the switch, on');
     assert.ok(/function drawHazards\(\)/.test(v) && /'B ' : 'W '|\(z\.type === 'w' \? 'W ' : 'B '\)/.test(v), 'bunker / water carries');
     assert.ok(/if \(m\) \{ Object\.keys\(m\.record\.holes\)\.forEach\(\(n\) => out\.add\(Number\(n\)\)\); return out; \}/.test(a), 'the badge counts the GolfAPI holes only');
 });
@@ -803,6 +807,8 @@ test('GolfAPI puller fixes (Grok, 2026-10-10): apiRequestsLeft arrives as a STRI
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'golfapi-floor-'));
     fs.mkdirSync(path.join(tmp, 'tools'), { recursive: true });
     fs.copyFileSync(path.join(__dirname, 'tools/golfapi-pull.js'), path.join(tmp, 'tools/golfapi-pull.js'));
+    fs.mkdirSync(path.join(tmp, 'firebase-functions'));
+    fs.copyFileSync(path.join(__dirname, 'firebase-functions/golfapi-strip.js'), path.join(tmp, 'firebase-functions/golfapi-strip.js'));
     fs.mkdirSync(path.join(tmp, 'golfapi'));
     fs.writeFileSync(path.join(tmp, 'golfapi/calls.log'), JSON.stringify({ at: 'x', endpoint: '/x', cost: 1, status: 200, apiRequestsLeft: '1.5' }) + '\n');
     const r = cp.spawnSync(process.execPath, [path.join(tmp, 'tools/golfapi-pull.js'), '--pull', 'ABC123', '--floor', '2'], { encoding: 'utf8', env: Object.assign({}, process.env, { GOLFAPI_KEY: 'not-a-real-key' }) });

@@ -32,4 +32,8 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // GOLFAPI.IO KILL SWITCH (build 9): false = never load or use GolfAPI data, so
     // the app behaves exactly as build 8 (OpenStreetMap only). The data itself
     // ships in the iOS build only (tools/build-gps-app.js); the web never has it.
-    golfapi: true };
+    golfapi: true,
+    // GPS LIVE (gps-live, 2026-10-10): any US course from GolfAPI through our Cloud
+    // Functions (gps-live.js). OpenStreetMap OFF - kept, one setting away: build 10
+    // is osm: true, live: false. liveBase: where gpsSearch / gpsCourse answer.
+    osm: false, live: true, liveBase: 'https://us-central1-golfapp-9fb21.cloudfunctions.net' };

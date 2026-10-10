@@ -1,0 +1,21 @@
+{
+  "_comment": "PROPOSAL ONLY - NOT IN database.rules.json, NOT PUBLISHED (gps-live, 2026-10-10). ADDITIVE: three new top-level nodes, nothing existing changes. Every write is the Cloud Functions' (admin SDK, which rules do not govern); a phone may only READ one course, one link, or its own usage. gps_search, gps_log, gps_alerts and gps_meta need no rule: the existing $other already refuses every phone. gps_live_rules_test.js merges these into an in-memory copy of database.rules.json and runs the scenarios; docs/gps-live-rules.diff is the exact diff.",
+  "gps_courses": {
+    "$courseId": {
+      ".read": "auth != null",
+      ".write": false
+    }
+  },
+  "gps_links": {
+    "$courseKey": {
+      ".read": "auth != null",
+      ".write": false
+    }
+  },
+  "gps_usage": {
+    "$uid": {
+      ".read": "auth != null && auth.uid === $uid",
+      ".write": false
+    }
+  }
+}

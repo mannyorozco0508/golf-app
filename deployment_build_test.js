@@ -95,7 +95,7 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
         // inside a GPS block; in a Consumer tree they are not there at all). Six
         // until 2026-10-10, when the five per-state coverage lists and gps-match.js joined.
         const GPS = declared('GPS_SHELL');
-        assert.ok(GPS.length === 12, 'positive: GPS_SHELL parsed');
+        assert.ok(GPS.length === 13, 'positive: GPS_SHELL parsed');
         assert.deepEqual(listing(outDir('consumer')), SHARED.concat(CONSUMER).filter(f => !GPS.includes(f)).sort());
         GPS.forEach(f => assert.ok(!listing(outDir('consumer')).includes(f), 'Consumer ships ' + f));
     });

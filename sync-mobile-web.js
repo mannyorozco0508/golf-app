@@ -225,7 +225,7 @@ const CONSUMER_SHELL = [
     // tree has none of these lines; and listed again in GPS_SHELL below, which is
     // what the build scripts filter on. NO APOSTROPHES IN THIS BLOCK.
     'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js',
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js',
     // GPS:END
 ];
 
@@ -237,7 +237,7 @@ const CONSUMER_SHELL = [
 // gps_wiring_test.js holds the two lists equal. NO APOSTROPHES IN THIS BLOCK.
 const GPS_SHELL = [
     'gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js',
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

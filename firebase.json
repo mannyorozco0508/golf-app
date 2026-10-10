@@ -1,5 +1,13 @@
 {
   "database": {
     "rules": "database.rules.json"
-  }
+  },
+  "functions": [
+    {
+      "source": "firebase-functions",
+      "codebase": "gps-live",
+      "runtime": "nodejs20",
+      "ignore": ["node_modules", ".git", "*.local"]
+    }
+  ]
 }

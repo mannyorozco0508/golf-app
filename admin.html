@@ -6419,6 +6419,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // upstream error stops the loop outright: retrying a broken proxy four
         // times would spend the budget on nothing and say the same thing slower.
         const variants = courseQueryVariants(query).slice(0, 3);
+        // GPS:BEGIN
+        const gpsLive = gpsLiveSearch(query);
+        // GPS:END
         let payload = null;
         for (let i = 0; i < variants.length; i++) {
             try {
@@ -6433,6 +6436,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         onlineSearchInFlight = false;
         renderOnlineOutcome(payload, query);
+        // GPS:BEGIN
+        gpsLiveRender(await gpsLive, query);
+        // GPS:END
     }
 
     function renderOnlineOutcome(payload, query) {
@@ -6545,15 +6551,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // golfapiMatch links a course to it.
     function gpsGolfApiLoad() {
         const native = (() => { try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; } })();
-        // The web never has the data: nothing to load (a test can name a file).
-        if (!native && !(window.HARDPAN_GPS_CONFIG && window.HARDPAN_GPS_CONFIG.golfapiFile)) return Promise.resolve(false);
+        // The web never has the data: nothing to load (a test can name a file, or set liveTest).
+        const pre = window.HARDPAN_GPS_CONFIG || {};
+        if (!native && !pre.golfapiFile && !pre.liveTest) return Promise.resolve(false);
         return gpsLoadScript('gps-config.js', () => !!window.HARDPAN_GPS_CONFIG).then(() => {
             const c = window.HARDPAN_GPS_CONFIG || {};
-            if (c.golfapi === false || !(native || c.golfapiFile)) return false;
+            if (c.golfapi === false || !(native || c.golfapiFile || c.liveTest)) return false;
+            // The bundled file REPLACES window.HardPanGolfApi (it carries .built), so the
+            // live courses (gps-live.js) are merged in after it.
             return gpsLoadScript('gps-geo.js', () => !!window.HardPanGeo)
-                .then(() => gpsLoadScript(String(c.golfapiFile || 'gps-golfapi.js'), () => !!window.HardPanGolfApi));
+                .then(() => (native || c.golfapiFile) ? gpsLoadScript(String(c.golfapiFile || 'gps-golfapi.js'), () => !!(window.HardPanGolfApi && window.HardPanGolfApi.built)) : true)
+                .then(() => gpsLiveOn() ? gpsLoadScript('gps-live.js', () => !!window.HardPanGpsLive) : false)
+                .then(() => { if (window.HardPanGpsLive) window.HardPanGpsLive.merge(); return true; });
         });
     }
+    // GPS LIVE (gps-config.js live: true) and OPENSTREETMAP (osm: false = off).
+    // Build 10 is osm: true, live: false.
+    function gpsLiveOn() { const c = window.HARDPAN_GPS_CONFIG || {}; return c.golfapi !== false && c.live === true && !!c.liveBase; }
+    function gpsOsmOn() { return (window.HARDPAN_GPS_CONFIG || {}).osm !== false; }
     function gpsBadgeLoadBundle() {
         if (window.HardPanGpsCourses) return Promise.resolve(window.HardPanGpsCourses);
         if (gpsBadgeBundle) return gpsBadgeBundle;
@@ -6586,6 +6601,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const m = window.HardPanGeo.golfapiMatch(window.HardPanGolfApi, key, name, null, 18, window.HardPanGpsCourses || null);
             if (m) { Object.keys(m.record.holes).forEach((n) => out.add(Number(n))); return out; }
         }
+        if (!gpsOsmOn()) return out;   // GPS LIVE: GolfAPI or nothing
         const addHoles = (holes, off) => Object.keys(holes || {}).forEach((n) => {
             const h = holes[n], o = h && (h.osm || h);
             if (o && ((Array.isArray(o.green) && o.green.length >= 3) || Array.isArray(o.mid))) out.add(Number(n) + off);
@@ -6683,6 +6699,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function gpsBadgePaint(el, n, of) {
         const kind = n >= of ? 'full' : n > 0 ? 'partial' : 'none';
         el.dataset.gps = kind;
+        // GPS LIVE: whether GolfAPI has GPS is what the "Courses with GPS" list above
+        // says - a scorecard row never contradicts it with "No GPS yet".
+        if (kind === 'none' && !gpsOsmOn() && gpsLiveOn()) { el.style.display = 'none'; return; }
         el.textContent = kind === 'full' ? 'GPS \u2713' : kind === 'partial' ? 'GPS partial (' + n + '/' + of + ')' : 'No GPS yet';
         el.style.cssText = 'display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:0.68rem; font-weight:700; line-height:1.45; vertical-align:1px; white-space:nowrap; border:1px solid; '
             + (kind === 'full' ? 'color:var(--brand-green); border-color:var(--brand-green);'
@@ -6710,7 +6729,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             holes.forEach((h) => { if (h <= of) n++; });
             // The coverage list, scaled to this course's holes (a row can be one
             // OSM outline for a 36-hole club): all usable -> all; else a share.
-            const row = n < of ? gpsCoverageRow(course, coverage) : null;
+            const row = n < of && gpsOsmOn() ? gpsCoverageRow(course, coverage) : null;
             if (row && row[5] > 0) {
                 const fromList = row[4] >= row[5] ? of : Math.min(of - 1, Math.round(row[4] * of / row[5]));
                 if (fromList > n) n = fromList;
@@ -6789,6 +6808,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (r.status === 'ready') gpsSetupShow('ready', 'GPS ✓ ready — all ' + r.of + ' holes');
         else if (r.status === 'partial') gpsSetupShow('partial', 'GPS partial (' + r.n + '/' + r.of + ')');
         else if (r.status === 'ask') gpsSetupShow('ask', 'This club has more than one course here.', { label: 'Choose hole 1 on the map', onclick: () => gpsSetupPicker(key, r.candidates, name) });
+        else if (!gpsOsmOn() && gpsLiveOn() && window.HardPanGpsLive && window.HardPanGpsLive.on())
+            gpsSetupShow('none', 'No GPS yet for this course.', { label: 'Find GPS for this course', onclick: () => gpsLiveFind(key, name) });
         else gpsSetupShow('none', 'No GPS yet: you can tap greens during the round');
     }
     // The course's point: our record, else the coverage list's row for its name.
@@ -6835,6 +6856,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // only when newer and with at least as many usable holes.
         const known = M.known(key, holes, name);
         if (known) gpsSetupRender(key, known, name);
+        if (!gpsOsmOn()) {
+            // GPS LIVE: GolfAPI only - on the phone, else Firebase (gps_links /
+            // gps_courses: no GolfAPI call). No OpenStreetMap, no course point needed.
+            const r = known || await M.match({ key, name, holes, db });
+            if (mine !== gpsSetupSeq) return;
+            gpsSetupRender(key, r, name);
+            return;
+        }
         const recheck = known ? 'pick' : undefined;
         const loc = (await gpsSetupLocation(key, name)) || M.bundleCenter(key, name);
         if (mine !== gpsSetupSeq) return;
@@ -6883,6 +6912,106 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 gpsSetupRender(key, r || { status: 'none' }, name);
             };
             new window.maplibregl.Marker({ element: b, anchor: 'center' }).setLngLat([c.tee[1], c.tee[0]]).addTo(map);
+        });
+    }
+    // ---- GPS LIVE: ANY US COURSE (gps-live, 2026-10-10) ----
+    // On a TAP only (never as you type): "Search online" also asks our gpsSearch
+    // function (GolfAPI by name - the typed name only, never the golfer's
+    // position). Its courses come first, with GPS: "GPS ✓ ready" (already set up:
+    // opens at once, 0 calls) or "GPS ✓" (set up on the tap: the function pulls it
+    // once, for everyone). Same-club courses are separate rows (O'odham / Piipaash).
+    // Courses GolfAPI has no GPS for are left to the scorecard results below.
+    async function gpsLiveSearch(query) {
+        try {
+            await gpsGolfApiLoad();
+            const L = window.HardPanGpsLive;
+            if (gpsOsmOn() || !gpsLiveOn() || !L || !L.on()) return null;
+            return await L.search(query);
+        } catch (e) { return null; }
+    }
+    function gpsLiveNote(text) {
+        const d = renderDropdownNote(text);
+        d.className = 'gps-live-note';
+        return d;
+    }
+    function gpsLiveRender(r, query) {
+        if (!r || r.status === 'off') return;
+        const first = courseDropdown.firstChild;
+        const put = (el) => courseDropdown.insertBefore(el, first);
+        if (r.status !== 'ok') { put(gpsLiveNote(window.HardPanGpsLive.message(r.status))); return; }
+        const withGps = (r.results || []).filter((x) => x.gps);
+        withGps.sort((a, b) => (b.cached ? 1 : 0) - (a.cached ? 1 : 0));
+        const head = document.createElement('div');
+        head.className = 'custom-select-group gps-live-group';
+        head.textContent = '📡 Courses with GPS';
+        put(head);
+        if (!withGps.length) { put(gpsLiveNote(`No GPS course matched "${query}" - the scorecard results are below.`)); return; }
+        withGps.slice(0, 25).forEach((x) => {
+            const row = document.createElement('div');
+            row.className = 'custom-select-option gps-live-result';
+            row.dataset.gpsId = x.id;
+            const title = document.createElement('div');
+            title.textContent = x.name;
+            const badge = document.createElement('span');
+            badge.className = 'gps-badge';
+            badge.textContent = x.cached ? 'GPS ✓ ready' : 'GPS ✓';
+            badge.style.cssText = 'margin-left:6px; font-size:0.7rem; font-weight:800; padding:2px 6px; border-radius:999px; border:1px solid var(--brand-green); color:var(--brand-green);';
+            title.appendChild(badge);
+            const sub = document.createElement('div');
+            sub.style.cssText = 'font-size:0.74rem; color:var(--text-muted);';
+            sub.textContent = (x.city || '?') + ', ' + (x.state || '?') + ' · ' + (x.holes || '?') + ' holes';
+            row.appendChild(title);
+            row.appendChild(sub);
+            row.onclick = () => gpsLivePick(x, row);
+            put(row);
+        });
+    }
+    let gpsLivePicking = false;
+    async function gpsLivePick(x, row) {
+        if (gpsLivePicking) return;
+        gpsLivePicking = true;
+        const sub = row.lastChild;
+        sub.textContent = x.cached ? 'Opening…' : 'Setting up GPS for this course…';
+        const L = window.HardPanGpsLive;
+        const r = await L.course(x.id);
+        gpsLivePicking = false;
+        if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status); return; }
+        if (r.cardKey) {
+            // The function wrote the scorecard (pars, handicaps, tees) to
+            // global_courses/<cardKey>: picked like any saved course.
+            selectCourse(r.cardKey, x.name);
+            return;
+        }
+        // GPS is here; the card is not (a 9-hole course, or GolfAPI's card is not
+        // complete): the scorecard comes from the results below, or is typed.
+        sub.textContent = 'GPS ✓ ready - pick this course from the scorecard results below, or type its card';
+    }
+    // A SAVED COURSE WITH NO GPS: one tap searches GolfAPI by its name; the golfer
+    // picks the right one; the function links our course to it (gps_links), so the
+    // next golfer who picks this course has GPS with no search at all.
+    async function gpsLiveFind(key, name) {
+        const L = window.HardPanGpsLive;
+        if (!L) return;
+        gpsSetupShow('busy', 'Looking for GPS…');
+        const r = await L.search(name);
+        if (!r || r.status !== 'ok') { gpsSetupShow('none', L.message(r && r.status)); return; }
+        const hits = (r.results || []).filter((x) => x.gps).slice(0, 6);
+        if (!hits.length) { gpsSetupShow('none', 'No GPS for this course yet - Tools › Set the green during the round'); return; }
+        const el = gpsSetupEl();
+        gpsSetupShow('ask', 'Which one is it?');
+        hits.forEach((x) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'gps-live-link';
+            b.textContent = x.name + ' · ' + (x.city || '?') + ', ' + (x.state || '?');
+            b.style.cssText = 'display:block; width:100%; text-align:left; margin-top:6px; padding:10px 12px; min-height:44px; border-radius:10px; border:1px solid var(--border-faint); background:var(--bg-card); color:inherit; font-weight:700; cursor:pointer;';
+            b.onclick = async () => {
+                gpsSetupShow('busy', 'Setting up GPS…');
+                const c = await L.course(x.id, key);
+                if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status)); return; }
+                gpsSetupMatch(key);
+            };
+            el.appendChild(b);
         });
     }
     // GPS:END

@@ -1,0 +1,11 @@
+{
+  "name": "hardpan-gps-live-functions",
+  "private": true,
+  "description": "HardPan GPS live course search: gpsSearch / gpsCourse (Firebase golfapp-9fb21). Deploy ONLY with: firebase deploy --only functions:gpsSearch,functions:gpsCourse",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

@@ -313,6 +313,7 @@
     function osmRecord(key) {
         var ga = golfapiFor(key);
         if (ga) return ga;
+        if (!osmOn()) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // Bundled first; else what an OpenStreetMap lookup found for this course
         // (this phone's, or the shared one) - see ANY COURSE below.
@@ -439,6 +440,15 @@
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // No pull on the tee: a course the phone has is used as the pick left it.
         if (osmRecord(key)) { fin(true); return; }
+        if (!osmOn()) {
+            var L = window.HardPanGpsLive;
+            if (!liveOn() || !L) { fin(false); return; }
+            L.ensure(key).then(function (got) {
+                if (got && S === mine) { S.gaCache = null; S.needsFrame = true; render(); }
+                fin(!!(got && osmRecord(key)));
+            });
+            return;
+        }
         if (S.osmInFlight) { fin(false); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
         if (!S.courseLoc) { fin(false); return; }
@@ -633,13 +643,33 @@
     function loadCourses(done) {
         loadScript('gps-courses.js', function () { return !!window.HardPanGpsCourses; }, function () {
             if (!golfapiOn()) { done(); return; }
-            loadScript(String(cfg().golfapiFile || 'gps-golfapi.js'), function () { return !!window.HardPanGolfApi; }, done);
+            var live = function () {
+                if (!liveOn()) { done(); return; }
+                // GPS LIVE: the round's course from Firebase (gps_links / gps_courses),
+                // kept on the phone after the first time - no GolfAPI call, no function.
+                loadScript('gps-live.js', function () { return !!window.HardPanGpsLive; }, function () {
+                    var L = window.HardPanGpsLive, mine = S;
+                    if (!L || !S) { done(); return; }
+                    L.merge();
+                    L.ensure(S.courseKey).then(function (got) {
+                        if (got && S === mine) S.gaCache = null;
+                        done();
+                    });
+                });
+            };
+            // The bundled file REPLACES window.HardPanGolfApi: live courses are merged after it.
+            if (!isNative() && !cfg().golfapiFile) { live(); return; }
+            loadScript(String(cfg().golfapiFile || 'gps-golfapi.js'), function () { return !!(window.HardPanGolfApi && window.HardPanGolfApi.built); }, live);
         });
     }
     // GOLFAPI.IO (build 9). The data ships in the iOS app only (tools/build-gps-app.js);
     // the web never has it, so it is only looked for in the app (or when a test's
     // config names a file). golfapi: false in gps-config.js turns it all off.
-    function golfapiOn() { var c = cfg(); return c.golfapi !== false && (isNative() || !!c.golfapiFile); }
+    function golfapiOn() { var c = cfg(); return c.golfapi !== false && (isNative() || !!c.golfapiFile || !!c.liveTest); }
+    // GPS LIVE (gps-config.js live: true) and OPENSTREETMAP (osm: false = off; build 10
+    // is osm: true, live: false).
+    function liveOn() { var c = cfg(); return golfapiOn() && c.live === true && !!c.liveBase; }
+    function osmOn() { return cfg().osm !== false; }
     // THE ROUND'S GOLFAPI COURSE, if there is one: then it is the ONLY source for
     // this course (no OpenStreetMap greens mixed in). gps-geo.golfapiMatch: a puller
     // link, a 27-hole pairing's nines, or the name within 5 km.
@@ -2895,6 +2925,16 @@
             if (!S) return;
             closeMenus();
             if (typeof navigator !== 'undefined' && navigator.onLine === false) { flash('No signal - Refresh GPS data needs a connection'); return; }
+            if (!osmOn()) {
+                var L = window.HardPanGpsLive, mine = S;
+                if (!liveOn() || !L) { flash('No GPS data for this course - Tools \u203A Set the green'); return; }
+                L.ensure(S.courseKey).then(function (got) {
+                    if (S !== mine) return;
+                    S.gaCache = null; S.needsFrame = true; render();
+                    flash(got && osmRecord(S.courseKey) ? 'GPS data is up to date' : 'No GPS data for this course - Tools \u203A Set the green');
+                });
+                return;
+            }
             flash('Checking OpenStreetMap\u2026');
             recheckCourse(true, function (r) {
                 if (!r) { flash('Could not check - no course location'); return; }
