@@ -6525,7 +6525,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     //      cached copy first, then one read per result, best effort;
     //   3. this phone's own earlier OpenStreetMap lookup for that course.
     // A hole counts when it has a usable green (a green outline or a center).
-    // "GPS ✓" every hole, "GPS partial (X/18)", "No GPS yet". A course with none
+    // "GPS ✓" every hole, "GPS partial (X/18)", "No GPS yet".
+    // OUT OF THE COURSE'S OWN HOLE COUNT whenever it is known (gpsBadgeHoleCount):
+    // a 9-hole course with 9 greens is "GPS ✓", not "partial (9/18)". Out of 18
+    // only when nothing says how many holes it has. A course with none
     // opens on the existing "tap the middle of the green" flow, and its GPS side
     // makes its one OpenStreetMap lookup then (gps-view.js ANY COURSE) - only for
     // the course the golfer picked.
@@ -6565,6 +6568,34 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         return out;
     }
+    // How many holes the course has, from the first source that knows: the
+    // directory's card (course-data.js), our course record (global_courses - where
+    // the GolfCourseAPI details land after an import), the search result's own
+    // tees (number_of_holes), then the bundle (a 27-hole pairing is its nines;
+    // a bundled course alone rounds up to 9 or 18). null: unknown.
+    function gpsBadgeHoleCount(key, course, table) {
+        const cardLen = (rec) => (rec && Array.isArray(rec.data) && rec.data.length) ? rec.data.length : 0;
+        const preset = (typeof coursePresets !== 'undefined' && coursePresets) ? coursePresets[key] : null;
+        if (cardLen(preset)) return cardLen(preset);
+        if (cardLen(globalCourses && globalCourses[key])) return cardLen(globalCourses[key]);
+        let fromTees = 0;
+        Object.keys((course && course.tees) || {}).forEach((k) => {
+            const list = Array.isArray(course.tees[k]) ? course.tees[k] : [];
+            list.forEach((t) => {
+                const n = Number(t && t.number_of_holes) || (t && Array.isArray(t.holes) ? t.holes.length : 0);
+                if (n > fromTees) fromTees = n;
+            });
+        });
+        if (fromTees) return fromTees;
+        const b = table && table[key];
+        if (b && b.compose) return 9 * b.compose.length;
+        if (b && b.holes) {
+            let top = 0;
+            Object.keys(b.holes).forEach((n) => { if (Number(n) > top) top = Number(n); });
+            if (top) return Math.ceil(top / 9) * 9;
+        }
+        return null;
+    }
     function gpsBadgePaint(el, n, of) {
         const kind = n >= of ? 'full' : n > 0 ? 'partial' : 'none';
         el.dataset.gps = kind;
@@ -6586,7 +6617,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const holes = gpsBadgeHoles(table, key, rec);
             let top = 0;
             holes.forEach((n) => { if (n > top) top = n; });
-            gpsBadgePaint(badge, holes.size, top > 18 ? Math.ceil(top / 9) * 9 : 18);
+            const known = gpsBadgeHoleCount(key, course, table);
+            // Unknown: out of 18 (more when the greens go past 18). Known: the
+            // course's own count, and never less than a hole that has a green.
+            const of = known ? Math.max(known, top) : (top > 18 ? Math.ceil(top / 9) * 9 : 18);
+            let n = 0;
+            holes.forEach((h) => { if (h <= of) n++; });
+            gpsBadgePaint(badge, n, of);
         }).catch(() => { /* a badge never breaks the search */ });
         const cached = gpsBadgeLs(GPS_BADGE_CACHE + key);
         paint(cached);

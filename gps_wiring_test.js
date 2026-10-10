@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v346-gps-badge'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v347-gps-badgenine'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -446,5 +446,23 @@ test('GPS badge on online course search results: bundled greens and course_gps f
     store.hardpan_osm_v1_gca_looked = JSON.stringify({ holes: { 1: { osm: { green: [[0, 0], [0, 1], [1, 1]] } }, 2: { osm: { mid: [0, 0] } } } });
     assert.equal((await badge('gca_looked')).textContent, 'GPS partial (2/18)');
     assert.ok(reads.every((p) => /^course_gps\/[\w-]+$/.test(p)), 'one course_gps read per result: ' + reads.join(' '));
+    // 9-HOLE COURSES: out of the course's own hole count whenever it is known.
+    const nineGreens = {}, fiveGreens = {};
+    for (let n = 1; n <= 9; n++) nineGreens[n] = { osm: { mid: [0, 0] } };
+    for (let n = 1; n <= 5; n++) fiveGreens[n] = { osm: { mid: [0, 0] } };
+    const card9 = Array.from({ length: 9 }, (_, i) => ({ hole: i + 1, par: 4 }));
+    Object.assign(sb.window.HardPanGpsCourses, { __nine_preset: { v: 1, holes: nineGreens }, __nine_half: { v: 1, holes: fiveGreens }, __nine_record: { v: 1, holes: nineGreens }, __nine_tees: { v: 1, holes: nineGreens } });
+    sb.coursePresets = { __nine_preset: { name: 'Nine', data: card9 }, __nine_half: { name: 'Nine', data: card9 } };
+    sb.globalCourses.__nine_record = { name: 'Nine', data: card9 };
+    assert.equal((await badge('__nine_preset')).textContent, 'GPS \u2713', 'the directory says 9 holes, all 9 have greens');
+    assert.equal((await badge('__nine_half')).textContent, 'GPS partial (5/9)', 'out of 9, not 18');
+    assert.equal((await badge('__nine_record')).textContent, 'GPS \u2713', 'the course record (after an import) says 9');
+    store.hardpan_osm_v1___nine_tees_x = JSON.stringify({ holes: nineGreens });
+    const t2 = el(); sb.addGpsBadge(t2, { key: '__nine_tees_x', tees: { male: [{ tee_name: 'White', number_of_holes: 9, holes: card9 }] } });
+    await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0));
+    assert.equal(t2.kids[0].textContent, 'GPS \u2713', 'the GolfCourseAPI result\'s own tees say 9 holes');
+    assert.equal((await badge('thistle_27_cameron')).textContent, 'GPS \u2713', 'a bundled nine on its own counts out of 9');
+    store.hardpan_osm_v1___unknown = JSON.stringify({ holes: nineGreens });
+    assert.equal((await badge('__unknown')).textContent, 'GPS partial (9/18)', 'unknown hole count: out of 18');
     assert.equal(store.hardpan_gps_course_v1_gca_partial !== undefined, true, 'the record is kept on the phone for next time (offline)');
 });
