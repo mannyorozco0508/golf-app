@@ -20,17 +20,16 @@
 // golf=green features with their geometry and tags - what the app uses - not
 // the whole Overpass answer (tees, bunkers, paths), which is ~10x larger.
 //
-// PAR COMES FROM OUR SCORECARD, NEVER FROM OSM (decision 2026-10-07). OSM's
-// par= is not shipped. It is used for one thing only: a hole whose OSM par
-// disagrees with our card ships with a VERIFY note ("verify on course"), and
-// nothing is dropped for it. What IS dropped is a hole whose green did not match
-// CLEANLY: the hole line must end inside the green polygon.
+// PAR COMES FROM OUR SCORECARD, NEVER FROM OSM (decision 2026-10-07; and since
+// 2026-10-10 OSM's par= is not read at all - map data is for mapping only, and a
+// par OSM disagrees with is not a GPS problem). What IS dropped is a hole whose
+// green did not match CLEANLY: the hole line must end inside the green polygon.
 //
 // VERIFY NOTES are HardPan's own annotations (record.verify, by hole number),
-// not OSM data. The GPS side shows them until somebody sets or fixes that green.
-// Measured 2026-10-07 and decided:
-//   True Blue #10   OSM tags par 4; the card (official) says 5, and the hole line
-//                   is 593 yds. Ships, marked verify.
+// not OSM data, about the GREEN itself. The GPS side shows them until somebody
+// sets or fixes that green. Measured 2026-10-07 and decided:
+//   True Blue #10   OSM tags par 4; the card (official) says 5 - a par note until
+//                   2026-10-10, now nothing (map pars are never compared).
 //   Pine Lakes      OSM maps nine holes, refs 1-9, as a consistent walking route
 //                   (each green 43-99 yds from the next tee). By length they play
 //                   5,3,4,4,4,4,3,4,4 - the official 2026 BACK nine exactly; the
@@ -190,7 +189,6 @@ function build(rawDir) {
     // Ship a hole only if its green matched CLEANLY (the line ends on the green);
     // note a par that disagrees with the card; never ship OSM's par.
     const finish = (key, holes, pars, verify) => {
-        const placeholderCard = pars.length >= 9 && pars.every((p) => p === 4);
         Object.keys(holes).forEach((n) => {
             const o = holes[n].osm;
             if (!o.green || !geo.pointInRing(o.end, o.green)) {
@@ -198,15 +196,11 @@ function build(rawDir) {
                 delete holes[n];
                 return;
             }
-            const want = pars[Number(n) - 1];
-            // A PLACEHOLDER CARD (every hole par 4 - TPC Scottsdale Champions and
-            // Allenmore in global_courses, 2026-10-10) says nothing about par, so it
-            // is not compared: nine "verify" notes from a card nobody filled in would
-            // be noise on the GPS screen.
-            if (placeholderCard) { delete o.par; return; }
-            if (o.par && want && o.par !== want && !verify[n]) {
-                verify[n] = 'OpenStreetMap says par ' + o.par + ', our card says ' + want + '. Verify this green on course.';
-            }
+            // MAP PARS NEVER TOUCH THE CARD (Manny, 2026-10-10): GPS data is for
+            // mapping only - greens, hazards, tees, distances. Par and handicap come
+            // from OUR scorecard, which the organizer edits. A par OSM disagrees
+            // with is not a GPS problem, so it no longer makes a "verify" note on
+            // the player's GPS screen; OSM's par is dropped here, unread.
             delete o.par;
         });
         Object.keys(verify).forEach((n) => { if (!holes[n]) delete verify[n]; });

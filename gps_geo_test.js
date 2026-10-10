@@ -238,8 +238,11 @@ test('what ships per course, and what is marked "verify on course" (decisions 20
     const v = (k) => Object.keys((geo.osmCourse(table, k) || {}).verify || {}).sort((a, b) => a - b).join(',');
     assert.strictEqual(n('caledonia'), 18); assert.strictEqual(v('caledonia'), '');
     assert.strictEqual(n('trueblue'), 18, 'True Blue #10 ships: its green matched cleanly');
-    assert.strictEqual(v('trueblue'), '10', '#10 is marked verify (OSM says par 4; the card says 5)');
-    assert.ok(/our card says 5/.test(table.trueblue.verify['10']));
+    // MAP PARS NEVER MAKE A NOTE (Manny, 2026-10-10): #10's OSM par 4 vs the card's 5
+    // is not a GPS problem - nothing on the player's screen.
+    assert.strictEqual(v('trueblue'), '');
+    const all = JSON.stringify(table);
+    assert.ok(!/OpenStreetMap says par/.test(all), 'no par-mismatch note anywhere in the bundle');
     // Pine Lakes: OSM's nine are the 2026 card's BACK nine - holes 10-18, all marked.
     assert.deepStrictEqual(Object.keys(table.pinelakes.holes).map(Number).sort((a, b) => a - b), [10, 11, 12, 13, 14, 15, 16, 17, 18]);
     assert.strictEqual(v('pinelakes'), '10,11,12,13,14,15,16,17,18');
