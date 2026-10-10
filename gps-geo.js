@@ -1232,11 +1232,16 @@
     // spelling rules as pickHoleSet: "Piipaash" = "Piipash", "MacKay" = "McKay")
     // within 5 km of the course when its point is known. Only one clear match
     // counts. Returns { record, how } or null.
-    function golfapiMatch(data, key, name, loc, holesWanted) {
+    function golfapiMatch(data, key, name, loc, holesWanted, table) {
         if (!data || !data.courses) return null;
         var all = Object.keys(data.courses).map(function (id) { return data.courses[id]; });
-        var link = data.links && data.links[key] && data.courses[data.links[key]];
-        if (link) return { record: golfapiRecord([link]), how: 'linked' };
+        // A link under the round's key, else under the bundle key its name resolves to
+        // (the Myrtle trip's Thistle rounds carry "thistle_cameron_stewart"; the link
+        // is "thistle_27_cameron_stewart").
+        var alias = table ? bundleKeyFor(table, key, name) : null;
+        var linkId = data.links && (data.links[key] || (alias && data.links[alias]));
+        var link = linkId && data.courses[linkId];
+        if (link) return { record: golfapiRecord([link]), how: 'linked' + (data.links[key] ? '' : ' (as ' + alias + ')') };
         var near = function (c) { return !loc || !isFinite(c.lat) || haversineMeters(loc, [c.lat, c.lng]) <= 5000; };
         var words = function (c) { return hsWords(c.club + ' ' + c.course); };
         var covers = function (want, have) {
@@ -1256,7 +1261,15 @@
         }
         var want = hsWords(name);
         if (!want.length) return null;
-        var hit = all.filter(function (c) { return near(c) && (!holesWanted || c.holes >= holesWanted) && covers(want, words(c)); });
+        // A pairing's ORDER matters: "(Stewart / Cameron)" is never "Cameron + Stewart".
+        var ordered = function (c) {
+            if (!m) return true;
+            var cw = words(c), i = -1, j = -1;
+            hsWords(m[1]).forEach(function (w) { cw.forEach(function (x, k) { if (hsSame(x, w) && i < 0) i = k; }); });
+            hsWords(m[2]).forEach(function (w) { cw.forEach(function (x, k) { if (hsSame(x, w) && j < 0) j = k; }); });
+            return i < 0 || j < 0 || i < j;
+        };
+        var hit = all.filter(function (c) { return near(c) && (!holesWanted || c.holes >= holesWanted) && covers(want, words(c)) && ordered(c); });
         // Several: ambiguous (the club name alone, "Talking Stick Golf Club") - no
         // match, unless exactly one of them IS the name with nothing more.
         if (hit.length > 1) hit = hit.filter(function (c) { return words(c).length === want.length; });

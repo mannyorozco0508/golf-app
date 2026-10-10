@@ -649,7 +649,7 @@
         var ck = key + '|' + name;
         if (S.gaCache && S.gaCache.k === ck) return S.gaCache.v;
         var list = (typeof S.holeList === 'function' ? S.holeList() : null) || [];
-        var m = G.golfapiMatch(window.HardPanGolfApi, key, name, S.courseLoc || null, list.length === 9 ? 9 : 18);
+        var m = G.golfapiMatch(window.HardPanGolfApi, key, name, S.courseLoc || null, list.length === 9 ? 9 : 18, window.HardPanGpsCourses || null);
         S.gaCache = { k: ck, v: m ? m.record : null, how: m ? m.how : '' };
         return S.gaCache.v;
     }

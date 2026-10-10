@@ -56,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v350-gps-recheck'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v351-gps-buildnine'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -695,7 +695,7 @@ test('GolfAPI puller: the stripped file keeps only what GPS needs, the key never
     const src = read('tools/golfapi-pull.js');
     assert.ok(/process\.env\.GOLFAPI_KEY/.test(src) && /'\.env'/.test(src), 'the key from the environment or .env');
     assert.ok(!/console\.(log|error|warn)\([^)]*\bkey\b/.test(src.replace(/linkCourse[\s\S]*$/, '')), 'the key is never printed');
-    assert.ok(/already stored - not re-pulled \(use --refresh/.test(src) && /floor: /.test(src) && /calls\.log/.test(src) && /--dry-run/.test(src), 'no re-pull without --refresh, a floor, a call log, dry run');
+    assert.ok(/ - not re-pulled \(use --refresh/.test(src) && /floor: /.test(src) && /calls\.log/.test(src) && /--dry-run/.test(src), 'no re-pull without --refresh, a floor, a call log, dry run');
     // Out of the repo and out of the web build.
     const gi = read('.gitignore');
     assert.ok(/^golfapi\/$/m.test(gi) && /^\.env$/m.test(gi), 'golfapi/ and .env are gitignored');
@@ -772,4 +772,39 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
     assert.ok(/golfapi: true \};/.test(c), 'the switch, on');
     assert.ok(/function drawHazards\(\)/.test(v) && /'B ' : 'W '|\(z\.type === 'w' \? 'W ' : 'B '\)/.test(v), 'bunker / water carries');
     assert.ok(/if \(m\) \{ Object\.keys\(m\.record\.holes\)\.forEach\(\(n\) => out\.add\(Number\(n\)\)\); return out; \}/.test(a), 'the badge counts the GolfAPI holes only');
+});
+
+test('GolfAPI puller fixes (Grok, 2026-10-10): apiRequestsLeft arrives as a STRING, so it is read as a number and the floor works; golfapi/held/ is built', { skip }, async () => {
+    const P = require('./tools/golfapi-pull.js');
+    assert.equal(P.leftOf('22.8'), 22.8, 'the string GolfAPI sends');
+    assert.equal(P.leftOf(8.3), 8.3);
+    assert.equal(P.leftOf(null), null); assert.equal(P.leftOf(''), null); assert.equal(P.leftOf('n/a'), null);
+    const src = read('tools/golfapi-pull.js');
+    assert.ok(/apiRequestsLeft: body \? leftOf\(body\.apiRequestsLeft\) : null/.test(src), 'the log records the number');
+    assert.ok(/const l = logLines\(\)\.map\(\(x\) => leftOf\(x\.apiRequestsLeft\)\)/.test(src), 'and the floor reads it back as a number (old logs with strings too)');
+    assert.ok(/const dirs = \[RAW, HELD\]/.test(src) && /already stored\$\{held \? ' \(golfapi\/held\/\)' : ''\} - not re-pulled/.test(src), 'held courses are built and never re-pulled');
+    // The floor actually stops a call: run the tool against a temp log that says 1.5 left.
+    const os = require('os'), cp = require('child_process');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'golfapi-floor-'));
+    fs.mkdirSync(path.join(tmp, 'tools'), { recursive: true });
+    fs.copyFileSync(path.join(__dirname, 'tools/golfapi-pull.js'), path.join(tmp, 'tools/golfapi-pull.js'));
+    fs.mkdirSync(path.join(tmp, 'golfapi'));
+    fs.writeFileSync(path.join(tmp, 'golfapi/calls.log'), JSON.stringify({ at: 'x', endpoint: '/x', cost: 1, status: 200, apiRequestsLeft: '1.5' }) + '\n');
+    const r = cp.spawnSync(process.execPath, [path.join(tmp, 'tools/golfapi-pull.js'), '--pull', 'ABC123', '--floor', '2'], { encoding: 'utf8', env: Object.assign({}, process.env, { GOLFAPI_KEY: 'not-a-real-key' }) });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /floor: 1\.5 calls left/, 'stopped before calling: ' + r.stderr);
+    assert.ok(!/not-a-real-key/.test(r.stdout + r.stderr), 'the key is never printed');
+    fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('GolfAPI links reach the trip rounds\' own keys (Thistle "thistle_cameron_stewart" -> the link under "thistle_27_cameron_stewart"); a pairing\'s order is never swapped', { skip }, () => {
+    const G = require('./gps-geo.js'), T = require('./gps-courses.js');
+    const cs = fakeGolfApi('thistle_27_cameron_stewart', 'CS', 'Thistle Golf Club', 'Cameron + Stewart');
+    const data = { courses: { CS: cs }, links: { thistle_27_cameron_stewart: 'CS' } };
+    const m = G.golfapiMatch(data, 'thistle_cameron_stewart', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T);
+    assert.ok(m && m.record.golfapiIds[0] === 'CS' && /as thistle_27_cameron_stewart/.test(m.how), m && m.how);
+    // Without links: the name matches - but only in the same order.
+    data.links = {};
+    assert.equal(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T).record.golfapiIds[0], 'CS');
+    assert.equal(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', null, 18, T), null, 'Stewart front, Cameron back is a different round');
 });

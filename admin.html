@@ -6583,7 +6583,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // A course with GolfAPI data counts its GolfAPI holes, and only those.
         const c = window.HARDPAN_GPS_CONFIG || {};
         if (c.golfapi !== false && window.HardPanGolfApi && window.HardPanGeo && window.HardPanGeo.golfapiMatch) {
-            const m = window.HardPanGeo.golfapiMatch(window.HardPanGolfApi, key, name, null, 18);
+            const m = window.HardPanGeo.golfapiMatch(window.HardPanGolfApi, key, name, null, 18, window.HardPanGpsCourses || null);
             if (m) { Object.keys(m.record.holes).forEach((n) => out.add(Number(n))); return out; }
         }
         const addHoles = (holes, off) => Object.keys(holes || {}).forEach((n) => {

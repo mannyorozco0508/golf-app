@@ -4498,7 +4498,12 @@
 // re-checks OpenStreetMap (daily, at once after Search online, Tools > Refresh GPS
 // data); Canyon Lakes 18/18; real TPC Champions / Allenmore pars. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v350-gps-recheck';
+// GPS:BEGIN
+// Moved to v351 (gps-flow build 9, 2026-10-10): GolfAPI.io read path (the data
+// itself ships in the iOS app only), map pars never touch the card, Palmbrook,
+// a hole drawn per tee, green multipolygons. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v351-gps-buildnine';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

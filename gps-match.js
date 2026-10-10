@@ -66,7 +66,7 @@
     function golfapiKnown(key, of, name, loc) {
         var g = G(), c = cfg();
         if (!g || !g.golfapiMatch || c.golfapi === false || !W.HardPanGolfApi) return null;
-        var m = g.golfapiMatch(W.HardPanGolfApi, key, name, loc || null, of);
+        var m = g.golfapiMatch(W.HardPanGolfApi, key, name, loc || null, of, W.HardPanGpsCourses || null);
         return m ? verdict(m.record.holes, of, { source: 'golfapi', how: m.how }) : null;
     }
     function known(key, of, name, loc) {

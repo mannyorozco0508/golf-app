@@ -20,13 +20,13 @@ const FILE = path.join(ROOT, 'golfapi', 'gps-golfapi.js');
 if (!fs.existsSync(FILE)) { console.error('no golfapi/gps-golfapi.js - run tools/golfapi-pull.js --build first'); process.exit(1); }
 const D = require(FILE);
 const names = T._names || {};
-const KEYS = process.argv.slice(2).length ? process.argv.slice(2) : ['caledonia', 'trueblue', 'pinelakes', 'pinehills',
-    'thistle_27_cameron_stewart', 'thistle_27_mackay_cameron', 'thistle_27_stewart_mackay', 'az_talking_piipaash'];
+const KEYS = process.argv.slice(2).length ? process.argv.slice(2) : ['caledonia', 'trueblue', 'pinelakes', 'pinehills', 'manofwar',
+    'thistle_27_cameron_stewart', 'thistle_27_mackay_cameron', 'az_talking_piipaash'];
 const YD = 0.9144;
 let flagged = 0;
 KEYS.forEach((key) => {
     const name = names[key] || key;
-    const m = G.golfapiMatch(D, key, name, null, 18);
+    const m = G.golfapiMatch(D, key, name, null, 18, T);
     const osm = G.osmCourse(T, key);
     if (!m) { console.log(`${key.padEnd(28)} no GolfAPI course (name "${name}")`); return; }
     const rows = [];
