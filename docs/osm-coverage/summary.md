@@ -2,7 +2,7 @@
 
 Data © OpenStreetMap contributors, available under the Open Database License (ODbL): https://www.openstreetmap.org/copyright
 
-Fetched 2026-10-09 (Phoenix greens and hole lines refreshed 2026-10-10) from OpenStreetMap (Overpass, one area at a time). Per-area lists: [Phoenix metro, AZ](phoenix.md), [Washington](washington.md), [Oregon](oregon.md), [Connecticut](connecticut.md), [Florida](florida.md). The app reads the same rows from gps-coverage-<state>.js (tools/gps-osm-coverage.js).
+Fetched 2026-10-09 (Phoenix and Washington greens and hole lines refreshed 2026-10-10; green relations counted by outer piece since 2026-10-10) from OpenStreetMap (Overpass, one area at a time). Per-area lists: [Phoenix metro, AZ](phoenix.md), [Washington](washington.md), [Oregon](oregon.md), [Connecticut](connecticut.md), [Florida](florida.md). The app reads the same rows from gps-coverage-<state>.js (tools/gps-osm-coverage.js).
 
 - **All greens** = a mapped green for every hole (out of the course's `holes` tag when OSM has one, else 18; 27/36 when the hole numbers show it). **Partial** = some greens. **None** = outline only.
 - **Bundle-ready** = all greens AND a hole line ending at every green — what tools/gps-import-osm.js needs to bundle a course.
@@ -14,8 +14,8 @@ Fetched 2026-10-09 (Phoenix greens and hole lines refreshed 2026-10-10) from Ope
 | Washington | 268 | 139 | 62 | 67 | 52% | 113 |
 | Oregon | 193 | 78 | 43 | 72 | 40% | 62 |
 | Connecticut | 186 | 121 | 55 | 10 | 65% | 118 |
-| Florida | 1964 | 411 | 362 | 1191 | 21% | 326 |
-| **All five** | **2809** | **840** | **577** | **1392** | **30%** | **693** |
+| Florida | 1964 | 411 | 362 | 1191 | 21% | 327 |
+| **All five** | **2809** | **840** | **577** | **1392** | **30%** | **694** |
 
 ## Courses Manny plays
 
@@ -54,3 +54,4 @@ Notes (2026-10-10):
 - **Reserve Vineyards** is in OSM as "The Reserve" (Hillsboro), one outline for the 36-hole club. It has 40 greens (36 holes + practice) but only 1 hole line, so it is not bundle-ready.
 - **Camas Meadows** has all 18 greens but 16 hole lines, 2 short of bundle-ready. A second, older outline ("Camas Meadows Golf Club") has 2 greens.
 - **We-Ko-Pa** (10 of 18, one outline for both courses) and **Elk Ridge** (13 of 18) are partial.
+- **Green relations (2026-10-10):** a golf=green mapped as a multipolygon now counts once per outer piece, and the app reads every piece (it used to read only the first outer member). Under that rule 2 courses gain holes: Twin Eagles (Bonita Springs, +6) and Pembroke Lakes (Pembroke Pines, +1). Lewis River 11 was the same case until it was redrawn as a simple area.

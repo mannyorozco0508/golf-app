@@ -10,7 +10,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 - **Bundle-ready** = all greens AND every hole has a hole line (golf=hole) ending at its green - what tools/gps-import-osm.js needs to bundle a course. **(bundled)** = already in the app.
 - City = the course's addr:city, else the nearest town in OSM. ★ = a course Manny plays.
 
-**Summary:** 1964 courses — all greens 411, partial 362, none 1191 (21% with all greens). Bundle-ready, not yet bundled: 326.
+**Summary:** 1964 courses — all greens 411, partial 362, none 1191 (21% with all greens). Bundle-ready, not yet bundled: 327.
 
 ## ALL GREENS (411)
 
@@ -43,7 +43,7 @@ Fetched 2026-10-10 from OpenStreetMap (Overpass). 1964 courses: every leisure=go
 | Bonita Springs | Spring Run Golf Club — bundle-ready | 18/18 | 18/18 | 0/18 | r4026459 |
 | Bonita Springs | The Colony Golf & Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4068800 |
 | Bonita Springs | Tiburón Golf Club | 36/36 | 35/36 | 36/36 | r5462396 |
-| Bonita Springs | Twin Eagles Golf Club | 18/18 | 17/18 | 18/18 | r13716300 |
+| Bonita Springs | Twin Eagles Golf Club — bundle-ready | 18/18 | 18/18 | 18/18 | r13716300 |
 | Bowling Green | **Streamsong Resort - Black Course** ★ — bundle-ready | 18/18 | 18/18 | 0/18 | w1351613366 |
 | Bowling Green | **Streamsong Resort - Red and Blue Courses** ★ (bundled) | 36/36 | 36/36 | 21/36 | w1351613365 |
 | Boynton Beach | Indian Spring Country Club — bundle-ready | 18/18 | 18/18 | 18/18 | r4064854 |

@@ -671,3 +671,23 @@ test('the bundle by name when a round\'s key differs: the Myrtle trip\'s Thistle
     assert.equal(geo.bundleKeyFor(table, 'gca_y', 'Nowhere Links'), null);
     assert.ok(table._names && !table._names.holes, 'the name index is names only (our directory, not OSM)');
 });
+
+test('a green mapped as a multipolygon RELATION: every outer piece is read, and the hole takes the piece its line ends in (Lewis River 11: bunker first)', () => {
+    const P = (lat, lon) => ({ lat, lon });
+    const sq = (lat, lon, d) => [P(lat, lon), P(lat + d, lon), P(lat + d, lon + d), P(lat, lon + d), P(lat, lon)];
+    // The green, drawn as TWO member ways that only make a ring together.
+    const gr = sq(45.0, -122.0, 0.0002);
+    const greenA = gr.slice(0, 3), greenB = gr.slice(2);
+    const bunker = sq(45.0004, -122.0, 0.0001);
+    const rel = { type: 'relation', id: 9, tags: { golf: 'green', landuse: 'grass', type: 'multipolygon' },
+        members: [{ type: 'way', role: 'outer', geometry: bunker }, { type: 'way', role: 'outer', geometry: greenA }, { type: 'way', role: 'outer', geometry: greenB },
+                  { type: 'way', role: 'inner', geometry: sq(45.00005, -121.99995, 0.00005) }] };
+    const hole = { type: 'way', id: 1, tags: { golf: 'hole', ref: '11' }, geometry: [P(44.997, -121.9999), P(45.0001, -121.9999)] };
+    assert.equal(geo.outerRings(rel).length, 2, 'two outer pieces (the split green stitched into one ring), the inner ignored');
+    const r = geo.osmToCourseGps([rel, hole], {});
+    const o = r.holes['11'] && r.holes['11'].osm;
+    assert.ok(o && o.green, 'the hole matched a green');
+    assert.ok(geo.pointInRing(o.end, o.green), 'the line ends inside the matched piece (it was dropped when only the bunker was read)');
+    assert.ok(Math.abs(o.mid[0] - 45.0001) < 0.00003 && Math.abs(o.mid[1] + 121.9999) < 0.00003, 'Center is the green piece\'s, not the combined shape: ' + o.mid);
+    assert.equal(Object.keys(geo.cleanLookupHoles([rel, hole]).holes).length, 1, 'the live lookup keeps it too');
+});

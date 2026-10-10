@@ -93,13 +93,33 @@ function owner(p) {
   return near;
 }
 const ctr = (e) => e.center ? [e.center.lat, e.center.lon] : (e.lat != null ? [e.lat, e.lon] : null);
-for (const g of D.greens) { const t = g.tags || {}; if (/practice|putting|chipping/i.test((t.name || '') + ' ' + (t.description || '') + ' ' + (t['golf:green'] || ''))) continue; const p = ctr(g); const c = p && owner(p); if (c) c.greens.push(p); }
+// GREEN RELATIONS (2026-10-10): a golf=green mapped as a multipolygon counts once
+// per OUTER PIECE (stitched; inners ignored) - as gps-geo.outerRings now reads it -
+// instead of once at the middle of the combined shape. GAINED: a hole whose line
+// ends in such a piece but NOT in the relation's first outer member, which is all
+// the app used to read (Lewis River 11: the bunker was the first member).
+const PRACTICE = (t) => /practice|putting|chipping/i.test((t.name || '') + ' ' + (t.description || '') + ' ' + (t['golf:green'] || ''));
+const relGreens = (D.greenrels || []).filter((e) => e.tags && e.tags.golf === 'green' && !PRACTICE(e.tags));
+const relIds = new Set(relGreens.map((e) => e.id));
+for (const g of relGreens) {
+  const m = (g.members || []).find((x) => x.role !== 'inner' && x.geometry && x.geometry.length >= 2);
+  const first = m ? m.geometry.map(pt) : null;
+  rings(g).filter((r) => r.length >= 3).forEach((r) => {
+    const cen = [r.reduce((t, p) => t + p[0], 0) / r.length, r.reduce((t, p) => t + p[1], 0) / r.length];
+    const c = owner(cen);
+    if (c) { c.greens.push(cen); (c.relPieces = c.relPieces || []).push({ ring: r, first }); }
+  });
+}
+for (const g of D.greens) { if (g.type === 'relation' && relIds.has(g.id)) continue; const t = g.tags || {}; if (/practice|putting|chipping/i.test((t.name || '') + ' ' + (t.description || '') + ' ' + (t['golf:green'] || ''))) continue; const p = ctr(g); const c = p && owner(p); if (c) c.greens.push(p); }
 for (const t of D.tees) { const p = ctr(t); const c = p && owner(t.type === 'node' ? p : p); if (c) c.tees.push(p); }
 for (const h of D.holes) {
   if (!h.geometry || h.geometry.length < 2) continue;
   const g = h.geometry.map(pt), a = g[0], b = g[g.length - 1];
   const c = owner(b) || owner(a);
   if (c) c.holes.push({ ref: h.tags && h.tags.ref, a, b });
+}
+for (const c of courses) {
+  c.gained = c.holes.filter((h) => (c.relPieces || []).some((pc) => inRing(h.b, pc.ring) && !(pc.first && inRing(h.b, pc.first)))).length;
 }
 // Places for the city when addr:city is missing.
 const places = (D.places || []).filter((p) => p.tags && p.tags.name).map((p) => ({ name: p.tags.name, p: [p.lat, p.lon] }));
@@ -138,12 +158,13 @@ const rows = courses.map((c) => {
   const city = c.tags['addr:city'] || nearestPlace(c.center);
   const flag = FLAGS.find(([, re]) => new RegExp(re, 'i').test(name));
   const bundled = BUNDLED.has(c.id);
-  return { id: c.id, name, city, nominal, knownHoles: tagHoles > 0, greens, tees, lines, ready, status, bundleReady, bundled, flag: flag ? flag[0] : null, center: c.center.map((x) => +x.toFixed(4)) };
+  return { id: c.id, gained: Math.min(c.gained || 0, nominal), name, city, nominal, knownHoles: tagHoles > 0, greens, tees, lines, ready, status, bundleReady, bundled, flag: flag ? flag[0] : null, center: c.center.map((x) => +x.toFixed(4)) };
 });
 rows.sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
 const count = (s) => rows.filter((r) => r.status === s).length;
 const sum = { area: title, total: rows.length, full: count('FULL'), partial: count('PARTIAL'), none: count('NONE'),
   bundleReady: rows.filter((r) => r.bundleReady && !r.bundled).map((r) => ({ name: r.name, city: r.city, holes: r.nominal, flag: r.flag, id: r.id })),
+  gained: rows.filter((r) => r.gained > 0).map((r) => ({ name: r.name, city: r.city, holes: r.gained, status: r.status })),
   alreadyBundled: rows.filter((r) => r.bundled).map((r) => r.name),
   flagged: FLAGS.map(([label, re]) => ({ label, hits: rows.filter((r) => r.flag === label).map((r) => ({ name: r.name, city: r.city, status: r.status, greens: r.greens, holes: r.nominal, bundleReady: r.bundleReady, bundled: r.bundled })) })) };
 const nm = (r) => (r.flag ? '**' + r.name + '** ★' : r.name) + (r.bundled ? ' (bundled)' : r.bundleReady ? ' — bundle-ready' : '');
@@ -161,7 +182,7 @@ fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, tag + '.md'), md);
 fs.writeFileSync(path.join(RAW, tag + '.summary.json'), JSON.stringify(sum));
   return rows;
-  console.log(JSON.stringify({ area: sum.area, total: sum.total, full: sum.full, partial: sum.partial, none: sum.none, bundleReady: sum.bundleReady.length, bundled: sum.alreadyBundled }));
+  console.log(JSON.stringify({ area: sum.area, gainedCourses: sum.gained.length, gainedHoles: sum.gained.reduce((t, g) => t + g.holes, 0), total: sum.total, full: sum.full, partial: sum.partial, none: sum.none, bundleReady: sum.bundleReady.length, bundled: sum.alreadyBundled }));
 
 }
 

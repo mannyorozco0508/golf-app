@@ -350,6 +350,32 @@
         if (el.type === 'node' && isFinite(el.lat)) return [[el.lat, el.lon]];
         return null;
     }
+    // EVERY OUTER RING OF A MULTIPOLYGON (2026-10-10). geomOf above returns a
+    // relation's FIRST outer member only - and a golf=green mapped as a relation
+    // can have several outer pieces (Lewis River 11: the green AND the bunker
+    // beside it, the bunker first), or one ring drawn as several member ways. Here
+    // the outer members are stitched end to end into closed rings; inners (holes
+    // in the shape) are ignored. A way is its own single ring.
+    function outerRings(el) {
+        if (el.type !== 'relation' || !el.members) { var g = geomOf(el); return g && g.length >= 3 ? [g] : []; }
+        var segs = el.members.filter(function (m) { return m.role !== 'inner' && m.geometry && m.geometry.length >= 2; })
+            .map(function (m) { return m.geometry.map(function (p) { return [p.lat, p.lon]; }); });
+        var key = function (p) { return p[0].toFixed(7) + ',' + p[1].toFixed(7); };
+        var rings = [];
+        while (segs.length) {
+            var ring = segs.shift(), grew = true;
+            while (key(ring[0]) !== key(ring[ring.length - 1]) && grew) {
+                grew = false;
+                for (var i = 0; i < segs.length; i++) {
+                    var sg = segs[i], end = key(ring[ring.length - 1]);
+                    if (key(sg[0]) === end) { ring = ring.concat(sg.slice(1)); segs.splice(i, 1); grew = true; break; }
+                    if (key(sg[sg.length - 1]) === end) { ring = ring.concat(sg.slice().reverse().slice(1)); segs.splice(i, 1); grew = true; break; }
+                }
+            }
+            if (ring.length >= 3) rings.push(ring);
+        }
+        return rings;
+    }
     function holeRef(tags) {
         var m = String((tags && tags.ref) || '').match(/^\s*(\d{1,2})\s*$/);
         var n = m ? parseInt(m[1], 10) : NaN;
@@ -404,9 +430,14 @@
                 var num = opts.holeNumber ? opts.holeNumber(tags) : holeRef(tags);
                 holes.push({ ref: num, par: parseInt(tags.par, 10) || null, line: g, id: el.id });
             }
-            else if (tags.golf === 'green' && g.length >= 3) greens.push({ ref: holeRef(tags), ring: cleanRing(g), id: el.type + '/' + el.id });
+            // A green relation: each outer piece is a candidate of its own, so a hole
+            // takes the piece its line ends in (or the nearest) - its Front / Center /
+            // Back are that piece's, never the combined shape's.
+            else if (tags.golf === 'green') outerRings(el).forEach(function (ring, i, all) {
+                greens.push({ ref: holeRef(tags), ring: cleanRing(ring), id: el.type + '/' + el.id + (all.length > 1 ? '#' + i : '') });
+            });
             else if (tags.golf === 'tee') { tees++; teeBoxes.push({ ref: holeRef(tags), at: g.length >= 3 ? polygonCentroid(g) : g[0] }); }
-            else if (tags.golf === 'fairway') { fairways++; if (g.length >= 3) fairwayRings.push(cleanRing(g)); }
+            else if (tags.golf === 'fairway') { fairways++; outerRings(el).forEach(function (ring) { fairwayRings.push(cleanRing(ring)); }); }
         });
         greens.forEach(function (gr) { gr.centroid = polygonCentroid(gr.ring); });
 
@@ -417,7 +448,16 @@
             if (refsSeen[h.ref]) return;              // a duplicate ref: first way wins, the report says so
             refsSeen[h.ref] = true;
             var end = h.line[h.line.length - 1];
-            var green = (opts.holeNumber ? null : greens.filter(function (gr) { return gr.ref === h.ref; })[0])
+            // Greens tagged with this hole's number first - and of those (a relation's
+            // several pieces), the one the line ends in, else the nearest.
+            var byRef = opts.holeNumber ? [] : greens.filter(function (gr) { return gr.ref === h.ref; });
+            var nearest = function (list) {
+                var b = null, bd = Infinity;
+                list.forEach(function (gr) { var dd = haversineMeters(end, gr.centroid); if (dd < bd) { bd = dd; b = gr; } });
+                return b;
+            };
+            var green = byRef.filter(function (gr) { return pointInRing(end, gr.ring); })[0]
+                || (byRef.length ? nearest(byRef) : null)
                 || greens.filter(function (gr) { return pointInRing(end, gr.ring); })[0]
                 || null;
             if (!green) {
@@ -1106,7 +1146,7 @@
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,
         accuracyLabel: accuracyLabel, polygonCentroid: polygonCentroid, pointInRing: pointInRing,
-        greenNumbers: greenNumbers, compactRing: compactRing, osmToCourseGps: osmToCourseGps,
+        greenNumbers: greenNumbers, compactRing: compactRing, osmToCourseGps: osmToCourseGps, outerRings: outerRings,
         resolveHole: resolveHole, holeNumbers: holeNumbers, makePin: makePin, undoPin: undoPin, pinPt: pinPt
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
