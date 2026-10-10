@@ -55,7 +55,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v345-gps-wind'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v346-gps-badge'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -409,4 +409,42 @@ test('build 7: F / B follow the golfer\'s live angle - 100 yds right of the gree
     const v = read('gps-view.js');
     assert.ok(/var nums = r \? G\.holeNumbers\(o \? o\.pt : null, r\) : null;\s*marker\('front', nums && nums\.front/.test(v), 'the F / B markers come from the live origin');
     assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy \};\s*S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
+});
+
+test('GPS badge on online course search results: bundled greens and course_gps first, never Overpass per result', { skip }, async () => {
+    const vm = require('vm');
+    const a = read('admin.html');
+    const i = a.indexOf('    // THE GPS-MAPPED BADGE');
+    const start = a.lastIndexOf('// GPS:BEGIN', i), end = a.indexOf('// GPS:END', i);
+    assert.ok(i > 0 && start > 0 && end > i, 'the badge is one GPS-only block');
+    const block = a.slice(start, end);
+    assert.ok(!/overpass|interpreter|fetch\(/i.test(block.replace(/^\s*\/\/.*$/gm, '')), 'no live OpenStreetMap query, no network fetch per result');
+    assert.ok(/\/\/ GPS:BEGIN\s*\n\s*addGpsBadge\(title, c\);\s*\n\s*\/\/ GPS:END/.test(a), 'its one call is GPS-only too');
+    // Run the real block with the real bundle.
+    const store = {}, reads = [];
+    const records = { gca_partial: { pins: { h1: { mid: { lat: 1, lng: 2 } }, h2: { mid: { lat: 1, lng: 2 } }, h3: {} } } };
+    const sb = {
+        window: { HardPanGpsCourses: require('./gps-courses.js') }, document: {},
+        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+        globalCourses: {}, importedCourseKey: (c) => c.key,
+        db: { ref: (p) => ({ once: () => { reads.push(p); const k = p.split('/')[1]; return Promise.resolve({ val: () => records[k] || null }); } }) },
+    };
+    vm.createContext(sb);
+    vm.runInContext(block + '\nthis.addGpsBadge = addGpsBadge;', sb);
+    const el = () => { const kids = []; return { kids, appendChild: (k) => kids.push(k) }; };
+    sb.document.createElement = () => ({ style: {}, dataset: {}, textContent: '', className: '' });
+    const badge = async (key) => { const t = el(); sb.addGpsBadge(t, { key }); await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0)); return t.kids[0]; };
+    const full = await badge('caledonia');
+    assert.equal(full.textContent, 'GPS ✓'); assert.equal(full.dataset.gps, 'full');
+    const composed = await badge('thistle_27_cameron_stewart');
+    assert.equal(composed.textContent, 'GPS ✓', 'a 27-hole pairing: two bundled nines make 18');
+    const part = await badge('gca_partial');
+    assert.equal(part.textContent, 'GPS partial (2/18)', 'greens fixed by GPS in course_gps (a pin with no center does not count)');
+    const none = await badge('gca_nothing');
+    assert.equal(none.textContent, 'No GPS yet');
+    // This phone's own earlier OpenStreetMap lookup counts too.
+    store.hardpan_osm_v1_gca_looked = JSON.stringify({ holes: { 1: { osm: { green: [[0, 0], [0, 1], [1, 1]] } }, 2: { osm: { mid: [0, 0] } } } });
+    assert.equal((await badge('gca_looked')).textContent, 'GPS partial (2/18)');
+    assert.ok(reads.every((p) => /^course_gps\/[\w-]+$/.test(p)), 'one course_gps read per result: ' + reads.join(' '));
+    assert.equal(store.hardpan_gps_course_v1_gca_partial !== undefined, true, 'the record is kept on the phone for next time (offline)');
 });

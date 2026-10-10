@@ -6486,6 +6486,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + (teeCount ? teeCount + ' tee sets' : 'no tee data');
             row.appendChild(title);
             row.appendChild(sub);
+            // GPS:BEGIN
+            addGpsBadge(title, c);
+            // GPS:END
             // NOTHING AUTO-SELECTS. Not even when there is one result - one
             // result that is the wrong Legacy is exactly the failure being
             // designed against.
@@ -6511,6 +6514,92 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         courseDropdown.style.display = "block";
     }
 
+    // GPS:BEGIN
+    // THE GPS-MAPPED BADGE (HardPan only - GPS_ENABLED=0 removes this block and
+    // its one call above). Each online result gets one small badge from what is
+    // ALREADY on the phone or in our own database, never a live OpenStreetMap
+    // query per result:
+    //   1. the greens bundled with the app (gps-courses.js - offline);
+    //   2. the shared record course_gps/<key>: greens fixed by GPS (pins.hN) and
+    //      an OpenStreetMap lookup another phone shared (osm.holes) - this phone's
+    //      cached copy first, then one read per result, best effort;
+    //   3. this phone's own earlier OpenStreetMap lookup for that course.
+    // A hole counts when it has a usable green (a green outline or a center).
+    // "GPS ✓" every hole, "GPS partial (X/18)", "No GPS yet". A course with none
+    // opens on the existing "tap the middle of the green" flow, and its GPS side
+    // makes its one OpenStreetMap lookup then (gps-view.js ANY COURSE) - only for
+    // the course the golfer picked.
+    const GPS_BADGE_CACHE = 'hardpan_gps_course_v1_', GPS_BADGE_OSM = 'hardpan_osm_v1_';
+    let gpsBadgeBundle = null;
+    function gpsBadgeLoadBundle() {
+        if (window.HardPanGpsCourses) return Promise.resolve(window.HardPanGpsCourses);
+        if (gpsBadgeBundle) return gpsBadgeBundle;
+        gpsBadgeBundle = new Promise((res) => {
+            const host = document.head || document.body;
+            if (!host || typeof document.createElement !== 'function') { gpsBadgeBundle = null; res({}); return; }
+            const s = document.createElement('script');
+            s.src = 'gps-courses.js';
+            s.onload = () => res(window.HardPanGpsCourses || {});
+            s.onerror = () => { gpsBadgeBundle = null; res({}); };
+            host.appendChild(s);
+        });
+        return gpsBadgeBundle;
+    }
+    function gpsBadgeLs(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+    // The hole numbers that have a usable green, from every source.
+    function gpsBadgeHoles(table, key, rec) {
+        const out = new Set();
+        const addHoles = (holes, off) => Object.keys(holes || {}).forEach((n) => {
+            const h = holes[n], o = h && (h.osm || h);
+            if (o && ((Array.isArray(o.green) && o.green.length >= 3) || Array.isArray(o.mid))) out.add(Number(n) + off);
+        });
+        const b = table && table[key];
+        if (b && b.compose) b.compose.forEach((part, i) => addHoles(table[part] && table[part].holes, 9 * i));
+        else if (b) addHoles(b.holes, 0);
+        if (rec && rec.osm) addHoles(rec.osm.holes, 0);
+        const mine = gpsBadgeLs(GPS_BADGE_OSM + key);
+        if (mine) addHoles(mine.holes, 0);
+        Object.keys((rec && rec.pins) || {}).forEach((k) => {
+            const m = /^h(\d+)$/.exec(k);
+            if (m && rec.pins[k] && rec.pins[k].mid) out.add(Number(m[1]));
+        });
+        return out;
+    }
+    function gpsBadgePaint(el, n, of) {
+        const kind = n >= of ? 'full' : n > 0 ? 'partial' : 'none';
+        el.dataset.gps = kind;
+        el.textContent = kind === 'full' ? 'GPS \u2713' : kind === 'partial' ? 'GPS partial (' + n + '/' + of + ')' : 'No GPS yet';
+        el.style.cssText = 'display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:0.68rem; font-weight:700; line-height:1.45; vertical-align:1px; white-space:nowrap; border:1px solid; '
+            + (kind === 'full' ? 'color:var(--brand-green); border-color:var(--brand-green);'
+                : kind === 'partial' ? 'color:#b45309; border-color:#f59e0b;'
+                : 'color:var(--text-muted); border-color:var(--border-faint);');
+    }
+    function addGpsBadge(title, course) {
+        let key;
+        try { key = importedCourseKey(course, globalCourses); } catch (e) { return; }
+        if (!key) return;
+        const badge = document.createElement('span');
+        badge.className = 'gps-badge';
+        badge.style.display = 'none';
+        title.appendChild(badge);
+        const paint = (rec) => gpsBadgeLoadBundle().then((table) => {
+            const holes = gpsBadgeHoles(table, key, rec);
+            let top = 0;
+            holes.forEach((n) => { if (n > top) top = n; });
+            gpsBadgePaint(badge, holes.size, top > 18 ? Math.ceil(top / 9) * 9 : 18);
+        }).catch(() => { /* a badge never breaks the search */ });
+        const cached = gpsBadgeLs(GPS_BADGE_CACHE + key);
+        paint(cached);
+        try {
+            db.ref('course_gps/' + key).once('value').then((snap) => {
+                const v = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!v) return;
+                try { localStorage.setItem(GPS_BADGE_CACHE + key, JSON.stringify(v)); } catch (e) {}
+                paint(v);
+            }, () => { /* not readable (no rule yet) or offline: the phone's copy stands */ });
+        } catch (e) {}
+    }
+    // GPS:END
     // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
     async function openImportConfirm(course) {
         // (The native no-op that stood here came off on 2026-09-19 with the search's.)

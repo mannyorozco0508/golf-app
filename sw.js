@@ -4475,7 +4475,11 @@
 // live NWS wind always on (the station's latest observation), and the Apple
 // sign-in fix (one Apple token, one Firebase call). HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v345-gps-wind';
+// GPS:BEGIN
+// Moved to v346 (gps-flow, 2026-10-09): the GPS badge on the setup page's online
+// course search results (GPS ✓ / GPS partial (X/18) / No GPS yet). HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v346-gps-badge';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
