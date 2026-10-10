@@ -173,3 +173,11 @@ android/app/release/
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+
+# ---- GolfAPI.io (HardPan GPS build 9) --------------------------------------
+# The key (GOLFAPI_KEY in .env) and everything the puller writes stay OFF this
+# public repo: GolfAPI's terms allow storing the data for use in the app, not
+# redistributing it. tools/build-gps-app.js copies golfapi/gps-golfapi.js into
+# the iOS build only; the public web build never sees it.
+.env
+golfapi/

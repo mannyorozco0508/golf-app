@@ -62,7 +62,16 @@
         return out;
     }
     // What is already known, with no network: the bundle, then a kept lookup.
-    function known(key, of, name) {
+    // GOLFAPI FIRST (build 9): a course with GolfAPI data is that, and only that.
+    function golfapiKnown(key, of, name, loc) {
+        var g = G(), c = cfg();
+        if (!g || !g.golfapiMatch || c.golfapi === false || !W.HardPanGolfApi) return null;
+        var m = g.golfapiMatch(W.HardPanGolfApi, key, name, loc || null, of);
+        return m ? verdict(m.record.holes, of, { source: 'golfapi', how: m.how }) : null;
+    }
+    function known(key, of, name, loc) {
+        var ga = golfapiKnown(key, of, name, loc);
+        if (ga) return ga;
         var g = G(), all = W.HardPanGpsCourses || {};
         var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name));
         var l = lsGet(OSM_LOOKUP + key);
@@ -103,7 +112,9 @@
     // candidates (ask only), rechecked }. Never rejects.
     function match(opts) {
         var key = opts.key, of = opts.holes === 9 ? 9 : 18;
-        var have = !opts.force && known(key, of, opts.name);
+        var have = !opts.force && known(key, of, opts.name, opts.loc);
+        // GolfAPI data: no OpenStreetMap pull for this course - one source per course.
+        if (have && have.source === 'golfapi') return Promise.resolve(have);
         if (have) {
             var last = lsGet(CHECKED + key);
             var due = opts.loc && G() && typeof fetch === 'function'

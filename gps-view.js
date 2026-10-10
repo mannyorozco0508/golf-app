@@ -311,6 +311,8 @@
         try { localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(rec || {})); } catch (e) {}
     }
     function osmRecord(key) {
+        var ga = golfapiFor(key);
+        if (ga) return ga;
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // Bundled first; else what an OpenStreetMap lookup found for this course
         // (this phone's, or the shared one) - see ANY COURSE below.
@@ -501,6 +503,34 @@
             frameHole(false); render();
         });
     }
+    // HAZARD CARRIES (GolfAPI courses): each bunker / water point on this hole, with
+    // the distance to it from you (or the tee), at the point. Past the green or
+    // behind you: not shown.
+    function drawHazards() {
+        var keep = {};
+        var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
+        var hz = (h && h.osm && h.osm.hazards) || [];
+        var r = resolved(), o = r && origin(r);
+        if (S.map && ML() && S.mode === 'measure' && o && r && r.mid && hz.length) {
+            var toGreen = G.haversineMeters(o.pt, r.mid), dir = G.bearingDeg(o.pt, r.mid);
+            hz.forEach(function (z, i) {
+                var d = G.haversineMeters(o.pt, z.pt);
+                var off = Math.abs((((G.bearingDeg(o.pt, z.pt) - dir) % 360) + 540) % 360 - 180);
+                if (d > toGreen + 25 || off > 75) return;
+                var k = 'hz' + i;
+                keep[k] = 1;
+                var m = marker(k, z.pt, function () {
+                    var e = document.createElement('div');
+                    e.className = 'gps-hz ' + (z.type === 'w' ? 'gps-hz-water' : 'gps-hz-bunker');
+                    return e;
+                });
+                var t = (z.type === 'w' ? 'W ' : 'B ') + G.shownDistance(d, units());
+                var el = m && m.getElement();
+                if (el && el.textContent !== t) el.textContent = t;
+            });
+        }
+        Object.keys(S.markers || {}).forEach(function (k) { if (/^hz/.test(k) && !keep[k]) marker(k, null); });
+    }
     function drawHoleAsk() {
         var want = S.holeAsk || [];
         Object.keys(S.markers || {}).forEach(function (k) { if (/^ask/.test(k) && !want.some(function (c) { return 'ask' + c.id === k; })) marker(k, null); });
@@ -601,7 +631,27 @@
         loadScript('maplibre-gl.js', function () { return !!ML(); }, done);
     }
     function loadCourses(done) {
-        loadScript('gps-courses.js', function () { return !!window.HardPanGpsCourses; }, done);
+        loadScript('gps-courses.js', function () { return !!window.HardPanGpsCourses; }, function () {
+            if (!golfapiOn()) { done(); return; }
+            loadScript(String(cfg().golfapiFile || 'gps-golfapi.js'), function () { return !!window.HardPanGolfApi; }, done);
+        });
+    }
+    // GOLFAPI.IO (build 9). The data ships in the iOS app only (tools/build-gps-app.js);
+    // the web never has it, so it is only looked for in the app (or when a test's
+    // config names a file). golfapi: false in gps-config.js turns it all off.
+    function golfapiOn() { var c = cfg(); return c.golfapi !== false && (isNative() || !!c.golfapiFile); }
+    // THE ROUND'S GOLFAPI COURSE, if there is one: then it is the ONLY source for
+    // this course (no OpenStreetMap greens mixed in). gps-geo.golfapiMatch: a puller
+    // link, a 27-hole pairing's nines, or the name within 5 km.
+    function golfapiFor(key) {
+        if (!S || S.courseKey !== key || !G.golfapiMatch || !golfapiOn() || !window.HardPanGolfApi) return null;
+        var name = (S.round && S.round.courseName) || '';
+        var ck = key + '|' + name;
+        if (S.gaCache && S.gaCache.k === ck) return S.gaCache.v;
+        var list = (typeof S.holeList === 'function' ? S.holeList() : null) || [];
+        var m = G.golfapiMatch(window.HardPanGolfApi, key, name, S.courseLoc || null, list.length === 9 ? 9 : 18);
+        S.gaCache = { k: ck, v: m ? m.record : null, how: m ? m.how : '' };
+        return S.gaCache.v;
     }
 
     // ---- IMAGERY: USGS FROM THE PHONE FIRST, ESRI ON TOP --------------------
@@ -2349,6 +2399,7 @@
         drawDot();
         drawTarget();
         drawHoleAsk();
+        drawHazards();
         placePills();
         syncWind();
     }
@@ -2600,6 +2651,9 @@
         + '#gps-overlay .gps-wind-tag{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font:700 9px/1 ' + FONT + ';color:#c8d1ca;letter-spacing:.02em;}'
         + '#gps-overlay .gps-wind-tagged .gps-wind-tag{display:block;}'
         + '#gps-overlay .gps-wind-manual .gps-wind-tag{color:#fbbf24;}'
+        + '#gps-overlay .gps-hz{font:800 11px/1 ' + FONT + ';padding:3px 6px;border-radius:999px;border:1px solid rgba(11,15,12,.55);white-space:nowrap;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.35);}'
+        + '#gps-overlay .gps-hz-bunker{background:#f3e3b5;color:#3a2e12;}'
+        + '#gps-overlay .gps-hz-water{background:#9fd3ff;color:#0b2540;}'
         + '#gps-overlay .gps-ask-hole1{font:800 14px/1 ' + FONT + ';color:#0b0f0c;background:#d9f99d;border:2px solid #0b0f0c;border-radius:999px;padding:10px 14px;min-height:44px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);white-space:nowrap;}'
         + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tagged{padding-bottom:13px !important;}'

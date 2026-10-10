@@ -1132,11 +1132,99 @@
             });
     }
 
+    // ---- GOLFAPI.IO COURSES (build 9, 2026-10-10) --------------------------------
+    // GolfAPI gives POINTS, not shapes: per hole the green's front / center / back,
+    // the front and back tees, bunkers and water, a dogleg. A course with GolfAPI
+    // data uses ONLY these (no OpenStreetMap greens mixed in). To keep front / back
+    // moving with the golfer's angle, the green is estimated as an ELLIPSE along the
+    // front -> back axis: as deep as front-to-back, as wide as 80% of that (18 to
+    // 30 m) - greenNumbers then casts the golfer's ray through it like any green.
+    function ellipseRing(f, b, mid) {
+        var c = (f && b) ? midpoint(f, b) : mid;
+        var bearing = (f && b) ? bearingDeg(f, b) : null;
+        var depth = (f && b) ? haversineMeters(f, b) : 27;
+        if (bearing == null) return null;
+        depth = Math.max(12, depth);
+        var a = depth / 2, w = Math.max(9, Math.min(15, depth * 0.4));
+        var ring = [];
+        for (var i = 0; i < 24; i++) {
+            var t = i / 24 * 2 * Math.PI;
+            var along = a * Math.cos(t), across = w * Math.sin(t);
+            var p = destination(c, bearing, along);
+            ring.push(destination(p, bearing + 90, across));
+        }
+        ring.push(ring[0]);
+        return ring;
+    }
+    // One stripped GolfAPI course (tools/golfapi-pull.js) -> the hole record the GPS
+    // side reads (the bundle's shape). offset: 9 for the back nine of a pairing.
+    function golfapiHoles(c, offset, into) {
+        into = into || {};
+        Object.keys((c && c.h) || {}).forEach(function (k) {
+            var h = c.h[k], g = h.g || {};
+            var mid = g.c || ((g.f && g.b) ? midpoint(g.f, g.b) : null);
+            if (!mid) return;
+            var tee = (h.t && (h.t.b || h.t.f)) || null;
+            var line = [tee, h.d || null, mid].filter(Boolean);
+            var lineM = 0;
+            for (var i = 1; i < line.length; i++) lineM += haversineMeters(line[i - 1], line[i]);
+            var green = ellipseRing(g.f, g.b, mid);
+            var osm = { tee: tee, end: mid, mid: mid, line: line.length >= 2 ? line : null, lineM: line.length >= 2 ? Math.round(lineM) : null,
+                        green: green ? compactRing(green) : null, src: 'golfapi',
+                        hazards: (h.z || []).map(function (z) { return { type: z[0], side: z[1], pt: [z[2], z[3]] }; }) };
+            if (!tee) delete osm.tee;
+            into[String(Number(k) + (offset || 0))] = { osm: osm };
+        });
+        return into;
+    }
+    function golfapiRecord(courses) {
+        var holes = {};
+        courses.forEach(function (c, i) { golfapiHoles(c, 9 * i, holes); });
+        return { v: 1, src: 'golfapi', golfapiIds: courses.map(function (c) { return c.id; }), osmBase: courses.map(function (c) { return c.fetched || c.updated || null; })[0], holes: holes };
+    }
+    // WHICH GOLFAPI COURSE IS THIS ROUND'S? In order: an explicit link from the
+    // puller (links[ourKey]); a 27-hole pairing - our name "Club (A / B)" - from
+    // the club's two nines; else the club / course name (the naming words, same
+    // spelling rules as pickHoleSet: "Piipaash" = "Piipash", "MacKay" = "McKay")
+    // within 5 km of the course when its point is known. Only one clear match
+    // counts. Returns { record, how } or null.
+    function golfapiMatch(data, key, name, loc, holesWanted) {
+        if (!data || !data.courses) return null;
+        var all = Object.keys(data.courses).map(function (id) { return data.courses[id]; });
+        var link = data.links && data.links[key] && data.courses[data.links[key]];
+        if (link) return { record: golfapiRecord([link]), how: 'linked' };
+        var near = function (c) { return !loc || !isFinite(c.lat) || haversineMeters(loc, [c.lat, c.lng]) <= 5000; };
+        var words = function (c) { return hsWords(c.club + ' ' + c.course); };
+        var covers = function (want, have) {
+            var hj = have.join('');
+            return want.every(function (w) { return hsHas(have, w) || (w.length >= 4 && hj.indexOf(w) !== -1); });
+        };
+        var m = String(name || '').match(/\(\s*([^()\/]+?)\s*\/\s*([^()\/]+?)\s*\)/);
+        if (m) {
+            var clubW = hsWords(String(name).replace(/\(.*\)/, ''));
+            var nine = function (label) {
+                var lw = hsWords(label);
+                var hit = all.filter(function (c) { return c.holes === 9 && near(c) && covers(clubW, hsWords(c.club)) && covers(lw, words(c)); });
+                return hit.length === 1 ? hit[0] : null;
+            };
+            var a = nine(m[1]), b = nine(m[2]);
+            if (a && b && a !== b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
+        }
+        var want = hsWords(name);
+        if (!want.length) return null;
+        var hit = all.filter(function (c) { return near(c) && (!holesWanted || c.holes >= holesWanted) && covers(want, words(c)); });
+        // Several: ambiguous (the club name alone, "Talking Stick Golf Club") - no
+        // match, unless exactly one of them IS the name with nothing more.
+        if (hit.length > 1) hit = hit.filter(function (c) { return words(c).length === want.length; });
+        return hit.length === 1 ? { record: golfapiRecord([hit[0]]), how: '"' + hit[0].club + ' / ' + hit[0].course + '" by name' } : null;
+    }
+
     var api = {
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
+        golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, ellipseRing: ellipseRing,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

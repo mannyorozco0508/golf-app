@@ -28,4 +28,8 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // offline fallback, in the same app, conflicts with. NEVER ship a build that
     // can show Google and Esri/USGS in the same app. The plan: Esri online, USGS
     // offline. gps_wiring_test.js fails if a Google key is set here.
-    imagery: 'esri', imageryPro: 'esri', googleKey: '' };
+    imagery: 'esri', imageryPro: 'esri', googleKey: '',
+    // GOLFAPI.IO KILL SWITCH (build 9): false = never load or use GolfAPI data, so
+    // the app behaves exactly as build 8 (OpenStreetMap only). The data itself
+    // ships in the iOS build only (tools/build-gps-app.js); the web never has it.
+    golfapi: true };

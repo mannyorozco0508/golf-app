@@ -150,7 +150,8 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'googleKey', 'imagery', 'imageryPro', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile) in the shipped config');
+    assert.strictEqual(cfg.golfapi, true, 'the GolfAPI kill switch is a plain boolean, on');
     assert.strictEqual(cfg.imagery, 'esri', 'Esri stays the default');
     // GOOGLE STAYS OFF (2026-10-08): its terms forbid offline storage and use
     // with a non-Google map, and this app falls back to Esri / USGS.
@@ -522,7 +523,7 @@ test('a newer bundle beats an old OSM lookup cached on the phone (and only a str
     const src = v.slice(v.indexOf('    function osmRecord(key) {'), v.indexOf('    function holeKey(n)'));
     const sb = { window: { HardPanGpsCourses: { k: { v: 1, osmBase: '2026-10-10T10:30:00Z', holes: { 1: 'bundle' } } } }, G: { osmCourse: (t, k) => (k && t[k]) || null, bundleKeyFor: (t, k) => (t[k] ? k : null) }, lookup: null, S: null };
     vm.createContext(sb);
-    vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nthis.osmRecord = osmRecord;', sb);
+    vm.runInContext(src + '\nfunction lookedUp() { return lookup; }\nfunction golfapiFor() { return null; }\nthis.osmRecord = osmRecord;', sb);
     sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'old lookup' } };
     assert.equal(sb.osmRecord('k').holes[1], 'bundle', 'old lookup, newer bundle: the bundle');
     sb.lookup = { osmBase: null, holes: { 1: 'undated lookup' } };
@@ -659,3 +660,116 @@ test('pulls happen at pick time; GPS opening during the round does not pull; the
     assert.ok(!/gpsRecheckNext/.test(a), 'every pick pulls - Search online or the saved list alike');
 });
 
+
+// ---- GOLFAPI.IO (build 9) ------------------------------------------------------
+// SYNTHETIC GolfAPI-shaped data only (built from the bundled OSM greens): real GolfAPI
+// data may not be committed to this public repo.
+function fakeGolfApi(key, id, club, course, holes) {
+    const G = require('./gps-geo.js'), T = require('./gps-courses.js');
+    const rec = G.osmCourse(T, key), h = {};
+    Object.keys(rec.holes).forEach((n) => {
+        const o = rec.holes[n].osm, gn = G.greenNumbers(o.tee, o.green, o.mid);
+        h[n] = { g: { f: gn.front, c: o.mid, b: gn.back }, t: { b: o.tee, f: G.destination(o.tee, G.bearingDeg(o.tee, o.mid), 30) },
+                 z: [['fb', 'R', ...G.destination(o.tee, G.bearingDeg(o.tee, o.mid), 230)], ['w', 'L', ...G.destination(o.tee, G.bearingDeg(o.tee, o.mid) - 5, 150)]] };
+    });
+    const m = rec.holes['1'].osm.mid;
+    return { id, club, course, city: '', state: '', lat: m[0], lng: m[1], holes: holes || 18, pars: [], hcp: [], tees: [], fetched: '2026-10-10T12:00:00Z', h };
+}
+
+test('GolfAPI puller: the stripped file keeps only what GPS needs, the key never goes anywhere, and nothing reaches the web build or the repo', { skip }, () => {
+    const P = require('./tools/golfapi-pull.js');
+    // The API's own shapes (handoff 2026-10-10): /courses and /coordinates.
+    const course = { courseID: '012141520639939791440', clubName: 'Talking Stick Golf Club', courseName: 'South - Piipaash', numHoles: 18, latitude: 33.54, longitude: -111.86,
+        parsMen: Array(18).fill(4), indexesMen: Array.from({ length: 18 }, (_, i) => i + 1), tees: [{ teeName: 'Black', teeColor: '#000', length1: 412, length2: 380 }], address: '9998 E Indian Bend Rd' };
+    const coords = { apiRequestsLeft: 20, coordinates: [
+        { hole: 1, poi: 1, location: 3, latitude: 33.5423694, longitude: -111.8676706 }, { hole: 1, poi: 1, location: 2, latitude: 33.542474, longitude: -111.8675878 },
+        { hole: 1, poi: 1, location: 1, latitude: 33.5425544, longitude: -111.8674728 }, { hole: 1, poi: 3, location: 2, sideFW: 3, latitude: 33.543, longitude: -111.866 },
+        { hole: 1, poi: 11, location: 2, latitude: 33.5443283, longitude: -111.8654632 }, { hole: 1, poi: 12, location: 2, latitude: 33.5448876, longitude: -111.8650578 },
+        { hole: 1, poi: 5, location: 2, latitude: 33.5, longitude: -111.8 }, { hole: 1, poi: 7, location: 2, latitude: 33.5, longitude: -111.8 } ] };
+    const s = P.stripCourse(course, coords);
+    assert.deepEqual(s.h['1'].g, { f: [33.542554, -111.867473], c: [33.542474, -111.867588], b: [33.542369, -111.867671] });
+    assert.deepEqual(s.h['1'].t, { f: [33.544328, -111.865463], b: [33.544888, -111.865058] });
+    assert.deepEqual(s.h['1'].z, [['fb', 'R', 33.543, -111.866]], 'bunkers / water kept; trees and yardage markers not shipped');
+    assert.deepEqual(s.tees[0].yards.slice(0, 2), [412, 380]);
+    assert.ok(!('address' in s), 'stripped to what GPS needs');
+    const src = read('tools/golfapi-pull.js');
+    assert.ok(/process\.env\.GOLFAPI_KEY/.test(src) && /'\.env'/.test(src), 'the key from the environment or .env');
+    assert.ok(!/console\.(log|error|warn)\([^)]*\bkey\b/.test(src.replace(/linkCourse[\s\S]*$/, '')), 'the key is never printed');
+    assert.ok(/already stored - not re-pulled \(use --refresh/.test(src) && /floor: /.test(src) && /calls\.log/.test(src) && /--dry-run/.test(src), 'no re-pull without --refresh, a floor, a call log, dry run');
+    // Out of the repo and out of the web build.
+    const gi = read('.gitignore');
+    assert.ok(/^golfapi\/$/m.test(gi) && /^\.env$/m.test(gi), 'golfapi/ and .env are gitignored');
+    const sync = read('sync-mobile-web.js'), sw = read('sw.js'), shell = read('build-shell.js');
+    assert.ok(!/gps-golfapi/.test(sync) && !/gps-golfapi/.test(sw) && !/gps-golfapi/.test(shell), 'never in a shell list, the precache or the web build');
+    assert.ok(/copyFileSync\(GOLFAPI, path\.join\(OUT, 'gps-golfapi\.js'\)\)/.test(read('tools/build-gps-app.js')), 'copied into the iOS app only');
+});
+
+test('GolfAPI matching: same-club courses kept apart, the club name alone is ambiguous, a 27-hole pairing from its nines, a puller link wins', { skip }, () => {
+    const G = require('./gps-geo.js');
+    const data = { courses: {}, links: {} };
+    [fakeGolfApi('az_talking_piipaash', 'P', 'Talking Stick Golf Club', 'South - Piipaash'), fakeGolfApi('az_talking_oodham', 'O', 'Talking Stick Golf Club', 'North - O Odham'),
+     fakeGolfApi('thistle_27_cameron', 'C9', 'Thistle Golf Club', 'Cameron', 9), fakeGolfApi('thistle_27_stewart', 'S9', 'Thistle Golf Club', 'Stewart', 9),
+     fakeGolfApi('thistle_27_mackay', 'M9', 'Thistle Golf Club', 'McKay', 9)].forEach((c) => { data.courses[c.id] = c; });
+    const ids = (m) => m && m.record.golfapiIds.join('+');
+    const near = [33.546, -111.864];
+    assert.equal(ids(G.golfapiMatch(data, 'az_talking_piipaash', 'Talking Stick Golf Club (Piipaash)', near, 18)), 'P');
+    assert.equal(ids(G.golfapiMatch(data, 'az_talking_oodham', "Talking Stick Golf Club (O'odham)", near, 18)), 'O');
+    assert.equal(G.golfapiMatch(data, 'x', 'Talking Stick Golf Club', near, 18), null, 'the club alone: no guess');
+    assert.equal(G.golfapiMatch(data, 'az_talking_piipaash', 'Talking Stick Golf Club (Piipaash)', [45.5, -122.6], 18), null, 'not 5 km from the course: no match');
+    const th = G.golfapiMatch(data, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)', null, 18);
+    assert.equal(ids(th), 'M9+C9', 'MacKay (ours) = McKay (theirs), front + back');
+    assert.equal(Object.keys(th.record.holes).length, 18);
+    assert.deepEqual(th.record.holes['10'].osm.mid, data.courses.C9.h['1'].g.c, 'the back nine\'s hole 1 is hole 10');
+    data.links.my_key = 'O';
+    assert.equal(ids(G.golfapiMatch(data, 'my_key', 'Anything', null, 18)), 'O', 'an explicit link from the puller wins');
+});
+
+test('GolfAPI greens: an ellipse along front -> back, so Front / Back still follow the golfer\'s angle; Center is the GolfAPI point; hazards ride along', { skip }, () => {
+    const G = require('./gps-geo.js');
+    const c = fakeGolfApi('az_talking_piipaash', 'P', 'Talking Stick Golf Club', 'South - Piipaash');
+    const rec = G.golfapiRecord([c]), h = rec.holes['1'], o = h.osm, g = c.h['1'].g;
+    assert.equal(rec.src, 'golfapi');
+    assert.deepEqual(o.mid, g.c, 'Center = the GolfAPI center point');
+    const r = G.resolveHole(h, []);
+    assert.ok(r.useGreenForEdges && r.green, 'front / back from the estimated green, by angle');
+    // From the tee: front and back land on the GolfAPI front / back points (within 2 yds).
+    const n = G.holeNumbers(o.tee, r);
+    assert.ok(G.haversineMeters(n.front, g.f) < 2 && G.haversineMeters(n.back, g.b) < 2, 'on the line, the points: ' + [G.haversineMeters(n.front, g.f), G.haversineMeters(n.back, g.b)]);
+    // From 100 yds right of the green: front and back move to that angle.
+    const side = G.destination(o.mid, G.bearingDeg(o.tee, o.mid) + 90, 100 * G.M_PER_YD);
+    const s = G.holeNumbers(side, r);
+    assert.ok(G.haversineMeters(s.front, n.front) > 3, 'front moves with the golfer');
+    assert.ok(s.frontM < s.middleM && s.middleM < s.backM);
+    assert.equal(o.hazards.length, 2); assert.deepEqual(o.hazards.map((z) => z.type), ['fb', 'w']);
+    assert.ok(o.line && o.line.length >= 2 && o.tee, 'a tee -> green line from the back tee');
+});
+
+test('GolfAPI in the app: one source per course, no OSM pull for it, the setup badge, hazard carries, and the kill switch', { skip }, async () => {
+    const vm = require('vm');
+    const store = {};
+    let fetches = 0;
+    const mk = (cfg) => {
+        const sb = { localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
+            HARDPAN_GPS_CONFIG: cfg, HardPanGpsCourses: require('./gps-courses.js'), fetch: () => { fetches++; return Promise.reject(new Error('no')); } };
+        sb.window = sb;
+        vm.createContext(sb);
+        vm.runInContext(read('gps-geo.js'), sb);
+        vm.runInContext(read('gps-match.js'), sb);
+        sb.HardPanGolfApi = { courses: { P: fakeGolfApi('az_talking_piipaash', 'P', 'Talking Stick Golf Club', 'South - Piipaash') }, links: {} };
+        return sb.HardPanGpsMatch;
+    };
+    const on = mk({});
+    const k = on.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)');
+    assert.deepEqual([k.source, k.status, k.n], ['golfapi', 'ready', 18]);
+    const r = await on.match({ key: 'az_talking_piipaash', name: 'Talking Stick Golf Club (Piipaash)', loc: [33.546, -111.864], holes: 18, recheck: 'pick' });
+    assert.equal(r.source, 'golfapi'); assert.equal(fetches, 0, 'a GolfAPI course is never pulled from OpenStreetMap');
+    // Kill switch: exactly build 8 - the bundle (OSM) answers.
+    const off = mk({ golfapi: false });
+    assert.equal(off.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)').source, 'bundle');
+    const v = read('gps-view.js'), a = read('admin.html'), c = read('gps-config.js');
+    assert.ok(/function osmRecord\(key\) \{\s*\n\s*var ga = golfapiFor\(key\);\s*\n\s*if \(ga\) return ga;/.test(v), 'GolfAPI is the only source when there is one');
+    assert.ok(/function golfapiOn\(\) \{ var c = cfg\(\); return c\.golfapi !== false && \(isNative\(\) \|\| !!c\.golfapiFile\); \}/.test(v), 'in the app only; off with the switch');
+    assert.ok(/golfapi: true \};/.test(c), 'the switch, on');
+    assert.ok(/function drawHazards\(\)/.test(v) && /'B ' : 'W '|\(z\.type === 'w' \? 'W ' : 'B '\)/.test(v), 'bunker / water carries');
+    assert.ok(/if \(m\) \{ Object\.keys\(m\.record\.holes\)\.forEach\(\(n\) => out\.add\(Number\(n\)\)\); return out; \}/.test(a), 'the badge counts the GolfAPI holes only');
+});

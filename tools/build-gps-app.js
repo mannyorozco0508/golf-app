@@ -65,6 +65,19 @@ FILES.filter((f) => f.endsWith('.html')).forEach((page) => {
 if (broken.length) { console.error('INCOMPLETE - do not sync:\n  ' + broken.join('\n  ')); process.exit(1); }
 console.log('gps-beta/www: ' + FILES.length + ' files (the Consumer app + ' + GPS.length + ' GPS files, GPS on)');
 
+// GOLFAPI DATA - THE APP ONLY (build 9). tools/golfapi-pull.js --build writes the
+// stripped GolfAPI file to golfapi/ (gitignored: the repo is public and the data
+// may not be redistributed). It is copied into the iOS app here and nowhere else:
+// the pages.dev web build is made from the repo and never has it, and the service
+// worker does not list it. The GPS side loads it when it is there; without it
+// the app runs on OpenStreetMap exactly as build 8.
+const GOLFAPI = path.join(ROOT, 'golfapi', 'gps-golfapi.js');
+if (fs.existsSync(GOLFAPI)) {
+    fs.copyFileSync(GOLFAPI, path.join(OUT, 'gps-golfapi.js'));
+    const d = require(GOLFAPI);
+    console.log('GolfAPI data: ' + Object.keys(d.courses || {}).length + ' courses, ' + (fs.statSync(GOLFAPI).size / 1024).toFixed(1) + ' KB (app only)');
+} else console.log('GolfAPI data: none (golfapi/gps-golfapi.js not built) - the app uses OpenStreetMap only');
+
 // THE FIREBASE iOS CONFIG. Sign in with Apple / Google and push need the
 // GoogleService-Info.plist of the Firebase iOS app registered for THIS bundle.
 // Not a failure here (the web build is fine without it); the Xcode project

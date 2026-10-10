@@ -6540,6 +6540,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // the course the golfer picked.
     const GPS_BADGE_CACHE = 'hardpan_gps_course_v1_', GPS_BADGE_OSM = 'hardpan_osm_v1_';
     let gpsBadgeBundle = null;
+    // GOLFAPI.IO DATA (build 9): in the iOS app only (the web build never has the
+    // file), unless gps-config.js says golfapi: false. Loads gps-geo.js too, whose
+    // golfapiMatch links a course to it.
+    function gpsGolfApiLoad() {
+        const native = (() => { try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; } })();
+        // The web never has the data: nothing to load (a test can name a file).
+        if (!native && !(window.HARDPAN_GPS_CONFIG && window.HARDPAN_GPS_CONFIG.golfapiFile)) return Promise.resolve(false);
+        return gpsLoadScript('gps-config.js', () => !!window.HARDPAN_GPS_CONFIG).then(() => {
+            const c = window.HARDPAN_GPS_CONFIG || {};
+            if (c.golfapi === false || !(native || c.golfapiFile)) return false;
+            return gpsLoadScript('gps-geo.js', () => !!window.HardPanGeo)
+                .then(() => gpsLoadScript(String(c.golfapiFile || 'gps-golfapi.js'), () => !!window.HardPanGolfApi));
+        });
+    }
     function gpsBadgeLoadBundle() {
         if (window.HardPanGpsCourses) return Promise.resolve(window.HardPanGpsCourses);
         if (gpsBadgeBundle) return gpsBadgeBundle;
@@ -6566,6 +6580,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
     function gpsBadgeHoles(table, key, rec, name) {
         const out = new Set();
+        // A course with GolfAPI data counts its GolfAPI holes, and only those.
+        const c = window.HARDPAN_GPS_CONFIG || {};
+        if (c.golfapi !== false && window.HardPanGolfApi && window.HardPanGeo && window.HardPanGeo.golfapiMatch) {
+            const m = window.HardPanGeo.golfapiMatch(window.HardPanGolfApi, key, name, null, 18);
+            if (m) { Object.keys(m.record.holes).forEach((n) => out.add(Number(n))); return out; }
+        }
         const addHoles = (holes, off) => Object.keys(holes || {}).forEach((n) => {
             const h = holes[n], o = h && (h.osm || h);
             if (o && ((Array.isArray(o.green) && o.green.length >= 3) || Array.isArray(o.mid))) out.add(Number(n) + off);
@@ -6678,7 +6698,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         badge.style.display = 'none';
         title.appendChild(badge);
         const state = ((course && course.location) || {}).state;
-        const paint = (rec) => Promise.all([gpsBadgeLoadBundle(), gpsBadgeLoadCoverage(state)]).then(([table, coverage]) => {
+        const paint = (rec) => Promise.all([gpsBadgeLoadBundle(), gpsBadgeLoadCoverage(state), gpsGolfApiLoad()]).then(([table, coverage]) => {
             const holes = gpsBadgeHoles(table, key, rec, typeof courseDisplayName === 'function' ? courseDisplayName(course) : '');
             let top = 0;
             holes.forEach((n) => { if (n > top) top = n; });
@@ -6793,6 +6813,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         await gpsLoadScript('gps-geo.js', () => !!window.HardPanGeo);
         await gpsLoadScript('gps-match.js', () => !!window.HardPanGpsMatch);
         await gpsBadgeLoadBundle();
+        await gpsGolfApiLoad();
         if (mine !== gpsSetupSeq) return;
         const M = window.HardPanGpsMatch;
         if (!M) { gpsSetupShow(''); return; }
