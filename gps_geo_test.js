@@ -691,3 +691,20 @@ test('a green mapped as a multipolygon RELATION: every outer piece is read, and 
     assert.ok(Math.abs(o.mid[0] - 45.0001) < 0.00003 && Math.abs(o.mid[1] + 121.9999) < 0.00003, 'Center is the green piece\'s, not the combined shape: ' + o.mid);
     assert.equal(Object.keys(geo.cleanLookupHoles([rel, hole]).holes).length, 1, 'the live lookup keeps it too');
 });
+
+test('a hole drawn as one line from EACH tee (Palmbrook 18: four lines to one green) is one hole - the back tee\'s line; a continuation of pieces joins', () => {
+    const P = (lat, lon) => ({ lat, lon });
+    const green = { type: 'way', id: 50, tags: { golf: 'green' }, geometry: [P(45.0040, -122.0002), P(45.0044, -122.0002), P(45.0044, -121.9998), P(45.0040, -121.9998), P(45.0040, -122.0002)] };
+    const end = P(45.0042, -122.0);
+    const fromTee = (id, lat) => ({ type: 'way', id, tags: { golf: 'hole', ref: '18', par: '4' }, geometry: [P(lat, -122.0), end] });
+    const lines = [fromTee(1, 45.0010), fromTee(2, 45.0013), fromTee(3, 45.0016), fromTee(4, 45.0020)];
+    const one = { type: 'way', id: 9, tags: { golf: 'hole', ref: '1' }, geometry: [P(45.0, -122.001), P(45.0002, -122.001)] };
+    const r = geo.pickHoleSet([green, one].concat(lines), { name: 'X', holes: 18 });
+    assert.equal(r.step, 1, r.how);
+    assert.equal(r.set['18'].id, 1, 'the longest line - the back tee');
+    // A hole drawn in two pieces, end to start: one line.
+    const a = { type: 'way', id: 21, tags: { golf: 'hole', ref: '2' }, geometry: [P(45.01, -122.0), P(45.011, -122.0)] };
+    const b = { type: 'way', id: 22, tags: { golf: 'hole', ref: '2' }, geometry: [P(45.011, -122.0), P(45.012, -122.0)] };
+    const r2 = geo.pickHoleSet([one, a, b], { name: 'X', holes: 18 });
+    assert.equal(r2.step, 1); assert.equal(r2.set['2'].geometry.length, 3, 'joined end to start');
+});

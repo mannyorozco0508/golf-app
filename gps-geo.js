@@ -1027,12 +1027,53 @@
         }
         return routes.map(function (r) { return r.set; });
     }
+    // ONE HOLE DRAWN IN PIECES is one hole, not several: same number and label,
+    // one piece starting within 2 m of where another ends -> one line, in order.
+    function hsStitch(holes) {
+        var groups = {}, out = [];
+        holes.forEach(function (h) { var k = h.label + '#' + h.num; (groups[k] = groups[k] || []).push(h); });
+        Object.keys(groups).forEach(function (k) {
+            var list = groups[k].slice();
+            if (list.length < 2) { out.push(Object.assign({ key: k }, list[0])); return; }
+            var pts = function (h) { return h.el.geometry.map(function (p) { return [p.lat, p.lon]; }); };
+            var meet = function (a, b) { return haversineMeters(a, b) <= 2; };
+            while (list.length) {
+                var cur = list.shift(), line = pts(cur), grew = true;
+                while (grew) {
+                    grew = false;
+                    for (var i = 0; i < list.length; i++) {
+                        var q = pts(list[i]);
+                        // Only a CONTINUATION joins (one piece ends where the next
+                        // starts): two lines ending at the same green are two tees.
+                        if (meet(line[line.length - 1], q[0])) line = line.concat(q.slice(1));
+                        else if (meet(line[0], q[q.length - 1])) line = q.concat(line.slice(1));
+                        else continue;
+                        list.splice(i, 1); grew = true; break;
+                    }
+                }
+                var el = { type: cur.el.type, id: cur.el.id, tags: cur.el.tags, geometry: line.map(function (p) { return { lat: p[0], lon: p[1] }; }) };
+                out.push({ el: el, num: cur.num, label: cur.label, raw: cur.raw, key: k });
+            }
+        });
+        // ONE HOLE DRAWN FROM EACH TEE (Palmbrook 18: four lines, one per tee box, all
+        // ending at the same green): lines of one number and label whose ENDS meet
+        // within 5 m are one hole - the longest (the back tee) is its line.
+        var len = function (h) { var g = h.el.geometry, m = 0; for (var i = 1; i < g.length; i++) m += haversineMeters([g[i - 1].lat, g[i - 1].lon], [g[i].lat, g[i].lon]); return m; };
+        var endOf = function (h) { var g = h.el.geometry; return [g[g.length - 1].lat, g[g.length - 1].lon]; };
+        var kept = [];
+        out.forEach(function (h) {
+            var twin = kept.filter(function (x) { return x.key === h.key && haversineMeters(endOf(x), endOf(h)) <= 5; })[0];
+            if (!twin) { kept.push(h); return; }
+            if (len(h) > len(twin)) kept[kept.indexOf(twin)] = h;
+        });
+        return kept;
+    }
     function pickHoleSet(elements, want) {
         want = want || {};
         var need = want.holes === 9 ? 9 : 18;
-        var holes = (elements || []).filter(function (e) { return e.type === 'way' && e.tags && e.tags.golf === 'hole' && hsEnds(e); })
+        var holes = hsStitch((elements || []).filter(function (e) { return e.type === 'way' && e.tags && e.tags.golf === 'hole' && hsEnds(e); })
             .map(function (e) { var ln = hsLabelNum(e.tags); return { el: e, num: ln.num, label: ln.label, raw: ln.raw }; })
-            .filter(function (h) { return h.num && h.num >= 1 && h.num <= 99; });
+            .filter(function (h) { return h.num && h.num >= 1 && h.num <= 99; }));
         if (!holes.length) return { step: 0, how: 'no hole lines in OpenStreetMap', set: null, candidates: [] };
         var asSet = function (list) { var o = {}; list.forEach(function (h) { if (!o[h.num]) o[h.num] = h; }); return o; };
         var count = function (set) { return Object.keys(set).length; };
@@ -1085,6 +1126,8 @@
             cands = hsRoutes(holes).map(function (set) { return { id: null, label: '', set: set }; });
         }
         cands = cands.filter(function (c) { return c.set[1]; });
+        // Nothing to choose between: never an empty question - no safe answer.
+        if (!cands.length) return { step: 0, how: 'hole numbers repeat but no course can be told apart', set: null, candidates: [] };
         cands.forEach(function (c, i) { c.id = c.set[1].el.type[0] + c.set[1].el.id; if (!c.label) c.label = String.fromCharCode(65 + i); });
         var from = labels.length >= 2 && labelled >= holes.length * 0.8 ? 'labelled groups' : 'walking routes';
         // A saved tap (step 5, earlier) answers.
@@ -1121,15 +1164,16 @@
     // The elements with only the picked holes, renumbered (a back nine's 1-9 -> 10-18),
     // ready for osmToCourseGps / cleanLookupHoles.
     function applyHoleSet(elements, set) {
-        var keep = {};
-        Object.keys(set || {}).forEach(function (n) { keep[set[n].type + set[n].id] = Number(n); });
-        return (elements || []).filter(function (e) { return !(e.type === 'way' && e.tags && e.tags.golf === 'hole') || keep[e.type + e.id]; })
-            .map(function (e) {
-                if (!(e.type === 'way' && e.tags && e.tags.golf === 'hole')) return e;
-                var t = {}; Object.keys(e.tags).forEach(function (k) { if (k !== 'name' && k !== 'golf:course:name') t[k] = e.tags[k]; });
-                t.ref = String(keep[e.type + e.id]);
-                return { type: e.type, id: e.id, tags: t, geometry: e.geometry };
-            });
+        // Everything but the hole lines, then the chosen holes - as picked (a hole
+        // stitched from pieces is its whole line), renumbered.
+        var out = (elements || []).filter(function (e) { return !(e.type === 'way' && e.tags && e.tags.golf === 'hole'); });
+        Object.keys(set || {}).forEach(function (n) {
+            var e = set[n], t = {};
+            Object.keys(e.tags || {}).forEach(function (k) { if (k !== 'name' && k !== 'golf:course:name') t[k] = e.tags[k]; });
+            t.ref = String(n);
+            out.push({ type: e.type, id: e.id, tags: t, geometry: e.geometry });
+        });
+        return out;
     }
 
     // ---- GOLFAPI.IO COURSES (build 9, 2026-10-10) --------------------------------

@@ -130,6 +130,9 @@ const COURSES = [
     { key: 'gca_4ad33747', file: 'streamsong_red_blue', osm: 'way(1351613365)', parsFrom: 'directory', pick: {} },
     // Dobson Ranch (Mesa): Manny mapped all 18 greens in OSM on 2026-10-09/10.
     { key: 'gca_zgkynkan', file: 'dobson_ranch', osm: 'relation(326342)', parsFrom: 'directory' },
+    // Palmbrook (Sun City): mapped in OSM 2026-10-10; hole 18 has a line from each
+    // tee box - the picker keeps the back tee's.
+    { key: 'gca_qbxhn8pj', file: 'palmbrook', osm: 'way(119067740)', parsFrom: 'directory', pick: {} },
     { nines: true, file: 'thistle', osm: 'relation(21283499)', base: 'thistle_27',
       loops: { cameron: 'cameron', stewart: 'stewart', mackay: 'mckay' },
       nineNotes: { stewart: STEWART_NOTE } },
