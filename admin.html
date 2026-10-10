@@ -6697,6 +6697,157 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }, () => { /* not readable (no rule yet) or offline: the phone's copy stands */ });
         } catch (e) {}
     }
+    // ---- LINKED TO OPENSTREETMAP AT PICK TIME (2026-10-10) ----
+    // The moment a course is picked (step 2), gps-match.js links it: the bundle,
+    // a kept lookup, else ONE OpenStreetMap lookup from the course's point - our
+    // record's location, else the coverage list's (found by name). The answer
+    // shows under the course name before Next, and is kept on the phone under
+    // the keys the GPS side reads, so GPS opens on it at once, offline too. A club
+    // whose outline holds more than one course and that nothing settles asks
+    // once, right here: its candidate hole 1s on a satellite map, one tap.
+    const GPS_COURSE_LOC = 'hardpan_course_loc_v1_';
+    const GPS_KEY_STATES = { az: 'AZ', or: 'OR', wa: 'WA', swwa: 'WA', ct: 'CT', fl: 'FL' };
+    let gpsSetupSeq = 0;
+    function gpsLoadScript(src, ready) {
+        if (ready()) return Promise.resolve(true);
+        return new Promise((res) => {
+            const host = document.head || document.body;
+            if (!host || typeof document.createElement !== 'function') { res(false); return; }
+            const el = document.createElement(/\.css$/.test(src) ? 'link' : 'script');
+            if (/\.css$/.test(src)) { el.rel = 'stylesheet'; el.href = src; } else el.src = src;
+            el.onload = () => res(true);
+            el.onerror = () => res(false);
+            host.appendChild(el);
+        });
+    }
+    function gpsSetupEl() {
+        let el = document.getElementById('gps-setup-status');
+        if (el) return el;
+        const wrap = document.getElementById('course-wrapper');
+        if (!wrap || !wrap.parentNode) return null;
+        el = document.createElement('div');
+        el.id = 'gps-setup-status';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'margin-top:8px; font-size:0.85rem; font-weight:700; display:none;';
+        wrap.parentNode.insertBefore(el, wrap.nextSibling);
+        return el;
+    }
+    function gpsSetupShow(kind, text, button) {
+        const el = gpsSetupEl();
+        if (!el) return;
+        el.textContent = '';
+        el.dataset.gps = kind || '';
+        if (!kind) { el.style.display = 'none'; return; }
+        el.style.display = '';
+        el.style.color = kind === 'ready' ? 'var(--brand-green)' : kind === 'partial' ? '#b45309' : 'var(--text-muted)';
+        const t = document.createElement('span');
+        t.textContent = text;
+        el.appendChild(t);
+        if (button) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'gps-setup-choose';
+            b.textContent = button.label;
+            b.style.cssText = 'margin-left:8px; padding:8px 12px; min-height:40px; border-radius:999px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-weight:800; cursor:pointer;';
+            b.onclick = button.onclick;
+            el.appendChild(b);
+        }
+    }
+    function gpsSetupRender(key, r, name) {
+        if (!r) { gpsSetupShow(''); return; }
+        if (r.status === 'ready') gpsSetupShow('ready', 'GPS ✓ ready — all ' + r.of + ' holes');
+        else if (r.status === 'partial') gpsSetupShow('partial', 'GPS partial (' + r.n + '/' + r.of + ')');
+        else if (r.status === 'ask') gpsSetupShow('ask', 'This club has more than one course here.', { label: 'Choose hole 1 on the map', onclick: () => gpsSetupPicker(key, r.candidates, name) });
+        else gpsSetupShow('none', 'No GPS yet: you can tap greens during the round');
+    }
+    // The course's point: our record, else the coverage list's row for its name.
+    async function gpsSetupLocation(key, name) {
+        const L = (globalCourses[key] || {}).location || null;
+        const lat = L && Number(L.latitude != null ? L.latitude : L.lat), lng = L && Number(L.longitude != null ? L.longitude : (L.lng != null ? L.lng : L.lon));
+        if (L && isFinite(lat) && isFinite(lng) && (lat || lng)) return [lat, lng];
+        try { const c = JSON.parse(localStorage.getItem(GPS_COURSE_LOC + key) || 'null'); if (c && isFinite(c.lat) && isFinite(c.lng)) return [c.lat, c.lng]; } catch (e) {}
+        const st = (L && L.state) || GPS_KEY_STATES[String(key).split('_')[0]] || null;
+        const states = st ? [st] : GPS_COVERAGE_STATES;
+        for (let i = 0; i < states.length; i++) {
+            const list = await gpsBadgeLoadCoverage(states[i]);
+            const row = gpsCoverageRow({ club_name: name, location: { city: (L && L.city) || '' } }, list);
+            if (row && isFinite(row[7]) && isFinite(row[8])) return [row[7], row[8]];
+        }
+        return null;
+    }
+    async function gpsSetupMatch(key) {
+        const mine = ++gpsSetupSeq;
+        if (!key) { gpsSetupShow(''); return; }
+        gpsSetupShow('busy', 'Linking GPS…');
+        await gpsLoadScript('gps-geo.js', () => !!window.HardPanGeo);
+        await gpsLoadScript('gps-match.js', () => !!window.HardPanGpsMatch);
+        await gpsBadgeLoadBundle();
+        if (mine !== gpsSetupSeq) return;
+        const M = window.HardPanGpsMatch;
+        if (!M) { gpsSetupShow(''); return; }
+        // A 27-hole club: every pairing of its nines is bundled.
+        if (key === 'thistle_27') { gpsSetupRender(key, { status: 'ready', n: 18, of: 18 }); return; }
+        const rec = globalCourses[key] || {};
+        const preset = (typeof coursePresets !== 'undefined' && coursePresets) ? coursePresets[key] : null;
+        const card = (Array.isArray(rec.data) && rec.data.length ? rec.data : (preset && preset.data) || []);
+        const holes = card.length === 9 ? 9 : 18;
+        const name = rec.name || (preset && preset.name) || courseSearchInput.value || '';
+        let yards = [];
+        Object.keys(rec.tees || {}).forEach((g) => (Array.isArray(rec.tees[g]) ? rec.tees[g] : []).forEach((t) => {
+            const y = (t && Array.isArray(t.holes) ? t.holes : []).map((h) => Number(h && h.yardage) || 0);
+            if (y.length === holes && y.reduce((a, b) => a + b, 0) > yards.reduce((a, b) => a + b, 0)) yards = y;
+        }));
+        const known = M.known(key, holes);
+        if (known) { gpsSetupRender(key, known, name); return; }
+        const loc = await gpsSetupLocation(key, name);
+        if (mine !== gpsSetupSeq) return;
+        if (loc) { try { localStorage.setItem(GPS_COURSE_LOC + key, JSON.stringify({ lat: loc[0], lng: loc[1] })); } catch (e) {} }
+        const r = await M.match({ key, name, loc, holes, pars: card.map((h) => h.par), yards, db });
+        if (mine !== gpsSetupSeq) return;
+        gpsSetupRender(key, r, name);
+    }
+    // THE ONE TAP: the candidate courses' hole 1s on a satellite map.
+    async function gpsSetupPicker(key, candidates, name) {
+        await gpsLoadScript('gps-config.js', () => !!window.HARDPAN_GPS_CONFIG);
+        await gpsLoadScript('maplibre-gl.css', () => !!document.querySelector('link[href="maplibre-gl.css"]'));
+        const ok = await gpsLoadScript('maplibre-gl.js', () => !!(window.maplibregl && window.maplibregl.Map));
+        if (!ok || !candidates || !candidates.length) return;
+        const wrap = document.createElement('div');
+        wrap.id = 'gps-hole1-picker';
+        wrap.setAttribute('role', 'dialog');
+        wrap.setAttribute('aria-label', 'Choose hole 1');
+        wrap.style.cssText = 'position:fixed; inset:0; z-index:10000; background:#0b0f0c; display:flex; flex-direction:column;';
+        const head = document.createElement('div');
+        head.style.cssText = 'padding:calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; color:#f4f4ef; font-weight:800; display:flex; align-items:center; gap:10px;';
+        const title = document.createElement('div');
+        title.style.cssText = 'flex:1 1 auto; font-size:1rem; line-height:1.3;';
+        title.textContent = 'Which is ' + (name || 'your course') + '? Tap its hole 1.';
+        const cancel = document.createElement('button');
+        cancel.type = 'button'; cancel.textContent = 'Cancel';
+        cancel.style.cssText = 'min-height:44px; padding:0 14px; border-radius:12px; border:1px solid rgba(255,255,255,.3); background:transparent; color:#fff; font-weight:800;';
+        cancel.onclick = () => { wrap.remove(); };
+        head.appendChild(title); head.appendChild(cancel);
+        const mapEl = document.createElement('div');
+        mapEl.style.cssText = 'flex:1 1 auto; min-height:0;';
+        wrap.appendChild(head); wrap.appendChild(mapEl);
+        document.body.appendChild(wrap);
+        const la = candidates.map((c) => c.tee[0]), lo = candidates.map((c) => c.tee[1]);
+        const map = new window.maplibregl.Map({ container: mapEl, style: window.HardPanGpsMatch.imageryStyle(),
+            bounds: [[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], fitBoundsOptions: { padding: 90, maxZoom: 17 }, attributionControl: { compact: true } });
+        candidates.forEach((c) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'gps-hole1-choice';
+            b.textContent = 'Hole 1 · ' + c.label;
+            b.style.cssText = 'font-weight:800; font-size:14px; color:#0b0f0c; background:#d9f99d; border:2px solid #0b0f0c; border-radius:999px; padding:10px 14px; min-height:44px; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.45); white-space:nowrap;';
+            b.onclick = async () => {
+                const r = await window.HardPanGpsMatch.choose(key, c.id, { db });
+                wrap.remove();
+                gpsSetupRender(key, r || { status: 'none' }, name);
+            };
+            new window.maplibregl.Marker({ element: b, anchor: 'center' }).setLngLat([c.tee[1], c.tee[0]]).addTo(map);
+        });
+    }
     // GPS:END
     // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
     async function openImportConfirm(course) {
@@ -7894,6 +8045,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             warningText.innerHTML = pendingImport ? "" : "Make quick adjustments from your phone if the course isn't mapped accurately.";
             warningText.style.color = "var(--text-muted)";
         }
+        // GPS:BEGIN
+        if (typeof gpsSetupMatch === 'function') gpsSetupMatch(courseKey);
+        // GPS:END
     }
 
     // remapNineHandicaps now lives in course-data.js so admin.html and trip.html

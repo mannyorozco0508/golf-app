@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -56,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v348-gps-bundle'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v349-gps-holepick'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -308,11 +308,14 @@ test('build 5 landing: the Card choice is remembered per round, so every new rou
 test('build 5, any course: the OpenStreetMap lookup asks from the COURSE point, keeps clean holes, shares best-effort', { skip }, () => {
     const v = read('gps-view.js'), g = read('gps-geo.js');
     const sec = v.slice(v.indexOf('// ---- ANY COURSE: AN OPENSTREETMAP LOOKUP'), v.indexOf('// ONE writer for a pin.'));
-    assert.ok(/var pt = S\.courseLoc;/.test(sec) && !/fix\b/.test(sec), 'the course point, never the golfer (no fix in the lookup)');
+    const mt = read('gps-match.js');
+    // 2026-10-10: the lookup itself lives in gps-match.js (shared with the setup page).
+    assert.ok(/M\.match\(lookupWant\(\)\)/.test(sec) && /loc: S\.courseLoc/.test(sec) && !/\bfix\b/.test(sec.slice(sec.indexOf('function lookupWant'), sec.indexOf('function chooseHoleOne'))), 'the course point, never the golfer');
+    assert.ok(!/\bfix\b|coords|watchPosition/.test(mt), 'gps-match.js never sees the golfer');
     assert.ok(/db\.ref\('global_courses\/' \+ key \+ '\/location'\)/.test(sec), 'the location comes from the course directory');
-    assert.ok(/G\.golfCoursesQuery\(pt\)/.test(sec) && /G\.pickGolfCourse\(/.test(sec) && /G\.cleanLookupHoles\(/.test(sec), 'the shared pure parts');
-    assert.ok(/course_gps\/' \+ key \+ '\/osm'\)\.set\(rec\)/.test(sec) && /w\.then\(null, function \(\) \{\}\)/.test(sec), 'shared best-effort; a refusal is fine');
-    assert.ok(/LOOKUP_RETRY_NONE_MS = 7 \* 24 \* 3600 \* 1000/.test(sec), 'nothing found: not asked again for a week');
+    assert.ok(/G\(\)\.golfCoursesQuery\(opts\.loc\)/.test(mt) && /G\(\)\.pickGolfCourse\(/.test(mt) && /G\(\)\.cleanLookupHoles\(/.test(mt) && /G\(\)\.pickHoleSet\(/.test(mt), 'the shared pure parts');
+    assert.ok(/course_gps\/' \+ key \+ '\/osm'\)\.set\(rec\)/.test(mt) && /w\.then\(null, function \(\) \{\}\)/.test(mt), 'shared best-effort; a refusal is fine');
+    assert.ok(/RETRY_NONE_MS = 7 \* 24 \* 3600 \* 1000/.test(mt), 'nothing found: not asked again for a week');
     assert.ok(/!pointInRing\(o\.end, o\.green\)/.test(g) && /delete o\.par;/.test(g), 'kept only when the hole line ends in its green; OSM par dropped');
 });
 
@@ -477,7 +480,7 @@ test('GPS badge, coverage list: a mapped course that is not bundled never reads 
     ['az', 'wa', 'or', 'ct', 'fl'].forEach((st) => {
         const f = 'gps-coverage-' + st + '.js', d = require('./' + f);
         assert.ok(Array.isArray(d.rows) && d.rows.length > 100, f + ' has rows');
-        assert.ok(d.rows.every((r) => r.length === 7 && typeof r[0] === 'number' && r[3] <= r[5] && r[4] <= r[3]), f + ': [id, name, city, greens, usable, holes, ready] - no outlines');
+        assert.ok(d.rows.every((r) => r.length === 9 && typeof r[0] === 'number' && r[3] <= r[5] && r[4] <= r[3] && Math.abs(r[7]) <= 90 && Math.abs(r[8]) <= 180), f + ': [id, name, city, greens, usable, holes, ready, lat, lon] - no outlines');
         assert.ok(fs.statSync(path.join(__dirname, f)).size < 300 * 1024, f + ' stays small');
     });
     const loaded = [];
@@ -505,9 +508,9 @@ test('GPS badge, coverage list: a mapped course that is not bundled never reads 
     assert.equal(await badge({ id: 'x4', club_name: 'Pebble Beach Golf Links', location: { city: 'Pebble Beach', state: 'CA' } }), 'No GPS yet');
     assert.deepEqual(loaded.sort(), ['gps-coverage-az.js', 'gps-coverage-fl.js'], 'only the searched states loaded, once each');
     // Matching: the course's own words, the town breaks a tie, a tie is no match.
-    const W = { rows: [[1, 'Legacy Golf Resort Phoenix', 'Phoenix', 18, 18, 18, 1], [2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0]] };
+    const W = { rows: [[1, 'Legacy Golf Resort Phoenix', 'Phoenix', 18, 18, 18, 1, 33.4, -112.0], [2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0, 32.2, -110.9]] };
     assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Resort', location: { city: 'Phoenix' } }, W)[0], 1);
-    const W2 = { rows: [[2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0], [3, 'Legacy Golf Club', 'Sun City', 18, 18, 18, 1]] };
+    const W2 = { rows: [[2, 'Legacy Golf Club', 'Tucson', 0, 0, 18, 0, 32.2, -110.9], [3, 'Legacy Golf Club', 'Sun City', 18, 18, 18, 1, 33.6, -112.3]] };
     assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Club', location: { city: 'Mesa' } }, W2), null, 'two Legacy Golf Clubs and no town to tell them apart: no badge from the list');
     assert.equal(sb.gpsCoverageRow({ club_name: 'Legacy Golf Club', location: { city: 'Sun City' } }, W2)[0], 3, 'the town tells them apart');
     assert.equal(sb.gpsCoverageRow({ club_name: 'Golf Club', location: {} }, W), null, 'no naming words, no match');
@@ -528,4 +531,63 @@ test('a newer bundle beats an old OSM lookup cached on the phone (and only a str
     assert.equal(sb.osmRecord('k').holes[1], 'newer lookup', 'a lookup made after the bundle was built: the lookup');
     sb.lookup = { osmBase: '2026-10-09T23:00:00Z', holes: { 1: 'only a lookup' } };
     assert.equal(sb.osmRecord('none').holes[1], 'only a lookup', 'nothing bundled: the lookup');
+});
+
+test('gps-match: Talking Stick Piipaash and O\'odham, picked separately, each get only their own 18; an unsure club asks once and is answered from then on', { skip }, async () => {
+    const vm = require('vm');
+    const store = {};
+    const fixture = (f) => JSON.parse(read('gps-osm/' + f + '.json'));
+    let served = null, asked = 0;
+    const sb = {
+        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
+        HARDPAN_GPS_CONFIG: {}, HardPanGpsCourses: {},
+        fetch: (url, o) => { asked++; const q = decodeURIComponent(String(o.body).slice(5)); const body = /leisure/.test(q) ? { elements: [served.course] } : fixture(served.file);
+            return Promise.resolve({ ok: true, json: () => Promise.resolve(body) }); },
+    };
+    sb.window = sb; sb.module = undefined;
+    vm.createContext(sb);
+    vm.runInContext(read('gps-geo.js'), sb);
+    vm.runInContext(read('gps-match.js'), sb);
+    const M = sb.HardPanGpsMatch;
+    const TS = { type: 'way', id: 61417793, tags: { leisure: 'golf_course', name: 'Talking Stick Golf Club' } };
+    served = { course: TS, file: 'talking_stick' };
+    const pi = await M.match({ key: 'k_pi', name: 'Talking Stick Golf Club (Piipaash)', loc: [33.53, -111.87], holes: 18 });
+    const od = await M.match({ key: 'k_od', name: "Talking Stick Golf Club (O'odham)", loc: [33.53, -111.87], holes: 18 });
+    assert.deepEqual([pi.status, pi.n, pi.step], ['ready', 18, 2], JSON.stringify(pi));
+    assert.deepEqual([od.status, od.n, od.step], ['ready', 18, 2], JSON.stringify(od));
+    const recPi = JSON.parse(store.hardpan_osm_v1_k_pi), recOd = JSON.parse(store.hardpan_osm_v1_k_od);
+    const greensOf = (r) => Object.keys(r.holes).map((n) => JSON.stringify(r.holes[n].osm.mid));
+    assert.equal(greensOf(recPi).filter((g) => greensOf(recOd).includes(g)).length, 0, 'no green in both courses');
+    assert.equal(Object.keys(recPi.holes).length, 18); assert.equal(Object.keys(recOd.holes).length, 18);
+    // Kept: the next match is instant and needs no network (GPS opens on it offline).
+    const before = asked;
+    assert.equal((await M.match({ key: 'k_pi', name: 'x', loc: null, holes: 18 })).status, 'ready');
+    assert.equal(asked, before, 'no request for a course already matched');
+    // We-Ko-Pa by its club name: two courses, no name settles it -> ask (step 5), then the tap answers.
+    served = { course: { type: 'way', id: 262825784, tags: { leisure: 'golf_course', name: 'We-Ko-Pa Golf Club' } }, file: 'wekopa' };
+    const wk = await M.match({ key: 'k_wk', name: 'We-Ko-Pa Golf Club', loc: [33.62, -111.68], holes: 18 });
+    assert.equal(wk.status, 'ask'); assert.equal(wk.candidates.length, 2);
+    assert.deepEqual(wk.candidates.map((c) => c.label).sort(), ['Cholla', 'Saguaro'], 'shown by their own names');
+    const done = await M.choose('k_wk', wk.candidates.find((c) => c.label === 'Saguaro').id, {});
+    assert.deepEqual([done.status, done.n, done.step], ['ready', 18, 5]);
+    assert.ok(store.hardpan_holechoice_v1_k_wk, 'the tap is kept on the phone');
+    // The kept lookup gone (cleared on this phone) but the tap kept: it answers without asking.
+    delete store.hardpan_osm_v1_k_wk; delete store.hardpan_osm_v1_tried_k_wk;
+    const again = await M.match({ key: 'k_wk', name: 'We-Ko-Pa Golf Club', loc: [33.62, -111.68], holes: 18 });
+    assert.deepEqual([again.status, again.step], ['ready', 5]);
+    // Reserve Vineyards: too few hole lines to tell its courses apart -> no GPS yet, never a wrong course.
+    served = { course: { type: 'way', id: 136348508, tags: { leisure: 'golf_course', name: 'The Reserve' } }, file: 'reserve_vineyards' };
+    const rv = await M.match({ key: 'k_rv', name: 'The Reserve Vineyards (North)', loc: [45.48, -122.9], holes: 18 });
+    assert.equal(rv.status, 'none'); assert.match(rv.how, /too few to tell/);
+});
+
+test('setup step 2 links the course to OpenStreetMap at pick time, and says what it found under the name', { skip }, () => {
+    const a = read('admin.html');
+    assert.ok(/\/\/ GPS:BEGIN\s*\n\s*if \(typeof gpsSetupMatch === 'function'\) gpsSetupMatch\(courseKey\);\s*\n\s*\/\/ GPS:END\s*\n    \}/.test(a), 'every course pick (directory or import) runs the match - GPS-only');
+    ['GPS \u2713 ready', "'GPS partial ('", 'Choose hole 1 on the map', 'No GPS yet: you can tap greens during the round'].forEach((t) => assert.ok(a.includes(t), t));
+    assert.ok(/M\.match\(\{ key, name, loc, holes, pars: card\.map\(\(h\) => h\.par\), yards, db \}\)/.test(a), 'the one matcher, with our card');
+    assert.ok(/localStorage\.setItem\(GPS_COURSE_LOC \+ key/.test(a), 'the point is kept for the GPS side');
+    assert.ok(/window\.HardPanGpsMatch\.choose\(key, c\.id, \{ db \}\)/.test(a), 'the tap is saved through the matcher');
+    const sec = a.slice(a.indexOf('// ---- LINKED TO OPENSTREETMAP AT PICK TIME'), a.indexOf('// ---- THE CONFIRMATION.'));
+    assert.ok(!/geolocation|watchPosition|coords/.test(sec), 'setup never uses the golfer\'s position');
 });

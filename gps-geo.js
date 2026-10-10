@@ -879,11 +879,204 @@
         return { holes: holes, counts: r.counts };
     }
 
+    // ---- WHICH HOLES ARE THE PICKED COURSE'S (2026-10-10) -------------------------
+    // Clubs put 27, 36, 54 or 72 holes inside ONE OpenStreetMap outline. Given every
+    // hole line in it, pick the 18 (or 9) of the course the golfer chose, in order:
+    //   1  the outline holds one course (no hole number twice);
+    //   2  the holes carry a course label - golf:course:name, or a prefix in the ref
+    //      or name ("O'odham 3", "Blue 3", "N3", "Cameron - Hole 3") - and one label
+    //      (or, for a 27-hole pairing, two nines) matches the course's name;
+    //   3  the scorecard: each candidate's hole lengths against our card's yardage
+    //      (else its OSM par tags against our card's pars); a clear winner only;
+    //   4  walking order: unlabelled duplicates are split into routes (hole n's
+    //      green -> the nearest hole n+1 tee); a direction in the name ("East")
+    //      then picks the route lying that way;
+    //   5  still unsure: ask once - the candidates' hole 1s go back to be shown on
+    //      the map; the golfer's tap is saved (want.choice) and answers from then on.
+    // want: { name, holes (18|9), nines: [frontLabel, backLabel], yards: [...],
+    //         pars: [...], choice: candidate id }. Returns { step, how, set: {n: hole
+    //         element}, candidates } - set null when asking (step 5) or nothing to
+    //         pick from (step 0).
+    var HS_STOP = { golf: 1, course: 1, courses: 1, club: 1, country: 1, resort: 1, the: 1, and: 1, at: 1, of: 1, links: 1, nine: 1, holes: 1, hole: 1 };
+    function hsWords(s) {
+        return String(s || '').toLowerCase().replace(/['’`]/g, '').split(/[^a-z0-9]+/)
+            .filter(function (w) { return w && !HS_STOP[w] && !/^\d+$/.test(w); })
+            .map(function (w) { return w.replace(/(.)\1+/g, '$1'); });   // "piipaash" = "piipash" = "pipash"
+    }
+    // Two spellings of one word: equal, or the same consonants ("MacKay" / "McKay").
+    function hsSame(a, b) {
+        if (a === b) return true;
+        var sk = function (w) { return w.replace(/[aeiouy]/g, ''); };
+        return a.length >= 3 && b.length >= 3 && sk(a).length >= 3 && sk(a) === sk(b);
+    }
+    function hsHas(list, w) { for (var i = 0; i < list.length; i++) if (hsSame(list[i], w)) return true; return false; }
+    function hsLabelNum(tags) {
+        tags = tags || {};
+        var label = '', num = null, m;
+        var ref = String(tags.ref || ''), name = String(tags.name || '');
+        m = ref.match(/^\s*(\d{1,2})\s*$/);
+        if (m) num = parseInt(m[1], 10);
+        else if ((m = ref.match(/^\s*(.*?[^\d\s-])\s*-?\s*(\d{1,2})\s*$/))) { label = m[1]; num = parseInt(m[2], 10); }
+        // A label and a number in the name ("Cameron - Hole 3 - 402 yards"): the
+        // name's number wins - a club that names its holes this way may not keep ref.
+        if (!label && (m = name.match(/^\s*(.*?[^\d\s#-])\s*[-:#]?\s*(?:hole\s*)?#?\s*(\d{1,2})\b/i)) && !/^hole$/i.test(m[1].trim())) {
+            label = m[1]; num = parseInt(m[2], 10);
+        }
+        // A name with no number at all ("Streamsong Blue") is the course's name.
+        if (!label && name && !/\d/.test(name)) label = name;
+        if (num == null && (m = name.match(/\bhole\s*#?\s*(\d{1,2})\b/i))) num = parseInt(m[1], 10);
+        if (tags['golf:course:name']) label = tags['golf:course:name'];
+        return { label: hsWords(label).join(' '), raw: String(label || '').trim(), num: num };
+    }
+    function hsEnds(el) {
+        var g = (el.geometry || []);
+        return g.length >= 2 ? { a: [g[0].lat, g[0].lon], b: [g[g.length - 1].lat, g[g.length - 1].lon] } : null;
+    }
+    function hsLenYd(el) {
+        var g = el.geometry || [], m = 0;
+        for (var i = 1; i < g.length; i++) m += haversineMeters([g[i - 1].lat, g[i - 1].lon], [g[i].lat, g[i].lon]);
+        return m / M_PER_YD;
+    }
+    // Split holes whose numbers repeat into walking routes (step 4).
+    function hsRoutes(holes) {
+        var byNum = {}, max = 0;
+        holes.forEach(function (h) { (byNum[h.num] = byNum[h.num] || []).push(h); if (h.num > max) max = h.num; });
+        var starts = byNum[1] || [];
+        if (starts.length < 2) return [];
+        var routes = starts.map(function (h) { var r = {}; r[1] = h; return { set: r, last: h }; });
+        for (var n = 2; n <= max; n++) {
+            var cands = (byNum[n] || []).slice(0, 6);
+            // The assignment of this number's holes to the routes with the least
+            // walking in all (every ordering tried - a club has 2 to 4 courses).
+            var dist = function (ri, ci) { return haversineMeters(hsEnds(routes[ri].last.el).b, hsEnds(cands[ci].el).a); };
+            var best = null, bestD = Infinity;
+            var tryPerm = function (ri, used, acc, d) {
+                if (d >= bestD) return;
+                if (ri === routes.length) { bestD = d; best = acc.slice(); return; }
+                var any = false;
+                for (var ci = 0; ci < cands.length; ci++) {
+                    if (used[ci]) continue;
+                    any = true; used[ci] = 1; acc[ri] = ci;
+                    tryPerm(ri + 1, used, acc, d + dist(ri, ci));
+                    used[ci] = 0;
+                }
+                if (!any) { acc[ri] = -1; tryPerm(ri + 1, used, acc, d); }   // fewer holes than routes
+            };
+            tryPerm(0, {}, [], 0);
+            (best || []).forEach(function (ci, ri) { if (ci >= 0) { routes[ri].set[n] = cands[ci]; routes[ri].last = cands[ci]; } });
+        }
+        return routes.map(function (r) { return r.set; });
+    }
+    function pickHoleSet(elements, want) {
+        want = want || {};
+        var need = want.holes === 9 ? 9 : 18;
+        var holes = (elements || []).filter(function (e) { return e.type === 'way' && e.tags && e.tags.golf === 'hole' && hsEnds(e); })
+            .map(function (e) { var ln = hsLabelNum(e.tags); return { el: e, num: ln.num, label: ln.label, raw: ln.raw }; })
+            .filter(function (h) { return h.num && h.num >= 1 && h.num <= 99; });
+        if (!holes.length) return { step: 0, how: 'no hole lines in OpenStreetMap', set: null, candidates: [] };
+        var asSet = function (list) { var o = {}; list.forEach(function (h) { if (!o[h.num]) o[h.num] = h; }); return o; };
+        var count = function (set) { return Object.keys(set).length; };
+        var nums = {}, dup = false;
+        holes.forEach(function (h) { if (nums[h.num]) dup = true; nums[h.num] = 1; });
+        var out = function (step, how, set) {
+            var o = {};
+            Object.keys(set).forEach(function (n) { if (Number(n) <= need) o[n] = set[n].el; });
+            return { step: step, how: how, set: o, candidates: [] };
+        };
+        // 1 - one course in the outline. Unless the outline plainly holds more than one
+        // course (greens for well over this many holes) and has too few hole lines to
+        // say whose they are: then there is nothing safe to pick.
+        var greens = (elements || []).filter(function (e) { return e.tags && e.tags.golf === 'green'; }).length;
+        if (!dup && greens > need + 9 && holes.length < need / 2) {
+            return { step: 0, how: 'only ' + holes.length + ' hole line(s) among ' + greens + ' greens - too few to tell this club\'s courses apart', set: null, candidates: [] };
+        }
+        if (!dup) return out(1, 'one course in the outline', asSet(holes));
+        // 2 - labelled groups.
+        var groups = {}, labelled = 0;
+        holes.forEach(function (h) { if (h.label) { labelled++; (groups[h.label] = groups[h.label] || []).push(h); } });
+        var labels = Object.keys(groups).filter(function (l) { return count(asSet(groups[l])) >= 5; });
+        var cands = [];
+        if (labels.length >= 2 && labelled >= holes.length * 0.8) {
+            var wantW = hsWords(want.name);
+            var wantJ = wantW.join('');
+            var match = function (lbl) {
+                var lw = lbl.split(' ');
+                if (lw.length && lw.every(function (w) { return hsHas(wantW, w); })) return lw.length;
+                return lbl.replace(/ /g, '') && wantJ.indexOf(lbl.replace(/ /g, '')) !== -1 ? lw.length : 0;   // "Man O'War" = "man o war"
+            };
+            if (want.nines && want.nines.length === 2) {
+                var nineOf = function (nm) { var w = hsWords(nm); var hit = labels.filter(function (l) { return l.split(' ').every(function (x) { return hsHas(w, x); }); }); return hit.length === 1 ? hit[0] : null; };
+                var f = nineOf(want.nines[0]), b = nineOf(want.nines[1]);
+                if (f && b && f !== b) {
+                    var set = {};
+                    groups[f].forEach(function (h) { if (h.num <= 9 && !set[h.num]) set[h.num] = h; });
+                    groups[b].forEach(function (h) { if (h.num <= 9 && !set[h.num + 9]) set[h.num + 9] = { el: h.el, num: h.num + 9 }; });
+                    return out(2, 'the nines "' + (groups[f][0].raw || f) + '" + "' + (groups[b][0].raw || b) + '"', set);
+                }
+            }
+            var scored = labels.map(function (l) { return { l: l, s: match(l) }; }).sort(function (x, y) { return y.s - x.s; });
+            var shown = function (l) { return groups[l][0].raw || l; };
+            if (scored[0].s > 0 && (scored.length < 2 || scored[1].s < scored[0].s)) return out(2, 'holes labelled "' + shown(scored[0].l) + '"', asSet(groups[scored[0].l]));
+            // No name settles it, but only one group is the right size (an 18 beside a nine).
+            var sized = labels.filter(function (l) { return count(asSet(groups[l])) >= need; });
+            if (need === 18 && sized.length === 1) return out(2, 'the only 18-hole group ("' + shown(sized[0]) + '")', asSet(groups[sized[0]]));
+            cands = labels.map(function (l) { return { id: null, label: groups[l][0].raw || l, set: asSet(groups[l]) }; });
+        } else {
+            cands = hsRoutes(holes).map(function (set) { return { id: null, label: '', set: set }; });
+        }
+        cands = cands.filter(function (c) { return c.set[1]; });
+        cands.forEach(function (c, i) { c.id = c.set[1].el.type[0] + c.set[1].el.id; if (!c.label) c.label = String.fromCharCode(65 + i); });
+        var from = labels.length >= 2 && labelled >= holes.length * 0.8 ? 'labelled groups' : 'walking routes';
+        // A saved tap (step 5, earlier) answers.
+        if (want.choice) { var ch = cands.filter(function (c) { return c.id === want.choice; })[0]; if (ch) return out(5, 'the hole 1 chosen on the map', ch.set); }
+        // 3 - the scorecard: yardage, else par.
+        var card = function (c) {
+            var hit = 0, tried = 0;
+            for (var n = 1; n <= need; n++) {
+                var h = c.set[n]; if (!h) continue;
+                var yd = want.yards && want.yards[n - 1], par = want.pars && want.pars[n - 1];
+                if (yd) { tried++; if (Math.abs(hsLenYd(h.el) - yd) <= yd * 0.10) hit++; }
+                else if (par && h.el.tags.par) { tried++; if (parseInt(h.el.tags.par, 10) === par) hit++; }
+            }
+            return { hit: hit, tried: tried };
+        };
+        if (cands.length >= 2 && ((want.yards && want.yards.length) || (want.pars && want.pars.length))) {
+            var sc = cands.map(function (c) { return { c: c, r: card(c) }; }).sort(function (x, y) { return y.r.hit - x.r.hit; });
+            if (sc[0].r.tried >= need * 0.6 && sc[0].r.hit >= sc[0].r.tried * 0.6 && sc[0].r.hit - sc[1].r.hit >= 3) {
+                return out(3, 'the scorecard (' + sc[0].r.hit + ' of ' + sc[0].r.tried + ' holes match ' + (want.yards && want.yards.length ? 'its yardage' : 'its pars') + ') among ' + from, sc[0].c.set);
+            }
+        }
+        // 4 - a direction in the name picks the route lying that way.
+        var dir = (hsWords(want.name).filter(function (w) { return /^(east|west|north|south)$/.test(w); })[0]);
+        if (dir && cands.length === 2) {
+            var mean = function (c, k) { var t = 0, m = 0; Object.keys(c.set).forEach(function (n) { var e = hsEnds(c.set[n].el); t += e.b[k]; m++; }); return t / m; };
+            var k = dir === 'east' || dir === 'west' ? 1 : 0, bigger = mean(cands[0], k) > mean(cands[1], k) ? 0 : 1;
+            var pick = (dir === 'east' || dir === 'north') ? cands[bigger] : cands[1 - bigger];
+            return out(4, 'walking order split the ' + cands.length + ' courses; "' + dir + '" is the route lying ' + dir, pick.set);
+        }
+        // 5 - ask once.
+        return { step: 5, how: 'ask: ' + cands.length + ' candidate courses (' + from + ')', set: null,
+                 candidates: cands.map(function (c) { var e = hsEnds(c.set[1].el); return { id: c.id, label: c.label, tee: e.a, end: e.b, holes: count(c.set) }; }) };
+    }
+    // The elements with only the picked holes, renumbered (a back nine's 1-9 -> 10-18),
+    // ready for osmToCourseGps / cleanLookupHoles.
+    function applyHoleSet(elements, set) {
+        var keep = {};
+        Object.keys(set || {}).forEach(function (n) { keep[set[n].type + set[n].id] = Number(n); });
+        return (elements || []).filter(function (e) { return !(e.type === 'way' && e.tags && e.tags.golf === 'hole') || keep[e.type + e.id]; })
+            .map(function (e) {
+                if (!(e.type === 'way' && e.tags && e.tags.golf === 'hole')) return e;
+                var t = {}; Object.keys(e.tags).forEach(function (k) { if (k !== 'name' && k !== 'golf:course:name') t[k] = e.tags[k]; });
+                t.ref = String(keep[e.type + e.id]);
+                return { type: e.type, id: e.id, tags: t, geometry: e.geometry };
+            });
+    }
+
     var api = {
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
-        courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles,
+        courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

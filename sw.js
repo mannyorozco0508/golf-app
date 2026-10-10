@@ -4488,7 +4488,12 @@
 // and fifteen OSM maps fully), the coverage lists the GPS badge reads, and the
 // newer of a bundle and a phone's own OSM lookup wins. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v348-gps-bundle';
+// GPS:BEGIN
+// Moved to v349 (gps-flow build 8, 2026-10-10): the course is linked to
+// OpenStreetMap at pick time (gps-match.js), one general hole picker for clubs
+// with several courses in one outline, and the one-tap hole-1 choice. HardPan only.
+// GPS:END
+const CACHE_VERSION = 'golfapp-v349-gps-holepick';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4686,6 +4691,8 @@ const SHELL_FILES = [
     './gps-coverage-or.js',
     './gps-coverage-ct.js',
     './gps-coverage-fl.js',
+    // The one course-to-OpenStreetMap matcher, setup and GPS side (2026-10-10).
+    './gps-match.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the

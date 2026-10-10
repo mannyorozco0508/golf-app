@@ -67,35 +67,6 @@ function thistleNumber(nine) {
 }
 
 const refOf = (tags) => { const m = String((tags && tags.ref) || '').match(/^\s*(\d{1,2})\s*$/); return m ? parseInt(m[1], 10) : null; };
-// TWO 18s IN ONE OUTLINE WITH NOTHING TELLING THEM APART (Glendoveer: refs 1-18
-// twice, no names). Each course is a walking ROUTE: hole n+1's tee is near hole
-// n's green. Starting from the two hole 1s, each next hole goes to the route whose
-// last green is nearer its tee (the cheaper pairing of the two); the route lying
-// further east is the East course. The par check against our card (below) is the
-// proof: a wrong split shows up as verify notes.
-function routeSplit(side) {
-    return (elements) => {
-        const isHole = (e) => e.type === 'way' && e.tags && e.tags.golf === 'hole' && e.geometry && e.geometry.length >= 2;
-        const byRef = {};
-        elements.filter(isHole).forEach((h) => { const r = refOf(h.tags); if (r) (byRef[r] = byRef[r] || []).push(h); });
-        const pt = (p) => [p.lat, p.lon];
-        const first = (h) => pt(h.geometry[0]), last = (h) => pt(h.geometry[h.geometry.length - 1]);
-        const d = (a, b) => Math.hypot(a[0] - b[0], (a[1] - b[1]) * Math.cos(a[0] * Math.PI / 180));
-        if (!byRef[1] || byRef[1].length !== 2) throw new Error('routeSplit: expected two hole 1s');
-        const routes = [[byRef[1][0]], [byRef[1][1]]];
-        for (let n = 2; n <= 18; n++) {
-            const c = byRef[n] || [];
-            if (c.length !== 2) throw new Error('routeSplit: expected two hole ' + n + 's, found ' + c.length);
-            const e0 = last(routes[0][routes[0].length - 1]), e1 = last(routes[1][routes[1].length - 1]);
-            if (d(e0, first(c[0])) + d(e1, first(c[1])) <= d(e0, first(c[1])) + d(e1, first(c[0]))) { routes[0].push(c[0]); routes[1].push(c[1]); }
-            else { routes[0].push(c[1]); routes[1].push(c[0]); }
-        }
-        const lon = (r) => r.reduce((t, h) => t + last(h)[1], 0) / r.length;
-        const east = lon(routes[0]) > lon(routes[1]) ? routes[0] : routes[1];
-        const keep = new Set((side === 'east' ? east : routes[east === routes[0] ? 1 : 0]).map((h) => h.id));
-        return elements.filter((e) => !isHole(e) || keep.has(e.id));
-    };
-}
 const STEWART_NOTE = 'Stewart greens were rebuilt Jun-Sep 2026, so this green may have moved.';
 
 // key = the app's course key (course-data.js) or a 27-hole pairing key from
@@ -134,26 +105,29 @@ const COURSES = [
     // every green, and a hole line ending at each (docs/osm-coverage/summary.md).
     // Pars from our card: the preset, else gps-osm/directory-pars.json.
     { key: 'az_tpc_champions', file: 'tpc_scottsdale_champions', osm: 'way(78388952)', parsFrom: 'directory' },
-    // Talking Stick: one outline, holes named "O'odham N" and "Piipaash N" (one "Piipash 7").
-    { key: 'az_talking_oodham', file: 'talking_stick', osm: 'way(61417793)', preset: 'az_talking_oodham', holeFilter: (t) => /^\s*o\W?odham\b/i.test(String(t.name || '')) },
-    { key: 'az_talking_piipaash', file: 'talking_stick', osm: 'way(61417793)', preset: 'az_talking_piipaash', holeFilter: (t) => /^\s*pii?pa+sh\b/i.test(String(t.name || '')) },
+    // CLUBS WITH MORE THAN ONE COURSE IN AN OUTLINE: `pick` hands the course's name
+    // to gps-geo.pickHoleSet - the same chooser a phone's lookup uses - which says
+    // which step settled it (printed below). Talking Stick: holes named "O'odham N" /
+    // "Piipaash N" (step 2).
+    { key: 'az_talking_oodham', file: 'talking_stick', osm: 'way(61417793)', preset: 'az_talking_oodham', pick: {} },
+    { key: 'az_talking_piipaash', file: 'talking_stick', osm: 'way(61417793)', preset: 'az_talking_piipaash', pick: {} },
     { key: 'gca_bwcdmzcy', file: 'legacy_phoenix', osm: 'relation(3547143)', parsFrom: 'directory' },
     { key: 'swwa_lewisriver', file: 'lewis_river', osm: 'way(357058419)', preset: 'swwa_lewisriver' },
     { key: 'swwa_mintvalley', file: 'mint_valley', osm: 'way(806288368)', parsFrom: 'directory' },
     { key: 'swwa_threerivers', file: 'three_rivers', osm: 'way(305645798)', parsFrom: 'directory' },
     { key: 'swwa_tahoma_valley', file: 'tahoma_valley', osm: 'way(94252069)', preset: 'swwa_tahoma_valley' },
     { key: 'wa_allenmore', file: 'allenmore', osm: 'way(23143257)', parsFrom: 'directory' },
-    // Meadow Park: the Championship 18, not the Williams Nine (golf:course:name).
-    { key: 'wa_meadow_park', file: 'meadow_park', osm: 'way(22718513)', parsFrom: 'directory', holeFilter: (t) => /championship/i.test(String(t['golf:course:name'] || '')) },
-    // Glendoveer: East and West in one outline, refs 1-18 twice and nothing else - see routeSplit.
-    { key: 'or_glendoveer_east', file: 'glendoveer', osm: 'way(39789766)', preset: 'or_glendoveer_east', select: routeSplit('east') },
-    { key: 'or_glendoveer_west', file: 'glendoveer', osm: 'way(39789766)', preset: 'or_glendoveer_west', select: routeSplit('west') },
+    // Meadow Park: the Championship 18 beside the Williams Nine (step 2).
+    { key: 'wa_meadow_park', file: 'meadow_park', osm: 'way(22718513)', parsFrom: 'directory', pick: {} },
+    // Glendoveer: East and West, refs 1-18 twice and nothing else (steps 3 / 4).
+    { key: 'or_glendoveer_east', file: 'glendoveer', osm: 'way(39789766)', preset: 'or_glendoveer_east', pick: {} },
+    { key: 'or_glendoveer_west', file: 'glendoveer', osm: 'way(39789766)', preset: 'or_glendoveer_west', pick: {} },
     { key: 'or_indiancreek', file: 'indian_creek', osm: 'way(276425283)', preset: 'or_indiancreek' },
     { key: 'or_stonecreek', file: 'stone_creek', osm: 'way(188382554)', preset: 'or_stonecreek' },
     { key: 'or_wildwood', file: 'wildwood', osm: 'way(428675780)', preset: 'or_wildwood' },
     // Streamsong Red (golf:course:name). Blue shares the outline and Black has its
     // own; neither is in our directory yet, so neither has a key to ship under.
-    { key: 'gca_4ad33747', file: 'streamsong_red_blue', osm: 'way(1351613365)', parsFrom: 'directory', holeFilter: (t) => /streamsong red/i.test(String(t['golf:course:name'] || '')) },
+    { key: 'gca_4ad33747', file: 'streamsong_red_blue', osm: 'way(1351613365)', parsFrom: 'directory', pick: {} },
     // Dobson Ranch (Mesa): Manny mapped all 18 greens in OSM on 2026-10-09/10.
     { key: 'gca_zgkynkan', file: 'dobson_ranch', osm: 'relation(326342)', parsFrom: 'directory' },
     { nines: true, file: 'thistle', osm: 'relation(21283499)', base: 'thistle_27',
@@ -241,10 +215,17 @@ function build(rawDir) {
         const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
         const fetched = raw.osm3s && raw.osm3s.timestamp_osm_base || null;
         if (!c.nines) {
-            const r = geo.osmToCourseGps(c.select ? c.select(raw.elements) : raw.elements, { holeFilter: c.holeFilter, holeNumber: c.holeNumber });
-            const pars = c.parsFrom === 'directory'
-                ? JSON.parse(fs.readFileSync(path.join(RAW_DIR, 'directory-pars.json'), 'utf8'))[c.key].pars
-                : cd.coursePresets[c.preset].data.map((h) => h.par);
+            const dir = JSON.parse(fs.readFileSync(path.join(RAW_DIR, 'directory-pars.json'), 'utf8'));
+            const pars = c.parsFrom === 'directory' ? dir[c.key].pars : cd.coursePresets[c.preset].data.map((h) => h.par);
+            let els = raw.elements, how = '';
+            if (c.pick) {
+                const name = c.parsFrom === 'directory' ? dir[c.key].name : cd.coursePresets[c.preset].name;
+                const ph = geo.pickHoleSet(raw.elements, Object.assign({ name, holes: pars.length === 9 ? 9 : 18, pars }, c.pick));
+                if (!ph.set) { problems.push(`${c.key}: the hole picker could not choose (${ph.how})`); return; }
+                els = geo.applyHoleSet(raw.elements, ph.set);
+                how = `step ${ph.step}: ${ph.how}`;
+            }
+            const r = geo.osmToCourseGps(els, { holeFilter: c.holeFilter, holeNumber: c.holeNumber });
             const verify = {};
             if (c.allNote) Object.keys(r.holes).forEach((n) => { verify[n] = c.allNote.replace('REF', String(Number(n) - 9)).replace('HOLE', String(n)); });
             const holes = finish(c.key, r.holes, pars, verify);
@@ -252,7 +233,7 @@ function build(rawDir) {
             if (Object.keys(verify).length) rec.verify = verify;
             records[c.key] = rec;
             report.push({ key: c.key, holeWays: r.counts.holeWays, greensMatched: r.counts.greensMatched,
-                          shipped: Object.keys(holes).length, verify: Object.keys(verify).length });
+                          shipped: Object.keys(holes).length, verify: Object.keys(verify).length, how });
             return;
         }
         // A 27-hole club: one record per nine, then every pairing the app can
@@ -329,7 +310,7 @@ async function main() {
         });
     }
     const { records, report, problems, drops } = build(args.includes('--trim-from') ? RAW_DIR : rawDir);
-    report.forEach((r) => console.log(`${r.key.padEnd(22)} hole ways ${r.holeWays}/${r.of || 18}  greens matched ${r.greensMatched}/${r.of || 18}  shipped ${r.shipped}/${r.of || 18}  verify ${r.verify}`));
+    report.forEach((r) => console.log(`${r.key.padEnd(22)} hole ways ${r.holeWays}/${r.of || 18}  greens matched ${r.greensMatched}/${r.of || 18}  shipped ${r.shipped}/${r.of || 18}  verify ${r.verify}${r.how ? '  [' + r.how + ']' : ''}`));
     drops.forEach((d) => console.log('  ' + d));
     if (problems.length) {
         console.error('NOT WRITTEN - fix these first:\n  ' + problems.join('\n  '));

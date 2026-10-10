@@ -609,3 +609,49 @@ test('alongLine (now exported): how far along tee -> green a point projects', ()
     assert.strictEqual(geo.alongLine([0, -0.001], [[0, 0], [0, 0.001]]).t, 0);   // behind the tee
     assert.strictEqual(geo.alongLine([0, 0.002], [[0, 0], [0, 0.001]]).t, 1);    // past the green
 });
+
+// ---- WHICH HOLES ARE THE PICKED COURSE'S (2026-10-10): real OpenStreetMap extracts ----
+test('pickHoleSet: each club resolves its course by the step it should, on real OSM data', () => {
+    const vm = require('vm');
+    const sb = {}; vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'course-data.js'), 'utf8') + ';this.p=coursePresets', sb);
+    const pars = (k) => sb.p[k].data.map((h) => h.par);
+    const els = (f) => JSON.parse(fs.readFileSync(path.join(__dirname, 'gps-osm', f + '.json'), 'utf8')).elements;
+    const pick = (f, want) => geo.pickHoleSet(els(f), want);
+    const usable = (f, r) => Object.keys(geo.cleanLookupHoles(geo.applyHoleSet(els(f), r.set)).holes).length;
+    // Talking Stick: 2 x 18 in one outline, holes named "O'odham N" / "Piipaash N" (one "Piipash 7") -> step 2, each only its own 18.
+    const pi = pick('talking_stick', { name: 'Talking Stick Golf Club (Piipaash)', pars: pars('az_talking_piipaash') });
+    const od = pick('talking_stick', { name: "Talking Stick Golf Club (O'odham)", pars: pars('az_talking_oodham') });
+    assert.equal(pi.step, 2); assert.equal(od.step, 2);
+    assert.equal(Object.keys(pi.set).length, 18); assert.equal(Object.keys(od.set).length, 18);
+    const ids = (r) => Object.values(r.set).map((e) => e.id);
+    assert.equal(ids(pi).filter((id) => ids(od).includes(id)).length, 0, 'no hole in both');
+    assert.ok(Object.values(pi.set).every((e) => /^pii?pa+sh/i.test(e.tags.name)) && Object.values(od.set).every((e) => /^o.?odham/i.test(e.tags.name)));
+    assert.equal(usable('talking_stick', pi), 18); assert.equal(usable('talking_stick', od), 18);
+    // We-Ko-Pa: 2 x 18 in one outline (golf:course:name Cholla / Saguaro) -> step 2; the club name alone -> ask (step 5).
+    assert.equal(pick('wekopa', { name: 'We-Ko-Pa Golf Club (Saguaro)' }).step, 2);
+    const wk = pick('wekopa', { name: 'We-Ko-Pa Golf Club' });
+    assert.equal(wk.step, 5); assert.equal(wk.set, null);
+    assert.deepEqual(wk.candidates.map((c) => c.holes), [18, 18]);
+    assert.ok(wk.candidates.every((c) => c.tee.length === 2 && c.id), 'each candidate brings its hole 1 to show on the map');
+    // ...and the tap, saved, answers from then on.
+    const tapped = pick('wekopa', { name: 'We-Ko-Pa Golf Club', choice: wk.candidates[1].id });
+    assert.equal(tapped.step, 5); assert.equal(Object.keys(tapped.set).length, 18);
+    // Reserve Vineyards: 36 holes, 40 greens, 1 hole line -> nothing safe to pick (step 0), never a wrong course.
+    const rv = pick('reserve_vineyards', { name: 'The Reserve Vineyards (North)' });
+    assert.equal(rv.step, 0); assert.equal(rv.set, null);
+    // A 27-hole pairing: Thistle's nines, front + back, "MacKay" matching OSM's "McKay".
+    const th = pick('thistle', { name: 'Thistle (MacKay / Cameron)', nines: ['MacKay', 'Cameron'] });
+    assert.equal(th.step, 2); assert.equal(Object.keys(th.set).length, 18);
+    assert.ok([1, 9].every((n) => /mckay/i.test(th.set[n].tags.name)) && [10, 18].every((n) => /cameron/i.test(th.set[n].tags.name)));
+    // A 9-hole course: Meadow Park's Williams Nine (beside the Championship 18).
+    const wn = pick('meadow_park', { name: 'Meadow Park (Williams Nine)', holes: 9 });
+    assert.equal(wn.step, 2); assert.equal(Object.keys(wn.set).length, 9);
+    assert.equal(pick('meadow_park', { name: 'Meadow Park', pars: [] }).how, 'the only 18-hole group ("Championship 18")');
+    // Unlabelled 2 x 18 (Glendoveer): walking order separates; a direction or the scorecard picks; neither -> ask.
+    assert.equal(pick('glendoveer', { name: 'Glendoveer Golf Course (East)', pars: pars('or_glendoveer_east') }).step, 3, 'the scorecard (pars)');
+    assert.equal(pick('glendoveer', { name: 'Glendoveer Golf Course (East)' }).step, 4, 'no card: the direction in the name');
+    assert.equal(pick('glendoveer', { name: 'Glendoveer Golf Course (West)', pars: pars('or_glendoveer_west') }).step, 3);
+    assert.equal(pick('glendoveer', { name: 'Glendoveer Golf Course' }).step, 5);
+    // One course in the outline (step 1).
+    assert.equal(pick('dobson_ranch', { name: 'Dobson Ranch Golf Course' }).step, 1);
+});

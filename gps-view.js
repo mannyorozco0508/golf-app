@@ -391,9 +391,6 @@
     // the mirror that answers browsers goes first; the main one is the fallback.
     // Courses OSM maps well are BUNDLED instead (tools/gps-import-osm.js), so this
     // lookup is only for the rest.
-    var OVERPASS_URLS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter'];
-    var LOOKUP_RETRY_NONE_MS = 7 * 24 * 3600 * 1000, LOOKUP_RETRY_ERR_MS = 3600 * 1000;
-    function overpassUrls() { return cfg().overpassUrl ? [String(cfg().overpassUrl)] : OVERPASS_URLS; }
     function lookedUp(key) {
         if (S && S.courseKey === key && S.osmShared && S.osmShared.holes) return S.osmShared;
         var v = lsGet(OSM_LOOKUP + key);
@@ -426,48 +423,75 @@
             }, fin);
         } catch (e) { fin(); }
     }
-    function overpass(q) {
-        var urls = overpassUrls();
-        var one = function (i) {
-            return fetch(urls[i], { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) })
-                .then(function (r) { if (!r.ok) throw new Error('overpass ' + r.status); return r.json(); })
-                .catch(function (e) { if (i + 1 < urls.length) return one(i + 1); throw e; });
-        };
-        return one(0);
-    }
+    // THE LOOKUP IS gps-match.js NOW (2026-10-10), shared with the setup page that
+    // runs it the moment a course is picked: the same order (bundle, a kept lookup,
+    // one OpenStreetMap lookup from the course point), the same keys on the phone,
+    // and gps-geo.pickHoleSet choosing this course's holes when the outline holds
+    // more than one course. Unsure -> S.holeAsk: the candidates' hole 1s on the map,
+    // one tap, saved - never a silent "No green mapped".
     function lookupCourse(done) {
         var fin = function (found) { if (done) { var d = done; done = null; d(found); } };
-        if (!S || typeof fetch !== 'function') { fin(false); return; }
+        var M = (typeof window !== 'undefined' && window.HardPanGpsMatch) || null;
+        if (!S || !M) { fin(false); return; }
         var key = S.courseKey, mine = S;
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         if (G.osmCourse(all, key) || lookedUp(key)) { fin(true); return; }
-        var tried = lsGet(OSM_LOOKUP + 'tried_' + key);
-        if (tried && Date.now() - tried.at < (tried.none ? LOOKUP_RETRY_NONE_MS : LOOKUP_RETRY_ERR_MS)) { fin(false); return; }
         if (S.osmInFlight) { fin(false); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
-        var pt = S.courseLoc;
-        if (!pt) { fin(false); return; }
+        if (!S.courseLoc) { fin(false); return; }
         S.osmInFlight = true;
-        var cname = (S.round && S.round.courseName) || '';
-        var mark = function (none) { lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: !!none }); mine.osmInFlight = false; };
-        overpass(G.golfCoursesQuery(pt)).then(function (j) {
-            var pick = G.pickGolfCourse(j && j.elements, cname);
-            if (!pick) return null;
-            return overpass(G.courseHolesQuery(pick)).then(function (k) { return { course: pick, raw: k }; });
-        }).then(function (got) {
-            if (!got) { mark(true); fin(false); return; }
-            var holes = G.cleanLookupHoles(got.raw.elements).holes;
-            if (!Object.keys(holes).length) { mark(true); fin(false); return; }
-            var rec = { v: 1, src: 'osm-lookup', osm: got.course.type + '/' + got.course.id, name: (got.course.tags && got.course.tags.name) || '',
-                        osmBase: (got.raw.osm3s && got.raw.osm3s.timestamp_osm_base) || null, at: Date.now(), holes: holes };
-            lsSet(OSM_LOOKUP + key, rec);
-            mark(false);
-            if (mine.db && typeof mine.db.ref === 'function') {
-                try { var w = mine.db.ref('course_gps/' + key + '/osm').set(rec); if (w && typeof w.then === 'function') w.then(null, function () {}); } catch (e) {}
-            }
-            if (S === mine) { S.needsFrame = true; render(); }
-            fin(true);
-        }).catch(function () { mark(false); fin(false); });
+        M.match(lookupWant()).then(function (r) {
+            mine.osmInFlight = false;
+            if (r.status === 'ask') { if (S === mine) { S.holeAsk = r.candidates; S.needsFrame = true; render(); } fin(false); return; }
+            var ok = r.status === 'ready' || r.status === 'partial';
+            if (S === mine) { S.holeAsk = null; if (ok) { S.needsFrame = true; render(); } }
+            fin(ok);
+        });
+    }
+    // What the matcher needs about THIS course: its name, point and card.
+    function lookupWant() {
+        var list = (typeof S.holeList === 'function' ? S.holeList() : null) || [];
+        var n = list.length === 9 ? 9 : 18, pars = [], yards = [];
+        for (var h = 1; h <= n; h++) {
+            var m = (typeof S.holeMeta === 'function' ? S.holeMeta(h) : null) || {};
+            pars.push(m.par != null ? Number(m.par) : null);
+            yards.push(m.yards ? Number(m.yards) : null);
+        }
+        return { key: S.courseKey, name: (S.round && S.round.courseName) || '', loc: S.courseLoc, holes: n,
+                 pars: pars.some(function (x) { return x; }) ? pars : [], yards: yards.some(function (x) { return x; }) ? yards : [], db: S.db };
+    }
+    // ONE TAP (step 5): a candidate course's hole 1, chosen on the map.
+    function chooseHoleOne(id) {
+        var M = window.HardPanGpsMatch, mine = S;
+        if (!S || !M) return;
+        M.choose(S.courseKey, id, { db: S.db }).then(function (r) {
+            if (S !== mine) return;
+            S.holeAsk = null;
+            S.needsFrame = true; S.framed = null;
+            if (!r) { lookupCourse(); return; }
+            frameHole(false); render();
+        });
+    }
+    function drawHoleAsk() {
+        var want = S.holeAsk || [];
+        Object.keys(S.markers || {}).forEach(function (k) { if (/^ask/.test(k) && !want.some(function (c) { return 'ask' + c.id === k; })) marker(k, null); });
+        if (!S.map || !ML()) return;
+        want.forEach(function (c) {
+            marker('ask' + c.id, c.tee, function () {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'gps-ask-hole1';
+                b.textContent = 'Hole 1 · ' + c.label;
+                b.setAttribute('aria-label', 'This is my hole 1: ' + c.label);
+                b.addEventListener('click', function (e) { e.stopPropagation(); chooseHoleOne(c.id); });
+                return b;
+            });
+        });
+        if (want.length && S.askFramed !== want.map(function (c) { return c.id; }).join()) {
+            S.askFramed = want.map(function (c) { return c.id; }).join();
+            var la = want.map(function (c) { return c.tee[0]; }), lo = want.map(function (c) { return c.tee[1]; });
+            try { S.map.fitBounds([[Math.min.apply(null, lo), Math.min.apply(null, la)], [Math.max.apply(null, lo), Math.max.apply(null, la)]], { padding: 90, maxZoom: 17, duration: 0 }); } catch (e) {}
+        }
     }
     // Does this hole have a green (or a tee) to measure to?
     function holeHasData(n) {
@@ -2238,6 +2262,7 @@
         else if (S.mode === 'setBack') banner = 'Tap the BACK edge (optional)';
         else if (S.mode === 'confirmMid' || S.mode === 'confirmAll' || S.mode === 'gpsConfirmMid' || S.mode === 'gpsConfirmAll') banner = 'Save this green for hole ' + S.hole + '?';
         else if (S.loadingCourses) banner = 'Loading the course…';
+        else if (S.holeAsk && S.holeAsk.length) banner = 'More than one course here - tap YOUR hole 1';
         else if (noGreen) banner = 'No green mapped for this hole yet';
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
@@ -2246,6 +2271,9 @@
         // Free: no map, so nothing to set - the numbers only.
         show('.gps-set-green', S.pro && !setting && noGreen && !S.loadingCourses);
         show('.gps-fix-green', S.pro && !setting && !noGreen && !!S.canFix);
+        // The organizer can change which course's holes a club's outline gave.
+        var lk = lookedUp(S.courseKey);
+        show('.gps-rechoose', !!S.canFix && !!(lk && lk.pick && lk.pick.candidates > 1));
         // THE SCORE BUTTON: the hole's own score entry, on the card (Bets side).
         // GREEN / HOLE: the green alone, or back to the whole hole.
         show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
@@ -2288,6 +2316,7 @@
         drawLayers();
         drawDot();
         drawTarget();
+        drawHoleAsk();
         placePills();
         syncWind();
     }
@@ -2437,6 +2466,7 @@
         +   '<button type="button" class="gps-menu-item gps-set-green" style="display:none">Set the green</button>'
         +   '<button type="button" class="gps-menu-item gps-fix-green" style="display:none">Fix the green</button>'
         +   '<button type="button" class="gps-menu-item gps-undo-green" style="display:none">Undo last fix</button>'
+        +   '<button type="button" class="gps-menu-item gps-rechoose" style="display:none">Choose hole 1 again</button>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
         + '</div>'
         // THE HOLE PICKER.
@@ -2537,6 +2567,7 @@
         + '#gps-overlay .gps-wind-tag{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font:700 9px/1 ' + FONT + ';color:#c8d1ca;letter-spacing:.02em;}'
         + '#gps-overlay .gps-wind-tagged .gps-wind-tag{display:block;}'
         + '#gps-overlay .gps-wind-manual .gps-wind-tag{color:#fbbf24;}'
+        + '#gps-overlay .gps-ask-hole1{font:800 14px/1 ' + FONT + ';color:#0b0f0c;background:#d9f99d;border:2px solid #0b0f0c;border-radius:999px;padding:10px 14px;min-height:44px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);white-space:nowrap;}'
         + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tagged{padding-bottom:13px !important;}'
         + '#gps-overlay .gps-wind-sheet{position:absolute;z-index:46;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;border-radius:18px 18px 0 0;padding:10px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;color:#f4f4ef;display:flex;flex-direction:column;align-items:center;gap:8px;}'
@@ -2773,6 +2804,13 @@
         on(el, '.gps-prev', function () { if (S && S.stepHole) S.stepHole(-1); });
         on(el, '.gps-next', function () { if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-units', function () { setUnits(units() === 'm' ? 'yd' : 'm'); render(); });
+        on(el, '.gps-rechoose', function () {
+            if (!S || !window.HardPanGpsMatch) return;
+            closeMenus();
+            window.HardPanGpsMatch.forget(S.courseKey);
+            S.osmShared = null;
+            lookupCourse();
+        });
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
         // Recenter also puts the target back at its default (build 6).
         on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
