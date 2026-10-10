@@ -84,13 +84,30 @@ passes unchanged.
 
 ## What Muse / Manny do (once, ~45 min)
 
-1. `firebase login` (rattlegolf account with access to golfapp-9fb21).
-2. Secret: `firebase functions:secrets:set GOLFAPI_KEY` (paste the key at the prompt; never in a file).
-3. `cd firebase-functions && npm install`
-4. Deploy ONLY the functions: `firebase deploy --only functions:gpsSearch,functions:gpsCourse`
-   (**never a bare `firebase deploy`** - it would publish database.rules.json).
-5. Manny reviews `docs/gps-live-rules.diff`, then publishes those 3 blocks (or says go).
-6. Archive build 11 -> TestFlight INTERNAL only.
+In `~/golf-app-gps-live` (branch gps-live; it has golfapi/ already). Nothing here
+touches builds 9 / 10, `~/golf-app-gps-flow`, or the "Myrtle trip" review.
+
+1. Firebase CLI: `npm install -g firebase-tools` (free), then `firebase login` with the
+   Google account that owns golfapp-9fb21, then `firebase use golfapp-9fb21`.
+2. The key, into Secret Manager (never a file):
+   `firebase functions:secrets:set GOLFAPI_KEY` - paste the key at the prompt.
+3. `cd firebase-functions && npm install && cd ..`
+4. Deploy ONLY the two functions:
+   `firebase deploy --only functions:gpsSearch,functions:gpsCourse`
+   - First time: the CLI asks to enable Cloud Functions / Cloud Build / Artifact
+     Registry / Cloud Run / Eventarc / Secret Manager APIs - say yes.
+   - It asks for `ALERT_UIDS`: Manny's Firebase uid (Authentication tab), or blank.
+   - **Never a bare `firebase deploy`**: that would also publish database.rules.json.
+5. Rules: Manny reads `docs/gps-live-rules.diff`. To publish, Firebase console ->
+   Realtime Database -> Rules: paste the three blocks (`gps_courses`, `gps_links`,
+   `gps_usage`) just above `"$other"`, Publish. Nothing else in the rules changes.
+6. Optional (free): Cloud Logging alert on `GOLFAPI_FLOOR` -> email Manny.
+7. Archive build 11 from this folder (as builds 9/10: `node tools/golfapi-pull.js
+   --build`, `node tools/build-gps-app.js`, `cd gps-beta && npm install && npx cap sync
+   ios`, Xcode Version 0.2 Build 11) -> TestFlight **INTERNAL group only**.
+
+Until steps 4-5 are done, build 11 still has the 9 bundled courses; a new search
+says "GPS is not available right now".
 
 ## Cost
 
