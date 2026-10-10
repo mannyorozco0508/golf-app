@@ -592,63 +592,70 @@ test('setup step 2 links the course to OpenStreetMap at pick time, and says what
     assert.ok(!/geolocation|watchPosition|coords/.test(sec), 'setup never uses the golfer\'s position');
 });
 
-test('a PARTIAL course re-checks OpenStreetMap (daily, or at once when asked) and keeps the answer only with more holes - Canyon Lakes hole 8', { skip }, async () => {
+test('a FRESH PULL when a course is picked: the copy first, the pull only if newer and with at least as many holes; once an hour; not on the tee - Canyon Lakes hole 8', { skip }, async () => {
     const vm = require('vm');
     const store = {};
     const full = JSON.parse(read('gps-osm/canyon_lakes_kennewick.json'));
-    const G = require('./gps-geo.js');
     // The bundle as build 8 shipped it: hole 8 missing, read from older OSM data.
     const bundle = JSON.parse(JSON.stringify(require('./gps-courses.js')));
     delete bundle.gca_f0s28j10.holes['8'];
     bundle.gca_f0s28j10.osmBase = '2026-10-09T18:29:31Z';
-    let fetches = 0, serve = full;
+    let fetches = 0, serve = full, online = true, now = Date.now();
     const sb = {
         localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
         HARDPAN_GPS_CONFIG: {}, HardPanGpsCourses: bundle,
+        navigator: { get onLine() { return online; } },
         fetch: (url, o) => { fetches++; const q = decodeURIComponent(String(o.body).slice(5));
             const body = /leisure/.test(q) ? { elements: [{ type: 'relation', id: 19187969, tags: { leisure: 'golf_course', name: 'Canyon Lakes Golf Course' } }] } : serve;
             return Promise.resolve({ ok: true, json: () => Promise.resolve(body) }); },
     };
     sb.window = sb;
+    sb.Date = class extends Date { constructor(...a) { if (a.length) super(...a); else super(now); } static now() { return now; } };
     vm.createContext(sb);
     vm.runInContext(read('gps-geo.js'), sb);
     vm.runInContext(read('gps-match.js'), sb);
     const M = sb.HardPanGpsMatch;
-    const opts = (x) => Object.assign({ key: 'gca_f0s28j10', name: 'Canyon Lakes Golf Course', loc: [46.1765, -119.1703], holes: 18 }, x || {});
-    // Without a re-check: the bundle's 17, no request.
-    assert.deepEqual([(await M.match(opts())).n, fetches], [17, 0]);
-    // The daily re-check (GPS opening / setup pick): OSM now has hole 8 -> 18, kept.
-    const r1 = await M.match(opts({ recheck: 'daily' }));
-    assert.deepEqual([r1.status, r1.n, r1.rechecked], ['ready', 18, 'better']);
-    assert.equal(fetches, 2, 'one lookup: the courses near, then its holes');
-    // From now on the newer lookup wins over the bundle, here and in the GPS view.
-    assert.equal(M.known('gca_f0s28j10', 18, 'Canyon Lakes Golf Course').n, 18);
-    const rec = JSON.parse(store.hardpan_osm_v1_gca_f0s28j10);
-    assert.ok(Date.parse(rec.osmBase) > Date.parse(bundle.gca_f0s28j10.osmBase), 'the kept lookup is newer than the bundle, so osmRecord uses it');
-    // Complete now: a daily re-check asks nothing.
-    await M.match(opts({ recheck: 'daily' }));
-    assert.equal(fetches, 2);
-    // Partial again (another course state) but already checked today: no request until tomorrow.
-    delete store.hardpan_osm_v1_gca_f0s28j10;
-    assert.equal((await M.match(opts({ recheck: 'daily' }))).n, 17);
-    assert.equal(fetches, 2, 'once a day');
-    // An asked-for re-check (Search online / Refresh GPS data) goes at once - but a WORSE answer is not kept.
-    serve = { osm3s: full.osm3s, elements: full.elements.filter((e) => !(e.tags && e.tags.golf === 'green')) };
-    const r2 = await M.match(opts({ recheck: true }));
-    assert.deepEqual([r2.n, r2.rechecked], [17, 'no change']);
-    assert.ok(!store.hardpan_osm_v1_gca_f0s28j10, 'nothing worse kept');
-    // Refresh on a complete course takes the same count from newer data.
+    const pick = (x) => M.match(Object.assign({ key: 'gca_f0s28j10', name: 'Canyon Lakes Golf Course', loc: [46.1765, -119.1703], holes: 18, recheck: 'pick' }, x || {}));
+    // The copy on the phone answers at once (the setup line shows it before any pull).
+    assert.equal(M.known('gca_f0s28j10', 18, 'Canyon Lakes Golf Course').n, 17);
+    // Picked: a fresh pull - newer and more holes -> taken.
+    const r1 = await pick();
+    assert.deepEqual([r1.status, r1.n, r1.rechecked, fetches], ['ready', 18, 'better', 2]);
+    assert.equal(M.known('gca_f0s28j10', 18, 'Canyon Lakes Golf Course').n, 18, 'the newer copy now answers - the GPS view uses the same rule');
+    // Tapped again within the hour: no pull.
+    await pick();
+    assert.equal(fetches, 2, 'repeat taps in the hour use the copy');
+    // An hour later, OSM newer but WORSE (greens deleted): the copy stands.
+    now += 61 * 60000;
+    serve = { osm3s: { timestamp_osm_base: '2026-12-01T00:00:00Z' }, elements: full.elements.filter((e) => !(e.tags && e.tags.golf === 'green' && /^[0-9]$/.test(String(e.id).slice(-1)) && Number(String(e.id).slice(-1)) < 5)) };
+    const r2 = await pick();
+    assert.equal(fetches, 4);
+    assert.deepEqual([r2.n, r2.rechecked], [18, 'kept the copy']);
+    assert.match(r2.why, /fewer holes/);
+    // Same OSM data as the copy (not newer): kept as it is.
+    now += 61 * 60000;
     serve = full;
-    await M.match(opts({ recheck: true }));
-    const r3 = await M.match(opts({ recheck: true }));
-    assert.deepEqual([r3.n, r3.rechecked], [18, 'refreshed']);
+    const r3 = await pick();
+    assert.deepEqual([r3.n, r3.rechecked], [18, 'kept the copy']);
+    assert.match(r3.why, /not newer/);
+    // No signal: the copy, silently, no request.
+    now += 61 * 60000; online = false;
+    const before = fetches;
+    assert.equal((await pick()).n, 18); assert.equal(fetches, before);
+    online = true;
+    // The organizer's Refresh ignores the hour.
+    const r4 = await pick({ recheck: true });
+    assert.equal(fetches, before + 2); assert.equal(r4.n, 18);
 });
 
-test('Tools > Refresh GPS data (the organizer) and the daily re-check are wired', { skip }, () => {
+test('pulls happen at pick time; GPS opening during the round does not pull; the organizer keeps a hidden Refresh', { skip }, () => {
     const v = read('gps-view.js'), a = read('admin.html');
-    assert.ok(/class="gps-menu-item gps-refresh-gps"[^']*>Refresh GPS data</.test(v) && /show\('\.gps-refresh-gps', !!S\.canFix && S\.pro && !setting\)/.test(v), 'organizer only');
-    assert.ok(/on\(el, '\.gps-refresh-gps'[\s\S]{0,400}recheckCourse\(true,/.test(v), 'forces a re-check now');
-    assert.ok(/if \(osmRecord\(key\)\) \{ recheckCourse\('daily'\); fin\(true\); return; \}/.test(v), 'GPS opening: daily re-check of a partial course');
+    assert.ok(/if \(osmRecord\(key\)\) \{ fin\(true\); return; \}/.test(v) && !/recheckCourse\('daily'\)/.test(v), 'no pull on the tee');
+    assert.ok(/class="gps-menu-item gps-refresh-gps"[^']*>Refresh GPS data</.test(v) && /show\('\.gps-refresh-gps', !!S\.canFix && S\.pro && !setting\)/.test(v), 'organizer only, in Tools');
+    assert.ok(/on\(el, '\.gps-refresh-gps'[\s\S]{0,400}recheckCourse\(true,/.test(v), 'Refresh pulls now');
     assert.ok(/w\.loc = S\.courseLoc \|\| courseCenter\(\);/.test(v), 'from the course point, never the golfer');
-    assert.ok(/const recheck = known \? \(gpsRecheckNext \? true : 'daily'\) : undefined;/.test(a) && /\/\/ GPS:BEGIN\s*\n\s*gpsRecheckNext = true;\s*\n\s*\/\/ GPS:END/.test(a), 'setup: at once after Search online, else daily');
+    assert.ok(/if \(known\) gpsSetupRender\(key, known, name\);\s*\n\s*const recheck = known \? 'pick' : undefined;/.test(a), 'setup: the copy at once, then a fresh pull on every pick');
+    assert.ok(/\|\| M\.bundleCenter\(key, name\)/.test(a), 'a bundled course with no location in our records still pulls from its greens\' middle');
+    assert.ok(!/gpsRecheckNext/.test(a), 'every pick pulls - Search online or the saved list alike');
 });
+

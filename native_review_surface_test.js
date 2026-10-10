@@ -744,7 +744,9 @@ describe('5 - THE IMPORT LANDS IN BOTH CONTEXTS (2026-09-19): search, pick, conf
     for (const [label, key, base] of [['NATIVE', 'nativeImport', ORIGIN], ['WEB', 'webImport', '']]) {
         test(`${label}: the two proxy calls, in order, through the base for this context`, () => {
             const s = ran(S[key], key);
-            assert.deepEqual((s.fetches || []).filter((u) => /\/api\//.test(u)),
+            // The course proxy's calls (/api/course...). In a HardPan build the GPS
+            // side also asks OpenStreetMap about the picked course - not a proxy call.
+            assert.deepEqual((s.fetches || []).filter((u) => /\/api\/course/.test(u)),
                 [base + '/api/course-search?q=Legacy', base + '/api/course/bwcdmzcy'],
                 'trace: ' + JSON.stringify(s.trace));
         });

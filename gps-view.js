@@ -435,7 +435,8 @@
         if (!S || !M) { fin(false); return; }
         var key = S.courseKey, mine = S;
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
-        if (osmRecord(key)) { recheckCourse('daily'); fin(true); return; }
+        // No pull on the tee: a course the phone has is used as the pick left it.
+        if (osmRecord(key)) { fin(true); return; }
         if (S.osmInFlight) { fin(false); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { fin(false); return; }
         if (!S.courseLoc) { fin(false); return; }
@@ -448,11 +449,11 @@
             fin(ok);
         });
     }
-    // A PARTIAL COURSE RE-CHECKS OPENSTREETMAP (2026-10-10): once a day when GPS
-    // opens with signal (gps-match.js keeps the answer only with more holes), and
-    // at once from Tools > Refresh GPS data (the organizer). The point is the
-    // course's - our record's, else the middle of its mapped greens - never the
-    // golfer's.
+    // THE ORGANIZER'S BACKUP: Tools > Refresh GPS data pulls the course from
+    // OpenStreetMap now (gps-match.js keeps it only when newer and with at least as
+    // many holes). Nothing else pulls during a round - the fresh pull happens when
+    // the course is picked in setup. The point is the course's - our record's, else
+    // the middle of its mapped greens - never the golfer's.
     function recheckCourse(mode, after) {
         var M = (typeof window !== 'undefined' && window.HardPanGpsMatch) || null;
         if (!S || !M || S.recheckInFlight) { if (after) after(null); return; }
@@ -465,7 +466,7 @@
         M.match(w).then(function (r) {
             mine.recheckInFlight = false;
             if (S !== mine) return;
-            if (r && (r.rechecked === 'better' || r.rechecked === 'refreshed')) { S.osmShared = null; S.needsFrame = true; render(); }
+            if (r && (r.rechecked === 'better' || r.rechecked === 'newer')) { S.osmShared = null; S.needsFrame = true; render(); }
             if (after) after(r);
         });
     }
@@ -2844,8 +2845,8 @@
             recheckCourse(true, function (r) {
                 if (!r) { flash('Could not check - no course location'); return; }
                 if (r.rechecked === 'better') flash('GPS data updated: ' + r.n + '/' + r.of + ' holes');
-                else if (r.rechecked === 'refreshed') flash('GPS data refreshed: ' + r.n + '/' + r.of + ' holes');
-                else flash('No newer GPS data in OpenStreetMap (' + r.n + '/' + r.of + ' holes)');
+                else if (r.rechecked === 'newer') flash('GPS data refreshed: ' + r.n + '/' + r.of + ' holes');
+                else flash('Kept the GPS data on this phone (' + r.n + '/' + r.of + ' holes)' + (r.why ? ' - ' + r.why : ''));
             });
         });
         on(el, '.gps-rechoose', function () {
