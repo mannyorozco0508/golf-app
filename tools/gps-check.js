@@ -1439,6 +1439,12 @@ function usgsFallbackFails(tag, g, why) {
     // ---- THE FLOW (gps-flow, 2026-10-09): a round opens on GPS; Enter Score saves
     // through the card and comes back to GPS on the next hole ----------------------
     const FRESH = 'window.__freshPhone = true;';
+    // THE SHIPPED CONFIG HAS OPENSTREETMAP OFF (gps-live) and GolfAPI is in the app
+    // only, so in this browser the shipped config has no course data at all - and a
+    // round with no data rightly stays on the Card. The flow is checked on the
+    // build 10 data path (OSM on, live off): what it tests is the landing and the
+    // scoring, not where the greens come from (gps_live_app_test.js does that).
+    const OSM_PATH = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false});}});})();";
     const typeScore = (d) => [{ cdp: { method: 'Input.insertText', params: { text: d } } }, { sleep: 350 }];
     const fl = await arm('flow', 'caledonia', null, 'ok', ME, 4.6, [
         WAIT_MAP, { sleep: 1200 }, { expression: READ },                                                // 0 landed: GPS, hole 1
@@ -1451,11 +1457,11 @@ function usgsFallbackFails(tag, g, why) {
         { expression: `'SIDEV' + localStorage.getItem('hardpan_round_side')` },
         // BUILD 5: a Card choice made in ANOTHER round does not stop this one landing on GPS.
         { expression: `(localStorage.setItem('hardpan_round_side', 'bets|OTHER1'), location.reload(), 'other')` }, { sleep: 4000 }, WAIT_MAP, { sleep: 1200 }, { expression: READ }, // 5 GPS
-    ], { preScript: FRESH + sensor('ok', ME[0], ME[1], 4.6) });
+    ], { preScript: FRESH + OSM_PATH + sensor('ok', ME[0], ME[1], 4.6) });
     out.flow = fl; bail(out, fl);
-    const fu = await arm('flowu', 'pinelakes', null, 'ok', pl, 5, [{ sleep: 6000 }, { expression: READ }], { preScript: FRESH + sensor('ok', pl[0], pl[1], 5) });
+    const fu = await arm('flowu', 'pinelakes', null, 'ok', pl, 5, [{ sleep: 6000 }, { expression: READ }], { preScript: FRESH + OSM_PATH + sensor('ok', pl[0], pl[1], 5) });
     out.flowUnmapped = fu; bail(out, fu);
-    const fd = await arm('flowd', 'caledonia', null, 'denied', ME, 5, [{ sleep: 7000 }, { expression: READ }], { preScript: FRESH + sensor('denied', ME[0], ME[1], 5) });
+    const fd = await arm('flowd', 'caledonia', null, 'denied', ME, 5, [{ sleep: 7000 }, { expression: READ }], { preScript: FRESH + OSM_PATH + sensor('denied', ME[0], ME[1], 5) });
     out.flowDenied = fd; bail(out, fd);
     {
         const [f0, f1, f2, f3, f4, f5] = fl.reads;
