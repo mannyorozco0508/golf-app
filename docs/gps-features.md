@@ -170,3 +170,11 @@ Rules that would need ADDING (additive; nothing existing changes):
   skins and settlement: old trees read identically, no errors.
 - Round Setup kept open during play keeps its copy of BBB points in step with the round,
   so Save never writes back stale points; a copied round starts with none.
+- Vegas rules APPROVED by Manny 2026-10-11 (all five as built): 10+ first; birdie flips the
+  other team, both birdie = no flip; gross; each golfer wins / pays points x $; 2 v 2 only.
+- Payout card: "How it adds up" - the rule, one real hole from the round (a flipped one when
+  there is one), and the round's points x $ per golfer; BBB shows the top golfer's sum.
+- PLAN ONLY (not built): a NET Vegas option - `vegasScoring: 'net'`; each golfer's net score per
+  hole (strokes off the course handicap by hole index, as the existing engines allocate them,
+  read through handicap.js - no change to it), then the same number rule. The birdie flip
+  stays on GROSS birdies (or a toggle). Shown as "Vegas · net" on the cards.

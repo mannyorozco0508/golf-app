@@ -120,8 +120,31 @@
                 : '<div class="ledger-row"><span>Nobody owes anything</span><span></span></div>';
             return '<div class="settle-card exg-settle"><div class="settle-header">' + f.icon + ' ' + f.label + ' · ' + dollars(r.perPoint) + '/pt</div>'
                 + '<div style="font-size:.78rem;opacity:.8;margin:2px 0 6px;">' + esc(sub) + '</div>' + rows
+                + '<div class="exg-how" style="font-size:.78rem;margin-top:8px;padding:8px;border-radius:10px;background:rgba(127,127,127,.1);"><b>How it adds up</b><br>' + (bbb ? bbbHow(data, r) : vegasHow(data, g.cfg, r)) + '</div>'
                 + '<div style="font-size:.78rem;font-weight:800;margin-top:8px;">Settle this game separately — it is not in Who Pays Who above:</div>' + pays + '</div>';
         }).join('');
+    }
+    // THE WORKED EXAMPLE on the payout card, from this round's own numbers.
+    function bbbHow(data, r) {
+        var ids = Object.keys(r.net), n = ids.length;
+        var top = ids.slice().sort(function (a, b) { return r.points[b] - r.points[a]; })[0];
+        var pts = r.points[top], diff = n * pts - r.totalPoints;
+        return 'Every golfer plays every other: the one with more points takes the difference x ' + dollars(r.perPoint) + '.<br>'
+            + esc(nameOf(data, top)) + ': ' + pts + ' pts x ' + n + ' golfers \u2212 ' + r.totalPoints + ' total = '
+            + (diff > 0 ? '+' : '') + diff + ' x ' + dollars(r.perPoint) + ' = ' + money(r.net[top]) + '.';
+    }
+    function vegasHow(data, cfg, r) {
+        var a = teamName(data, cfg.vegasTeamA), b = teamName(data, cfg.vegasTeamB);
+        var won = r.holes.filter(function (h) { return h.winner; });
+        var ex = won.filter(function (h) { return h.flipA || h.flipB; })[0] || won[0];
+        var line = 'Each hole, a team\'s two scores make a number, low score first (a 10+ goes first: 4 and 10 = 104)'
+            + (cfg.vegasBirdieFlip ? '; a birdie flips the OTHER team\'s number (\u21BB), both birdie = no flip' : '') + '. The lower number wins the difference.<br>';
+        if (ex) line += 'Hole ' + ex.hole + ': ' + esc(a) + ' ' + ex.a + (ex.flipA ? '\u21BB' : '') + ' v ' + esc(b) + ' ' + ex.b + (ex.flipB ? '\u21BB' : '')
+            + ' \u2192 ' + esc(ex.winner === 'A' ? a : b) + ' +' + ex.points + '.<br>';
+        var pts = Math.abs(r.pointsA), lead = r.pointsA > 0 ? a : b, lose = r.pointsA > 0 ? b : a;
+        line += pts ? 'Round: ' + esc(lead) + ' +' + pts + ' pts x ' + dollars(r.perPoint) + ' = ' + dollars(pts * r.perPoint) + ' to EACH of ' + esc(lead) + '; ' + esc(lose) + ' each pay it.'
+            : 'Round: all square - nobody pays.';
+        return line;
     }
 
     // ---- ROUND SETUP (Money step) ----------------------------------------------

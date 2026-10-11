@@ -63,6 +63,9 @@ test('settlement: its own card and who-pays-whom, said to be separate from Who P
     assert.match(h, /Vegas · \$0\.50\/pt/);
     assert.match(h, /Dee Dunn pays Bob Baker<\/span><span>\$5\.50/);
     assert.equal((h.match(/Settle this game separately/g) || []).length, 2);
+    assert.match(h, /Ann Able: 2 pts x 3 golfers \u2212 3 total = \+3 x \$2 = \+\$6\./, 'BBB worked example');
+    assert.match(h, /Hole 1: Ann &amp; Bob 45 v Cal &amp; Dee 56 \u2192 Ann &amp; Bob \+11\./, 'Vegas worked example: a hole');
+    assert.match(h, /Round: Ann &amp; Bob \+11 pts x \$0\.50 = \$5\.50 to EACH of Ann &amp; Bob; Cal &amp; Dee each pay it\./);
     assert.equal(X.settleHtml({ players, additionalGameInstances: { v: { format: 'vegas', vegasTeamA: ['11'] } } }, CD, {}), '', 'an unfinished Vegas setup settles nothing');
 });
 
