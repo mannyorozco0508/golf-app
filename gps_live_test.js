@@ -66,7 +66,7 @@ function setup(seed, opts) {
     const { createCore } = require('./firebase-functions/gps-live-core.js');
     const db = fakeDb(seed), api = fakeApi(opts), pushes = [];
     let t = T0;
-    const core = createCore({ db, fetch: api.fetch, key: () => KEY, now: () => t, notify: async (k, d) => pushes.push([k, d]), cfg: (opts && opts.cfg) || {} });
+    const core = createCore({ db, fetch: api.fetch, key: () => KEY, now: () => t, notify: async (k, d) => pushes.push([k, d]), cfg: (opts && opts.cfg) || {}, owners: () => (opts && opts.owners) || [] });
     return { core, db, api, pushes, tick: (ms) => { t += ms; } };
 }
 const MANNY = { uid: 'uMANNY', token: { firebase: { sign_in_provider: 'apple.com' } } };
@@ -141,26 +141,57 @@ test('a NEW pull needs a real account (anonymous uids are free to mint); a guest
     assert.equal((await open.core.course(GUEST, { courseId: PW })).status, 'ready', 'one setting');
 });
 
-test('caps: 5 new courses per golfer per day, 25 a day for everyone; tomorrow it starts again; a failed pull is not counted', { skip }, async () => {
-    const ids = Array.from({ length: 30 }, (_, i) => String(1000000000 + i));
+test('caps: 15 new courses per golfer per day, 50 a day for everyone; tomorrow it starts again; a failed pull is not counted', { skip }, quiet(async () => {
+    const ids = Array.from({ length: 60 }, (_, i) => String(1000000000 + i));
     const seed = { gps_meta: { known: Object.fromEntries(ids.map((id) => [id, { gps: true, holes: 18 }])) } };
-    const { core, db, tick } = setup(seed);
-    for (let i = 0; i < 5; i++) assert.equal((await core.course(MANNY, { courseId: ids[i] })).status, 'ready');
-    const sixth = await core.course(MANNY, { courseId: ids[5] });
-    assert.equal(sixth.status, 'limit'); assert.equal(sixth.max, 5);
+    const { core, db, tick, pushes } = setup(seed);
+    for (let i = 0; i < 15; i++) assert.equal((await core.course(MANNY, { courseId: ids[i] })).status, 'ready');
+    const over = await core.course(MANNY, { courseId: ids[15] });
+    assert.equal(over.status, 'limit'); assert.equal(over.max, 15);
+    assert.equal(over.message, "You've hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.");
+    assert.ok(db.root.gps_alerts['userlimit_uMANNY_20261011'], 'Manny is told when anyone hits it');
+    assert.ok(pushes.some((p) => p[0] === 'userlimit_uMANNY'));
     assert.equal((await core.course(MANNY, { courseId: ids[0] })).status, 'ready', 'a course already pulled never counts');
-    let n = 5;
-    for (let u = 0; n < 25; u++) for (let i = 0; i < 5 && n < 25; i++, n++) {
+    let n = 15;
+    for (let u = 0; n < 50; u++) for (let i = 0; i < 15 && n < 50; i++, n++) {
         const who = { uid: 'u' + u, token: { firebase: { sign_in_provider: 'google.com' } } };
         assert.equal((await core.course(who, { courseId: ids[n] })).status, 'ready');
     }
     const other = { uid: 'uLATE', token: { firebase: { sign_in_provider: 'password' } } };
-    await quiet(async () => assert.equal((await core.course(other, { courseId: ids[25] })).status, 'soon', 'the day\'s ceiling'))();
-    assert.ok(db.root.gps_alerts['daycap_20261011'], 'Manny is told');
+    assert.equal((await core.course(other, { courseId: ids[50] })).status, 'soon', 'the day\'s ceiling (50)');
+    assert.ok(db.root.gps_alerts['daycap_20261011']);
     assert.equal(db.root.gps_usage.uLATE['20261011'].pulls, 0, 'not counted against the golfer');
     tick(86400000);
-    assert.equal((await core.course(MANNY, { courseId: ids[5] })).status, 'ready', 'a new day');
-});
+    assert.equal((await core.course(MANNY, { courseId: ids[15] })).status, 'ready', 'a new day');
+}));
+
+test('the OWNER (ALERT_UIDS) has no per-golfer daily cap - but the floor still stops everyone, and every pull is still counted', { skip }, quiet(async () => {
+    const ids = Array.from({ length: 25 }, (_, i) => String(2000000000 + i));
+    const seed = { gps_meta: { known: Object.fromEntries(ids.map((id) => [id, { gps: true, holes: 18 }])) } };
+    const { core, db } = setup(seed, { owners: ['uMANNY'] });
+    for (let i = 0; i < 20; i++) assert.equal((await core.course(MANNY, { courseId: ids[i] })).status, 'ready', 'pull ' + (i + 1));
+    assert.equal(db.root.gps_usage.uMANNY['20261011'].pulls, 20, 'counted, not capped');
+    const low = setup({ gps_meta: Object.assign({}, seed.gps_meta, { left: 51 }) }, { owners: ['uMANNY'], left: 51 });
+    assert.equal((await low.core.course(MANNY, { courseId: ids[0] })).status, 'soon', '51 left - 2 is under the floor: even the owner waits');
+}));
+
+test('the limits are SETTINGS: gps_meta/config overrides the defaults (read again within a minute); nonsense is ignored', { skip }, quiet(async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => String(3000000000 + i));
+    const seed = { gps_meta: { known: Object.fromEntries(ids.map((id) => [id, { gps: true, holes: 18 }])), config: { userPullsPerDay: 2, floor: 0, pullsPerDay: 'lots', ownerUids: 'uBOSS1' } } };
+    const { core, db, tick } = setup(seed);
+    assert.equal((await core.course(MANNY, { courseId: ids[0] })).status, 'ready');
+    assert.equal((await core.course(MANNY, { courseId: ids[1] })).status, 'ready');
+    const third = await core.course(MANNY, { courseId: ids[2] });
+    assert.deepEqual([third.status, third.max], ['limit', 2], 'the database said 2');
+    const boss = { uid: 'uBOSS1', token: { firebase: { sign_in_provider: 'apple.com' } } };
+    for (let i = 3; i < 6; i++) assert.equal((await core.course(boss, { courseId: ids[i] })).status, 'ready', 'an owner listed in the config');
+    db.root.gps_meta.config.userPullsPerDay = 3;
+    assert.equal((await core.course(MANNY, { courseId: ids[2] })).status, 'limit', 'still cached');
+    tick(61000);
+    assert.equal((await core.course(MANNY, { courseId: ids[2] })).status, 'ready', 'a minute later: 3');
+    const { cleanConfig } = require('./firebase-functions/gps-live-core.js');
+    assert.deepEqual(cleanConfig({ floor: 0, userPullsPerDay: 1e9, pullsPerDay: -1, searchDays: 'x' }), { ownerUids: [] }, 'a typo never lifts the floor or the caps');
+}));
 
 test('the floor: below 50 calls left nothing is pulled ("GPS coming soon"), Manny is alerted ONCE a day with a push and an ERROR line', { skip }, quiet(async () => {
     const { core, api, db, pushes } = setup({}, { left: 52.3 });

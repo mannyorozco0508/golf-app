@@ -68,7 +68,8 @@ test('signed out, or no signal: no request, and a plain message', { skip }, asyn
     assert.equal((await off.sb.HardPanGpsLive.course(PW)).status, 'offline'); assert.equal(off.requests.length, 0);
     const L = sandbox().sb.HardPanGpsLive;
     assert.equal(L.message('soon'), 'GPS coming soon for this course');
-    assert.match(L.message('limit'), /5 new GPS courses today/);
+    assert.match(L.message('limit'), /hit your daily limit for new GPS courses\. You can still play and score this round/);
+    assert.equal(L.message('limit', { message: 'From the function' }), 'From the function', 'the function\'s wording wins');
     assert.match(L.message('nogps'), /Tools › Set the green/);
     assert.match(L.message('whatever'), /not available right now/);
 });

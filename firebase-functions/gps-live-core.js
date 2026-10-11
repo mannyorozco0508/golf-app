@@ -27,10 +27,18 @@
 const { stripCourse, leftOf } = require('./golfapi-strip.js');
 
 const BASE = 'https://www.golfapi.io/api/v2.3';
+// THE LIMITS ARE SETTINGS (2026-10-11): these defaults, overridden by the database
+// node gps_meta/config (closed to phones; Manny edits it in the Firebase console's
+// DATA view - no code, no deploy; read again within a minute), e.g.
+//   gps_meta/config = { userPullsPerDay: 15, pullsPerDay: 50, floor: 50,
+//                       userSearchesPerDay: 20, ownerUids: "uid1,uid2" }
+// OWNERS (ALERT_UIDS, plus config.ownerUids) have NO per-golfer daily cap; the
+// floor and the day's ceiling still apply to everyone.
+const LIMIT_MESSAGE = "You've hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.";
 const DEFAULTS = {
     floor: 50,              // no GolfAPI call when fewer calls than this are left
-    userPullsPerDay: 5,     // NEW courses per golfer per day
-    pullsPerDay: 25,        // NEW courses per day, everyone - the ceiling
+    userPullsPerDay: 15,    // NEW courses per golfer per day (owners: no cap)
+    pullsPerDay: 50,        // NEW courses per day, everyone - the ceiling
     userSearchesPerDay: 20, // uncached searches per golfer per day
     searchDays: 30,         // a search's answer is kept this long
     pullNeedsAccount: true, // anonymous may search and open cached courses; a NEW pull needs Apple / Google / email
@@ -92,9 +100,34 @@ function cardRecord(s, at) {
     };
 }
 
+// Only sane numbers / booleans from the database: a typo can never lift the floor to 0
+// or the caps to a million.
+const LIMITS = { floor: [10, 500], userPullsPerDay: [0, 200], pullsPerDay: [0, 1000], userSearchesPerDay: [0, 500], searchDays: [1, 365] };
+function cleanConfig(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    Object.keys(LIMITS).forEach((k) => { const v = Number(raw[k]); if (raw[k] != null && Number.isFinite(v) && v >= LIMITS[k][0] && v <= LIMITS[k][1]) out[k] = Math.floor(v); });
+    if (typeof raw.pullNeedsAccount === 'boolean') out.pullNeedsAccount = raw.pullNeedsAccount;
+    const owners = Array.isArray(raw.ownerUids) ? raw.ownerUids : String(raw.ownerUids || '').split(',');
+    out.ownerUids = owners.map((x) => String(x).trim()).filter((x) => /^[A-Za-z0-9_-]{6,128}$/.test(x));
+    return out;
+}
 function createCore(deps) {
     const cfg = Object.assign({}, DEFAULTS, deps.cfg || {});
     const db = deps.db, now = deps.now || Date.now;
+    // The live settings: the defaults, then gps_meta/config (60 s cache).
+    let cfgCache = null, cfgAt = 0;
+    async function settings() {
+        if (cfgCache && now() - cfgAt < 60000) return cfgCache;
+        let raw = null;
+        try { raw = await db.get('gps_meta/config'); } catch (e) { raw = null; }
+        const c = cleanConfig(raw);
+        const owners = new Set([].concat(c.ownerUids || [], (deps.owners ? deps.owners() : []) || []));
+        delete c.ownerUids;
+        cfgCache = Object.assign({}, cfg, c, { owners });
+        cfgAt = now();
+        return cfgCache;
+    }
 
     async function log(entry) {
         try { await db.push('gps_log', Object.assign({ at: now() }, entry)); } catch (e) { /* the log never breaks a pull */ }
@@ -114,7 +147,8 @@ function createCore(deps) {
         const l = body ? leftOf(body.apiRequestsLeft) : null;
         if (l != null) await db.set('gps_meta/left', l);
         await log({ uid: who.uid, act: 'call', endpoint: endpoint.replace(/\?.*$/, ''), cost, status: res.status, left: l });
-        if (l != null && l < cfg.floor) await alert('floor', { left: l, floor: cfg.floor });
+        const fl = (cfgCache && cfgCache.floor) || cfg.floor;
+        if (l != null && l < fl) await alert('floor', { left: l, floor: fl });
         if (!res.ok || !body) throw new Error('GolfAPI ' + res.status);
         return body;
     }
@@ -138,14 +172,14 @@ function createCore(deps) {
         if (name.length < 3 || name.length > 60) throw bad('Type 3 to 60 letters of the course name.');
         const q = queryKey(name);
         if (!q) throw bad('Type the course name.');
-        const t = now(), day = dayKey(t);
+        const t = now(), day = dayKey(t), c = await settings();
         let hit = await db.get('gps_search/' + q);
-        let results = hit && hit.at > t - cfg.searchDays * DAY_MS ? hit.results || [] : null;
+        let results = hit && hit.at > t - c.searchDays * DAY_MS ? hit.results || [] : null;
         let cost = 0;
         if (!results) {
             const l = await left();
-            if (l != null && l - 0.1 < cfg.floor) { await alert('floor', { left: l, floor: cfg.floor }); await log({ uid: who.uid, act: 'search', q, result: 'floor' }); return { status: 'soon', results: [] }; }
-            if (!(await count(`gps_usage/${who.uid}/${day}/searches`, cfg.userSearchesPerDay))) { await log({ uid: who.uid, act: 'search', q, result: 'limit' }); return { status: 'limit', results: [] }; }
+            if (l != null && l - 0.1 < c.floor) { await alert('floor', { left: l, floor: c.floor }); await log({ uid: who.uid, act: 'search', q, result: 'floor' }); return { status: 'soon', results: [] }; }
+            if (!c.owners.has(who.uid) && !(await count(`gps_usage/${who.uid}/${day}/searches`, c.userSearchesPerDay))) { await log({ uid: who.uid, act: 'search', q, result: 'limit' }); return { status: 'limit', results: [], message: LIMIT_MESSAGE }; }
             const body = await call('/clubs?' + new URLSearchParams({ name, country: 'usa' }).toString(), 0.1, who);
             cost = 0.1;
             results = [];
@@ -174,7 +208,7 @@ function createCore(deps) {
         if (!ID_RE.test(id)) throw bad('No such course.');
         const ourKey = input && input.ourKey != null ? String(input.ourKey) : null;
         if (ourKey != null && !KEY_RE.test(ourKey)) throw bad('No such course key.');
-        const t = now(), day = dayKey(t);
+        const t = now(), day = dayKey(t), c = await settings();
         const link = async () => {
             if (!ourKey || ourKey === 'gapi_' + id) return;
             if (!(await db.get('global_courses/' + ourKey + '/name'))) return;   // only a real course of ours
@@ -190,13 +224,19 @@ function createCore(deps) {
         const done = async (result, extra) => { await log({ uid: who.uid, act: 'course', id, cost: 0, result }); return Object.assign({ status: result }, extra || {}); };
         if (!known) return done('unknown');                     // search for it first - no blind pulls
         if (!known.gps) return done('nogps');                   // GolfAPI has no GPS for it
-        if (cfg.pullNeedsAccount && who.anonymous) return done('account');
+        if (c.pullNeedsAccount && who.anonymous) return done('account');
         const l = await left();
-        if (l != null && l - 2 < cfg.floor) { await alert('floor', { left: l, floor: cfg.floor }); return done('soon'); }
+        if (l != null && l - 2 < c.floor) { await alert('floor', { left: l, floor: c.floor }); return done('soon'); }
         const mine = `gps_usage/${who.uid}/${day}/pulls`, all = `gps_meta/day/${day}/pulls`;
-        if (!(await count(mine, cfg.userPullsPerDay))) return done('limit', { max: cfg.userPullsPerDay });
-        if (!(await count(all, cfg.pullsPerDay))) { await uncount(mine); await alert('daycap', { day, max: cfg.pullsPerDay }); return done('soon'); }
-        const lock = await db.transaction('gps_meta/lock/' + id, (cur) => (cur && cur.at > t - cfg.lockMs ? undefined : { at: t, uid: who.uid }));
+        const owner = c.owners.has(who.uid);
+        // Every pull is still COUNTED for the owner (the log and usage stay honest); the cap is just not applied.
+        if (owner) await db.transaction(mine, (cur) => (Number(cur) || 0) + 1);
+        else if (!(await count(mine, c.userPullsPerDay))) {
+            await alert('userlimit_' + who.uid, { uid: who.uid, day, max: c.userPullsPerDay });
+            return done('limit', { max: c.userPullsPerDay, message: LIMIT_MESSAGE });
+        }
+        if (!(await count(all, c.pullsPerDay))) { await uncount(mine); await alert('daycap', { day, max: c.pullsPerDay }); return done('soon'); }
+        const lock = await db.transaction('gps_meta/lock/' + id, (cur) => (cur && cur.at > t - c.lockMs ? undefined : { at: t, uid: who.uid }));
         if (!lock.committed) { await uncount(mine); await uncount(all); return done('busy'); }
         try {
             // AN INTERRUPTED PULL IS NOT PAID FOR TWICE: the /courses answer is kept
@@ -235,4 +275,4 @@ function createCore(deps) {
     return { search, course, cfg };
 }
 
-module.exports = { createCore, normalCourse, cardRecord, displayName, queryKey, dayKey, DEFAULTS };
+module.exports = { createCore, cleanConfig, LIMIT_MESSAGE, normalCourse, cardRecord, displayName, queryKey, dayKey, DEFAULTS };

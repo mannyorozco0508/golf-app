@@ -6975,7 +6975,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const L = window.HardPanGpsLive;
         const r = await L.course(x.id);
         gpsLivePicking = false;
-        if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status); return; }
+        if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status, r); return; }
         if (r.cardKey) {
             // The function wrote the scorecard (pars, handicaps, tees) to
             // global_courses/<cardKey>: picked like any saved course. READ FRESH
@@ -7001,7 +7001,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!L) return;
         gpsSetupShow('busy', 'Looking for GPS…');
         const r = await L.search(name);
-        if (!r || r.status !== 'ok') { gpsSetupShow('none', L.message(r && r.status)); return; }
+        const searchOnline = { label: 'Search online', onclick: () => { courseSearchInput.value = name; runOnlineCourseSearch(name, null); courseDropdown.style.display = 'block'; } };
+        if (!r || r.status !== 'ok') { gpsSetupShow('none', L.message(r && r.status, r), searchOnline); return; }
         const hits = (r.results || []).filter((x) => x.gps).slice(0, 6);
         if (!hits.length) { gpsSetupShow('none', 'No GPS for this course yet - Tools › Set the green during the round'); return; }
         const el = gpsSetupEl();
@@ -7015,7 +7016,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             b.onclick = async () => {
                 gpsSetupShow('busy', 'Setting up GPS…');
                 const c = await L.course(x.id, key);
-                if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status)); return; }
+                if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status, c), searchOnline); return; }
                 gpsSetupMatch(key);
             };
             el.appendChild(b);
