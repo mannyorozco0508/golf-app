@@ -4438,23 +4438,22 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // liveStandings(); this chooses which mounts receive it. Nothing is
         // recomputed, so the two views cannot disagree about who is leading.
         const grid = cards => cards.filter(Boolean).length ? '<div class="lw-grid">' + cards.join('') + '</div>' : '';
-        let extraGames = '';
+        const rest = [dotsBoard, ryder, skins, matches, points, hilo, strokeBets];
         // GPS:BEGIN
         // BINGO BANGO BONGO + VEGAS (HardPan, gps-games): a card per game; BBB takes the
         // hole's three taps from whoever may score one of its golfers.
         if (!closed && window.HardPanExtraGames) {
             try {
-                extraGames = window.HardPanExtraGames.liveHtml(currentData, {
+                rest.splice(1, 0, window.HardPanExtraGames.liveHtml(currentData, {
                     hole: currentViewedHole,
                     canTap: ids => !roundSuperseded() && ids.some(id => canWritePlayer(id)),
                     write: (path, value) => db.ref(`events/${currentMode}/additionalGameInstances/${path}`).set(value),
                     online: () => requireOnlineForMoney('POINT NOT SAVED', 'Reconnect before recording Bingo Bango Bongo.'),
                     fail: msg => uiFail(msg)
-                });
-            } catch (e) { extraGames = ''; }
+                }));
+            } catch (e) { /* the other cards draw as before */ }
         }
         // GPS:END
-        const rest = [dotsBoard, extraGames, ryder, skins, matches, points, hilo, strokeBets];
         const HTML_FOR = {
             'live-ticker-mount': grid(rest),
             'fc-ticker-mount': grid([board].concat(rest))

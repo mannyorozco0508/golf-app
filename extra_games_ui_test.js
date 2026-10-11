@@ -116,7 +116,7 @@ test('wiring: scorecard, settlement and Round Setup load it in GPS blocks; Quick
     assert.match(admin, /onclick="gpsApplyTemplate\('bbb'\)">\$1 Bingo Bango Bongo</);
     assert.match(admin, /onclick="gpsApplyTemplate\('vegas'\)">\$1 Vegas</);
     assert.match(admin, /if \(typeof exgAfterLoad === 'function'\) exgAfterLoad\(!!copyFromCode\);/);
-    assert.match(read('index.html'), /const rest = \[dotsBoard, extraGames, ryder, skins, matches, points, hilo, strokeBets\];/);
+    assert.match(read('index.html'), /const rest = \[dotsBoard, ryder, skins, matches, points, hilo, strokeBets\];\n\s*\/\/ GPS:BEGIN[\s\S]{0,300}rest\.splice\(1, 0, window\.HardPanExtraGames\.liveHtml\(/, 'the cards join the grid inside the GPS block; the Consumer line is untouched');
     assert.match(read('index.html'), /requireOnlineForMoney\('POINT NOT SAVED'/);
     assert.match(read('settlement.html'), /HardPanExtraGames\.settleHtml\(data, courseData, savedScores\)/);
 });

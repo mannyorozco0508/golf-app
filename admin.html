@@ -3113,31 +3113,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         gpsPendingTemplate = null;
     }
-    // BINGO BANGO BONGO + VEGAS (gps-games): their editor under Also Playing. The
-    // games live in foreignGameInstances - the map Round Setup already writes back
-    // byte for byte - so the save path is the one every other instance takes.
-    function exgRender() {
-        const el = document.getElementById('exg-editor');
-        if (!el || !window.HardPanExtraGames) return;
-        window.HardPanExtraGames.editor({
-            mount: el,
-            get: () => foreignGameInstances,
-            players: () => collectWizardPlayers(),
-            changed: () => { if (typeof updateWizardReview === 'function') updateWizardReview(); }
-        });
-    }
-    // After a round is loaded: a copied round starts with no BBB points; a reopened
-    // one keeps its held points in step with the course, so Save never writes back
-    // points tapped while this screen was open.
-    let exgPointsRef = null;
-    function exgAfterLoad(isCopy) {
-        if (!window.HardPanExtraGames) return;
-        if (exgPointsRef) { exgPointsRef.off(); exgPointsRef = null; }
-        if (isCopy) { window.HardPanExtraGames.dropPoints(foreignGameInstances); return; }
-        if (!currentMode || typeof db === 'undefined') return;
-        exgPointsRef = db.ref(`events/${currentMode}/additionalGameInstances`);
-        exgPointsRef.on('value', (snap) => window.HardPanExtraGames.freshPoints(foreignGameInstances, snap.val() || {}));
-    }
     // GPS:END
     // GPS:BEGIN
     // PASTE THE WHOLE ROUND / A TRIP DAY'S DRAFT (HardPan, gps-paste). A draft (made
@@ -5507,6 +5482,41 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         return out;
     }
+
+    // GPS:BEGIN
+    // BINGO BANGO BONGO + VEGAS (gps-games): their editor under Also Playing. The
+    // games live in foreignGameInstances - the map Round Setup already writes back
+    // byte for byte - so the save path is the one every other instance takes.
+    function exgRender() {
+        const el = document.getElementById('exg-editor');
+        if (!el || !window.HardPanExtraGames) return;
+        window.HardPanExtraGames.editor({
+            mount: el,
+            get: () => foreignGameInstances,
+            players: () => collectWizardPlayers(),
+            changed: () => { if (typeof updateWizardReview === 'function') updateWizardReview(); }
+        });
+    }
+    // After a round is loaded: a copied round starts with no BBB points; a reopened
+    // one keeps its held points in step with the course, so Save never writes back
+    // points tapped while this screen was open.
+    let exgPointsRef = null;
+    // Never in the way of loading the round: any failure here leaves Setup as it was.
+    function exgAfterLoad(isCopy) {
+        try {
+            if (!window.HardPanExtraGames) return;
+            if (exgPointsRef && typeof exgPointsRef.off === 'function') exgPointsRef.off();
+            exgPointsRef = null;
+            if (isCopy) { window.HardPanExtraGames.dropPoints(foreignGameInstances); return; }
+            const hasBbb = Object.keys(foreignGameInstances).some((k) => foreignGameInstances[k] && foreignGameInstances[k].format === 'bbb');
+            if (!hasBbb || !currentMode || typeof db === 'undefined') return;
+            const ref = db.ref(`events/${currentMode}/additionalGameInstances`);
+            if (!ref || typeof ref.on !== 'function') return;
+            ref.on('value', (snap) => { try { window.HardPanExtraGames.freshPoints(foreignGameInstances, (snap && snap.val()) || {}); } catch (e) { /* keep the held copy */ } });
+            exgPointsRef = ref;
+        } catch (e) { /* Setup loads exactly as before */ }
+    }
+    // GPS:END
 
     // Restores the toggles when an existing round is reopened.
     function loadAdditionalGames(data) {
