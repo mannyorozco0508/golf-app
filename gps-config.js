@@ -36,4 +36,7 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // GPS LIVE (gps-live, 2026-10-10): any US course from GolfAPI through our Cloud
     // Functions (gps-live.js). OpenStreetMap OFF - kept, one setting away: build 10
     // is osm: true, live: false. liveBase: where gpsSearch / gpsCourse answer.
-    osm: false, live: true, liveBase: 'https://us-central1-golfapp-9fb21.cloudfunctions.net' };
+    osm: false, live: true, liveBase: 'https://us-central1-golfapp-9fb21.cloudfunctions.net',
+    // PLAYS-LIKE HEIGHTS UP FRONT (gps-features): never asked for hole by hole on the
+    // tee - fetched once for the whole course at setup, download or round open.
+    elevOnTee: false };

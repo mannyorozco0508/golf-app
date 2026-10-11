@@ -4705,6 +4705,8 @@ const SHELL_FILES = [
     './gps-match.js',
     // GPS LIVE (gps-live): any US course from GolfAPI through the Cloud Functions.
     './gps-live.js',
+    // Offline course packs + plays-like heights up front (gps-features).
+    './gps-offline.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the

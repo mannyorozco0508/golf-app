@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -150,7 +150,7 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');

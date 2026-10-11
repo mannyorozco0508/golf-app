@@ -640,7 +640,22 @@
         }
         loadScript('maplibre-gl.js', function () { return !!ML(); }, done);
     }
+    // THE WHOLE COURSE'S HEIGHTS, ONCE, when the round opens with signal - for the
+    // phones that never picked the course in setup (gps-offline.js; course points only).
+    function prefetchCourseElevs() {
+        if (!S || S.elevPrefetch || cfg().elevOnTee !== false) return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        var mine = S;
+        S.elevPrefetch = true;
+        loadScript('gps-offline.js', function () { return !!window.HardPanGpsOffline; }, function () {
+            var O = window.HardPanGpsOffline;
+            if (!O || S !== mine) return;
+            O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '').then(function () { if (S === mine) syncPlays(); });
+        });
+    }
     function loadCourses(done) {
+        var fin = done;
+        done = function () { try { prefetchCourseElevs(); } catch (e) {} fin(); };
         loadScript('gps-courses.js', function () { return !!window.HardPanGpsCourses; }, function () {
             if (!golfapiOn()) { done(); return; }
             var live = function () {
@@ -2154,6 +2169,10 @@
         return pts.map(r5);
     }
     function fetchElevs() {
+        // HEIGHTS UP FRONT (gps-features): with elevOnTee: false nothing is asked for
+        // hole by hole on the tee - the whole course's heights come once, at setup,
+        // with a download, or when the round opens with signal (prefetchCourseElevs).
+        if (cfg().elevOnTee === false) return;
         if (!S || !S.pro || S.side !== 'gps' || S.elevInFlight || typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         if (S.elevFailedAt && Date.now() - S.elevFailedAt < 60000) return;

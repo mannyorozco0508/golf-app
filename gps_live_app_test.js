@@ -101,7 +101,7 @@ test('the bundled file REPLACES window.HardPanGolfApi when it loads; merge() put
     assert.equal(t.sb.HardPanGolfApi.links.caledonia, 'B1', 'a bundled link is never overwritten');
     const v = read('gps-view.js'), a = read('admin.html');
     assert.ok(/return !!\(window\.HardPanGolfApi && window\.HardPanGolfApi\.built\); \}, live\);/.test(v), 'the GPS screen loads the bundled file first, then merges');
-    assert.ok(/!!\(window\.HardPanGolfApi && window\.HardPanGolfApi\.built\)\) : true\)[\s\S]{0,200}window\.HardPanGpsLive\.merge\(\)/.test(a), 'so does setup');
+    assert.ok(/!!\(window\.HardPanGolfApi && window\.HardPanGolfApi\.built\)\) : true\)[\s\S]{0,320}window\.HardPanGpsLive\.merge\(\)/.test(a), 'so does setup');
 });
 
 test('a course picked from the search: the function\'s answer is kept, linked under the card key, and found by the matcher', { skip }, async () => {

@@ -6562,6 +6562,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return gpsLoadScript('gps-geo.js', () => !!window.HardPanGeo)
                 .then(() => (native || c.golfapiFile) ? gpsLoadScript(String(c.golfapiFile || 'gps-golfapi.js'), () => !!(window.HardPanGolfApi && window.HardPanGolfApi.built)) : true)
                 .then(() => gpsLiveOn() ? gpsLoadScript('gps-live.js', () => !!window.HardPanGpsLive) : false)
+                .then(() => gpsLoadScript('gps-offline.js', () => !!window.HardPanGpsOffline))
                 .then(() => { if (window.HardPanGpsLive) window.HardPanGpsLive.merge(); return true; });
         });
     }
@@ -6804,6 +6805,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
     function gpsSetupRender(key, r, name) {
+        gpsOfflineRow(key, r, name);
         if (!r) { gpsSetupShow(''); return; }
         if (r.status === 'ready') gpsSetupShow('ready', 'GPS ✓ ready — all ' + r.of + ' holes');
         else if (r.status === 'partial') gpsSetupShow('partial', 'GPS partial (' + r.n + '/' + r.of + ')');
@@ -6913,6 +6915,87 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             };
             new window.maplibregl.Marker({ element: b, anchor: 'center' }).setLngLat([c.tee[1], c.tee[0]]).addTo(map);
         });
+    }
+    // ---- OFFLINE COURSE PACKS + PLAYS-LIKE HEIGHTS (gps-features, 2026-10-11) ----
+    // Under the GPS line, for a course with GPS: "Download for offline" puts its
+    // greens, card, USGS satellite tiles and plays-like heights on the phone
+    // (gps-offline.js), so the round works with no signal; then "✓ Offline" and
+    // Delete. Picking a course with signal also fetches its heights once, so the
+    // GPS screen never asks for one on the tee.
+    const GPS_OFFLINE_PACK = 'hardpan_offline_v1_';
+    function gpsOfflinePack(key) { try { const p = JSON.parse(localStorage.getItem(GPS_OFFLINE_PACK + key) || 'null'); return p && p.v === 1 ? p : null; } catch (e) { return null; } }
+    function gpsOfflineEl() {
+        let el = document.getElementById('gps-offline-row');
+        if (el) return el;
+        const status = gpsSetupEl();
+        if (!status || !status.parentNode) return null;
+        el = document.createElement('div');
+        el.id = 'gps-offline-row';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'margin-top:6px; font-size:0.82rem; font-weight:700; display:none; color:var(--text-muted);';
+        status.parentNode.insertBefore(el, status.nextSibling);
+        return el;
+    }
+    const gpsElevAsked = {};
+    function gpsOfflineRow(key, r, name) {
+        const el = gpsOfflineEl();
+        if (!el) return;
+        const O = window.HardPanGpsOffline;
+        const ready = r && (r.status === 'ready' || r.status === 'partial');
+        if (!key || !O || !ready) { el.style.display = 'none'; el.textContent = ''; return; }
+        // Plays-like heights, once per course per visit, with signal (feature 2).
+        if (!gpsElevAsked[key] && navigator.onLine !== false) { gpsElevAsked[key] = 1; O.prefetchElevations(key, name).catch(() => {}); }
+        el.style.display = '';
+        el.textContent = '';
+        const btn = (label, fn, danger) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = label;
+            b.style.cssText = 'margin-left:8px; padding:8px 12px; min-height:40px; border-radius:999px; font-weight:800; cursor:pointer; background:var(--bg-card); border:1px solid ' + (danger ? 'var(--accent-red)' : 'var(--brand-green)') + '; color:' + (danger ? 'var(--accent-red)' : 'var(--brand-green)') + ';';
+            b.onclick = fn;
+            return b;
+        };
+        const pack = gpsOfflinePack(key);
+        const t = document.createElement('span');
+        if (pack) {
+            t.className = 'gps-offline-badge';
+            t.style.color = 'var(--brand-green)';
+            t.textContent = '\u2713 Downloaded for offline \u00b7 ' + pack.holes + ' holes \u00b7 ' + (pack.tiles || []).length + ' map tiles'
+                + (pack.tilesOk ? '' : ' (map needs signal)') + (pack.elevOk ? '' : ' \u00b7 some heights missing');
+            el.appendChild(t);
+            el.appendChild(btn('Delete', async () => { await O.remove(key); gpsOfflineRow(key, r, name); }, true));
+            return;
+        }
+        t.textContent = 'Not downloaded';
+        el.appendChild(t);
+        el.appendChild(btn('\u2B07 Download for offline', async (ev) => {
+            const b = ev.currentTarget;
+            b.disabled = true;
+            if (navigator.onLine === false) { t.textContent = 'No signal - download it where you have signal'; b.disabled = false; return; }
+            t.textContent = 'Downloading\u2026';
+            const res = await O.download(key, { name, card: globalCourses[key] || null, progress: (p) => {
+                if (p.tiles) t.textContent = 'Downloading map\u2026 ' + (p.tiles.fetched + p.tiles.had + p.tiles.failed) + '/' + p.tiles.tiles;
+                else if (p.elev) t.textContent = 'Downloading heights\u2026 ' + (p.elev.had + p.elev.fetched + p.elev.failed) + '/' + p.elev.points;
+            } });
+            if (!res.pack) { t.textContent = res.reason === 'offline' ? 'No signal - try again with signal' : 'Could not download (' + (res.reason || 'error') + ')'; b.disabled = false; return; }
+            gpsOfflineRow(key, r, name);
+        }));
+    }
+    // NO SIGNAL AT SETUP: a downloaded course's card comes from its pack (only when
+    // the course list has no card for it).
+    function gpsOfflineCardFill(key) {
+        const has = globalCourses[key] && Array.isArray(globalCourses[key].data) && globalCourses[key].data.length;
+        if (has) return;
+        const p = gpsOfflinePack(key);
+        if (p && p.card && Array.isArray(p.card.data) && p.card.data.length) globalCourses[key] = Object.assign({}, globalCourses[key] || {}, p.card);
+    }
+    function gpsOfflineBadge(row, key) {
+        if (!gpsOfflinePack(key)) return;
+        const b = document.createElement('span');
+        b.className = 'gps-offline-badge';
+        b.textContent = '\u2713 Offline';
+        b.style.cssText = 'margin-left:6px; font-size:0.68rem; font-weight:800; padding:1px 7px; border-radius:999px; border:1px solid var(--brand-green); color:var(--brand-green);';
+        row.appendChild(b);
     }
     // ---- GPS LIVE: ANY US COURSE (gps-live, 2026-10-10) ----
     // On a TAP only (never as you type): "Search online" also asks our gpsSearch
@@ -7201,6 +7284,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const optionDiv = document.createElement("div");
         optionDiv.className = "custom-select-option";
         optionDiv.textContent = name;
+        // GPS:BEGIN
+        if (typeof gpsOfflineBadge === 'function') gpsOfflineBadge(optionDiv, id);
+        // GPS:END
         optionDiv.onclick = () => { selectCourse(id, name); };
         return optionDiv;
     }
@@ -7393,6 +7479,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function selectCourse(id, name) {
+        // GPS:BEGIN
+        if (typeof gpsOfflineCardFill === 'function') gpsOfflineCardFill(id);
+        // GPS:END
         courseHiddenSelect.value = id;
         courseSearchInput.value = name;
         courseDropdown.style.display = "none";
