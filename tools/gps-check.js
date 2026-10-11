@@ -312,7 +312,9 @@ function leaks(r, me) {
     // (measured: 33.4501, 50 % along Caledonia #1) - the point decides, not one
     // coordinate. Within 3 m of the golfer it IS a leak; the plays arm also checks
     // every elevation point against the course's own list.
-    const elevAt = (h) => { const m = /epqs\?x=(-?[\d.]+)&y=(-?[\d.]+)/.exec(h) || /hardpan_elev_v1_(-?[\d.]+),(-?[\d.]+)/.exec(h); if (!m) return null; return /epqs/.test(h) ? [+m[2], +m[1]] : [+m[1], +m[2]]; };
+    // The stand-in (".../epqs?x=") AND the real service (epqs.nationalmap.gov/v1/json?x=):
+    // the whole-course height fetch (gps-features) asks the real one for COURSE points.
+    const elevAt = (h) => { const m = /epqs(?:\.nationalmap\.gov\/v1\/json)?\?x=(-?[\d.]+)&y=(-?[\d.]+)/.exec(h) || /hardpan_elev_v1_(-?[\d.]+),(-?[\d.]+)/.exec(h); if (!m) return null; return /epqs/.test(h) ? [+m[2], +m[1]] : [+m[1], +m[2]]; };
     const elevNotMe = (h) => { const p = elevAt(h); return !!p && inlineHaversineM(p, me) >= 3; };
     r.dump.writes.forEach((w) => hay.push('write ' + w.path + ' ' + JSON.stringify(w.value)));
     r.requests.forEach((q) => hay.push('request ' + urlOf(q)));

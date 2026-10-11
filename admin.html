@@ -1755,6 +1755,7 @@ html {
             <button type="button" class="gps-tpl" data-tpl="nassau" onclick="gpsApplyTemplate('nassau')">$5 Nassau</button>
             <button type="button" class="gps-tpl" data-tpl="skins" onclick="gpsApplyTemplate('skins')">$2 Skins</button>
             <button type="button" class="gps-tpl" data-tpl="wolf" onclick="gpsApplyTemplate('wolf')">$1 Wolf</button>
+            <div id="gps-tpl-note" role="status" style="flex-basis:100%; font-size:0.78rem; color:var(--brand-green); font-weight:700;"></div>
         </div>
         <style>.gps-tpl{min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-weight:800; cursor:pointer;}</style>
         <!-- GPS:END -->
@@ -3047,9 +3048,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!t) return;
         gpsPendingTemplate = id;
         if (id === 'wolf') gpsSetField('wolf-point-value', 1);
+        // Said in place, under the chips (no pop-up): what was filled and where.
+        const note = document.getElementById('gps-tpl-note');
+        if (note) note.textContent = id === 'nassau' ? '$5 Nassau: the amounts are filled in on Money - pick the golfers there'
+            : id === 'skins' ? '$2 Skins (carry over) is added on the Money step' : '$1 Wolf: set - change it under Settings';
         selectFormatCard(t.format);
-        if (typeof uiToast === 'function') uiToast(id === 'nassau' ? '$5 Nassau: pick the golfers on Money - the amounts are filled in'
-            : id === 'skins' ? '$2 Skins (carry over) is added on the Money step' : '$1 Wolf: set - change it under Settings');
     }
     // On arrival at a step: the Money step gets the amounts, once.
     function gpsTemplateArrive(n) {
