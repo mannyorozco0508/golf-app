@@ -10,7 +10,7 @@
 // Callable functions refuse a call with no Firebase ID token before this code
 // runs; gps-live-core.js checks request.auth again and does everything else.
 //
-// DEPLOY ONLY THESE:  firebase deploy --only functions:gpsSearch,functions:gpsCourse
+// DEPLOY ONLY THESE:  firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse
 // (a bare `firebase deploy` would also publish database.rules.json)
 // ============================================================================
 'use strict';

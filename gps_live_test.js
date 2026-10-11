@@ -230,6 +230,6 @@ test('one stripCourse: the Mac puller and the functions share it; deploy names o
     const fj = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase.json'), 'utf8'));
     assert.equal(fj.functions[0].source, 'firebase-functions');
     assert.equal(fj.database.rules, 'database.rules.json');
-    assert.ok(/firebase deploy --only functions:gpsSearch,functions:gpsCourse/.test(fs.readFileSync(path.join(DIR, 'index.js'), 'utf8')));
+    assert.ok(/firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse/.test(fs.readFileSync(path.join(DIR, 'index.js'), 'utf8')));
     assert.ok(/node_modules/.test(fs.readFileSync(path.join(DIR, '.gitignore'), 'utf8')));
 });

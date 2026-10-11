@@ -93,7 +93,8 @@ touches builds 9 / 10, `~/golf-app-gps-flow`, or the "Myrtle trip" review.
    `firebase functions:secrets:set GOLFAPI_KEY` - paste the key at the prompt.
 3. `cd firebase-functions && npm install && cd ..`
 4. Deploy ONLY the two functions:
-   `firebase deploy --only functions:gpsSearch,functions:gpsCourse`
+   `firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse`
+   (firebase.json names the codebase "gps-live", so the names need that prefix.)
    - First time: the CLI asks to enable Cloud Functions / Cloud Build / Artifact
      Registry / Cloud Run / Eventarc / Secret Manager APIs - say yes.
    - It asks for `ALERT_UIDS`: Manny's Firebase uid (Authentication tab), or blank.
@@ -101,6 +102,11 @@ touches builds 9 / 10, `~/golf-app-gps-flow`, or the "Myrtle trip" review.
 5. Rules: Manny reads `docs/gps-live-rules.diff`. To publish, Firebase console ->
    Realtime Database -> Rules: paste the three blocks (`gps_courses`, `gps_links`,
    `gps_usage`) just above `"$other"`, Publish. Nothing else in the rules changes.
+   DONE 2026-10-10 (Muse, from the LIVE rules + the 3 blocks; verified: the only change).
+   WARNING: database.rules.json in this repo (every branch, main included) is NOT the
+   live ruleset - 41 rules differ and it has no gps_* blocks. Never `firebase deploy
+   --only database` from a branch: it would rewrite the live rules. Change rules from
+   the live copy (Firebase console), and bring the repo file in line first (to-do).
 6. Optional (free): Cloud Logging alert on `GOLFAPI_FLOOR` -> email Manny.
 7. Archive build 11 from this folder (as builds 9/10: `node tools/golfapi-pull.js
    --build`, `node tools/build-gps-app.js`, `cd gps-beta && npm install && npx cap sync
@@ -115,3 +121,18 @@ says "GPS is not available right now".
   and cached.
 - Firebase (Blaze): Functions / RTDB / Secret Manager at this volume sit inside the free
   allowances -> about $0 a month.
+
+## To-do (after the trip)
+
+- **BEFORE OCT 30: move the functions off Node 20** (Google retires the Node 20 runtime
+  for Cloud Functions on Oct 30). Plan: `firebase.json` runtime `nodejs22`, `package.json`
+  engines `"node": "22"`, update `firebase-functions` (and `firebase-admin`) to current
+  majors - read their release notes for breaking changes (params / `onCall` options /
+  secrets) - run `gps_live_test.js`, load the functions locally (as on 2026-10-10:
+  2 callables, us-central1, the secret bound), then redeploy with
+  `firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse`
+  and re-run one cached search on a phone (0 calls). Not done yet.
+- **Rules file in the repo != live rules** (41 differences, no gps_* blocks, every branch).
+  Bring `database.rules.json` on main in line with the live ruleset (from the console)
+  before anyone deploys rules from the repo again.
+- Saved course list: GPS badge + sort (deferred from build 9).
