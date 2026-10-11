@@ -69,14 +69,25 @@ function cardRecord(s, at) {
     const seen = new Set(s.hcp);
     if (seen.size !== 18 || !s.hcp.every((h) => Number.isInteger(h) && h >= 1 && h <= 18)) return null;
     const data = s.pars.map((par, i) => ({ hole: i + 1, par, hcpIndex: s.hcp[i] }));
-    const tees = s.tees.filter((t) => t.yards.some((y) => y > 0)).map((t) => ({
-        name: t.name, totalYards: t.yards.reduce((a, b) => a + b, 0), parTotal: s.pars.reduce((a, b) => a + b, 0),
-        holes: t.yards.map((y, i) => ({ par: s.pars[i], yardage: y, hcpIndex: s.hcp[i] })),
-    }));
+    // THE TEES IN THE SHAPE ROUND SETUP READS (the GolfCourseAPI import's):
+    // { name, rating, slope, totalYards, parTotal, holes[] } under male / female.
+    // Setup offers a tee only with a rating AND a slope (courseTeeChoices), so the
+    // men's ratings make the male list and the women's (where GolfAPI rates a tee
+    // for women) the female list, on the women's card when it is a valid one.
+    const valid = (pars, hcp) => pars && hcp && pars.length === 18 && hcp.length === 18 && pars.every((p) => Number.isInteger(p) && p >= 3 && p <= 6)
+        && new Set(hcp).size === 18 && hcp.every((h) => Number.isInteger(h) && h >= 1 && h <= 18);
+    const wPars = valid(s.parsW, s.hcpW) ? s.parsW : s.pars, wHcp = valid(s.parsW, s.hcpW) ? s.hcpW : s.hcp;
+    const tee = (t, pars, hcp, rating, slope) => Object.assign({
+        name: t.name, totalYards: t.yards.reduce((a, b) => a + b, 0), parTotal: pars.reduce((a, b) => a + b, 0),
+        holes: t.yards.map((y, i) => ({ par: pars[i], yardage: y, hcpIndex: hcp[i] })),
+    }, rating && slope ? { rating, slope } : {});
+    const played = s.tees.filter((t) => t.yards.some((y) => y > 0));
+    const tees = played.map((t) => tee(t, s.pars, s.hcp, t.rm, t.sm));
+    const women = played.filter((t) => t.rw && t.sw).map((t) => tee(t, wPars, wHcp, t.rw, t.sw));
     return {
         name: displayName(s.club, s.course).slice(0, 120), data,
         location: { city: s.city, state: s.state, country: 'USA', latitude: s.lat, longitude: s.lng },
-        tees: { male: tees, female: [] },
+        tees: { male: tees, female: women },
         source: { provider: 'golfapi', providerCourseId: s.id, providerClubName: s.club, importedAt: at },
     };
 }
@@ -199,6 +210,9 @@ function createCore(deps) {
             const greens = Object.keys(s.h).filter((n) => s.h[n].g && s.h[n].g.c).length;
             if (!greens) { await db.update('gps_meta/known/' + id, { gps: false }); await db.set('gps_meta/partial/' + id, null); await uncount(mine); return done('nogps'); }
             await db.set('gps_courses/' + id, s);
+            // The raw /courses answer, kept server-side (gps_meta is closed to phones):
+            // a later card fix rebuilds from it with no GolfAPI call.
+            await db.set('gps_meta/raw/' + id, { course: cb, at: t });
             await db.set('gps_meta/partial/' + id, null);
             const card = cardRecord(s, t);
             let cardKey = null;

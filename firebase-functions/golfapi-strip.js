@@ -29,7 +29,11 @@ function stripCourse(course, coords) {
     const tees = (course.tees || []).map((t) => {
         const yards = [];
         for (let i = 1; i <= n; i++) yards.push(Number(t['length' + i]) || 0);
-        return { name: t.teeName || '', color: t.teeColor || '', yards };
+        // Course rating / slope per tee (men's; women's on the forward tees) - round
+        // setup offers only a RATED tee, and handicap strokes come from them.
+        const num = (v) => { const x = Number(v); return v != null && v !== '' && isFinite(x) && x > 0 ? x : null; };
+        return { name: t.teeName || '', color: t.teeColor || '', yards,
+            rm: num(t.courseRatingMen), sm: num(t.slopeMen), rw: num(t.courseRatingWomen), sw: num(t.slopeWomen) };
     });
     return {
         id: String(course.courseID || course.id || ''), club: course.clubName || '', course: course.courseName || '',

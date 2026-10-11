@@ -272,3 +272,37 @@ test('an interrupted pull is not paid for twice: the /courses answer is kept, a 
     assert.deepEqual(log.map((l) => [l.cost, l.result]), [[1, 'pulled (resumed)']]);
 });
 const quietly = async (fn) => { const e = console.error; console.error = () => {}; try { return await fn(); } finally { console.error = e; } };
+
+// ---- BUILD 13 (2026-10-11): RATED TEES - the Players step offers a tee only with a rating AND a slope ----
+test('the card carries RATED tees in the import shape (men\'s ratings -> male, women\'s -> female); the raw answer is kept, so a later fix costs 0 calls', { skip }, async () => {
+    const { core, db, api } = setup();
+    const realFetch = api.fetch;
+    const { createCore } = require('./firebase-functions/gps-live-core.js');
+    const rated = createCore({ db, key: () => KEY, now: () => T0, fetch: async (u, i) => {
+        const r = await realFetch(u, i);
+        if (!/\/courses\//.test(u)) return r;
+        const b = await r.json();
+        b.parsWomen = b.parsMen.slice(); b.indexesWomen = b.indexesMen.slice();
+        b.tees = [{ teeName: 'Black', courseRatingMen: '74.9', slopeMen: '140', length1: 383, length2: 448 },
+            { teeName: 'Red', courseRatingMen: 66.3, slopeMen: 115, courseRatingWomen: 70.5, slopeWomen: 126, length1: 300 },
+            { teeName: 'Unrated', length1: 350 }];
+        return { ok: true, status: 200, json: async () => b };
+    } });
+    await core.search(MANNY, { name: 'Prestwick' });
+    assert.equal((await rated.course(MANNY, { courseId: PW })).status, 'ready');
+    const card = db.root.global_courses['gapi_' + PW];
+    assert.deepEqual(card.tees.male.map((t) => [t.name, t.rating, t.slope, t.parTotal]), [['Black', 74.9, 140, 72], ['Red', 66.3, 115, 72], ['Unrated', undefined, undefined, 72]],
+        'numbers, not strings; an unrated tee is kept for its yards but round setup will not offer it');
+    assert.deepEqual(card.tees.female.map((t) => [t.name, t.rating, t.slope]), [['Red', 70.5, 126]], 'only tees GolfAPI rates for women');
+    assert.equal(card.tees.male[0].holes[1].yardage, 448);
+    assert.ok(db.root.gps_meta.raw[PW].course.tees, 'the raw /courses answer is kept (server only)');
+    assert.equal(db.root.gps_courses[PW].tees[0].rm, 74.9, 'and the cached course keeps the ratings');
+});
+
+test('the backfill tool rewrites ONLY the tees, spends a GolfAPI call only with --allow-call, and never prints the key', { skip }, () => {
+    const src = fs.readFileSync(path.join(__dirname, 'tools/gps-live-backfill.js'), 'utf8');
+    assert.ok(/if \(!allowCall\) \{ console\.log\(`\$\{id\} \(\$\{card\.name\}\): no kept raw answer - needs ONE GolfAPI call/.test(src), 'no call without --allow-call');
+    assert.ok(/set\('\/gps_courses\/' \+ id \+ '\/tees', s\.tees\);\s*\n\s*set\('\/global_courses\/gapi_' \+ id \+ '\/tees', fresh\.tees\);/.test(src), 'only the two tees nodes are written');
+    assert.ok(!/console\.\w+\([^)]*\bkey\b/.test(src), 'the key is never printed');
+    assert.ok(/'database:get'/.test(src) && !/database:remove|'--only'/.test(src), 'reads / sets through the Firebase CLI; no removes, no deploys');
+});
