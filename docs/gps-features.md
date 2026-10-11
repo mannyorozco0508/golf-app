@@ -50,6 +50,16 @@ Rules that would need ADDING (additive; nothing existing changes):
   yards (first from the tee, then from the shot before). **Undo**, **Done**.
 - Replay round: shots hole by hole; ◀ / ▶ Play (3.5 s per hole) / Exit replay.
 - Stored: `localStorage hardpan_shots_v1_<round>` only. Positions never leave the phone.
+- **📍 Mark shot** (one tap, on the GPS screen, right side): marks the shot at the phone's
+  GPS position - no map tap. Then a club picker: Dr 3W 5W Hy 3i-9i PW GW SW LW Putter,
+  **Skip**, or **Move it on the map** (the next map tap moves that shot; its numbers are
+  redone). Saved with each shot: club, position, yards from the shot before (or the tee),
+  the wind at that moment relative to the shot (mph, from, head/cross, kind), the
+  elevation change (ft, from the hole's stored heights) and the plays-like yards.
+- Map labels and Replay show "2 · 7i · 152".
+- PLAN ONLY (not built): **My clubs** - per club, from every round's shots on this phone:
+  shots counted, average real yards and average plays-like yards (Putter left out;
+  shots with no club skipped; maybe drop the shortest 10 % as mishits).
 - After the trip (same pattern as stats): `player_stats/<uid>/shots/<round>/h<n>` =
   list of points — owner-only rule. It is location data: only with the golfer's opt-in.
 

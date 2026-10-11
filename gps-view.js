@@ -2306,6 +2306,8 @@
         if (S.mode === 'setFront') { S.draft.front = pt; S.mode = 'setBack'; render(); return; }
         if (S.mode === 'setBack') { S.draft.back = pt; S.mode = 'confirmAll'; render(); return; }
         if (S.mode !== 'measure') return;
+        // MOVING THE LAST SHOT ("Move it on the map" after a one-tap Mark shot).
+        if (S.shotAdjust) { moveLastShot(pt); return; }
         // MARKING SHOTS: a tap is where the ball finished (gps-shots.js, this phone only).
         if (S.shotMode) { addShot(pt, 'tap'); return; }
         if (S.replay) return;
@@ -2467,14 +2469,77 @@
     // ---- SHOT BY SHOT (gps-features): mark, then replay - on this phone only ------
     function shotsApi() { return window.HardPanGpsShots || null; }
     function withShots(fn) { loadScript('gps-shots.js', function () { return !!shotsApi(); }, function () { if (S && shotsApi()) fn(shotsApi()); }); }
+    // THE SHOT'S NUMBERS, at the moment it is marked: from the shot before (or the
+    // tee) to here - yards, the slope (the hole line's heights, already on the phone),
+    // the wind relative to THIS shot, and what it played like (gps-geo.playsLike: the
+    // still-air, level distance that shot was worth). All on this phone.
+    function shotDetails(prev, pt) {
+        var r = resolved();
+        var from = prev || (r && r.tee) || null;
+        if (!from) return {};
+        var yd = Math.round(G.haversineMeters(from, pt) / G.M_PER_YD);
+        var brg = G.bearingDeg(from, pt);
+        var w = effectiveWind(), has = !!(w && !w.none);
+        var e0 = r ? (prev ? lineElev(r, from) : elevAt(r.tee)) : null, e1 = r ? lineElev(r, pt) : null;
+        var pl = G.playsLike({ yards: yd, elevFromFt: e0, elevToFt: e1, windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
+            shotBearingDeg: brg, tempF: w && typeof w.tempF === 'number' ? w.tempF : null });
+        var out = { yd: yd, plays: pl ? pl.yards : null, elevFt: e0 != null && e1 != null ? Math.round((e1 - e0) * 10) / 10 : null };
+        if (has) out.wind = Object.assign({ mph: w.mph, fromDeg: w.fromDeg }, G.windRelative(w.fromDeg, brg, w.mph));
+        return out;
+    }
     function addShot(pt, how) {
         var A = shotsApi();
+        if (!A || !S) return false;
+        var list = A.shots(S.eventCode, S.hole);
+        var prev = list.length ? list[list.length - 1].p : null;
+        if (A.add(S.eventCode, S.hole, pt, how, shotDetails(prev, pt)) == null) { flash('That is ' + A.MAX_PER_HOLE + ' shots on this hole'); return false; }
+        render();
+        return true;
+    }
+    // ONE TAP (gps-features): the shot, here (the GPS position), then the club.
+    function markShotHere() {
+        if (!S) return;
+        if (!fix) { flash('No GPS position yet - or tap the map: Tools \u203A Mark shots'); return; }
+        withShots(function () {
+            if (!addShot(fix.pt, 'here')) return;
+            openClubSheet();
+        });
+    }
+    function openClubSheet() {
+        var A = shotsApi(), sh = S && S.el.querySelector('.gps-clubs');
+        if (!A || !sh) return;
+        var code = S.eventCode, hole = S.hole;
+        var list = A.shots(code, hole), last = list[list.length - 1];
+        var head = sh.querySelector('.gps-clubs-head');
+        head.textContent = 'Shot ' + list.length + (last && last.yd != null ? ' \u00b7 ' + G.shownDistance(last.yd * G.M_PER_YD, units()) + (last.plays != null && last.plays !== last.yd ? ' (played ' + G.shownDistance(last.plays * G.M_PER_YD, units()) + ')' : '') : '') + ' \u2014 which club?';
+        var row = sh.querySelector('.gps-clubs-row');
+        row.textContent = '';
+        A.CLUBS.forEach(function (c) {
+            var b = document.createElement('button');
+            b.type = 'button'; b.textContent = c; b.setAttribute('data-club', c);
+            b.onclick = function () { if (!S) return; A.setLast(code, hole, { club: c }); closeClubSheet(); render(); };
+            row.appendChild(b);
+        });
+        sh.style.display = '';
+    }
+    function closeClubSheet() { var sh = S && S.el.querySelector('.gps-clubs'); if (sh) sh.style.display = 'none'; }
+    function moveLastShot(pt) {
+        var A = shotsApi();
         if (!A || !S) return;
-        if (A.add(S.eventCode, S.hole, pt, how) == null) flash('That is ' + A.MAX_PER_HOLE + ' shots on this hole');
+        var list = A.shots(S.eventCode, S.hole);
+        var prev = list.length > 1 ? list[list.length - 2].p : null;
+        A.setLast(S.eventCode, S.hole, Object.assign({ p: pt, how: 'tap', yd: null, plays: null, elevFt: null, wind: null }, shotDetails(prev, pt)));
+        S.shotAdjust = false;
+        flash('Shot moved');
         render();
     }
     function drawShots() {
-        var A = shotsApi(), on = !!(S && (S.shotMode || S.replay) && A && S.mode === 'measure');
+        var A = shotsApi();
+        var mb = S && S.el.querySelector('.gps-mark-shot');
+        if (mb) mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none';
+        // Markers whenever this hole has shots; the bar only while marking / replaying / moving.
+        var mode = !!(S && (S.shotMode || S.replay || S.shotAdjust));
+        var on = !!(S && A && S.mode === 'measure' && (mode || A.shots(S.eventCode, S.hole).length));
         var list = on ? A.shots(S.eventCode, S.hole) : [];
         var r = on ? resolved() : null;
         var legs = on ? A.legs(list, r && r.tee, G.haversineMeters) : [];
@@ -2483,18 +2548,23 @@
             var k = 'shot' + i;
             keep[k] = 1;
             var m = marker(k, sh.p, function () { var e = document.createElement('div'); e.className = 'gps-shot'; return e; });
-            var t = (i + 1) + (legs[i] != null ? ' \u00b7 ' + G.shownDistance(legs[i] * G.M_PER_YD, units()) : '');
+            var yd = sh.yd != null ? sh.yd : legs[i];
+            var t = (i + 1) + (sh.club ? ' \u00b7 ' + sh.club : '') + (yd != null ? ' \u00b7 ' + G.shownDistance(yd * G.M_PER_YD, units()) : '');
             var el = m && m.getElement();
             if (el && el.textContent !== t) el.textContent = t;
         });
         Object.keys((S && S.markers) || {}).forEach(function (k) { if (/^shot/.test(k) && !keep[k]) marker(k, null); });
         var bar = S && S.el.querySelector('.gps-shotbar');
         if (!bar) return;
-        bar.style.display = on ? '' : 'none';
-        if (!on) return;
+        bar.style.display = on && mode ? '' : 'none';
+        if (!on || !mode) return;
         var n = list.length;
-        var text = S.shotMode ? 'Hole ' + S.hole + ' \u00b7 tap where shot ' + (n + 1) + ' finished' + (n ? ' (' + n + ' marked)' : '')
-            : 'Replay \u00b7 Hole ' + S.hole + ' \u00b7 ' + (n ? n + ' shot' + (n === 1 ? '' : 's') + ': ' + legs.map(function (y) { return y == null ? '?' : G.shownDistance(y * G.M_PER_YD, units()); }).join(' \u00b7 ') : 'no shots marked');
+        var text = S.shotAdjust ? 'Hole ' + S.hole + ' \u00b7 tap the map where shot ' + n + ' finished'
+            : S.shotMode ? 'Hole ' + S.hole + ' \u00b7 tap where shot ' + (n + 1) + ' finished' + (n ? ' (' + n + ' marked)' : '')
+            : 'Replay \u00b7 Hole ' + S.hole + ' \u00b7 ' + (n ? n + ' shot' + (n === 1 ? '' : 's') + ': ' + list.map(function (sh, i) {
+                var y = sh.yd != null ? sh.yd : legs[i];
+                return (sh.club ? sh.club + ' ' : '') + (y == null ? '?' : G.shownDistance(y * G.M_PER_YD, units()));
+            }).join(' \u00b7 ') : 'no shots marked');
         var tx = bar.querySelector('.gps-shotbar-text');
         if (tx.textContent !== text) tx.textContent = text;
         var vis = function (sel, v) { var b = bar.querySelector(sel); if (b) b.style.display = v ? '' : 'none'; };
@@ -2632,7 +2702,10 @@
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
         +   '<button type="button" class="gps-zoom gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
+        +   '<button type="button" class="gps-mark-shot gps-float" style="display:none" aria-label="Mark shot here">\uD83D\uDCCD Mark shot</button>'
         + '</div>'
+        + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
+        +   '<div class="gps-clubs-foot"><button type="button" class="gps-club-move">Move it on the map</button><button type="button" class="gps-club-skip">Skip</button></div></div>'
         // LEFT, ABOVE THE SCORECARD: Recenter, and you (or the tee) -> the target.
         + '<div class="gps-leftrow">'
         +   '<button type="button" class="gps-recenter gps-float" aria-label="Recenter on the hole">⌖</button>'
@@ -2828,6 +2901,12 @@
         + '#gps-overlay .gps-shotbar button{min-height:44px;min-width:44px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 14px/1 ' + FONT + ';padding:0 12px;cursor:pointer;}'
         + '#gps-overlay .gps-shotbar .gps-sb-done{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;margin-left:auto;}'
         + '#gps-overlay .gps-shot{min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:#f97316;color:#fff;border:2px solid #fff;font:800 12px/22px ' + FONT + ';text-align:center;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.5);}'
+        + '#gps-overlay .gps-mark-shot{font-size:13px;font-weight:800;white-space:nowrap;padding:0 12px;min-height:44px;}'
+        + '#gps-overlay .gps-clubs{position:absolute;z-index:47;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;border-radius:18px 18px 0 0;padding:10px 12px calc(14px + env(safe-area-inset-bottom));color:#f4f4ef;font:700 14px/1.3 ' + FONT + ';}'
+        + '#gps-overlay .gps-clubs-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}'
+        + '#gps-overlay .gps-clubs button{min-height:44px;min-width:52px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;cursor:pointer;}'
+        + '#gps-overlay .gps-clubs-foot{display:flex;gap:8px;justify-content:space-between;}'
+        + '#gps-overlay .gps-clubs .gps-club-skip{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;}'
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
@@ -3055,6 +3134,10 @@
                 if (!hs.length) flash('No shots marked in this round yet - Tools \u203A Mark shots');
             });
         });
+        // ONE TAP (gps-features): 📍 Mark shot on the GPS screen, then the club (skippable).
+        on(el, '.gps-mark-shot', function () { closeMenus(); markShotHere(); });
+        on(el, '.gps-club-skip', function () { closeClubSheet(); });
+        on(el, '.gps-club-move', function () { if (!S) return; closeClubSheet(); S.shotAdjust = true; flash('Tap the map where the ball is'); render(); });
         on(el, '.gps-sb-here', function () { if (S && fix) addShot(fix.pt, 'here'); });
         on(el, '.gps-sb-undo', function () { var A = shotsApi(); if (S && A) { A.undo(S.eventCode, S.hole); render(); } });
         on(el, '.gps-sb-prev', function () { stopReplayTimer(); replayStep(-1); render(); });
@@ -3064,7 +3147,7 @@
             S.replayTimer = setInterval(function () { if (!S || !S.replay || !replayStep(1)) { stopReplayTimer(); if (S) render(); } }, 3500);
             render();
         });
-        on(el, '.gps-sb-done', function () { if (!S) return; stopReplayTimer(); S.shotMode = false; S.replay = false; render(); });
+        on(el, '.gps-sb-done', function () { if (!S) return; stopReplayTimer(); S.shotMode = false; S.replay = false; S.shotAdjust = false; render(); });
         // MY STATS (gps-features): putts, fairway, GIR for this hole; the round and the
         // season - on this phone only (gps-stats.js).
         on(el, '.gps-my-stats', function () {

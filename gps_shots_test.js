@@ -57,3 +57,32 @@ test('the GPS screen: Tools > Mark shots / Replay round; a tap in mark mode mark
     assert.ok(/function stopReplayTimer\(\)/.test(v) && /function unmount\(\) \{[\s\S]{0,120}stopReplayTimer\(\);/.test(v), 'the replay timer stops with the screen');
     assert.ok(!/firebase|\.ref\(|fetch\(|XMLHttpRequest/.test(src), 'no database, no network');
 });
+
+test('one-tap Mark shot: the club, the yards, wind, slope and plays-like saved with the shot; the club picked after; moving it', { skip }, () => {
+    const { A } = sandbox();
+    assert.deepEqual(A.CLUBS, ['Dr', '3W', '5W', 'Hy', '3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW', 'Putter']);
+    const wind = { mph: 10, fromDeg: 0, head: 10, cross: 0, kind: 'headwind' };
+    assert.equal(A.add('ZNBLP8', 2, [33.64, -78.96], 'here', { yd: 243, plays: 262, elevFt: 6.5, wind, club: null }), 1);
+    let s = A.shots('ZNBLP8', 2)[0];
+    assert.equal(s.how, 'here');
+    assert.deepEqual([s.yd, s.plays, s.elevFt, s.wind.kind], [243, 262, 6.5, 'headwind']);
+    assert.ok(!('club' in s), 'no club until one is picked');
+    assert.equal(A.setLast('ZNBLP8', 2, { club: '7i' }).club, '7i');
+    assert.equal(A.setLast('ZNBLP8', 2, { club: '12i' }).club, '7i', 'only clubs from the list');
+    s = A.setLast('ZNBLP8', 2, { p: [33.6412345678, -78.96], how: 'tap', yd: 250, wind: null });
+    assert.deepEqual([s.p[0], s.how, s.yd, s.club, 'wind' in s], [33.641235, 'tap', 250, '7i', false], 'moved: new spot and numbers, club kept, stale wind dropped');
+    assert.equal(A.setLast('ZNBLP8', 3, { club: 'Dr' }), null, 'no shot on that hole: nothing');
+});
+
+test('the GPS screen: 📍 Mark shot (one tap, GPS position), the club picker (skippable), Move it on the map; labels show club + yards', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.ok(/class="gps-mark-shot gps-float"[^>]*>\\uD83D\\uDCCD Mark shot</.test(v), 'the button is on the GPS screen, not under Tools');
+    assert.ok(/on\(el, '\.gps-mark-shot', function \(\) \{ closeMenus\(\); markShotHere\(\); \}\)/.test(v));
+    assert.ok(/function markShotHere\(\) \{[\s\S]{0,300}addShot\(fix\.pt, 'here'\)[\s\S]{0,60}openClubSheet\(\)/.test(v), 'marks at the GPS fix, then asks the club');
+    assert.ok(/class="gps-club-skip">Skip</.test(v) && /class="gps-club-move">Move it on the map</.test(v));
+    assert.ok(/if \(S\.shotAdjust\) \{ moveLastShot\(pt\); return; \}/.test(v), 'after "Move it", a map tap moves the last shot');
+    const det = v.slice(v.indexOf('function shotDetails('), v.indexOf('function addShot('));
+    for (const k of ['yd:', 'plays:', 'elevFt:', 'out.wind', 'G.windRelative', 'G.playsLike', 'effectiveWind()']) assert.ok(det.includes(k), 'shot details: ' + k);
+    assert.ok(/\(sh\.club \? ' \\u00b7 ' \+ sh\.club : ''\)/.test(v), 'map label: number · club · yards');
+    assert.ok(!/firebase|\.ref\(|fetch\(/.test(det), 'the shot details never leave the phone');
+});
