@@ -6978,8 +6978,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status); return; }
         if (r.cardKey) {
             // The function wrote the scorecard (pars, handicaps, tees) to
-            // global_courses/<cardKey>: picked like any saved course.
-            selectCourse(r.cardKey, x.name);
+            // global_courses/<cardKey>: picked like any saved course. READ FRESH
+            // and put in hand FIRST (build 12): the course list may hold a name-only
+            // stub for it, or an earlier read from before the card existed - either
+            // left setup on "COURSE NOT MAPPED" with an empty card.
+            let rec = null;
+            try { const snap = await db.ref('global_courses/' + r.cardKey).once('value'); rec = snap && typeof snap.val === 'function' ? snap.val() : null; } catch (e) { rec = null; }
+            if (rec && rec.name && Array.isArray(rec.data) && rec.data.length === 18) globalCourses[r.cardKey] = rec;
+            else { sub.textContent = 'GPS \u2713 ready - the scorecard did not load; tap again'; return; }
+            selectCourse(r.cardKey, rec.name);
             return;
         }
         // GPS is here; the card is not (a 9-hole course, or GolfAPI's card is not
@@ -7303,6 +7310,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // native list: that is the review reply's stranger-content claim and a
         // separate decision.
         const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_")));
+        // GPS:BEGIN
+        // GPS LIVE (build 12): a course set up from GolfAPI - global_courses/gapi_<id>,
+        // its card written by our function - is a saved course like an import, so
+        // picking it again needs no search.
+        Object.keys(globalCourses).forEach(k => { if (k.startsWith('gapi_') && globalKeys.indexOf(k) === -1) globalKeys.push(k); });
+        // GPS:END
         if (globalKeys.length > 0) {
             const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
             if (filteredGlobals.length > 0) {

@@ -141,3 +141,32 @@ test('the GPS screen and setup with OSM off: GolfAPI only, no lookup, Refresh re
     assert.ok(!/gpsLive/.test(require('./tools/gps-flag.js').applyFlag(a, false)), 'none of it in the Consumer app');
     assert.ok(!/addEventListener\('input'[\s\S]{0,200}gpsLive/.test(a), 'never as you type');
 });
+
+// ---- BUILD 12: the array Firebase hands back ----------------------------------
+const FB = Object.assign({}, COURSE, { h: [null].concat(Array.from({ length: 18 }, (_, i) => COURSE.h[String(i + 1)])) });
+
+test('a course read from Firebase (holes as an ARRAY, [0] empty) is kept as an object, and the matcher and setup line do not throw', { skip }, async () => {
+    const t = sandbox({ db: { gps_courses: { [PW]: FB } } });
+    assert.equal(await t.sb.HardPanGpsLive.ensure('gapi_' + PW), true);
+    const kept = t.sb.HardPanGolfApi.courses[PW];
+    assert.ok(!Array.isArray(kept.h)); assert.equal(Object.keys(kept.h).length, 18);
+    const k = t.sb.HardPanGpsMatch.known('gapi_' + PW, 18, 'Prestwick Golf Course (Prestwick)');
+    assert.deepEqual([k.source, k.status, k.n], ['golfapi', 'ready', 18]);
+    // A cached function answer has the same shape.
+    const c = sandbox({ reply: () => ({ result: { status: 'ready', course: FB, cardKey: 'gapi_' + PW } }) });
+    await c.sb.HardPanGpsLive.course(PW);
+    assert.equal(c.sb.HardPanGpsMatch.known('gapi_' + PW, 18, 'x').n, 18);
+    // A copy kept on the phone BEFORE this fix (an array) is repaired at load.
+    const old = sandbox({ ls: { ['hardpan_gpslive_v1_' + PW]: JSON.stringify(FB) } });
+    assert.ok(!Array.isArray(old.sb.HardPanGpsLive._store.courses[PW].h));
+    // And gps-geo itself never trips on an empty slot.
+    const G = require('./gps-geo.js');
+    assert.equal(Object.keys(G.golfapiRecord([FB]).holes).length, 18);
+});
+
+test('setup after a pick: the card is read FRESH and put in hand before it is selected; GolfAPI courses are in the saved list (HardPan only)', { skip }, () => {
+    const a = read('admin.html');
+    const pick = a.slice(a.indexOf('async function gpsLivePick'), a.indexOf('async function gpsLiveFind'));
+    assert.ok(/db\.ref\('global_courses\/' \+ r\.cardKey\)\.once\('value'\)[\s\S]{0,300}globalCourses\[r\.cardKey\] = rec;[\s\S]{0,200}selectCourse\(r\.cardKey, rec\.name\)/.test(pick), 'fresh read -> in hand -> selected');
+    assert.ok(/k\.startsWith\('gapi_'\)/.test(a) && !/gapi_/.test(require('./tools/gps-flag.js').applyFlag(a, false)), 'gapi_ in the saved list, GPS build only');
+});

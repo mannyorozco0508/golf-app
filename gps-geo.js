@@ -1204,8 +1204,11 @@
     // side reads (the bundle's shape). offset: 9 for the back nine of a pairing.
     function golfapiHoles(c, offset, into) {
         into = into || {};
+        // Firebase returns holes "1".."18" as an ARRAY with an empty [0]: only real holes.
         Object.keys((c && c.h) || {}).forEach(function (k) {
-            var h = c.h[k], g = h.g || {};
+            var h = c.h[k];
+            if (!h || typeof h !== 'object' || !(Number(k) >= 1)) return;
+            var g = h.g || {};
             var mid = g.c || ((g.f && g.b) ? midpoint(g.f, g.b) : null);
             if (!mid) return;
             var tee = (h.t && (h.t.b || h.t.f)) || null;

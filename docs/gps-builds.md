@@ -103,7 +103,7 @@ any other (the "Firebase config is for this app" build phase).
 
 ```bash
 node build-shell.js consumer                 # CONSUMER -> dist/consumer (cache consumer-v152-unplayedzero, unchanged from main)
-GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v187-gps-live)
+GPS_ENABLED=1 node build-shell.js consumer   # HARDPAN  -> dist/hardpan  (cache consumer-v188-gps-livefix)
 node build-shell.js tournament               # Tournaments never ship GPS, whatever the flag says
 ```
 

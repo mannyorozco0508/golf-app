@@ -37,6 +37,14 @@ const DEFAULTS = {
     lockMs: 120000,
 };
 const DAY_MS = 86400000;
+// The Realtime Database hands holes "1".."18" back as an ARRAY ([0] empty): the
+// phone always gets an object keyed by hole number.
+function normalCourse(c) {
+    if (!c || typeof c !== 'object' || !c.h) return c;
+    const h = {};
+    Object.keys(c.h).forEach((k) => { const x = c.h[k]; if (x && typeof x === 'object' && Number(k) >= 1) h[String(Number(k))] = x; });
+    return Object.assign({}, c, { h });
+}
 
 function dayKey(ms) { return new Date(ms).toISOString().slice(0, 10).replace(/-/g, ''); }
 // The typed name, as a database key: "Prestwick  C.C." -> "prestwick_c_c".
@@ -165,7 +173,7 @@ function createCore(deps) {
         if (cached) {
             await link();
             await log({ uid: who.uid, act: 'course', id, cost: 0, result: 'cache' });
-            return { status: 'ready', course: cached, cardKey: (await db.get('global_courses/gapi_' + id + '/name')) ? 'gapi_' + id : null };
+            return { status: 'ready', course: normalCourse(cached), cardKey: (await db.get('global_courses/gapi_' + id + '/name')) ? 'gapi_' + id : null };
         }
         const known = await db.get('gps_meta/known/' + id);
         const done = async (result, extra) => { await log({ uid: who.uid, act: 'course', id, cost: 0, result }); return Object.assign({ status: result }, extra || {}); };
@@ -180,13 +188,18 @@ function createCore(deps) {
         const lock = await db.transaction('gps_meta/lock/' + id, (cur) => (cur && cur.at > t - cfg.lockMs ? undefined : { at: t, uid: who.uid }));
         if (!lock.committed) { await uncount(mine); await uncount(all); return done('busy'); }
         try {
-            const cb = await call('/courses/' + id, 1, who);
+            // AN INTERRUPTED PULL IS NOT PAID FOR TWICE: the /courses answer is kept
+            // (gps_meta/partial) until the pull completes, so a retry asks only for
+            // what is missing.
+            let cb = await db.get('gps_meta/partial/' + id + '/course'), spent = 1;
+            if (!cb) { cb = await call('/courses/' + id, 1, who); spent = 2; await db.set('gps_meta/partial/' + id, { course: cb, at: t }); }
             const kb = await call('/coordinates/' + id, 1, who);
             const s = stripCourse(cb.course || cb, Object.assign({}, kb, { __fetched: new Date(t).toISOString() }));
             s.id = id;
             const greens = Object.keys(s.h).filter((n) => s.h[n].g && s.h[n].g.c).length;
-            if (!greens) { await db.update('gps_meta/known/' + id, { gps: false }); await uncount(mine); return done('nogps'); }
+            if (!greens) { await db.update('gps_meta/known/' + id, { gps: false }); await db.set('gps_meta/partial/' + id, null); await uncount(mine); return done('nogps'); }
             await db.set('gps_courses/' + id, s);
+            await db.set('gps_meta/partial/' + id, null);
             const card = cardRecord(s, t);
             let cardKey = null;
             if (card) {
@@ -195,7 +208,7 @@ function createCore(deps) {
                 if (!w.committed) cardKey = (await db.get('global_courses/gapi_' + id + '/name')) ? cardKey : null;
             }
             await link();
-            await log({ uid: who.uid, act: 'course', id, cost: 2, result: 'pulled', greens, card: !!card });
+            await log({ uid: who.uid, act: 'course', id, cost: spent, result: spent === 2 ? 'pulled' : 'pulled (resumed)', greens, card: !!card });
             return { status: 'ready', course: s, cardKey };
         } catch (e) {
             await uncount(mine); await uncount(all);
@@ -208,4 +221,4 @@ function createCore(deps) {
     return { search, course, cfg };
 }
 
-module.exports = { createCore, cardRecord, displayName, queryKey, dayKey, DEFAULTS };
+module.exports = { createCore, normalCourse, cardRecord, displayName, queryKey, dayKey, DEFAULTS };

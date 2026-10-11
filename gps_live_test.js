@@ -233,3 +233,42 @@ test('one stripCourse: the Mac puller and the functions share it; deploy names o
     assert.ok(/firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse/.test(fs.readFileSync(path.join(DIR, 'index.js'), 'utf8')));
     assert.ok(/node_modules/.test(fs.readFileSync(path.join(DIR, '.gitignore'), 'utf8')));
 });
+
+// ---- BUILD 12 (2026-10-10): what Manny's phone hit ------------------------------
+// The Realtime Database hands holes "1".."18" back as an ARRAY with [0] empty.
+const asFirebase = (c) => Object.assign({}, c, { h: [null].concat(Array.from({ length: 18 }, (_, i) => c.h[String(i + 1)])) });
+
+test('a cached course comes back from Firebase with holes as an ARRAY ([0] empty): the phone gets an object keyed 1..18', { skip }, async () => {
+    const { core, db } = setup();
+    await core.search(MANNY, { name: 'Prestwick' });
+    await core.course(MANNY, { courseId: PW });
+    db.root.gps_courses[PW] = asFirebase(db.root.gps_courses[PW]);   // what the database really stores / returns
+    const r = await core.course(GUEST, { courseId: PW });
+    assert.equal(r.status, 'ready');
+    assert.ok(!Array.isArray(r.course.h), 'an object');
+    assert.deepEqual(Object.keys(r.course.h), Array.from({ length: 18 }, (_, i) => String(i + 1)));
+    assert.deepEqual(r.course.h['1'].g.c, [33.64, -78.96]);
+});
+
+test('an interrupted pull is not paid for twice: the /courses answer is kept, a retry asks only for /coordinates (cost 1), then it is cleared', { skip }, async () => {
+    const { core, api, db } = setup();
+    await core.search(MANNY, { name: 'Prestwick' });
+    // The first attempt dies after /courses (the coordinates call fails).
+    const realFetch = api.fetch;
+    let failCoords = true;
+    const { createCore } = require('./firebase-functions/gps-live-core.js');
+    const flaky = createCore({ db, key: () => KEY, now: () => T0, fetch: (u, i) => (failCoords && /\/coordinates\//.test(u) ? Promise.resolve({ ok: false, status: 500, json: async () => ({}) }) : realFetch(u, i)) });
+    const first = await quietly(() => flaky.course(MANNY, { courseId: PW }));
+    assert.equal(first.status, 'error');
+    assert.ok(db.root.gps_meta.partial[PW].course, 'the /courses answer is kept');
+    assert.equal(db.root.gps_usage.uMANNY['20261011'].pulls, 0, 'a failed pull is not counted');
+    failCoords = false;
+    const before = api.calls.length;
+    const again = await flaky.course(MANNY, { courseId: PW });
+    assert.equal(again.status, 'ready');
+    assert.deepEqual(api.calls.slice(before), ['/coordinates/' + PW], 'only the missing call');
+    assert.equal((db.root.gps_meta.partial || {})[PW], undefined, 'cleared once complete');
+    const log = Object.values(db.root.gps_log).filter((l) => l.act === 'course' && /^pulled/.test(l.result || ''));
+    assert.deepEqual(log.map((l) => [l.cost, l.result]), [[1, 'pulled (resumed)']]);
+});
+const quietly = async (fn) => { const e = console.error; console.error = () => {}; try { return await fn(); } finally { console.error = e; } };

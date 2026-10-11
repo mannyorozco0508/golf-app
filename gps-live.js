@@ -26,6 +26,16 @@
     var COURSE = 'hardpan_gpslive_v1_', LINK = 'hardpan_gpslive_link_v1_';
     var READ_MS = 8000, CALL_MS = 25000;
     var store = { courses: {}, links: {} };
+    // FIREBASE TURNS holes "1".."18" INTO AN ARRAY ([0] empty) when it hands a course
+    // back - from gps_courses or a cached function answer. One shape on the phone:
+    // an object keyed by hole number, real holes only.
+    function normal(c) {
+        if (!c || typeof c !== 'object' || !c.h) return c;
+        var h = {};
+        Object.keys(c.h).forEach(function (k) { var x = c.h[k]; if (x && typeof x === 'object' && Number(k) >= 1) h[String(Number(k))] = x; });
+        c.h = h;
+        return c;
+    }
 
     function cfg() { try { return W.HARDPAN_GPS_CONFIG || {}; } catch (e) { return {}; } }
     function native() { try { return !!(W.Capacitor && W.Capacitor.isNativePlatform && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
@@ -41,7 +51,7 @@
             for (var i = 0; i < W.localStorage.length; i++) {
                 var k = W.localStorage.key(i);
                 if (k && k.indexOf(LINK) === 0) { var id = lsGet(k); if (ID_RE.test(String(id))) store.links[k.slice(LINK.length)] = String(id); }
-                else if (k && k.indexOf(COURSE) === 0) { var c = lsGet(k); if (c && c.id && c.h) store.courses[String(c.id)] = c; }
+                else if (k && k.indexOf(COURSE) === 0) { var c = normal(lsGet(k)); if (c && c.id && c.h) store.courses[String(c.id)] = c; }
             }
         } catch (e) {}
     })();
@@ -57,6 +67,7 @@
         return d;
     }
     function add(course, key) {
+        course = normal(course);
         if (!course || !ID_RE.test(String(course.id)) || !course.h) return;
         var id = String(course.id);
         store.courses[id] = course; lsSet(COURSE + id, course);
@@ -152,5 +163,5 @@
     };
     function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
 
-    W.HardPanGpsLive = { on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, message: message, _store: store };
+    W.HardPanGpsLive = { normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, message: message, _store: store };
 })();
