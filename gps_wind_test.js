@@ -10,26 +10,27 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const G = require('./gps-geo.js');
-const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
-const skip = ON ? false : 'Consumer tree: no GPS view';
+// HardPan only: a Consumer tree has no gps-geo.js / gps-view.js - every test here skips.
+const ON = fs.existsSync(path.join(__dirname, 'gps-view.js')) && fs.existsSync(path.join(__dirname, 'gps-geo.js'));
+const skip = ON ? false : 'Consumer tree: no GPS files';
+const G = ON ? require('./gps-geo.js') : null;
 const tee = [33.45, -111.90];
 const N = [33.4536, -111.90], E = [33.45, -111.8957];   // greens due north / due east of the tee (~400 m)
 
-test('hole bearings: lat, lng in that order - due north is 0, due east is 90', () => {
+test('hole bearings: lat, lng in that order - due north is 0, due east is 90', { skip }, () => {
     assert.equal(Math.round(G.bearingDeg(tee, N)), 0);
     assert.equal(Math.round(G.bearingDeg(tee, E)), 90);
     assert.equal(Math.round(G.bearingDeg(N, tee)), 180);
 });
 
-test('a weather "W" wind comes FROM the west (270) and blows TO the east (90)', () => {
+test('a weather "W" wind comes FROM the west (270) and blows TO the east (90)', { skip }, () => {
     const w = G.parseNwsWind({ windSpeed: '25 mph', windDirection: 'W' });
     assert.deepEqual([w.fromDeg, w.toDeg, w.mph], [270, 90, 25]);
     const o = G.parseNwsObservation({ windSpeed: { unitCode: 'wmoUnit:km_h-1', value: 40.2 }, windDirection: { value: 90 } });
     assert.deepEqual([o.fromDeg, o.toDeg, o.mph], [90, 270, 25], 'observation degrees are FROM too');
 });
 
-test('worked examples: headwind, tailwind, crosswind direction', () => {
+test('worked examples: headwind, tailwind, crosswind direction', { skip }, () => {
     // Hole due NORTH, wind FROM the north, 20 mph: straight in your face.
     assert.deepEqual(G.windRelative(0, 0, 20), { head: 20, cross: 0, kind: 'headwind' });
     // Hole due NORTH, wind FROM the south: straight behind you.
@@ -44,14 +45,14 @@ test('worked examples: headwind, tailwind, crosswind direction', () => {
     assert.deepEqual(G.windRelative(270, 90, 25).kind, 'tailwind');
 });
 
-test('plays-like: into the wind plays LONGER, downwind SHORTER, a pure crosswind no different', () => {
+test('plays-like: into the wind plays LONGER, downwind SHORTER, a pure crosswind no different', { skip }, () => {
     assert.equal(G.playsLike({ yards: 150, windMph: 20, windFromDeg: 0, shotBearingDeg: 0 }).yards, 180, '150 into a 20 mph headwind: +1% per mph');
     assert.equal(G.playsLike({ yards: 150, windMph: 20, windFromDeg: 180, shotBearingDeg: 0 }).yards, 135, 'downwind: -0.5% per mph');
     assert.equal(G.playsLike({ yards: 150, windMph: 20, windFromDeg: 90, shotBearingDeg: 0 }).yards, 150, 'a pure crosswind changes no distance');
     assert.equal(G.playsLike({ yards: 150, windMph: 25, windFromDeg: 270, shotBearingDeg: 90 }).yards, 131, 'Legacy-like: hole east, 25 mph from the west');
 });
 
-test('the arrow on screen: hole-up map (bearing = the hole) and a north-up map', () => {
+test('the arrow on screen: hole-up map (bearing = the hole) and a north-up map', { skip }, () => {
     // Hole-up, hole due NORTH (map bearing 0), wind FROM north (blows TO 180): arrow points DOWN at you.
     assert.equal(G.windArrowRot(180, 0), 180);
     // Hole-up, hole due EAST (map bearing 90), wind FROM the WEST (TO 90): arrow points UP the hole (tailwind).
