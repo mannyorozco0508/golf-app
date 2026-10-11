@@ -4707,6 +4707,10 @@ const SHELL_FILES = [
     './gps-live.js',
     // Offline course packs + plays-like heights up front (gps-features).
     './gps-offline.js',
+    // My stats: putts / fairway / GIR, on the phone (gps-features).
+    './gps-stats.js',
+    // Shot by shot: mark, replay - on the phone (gps-features).
+    './gps-shots.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
