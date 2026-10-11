@@ -178,3 +178,30 @@ Rules that would need ADDING (additive; nothing existing changes):
   hole (strokes off the course handicap by hole index, as the existing engines allocate them,
   read through handicap.js - no change to it), then the same number rule. The birdie flip
   stays on GROSS birdies (or a toggle). Shown as "Vegas · net" on the cards.
+
+## 12. Trip builder + Cup scoreboard (branch gps-builder)
+- Trip page -> "Build the whole trip from one paste": TRIP name, the Cup line, TEAMS (captains),
+  each DAY (date, course, tee times), "Format:", "Group N (time): A & B vs C & D - games",
+  "Everyone:" games. Files: trip-builder.js (parse, questions, the writes; pure),
+  trip-builder-ui.js (the ONE review screen + Confirm), cup-scoreboard.js (display only).
+- Review: every value is editable in place (date, course, tee time, Cup format, each golfer
+  slot, every $ amount, Vegas flip, remove a game, team swap, captains, "first to", golfer
+  names, handicaps). Questions come first, each with the likely answer picked.
+  Lines it can't read are kept as trip notes (never dropped).
+- Confirm = ONE db.ref().update, the Build Trip way (code-issuer codes, organizerGate
+  ensureOrganizer + stamp): trips/<T> (name, createdAt, organizerToken, rounds/<R> rows,
+  builder: Cup rules, captains, notes) and events/<R> per day in Round Setup's payload shape:
+  players (same ids every day), groupSizeOverrides, sideMatches (Nassau via
+  sideMatchPayloadFromTerms -> buildNassauWagerPayload, scope/ownerGroup per group),
+  additionalGameInstances (skins, Vegas, BBB), moneyPool (KP), ryderCup (host = Day 1, built
+  with buildRyderCupConfig + one session per day) and ryderCupRef on every round.
+  Each round stays an ordinary round: Round Setup and Action edit it as usual.
+- The per-day "Paste the whole trip" (Fill it in) stays as the fallback.
+- RYDER GAPS (ryder-cup.js unchanged): a match is always the round's 18 holes, so "2 points
+  per match (front 9 + back 9)" can't be two 9-hole matches - it is counted 1 a match and
+  the rule is shown on the trip. Captains, "first to X" and the running total across days
+  are the display-only Cup scoreboard on the trip page (computeRyderCupTotals, called
+  as-is, with each round's scores keyed by its session).
+- AFTER OCT 17 (needs the Ryder engine): per-match points (2-point matches), per-nine
+  matches (startHole/endHole on a match), a stored target/captains on the Cup, and the
+  scorecard's Cup card adding the other days.

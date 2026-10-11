@@ -4718,6 +4718,10 @@ const SHELL_FILES = [
     './bbb-engine.js',
     './vegas-engine.js',
     './extra-games-ui.js',
+    // The trip builder: one paste -> the trip and every round set up (gps-builder).
+    './trip-builder.js',
+    './trip-builder-ui.js',
+    './cup-scoreboard.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
