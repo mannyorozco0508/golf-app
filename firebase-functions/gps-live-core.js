@@ -32,8 +32,8 @@ const BASE = 'https://www.golfapi.io/api/v2.3';
 // DATA view - no code, no deploy; read again within a minute), e.g.
 //   gps_meta/config = { userPullsPerDay: 15, pullsPerDay: 50, floor: 50,
 //                       userSearchesPerDay: 20, ownerUids: "uid1,uid2" }
-// OWNERS (ALERT_UIDS, plus config.ownerUids) have NO per-golfer daily cap; the
-// floor and the day's ceiling still apply to everyone.
+// OWNERS (ALERT_UIDS, plus config.ownerUids) have NO per-golfer daily cap and are
+// not stopped by the day's ceiling; the floor (calls left) still applies to everyone.
 const LIMIT_MESSAGE = "You've hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.";
 const DEFAULTS = {
     floor: 50,              // no GolfAPI call when fewer calls than this are left
@@ -235,7 +235,9 @@ function createCore(deps) {
             await alert('userlimit_' + who.uid, { uid: who.uid, day, max: c.userPullsPerDay });
             return done('limit', { max: c.userPullsPerDay, message: LIMIT_MESSAGE });
         }
-        if (!(await count(all, c.pullsPerDay))) { await uncount(mine); await alert('daycap', { day, max: c.pullsPerDay }); return done('soon'); }
+        // The day's ceiling: owners are exempt too (their pulls still count toward it for everyone else).
+        if (owner) await db.transaction(all, (cur) => (Number(cur) || 0) + 1);
+        else if (!(await count(all, c.pullsPerDay))) { await uncount(mine); await alert('daycap', { day, max: c.pullsPerDay }); return done('soon'); }
         const lock = await db.transaction('gps_meta/lock/' + id, (cur) => (cur && cur.at > t - c.lockMs ? undefined : { at: t, uid: who.uid }));
         if (!lock.committed) { await uncount(mine); await uncount(all); return done('busy'); }
         try {

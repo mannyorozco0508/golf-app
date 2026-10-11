@@ -165,12 +165,18 @@ test('caps: 15 new courses per golfer per day, 50 a day for everyone; tomorrow i
     assert.equal((await core.course(MANNY, { courseId: ids[15] })).status, 'ready', 'a new day');
 }));
 
-test('the OWNER (ALERT_UIDS) has no per-golfer daily cap - but the floor still stops everyone, and every pull is still counted', { skip }, quiet(async () => {
+test('the OWNER (ALERT_UIDS) has no per-golfer cap and passes the day\'s ceiling - but the floor still stops everyone, and every pull is still counted', { skip }, quiet(async () => {
     const ids = Array.from({ length: 25 }, (_, i) => String(2000000000 + i));
     const seed = { gps_meta: { known: Object.fromEntries(ids.map((id) => [id, { gps: true, holes: 18 }])) } };
     const { core, db } = setup(seed, { owners: ['uMANNY'] });
     for (let i = 0; i < 20; i++) assert.equal((await core.course(MANNY, { courseId: ids[i] })).status, 'ready', 'pull ' + (i + 1));
     assert.equal(db.root.gps_usage.uMANNY['20261011'].pulls, 20, 'counted, not capped');
+    // The day's ceiling: owners pass it too (Manny, 2026-10-11), and their pulls still count toward it.
+    const day = setup({ gps_meta: Object.assign({}, seed.gps_meta, { day: { 20261011: { pulls: 50 } } }) }, { owners: ['uMANNY'] });
+    assert.equal((await day.core.course(MANNY, { courseId: ids[21] })).status, 'ready', 'past the 50-a-day ceiling');
+    assert.equal(day.db.root.gps_meta.day['20261011'].pulls, 51);
+    const golfer = { uid: 'uOTHER', token: { firebase: { sign_in_provider: 'google.com' } } };
+    assert.equal((await day.core.course(golfer, { courseId: ids[22] })).status, 'soon', 'everyone else still stops at the ceiling');
     const low = setup({ gps_meta: Object.assign({}, seed.gps_meta, { left: 51 }) }, { owners: ['uMANNY'], left: 51 });
     assert.equal((await low.core.course(MANNY, { courseId: ids[0] })).status, 'soon', '51 left - 2 is under the floor: even the owner waits');
 }));
