@@ -28,6 +28,8 @@
     function gameText(g) {
         if (g.type === 'nassau') return 'Nassau ' + (g.front == null ? '(amount?)' : money(g.front) + '/' + money(g.back) + '/' + money(g.overall)) + (g.press === 'auto' ? ', auto press' : g.press === 'manual' ? ', presses' : '');
         if (g.type === 'skins') return 'Skins ' + (g.amount == null ? '(amount?)' : money(g.amount)) + (g.carry === true ? ', carry over' : g.carry === false ? ', no carry' : '');
+        if (g.type === 'vegas') return 'Vegas' + (g.perPoint != null ? ' ' + money(g.perPoint) + '/point' : ' (amount?)') + (g.flip ? ', birdie flip' : '');
+        if (g.type === 'bbb') return 'Bingo Bango Bongo' + (g.perPoint != null ? ' ' + money(g.perPoint) + '/point' : ' (amount?)');
         if (g.type === 'wolf') return 'Wolf' + (g.perPoint != null ? ' ' + money(g.perPoint) + '/point' : '');
         if (g.type === 'birdie' || g.type === 'dots') return g.label + (g.amount != null ? ' ' + money(g.amount) : '');
         return g.label;
@@ -167,9 +169,15 @@
         var all = day.games.slice();
         day.groups.forEach(function (g) { all = all.concat(g.games); });
         var fmt = all.filter(function (x) { return x.format; })[0] || null;
-        var nassaus = [], skins = [];
+        var nassaus = [], skins = [], newGames = [];
         day.groups.forEach(function (g) {
             var games = day.games.concat(g.games);
+            // Vegas / Bingo Bango Bongo (gps-games): one per group, its golfers; Vegas
+            // takes the group's named teams, else Money shows 1st+2nd v 3rd+4th to check.
+            games.filter(function (x) { return x.type === 'vegas' || x.type === 'bbb'; }).forEach(function (x) {
+                newGames.push({ type: x.type, perPoint: x.perPoint == null ? null : x.perPoint, flip: !!x.flip, group: g.label,
+                    players: g.players.map(function (p) { return p.name; }), teams: x.type === 'vegas' && g.teams ? g.teams : null });
+            });
             var n = games.filter(function (x) { return x.type === 'nassau'; })[0];
             if (n && g.nassau) nassaus.push({ group: g.label, a: g.nassau.a, b: g.nassau.b, front: n.front, back: n.back, overall: n.overall, press: n.press });
             g.games.filter(function (x) { return x.type === 'skins'; }).forEach(function (s) { skins.push({ amount: s.amount, carry: s.carry, players: g.players.map(function (p) { return p.name; }) }); });
@@ -182,7 +190,7 @@
         return { v: 1, date: day.date || null, time: day.time || null, courseName: day.courseName || null, nines: day.nines || null,
             roster: rosterText(day), groups: day.groups.map(function (g) { return { label: g.label, players: g.players }; }),
             format: fmt ? { type: fmt.type, label: fmt.label, perPoint: fmt.perPoint == null ? null : fmt.perPoint } : null,
-            nassau: setupNassau, skins: skins.slice(0, 1), extraSkins: skins.slice(1), bets: bets,
+            nassau: setupNassau, skins: skins.slice(0, 1), extraSkins: skins.slice(1), bets: bets, newGames: newGames,
             extras: all.filter(function (x) { return x.type === 'birdie' || x.type === 'dots'; }).map(function (x) { return { type: x.type, amount: x.amount }; }) };
     }
 

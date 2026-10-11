@@ -138,3 +138,35 @@ Rules that would need ADDING (additive; nothing existing changes):
 - Drafts and queued bets: localStorage only. AFTER OCT 17 (post-trip list): move them into
   the trip record (trips/<code>/drafts - needs a rule) so other organizers' phones see them.
 - No money engine, settlement, side-bet or game-type change; nothing writes until Save.
+
+## 11. Bingo Bango Bongo + Vegas (branch gps-games)
+- NEW engines, own files: `bbb-engine.js`, `vegas-engine.js`; screens in `extra-games-ui.js`.
+  HardPan only (GPS blocks). money-engine, settlement-engine, payouts, match/pool/tournament
+  engines, aloha, ryder, side-match lines, live skins, trip pots and action-model are
+  byte-identical to main (extra_games_engine_test.js pins their hashes).
+- Stored as `events/<round>/additionalGameInstances/<id>` with format `bbb` / `vegas` - the map
+  the Action tab and Round Setup already write. The only new write: a BBB point,
+  `.../<id>/points/h<n>/<bingo|bango|bongo>` = golfer id. No rule change.
+- Set up: Round Setup -> Quick start "$1 Bingo Bango Bongo" / "$1 Vegas", or Money step ->
+  Also Playing -> "+ Bingo Bango Bongo" / "+ Vegas": $ per point, golfers (BBB), Team A /
+  Team B (Vegas, tap to cycle), Birdie flip. Paste the whole trip / round reads both names
+  ("vegas $1 birdie flip", "$2 bbb", "bingo bango bongo").
+- Scorecard: a card per game; BBB has the hole's 3 taps (Bingo first on / Bango closest /
+  Bongo first in; tap again clears) for whoever may score one of its golfers.
+- Settlement: a card per game with its own who-pays-whom. NOT in Final Money / Who Pays Who
+  (that would need settlement-engine.js) - the card says to settle it separately. Trip
+  totals do not include them either.
+- BBB money: every golfer v every other, $ x point difference = $ x (N x mine - total).
+  1) $1, 10/5/3 pts -> +12 / -3 / -9 (C pays A 9, B pays A 3).
+  2) $2, 6/6/4/2 -> +12 / +12 / -4 / -20 (D pays A 12, D pays B 8, C pays B 4).
+- Vegas money: low score first (10+ goes first: 4 & 10 = 104); birdie or better flips the
+  OTHER team (both birdie: no flip); a hole counts with all 4 scores; gross; each golfer
+  wins / pays points x $.
+  1) $1: 45 v 56 -> A +11 points, A +$11 each, B -$11 each.
+  2) $0.50, flip: 36 v 45->54 (A +18), then 56->65 v 47 (B +18) -> level, $0.
+- Older apps (GPS beta build 12, the web app): getRoundGames skips the unknown format and
+  Round Setup writes it back unchanged. `node tools/extra-games-backcompat.js <tree>...`
+  opens the same round with / without the new games on scorecard, Action, leaderboard,
+  skins and settlement: old trees read identically, no errors.
+- Round Setup kept open during play keeps its copy of BBB points in step with the round,
+  so Save never writes back stale points; a copied round starts with none.

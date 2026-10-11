@@ -115,6 +115,12 @@
     <script src="gps-config.js"></script>
     <script src="gps-view.js"></script>
     <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
+    <script src="bbb-engine.js"></script>
+    <script src="vegas-engine.js"></script>
+    <script src="extra-games-ui.js"></script>
+    <!-- GPS:END -->
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -4432,7 +4438,23 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // liveStandings(); this chooses which mounts receive it. Nothing is
         // recomputed, so the two views cannot disagree about who is leading.
         const grid = cards => cards.filter(Boolean).length ? '<div class="lw-grid">' + cards.join('') + '</div>' : '';
-        const rest = [dotsBoard, ryder, skins, matches, points, hilo, strokeBets];
+        let extraGames = '';
+        // GPS:BEGIN
+        // BINGO BANGO BONGO + VEGAS (HardPan, gps-games): a card per game; BBB takes the
+        // hole's three taps from whoever may score one of its golfers.
+        if (!closed && window.HardPanExtraGames) {
+            try {
+                extraGames = window.HardPanExtraGames.liveHtml(currentData, {
+                    hole: currentViewedHole,
+                    canTap: ids => !roundSuperseded() && ids.some(id => canWritePlayer(id)),
+                    write: (path, value) => db.ref(`events/${currentMode}/additionalGameInstances/${path}`).set(value),
+                    online: () => requireOnlineForMoney('POINT NOT SAVED', 'Reconnect before recording Bingo Bango Bongo.'),
+                    fail: msg => uiFail(msg)
+                });
+            } catch (e) { extraGames = ''; }
+        }
+        // GPS:END
+        const rest = [dotsBoard, extraGames, ryder, skins, matches, points, hilo, strokeBets];
         const HTML_FOR = {
             'live-ticker-mount': grid(rest),
             'fc-ticker-mount': grid([board].concat(rest))

@@ -55,6 +55,12 @@
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
     <script src="offline-queue.js"></script>
+<!-- GPS:BEGIN -->
+<!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
+<script src="bbb-engine.js"></script>
+<script src="vegas-engine.js"></script>
+<script src="extra-games-ui.js"></script>
+<!-- GPS:END -->
 <script src="settlement-engine.js"></script>
 <script src="side-match-lines.js"></script>
 <script src="live-skins.js"></script>
@@ -1354,6 +1360,13 @@ html {
             });
         }
 
+        // GPS:BEGIN
+        // BINGO BANGO BONGO + VEGAS (HardPan, gps-games): their own cards and their own
+        // who-pays-whom - NOT in Final Money / Who Pays Who (settlement-engine.js untouched).
+        if (window.HardPanExtraGames) {
+            try { html += window.HardPanExtraGames.settleHtml(data, courseData, savedScores); } catch (e) { /* the rest of the page still settles */ }
+        }
+        // GPS:END
         html += buildSideMatchesHtml(data, courseData, savedScores);
 
         return html;

@@ -4714,6 +4714,10 @@ const SHELL_FILES = [
     // Paste the whole trip / round: parser + review + drafts (gps-paste).
     './trip-setup-paste.js',
     './setup-paste-ui.js',
+    // Bingo Bango Bongo + Vegas: two new engines and their screens (gps-games).
+    './bbb-engine.js',
+    './vegas-engine.js',
+    './extra-games-ui.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
