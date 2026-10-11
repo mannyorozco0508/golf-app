@@ -6,14 +6,19 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+// HardPan only: a Consumer tree has no trip-setup-paste.js - every test here skips.
+const ON = fs.existsSync(path.join(__dirname, 'trip-setup-paste.js'));
+const skip = ON ? false : 'Consumer tree: no HardPan paste';
 const I = require('./trip-itinerary.js');
 Object.assign(global, { tripItinParseLine: I.tripItinParseLine, tripItinTime: I.tripItinTime, tripItinCourse: I.tripItinCourse });
-const P = require('./trip-setup-paste.js');
+const P = ON ? require('./trip-setup-paste.js') : null;
 const parse = (t) => P.parseSetupPaste(t, { year: 2026 });
 const names = (g) => g.players.map((p) => p.name);
 const why = (r) => r.flags.map((f) => f.why);
 
-test('A) group chat: days, groups, handicaps, the day\'s games; Wolf on the day line; a day with no groups is asked', () => {
+test('A) group chat: days, groups, handicaps, the day\'s games; Wolf on the day line; a day with no groups is asked', { skip }, () => {
     const r = parse(`Myrtle trip!!
 Tue 10/13 Caledonia 8:24
 group 1: Manny 8, Jimmy 11, Paul 3.5, Marty 9
@@ -33,7 +38,7 @@ Wed 10/14 True Blue 9:10 - wolf $1 everyone`);
     assert.equal(r.players.length, 8);
 });
 
-test('B) numbered email: full weekday names, en dashes, "(8)" handicaps, teams per foursome, 27-hole nines, "same groups"', () => {
+test('B) numbered email: full weekday names, en dashes, "(8)" handicaps, teams per foursome, 27-hole nines, "same groups"', { skip }, () => {
     const r = parse(`1. Tuesday, October 13 – Caledonia Golf & Fish Club, 8:24 AM
    Foursome A: Manny (8) & Jimmy (11) vs Paul (3.5) & Marty (9) – $5 Nassau, best ball
    Foursome B: Lance, Ben, Cal, Dee – skins $2 carry
@@ -52,7 +57,7 @@ test('B) numbered email: full weekday names, en dashes, "(8)" handicaps, teams p
     assert.ok(!why(r).some((w) => /Who plays whom/.test(w)), 'teams named: team vs team, nothing to ask');
 });
 
-test('C) one round: a weekday without a date is asked; "/" pairs and "vs"; auto press; everyone skins; Vegas skipped', () => {
+test('C) one round: a weekday without a date is asked; "/" pairs and "vs"; auto press; everyone skins; Vegas skipped', { skip }, () => {
     const r = parse(`Sat at Dobson 7:30
 Manny 8 / Jimmy 11 vs Paul 4 / Marty 9   $10 nassau auto press
 skins $5 everyone
@@ -69,7 +74,7 @@ vegas $1 a point`);
     assert.ok(why(r).some((w) => /Sat has no date/.test(w)));
 });
 
-test('messy text: bullets, emoji, "and", blank lines between groups, flights, a $5/5/10 Nassau, unknown games, odd lines', () => {
+test('messy text: bullets, emoji, "and", blank lines between groups, flights, a $5/5/10 Nassau, unknown games, odd lines', { skip }, () => {
     const r = parse(`⛳️ Saturday game!!!
 • Sat 10/17 Dobson Ranch 7:30 am
 Manny 8
@@ -93,7 +98,7 @@ call me if you can't make it`);
     assert.ok(r.flags.some((f) => /call me/.test(f.text) && /Not understood/.test(f.why)), 'chatter is shown, not guessed at');
 });
 
-test('checks a golfer wants: two handicaps for one name, a golfer in two groups, a group of 6, a Nassau with no amount', () => {
+test('checks a golfer wants: two handicaps for one name, a golfer in two groups, a group of 6, a Nassau with no amount', { skip }, () => {
     const r = parse(`Fri 10/16 Man O War 9:00
 Group 1: Manny 8, Jimmy 11, Paul 3, Marty 9, Lance 14, Ben 6
 Group 2: Manny 9, Cal 12
@@ -105,7 +110,7 @@ nassau`);
     assert.ok(w.some((x) => /Nassau with no amount/.test(x)));
 });
 
-test('only EXISTING game types come out; the unknown list is skipped, never mapped to something close', () => {
+test('only EXISTING game types come out; the unknown list is skipped, never mapped to something close', { skip }, () => {
     const g = P.tspGames('$5 nassau, skins $2 no carry, wolf $1, best ball, scramble, stableford, hi-lo, team match, stroke play, birdie game $1, greenies $2, vegas $1, rabbit');
     assert.deepEqual(g.games.map((x) => x.type), ['nassau', 'skins', 'wolf', 'bestball', 'scramble', 'stableford', 'hilo', 'ryder', 'stroke', 'birdie', 'dots']);
     assert.equal(g.games[1].carry, false);

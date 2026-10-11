@@ -81,7 +81,8 @@ function tspGames(text) {
         }
         if (/\bwolf\b/i.test(p)) { out.push({ type: 'wolf', label: 'Wolf', raw: p, perPoint: tspMoney(p), format: true }); return; }
         if (/\bbirdie game\b|\bbirdies\b/i.test(p)) { out.push({ type: 'birdie', label: 'Birdie game', raw: p, amount: tspMoney(p) }); return; }
-        if (/\bdots\b|\bgreenies\b/i.test(p)) { out.push({ type: 'dots', label: 'Dots / greenies', raw: p, amount: tspMoney(p) }); return; }
+        // "greenies" in a paste is read as the Dots game - and shown as Dots (the app's word).
+        if (/\bdots\b|\bgreenies\b/i.test(p)) { out.push({ type: 'dots', label: 'Dots', raw: p, amount: tspMoney(p) }); return; }
         for (var i = 0; i < TSP_FORMATS.length; i++) {
             if (TSP_FORMATS[i].re.test(p)) { out.push({ type: TSP_FORMATS[i].type, label: TSP_FORMATS[i].label, raw: p, format: true, amount: tspMoney(p) }); return; }
         }

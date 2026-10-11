@@ -14,7 +14,7 @@ const ON = fs.existsSync(path.join(__dirname, 'setup-paste-ui.js'));
 const skip = ON ? false : 'Consumer tree: no HardPan paste';
 const I = require('./trip-itinerary.js');
 Object.assign(global, { tripItinParseLine: I.tripItinParseLine, tripItinTime: I.tripItinTime, tripItinCourse: I.tripItinCourse });
-const P = require('./trip-setup-paste.js');
+const P = ON ? require('./trip-setup-paste.js') : null;
 const R = require('./roster-paste.js');
 function ui() {
     const store = {};

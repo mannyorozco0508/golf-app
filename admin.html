@@ -3099,6 +3099,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // and further Nassaus are kept for Side Matches after Save. The organizer checks
     // it all and taps Save; nothing here saves or writes anything.
     let spPendingMoney = null;
+    const SP_NASSAU_CARD = FORMAT_CARD_VALUES.find((v) => /^nassau/.test(v));
     function spBannerEl() {
         let el = document.getElementById('sp-draft-banner');
         if (el) return el;
@@ -3186,12 +3187,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (d.format) {
             if (d.format.type === 'wolf' && d.format.perPoint != null) gpsSetField('wolf-point-value', d.format.perPoint);
             selectFormatCard(d.format.type);
-        } else if (d.nassau) selectFormatCard('nassau-modern');
+        } else if (d.nassau) selectFormatCard(SP_NASSAU_CARD);   // the Nassau card's own token, named once
         // MONEY, when the organizer reaches it (the golfers exist by then).
         spPendingMoney = d;
         if (d.bets && d.bets.length) { window.HardPanSetupPaste.queueBets(code, d.bets); notes.push(d.bets.length + ' Nassau' + (d.bets.length === 1 ? '' : 's') + ' to add on Side Matches after Save'); }
         if (d.extraSkins && d.extraSkins.length) notes.push('Add ' + d.extraSkins.length + ' more Skins game' + (d.extraSkins.length === 1 ? '' : 's') + ' on Money');
-        (d.extras || []).forEach((x) => { if (x.type === 'birdie') { const b = document.getElementById('enable-birdiegame'); if (b && !b.checked) { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); } } else notes.push('Set dots / greenies on Money'); });
+        (d.extras || []).forEach((x) => { if (x.type === 'birdie') { const b = document.getElementById('enable-birdiegame'); if (b && !b.checked) { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); } } else notes.push('Set Dots on Money'); });
         // Said in the banner, not a pop-up.
         const el = spBannerEl();
         if (el && notes.length) { const n = document.createElement('div'); n.style.cssText = 'margin-top:6px; color:var(--warn-text); font-weight:700;'; n.textContent = notes.join(' \u00b7 '); el.appendChild(n); }
