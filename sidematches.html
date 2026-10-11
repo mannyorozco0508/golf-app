@@ -83,6 +83,10 @@
          no coverage at all, was the worst-tested duplication in the app. Loaded before
          the inline block so nothing below can shadow it. -->
     <script src="grouping.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- Bets kept from a pasted round (HardPan, gps-paste): filled in here, saved by the organizer. -->
+    <script src="setup-paste-ui.js"></script>
+    <!-- GPS:END -->
     <script src="product-links.js"></script>
     <style>
         :root {
@@ -1026,6 +1030,9 @@ html {
             // Arrived from the scorecard's "+ ADD GROUP ACTION". Opened only once,
             // and only after the round data has landed - the scope chooser needs to
             // know how many groups exist before it can ask anything sensible.
+            // GPS:BEGIN
+            if (typeof spBetsOffer === 'function') spBetsOffer();
+            // GPS:END
             if (urlParams.get('add') === '1' && !window.__smAutoOpened && (currentData.players || []).length) {
                 window.__smAutoOpened = true;
                 openSideMatchModal();
@@ -1253,6 +1260,48 @@ html {
         };
     }
 
+    // GPS:BEGIN
+    // BETS FROM A PASTED ROUND (HardPan, gps-paste). Round Setup takes one 1v1 Nassau;
+    // the rest of what was pasted (team vs team, the other foursomes) is listed here.
+    // "Fill it in" opens the ordinary Add form with the group, the sides and the
+    // stakes already chosen - the organizer checks and taps Save, exactly as by hand.
+    function spBetsOffer() {
+        const S = window.HardPanSetupPaste;
+        const bets = S ? S.betsFor(currentMode) : [];
+        let el = document.getElementById('sp-bets-banner');
+        if (!bets.length) { if (el) el.remove(); return; }
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'sp-bets-banner';
+            el.setAttribute('role', 'status');
+            el.style.cssText = 'margin:10px 0; padding:10px 12px; border-radius:12px; border:1px solid var(--brand-green); background:var(--bg-card); font-size:0.86rem;';
+            const t = document.getElementById('main-title');
+            if (t && t.parentNode) t.parentNode.insertBefore(el, t.nextSibling);
+        }
+        el.innerHTML = '<b>\uD83D\uDCCB From your paste \u2014 bets to add</b>' + bets.map((b, i) =>
+            '<div style="margin-top:6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><span>' + escapeHtml(b.group + ': Nassau $' + b.front + '/$' + b.back + '/$' + b.overall + ' \u2014 ' + b.a.join(' & ') + ' vs ' + b.b.join(' & ')) + '</span>'
+            + '<button type="button" class="btn-primary" data-sp-fill="' + i + '" style="min-height:40px;">Fill it in</button>'
+            + '<button type="button" class="btn-outline" data-sp-done="' + i + '" style="min-height:40px;">Remove</button></div>').join('');
+        el.querySelectorAll('[data-sp-fill]').forEach((btn) => { btn.onclick = () => spFillBet(bets[Number(btn.getAttribute('data-sp-fill'))]); });
+        el.querySelectorAll('[data-sp-done]').forEach((btn) => { btn.onclick = () => { const i = Number(btn.getAttribute('data-sp-done')); S.setBets(currentMode, bets.filter((_, j) => j !== i)); spBetsOffer(); }; });
+    }
+    function spFillBet(b) {
+        const players = currentData.players || [];
+        const idOf = (n) => { const p = players.find((x) => String(x.name).trim().toLowerCase() === String(n).trim().toLowerCase()); return p ? String(p.id) : null; };
+        let A = b.a.map(idOf).filter(Boolean), B = b.b.map(idOf).filter(Boolean);
+        if (!A.length || !B.length) { if (typeof uiAlert === 'function') uiAlert({ title: 'Those golfers are not in this round', body: b.a.concat(b.b).join(', ') }); return; }
+        if (A.length < B.length) { const t = A; A = B; B = t; }   // the page gives an odd extra golfer to the first side
+        openSideMatchModal();
+        if (isMultiGroupRound()) { const g = playerGroupMap(players, currentData.groupSizeOverrides || {})[A[0]]; beginActionForm('group', g || 1); }
+        const f = document.getElementById('sm-format');
+        if (f) { f.value = 'nassau'; onSideMatchFormatChange(); }
+        sidematchPickOrder = [];
+        A.concat(B).forEach((id) => pickPlayerForSide(id));
+        const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) { e.value = String(v); e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } };
+        set('sm-front-stake', b.front); set('sm-back-stake', b.back); set('sm-overall-stake', b.overall);
+        if (b.press) set('sm-press-rule', b.press === 'auto' ? '2down' : 'anytime');
+    }
+    // GPS:END
     function openSideMatchModal() {
         // A plain "+ SIDE BETS" tap leaves challenge mode behind, so the button
         // cannot be stuck on Send from a previous visit.

@@ -108,3 +108,23 @@ Rules that would need ADDING (additive; nothing existing changes):
   | ... and its card lacks ratings | 1-3 | 2 (backup) |
   | Search online -> course only GolfCourseAPI has | 2-4 (1-3 searches + 1 card) | 2-4 (same) |
   | "Not listed?" tapped, then a scorecard pick | - | 2-4 |
+
+## 10. Paste the whole trip / round (branch gps-paste)
+- TRIP page: "📋 Paste the whole trip (days, groups, games)" above the itinerary box.
+  Read it -> REVIEW (questions first: no date, Nassau sides, "use Day 1's groups?";
+  skipped games; lines it could not read) -> Confirm. Confirm fills the itinerary and
+  golfers boxes (their own review / Apply as always) and keeps each day's groups + games
+  ON THIS PHONE; Build Trip ties each to its round code.
+- ROUND SETUP: a day's draft shows "📋 Pasted setup for this day — Fill it in": golfers in
+  the pasted groups (a trip round keeps each golfer's row and id; handicaps fill in), the
+  game card (Wolf $/pt, Best Ball ...), and on Money the one 1v1 Nassau Round Setup takes
+  + the Skins game (its golfers). The organizer checks and taps Save.
+  "📋 Paste the whole round" next to Paste Player List does the same for one round.
+- SIDE MATCHES: team-vs-team and the other foursomes' Nassaus are listed ("From your
+  paste — bets to add"); "Fill it in" opens the ordinary Add form with the group, sides
+  and stakes chosen; the organizer taps Save. Remove drops one.
+- Existing game types only; Vegas / Bingo Bango Bongo / Snake ... flagged and skipped.
+  "Auto press" = Auto @ 2 Down, "presses" = Press Any Hole (both changeable).
+- Drafts and queued bets: localStorage only. AFTER OCT 17 (post-trip list): move them into
+  the trip record (trips/<code>/drafts - needs a rule) so other organizers' phones see them.
+- No money engine, settlement, side-bet or game-type change; nothing writes until Save.
