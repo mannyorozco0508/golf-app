@@ -1747,6 +1747,17 @@ html {
              A card can say what a format IS in one line. A <select> option cannot,
              which is how "Ryder Cup" in a dropdown came to mean the legacy team money
              game and walked the organizer into 1v1 betting controls. -->
+        <!-- GPS:BEGIN -->
+        <!-- BET TEMPLATES (HardPan, gps-features): one tap picks an EXISTING game and
+             fills its EXISTING settings - no new game, no engine change. -->
+        <div id="gps-bet-templates" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 12px;">
+            <span style="font-size:0.78rem; font-weight:800; color:var(--text-muted);">Quick start:</span>
+            <button type="button" class="gps-tpl" data-tpl="nassau" onclick="gpsApplyTemplate('nassau')">$5 Nassau</button>
+            <button type="button" class="gps-tpl" data-tpl="skins" onclick="gpsApplyTemplate('skins')">$2 Skins</button>
+            <button type="button" class="gps-tpl" data-tpl="wolf" onclick="gpsApplyTemplate('wolf')">$1 Wolf</button>
+        </div>
+        <style>.gps-tpl{min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-weight:800; cursor:pointer;}</style>
+        <!-- GPS:END -->
         <div class="fmt-grid" id="format-card-grid" role="radiogroup" aria-labelledby="format-question-label">
 
             <!-- MENU LABELS, NOT RULES. Every tile is icon, name, one short line.
@@ -3012,6 +3023,52 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // GPS:BEGIN
+    // BET TEMPLATES (HardPan, gps-features). A template is ONLY a shortcut: it picks
+    // an existing game card and types the amounts into the existing fields - every
+    // rule, every engine, settlement and the side-bet flow are exactly what the
+    // organizer would have reached by hand, and every amount can still be changed.
+    //   $5 Nassau: the Nassau card; on Money, front / back / overall $5.
+    //   $2 Skins:  Stroke Play; on Money (golfers known by then), one Skins game,
+    //              $2 a skin, carry over.
+    //   $1 Wolf:   the Wolf card, $1 a point.
+    const GPS_TEMPLATES = { nassau: { format: 'nassau-modern' }, skins: { format: 'stroke' }, wolf: { format: 'wolf' } };
+    let gpsPendingTemplate = null;
+    function gpsSetField(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        el.value = String(value);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+    function gpsApplyTemplate(id) {
+        const t = GPS_TEMPLATES[id];
+        if (!t) return;
+        gpsPendingTemplate = id;
+        if (id === 'wolf') gpsSetField('wolf-point-value', 1);
+        selectFormatCard(t.format);
+        if (typeof uiToast === 'function') uiToast(id === 'nassau' ? '$5 Nassau: pick the golfers on Money - the amounts are filled in'
+            : id === 'skins' ? '$2 Skins (carry over) is added on the Money step' : '$1 Wolf: set - change it under Settings');
+    }
+    // On arrival at a step: the Money step gets the amounts, once.
+    function gpsTemplateArrive(n) {
+        const id = gpsPendingTemplate;
+        if (!id || n !== WIZARD_STEP_OF.action) return;
+        if (id === 'nassau') {
+            const box = document.getElementById('setup-nassau-enabled');
+            if (box && box.checked) { gpsSetField('setup-nassau-front', 5); gpsSetField('setup-nassau-back', 5); gpsSetField('setup-nassau-overall', 5); }
+        } else if (id === 'skins') {
+            if (!skinsInstances.length) {
+                addSkinsInstance();
+                const inst = skinsInstances[skinsInstances.length - 1];
+                setInstanceField(inst.id, 'skinsBuyIn', 2);
+                setInstanceField(inst.id, 'skinsCarryOver', true);
+            }
+        }
+        gpsPendingTemplate = null;
+    }
+    // GPS:END
     // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
     //
     // A Ryder Cup skips both Format Settings and Games & Money, so a stake the
@@ -3474,6 +3531,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (box && box.checked) renderSetupNassauPlayers();
         }
         if (n === WIZARD_STEP_OF.review) renderWizardReview();
+        // GPS:BEGIN
+        if (typeof gpsTemplateArrive === 'function') gpsTemplateArrive(n);
+        // GPS:END
         const progressEl = document.getElementById('wizard-progress');
         if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
