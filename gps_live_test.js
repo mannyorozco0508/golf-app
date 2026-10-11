@@ -343,3 +343,12 @@ test('the backfill tool rewrites ONLY the tees, spends a GolfAPI call only with 
     assert.ok(!/console\.\w+\([^)]*\bkey\b/.test(src), 'the key is never printed');
     assert.ok(/'database:get'/.test(src) && !/database:remove|'--only'/.test(src), 'reads / sets through the Firebase CLI; no removes, no deploys');
 });
+
+test('the day is ARIZONA\'s: limits reset at midnight Phoenix (UTC-7, no daylight saving), not at 5 PM', { skip }, () => {
+    const { dayKey } = require('./firebase-functions/gps-live-core.js');
+    assert.equal(dayKey(Date.UTC(2026, 9, 11, 23, 59)), '20261011', '4:59 PM Phoenix Oct 11 - before the old 5 PM reset');
+    assert.equal(dayKey(Date.UTC(2026, 9, 12, 0, 30)), '20261011', '5:30 PM Phoenix: still Oct 11 (UTC would have said Oct 12)');
+    assert.equal(dayKey(Date.UTC(2026, 9, 12, 6, 59)), '20261011', '11:59 PM Phoenix');
+    assert.equal(dayKey(Date.UTC(2026, 9, 12, 7, 0)), '20261012', 'midnight Phoenix: a new day');
+    assert.equal(dayKey(Date.UTC(2026, 6, 4, 7, 0)), '20260704', 'July too - Arizona keeps no daylight saving');
+});

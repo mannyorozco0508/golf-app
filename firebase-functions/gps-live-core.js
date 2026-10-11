@@ -54,7 +54,10 @@ function normalCourse(c) {
     return Object.assign({}, c, { h });
 }
 
-function dayKey(ms) { return new Date(ms).toISOString().slice(0, 10).replace(/-/g, ''); }
+// THE DAY IS ARIZONA'S (Manny, 2026-10-11): daily limits reset at midnight Phoenix
+// time - UTC-7 all year (Arizona keeps no daylight saving) - not at 5 PM (UTC midnight).
+const AZ_OFFSET_MS = 7 * 3600 * 1000;
+function dayKey(ms) { return new Date(ms - AZ_OFFSET_MS).toISOString().slice(0, 10).replace(/-/g, ''); }
 // The typed name, as a database key: "Prestwick  C.C." -> "prestwick_c_c".
 function queryKey(name) { return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80); }
 function cleanName(name) { return String(name || '').replace(/\s+/g, ' ').trim(); }
