@@ -136,8 +136,8 @@ test('the GPS screen and setup with OSM off: GolfAPI only, no lookup, Refresh re
     assert.ok(/if \(ga\) return ga;\s*\n\s*if \(!osmOn\(\)\) return null;/.test(v), 'osmRecord: GolfAPI or nothing');
     assert.ok(/if \(!osmOn\(\)\) \{\s*\n\s*var L = window\.HardPanGpsLive;\s*\n\s*if \(!liveOn\(\) \|\| !L\) \{ fin\(false\); return; \}/.test(v), 'no OpenStreetMap lookup');
     const run = a.slice(a.indexOf('async function runOnlineCourseSearch'), a.indexOf('function renderOnlineOutcome'));
-    assert.ok(/\/\/ GPS:BEGIN\s*\n\s*const gpsLive = gpsLiveSearch\(query\);\s*\n\s*\/\/ GPS:END/.test(run), 'started with the scorecard search, on the tap');
-    assert.ok(/\/\/ GPS:BEGIN\s*\n\s*gpsLiveRender\(await gpsLive, query\);\s*\n\s*\/\/ GPS:END/.test(run), 'shown first, above the scorecard results');
+    assert.ok(/\/\/ GPS:BEGIN[\s\S]{0,600}const gpsLive = scorecardsOnly \? Promise\.resolve\(null\) : gpsLiveSearch\(query\);[\s\S]{0,800}\/\/ GPS:END/.test(run), 'asked on the tap (GolfAPI first since gps-features)');
+    assert.ok(/\/\/ GPS:BEGIN\s*\n\s*if \(!scorecardsOnly\) gpsLiveRender\(await gpsLive, query\);\s*\n\s*\/\/ GPS:END/.test(run), 'shown first, above the scorecard results (when GolfAPI had no GPS course)');
     assert.ok(!/gpsLive/.test(require('./tools/gps-flag.js').applyFlag(a, false)), 'none of it in the Consumer app');
     assert.ok(!/addEventListener\('input'[\s\S]{0,200}gpsLive/.test(a), 'never as you type');
 });
@@ -169,4 +169,57 @@ test('setup after a pick: the card is read FRESH and put in hand before it is se
     const pick = a.slice(a.indexOf('async function gpsLivePick'), a.indexOf('async function gpsLiveFind'));
     assert.ok(/db\.ref\('global_courses\/' \+ r\.cardKey\)\.once\('value'\)[\s\S]{0,300}globalCourses\[r\.cardKey\] = rec;[\s\S]{0,200}selectCourse\(r\.cardKey, rec\.name\)/.test(pick), 'fresh read -> in hand -> selected');
     assert.ok(/k\.startsWith\('gapi_'\)/.test(a) && !/gapi_/.test(require('./tools/gps-flag.js').applyFlag(a, false)), 'gapi_ in the saved list, GPS build only');
+});
+
+// ---- FINDING AN OLD SAVED COURSE (gps-features) ---------------------------------
+// GolfAPI's search is strict: "Legacy Golf Resort" finds nothing; GolfAPI calls it
+// "The Legacy Golf Club" (Phoenix). There is also a "Legacy Golf Club" in Las Vegas.
+const LEG = [{ id: '0121646345752376514', club: 'The Legacy Golf Club', course: '18-hole course', name: 'The Legacy Golf Club (18-hole course)', city: 'Phoenix', state: 'AZ', holes: 18, gps: true },
+    { id: '0999000111', club: 'Legacy Golf Club', course: 'Legacy Golf Club', name: 'Legacy Golf Club', city: 'Henderson', state: 'NV', holes: 18, gps: true },
+    { id: '0999000222', club: 'Legacy Ridge', course: 'Legacy Ridge', name: 'Legacy Ridge', city: 'Phoenix', state: 'AZ', holes: 9, gps: false }];
+const byName = (url, body) => ({ result: { status: 'ok', results: /^legacy$/i.test(body.data.name) ? LEG : [] } });
+
+test('find: the name in shorter forms until GolfAPI answers; the saved card\'s city + state pick ONE clear match', { skip }, async () => {
+    const t = sandbox({ reply: byName });
+    assert.deepEqual(t.sb.HardPanGpsLive.nameVariants('Legacy Golf Resort'), ['Legacy Golf Resort', 'legacy']);
+    const r = await t.sb.HardPanGpsLive.find('Legacy Golf Resort', { city: 'Phoenix', state: 'Arizona' });
+    assert.equal(r.status, 'ok'); assert.equal(r.query, 'legacy');
+    assert.equal(r.clear && r.clear.id, '0121646345752376514', 'Phoenix, AZ - not Henderson, NV; never the 9-hole course with no GPS');
+    assert.deepEqual(t.requests.map((q) => JSON.parse(q.init.body).data.name), ['Legacy Golf Resort', 'legacy'], 'two searches (cached for everyone after)');
+});
+
+test('find: no city / state stored -> no guess, the golfer chooses; nothing anywhere -> "none" with what was tried', { skip }, async () => {
+    const t = sandbox({ reply: byName });
+    const r = await t.sb.HardPanGpsLive.find('Legacy Golf Resort', null);
+    assert.equal(r.status, 'ok'); assert.equal(r.clear, null);
+    assert.deepEqual(r.matches.map((x) => x.state), ['AZ', 'NV'], 'GPS courses only');
+    const n = sandbox({ reply: () => ({ result: { status: 'ok', results: [] } }) });
+    const none = await n.sb.HardPanGpsLive.find('Nowhere Golf Club', { city: 'Tucson', state: 'AZ' });
+    assert.equal(none.status, 'none'); assert.deepEqual(none.tried, ['Nowhere Golf Club', 'nowhere']);
+    const wrongState = await sandbox({ reply: byName }).sb.HardPanGpsLive.find('Legacy Golf Resort', { city: 'Austin', state: 'TX' });
+    assert.equal(wrongState.status, 'none', 'Phoenix and Henderson are not Texas: not offered as Austin\'s course');
+});
+
+test('setup: an old saved course with no GPS looks itself up ONCE on pick, links a clear match (gps_links, for everyone), never fails silently', { skip }, () => {
+    const a = read('admin.html');
+    assert.ok(/if \(!gpsFindTried\[key\] && navigator\.onLine !== false && !\/\^gapi_\/\.test\(key\)\) \{ gpsLiveFind\(key, name, \{ auto: true \}\); return; \}/.test(a), 'auto, once');
+    const f = a.slice(a.indexOf('async function gpsLiveFind'), a.indexOf('// GPS:END', a.indexOf('async function gpsLiveFind')));
+    assert.ok(/L\.find\(name, where\)/.test(f) && /L\.course\(x\.id, key\)/.test(f), 'the saved course key goes along: the function writes gps_links/<key>');
+    assert.ok(/No GPS match for/.test(f) && /label: 'Search online'/.test(f) && /None of these (\u2014|\\u2014) Search online/.test(f), 'every outcome says something and offers Search online');
+    assert.ok(/gpsCourseRowSub\(optionDiv, id\)/.test(a) && /gps-row-where/.test(a), 'city, state under each saved course');
+});
+
+// ---- GOLFAPI AS THE SCORECARD SOURCE (gps-features) ------------------------------
+test('Search online asks GolfAPI first; with a GPS course the free GolfCourseAPI search is not spent; "Not listed?" runs it; ratings backup only when the card has none', { skip }, () => {
+    const a = read('admin.html');
+    const run = a.slice(a.indexOf('async function runOnlineCourseSearch'), a.indexOf('function renderOnlineOutcome'));
+    const gpsFirst = run.indexOf('const g = await gpsLive;'), gcaFetch = run.indexOf("fetch(courseApiBase() + '/api/course-search");
+    assert.ok(gpsFirst > 0 && gcaFetch > gpsFirst, 'GolfAPI is awaited BEFORE any GolfCourseAPI request');
+    assert.ok(/\(g\.results \|\| \[\]\)\.some\(\(x\) => x\.gps\)\) \{[\s\S]{0,300}gpsScorecardOnlyRow\(query\);[\s\S]{0,120}return;/.test(run), 'GPS course found: show it, offer "Not listed?", return - no GolfCourseAPI');
+    assert.ok(/runOnlineCourseSearch\(query, row, \{ scorecardsOnly: true \}\)/.test(a), '"Not listed?" = the old search');
+    const pick = a.slice(a.indexOf('async function gpsLivePick'), a.indexOf('async function gpsLivePick') + 2500);
+    assert.ok(/if \(!courseTeeChoices\(rec\)\.length\) gpsRatingsBackup\(r\.cardKey, x\);/.test(pick), 'backup only without rated tees');
+    const bk = a.slice(a.indexOf('async function gpsRatingsBackup'), a.indexOf('let gpsLivePicking'));
+    assert.ok(!/db\.ref|\.set\(|\.update\(/.test(bk), 'the backup writes nothing to Firebase');
+    assert.ok(!/scorecardsOnly|gpsRatingsBackup/.test(require('./tools/gps-flag.js').applyFlag(a, false)), 'HardPan only');
 });

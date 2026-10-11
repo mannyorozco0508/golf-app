@@ -23,7 +23,8 @@ test('the templates call only what the setup screens already do; no Vegas', { sk
     assert.deepEqual([...block.matchAll(/format: '([a-z-]+)'/g)].map((m) => m[1]), ['nassau-modern', 'stroke', 'wolf'], 'existing format tokens only');
     ['selectFormatCard(', 'addSkinsInstance()', 'setInstanceField(', "gpsSetField('setup-nassau-front'", "gpsSetField('wolf-point-value'"].forEach((x) => assert.ok(block.includes(x), x));
     assert.ok(!/db\.ref|calculate|settle|engine|payout/i.test(block), 'no database writes, no engine / settlement call');
-    assert.ok(!/vegas/i.test(block) && !/vegas/i.test(read('admin.html').replace(/<!--[\s\S]*?-->/g, '')), 'no Vegas game anywhere');
+    // No Vegas GAME: no format card / option / token named vegas (a course in Las Vegas is not a game).
+    assert.ok(!/vegas/i.test(block) && !/data-format="vegas"|value="vegas"|'vegas'/i.test(a), 'no Vegas game anywhere');
     const consumer = require('./tools/gps-flag.js').applyFlag(a, false);
     assert.ok(!/gpsApplyTemplate|gps-bet-templates|gpsTemplateArrive/.test(consumer), 'HardPan only');
 });

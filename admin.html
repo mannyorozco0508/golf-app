@@ -6483,7 +6483,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // times would spend the budget on nothing and say the same thing slower.
         const variants = courseQueryVariants(query).slice(0, 3);
         // GPS:BEGIN
-        const gpsLive = gpsLiveSearch(query);
+        // GOLFAPI FIRST (gps-features): its courses come with GPS AND the scorecard
+        // (pars, handicaps, rated tees), so when GolfAPI has the course the free
+        // GolfCourseAPI search (35 a day) is not spent at all. "Not listed?" runs it.
+        const scorecardsOnly = !!(arguments[2] && arguments[2].scorecardsOnly);
+        const gpsLive = scorecardsOnly ? Promise.resolve(null) : gpsLiveSearch(query);
+        if (!scorecardsOnly && gpsLiveOn() && !gpsOsmOn()) {
+            const g = await gpsLive;
+            if (g && g.status === 'ok' && (g.results || []).some((x) => x.gps)) {
+                onlineSearchInFlight = false;
+                courseDropdown.innerHTML = '';
+                gpsLiveRender(g, query);
+                gpsScorecardOnlyRow(query);
+                courseDropdown.style.display = 'block';
+                return;
+            }
+        }
         // GPS:END
         let payload = null;
         for (let i = 0; i < variants.length; i++) {
@@ -6500,7 +6515,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         onlineSearchInFlight = false;
         renderOnlineOutcome(payload, query);
         // GPS:BEGIN
-        gpsLiveRender(await gpsLive, query);
+        if (!scorecardsOnly) gpsLiveRender(await gpsLive, query);
         // GPS:END
     }
 
@@ -6873,8 +6888,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (r.status === 'ready') gpsSetupShow('ready', 'GPS ✓ ready — all ' + r.of + ' holes');
         else if (r.status === 'partial') gpsSetupShow('partial', 'GPS partial (' + r.n + '/' + r.of + ')');
         else if (r.status === 'ask') gpsSetupShow('ask', 'This club has more than one course here.', { label: 'Choose hole 1 on the map', onclick: () => gpsSetupPicker(key, r.candidates, name) });
-        else if (!gpsOsmOn() && gpsLiveOn() && window.HardPanGpsLive && window.HardPanGpsLive.on())
+        else if (!gpsOsmOn() && gpsLiveOn() && window.HardPanGpsLive && window.HardPanGpsLive.on()) {
+            // An old saved course: look for it in GolfAPI by itself, once (cached searches).
+            if (!gpsFindTried[key] && navigator.onLine !== false && !/^gapi_/.test(key)) { gpsLiveFind(key, name, { auto: true }); return; }
             gpsSetupShow('none', 'No GPS yet for this course.', { label: 'Find GPS for this course', onclick: () => gpsLiveFind(key, name) });
+        }
         else gpsSetupShow('none', 'No GPS yet: you can tap greens during the round');
     }
     // The course's point: our record, else the coverage list's row for its name.
@@ -7052,6 +7070,36 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const p = gpsOfflinePack(key);
         if (p && p.card && Array.isArray(p.card.data) && p.card.data.length) globalCourses[key] = Object.assign({}, globalCourses[key] || {}, p.card);
     }
+    // CITY, STATE UNDER A SAVED COURSE (gps-features): "Legacy Golf Resort" /
+    // "Phoenix, AZ" is not "Legacy Golf Club" / "Las Vegas, NV". From the saved card's
+    // location; the course list holds names only, so a card not read yet costs ONE tiny
+    // read of its location, kept on this phone. No location stored: nothing extra.
+    const GPS_LOC_CACHE = 'hardpan_courseloc_v1_';
+    function gpsLocText(L) { return L && (L.city || L.state) ? [L.city, L.state].filter(Boolean).join(', ') : ''; }
+    function gpsCourseRowSub(row, key) {
+        const put = (t) => {
+            if (!t || row.querySelector('.gps-row-where')) return;
+            const d = document.createElement('div');
+            d.className = 'gps-row-where';
+            d.textContent = t;
+            d.style.cssText = 'font-size:0.74rem; color:var(--text-muted); font-weight:500;';
+            row.appendChild(d);
+        };
+        const have = globalCourses[key] && globalCourses[key].location;
+        if (have) { put(gpsLocText(have)); return; }
+        let c = null;
+        try { c = JSON.parse(localStorage.getItem(GPS_LOC_CACHE + key) || 'null'); } catch (e) { c = null; }
+        if (c) { put(gpsLocText(c)); return; }
+        if (!globalCourses[key] || typeof db === 'undefined' || !db || typeof db.ref !== 'function') return;
+        try {
+            db.ref('global_courses/' + key + '/location').once('value').then((snap) => {
+                const L = snap && typeof snap.val === 'function' ? snap.val() : null;
+                const v = L ? { city: L.city || '', state: L.state || '' } : { none: 1 };
+                try { localStorage.setItem(GPS_LOC_CACHE + key, JSON.stringify(v)); } catch (e) {}
+                put(gpsLocText(v));
+            }, () => {});
+        } catch (e) {}
+    }
     function gpsOfflineBadge(row, key) {
         if (!gpsOfflinePack(key)) return;
         const b = document.createElement('span');
@@ -7072,7 +7120,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             await gpsGolfApiLoad();
             const L = window.HardPanGpsLive;
             if (gpsOsmOn() || !gpsLiveOn() || !L || !L.on()) return null;
-            return await L.search(query);
+            const r = await L.search(query);
+            // GolfAPI's name search is strict: no GPS course for the whole name -> its
+            // shorter forms (gps-live.js find; each cached).
+            if (r && r.status === 'ok' && !(r.results || []).some((x) => x.gps) && L.find) {
+                const f = await L.find(query, null);
+                if (f && f.status === 'ok') return { status: 'ok', results: f.matches, query: f.query };
+            }
+            return r;
         } catch (e) { return null; }
     }
     function gpsLiveNote(text) {
@@ -7112,6 +7167,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             put(row);
         });
     }
+    function gpsScorecardOnlyRow(query) {
+        const row = document.createElement('div');
+        row.className = 'custom-select-option gps-scorecard-only';
+        row.textContent = '\uD83C\uDF10 Not listed? Search scorecards (no GPS) for \u201C' + query + '\u201D';
+        row.onclick = () => { runOnlineCourseSearch(query, row, { scorecardsOnly: true }); };
+        courseDropdown.appendChild(row);
+    }
     let gpsLivePicking = false;
     async function gpsLivePick(x, row) {
         if (gpsLivePicking) return;
@@ -7133,6 +7195,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (rec && rec.name && Array.isArray(rec.data) && rec.data.length === 18) globalCourses[r.cardKey] = rec;
             else { sub.textContent = 'GPS \u2713 ready - the scorecard did not load; tap again'; return; }
             selectCourse(r.cardKey, rec.name);
+            // No rated tees on GolfAPI's card: GolfCourseAPI as the backup (2 lookups).
+            if (!courseTeeChoices(rec).length) gpsRatingsBackup(r.cardKey, x);
             return;
         }
         // GPS is here; the card is not (a 9-hole course, or GolfAPI's card is not
@@ -7142,30 +7206,96 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // A SAVED COURSE WITH NO GPS: one tap searches GolfAPI by its name; the golfer
     // picks the right one; the function links our course to it (gps_links), so the
     // next golfer who picks this course has GPS with no search at all.
-    async function gpsLiveFind(key, name) {
+    // A SAVED COURSE WITH NO GPS (gps-features). GolfAPI's search is strict about
+    // names ("Legacy Golf Resort" is GolfAPI's "The Legacy Golf Club"), so the name is
+    // tried in shorter forms and matched on the saved card's CITY + STATE
+    // (gps-live.js find). One clear match: linked at once - gps_links/<ourKey>, so
+    // the next golfer who picks this course goes straight to "GPS ✓ ready". Several:
+    // the golfer picks. None: said so, with Search online one tap away. Run by itself
+    // once when such a course is picked (auto), and by "Find GPS for this course".
+    const gpsFindTried = {};
+    function gpsCourseWhere(key) {
+        const L = (globalCourses[key] || {}).location || null;
+        return L ? { city: L.city || '', state: L.state || '' } : null;
+    }
+    function gpsWhereText(w) { return w && (w.city || w.state) ? [w.city, w.state].filter(Boolean).join(', ') : ''; }
+    async function gpsLiveFind(key, name, opts) {
+        const auto = !!(opts && opts.auto);
         const L = window.HardPanGpsLive;
-        if (!L) return;
-        gpsSetupShow('busy', 'Looking for GPS…');
-        const r = await L.search(name);
-        if (!r || r.status !== 'ok') { gpsSetupShow('none', L.message(r && r.status)); return; }
-        const hits = (r.results || []).filter((x) => x.gps).slice(0, 6);
-        if (!hits.length) { gpsSetupShow('none', 'No GPS for this course yet - Tools › Set the green during the round'); return; }
+        if (!L || !L.find) return;
+        gpsFindTried[key] = 1;
+        const mine = gpsSetupSeq;
+        const where = gpsCourseWhere(key), wt = gpsWhereText(where);
+        gpsSetupShow('busy', 'Looking for GPS' + (wt ? ' in ' + wt : '') + '…');
+        const r = await L.find(name, where);
+        if (mine !== gpsSetupSeq) return;     // the golfer picked another course meanwhile
+        const searchOnline = { label: 'Search online', onclick: () => { courseSearchInput.value = name; runOnlineCourseSearch(name, null); courseDropdown.style.display = 'block'; } };
+        if (!r || (r.status !== 'ok' && r.status !== 'none')) { gpsSetupShow('none', L.message(r && r.status), searchOnline); return; }
+        if (r.status === 'none') {
+            gpsSetupShow('none', 'No GPS match for “' + name + '”' + (wt ? ' in ' + wt : '') + ' (tried: ' + r.tried.join(', ') + ').', searchOnline);
+            return;
+        }
+        const link = async (x) => {
+            gpsSetupShow('busy', 'Setting up GPS — ' + x.name + '…');
+            const c = await L.course(x.id, key);
+            if (mine !== gpsSetupSeq) return;
+            if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status), searchOnline); return; }
+            gpsSetupMatch(key);
+        };
+        if (r.clear) { await link(r.clear); return; }
         const el = gpsSetupEl();
-        gpsSetupShow('ask', 'Which one is it?');
-        hits.forEach((x) => {
+        gpsSetupShow('ask', auto ? 'GPS found - which course is yours?' : 'Which one is it?');
+        r.matches.slice(0, 6).forEach((x) => {
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'gps-live-link';
             b.textContent = x.name + ' · ' + (x.city || '?') + ', ' + (x.state || '?');
             b.style.cssText = 'display:block; width:100%; text-align:left; margin-top:6px; padding:10px 12px; min-height:44px; border-radius:10px; border:1px solid var(--border-faint); background:var(--bg-card); color:inherit; font-weight:700; cursor:pointer;';
-            b.onclick = async () => {
-                gpsSetupShow('busy', 'Setting up GPS…');
-                const c = await L.course(x.id, key);
-                if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status)); return; }
-                gpsSetupMatch(key);
-            };
+            b.onclick = () => link(x);
             el.appendChild(b);
         });
+        const none = document.createElement('button');
+        none.type = 'button';
+        none.className = 'gps-live-link';
+        none.textContent = 'None of these — Search online';
+        none.style.cssText = 'display:block; width:100%; text-align:left; margin-top:6px; padding:10px 12px; min-height:44px; border-radius:10px; border:1px dashed var(--border-faint); background:transparent; color:inherit; font-weight:700; cursor:pointer;';
+        none.onclick = searchOnline.onclick;
+        el.appendChild(none);
+    }
+    // GPS:END
+    // GPS:BEGIN
+    // Its own block: the badge block above makes no network request per result.
+    // RATINGS BACKUP (gps-features): a GolfAPI card whose tees carry no rating / slope
+    // gets them from GolfCourseAPI - 2 lookups (search + card), only then - matched on
+    // city + state, the tees by name. ON THIS PHONE for this setup only; nothing written.
+    async function gpsRatingsBackup(key, x) {
+        const rec = globalCourses[key];
+        if (!rec || courseTeeChoices(rec).length) return false;
+        const base = courseApiBase();
+        try {
+            const sr = await (await fetch(base + '/api/course-search?q=' + encodeURIComponent(x.club || rec.name))).json();
+            const list = (sr && sr.status === 'ok' && sr.courses) || [];
+            const st = (x.state || '').toUpperCase(), ct = String(x.city || '').toLowerCase();
+            const pick = list.filter((c) => (c.location || {}).state && String(c.location.state).toUpperCase() === st && String(c.location.city || '').toLowerCase() === ct)[0]
+                || list.filter((c) => (c.location || {}).state && String(c.location.state).toUpperCase() === st)[0];
+            if (!pick) return false;
+            const dr = await (await fetch(base + '/api/course/' + encodeURIComponent(pick.id))).json();
+            const detail = dr && dr.course;
+            if (!detail || !detail.tees) return false;
+            const rated = {};
+            ['male', 'female'].forEach((g) => (detail.tees[g] || []).forEach((t) => { if (t && t.tee_name && t.course_rating && t.slope_rating) rated[g + ':' + String(t.tee_name).toLowerCase()] = t; }));
+            let n = 0;
+            const tees = rec.tees || { male: [], female: [] };
+            ['male', 'female'].forEach((g) => (tees[g] || []).forEach((t) => {
+                const m = rated[g + ':' + String(t.name || '').toLowerCase()];
+                if (m && !(t.rating > 0 && t.slope > 0)) { t.rating = Number(m.course_rating); t.slope = Number(m.slope_rating); n++; }
+            }));
+            if (!n) return false;
+            rec.tees = tees;
+            globalCourses[key] = rec;
+            if (typeof syncTeeRatingFromCourse === 'function') syncTeeRatingFromCourse(key, { keepSelection: true });
+            return n;
+        } catch (e) { return false; }
     }
     // GPS:END
     // ---- THE CONFIRMATION. THE SECOND REQUEST IS SPENT HERE, NOT BEFORE. ----
@@ -7349,6 +7479,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         optionDiv.textContent = name;
         // GPS:BEGIN
         if (typeof gpsOfflineBadge === 'function') gpsOfflineBadge(optionDiv, id);
+        if (typeof gpsCourseRowSub === 'function') gpsCourseRowSub(optionDiv, id);
         // GPS:END
         optionDiv.onclick = () => { selectCourse(id, name); };
         return optionDiv;

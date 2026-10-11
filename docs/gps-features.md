@@ -74,3 +74,37 @@ Rules that would need ADDING (additive; nothing existing changes):
   if verified indexes matter. No scraping, no private API.
 - Sources: forums.garmin.com (USGA reply on GPA/VASP), thegrint.com (WHS integration),
   support.arccosgolf.com, help.18birdies.com, usga.org GHIN privacy / trial terms.
+
+## 7. Old saved courses find their GPS (Legacy fix)
+- WHY "Find GPS" failed for "Legacy Golf Resort": GolfAPI calls it "The Legacy Golf
+  Club" (Phoenix, AZ) and its name search is strict - the full saved name returns
+  nothing (log: legacy_golf_resort -> 0 results). Same pattern as "Southern Dunes Golf
+  and Country Club" (0) vs "Southern Dunes" (3). "Search online" only seemed to work:
+  it showed the free scorecard results; its GPS list was empty too.
+- Now (gps-live.js find): the name in up to 3 shorter forms (each search cached for
+  everyone: 0.1 call the first time, then 0), matched on the saved card's CITY + STATE.
+  One clear match: linked at once (gps_links/<saved key>: the next golfer goes
+  straight to GPS ✓ ready). Several: you pick. None: said so, with Search online.
+- Runs by itself ONCE when an old saved course with no GPS is picked; "Find GPS for
+  this course" stays for a retry. The saved list is kept.
+
+## 8. City, state under each course
+- Saved list: name, then "Phoenix, AZ" on a small second line, from the saved card's
+  location (one tiny read per row the first time, kept on the phone). No location
+  stored: nothing extra. Search online rows already show city, state.
+
+## 9. GolfAPI as the scorecard source
+- Search online asks GolfAPI FIRST. GPS courses found: only those are shown, plus
+  "Not listed? Search scorecards (no GPS)" - the free GolfCourseAPI search is NOT spent.
+  GolfAPI has none: GolfCourseAPI as before.
+- A GolfAPI pick fills pars, handicaps and rated tees from GolfAPI (the card our function
+  writes). If its card has no rated tees: GolfCourseAPI backup - search + card, matched
+  on city/state, ratings by tee name - on this phone for this setup only.
+- GolfCourseAPI lookups per round setup (35 a day free):
+  | path | before | after |
+  |---|---|---|
+  | saved course | 0 | 0 |
+  | Search online -> course GolfAPI has | 1-3 (search always ran) | **0** |
+  | ... and its card lacks ratings | 1-3 | 2 (backup) |
+  | Search online -> course only GolfCourseAPI has | 2-4 (1-3 searches + 1 card) | 2-4 (same) |
+  | "Not listed?" tapped, then a scorecard pick | - | 2-4 |

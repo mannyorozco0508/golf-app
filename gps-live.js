@@ -139,6 +139,72 @@
         }).catch(function () { return { status: 'error' }; });
     }
     function search(name) { return call('gpsSearch', { name: String(name || '').trim() }); }
+
+    // ---- FINDING A SAVED COURSE IN GOLFAPI (gps-features) ------------------------------
+    // GolfAPI's name search is STRICT: "Legacy Golf Resort" finds nothing when GolfAPI
+    // calls it "The Legacy Golf Club"; "Southern Dunes Golf & Country Club" nothing,
+    // "Southern Dunes" three. So the name is tried in up to three ever-shorter forms
+    // (each search is cached for everyone; 0.1 call the first time, then 0), and the
+    // answer is matched on the saved card's CITY and STATE, not on the name alone.
+    var GENERIC = { golf: 1, course: 1, courses: 1, club: 1, resort: 1, country: 1, cc: 1, gc: 1, the: 1, and: 1, at: 1, of: 1, links: 1,
+        hole: 1, holes: 1, '18': 1, '9': 1, '27': 1, municipal: 1, muni: 1, public: 1, private: 1, spa: 1, inn: 1, hotel: 1 };
+    var STATES = { alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+        hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA',
+        michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+        'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI',
+        'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+        wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC' };
+    function stateCode(st) { var t = String(st || '').trim(); if (!t) return ''; return /^[A-Za-z]{2}$/.test(t) ? t.toUpperCase() : (STATES[t.toLowerCase()] || t.toUpperCase()); }
+    function cityKey(c) { return String(c || '').toLowerCase().replace(/[^a-z]+/g, ''); }
+    function words(n) { return String(n || '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/['\u2019`]/g, '').split(/[^a-z0-9]+/).filter(Boolean); }
+    function nameVariants(name) {
+        var out = [], add = function (v) { v = String(v || '').replace(/\s+/g, ' ').trim(); if (v.length >= 3 && out.indexOf(v) === -1) out.push(v); };
+        add(String(name || '').replace(/\(.*?\)/g, ' '));
+        var w = words(name).filter(function (x) { return !GENERIC[x]; });
+        add(w.join(' '));
+        var longest = w.filter(function (x) { return x.length >= 4 && !/^\d+$/.test(x); }).sort(function (a, b) { return b.length - a.length; })[0];
+        add(longest);
+        return out.slice(0, 3);
+    }
+    // where: { city, state } from the saved card (either may be missing).
+    function rank(results, where, name) {
+        var st = stateCode(where && where.state), ct = cityKey(where && where.city);
+        var want = words(name).filter(function (x) { return !GENERIC[x]; });
+        return results.map(function (x) {
+            var sameState = !!st && stateCode(x.state) === st, sameCity = !!ct && cityKey(x.city) === ct;
+            var have = words(x.club + ' ' + x.course);
+            var shared = want.filter(function (w) { return have.indexOf(w) !== -1; }).length;
+            return { r: x, sameState: sameState, sameCity: sameCity, shared: shared, score: (sameCity ? 4 : 0) + (sameState ? 2 : 0) + shared };
+        }).sort(function (a, b) { return b.score - a.score; });
+    }
+    // Resolves { status: 'ok', matches: [results, best first], clear: result|null, query, tried }
+    // | { status: 'none', tried } | { status: <the function's status> }. Never rejects.
+    function find(name, where) {
+        var tried = [], variants = nameVariants(name);
+        var next = function (i) {
+            if (i >= variants.length) return Promise.resolve({ status: 'none', tried: tried });
+            tried.push(variants[i]);
+            return search(variants[i]).then(function (r) {
+                if (!r || r.status !== 'ok') return r || { status: 'error' };
+                var gps = (r.results || []).filter(function (x) { return x.gps; });
+                if (!gps.length) return next(i + 1);
+                var ranked = rank(gps, where, name);
+                // Where the saved card says the course is: keep that state's courses when there are any.
+                var st = stateCode(where && where.state);
+                var inState = st ? ranked.filter(function (x) { return x.sameState; }) : ranked;
+                if (st && !inState.length) return next(i + 1);
+                var pool = inState.length ? inState : ranked;
+                var top = pool[0];
+                var ties = pool.filter(function (x) { return x.score === top.score; });
+                // ONE CLEAR MATCH: the only one in that city (or, with no city stored, the only one in that state).
+                var inCity = pool.filter(function (x) { return x.sameCity; });
+                var clear = inCity.length === 1 ? inCity[0].r : (!cityKey(where && where.city) && pool.length === 1 && st ? pool[0].r : null);
+                if (!clear && ties.length === 1 && top.sameCity) clear = top.r;
+                return { status: 'ok', matches: pool.map(function (x) { return x.r; }), clear: clear, query: variants[i], tried: tried };
+            });
+        };
+        return next(0).catch(function () { return { status: 'error' }; });
+    }
     function course(id, ourKey) {
         var payload = { courseId: String(id) };
         if (ourKey && KEY_RE.test(ourKey)) payload.ourKey = ourKey;
@@ -163,5 +229,5 @@
     };
     function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
 
-    W.HardPanGpsLive = { normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, message: message, _store: store };
+    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, message: message, _store: store };
 })();
