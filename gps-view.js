@@ -1889,7 +1889,8 @@
     function holeBearing() {
         var r = resolved();
         if (r && r.tee && r.mid) return G.bearingDeg(r.tee, r.mid);
-        return S.camera ? S.camera.bearing : (S.map ? S.map.getBearing() : 0);
+        // No tee: the way the map is turned NOW (not the last hole's camera).
+        return S.map && typeof S.map.getBearing === 'function' ? S.map.getBearing() : (S.camera ? S.camera.bearing : 0);
     }
     function ageText(at) {
         var min = Math.floor(Math.max(0, Date.now() - at) / 60000);
@@ -2124,11 +2125,18 @@
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
         // is straight up), which is how the map is turned in the hole's view.
-        var bearing = S.camera ? S.camera.bearing : (S.map ? S.map.getBearing() : 0);
-        var rot = Math.round(((w.toDeg - bearing) % 360 + 360) % 360);
+        // THE MAP'S OWN BEARING, NOW (2026-10-11). S.camera is the last HOLE frame: a
+        // hole with no tee jumps north-up to the golfer's dot without replacing it, so
+        // the arrow was turned by the PREVIOUS hole's direction - 90 degrees off on an
+        // east-west hole (Manny, Legacy). The map is the truth; the camera is history.
+        var bearing = S.map && typeof S.map.getBearing === 'function' ? S.map.getBearing() : (S.camera ? S.camera.bearing : 0);
+        var rot = G.windArrowRot(w.toDeg, bearing);
+        // North-up (no tee -> green to turn by): the arrow is a COMPASS arrow; say so.
+        var rr = resolved(), northUp = !(rr && rr.tee && rr.mid) && Math.abs(((bearing % 360) + 360) % 360) < 0.5;
+        box.classList.toggle('gps-wind-northup', northUp);
         arrow.style.transform = 'rotate(' + rot + 'deg)';
         box.setAttribute('data-rot', String(rot));
-        box.setAttribute('aria-label', 'Wind ' + (w.mph === 0 ? 'calm' : w.mph + ' mph' + (w.gustMph ? ' gusting ' + w.gustMph : '') + ' from ' + G.compassName(w.fromDeg)) + (w.manual ? ', set by you for this hole' : ', ' + ageText(w.at)) + '. Tap to set it.');
+        box.setAttribute('aria-label', 'Wind ' + (w.mph === 0 ? 'calm' : w.mph + ' mph' + (w.gustMph ? ' gusting ' + w.gustMph : '') + ' from ' + G.compassName(w.fromDeg)) + (w.manual ? ', set by you for this hole' : ', ' + ageText(w.at)) + (northUp ? ', map north up' : '') + '. Tap to set it.');
         if (windSheetOpen()) syncWindSheet();
     }
 
@@ -2758,6 +2766,7 @@
         + '#gps-overlay .gps-right > *{min-width:56px;min-height:44px;box-sizing:border-box;font-weight:800;font-size:14px;padding:6px 9px;display:flex;align-items:center;justify-content:center;gap:4px;}'
         + '#gps-overlay .gps-wind{font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
         + '#gps-overlay .gps-wind-arrow{display:inline-block;font-size:18px;line-height:1;color:#93c5fd;transform-origin:50% 50%;}'
+        + '#gps-overlay .gps-wind-northup .gps-wind-tag::before{content:"N\\2191 map \\00b7 ";font-weight:800;}'
         + '#gps-overlay .gps-wind{cursor:pointer;position:relative;}'
         + '#gps-overlay .gps-wind-empty .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tag{display:none;position:absolute;left:0;right:0;bottom:2px;text-align:center;font:700 9px/1 ' + FONT + ';color:#c8d1ca;letter-spacing:.02em;}'

@@ -859,6 +859,23 @@
     }
     // THE WIND DIAL: the angle of a finger at (x, y) around a dial centered at
     // (cx, cy), clockwise from straight up, snapped to `step` degrees (5).
+    // THE WIND ARROW, ON SCREEN (2026-10-11, Manny at Legacy: "about 90 degrees off").
+    // The arrow points where the wind BLOWS (toDeg, compass, 0 = north, clockwise)
+    // on a map turned by mapBearing (MapLibre: the compass direction at the top of
+    // the screen). Rotation of an up-pointing arrow, clockwise, 0-359.
+    function windArrowRot(toDeg, mapBearing) {
+        return Math.round((((Number(toDeg) - (Number(mapBearing) || 0)) % 360) + 360) % 360);
+    }
+    // THE WIND, FOR THE SHOT: headwind (+) / tailwind (-) and crosswind, + = blowing
+    // LEFT TO RIGHT across the shot. fromDeg: where it comes FROM (weather services
+    // report that); shotDeg: golfer -> target. Facing north, a wind FROM the east
+    // comes from the right and blows RIGHT TO LEFT (cross -mph).
+    function windRelative(fromDeg, shotDeg, mph) {
+        var a = toRad(Number(fromDeg) - Number(shotDeg));
+        var head = mph * Math.cos(a), cross = -mph * Math.sin(a);
+        var r = function (x) { return Math.round(x * 10) / 10 || 0; };
+        return { head: r(head), cross: r(cross), kind: Math.abs(head) >= Math.abs(cross) ? (head >= 0 ? 'headwind' : 'tailwind') : (cross > 0 ? 'left-to-right' : 'right-to-left') };
+    }
     function dialDeg(cx, cy, x, y, step) {
         var a = Math.atan2(x - cx, cy - y) * 180 / Math.PI;
         var st = step || 5;
@@ -1288,7 +1305,7 @@
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
         golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, ellipseRing: ellipseRing,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
-        destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg,
+        destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
