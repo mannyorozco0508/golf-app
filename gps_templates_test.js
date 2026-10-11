@@ -16,15 +16,17 @@ const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree: no HardPan templates';
 
-test('the templates call only what the setup screens already do; no Vegas', { skip }, () => {
+test('the templates call only what the setup screens already do; Vegas / BBB only as their own instances', { skip }, () => {
     const a = read('admin.html');
     const block = a.slice(a.indexOf('const GPS_TEMPLATES'), a.indexOf('// NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW'));
     assert.ok(block.length > 500, 'positive: the template block was found');
     assert.deepEqual([...block.matchAll(/format: '([a-z-]+)'/g)].map((m) => m[1]), ['nassau-modern', 'stroke', 'wolf'], 'existing format tokens only');
     ['selectFormatCard(', 'addSkinsInstance()', 'setInstanceField(', "gpsSetField('setup-nassau-front'", "gpsSetField('wolf-point-value'"].forEach((x) => assert.ok(block.includes(x), x));
     assert.ok(!/db\.ref|calculate|settle|engine|payout/i.test(block), 'no database writes, no engine / settlement call');
-    // No Vegas GAME: no format card / option / token named vegas (a course in Las Vegas is not a game).
-    assert.ok(!/vegas/i.test(block) && !/data-format="vegas"|value="vegas"|'vegas'/i.test(a), 'no Vegas game anywhere');
+    // Vegas / Bingo Bango Bongo (gps-games) are NOT format cards: their templates add an
+    // instance through extra-games-ui.js (its own engines), never a game-format token.
+    assert.ok(!/data-format="(vegas|bbb)"|value="(vegas|bbb)"/i.test(a), 'no Vegas / BBB format card or option');
+    assert.ok(/HardPanExtraGames\.addGame\(foreignGameInstances, id, collectWizardPlayers\(\), 1\)/.test(block), 'the BBB / Vegas templates add their own instance');
     const consumer = require('./tools/gps-flag.js').applyFlag(a, false);
     assert.ok(!/gpsApplyTemplate|gps-bet-templates|gpsTemplateArrive/.test(consumer), 'HardPan only');
 });

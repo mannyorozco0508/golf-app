@@ -31,8 +31,9 @@ var TSP_FORMATS = [
     { re: /\bteam match\b/i, type: 'ryder', label: 'Team Match' },
     { re: /\bstroke play\b|\bmedal\b|\bstroke\b/i, type: 'stroke', label: 'Stroke Play' },
 ];
-// Games that do NOT exist here: flagged, skipped.
-var TSP_UNKNOWN = /\b(vegas|bingo[\s-]?bango[\s-]?bongo|bbb|snake|rabbit|hammer|wheel|9s|nines game|chicago|quota|banker|aces and deuces|round robin|sixes)\b/i;
+// Games that do NOT exist here: flagged, skipped. (Vegas and Bingo Bango Bongo exist
+// since gps-games: their own engines, set up on Round Setup's Money step.)
+var TSP_UNKNOWN = /\b(snake|rabbit|hammer|wheel|9s|nines game|chicago|quota|banker|aces and deuces|round robin|sixes)\b/i;
 var TSP_GAME_WORD = /\bnassau\b|\bskins?\b|\bwolf\b|\bbirdie game\b|\bbirdies\b|\bdots\b|\bgreenies\b|best[\s-]?ball|better[\s-]?ball|four[\s-]?ball|\bscramble\b|\bstableford\b|\bhi[\s-]?lo\b|\bteam match\b|\bstroke play\b|\bmedal\b|\bstroke\b|\bvegas\b|bingo[\s-]?bango|\bbbb\b|\bsnake\b|\brabbit\b|\bhammer\b|\bwheel\b|\bchicago\b|\bquota\b|\bbanker\b|\bround robin\b|\bsixes\b/i;
 
 function tspClean(line) {
@@ -57,7 +58,7 @@ function tspMoney(s) {
 // One phrase ("$5 nassau auto press", "skins $2 carry", "wolf $1") -> games + flags.
 function tspGames(text) {
     var out = [], flags = [];
-    var parts = String(text || '').split(/[,;]|\s\+\s|\band\b(?=\s*\$?\d*\s*(?:nassau|skins?|wolf|birdie|dots|greenies))/i).map(function (p) { return p.trim(); }).filter(Boolean);
+    var parts = String(text || '').split(/[,;]|\s\+\s|\band\b(?=\s*\$?\d*\s*(?:nassau|skins?|wolf|birdie|dots|greenies|vegas|bingo|bbb))/i).map(function (p) { return p.trim(); }).filter(Boolean);
     parts.forEach(function (p) {
         var unknown = TSP_UNKNOWN.exec(p);
         if (unknown) { flags.push({ level: 'skip', text: p, why: '"' + unknown[1] + '" is not a game in this app - skipped' }); return; }
@@ -77,6 +78,20 @@ function tspGames(text) {
             var s = { type: 'skins', label: 'Skins', raw: p, amount: tspMoney(p), carry: /\bno[\s-]?carry\b/i.test(p) ? false : (/\bcarry/i.test(p) ? true : null), everyone: everyone };
             out.push(s);
             if (s.amount == null) flags.push({ level: 'ask', text: p, why: 'Skins with no amount' });
+            return;
+        }
+        // VEGAS / BINGO BANGO BONGO (gps-games): before the birdie game, so "vegas $1
+        // birdie flip" stays Vegas.
+        if (/\bvegas\b/i.test(p)) {
+            var vg = { type: 'vegas', label: 'Vegas', raw: p, perPoint: tspMoney(p), flip: /\bflip/i.test(p) };
+            out.push(vg);
+            if (vg.perPoint == null) flags.push({ level: 'ask', text: p, why: 'Vegas with no $ per point' });
+            return;
+        }
+        if (/bingo[\s-]?bango[\s-]?bongo|\bbbb\b|\bbingo\b/i.test(p)) {
+            var bb = { type: 'bbb', label: 'Bingo Bango Bongo', raw: p, perPoint: tspMoney(p) };
+            out.push(bb);
+            if (bb.perPoint == null) flags.push({ level: 'ask', text: p, why: 'Bingo Bango Bongo with no $ per point' });
             return;
         }
         if (/\bwolf\b/i.test(p)) { out.push({ type: 'wolf', label: 'Wolf', raw: p, perPoint: tspMoney(p), format: true }); return; }

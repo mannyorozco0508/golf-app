@@ -57,7 +57,7 @@ test('B) numbered email: full weekday names, en dashes, "(8)" handicaps, teams p
     assert.ok(!why(r).some((w) => /Who plays whom/.test(w)), 'teams named: team vs team, nothing to ask');
 });
 
-test('C) one round: a weekday without a date is asked; "/" pairs and "vs"; auto press; everyone skins; Vegas skipped', { skip }, () => {
+test('C) one round: a weekday without a date is asked; "/" pairs and "vs"; auto press; everyone skins; Vegas recognized (gps-games)', { skip }, () => {
     const r = parse(`Sat at Dobson 7:30
 Manny 8 / Jimmy 11 vs Paul 4 / Marty 9   $10 nassau auto press
 skins $5 everyone
@@ -69,8 +69,9 @@ vegas $1 a point`);
     const n = g.games.find((x) => x.type === 'nassau');
     assert.deepEqual([n.front, n.back, n.overall, n.press], [10, 10, 10, 'auto']);
     assert.ok(g.games.some((x) => x.type === 'skins' && x.amount === 5 && x.everyone));
-    const sk = r.flags.find((f) => f.level === 'skip');
-    assert.match(sk.why, /"vegas" is not a game in this app - skipped/);
+    const vg = d.groups[0].games.concat(d.games).find((x) => x.type === 'vegas');
+    assert.deepEqual([vg.label, vg.perPoint, vg.flip], ['Vegas', 1, false]);
+    assert.ok(!r.flags.some((f) => f.level === 'skip'), 'nothing skipped');
     assert.ok(why(r).some((w) => /Sat has no date/.test(w)));
 });
 
@@ -94,7 +95,9 @@ call me if you can't make it`);
     assert.equal(d.groups[0].players[2].flight, 'B');
     const n = d.groups[1].games.find((x) => x.type === 'nassau');
     assert.deepEqual([n.front, n.back, n.overall, n.press], [5, 5, 10, 'manual']);
-    assert.equal(r.flags.filter((f) => f.level === 'skip').length, 2, 'bingo bango bongo and snake skipped');
+    assert.equal(r.flags.filter((f) => f.level === 'skip').length, 1, 'snake skipped');
+    assert.ok(d.groups[1].games.concat(d.games).some((x) => x.type === 'bbb'), 'bingo bango bongo recognized (gps-games)');
+    assert.ok(r.flags.some((f) => /Bingo Bango Bongo with no \$ per point/.test(f.why)), 'no amount: asked');
     assert.ok(r.flags.some((f) => /call me/.test(f.text) && /Not understood/.test(f.why)), 'chatter is shown, not guessed at');
 });
 
@@ -112,7 +115,16 @@ nassau`);
 
 test('only EXISTING game types come out; the unknown list is skipped, never mapped to something close', { skip }, () => {
     const g = P.tspGames('$5 nassau, skins $2 no carry, wolf $1, best ball, scramble, stableford, hi-lo, team match, stroke play, birdie game $1, greenies $2, vegas $1, rabbit');
-    assert.deepEqual(g.games.map((x) => x.type), ['nassau', 'skins', 'wolf', 'bestball', 'scramble', 'stableford', 'hilo', 'ryder', 'stroke', 'birdie', 'dots']);
+    assert.deepEqual(g.games.map((x) => x.type), ['nassau', 'skins', 'wolf', 'bestball', 'scramble', 'stableford', 'hilo', 'ryder', 'stroke', 'birdie', 'dots', 'vegas']);
     assert.equal(g.games[1].carry, false);
-    assert.deepEqual(g.flags.map((f) => f.level), ['skip', 'skip']);
+    assert.deepEqual(g.flags.map((f) => f.level), ['skip']);
+});
+
+test('Vegas and Bingo Bango Bongo by any of their names (gps-games): amount, birdie flip, "and" between games', { skip }, () => {
+    const t = (x) => P.tspGames(x).games.map((g) => [g.type, g.perPoint, g.flip]);
+    assert.deepEqual(t('vegas $1 birdie flip'), [['vegas', 1, true]], 'birdie flip is Vegas, not the birdie game');
+    assert.deepEqual(t('$2 bbb'), [['bbb', 2, undefined]]);
+    assert.deepEqual(t('Bingo-Bango-Bongo $0.50/point'), [['bbb', 0.5, undefined]]);
+    assert.deepEqual(t('$5 nassau and $1 vegas'), [['nassau', undefined, undefined], ['vegas', 1, false]]);
+    assert.deepEqual(P.tspGames('vegas').flags.map((f) => f.why), ['Vegas with no $ per point']);
 });

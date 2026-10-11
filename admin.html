@@ -27,6 +27,12 @@
     <script src="trip-setup-paste.js"></script>
     <script src="setup-paste-ui.js"></script>
     <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- Bingo Bango Bongo + Vegas: their own engines and setup (HardPan, gps-games). -->
+    <script src="bbb-engine.js"></script>
+    <script src="vegas-engine.js"></script>
+    <script src="extra-games-ui.js"></script>
+    <!-- GPS:END -->
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -1761,6 +1767,8 @@ html {
             <button type="button" class="gps-tpl" data-tpl="nassau" onclick="gpsApplyTemplate('nassau')">$5 Nassau</button>
             <button type="button" class="gps-tpl" data-tpl="skins" onclick="gpsApplyTemplate('skins')">$2 Skins</button>
             <button type="button" class="gps-tpl" data-tpl="wolf" onclick="gpsApplyTemplate('wolf')">$1 Wolf</button>
+            <button type="button" class="gps-tpl" data-tpl="bbb" onclick="gpsApplyTemplate('bbb')">$1 Bingo Bango Bongo</button>
+            <button type="button" class="gps-tpl" data-tpl="vegas" onclick="gpsApplyTemplate('vegas')">$1 Vegas</button>
             <div id="gps-tpl-note" role="status" style="flex-basis:100%; font-size:0.78rem; color:var(--brand-green); font-weight:700;"></div>
         </div>
         <style>.gps-tpl{min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-weight:800; cursor:pointer;}</style>
@@ -2365,6 +2373,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
             <div id="stacked-games-list"></div>
             <div id="skins-instances-list"></div>
+            <!-- GPS:BEGIN -->
+            <div id="exg-editor"></div>
+            <!-- GPS:END -->
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
             <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>✨ Extras</strong></label>
@@ -3062,6 +3073,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return true;
     }
     function gpsApplyTemplate(id) {
+        // Bingo Bango Bongo / Vegas (gps-games): no game card changes - the game is
+        // added under Also Playing on the Money step, where its golfers / teams are set.
+        if (id === 'bbb' || id === 'vegas') {
+            gpsPendingTemplate = id;
+            const n = document.getElementById('gps-tpl-note');
+            if (n) n.textContent = id === 'bbb' ? '$1 Bingo Bango Bongo is added on the Money step - check the golfers there'
+                : '$1 Vegas is added on the Money step - pick the two teams there';
+            return;
+        }
         const t = GPS_TEMPLATES[id];
         if (!t) return;
         gpsPendingTemplate = id;
@@ -3079,6 +3099,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (id === 'nassau') {
             const box = document.getElementById('setup-nassau-enabled');
             if (box && box.checked) { gpsSetField('setup-nassau-front', 5); gpsSetField('setup-nassau-back', 5); gpsSetField('setup-nassau-overall', 5); }
+        } else if ((id === 'bbb' || id === 'vegas') && window.HardPanExtraGames) {
+            const has = Object.keys(foreignGameInstances).some((k) => foreignGameInstances[k] && foreignGameInstances[k].format === id);
+            if (!has) window.HardPanExtraGames.addGame(foreignGameInstances, id, collectWizardPlayers(), 1);
+            exgRender();
         } else if (id === 'skins') {
             if (!skinsInstances.length) {
                 addSkinsInstance();
@@ -3119,6 +3143,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (d.format) bits.push(d.format.label + (d.format.perPoint != null ? ' $' + d.format.perPoint + '/pt' : ''));
         if (d.nassau) bits.push('Nassau ' + d.nassau.a.join(' & ') + ' vs ' + d.nassau.b.join(' & '));
         (d.skins || []).forEach((x) => bits.push('Skins $' + (x.amount == null ? '?' : x.amount)));
+        (d.newGames || []).forEach((x) => bits.push((x.type === 'vegas' ? 'Vegas' : 'Bingo Bango Bongo') + ' $' + (x.perPoint == null ? '?' : x.perPoint) + '/pt'));
         if (d.bets && d.bets.length) bits.push(d.bets.length + ' more Nassau' + (d.bets.length === 1 ? '' : 's') + ' for Side Matches after Save');
         return bits.join(' \u00b7 ');
     }
@@ -3224,6 +3249,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (sk.carry != null) setInstanceField(inst.id, 'skinsCarryOver', sk.carry);
             if (sk.players) { const ids = spIdsFor(sk.players); if (ids.length) setInstanceField(inst.id, 'participantIds', ids); }
         });
+        // Vegas / Bingo Bango Bongo (gps-games): under Also Playing, with the group's golfers.
+        if ((d.newGames || []).length && window.HardPanExtraGames) {
+            const all = collectWizardPlayers();
+            d.newGames.forEach((x) => {
+                const ids = spIdsFor(x.players);
+                const ps = ids.map((id) => all.find((p) => String(p.id) === id)).filter(Boolean);
+                const key = window.HardPanExtraGames.addGame(foreignGameInstances, x.type, ps, x.perPoint == null ? 1 : x.perPoint);
+                const e = foreignGameInstances[key];
+                if (x.type === 'vegas') {
+                    e.vegasBirdieFlip = !!x.flip;
+                    if (x.teams) {
+                        const a = spIdsFor(x.teams[0]).slice(0, 2), b = spIdsFor(x.teams[1]).slice(0, 2);
+                        if (a.length === 2 && b.length === 2) { e.vegasTeamA = a; e.vegasTeamB = b; e.participantIds = a.concat(b); }
+                    }
+                } else if (ids.length) e.participantIds = ids;
+            });
+            exgRender();
+        }
         spPendingMoney = null;
     }
     // "Paste the whole round" on this page.
@@ -4619,6 +4662,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         const instList = document.getElementById('skins-instances-list');
         if (instList) instList.innerHTML = renderSkinsInstances();
+        // GPS:BEGIN
+        if (typeof exgRender === 'function') exgRender();
+        // GPS:END
 
         list.innerHTML = available.map(format => {
             const spec = ADDITIONAL_GAME_CATALOG[format];
@@ -5436,6 +5482,41 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         return out;
     }
+
+    // GPS:BEGIN
+    // BINGO BANGO BONGO + VEGAS (gps-games): their editor under Also Playing. The
+    // games live in foreignGameInstances - the map Round Setup already writes back
+    // byte for byte - so the save path is the one every other instance takes.
+    function exgRender() {
+        const el = document.getElementById('exg-editor');
+        if (!el || !window.HardPanExtraGames) return;
+        window.HardPanExtraGames.editor({
+            mount: el,
+            get: () => foreignGameInstances,
+            players: () => collectWizardPlayers(),
+            changed: () => { if (typeof updateWizardReview === 'function') updateWizardReview(); }
+        });
+    }
+    // After a round is loaded: a copied round starts with no BBB points; a reopened
+    // one keeps its held points in step with the course, so Save never writes back
+    // points tapped while this screen was open.
+    let exgPointsRef = null;
+    // Never in the way of loading the round: any failure here leaves Setup as it was.
+    function exgAfterLoad(isCopy) {
+        try {
+            if (!window.HardPanExtraGames) return;
+            if (exgPointsRef && typeof exgPointsRef.off === 'function') exgPointsRef.off();
+            exgPointsRef = null;
+            if (isCopy) { window.HardPanExtraGames.dropPoints(foreignGameInstances); return; }
+            const hasBbb = Object.keys(foreignGameInstances).some((k) => foreignGameInstances[k] && foreignGameInstances[k].format === 'bbb');
+            if (!hasBbb || !currentMode || typeof db === 'undefined') return;
+            const ref = db.ref(`events/${currentMode}/additionalGameInstances`);
+            if (!ref || typeof ref.on !== 'function') return;
+            ref.on('value', (snap) => { try { window.HardPanExtraGames.freshPoints(foreignGameInstances, (snap && snap.val()) || {}); } catch (e) { /* keep the held copy */ } });
+            exgPointsRef = ref;
+        } catch (e) { /* Setup loads exactly as before */ }
+    }
+    // GPS:END
 
     // Restores the toggles when an existing round is reopened.
     function loadAdditionalGames(data) {
@@ -11603,6 +11684,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (data.matchPressRule && document.getElementById("match-press-rule")) document.getElementById("match-press-rule").value = data.matchPressRule;
             
             loadAdditionalGames(data);
+            // GPS:BEGIN
+            if (typeof exgAfterLoad === 'function') exgAfterLoad(!!copyFromCode);
+            // GPS:END
             // Same loader serves reopening a round and copying one, so a duplicated
             // round now brings its pot with it - which is the whole point of copying
             // a setup.
