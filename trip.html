@@ -63,6 +63,11 @@
     <script src="course-index.js"></script>
     <script src="trip-itinerary.js"></script>
     <script src="trip-roster.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- Paste the whole trip (HardPan, gps-paste): parser + review + drafts. -->
+    <script src="trip-setup-paste.js"></script>
+    <script src="setup-paste-ui.js"></script>
+    <!-- GPS:END -->
     <!-- The trip's own money: the points-race pot and the daily pot. Pure rules;
          the page reads the trip, the module says what the money is, the page writes. -->
     <script src="trip-pots.js"></script>
@@ -337,6 +342,30 @@ html {
              collects the text and shows what it made of it. NOTHING IS WRITTEN
              until the review below is accepted - a parser that writes straight
              through is a parser whose mistakes end up in the database. -->
+        <!-- GPS:BEGIN -->
+        <!-- PASTE THE WHOLE TRIP (HardPan, gps-paste): days, courses, tee times, groups,
+             teams, games and handicaps in one paste. A review first; Confirm fills the two
+             boxes below (their own review + Apply as always) and keeps each day's groups
+             and games on this phone, for that day's Round Setup to fill in after Build Trip. -->
+        <details class="settle-card" id="sp-trip-card" style="margin-bottom:12px;" open>
+            <summary style="font-weight:bold; cursor:pointer;">📋 Paste the whole trip (days, groups, games)</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">A group chat, an email or a list: dates, courses, tee times, groups, teams ("A &amp; B vs C &amp; D"), games ($5 Nassau, $2 skins, wolf, best ball&hellip;) and handicaps.</p>
+            <textarea id="sp-trip-box" rows="8" style="width:100%; font-size:0.84rem;" placeholder="Tue 10/13 Caledonia 8:24&#10;Group 1: Manny 8, Jimmy 11, Paul 3.5, Marty 9&#10;games: $5 nassau, $2 skins"></textarea>
+            <div class="form-group" style="margin:8px 0;"><label>Year these dates are in</label><input type="number" id="sp-trip-year" min="2024" max="2099" style="max-width:120px;"></div>
+            <button type="button" class="btn-outline" onclick="spTripRead()">Read it &rarr;</button>
+            <div id="sp-trip-review" style="margin-top:10px;"></div>
+        </details>
+        <style>
+            .sp-review{font-size:0.86rem;} .sp-sum{margin:4px 0 8px;} .sp-box{border-radius:10px;padding:8px 10px;margin:6px 0;} .sp-box ul{margin:4px 0 0 18px;padding:0;}
+            .sp-ask{background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warn-text);} .sp-skip{background:var(--bg-card);border:1px dashed var(--accent-red);}
+            .sp-warn{background:var(--bg-card);border:1px solid var(--warn-border);} .sp-info{color:var(--text-muted);font-size:0.78rem;}
+            .sp-day{border:1px solid var(--border-faint);border-radius:12px;padding:8px 10px;margin:8px 0;} .sp-day-head{font-weight:800;}
+            .sp-group{margin:6px 0 0 8px;padding-left:8px;border-left:3px solid var(--border-faint);} .sp-g-head{font-weight:700;} .sp-hcp{color:var(--text-muted);font-size:0.78rem;}
+            .sp-teams,.sp-games,.sp-note{font-size:0.8rem;color:var(--text-muted);} .sp-games{color:var(--brand-green);font-weight:700;}
+            .sp-chip{min-height:36px;margin:4px 4px 0 0;padding:4px 10px;border-radius:999px;border:1px solid var(--border-mid);background:var(--bg-card);font-weight:700;cursor:pointer;}
+            .sp-chip-A{background:#dbeafe;border-color:#3b82f6;} .sp-chip-B{background:#fee2e2;border-color:#ef4444;} .sp-actions{margin-top:10px;display:flex;gap:8px;}
+        </style>
+        <!-- GPS:END -->
         <details class="settle-card" id="itin-paste-card" style="margin-bottom:12px;" open>
             <summary style="font-weight:bold; cursor:pointer;">📋 The rounds — paste your itinerary</summary>
             <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">
@@ -1148,6 +1177,46 @@ html {
             + (itinApplied.length === 1 ? 'it' : 'them') + ', even with the paste box closed.';
     }
 
+    // GPS:BEGIN
+    // PASTE THE WHOLE TRIP (HardPan, gps-paste). Read -> review (questions first) ->
+    // Confirm: the itinerary and golfers boxes below are filled and their own review
+    // runs (course matching, lookups, Apply - unchanged); each day's groups and games
+    // are kept on this phone until Build Trip gives them round codes.
+    function spTripRead() {
+        const box = document.getElementById('sp-trip-box'), out = document.getElementById('sp-trip-review');
+        const yEl = document.getElementById('sp-trip-year');
+        if (yEl && !yEl.value) yEl.value = String(new Date().getFullYear());
+        const year = parseInt(yEl && yEl.value, 10);
+        if (!box || !out || typeof parseSetupPaste !== 'function' || !window.HardPanSetupPaste) return;
+        if (!box.value.trim()) { out.innerHTML = '<p class="sp-note">Paste the trip first.</p>'; return; }
+        const plan = parseSetupPaste(box.value, { year: year });
+        if (!plan.days.length) { out.innerHTML = '<p class="sp-note">No days or golfers found in that text.</p>'; return; }
+        window.HardPanSetupPaste.renderReview(out, plan, { mode: 'trip',
+            onEdit: () => { out.innerHTML = ''; box.focus(); },
+            onConfirm: (resolved) => spTripConfirm(resolved, year) });
+    }
+    function spTripConfirm(resolved, year) {
+        const S = window.HardPanSetupPaste, out = document.getElementById('sp-trip-review');
+        const itin = document.getElementById('itin-paste-box'), iy = document.getElementById('itin-year');
+        if (itin) itin.value = S.itineraryText(resolved);
+        if (iy) iy.value = String(year);
+        // Every golfer in the trip, in the first day's groups (others after).
+        const first = resolved.days.find((d) => d.groups.length);
+        const seen = {};
+        const groups = first ? first.groups.map((g) => ({ players: g.players.filter((p) => !seen[p.name.toLowerCase()] && (seen[p.name.toLowerCase()] = 1)) })) : [];
+        const rest = resolved.players.filter((p) => !seen[p.name.toLowerCase()]);
+        if (rest.length) groups.push({ players: rest });
+        const golf = document.getElementById('setup-golfers-box');
+        if (golf && groups.length) { golf.value = S.rosterText({ groups: groups }); reviewSetupGolfers(); }
+        S.savePending(resolved);
+        reviewItinerary();
+        out.innerHTML = '<div class="sp-box sp-ask"><b>Done — next:</b><ol style="margin:4px 0 0 18px;padding:0;">'
+            + '<li>Check the courses below and tap its Apply.</li><li>Check the golfers.</li><li>Build Trip.</li>'
+            + '<li>Open each day’s ⚙️ Round Setup: it offers to fill in that day’s groups and games — check, then Save.</li></ol></div>';
+        const card = document.getElementById('itin-paste-card');
+        if (card) { card.open = true; card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+    // GPS:END
     function applyItinerary() {
         if (!itinPlan) return;
         const usable = itinPlan.rows.filter(r => r.ok);
@@ -1784,6 +1853,10 @@ html {
             for (let i = 0; i < roundConfigs.length; i++) {
                 roundCodes.push(await issueUniqueCode({ db, root: 'events', reserved: usedCodes }));
             }
+            // GPS:BEGIN
+            // A pasted trip's day drafts go to their rounds (on this phone).
+            if (window.HardPanSetupPaste) { try { window.HardPanSetupPaste.bindCodes(roundConfigs, roundCodes); } catch (e) {} }
+            // GPS:END
             let updates = {};
             // THE CREATOR IS THE ORGANIZER, and has to leave here holding the
             // token or they lock themselves out of the trip they just made.

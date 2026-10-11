@@ -21,6 +21,12 @@
     <script src="organizer-gate.js"></script>
     <script src="my-groups.js"></script>
     <script src="roster-paste.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- Paste the whole round / a trip day's draft (HardPan, gps-paste). -->
+    <script src="trip-itinerary.js"></script>
+    <script src="trip-setup-paste.js"></script>
+    <script src="setup-paste-ui.js"></script>
+    <!-- GPS:END -->
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -2217,6 +2223,18 @@ html {
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
+    <!-- GPS:BEGIN -->
+    <button class="btn-outline" id="sp-round-btn" onclick="spRoundOpen()">📋 Paste the whole round (groups, teams, games)</button>
+    <div id="sp-round-modal" style="display:none; margin:8px 0; padding:12px; border:1px solid var(--brand-green); border-radius:12px; background:var(--bg-card);">
+        <div>
+            <h3 style="margin-top:0;">📋 Paste the whole round</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 8px;">Golfers (handicaps), groups, teams ("A &amp; B vs C &amp; D") and games ($5 Nassau, $2 skins, wolf&hellip;). Nothing changes until you confirm.</p>
+            <textarea id="sp-round-box" rows="7" style="width:100%; font-size:0.9rem;" placeholder="Manny 8 / Jimmy 11 vs Paul 4 / Marty 9  $10 nassau auto press&#10;skins $5 everyone"></textarea>
+            <div style="display:flex; gap:8px; margin-top:8px;"><button class="btn-outline" onclick="spRoundClose()">Cancel</button><button class="btn-primary" onclick="spRoundRead()">Read it &rarr;</button></div>
+            <div id="sp-round-review" style="margin-top:10px;"></div>
+        </div>
+    </div>
+    <!-- GPS:END -->
     <!-- MY GROUPS IS FOR EVERYBODY NOW (2026-10-04). It shipped behind a
          per-device beta switch in the Account panel; the switch is gone and so is
          the card. The button is an ordinary control on this step, and what it
@@ -3072,6 +3090,161 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         gpsPendingTemplate = null;
     }
     // GPS:END
+    // GPS:BEGIN
+    // PASTE THE WHOLE ROUND / A TRIP DAY'S DRAFT (HardPan, gps-paste). A draft (made
+    // by the trip page's "Paste the whole trip", or by "Paste the whole round" here)
+    // says what to put into THIS wizard's existing fields: golfers in group order
+    // (through the existing Paste Player List), the game card, and - on arrival at
+    // Money - the one 1v1 Nassau Round Setup takes and the Skins game. Team-vs-team
+    // and further Nassaus are kept for Side Matches after Save. The organizer checks
+    // it all and taps Save; nothing here saves or writes anything.
+    let spPendingMoney = null;
+    function spBannerEl() {
+        let el = document.getElementById('sp-draft-banner');
+        if (el) return el;
+        const anchor = document.getElementById('wizard-progress');
+        if (!anchor || !anchor.parentNode) return null;
+        el = document.createElement('div');
+        el.id = 'sp-draft-banner';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'margin:8px 0; padding:10px 12px; border-radius:12px; border:1px solid var(--brand-green); background:var(--bg-card); font-size:0.86rem;';
+        anchor.parentNode.insertBefore(el, anchor);
+        return el;
+    }
+    function spDraftSummary(d) {
+        const S = window.HardPanSetupPaste;
+        const bits = [];
+        if (d.groups && d.groups.length) bits.push(d.groups.length + ' group' + (d.groups.length === 1 ? '' : 's') + ' (' + d.groups.map((g) => g.players.length).join('/') + ')');
+        if (d.format) bits.push(d.format.label + (d.format.perPoint != null ? ' $' + d.format.perPoint + '/pt' : ''));
+        if (d.nassau) bits.push('Nassau ' + d.nassau.a.join(' & ') + ' vs ' + d.nassau.b.join(' & '));
+        (d.skins || []).forEach((x) => bits.push('Skins $' + (x.amount == null ? '?' : x.amount)));
+        if (d.bets && d.bets.length) bits.push(d.bets.length + ' more Nassau' + (d.bets.length === 1 ? '' : 's') + ' for Side Matches after Save');
+        return bits.join(' \u00b7 ');
+    }
+    function spDraftOffer(code) {
+        const S = window.HardPanSetupPaste;
+        const d = S && S.draftFor(code);
+        const el = spBannerEl();
+        if (!el) return;
+        if (!d) { el.style.display = 'none'; return; }
+        el.style.display = '';
+        el.innerHTML = '<b>\uD83D\uDCCB Pasted setup for this day' + (d.applied ? ' \u2014 filled in \u2713' : '') + '</b><div style="color:var(--text-muted); margin:4px 0;">' + escapeHtml(spDraftSummary(d)) + '</div>'
+            + '<button type="button" class="btn-primary" id="sp-fill-btn">' + (d.applied ? 'Fill it in again' : 'Fill it in') + '</button> '
+            + '<button type="button" class="btn-outline" id="sp-drop-btn">Dismiss</button>';
+        document.getElementById('sp-fill-btn').onclick = () => { spApplyDraft(d, code); d.applied = true; S.setDraft(code, d); spDraftOffer(code); };
+        document.getElementById('sp-drop-btn').onclick = () => { S.dropDraft(code); el.style.display = 'none'; };
+    }
+    function spMatchCourse(name) {
+        const want = String(name || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!want) return null;
+        const pool = {};
+        Object.keys(globalCourses || {}).forEach((k) => { if (globalCourses[k] && globalCourses[k].name) pool[k] = globalCourses[k].name; });
+        if (typeof coursePresets !== 'undefined') Object.keys(coursePresets).forEach((k) => { if (!pool[k] && coursePresets[k].name) pool[k] = coursePresets[k].name; });
+        const hits = Object.keys(pool).filter((k) => { const n = pool[k].toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); return n === want || n.indexOf(want) === 0 || want.indexOf(n) === 0; });
+        return hits.length === 1 ? { key: hits[0], name: pool[hits[0]] } : null;
+    }
+    function spApplyDraft(d, code) {
+        const notes = [];
+        // THE COURSE: only when this round has none yet (a trip day already does).
+        if (d.courseName && !(courseHiddenSelect && courseHiddenSelect.value)) {
+            const m = spMatchCourse(d.courseName);
+            if (m) selectCourse(m.key, m.name); else notes.push('Pick the course "' + d.courseName + '" in step 1');
+        }
+        // THE GOLFERS. A trip round already holds the trip's golfers - each with the
+        // player id the trip links across its rounds - so when every pasted golfer is
+        // there, those SAME rows are put in the pasted groups (ids kept; a pasted
+        // handicap fills in). Anyone not in today's groups stays, as a last group.
+        // Otherwise (a new round) the existing Paste Player List adds them.
+        if (d.roster) {
+            const key = (n) => String(n || '').trim().toLowerCase();
+            const existing = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim());
+            const want = [];
+            (d.groups || []).forEach((g) => g.players.forEach((p) => want.push(p)));
+            const pool = existing.slice();
+            const take = (name) => { const i = pool.findIndex((e) => key(e.name) === key(name)); return i === -1 ? null : pool.splice(i, 1)[0]; };
+            const matched = existing.length && want.every((p) => existing.some((e) => key(e.name) === key(p.name)));
+            if (matched) {
+                const ordered = want.map((p) => { const e = take(p.name); if (p.hcp !== '' && p.hcp != null) e.hcp = p.hcp; if (p.flight) e.flight = p.flight; return e; });
+                const sizes = (d.groups || []).map((g) => g.players.length);
+                if (pool.length) { sizes.push(pool.length); notes.push(pool.length + ' golfer' + (pool.length === 1 ? '' : 's') + ' not in today\u2019s groups kept as the last group (' + pool.map((e) => e.name).join(', ') + ')'); }
+                const all = ordered.concat(pool);
+                groupSizeOverrides = {};
+                sizes.forEach((n, i) => { groupSizeOverrides[i] = n; });
+                document.getElementById('player-list').innerHTML = '';
+                renderPlayerListHeaderAndWarning(all.length);
+                all.forEach((p) => appendPlayerFrom(p, false, all.length));
+                updateCount();
+            } else {
+                document.getElementById('player-list').innerHTML = '';
+                groupSizeOverrides = {};
+                const ta = document.getElementById('paste-players-textarea');
+                ta.value = d.roster;
+                commitPastedPlayers();
+            }
+        }
+        // THE GAME CARD.
+        if (d.format) {
+            if (d.format.type === 'wolf' && d.format.perPoint != null) gpsSetField('wolf-point-value', d.format.perPoint);
+            selectFormatCard(d.format.type);
+        } else if (d.nassau) selectFormatCard('nassau-modern');
+        // MONEY, when the organizer reaches it (the golfers exist by then).
+        spPendingMoney = d;
+        if (d.bets && d.bets.length) { window.HardPanSetupPaste.queueBets(code, d.bets); notes.push(d.bets.length + ' Nassau' + (d.bets.length === 1 ? '' : 's') + ' to add on Side Matches after Save'); }
+        if (d.extraSkins && d.extraSkins.length) notes.push('Add ' + d.extraSkins.length + ' more Skins game' + (d.extraSkins.length === 1 ? '' : 's') + ' on Money');
+        (d.extras || []).forEach((x) => { if (x.type === 'birdie') { const b = document.getElementById('enable-birdiegame'); if (b && !b.checked) { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); } } else notes.push('Set dots / greenies on Money'); });
+        // Said in the banner, not a pop-up.
+        const el = spBannerEl();
+        if (el && notes.length) { const n = document.createElement('div'); n.style.cssText = 'margin-top:6px; color:var(--warn-text); font-weight:700;'; n.textContent = notes.join(' \u00b7 '); el.appendChild(n); }
+        return notes;
+    }
+    function spIdsFor(names) {
+        const ps = collectWizardPlayers();
+        return (names || []).map((n) => { const p = ps.find((x) => String(x.name).trim().toLowerCase() === String(n).trim().toLowerCase()); return p ? String(p.id) : null; }).filter(Boolean);
+    }
+    function spArriveMoney(n) {
+        const d = spPendingMoney;
+        if (!d || n !== WIZARD_STEP_OF.action) return;
+        if (d.nassau) {
+            const box = document.getElementById('setup-nassau-enabled');
+            if (box && !box.checked && !box.disabled) { box.checked = true; toggleSetupNassau(); }
+            if (box && box.checked) {
+                const a = spIdsFor(d.nassau.a)[0], b = spIdsFor(d.nassau.b)[0];
+                const s1 = document.getElementById('setup-nassau-p1'), s2 = document.getElementById('setup-nassau-p2');
+                if (s1 && a) { s1.value = a; s1.dispatchEvent(new Event('change', { bubbles: true })); }
+                if (s2 && b) { s2.value = b; s2.dispatchEvent(new Event('change', { bubbles: true })); }
+                if (d.nassau.front != null) { gpsSetField('setup-nassau-front', d.nassau.front); gpsSetField('setup-nassau-back', d.nassau.back); gpsSetField('setup-nassau-overall', d.nassau.overall); }
+                if (d.nassau.press) gpsSetField('setup-nassau-press', d.nassau.press === 'auto' ? '2down' : 'anytime');
+            }
+        }
+        (d.skins || []).forEach((sk) => {
+            addSkinsInstance();
+            const inst = skinsInstances[skinsInstances.length - 1];
+            if (sk.amount != null) setInstanceField(inst.id, 'skinsBuyIn', sk.amount);
+            if (sk.carry != null) setInstanceField(inst.id, 'skinsCarryOver', sk.carry);
+            if (sk.players) { const ids = spIdsFor(sk.players); if (ids.length) setInstanceField(inst.id, 'participantIds', ids); }
+        });
+        spPendingMoney = null;
+    }
+    // "Paste the whole round" on this page.
+    function spRoundOpen() { const m = document.getElementById('sp-round-modal'); if (m) { m.style.display = 'block'; document.getElementById('sp-round-review').innerHTML = ''; m.scrollIntoView({ block: 'start' }); } }
+    function spRoundClose() { const m = document.getElementById('sp-round-modal'); if (m) m.style.display = 'none'; }
+    function spRoundRead() {
+        const S = window.HardPanSetupPaste, box = document.getElementById('sp-round-box'), out = document.getElementById('sp-round-review');
+        if (!S || typeof parseSetupPaste !== 'function' || !box.value.trim()) return;
+        const plan = parseSetupPaste(box.value, { year: new Date().getFullYear() });
+        if (!plan.days.length) { out.innerHTML = '<p class="sp-note">No golfers or games found in that text.</p>'; return; }
+        if (plan.days.length > 1) plan.flags.unshift({ day: null, line: null, text: '', why: 'This looks like ' + plan.days.length + ' days - only the first is set up here (use the trip page for a whole trip)', level: 'ask' });
+        plan.days = plan.days.slice(0, 1);
+        S.renderReview(out, plan, { mode: 'round', onEdit: () => { out.innerHTML = ''; },
+            onConfirm: (resolved) => {
+                const d = S.dayDraft(resolved.days[0]);
+                spRoundClose();
+                S.setDraft(currentMode, Object.assign(d, { applied: true }));
+                spDraftOffer(currentMode);
+                spApplyDraft(d, currentMode);
+            } });
+    }
+    // GPS:END
     // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
     //
     // A Ryder Cup skips both Format Settings and Games & Money, so a stake the
@@ -3536,6 +3709,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (n === WIZARD_STEP_OF.review) renderWizardReview();
         // GPS:BEGIN
         if (typeof gpsTemplateArrive === 'function') gpsTemplateArrive(n);
+        if (typeof spArriveMoney === 'function') spArriveMoney(n);
         // GPS:END
         const progressEl = document.getElementById('wizard-progress');
         if (progressEl) progressEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -11536,6 +11710,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             }
 
             if (restoreFailure) reportRoundLoadFailure(modeKey, restoreFailure);
+            // GPS:BEGIN
+            if (isThisRound && typeof spDraftOffer === 'function') spDraftOffer(modeKey);
+            // GPS:END
             // The headcount, once the roster is on screen. A copy loads another
             // round's setup into a new code, so it does not show that round's
             // answers. A fresh code has no one to confirm yet.
