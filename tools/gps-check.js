@@ -1451,7 +1451,8 @@ function usgsFallbackFails(tag, g, why) {
     const fl = await arm('flow', 'caledonia', null, 'ok', ME, 4.6, [
         WAIT_MAP, { sleep: 1200 }, { expression: READ },                                                // 0 landed: GPS, hole 1
         { tap: '.gps-score' }, { sleep: 600 }, { expression: READ },                                    // 1 the card, hole 1's first box
-        ...typeScore('4'), ...typeScore('5'), ...typeScore('3'), ...typeScore('6'), { sleep: 1500 }, { expression: READ }, // 2 all four saved -> GPS hole 2
+        ...typeScore('4'), ...typeScore('5'), ...typeScore('3'), ...typeScore('6'), { sleep: 1500 }, { expression: READ }, // 2 all four saved -> STAYS on the card, hole 1 (no auto-advance, 2026-10-12)
+        { tap: '.hole-view-nav-btn', nth: 1 }, { sleep: 1500 }, { expression: READ },                    // 2b Next -> GPS on hole 2
         // The writes are recorded per page: read them before the reload below.
         { expression: `'FLOWW' + JSON.stringify(window.__coldWrites || [])` },
         { expression: 'location.reload()' }, { sleep: 4000 }, WAIT_MAP, { sleep: 1200 }, { expression: READ },             // 3 reopened: GPS again
@@ -1466,7 +1467,7 @@ function usgsFallbackFails(tag, g, why) {
     const fd = await arm('flowd', 'caledonia', null, 'denied', ME, 5, [{ sleep: 7000 }, { expression: READ }], { preScript: FRESH + OSM_PATH + sensor('denied', ME[0], ME[1], 5) });
     out.flowDenied = fd; bail(out, fd);
     {
-        const [f0, f1, f2, f3, f4, f5] = fl.reads;
+        const [f0, f1, f2, f2b, f3, f4, f5] = fl.reads;
         const sv = fl.raw.find((v) => typeof v === 'string' && v.startsWith('SIDEV'));
         if (sv !== 'SIDEVbets|' + fl.code) fails.push('flow: the Card choice was not remembered for this round only: ' + sv);
         if (!f5 || f5.side !== 'gps' || !f5.gpsShown) fails.push('flow: a Card choice from another round kept this round on the Card: ' + JSON.stringify(f5 && [f5.side, f5.gpsShown]));
@@ -1478,13 +1479,14 @@ function usgsFallbackFails(tag, g, why) {
         const vals = sw.map((x) => x.value).sort().join(',');
         if (sw.length < 4 || vals !== '3,4,5,6') fails.push('flow: the four scores were not saved through the card: ' + JSON.stringify(sw.map((x) => [x.path, x.value])));
         if (flWrites.concat(fl.dump.writes).some((x) => !new RegExp('^events/' + fl.code + '/(scores|auditLog|scoresVerified)\\b').test(x.path))) fails.push('flow: unexpected writes ' + JSON.stringify(flWrites.map((x) => x.path)));
-        if (f2.side !== 'gps' || !f2.gpsShown || !/^Hole 2/.test(f2.title || '') || f2.cardHole !== 'Hole 2') fails.push('flow: after the last score, not back on GPS at hole 2: ' + JSON.stringify([f2.side, f2.title, f2.cardHole]));
+        if (f2.side !== 'bets' || f2.gpsShown || f2.cardHole !== 'Hole 1') fails.push('flow: after the last score the card must STAY on hole 1 (no auto-advance): ' + JSON.stringify([f2.side, f2.cardHole]));
+        if (!f2b || f2b.side !== 'gps' || !f2b.gpsShown || !/^Hole 2/.test(f2b.title || '') || f2b.cardHole !== 'Hole 2') fails.push('flow: Next after the last score did not go back to GPS on hole 2: ' + JSON.stringify(f2b && [f2b.side, f2b.title, f2b.cardHole]));
         if (f3.side !== 'gps' || !f3.gpsShown) fails.push('flow: reopening the round did not land on GPS: ' + JSON.stringify([f3.side, f3.gpsShown]));
         if (f4.side !== 'bets' || f4.gpsShown) fails.push('flow: left on the Card, the reopened round did not stay on the Card: ' + JSON.stringify([f4.side, f4.gpsShown]));
         if (fu.reads[0].side !== 'bets' || fu.reads[0].gpsShown) fails.push('flow: a hole with no GPS data landed on GPS: ' + JSON.stringify([fu.reads[0].side, fu.reads[0].title]));
         if (fd.reads[0].side !== 'bets' || fd.reads[0].gpsShown) fails.push('flow: location denied landed on GPS: ' + JSON.stringify([fd.reads[0].side]));
         if (/^bets/.test(fd.dump.storage.hardpan_round_side || '')) fails.push('flow: denied location was remembered as a choice of the Card');
-        out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
+        out.flowSummary = { landed: [f0.side, f0.title], afterScores: [f2.side, f2.cardHole], afterNext: f2b && [f2b.side, f2b.title], scores: vals, reopened: f3.side, leftOnCard: f4.side, unmapped: fu.reads[0].side, denied: fd.reads[0].side };
     }
 
     // ---- BUILD 5: ANY COURSE (a course with nothing bundled: Camas Meadows - Wildwood is bundled since 2026-10-10) ----------------------

@@ -3100,19 +3100,27 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function gpsTemplateArrive(n) {
         const id = gpsPendingTemplate;
         if (!id || n !== WIZARD_STEP_OF.action) return;
+        // From GPS-4's Quick start (front-door.js): the $ and the golfers chosen there
+        // (Vegas: Team A then Team B). Without them, the template's own defaults.
+        const o = window.__hpTplOpts || null;
+        window.__hpTplOpts = null;
+        const all = collectWizardPlayers();
+        const picked = o && o.ids && o.ids.length ? o.ids.map((x) => all.find((p) => String(p.id) === String(x))).filter(Boolean) : null;
         if (id === 'nassau') {
             const box = document.getElementById('setup-nassau-enabled');
-            if (box && box.checked) { gpsSetField('setup-nassau-front', 5); gpsSetField('setup-nassau-back', 5); gpsSetField('setup-nassau-overall', 5); }
+            const v = o && o.amt ? o.amt : 5;
+            if (box && box.checked) { gpsSetField('setup-nassau-front', v); gpsSetField('setup-nassau-back', v); gpsSetField('setup-nassau-overall', v); }
         } else if ((id === 'bbb' || id === 'vegas') && window.HardPanExtraGames) {
             const has = Object.keys(foreignGameInstances).some((k) => foreignGameInstances[k] && foreignGameInstances[k].format === id);
-            if (!has) window.HardPanExtraGames.addGame(foreignGameInstances, id, collectWizardPlayers(), 1);
+            if (!has || o) window.HardPanExtraGames.addGame(foreignGameInstances, id, picked || all, o && o.amt ? o.amt : 1);
             exgRender();
         } else if (id === 'skins') {
-            if (!skinsInstances.length) {
+            if (!skinsInstances.length || o) {
                 addSkinsInstance();
                 const inst = skinsInstances[skinsInstances.length - 1];
-                setInstanceField(inst.id, 'skinsBuyIn', 2);
-                setInstanceField(inst.id, 'skinsCarryOver', true);
+                setInstanceField(inst.id, 'skinsBuyIn', o && o.amt ? o.amt : 2);
+                setInstanceField(inst.id, 'skinsCarryOver', o && o.carry != null ? o.carry : true);
+                if (picked && picked.length < all.length) setInstanceField(inst.id, 'participantIds', picked.map((p) => String(p.id)));
             }
         }
         gpsPendingTemplate = null;

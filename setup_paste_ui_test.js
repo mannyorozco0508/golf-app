@@ -91,3 +91,28 @@ test('the pages: HardPan-only blocks; Build Trip binds the codes; nothing in the
     assert.ok(!/db\.ref|\.update\(|saveSideMatch\(|saveRound|commitRound|wizardSave/.test(glue), 'fills the screens; the organizer saves');
     assert.ok(/appendPlayerFrom\(p, false, all\.length\)/.test(a) && /captureCurrentPlayerInputs\(\)/.test(a), 'a trip round keeps each golfer\'s row (and id)');
 });
+
+test('the 2v2 picker (same as Side Matches): first two tapped = Team A, next two = Team B, re-tap un-picks, Swap teams, pre-filled 1+2 v 3+4; Vegas takes the picked sides', { skip }, () => {
+    const { S } = ui();
+    const g = { label: 'Group 1', players: ['Ann', 'Bob', 'Cal', 'Dee', 'Eve'].map((name) => ({ name, hcp: '' })), games: [] };
+    assert.deepEqual(S.pickDefault(g), ['Ann', 'Bob', 'Cal', 'Dee']);
+    let o = [];
+    ['Dee', 'Ann', 'Cal', 'Bob'].forEach((n) => { o = S.pickTap(o, n); });
+    assert.deepEqual(S.nassauSides(g, o), { a: ['Dee', 'Ann'], b: ['Cal', 'Bob'], how: 'picked' });
+    assert.deepEqual(S.pickTap(o, 'Eve'), o, 'four picked: a fifth stays out');
+    o = S.pickTap(o, 'Ann');
+    assert.deepEqual(S.nassauSides(g, o), { a: ['Dee', 'Cal'], b: ['Bob'], how: 'picked' }, 'un-picked: the rest move up');
+    o = S.pickTap(o, 'Eve');
+    assert.deepEqual(S.nassauSides(g, S.pickSwap(o)), { a: ['Bob', 'Eve'], b: ['Dee', 'Cal'], how: 'picked' });
+    assert.equal(S.nassauSides(g, ['Ann']), null, 'one side only: not an answer');
+    assert.deepEqual(S.nassauSides(g, { Ann: 'A', Bob: 'B' }), { a: ['Ann'], b: ['Bob'], how: 'picked' }, 'the older A/B map still reads');
+    const html = S.pickerHtml(g.players.map((p) => p.name), ['Ann', 'Bob', 'Cal'], 'data-key="1:0"');
+    assert.match(html, /Team A: Ann &amp; Bob/); assert.match(html, /Team B: Cal &amp; __/); assert.match(html, /Swap teams/);
+    assert.match(html, /sp-chip-A[^>]*data-name="Ann"/); assert.match(html, /sp-chip-B[^>]*data-name="Cal"/); assert.match(html, /sp-chip-off[^>]*data-name="Eve"/);
+    // A day's draft: Vegas takes the named teams, else the picked sides.
+    const day = { n: 1, games: [], groups: [
+        { label: 'Group 1', players: g.players.slice(0, 4), games: [{ type: 'vegas', perPoint: 1 }], vegasSides: [['Ann', 'Cal'], ['Bob', 'Dee']] },
+        { label: 'Group 2', players: g.players.slice(0, 4), games: [{ type: 'vegas', perPoint: 1 }], teams: [['Ann', 'Dee'], ['Bob', 'Cal']] }] };
+    const d = S.dayDraft(day);
+    assert.deepEqual(d.newGames.map((x) => x.teams), [[['Ann', 'Cal'], ['Bob', 'Dee']], [['Ann', 'Dee'], ['Bob', 'Cal']]]);
+});

@@ -180,11 +180,18 @@
                 var inIds = Array.isArray(e.participantIds) ? e.participantIds.map(String) : players.map(function (p) { return String(p.id); });
                 golfers = players.map(function (p) { return chip(inIds.indexOf(String(p.id)) !== -1, first(p.name), 'bbbp', id, p.id); }).join('');
             } else {
+                // THE 2v2 PICKER (same as Side Matches): first two tapped = Team A (green),
+                // next two = Team B (navy); tap again to un-pick; Swap teams.
                 var A = (e.vegasTeamA || []).map(String), B = (e.vegasTeamB || []).map(String);
+                var nm = function (xs) { return xs.map(function (x) { var p = players.filter(function (q) { return String(q.id) === x; })[0]; return p ? first(p.name) : '__'; }); };
                 golfers = players.map(function (p) {
                     var s = String(p.id), side = A.indexOf(s) !== -1 ? 'A' : B.indexOf(s) !== -1 ? 'B' : '';
-                    return chip(!!side, (side ? side + ' · ' : '') + first(p.name), 'vside', id, p.id);
+                    var c = chip(!!side, (side ? side + ((side === 'A' ? A : B).indexOf(s) + 1) + ' · ' : '') + first(p.name), 'vside', id, p.id);
+                    return side === 'B' ? c.replace('background:var(--brand-green);', 'background:#1d3557;border-color:#1d3557;') : c;
                 }).join('');
+                var tl = function (t, xs, col) { var n = nm(xs); return '<div style="font-weight:800;font-size:.82rem;color:' + col + ';">Team ' + t + ': ' + esc(n[0] || '__') + ' &amp; ' + esc(n[1] || '__') + '</div>'; };
+                golfers += '<div style="flex-basis:100%;margin-top:4px;">' + tl('A', A, 'var(--brand-green)') + tl('B', B, '#5b7bb4') + '</div>'
+                    + '<button type="button" data-exg-act="vswap" data-exg-id="' + id + '" class="btn-outline" style="min-height:36px;padding:4px 12px;"' + (A.length || B.length ? '' : ' disabled') + '>⇄ Swap teams</button>';
             }
             var ok = bbb ? (Array.isArray(e.participantIds) ? e.participantIds.length : players.length) >= 2 : !!(W.HardPanVegas && W.HardPanVegas.vegasValid(e));
             return '<div class="exg-ed" style="border-top:1px solid var(--border-mid);padding-top:10px;margin-top:10px;">'
@@ -192,7 +199,7 @@
                 + '<button type="button" data-exg-act="remove" data-exg-id="' + id + '" style="border:0;background:none;color:var(--text-muted);font-weight:800;min-height:36px;">Remove</button></div>'
                 + '<div style="font-size:.72rem;color:var(--text-muted);margin:2px 0 6px;">' + (bbb ? '$ per point · 3 points a hole, tapped on the scorecard · no handicaps' : '$ per point · two teams of two, low score first · gross') + '</div>'
                 + '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + amts + '</div>'
-                + '<div style="font-size:.72rem;font-weight:800;margin:8px 0 4px;">' + (bbb ? 'Golfers (tap to leave out / put in):' : 'Tap a golfer: Team A → Team B → out') + '</div>'
+                + '<div style="font-size:.72rem;font-weight:800;margin:8px 0 4px;">' + (bbb ? 'Golfers (tap to leave out / put in):' : 'Tap golfers: first two = Team A, next two = Team B · tap again to un-pick') + '</div>'
                 + '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + golfers + '</div>'
                 + (bbb ? '' : '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:.82rem;cursor:pointer;"><input type="checkbox" data-exg-act="flip" data-exg-id="' + id + '"' + (e.vegasBirdieFlip ? ' checked' : '') + ' style="width:18px;height:18px;margin:0;"> Birdie flips the other team\'s number</label>')
                 + (ok ? '' : '<div role="status" style="color:#b45309;font-size:.78rem;font-weight:800;margin-top:6px;">' + (bbb ? 'Needs at least 2 golfers' : 'Needs Team A of 2 and Team B of 2') + '</div>')
@@ -219,13 +226,14 @@
             e.participantIds = all.filter(function (x) { return cur.indexOf(x) !== -1; });
             return true;
         }
-        if (act === 'vside') {
-            var A = (e.vegasTeamA || []).map(String), B = (e.vegasTeamB || []).map(String);
-            if (A.indexOf(s) !== -1) { A = A.filter(function (x) { return x !== s; }); if (B.length < 2) B.push(s); }
-            else if (B.indexOf(s) !== -1) B = B.filter(function (x) { return x !== s; });
-            else if (A.length < 2) A.push(s);
-            else if (B.length < 2) B.push(s);
-            e.vegasTeamA = A; e.vegasTeamB = B; e.participantIds = A.concat(B);
+        if (act === 'vside' || act === 'vswap') {
+            // Tap order = Team A then Team B; picking appends, re-tapping removes (the rest
+            // move up), Swap puts B first.
+            var o = (e.vegasTeamA || []).map(String).concat((e.vegasTeamB || []).map(String));
+            if (act === 'vswap') o = o.slice(2, 4).concat(o.slice(0, 2));
+            else if (o.indexOf(s) !== -1) o = o.filter(function (x) { return x !== s; });
+            else if (o.length < 4) o.push(s);
+            e.vegasTeamA = o.slice(0, 2); e.vegasTeamB = o.slice(2, 4); e.participantIds = o.slice(0, 4);
             return true;
         }
         return false;

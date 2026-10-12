@@ -510,12 +510,20 @@
         if (p.get('start') === 'quick' && !p.get('game')) { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); return; }
         if (p.get('game')) {
             if (ss(QUICK)) { quickGps(); return; }
-            var tpl = p.get('tpl'), paste = p.get('paste'), step = p.get('step');
-            if (tpl || paste || step) whenLoaded(function () {
+            var tpl = p.get('tpl'), paste = p.get('paste'), step = p.get('step'), fmt = p.get('fmt');
+            var SO = typeof WIZARD_STEP_OF !== 'undefined' ? WIZARD_STEP_OF : { format: 3, players: 5, action: 6 };   /* global WIZARD_STEP_OF */
+            if (tpl || paste || step || fmt) whenLoaded(function () {
                 try {
                     if (paste && typeof W.spRoundOpen === 'function') { W.goToWizardStep(5); W.spRoundOpen(); return; }
                     if (step === 'players') { W.goToWizardStep(5); return; }
+                    if (step === 'money') { W.goToWizardStep(SO.action); return; }
+                    // ALL GAMES > a round format: its card picked on the Format step.
+                    if (fmt) { if (typeof W.selectFormatCard === 'function') W.selectFormatCard(fmt); W.goToWizardStep(SO.format); return; }
                     if (tpl && typeof W.gpsApplyTemplate === 'function') {
+                        // A QUICK START set up on GPS-4: its $ and golfers / teams (Vegas:
+                        // A, A, B, B) for the Money step to fill in.
+                        var amt = parseFloat(p.get('amt')), ids = (p.get('ids') || '').split(',').filter(Boolean), carry = p.get('carry');
+                        W.__hpTplOpts = amt > 0 || ids.length ? { amt: amt > 0 ? amt : null, ids: ids, carry: carry == null ? null : carry === '1' } : null;
                         W.gpsApplyTemplate(tpl);
                         // Money, where the template fills in (its golfers are the round's).
                         W.goToWizardStep(typeof WIZARD_STEP_OF !== 'undefined' ? WIZARD_STEP_OF.action : 6);   /* global WIZARD_STEP_OF */
@@ -608,18 +616,37 @@
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '' }));
         backFromBackground(function () { W.location.href = 'home.html'; });
-        // Games-3: a green GPS button in the header.
-        if (!$('fd-gps-btn')) {
-            var b = W.document.createElement('button');
-            b.type = 'button'; b.id = 'fd-gps-btn'; b.textContent = '📍 GPS';
-            b.setAttribute('aria-label', 'GPS yardages for this hole');
-            // THE HEADER, ALWAYS IN REACH: pinned top-right over the card (the header row
-            // scrolls away with the hole view); hidden while GPS is the screen.
-            b.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:10px;z-index:54;background:#0f4c3a;color:#fff;border:0;border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;min-height:40px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-            b.addEventListener('click', function () { if (W.HardPanGps && typeof W.HardPanGps.showSide === 'function') W.HardPanGps.showSide('gps'); });
-            W.document.body.appendChild(b);
-            var st = W.document.createElement('style'); st.textContent = 'body.gps-side-gps #fd-gps-btn{display:none !important;}'; W.document.head.appendChild(st);
-        }
+        // Games-3: the green GPS button lives IN the hole's heading (placeGpsPill, on
+        // every render) - never floating over the game cards or the keypad (Manny,
+        // 2026-10-12). The old floating GPS / Card toggle is hidden in the app: the
+        // heading's button and the GPS screen's own Score do its job.
+        var st = W.document.createElement('style');
+        st.textContent = '#gps-side-toggle{display:none !important;}';
+        W.document.head.appendChild(st);
+        // The heading is redrawn on every hole change: put the button back each time.
+        try {
+            var pending2 = false;
+            new MutationObserver(function () { if (pending2) return; pending2 = true; setTimeout(function () { pending2 = false; placeGpsPill(); placeMenuItems(); }, 50); })
+                .observe(W.document.body, { childList: true, subtree: true });
+        } catch (e) {}
+        placeGpsPill();
+        placeMenuItems();
+    }
+    function placeGpsPill() {
+        if (!on() || !params().get('game')) return;
+        var head = W.document.querySelector('#hole-view-card .hole-view-header') || W.document.querySelector('.hole-view-header');
+        if (!head) return;
+        var b = $('fd-gps-btn');
+        if (b && b.parentNode === head) return;
+        if (b) b.parentNode.removeChild(b);
+        b = W.document.createElement('button');
+        b.type = 'button'; b.id = 'fd-gps-btn'; b.textContent = '\uD83D\uDCCD GPS';
+        b.setAttribute('aria-label', 'GPS yardages for this hole');
+        b.style.cssText = 'margin:0 auto 0 10px;background:#0f4c3a;color:#fff;border:0;border-radius:999px;padding:6px 14px;font-weight:800;font-size:14px;min-height:36px;cursor:pointer;vertical-align:middle;';
+        b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        b.addEventListener('click', function () { if (W.HardPanGps && typeof W.HardPanGps.showSide === 'function') W.HardPanGps.showSide('gps'); });
+        var num = head.querySelector('.hv-hole-num');
+        if (num && num.nextSibling) head.insertBefore(b, num.nextSibling); else head.appendChild(b);
     }
     // GPS-3: on the card of a GPS round with no money, the next steps.
     function gpsRoundStrip(data) {
@@ -639,11 +666,261 @@
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
         if (t.closest('.fd-gps3-map') || t.closest('.fd-gps3-add')) {
-            var add = !!t.closest('.fd-gps3-add');
+            if (t.closest('.fd-gps3-add')) { openAddGame(); return; }
             if (W.HardPanGps && typeof W.HardPanGps.showSide === 'function') W.HardPanGps.showSide('gps');
-            if (add && W.HardPanGps && typeof W.HardPanGps.openAddGame === 'function') setTimeout(function () { W.HardPanGps.openAddGame(); }, 300);
         }
     });
+
+    // ---- GPS-4 "ADD A GAME" (gps-doors-fix, Manny 2026-10-12) -------------------------
+    // One sheet, from the GPS screen's + (next to the score box), its Tools menu, the
+    // card's "+ Add a game" and the ≡ Round Menu:
+    //   QUICK START  Nassau / Skins / Vegas / BBB: the $ and the golfers / teams first
+    //                (the betting side's 2v2 picker), then that game's normal setup for
+    //                THIS round opens filled in - Side Bets for a Nassau, Round Setup's
+    //                Money step for the others - and its own Save adds it.
+    //   ALL GAMES    every game the betting side has, each opening its normal setup.
+    //   PASTE        the whole round (Round Setup's paste), or a multi-round match /
+    //                trip (the trip builder, today = Day 1, this course, these golfers).
+    // Nothing here writes to Firebase: every game is saved by the screen it opens.
+    var AG = { q: null };
+    var AG_AMTS = { nassau: [2, 5, 10, 20], skins: [1, 2, 5, 10], vegas: [0.25, 0.5, 1, 2], bbb: [0.5, 1, 2, 5] };
+    var AG_DEF = { nassau: 5, skins: 2, vegas: 1, bbb: 1 };
+    var BETS_KEY = 'hardpan_paste_bets_v1_';   // setup-paste-ui.js's queue: Side Bets "Fill it in"
+    var ALL_GAMES = [
+        { id: 'nassau', ico: '💵', name: 'Nassau', sub: 'Front · back · total, 1 v 1 or 2 v 2, presses', go: 'sm', fmt: 'nassau' },
+        { id: 'match', ico: '⚔️', name: 'Match play', sub: 'One overall match, 1 v 1 or teams', go: 'sm', fmt: 'match' },
+        { id: 'strokebet', ico: '🏌️', name: 'Stroke play bet', sub: 'So much a hole + overall', go: 'sm', fmt: 'stroke' },
+        { id: 'skins', ico: '💰', name: 'Skins', sub: 'Carry over, pick who’s in', go: 'tpl', tpl: 'skins' },
+        { id: 'vegas', ico: '🎲', name: 'Vegas', sub: 'Two teams of two, a point a stroke', go: 'tpl', tpl: 'vegas' },
+        { id: 'bbb', ico: '🟢', name: 'Bingo Bango Bongo', sub: 'Three points a hole', go: 'tpl', tpl: 'bbb' },
+        { id: 'wolf', ico: '🐺', name: 'Wolf', sub: 'Round format · so much a point', go: 'tpl', tpl: 'wolf' },
+        { id: 'dots', ico: '🔵', name: 'Dots / junk', sub: 'Birdies, sandies, greenies… everyone playing', go: 'sm', fmt: 'dots' },
+        { id: 'nines', ico: '🔢', name: '9 Points', sub: 'Three golfers, 5-3-1', go: 'sm', fmt: 'nines' },
+        { id: 'kp', ico: '📍', name: 'KP pool / Weekly game', sub: 'One buy-in: KPs, net finishers, skins', go: 'step', step: 'money' },
+        { id: 'presses', ico: '⏫', name: 'Presses', sub: 'On a Nassau or match already playing', go: 'smlist' },
+        { id: 'side', ico: '🤝', name: 'Side bets', sub: 'Any bet between golfers or teams', go: 'sm' },
+        { id: 'bestball', ico: '👥', name: 'Best ball', sub: 'Round format', go: 'fmt', fmt: 'bestball' },
+        { id: 'stableford', ico: '⭐', name: 'Stableford', sub: 'Round format', go: 'fmt', fmt: 'stableford' },
+        { id: 'scramble', ico: '🤼', name: 'Scramble', sub: 'Round format', go: 'fmt', fmt: 'scramble' },
+        { id: 'hilo', ico: '↕️', name: 'Hi-Lo', sub: 'Round format', go: 'fmt', fmt: 'hilo' },
+        { id: 'ryder', ico: '🏆', name: 'Team match / Ryder Cup', sub: 'This round, team v team', go: 'fmt', fmt: 'ryder-cup' },
+        { id: 'cup', ico: '🗓️', name: 'Cup over several days', sub: 'Paste a multi-round match', go: 'trip' }
+    ];
+    function agCode() { return params().get('game'); }
+    function agPlayers() { try { return ((typeof currentData !== 'undefined' && currentData && currentData.players) || []).filter(function (p) { return p && p.name; }); } catch (e) { return []; } }   /* global currentData */
+    function agRound() { try { return (typeof currentData !== 'undefined' && currentData) || {}; } catch (e) { return {}; } }
+    function first(n) { return String(n || '').split(' ')[0]; }
+    function agMoney(v) { v = Number(v); return '$' + (v % 1 ? v.toFixed(2).replace(/0$/, '') : v); }
+    function agSheet() {
+        var el = $('fd-addgame');
+        if (el) return el;
+        el = W.document.createElement('div');
+        el.id = 'fd-addgame'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Add a game');
+        el.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483000;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#f0f4f2;color:#1a1a1a;color-scheme:light;font-family:inherit;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box;';
+        var st = W.document.createElement('style');
+        st.textContent = '#fd-addgame *{box-sizing:border-box;} #fd-addgame .ag-h{font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#5b6b64;margin:16px 0 6px;}'
+            + '#fd-addgame .ag-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;} #fd-addgame .ag-tile{background:#fff;border:1px solid #d0e1db;border-radius:14px;padding:12px;text-align:left;min-height:64px;color:#1a1a1a;}'
+            + '#fd-addgame .ag-tile b{display:block;color:#0f4c3a;font-size:1rem;} #fd-addgame .ag-tile span{font-size:.76rem;color:#5b6b64;}'
+            + '#fd-addgame .ag-row{display:flex;width:100%;align-items:center;gap:10px;background:#fff;border:1px solid #d0e1db;border-radius:12px;padding:10px 12px;margin:0 0 6px;text-align:left;min-height:52px;color:#1a1a1a;}'
+            + '#fd-addgame .ag-row b{display:block;font-size:.95rem;} #fd-addgame .ag-row small{display:block;font-size:.74rem;color:#5b6b64;} #fd-addgame .ag-row .ag-go{margin-left:auto;color:#0f4c3a;font-weight:800;}'
+            + '#fd-addgame .ag-chip{min-height:40px;padding:6px 14px;margin:4px 6px 0 0;border-radius:999px;border:2px solid #d0e1db;background:#fff;color:#1a1a1a;font-weight:800;}'
+            + '#fd-addgame .ag-chip.on{background:#0f4c3a;border-color:#0f4c3a;color:#fff;} #fd-addgame .ag-chip.b{background:#1d3557;border-color:#1d3557;color:#fff;}'
+            + '#fd-addgame .ag-cta{width:100%;min-height:54px;margin-top:16px;border:0;border-radius:14px;background:#0f4c3a;color:#fff;font-weight:800;font-size:1.02rem;} #fd-addgame .ag-cta:disabled{opacity:.45;}'
+            + '#fd-addgame .ag-not{width:100%;min-height:48px;margin-top:10px;border:0;background:none;color:#1d3557;font-weight:700;} #fd-addgame .ag-note{font-size:.8rem;color:#5b6b64;margin-top:6px;}'
+            + '#fd-addgame .ag-warn{font-size:.82rem;color:#9a3412;font-weight:700;margin-top:8px;}';
+        el.appendChild(st);
+        var body = W.document.createElement('div'); body.className = 'ag-body'; el.appendChild(body);
+        el.addEventListener('click', agClick);
+        el.addEventListener('input', function (ev) { if (ev.target && ev.target.classList.contains('ag-other') && AG.q) { var v = parseFloat(ev.target.value); if (v > 0) { AG.q.amt = v; agSummary(); } } });
+        W.document.body.appendChild(el);
+        return el;
+    }
+    function agHead(title, sub, back) {
+        return '<div style="display:flex;align-items:center;gap:10px;"><button type="button" data-ag="' + back + '" aria-label="Back" style="min-width:44px;min-height:44px;border:0;background:#fff;border-radius:12px;font-size:1.5rem;color:#0f4c3a;">‹</button>'
+            + '<div><div style="font-weight:800;font-size:1.2rem;color:#0f4c3a;">' + esc(title) + '</div><div style="font-size:.8rem;color:#5b6b64;">' + esc(sub) + '</div></div></div>';
+    }
+    function openAddGame() {
+        if (!agCode()) return false;
+        AG.q = null;
+        agList();
+        agSheet().style.display = '';
+        return true;
+    }
+    function closeAddGame() { var el = $('fd-addgame'); if (el) el.style.display = 'none'; AG.q = null; }
+    function agList() {
+        var ps = agPlayers();
+        var h = agHead('Add a game', 'To this round · your scores carry over', 'close')
+            + '<div class="ag-h">PLAYING</div><div style="font-weight:700;">' + (ps.length ? esc(ps.map(function (p) { return first(p.name); }).join(' · ')) : 'Just you so far') + '</div>'
+            + '<div class="ag-h">QUICK START</div><div class="ag-grid">'
+            + QUICK_STARTS.map(function (q) { return '<button type="button" class="ag-tile" data-ag-q="' + q.tpl + '"><b>' + esc(q.name) + '</b><span>' + esc(q.sub) + '</span></button>'; }).join('') + '</div>'
+            + '<div class="ag-note">Tap one to set the $ and who plays whom first.</div>'
+            + '<div class="ag-h">PASTE</div>'
+            + '<button type="button" class="ag-row" data-ag-go="paste"><span>📋</span><span><b>Paste the whole round</b><small>Groups, teams and games from one text</small></span><span class="ag-go">›</span></button>'
+            + '<button type="button" class="ag-row" data-ag-go="trip"><span>🗓️</span><span><b>Paste a multi-round match / trip</b><small>Today is Day 1 · this course · these golfers</small></span><span class="ag-go">›</span></button>'
+            + '<div class="ag-h">ALL GAMES</div>'
+            + ALL_GAMES.map(function (g) { return '<button type="button" class="ag-row" data-ag-all="' + g.id + '"><span>' + g.ico + '</span><span><b>' + esc(g.name) + '</b><small>' + esc(g.sub) + '</small></span><span class="ag-go">›</span></button>'; }).join('')
+            + '<button type="button" class="ag-not" data-ag="close">Not now · back to the round</button>';
+        agSheet().querySelector('.ag-body').innerHTML = h;
+        agSheet().scrollTop = 0;
+    }
+    // A QUICK START: the $ and the golfers / teams, then its normal setup.
+    function agQuick(tpl) {
+        var ps = agPlayers(), ids = ps.map(function (p) { return String(p.id); });
+        AG.q = { tpl: tpl, amt: AG_DEF[tpl], order: ids.slice(0, 4), ids: ids.slice(), carry: true, mode: ps.length === 2 || ps.length === 3 ? '1v1' : '2v2' };
+        if (AG.q.mode === '1v1') AG.q.order = ids.slice(0, 2);
+        agConfig();
+    }
+    function agName(id) { var p = agPlayers().filter(function (x) { return String(x.id) === String(id); })[0]; return p ? p.name : '?'; }
+    function agSides() {
+        var q = AG.q, o = q.order;
+        return q.mode === '1v1' ? { a: o.slice(0, 1), b: o.slice(1, 2) } : { a: o.slice(0, 2), b: o.slice(2, 4) };
+    }
+    function agValid() {
+        var q = AG.q, s = agSides();
+        if (!(q.amt > 0)) return false;
+        if (q.tpl === 'nassau') return s.a.length && s.b.length && (q.mode === '1v1' || (s.a.length === 2 && s.b.length >= 1));
+        if (q.tpl === 'vegas') return s.a.length === 2 && s.b.length === 2;
+        return q.ids.length >= 2;
+    }
+    function agSummary() {
+        var q = AG.q, s = agSides(), qs = QUICK_STARTS.filter(function (x) { return x.tpl === q.tpl; })[0] || { name: q.tpl };
+        var who = q.tpl === 'nassau' || q.tpl === 'vegas' ? s.a.map(function (i) { return first(agName(i)); }).join(' & ') + ' v ' + s.b.map(function (i) { return first(agName(i)); }).join(' & ')
+            : q.ids.map(function (i) { return first(agName(i)); }).join(', ');
+        var per = q.tpl === 'nassau' ? ' each (front · back · total)' : q.tpl === 'skins' ? ' a skin' : ' a point';
+        var cta = $('fd-ag-cta');
+        if (cta) { cta.disabled = !agValid(); cta.textContent = 'Add ' + qs.name + ' · ' + agMoney(q.amt) + per; }
+        var sm = $('fd-ag-sum'); if (sm) sm.textContent = who;
+    }
+    function agConfig() {
+        var q = AG.q, ps = agPlayers(), qs = QUICK_STARTS.filter(function (x) { return x.tpl === q.tpl; })[0];
+        var h = agHead(qs.name, 'For this round · change anything first', 'list');
+        h += '<div class="ag-h">' + (q.tpl === 'nassau' ? '$ EACH: FRONT · BACK · TOTAL' : q.tpl === 'skins' ? '$ A SKIN' : '$ A POINT') + '</div><div>'
+            + AG_AMTS[q.tpl].map(function (v) { return '<button type="button" class="ag-chip' + (Number(q.amt) === v ? ' on' : '') + '" data-ag-amt="' + v + '">' + agMoney(v) + '</button>'; }).join('')
+            + '<input type="number" inputmode="decimal" min="0" step="0.25" class="ag-other" placeholder="Other $" value="' + (AG_AMTS[q.tpl].indexOf(Number(q.amt)) === -1 ? esc(q.amt) : '') + '" style="width:96px;min-height:40px;margin-top:4px;border:2px solid #d0e1db;border-radius:999px;padding:4px 12px;font-weight:800;background:#fff;color:#1a1a1a;"></div>';
+        if (q.tpl === 'nassau' || q.tpl === 'vegas') {
+            var s = agSides();
+            h += '<div class="ag-h">WHO PLAYS WHOM</div>';
+            if (q.tpl === 'nassau' && ps.length >= 3) h += '<div style="margin-bottom:6px;">' + ['1v1', '2v2'].map(function (m) { return '<button type="button" class="ag-chip' + (q.mode === m ? ' on' : '') + '" data-ag-mode="' + m + '">' + (m === '1v1' ? '1 v 1' : '2 v 2') + '</button>'; }).join('') + '</div>';
+            h += '<div class="ag-note">' + (q.mode === '1v1' ? 'First golfer tapped = side A, the next = side B.' : 'First two tapped = Team A, next two = Team B.') + ' Tap again to un-pick.</div><div>'
+                + ps.map(function (p) {
+                    var id = String(p.id), i = q.order.indexOf(id), inA = s.a.indexOf(id) !== -1, inB = s.b.indexOf(id) !== -1;
+                    return '<button type="button" class="ag-chip' + (inA ? ' on' : inB ? ' b' : '') + '" data-ag-pick="' + esc(id) + '" aria-pressed="' + (i !== -1) + '">' + (inA ? 'A ' : inB ? 'B ' : '') + esc(first(p.name)) + '</button>';
+                }).join('') + '</div>'
+                + '<div style="margin-top:8px;font-weight:800;color:#0f4c3a;">' + (q.mode === '1v1' ? 'Side A: ' : 'Team A: ') + esc(agTeam(s.a, q.mode)) + '</div>'
+                + '<div style="font-weight:800;color:#1d3557;">' + (q.mode === '1v1' ? 'Side B: ' : 'Team B: ') + esc(agTeam(s.b, q.mode)) + '</div>'
+                + '<button type="button" class="ag-chip" data-ag-swap="1" style="margin-top:8px;">⇄ Swap teams</button>';
+            if (q.tpl === 'vegas' && ps.length < 4) h += '<div class="ag-warn">Vegas needs four golfers — add players first (≡ Round Menu › Edit round setup).</div>';
+        } else {
+            h += '<div class="ag-h">GOLFERS IN</div><div>' + ps.map(function (p) { var on2 = q.ids.indexOf(String(p.id)) !== -1; return '<button type="button" class="ag-chip' + (on2 ? ' on' : '') + '" data-ag-in="' + esc(String(p.id)) + '">' + (on2 ? '✓ ' : '') + esc(first(p.name)) + '</button>'; }).join('') + '</div>';
+            if (q.tpl === 'skins') h += '<label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:700;"><input type="checkbox" data-ag-carry="1"' + (q.carry ? ' checked' : '') + ' style="width:22px;height:22px;"> Ties carry over</label>';
+            if (ps.length < 2) h += '<div class="ag-warn">This needs two golfers or more — add players first.</div>';
+        }
+        h += '<div id="fd-ag-sum" class="ag-note" style="margin-top:14px;"></div>'
+            + '<button type="button" class="ag-cta" id="fd-ag-cta">Add</button>'
+            + '<div class="ag-note">' + (q.tpl === 'nassau' ? 'Opens Side Bets with this filled in — check it and tap Save.' : 'Opens Round Setup’s Money step with this filled in — check it and Save.') + '</div>'
+            + '<button type="button" class="ag-not" data-ag="list">‹ All games</button>';
+        agSheet().querySelector('.ag-body').innerHTML = h;
+        agSummary();
+    }
+    function agTeam(ids, mode) { var n = ids.map(agName); if (mode === '1v1') return n[0] || '__'; return (n[0] || '__') + ' & ' + (n[1] || '__'); }
+    function agPickTap(id) {
+        var q = AG.q, o = q.order.slice(), i = o.indexOf(id), max = q.mode === '1v1' ? 2 : 4;
+        if (i !== -1) o.splice(i, 1); else if (o.length < max) o.push(id);
+        q.order = o;
+    }
+    function agAdd() {
+        var q = AG.q, code = agCode(), base = '?game=' + encodeURIComponent(code), s = agSides();
+        if (!q || !agValid()) return;
+        if (q.tpl === 'nassau') {
+            var key = BETS_KEY + String(code).toUpperCase(), cur = null;
+            try { cur = JSON.parse(ls(key) || 'null'); } catch (e) { cur = null; }
+            var bets = cur && Array.isArray(cur.bets) ? cur.bets : [];
+            bets.push({ group: 'This round', a: s.a.map(agName), b: s.b.map(agName), front: q.amt, back: q.amt, overall: q.amt, press: null });
+            ls(key, JSON.stringify({ at: Date.now(), bets: bets }));
+            W.location.href = 'sidematches.html' + base + '&hpfill=1';
+            return;
+        }
+        var ids = q.tpl === 'vegas' ? s.a.concat(s.b) : q.ids;
+        W.location.href = 'admin.html' + base + '&tpl=' + q.tpl + '&amt=' + encodeURIComponent(q.amt) + '&ids=' + encodeURIComponent(ids.join(',')) + (q.tpl === 'skins' ? '&carry=' + (q.carry ? 1 : 0) : '');
+    }
+    function agRoute(g) {
+        var code = agCode(), base = '?game=' + encodeURIComponent(code);
+        if (g.go === 'sm') return 'sidematches.html' + base + '&add=1' + (g.fmt ? '&fmt=' + g.fmt : '');
+        if (g.go === 'smlist') return 'sidematches.html' + base;
+        if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
+        if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;
+        if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step;
+        return null;
+    }
+    // A MULTI-ROUND MATCH / TRIP: the trip builder, filled in with today as Day 1.
+    function tripPrefill() {
+        var d = agRound(), ps = agPlayers(), now = new Date();
+        var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // The builder drops "&" / "and" on a DAY line (tee times: "9:10 & 9:20"), so the
+        // name goes up to the "&" ("Caledonia Golf"): it still matches the saved course,
+        // and an unclear one is asked on review. Its golfers come from the group's
+        // "A & B vs C & D": the first half v the second half, to change.
+        var course = String(d.courseName || '').trim().split(/\s*&\s*|\s+and\s+/i)[0];
+        var names = ps.map(function (p) { return p.name; }), half = Math.ceil(names.length / 2);
+        return 'TRIP: ' + (course ? course.split(/\s+/)[0] + ' ' : '') + 'trip\n'
+            + 'DAY 1 - ' + WD[now.getDay()] + ' ' + MO[now.getMonth()] + ' ' + now.getDate() + ' - ' + (course || 'Course') + '\n'
+            + (names.length ? 'Group 1: ' + names.slice(0, half).join(' & ') + ' vs ' + (names.slice(half).join(' & ') || 'TBD') + '\n' : '');
+    }
+    function agTrip() {
+        ss('hardpan_tb_prefill', JSON.stringify({ text: tripPrefill(), from: agCode(), at: Date.now() }));
+        W.location.href = 'trip.html#build';
+    }
+    function agClick(ev) {
+        var t = ev.target && ev.target.closest ? ev.target : null;
+        if (!t) return;
+        var b;
+        if ((b = t.closest('[data-ag]'))) { var a = b.getAttribute('data-ag'); if (a === 'close') closeAddGame(); else { AG.q = null; agList(); } return; }
+        if ((b = t.closest('[data-ag-q]'))) { agQuick(b.getAttribute('data-ag-q')); return; }
+        if ((b = t.closest('[data-ag-go]'))) { var go = b.getAttribute('data-ag-go'); if (go === 'trip') agTrip(); else W.location.href = 'admin.html?game=' + encodeURIComponent(agCode()) + '&paste=1'; return; }
+        if ((b = t.closest('[data-ag-all]'))) {
+            var g = ALL_GAMES.filter(function (x) { return x.id === b.getAttribute('data-ag-all'); })[0];
+            if (!g) return;
+            if (g.go === 'trip') { agTrip(); return; }
+            var url = agRoute(g); if (url) W.location.href = url;
+            return;
+        }
+        if (!AG.q) return;
+        if ((b = t.closest('[data-ag-amt]'))) { AG.q.amt = Number(b.getAttribute('data-ag-amt')); agConfig(); return; }
+        if ((b = t.closest('[data-ag-mode]'))) { var m = b.getAttribute('data-ag-mode'), ids = agPlayers().map(function (p) { return String(p.id); }); AG.q.mode = m; AG.q.order = ids.slice(0, m === '1v1' ? 2 : 4); agConfig(); return; }
+        if ((b = t.closest('[data-ag-pick]'))) { agPickTap(b.getAttribute('data-ag-pick')); agConfig(); return; }
+        if (t.closest('[data-ag-swap]')) { var s = agSides(); AG.q.order = s.b.concat(s.a); agConfig(); return; }
+        if ((b = t.closest('[data-ag-in]'))) {
+            var id = b.getAttribute('data-ag-in'), all = agPlayers().map(function (p) { return String(p.id); });
+            var cur = AG.q.ids.indexOf(id) !== -1 ? AG.q.ids.filter(function (x) { return x !== id; }) : AG.q.ids.concat([id]);
+            AG.q.ids = all.filter(function (x) { return cur.indexOf(x) !== -1; });
+            agConfig(); return;
+        }
+        if (t.closest('[data-ag-carry]')) { AG.q.carry = !!t.closest('[data-ag-carry]').checked; return; }
+        if (t.closest('#fd-ag-cta')) { agAdd(); return; }
+    }
+    // ≡ ROUND MENU: Add a game, Paste the whole round, Paste a multi-round match.
+    function placeMenuItems() {
+        if (!on() || !agCode()) return;
+        var body = $('round-sheet-body');
+        if (!body || $('fd-menu-games')) return;
+        var box = W.document.createElement('div');
+        box.id = 'fd-menu-games';
+        box.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin:4px 0 10px;';
+        var btn = 'min-height:48px;border-radius:12px;border:1px solid #0f4c3a;background:#ffffff;color:#0f4c3a;font-weight:800;font-size:.95rem;text-align:left;padding:8px 14px;';
+        box.innerHTML = '<button type="button" data-fdm="add" style="' + btn + 'background:#0f4c3a;color:#fff;">➕ Add a game</button>'
+            + '<button type="button" data-fdm="paste" style="' + btn + '">📋 Paste the whole round</button>'
+            + '<button type="button" data-fdm="trip" style="' + btn + '">🗓️ Paste a multi-round match</button>';
+        box.addEventListener('click', function (ev) {
+            var b = ev.target && ev.target.closest ? ev.target.closest('[data-fdm]') : null;
+            if (!b) return;
+            var a = b.getAttribute('data-fdm');
+            try { if (typeof W.toggleRoundSheet === 'function') W.toggleRoundSheet(false); } catch (e) {}
+            if (a === 'add') openAddGame();
+            else if (a === 'paste') W.location.href = 'admin.html?game=' + encodeURIComponent(agCode()) + '&paste=1';
+            else agTrip();
+        });
+        body.insertBefore(box, body.firstChild);
+    }
 
     // ---- TRIP (trip.html#build) ---------------------------------------------------------
     function trip() {
@@ -652,6 +929,22 @@
             try {
                 if (typeof W.showCreateTripForm === 'function') W.showCreateTripForm();
                 var c = $('tb-card'); if (c) { c.open = true; c.scrollIntoView({ block: 'start' }); }
+                // From a round's "Paste a multi-round match": today is Day 1, this course,
+                // these golfers. Day 1 is made as a NEW round by Confirm (the builder
+                // writes every day whole); the round it came from keeps its scores.
+                var pf = null; try { pf = JSON.parse(ss('hardpan_tb_prefill') || 'null'); } catch (e) { pf = null; }
+                var box = $('tb-box');
+                if (pf && pf.text && box && Date.now() - (pf.at || 0) < 30 * 60 * 1000) {
+                    ss('hardpan_tb_prefill', null);
+                    box.value = pf.text;
+                    var note = W.document.createElement('div');
+                    note.id = 'fd-tb-note';
+                    note.style.cssText = 'margin:6px 0;padding:10px 12px;border-radius:12px;border:1px solid #0f4c3a;background:#ffffff;color:#1a1a1a;font-size:.84rem;';
+                    note.innerHTML = '<b>Day 1 = today, this course, these golfers.</b> Add the other days below (a line like <b>DAY 2 - Tue Oct 13 - True Blue</b>, then the groups and games), a Cup line and TEAMS if it is a match, then Read it → Confirm.'
+                        + '<div style="margin-top:4px;">Confirm creates the trip and every day as a new round, Day 1 included. Your round <b>' + esc(pf.from || '') + '</b> keeps its scores where it is.</div>';
+                    box.parentNode.insertBefore(note, box);
+                    try { box.focus(); box.setSelectionRange(box.value.length, box.value.length); } catch (e) {}
+                }
             } catch (e) {}
         }, 300);
     }
@@ -671,7 +964,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { QUICK_STARTS: QUICK_STARTS, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

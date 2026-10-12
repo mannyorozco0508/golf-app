@@ -221,6 +221,8 @@
     }
     function roundPlayers() { try { return (typeof currentData !== 'undefined' && currentData && currentData.players) || []; } catch (e) { return []; } }   /* global currentData */
     function openAddGame() {
+        // The app's one Add a game sheet (front-door.js): the same from +, Tools and ≡.
+        if (window.HardPanDoors && typeof window.HardPanDoors.openAddGame === 'function' && window.HardPanDoors.openAddGame()) return;
         if (!S) return;
         var sh = S.el.querySelector('.gps-addgame');
         if (!sh) return;

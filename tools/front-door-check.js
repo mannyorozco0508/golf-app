@@ -16,9 +16,12 @@
 //   3  Games door in a round: no location; the green GPS button asks for it.
 //   4  GPS door: GPS-1 - search finds Caledonia (GPS READY), Near you lists it
 //      with miles; a tap starts an ordinary round (one golfer) on GPS; Recent.
-//   5  GPS-2 in a round: Score, + Game, the Games chip; + Game opens GPS-4 with
-//      the round's golfers and the four quick starts; Skins opens Round Setup's
-//      Money with a Skins game added for this round.
+//   5  GPS-2 in a round: Score, + Game, the Games chip; + Game (and ≡ Round Menu >
+//      Add a game) opens the one Add a game sheet: Quick start sets the $ and the
+//      golfers / teams (the 2v2 picker) then opens that game's normal setup filled
+//      in (Side Bets for a Nassau, Round Setup's Money for the others); All games
+//      lists every game, each to its normal setup; Paste the whole round; Paste a
+//      multi-round match opens the trip builder with today as Day 1.
 //   6  GPS-3: the card of a no-money round offers Add a player / Add a game.
 //   7  trip.html#build opens the trip builder.
 //   8  The HardPan web pages (no app flag): no door anywhere.
@@ -170,23 +173,107 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     f(/Resume Caledonia Golf & Fish Club · thru 2/.test(d1.resume), '4d: no "Resume <course>" for the round in progress: ' + d1.resume);
     f(/index\.html\?game=FDRND2$/.test(d2.url), '4d: Resume did not open the round: ' + d2.url);
 
-    // 5: GPS-2 + GPS-4 in a round.
-    r = await go({ url: fileUrl('index.html', 'game=FDRND1&group=1'), db: DB({ FDRND1: round() }), settleMs: 4000, webgl: true, preScript: APP + GEO + ERR + "try{localStorage.setItem('hardpan_front_door','gps');localStorage.setItem('hardpan_round_side','gps|FDRND1')}catch(e){}", steps: [
+    // 5: GPS-2 + GPS-4 in a round (4 golfers): + opens the ONE Add a game sheet - Quick
+    // start (Nassau / Skins / Vegas / BBB), Paste, All games; ≡ Round Menu has the same.
+    const R4 = () => { const x = wizardSavedRound({ code: 'FDRND4', golfers: 4, names: ['Manny Orozco', 'Joe Russo', 'Mike Dunn', 'Dave Kirk'], hcps: [12, 8, 15, 10], ownerUid: 'anon-cold', thru: 0, flights: false,
+        overrides: { additionalGames: {}, activeCourseKey: 'caledonia', courseName: 'Caledonia Golf & Fish Club' } }); delete x.moneyPool; delete x.kpWinners; delete x.kpConfirmed; return x; };
+    const ID4 = {}; R4().players.forEach((p) => { ID4[p.name.split(' ')[0]] = String(p.id); });
+    const SHEET = "JSON.stringify({ open: !!document.getElementById('fd-addgame') && document.getElementById('fd-addgame').style.display !== 'none', bg: document.getElementById('fd-addgame') ? getComputedStyle(document.getElementById('fd-addgame')).backgroundColor : null, text: document.getElementById('fd-addgame') ? document.getElementById('fd-addgame').innerText : '', quick: Array.prototype.map.call(document.querySelectorAll('#fd-addgame [data-ag-q]'), function (b) { return b.getAttribute('data-ag-q'); }), all: Array.prototype.map.call(document.querySelectorAll('#fd-addgame [data-ag-all]'), function (b) { return b.getAttribute('data-ag-all'); }), cta: (document.getElementById('fd-ag-cta')||{}).textContent || null, ctaOff: !!(document.getElementById('fd-ag-cta')||{}).disabled, url: document.URL, e: window.__e })";
+    const CLICK = (sel) => ({ expression: "(function(){ var b = document.querySelector(" + JSON.stringify(sel) + "); if (!b) return 'missing " + sel.replace(/"/g, '') + "'; b.click(); return 'tap'; })()" });
+    const PICK = (first) => CLICK('#fd-addgame [data-ag-pick="' + ID4[first] + '"]');
+    const IDX = APP + GEO + ERR + "try{localStorage.setItem('hardpan_front_door','gps');localStorage.setItem('hardpan_round_side','gps|FDRND4')}catch(e){}";
+    r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 4000, webgl: true, preScript: IDX, steps: [
         { tap: '#fd-gps-btn' }, { sleep: 3000 },
         { expression: "JSON.stringify({ add: !!document.querySelector('#gps-overlay .gps-door-add') && document.querySelector('#gps-overlay .gps-door-add').style.display !== 'none', games: !!document.querySelector('#gps-overlay .gps-door-games') && document.querySelector('#gps-overlay .gps-door-games').style.display !== 'none', cap: (document.querySelector('#gps-overlay .gps-side-bets .gps-cap')||{}).textContent, score: !!document.querySelector('#gps-overlay .gps-score') })" },
-        { expression: "(function(){ document.querySelector('#gps-overlay .gps-door-add').click(); return 'add'; })()" }, { sleep: 400 },
-        { expression: "JSON.stringify({ sheet: getComputedStyle(document.querySelector('#gps-overlay .gps-addgame')).display, players: Array.prototype.map.call(document.querySelectorAll('#gps-overlay .gps-ag-players span'), function (s) { return s.textContent; }), quick: Array.prototype.map.call(document.querySelectorAll('#gps-overlay .gps-ag-grid button'), function (b) { return b.innerText.replace(/\\s+/g,' '); }), more: document.querySelector('#gps-overlay .gps-addgame').innerText.indexOf('Full game setup') !== -1 && document.querySelector('#gps-overlay .gps-addgame').innerText.indexOf('Not now') !== -1 })" },
-        { expression: "(function(){ document.querySelector('#gps-overlay [data-ag-tpl=\"skins\"]').click(); return 'skins'; })()" }, { sleep: 1500 },
-        { expression: "JSON.stringify({ url: document.URL })" }] });
-    const [s1, s2, s3] = J(r);
-    report.gps2 = s1; report.gps4 = { sheet: s2.sheet, players: s2.players, quick: s2.quick, url: s3.url };
+        CLICK('#gps-overlay .gps-door-add'), { sleep: 400 }, { expression: SHEET },                         // 1 the sheet
+        CLICK('#fd-addgame [data-ag-q="vegas"]'), { sleep: 200 }, { expression: SHEET },                    // 2 Vegas: pre-filled 1+2 v 3+4
+        PICK('Joe'), { sleep: 100 }, { expression: SHEET },                                                 // 3 Joe un-picked: Manny & Mike v Dave
+        PICK('Joe'), CLICK('#fd-addgame [data-ag-swap]'), CLICK('#fd-addgame [data-ag-amt="2"]'), { sleep: 100 }, { expression: SHEET },   // 4 Joe -> B; swap; $2
+        CLICK('#fd-ag-cta'), { sleep: 1500 }, { expression: "JSON.stringify({ url: document.URL })" }] });
+    const [s1, a1, a2, a3, a4, a5] = J(r);
+    report.gps2 = s1; report.addGame = { sheet: a1.open, quick: a1.quick, all: a1.all, vegas: [a2.text.match(/Team A:[^\n]*/), a2.text.match(/Team B:[^\n]*/), a3.text.match(/Team A:[^\n]*/), a4.text.match(/Team A:[^\n]*/), a4.cta].map(String), url: a5.url };
     f(s1.add && s1.games && s1.cap === 'Score' && s1.score, '5: GPS-2 lacks Score / + Game / the Games chip: ' + JSON.stringify(s1));
-    f(s2.sheet !== 'none' && s2.players.join() === 'Ann,Bob' && s2.quick.length === 4 && /Nassau\s*\$5 front/.test(s2.quick[0]) && s2.more, '5: GPS-4 sheet: ' + JSON.stringify(s2));
-    f(/admin\.html\?game=FDRND1&tpl=skins$/.test(s3.url), '5: Skins did not open Round Setup for the round: ' + s3.url);
-    r = await go({ url: fileUrl('admin.html', 'game=FDRND1&tpl=skins'), db: DB({ FDRND1: round() }), settleMs: 5000, preScript: APP + ERR, steps: [
-        { sleep: 2500 }, { expression: "JSON.stringify({ step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null, money: typeof WIZARD_STEP_OF !== 'undefined' ? WIZARD_STEP_OF.action : null, skins: typeof skinsInstances !== 'undefined' ? skinsInstances.map(function (s) { return s.skinsBuyIn; }) : null, e: window.__e })" }] });
+    f(a1.open && a1.bg === 'rgb(240, 244, 242)' && /Manny · Joe · Mike · Dave/.test(a1.text) && a1.quick.join() === 'nassau,skins,vegas,bbb', '5: + did not open the Add a game sheet (light, golfers, 4 quick starts): ' + JSON.stringify([a1.open, a1.bg, a1.quick, a1.text.slice(0, 120)]));
+    f(/Paste the whole round/.test(a1.text) && /Paste a multi-round match \/ trip/.test(a1.text), '5: the sheet lacks the two pastes');
+    ['nassau', 'match', 'strokebet', 'skins', 'vegas', 'bbb', 'wolf', 'dots', 'nines', 'kp', 'presses', 'side', 'bestball', 'stableford', 'scramble', 'hilo', 'ryder', 'cup'].forEach((g) => f(a1.all.indexOf(g) !== -1, '5: All games lacks ' + g));
+    f(/Team A: Manny Orozco & Joe Russo/.test(a2.text) && /Team B: Mike Dunn & Dave Kirk/.test(a2.text), '5: Vegas was not pre-filled 1+2 v 3+4: ' + a2.text.slice(0, 400));
+    f(/Team A: Manny Orozco & Mike Dunn/.test(a3.text) && /Team B: Dave Kirk & __/.test(a3.text) && a3.ctaOff, '5: un-picking Joe did not move the rest up (or Add was not held): ' + a3.text.slice(0, 400));
+    f(/Team A: Dave Kirk & Joe Russo/.test(a4.text) && /Team B: Manny Orozco & Mike Dunn/.test(a4.text) && /Add Vegas · \$2 a point/.test(a4.cta) && !a4.ctaOff, '5: re-pick + Swap + $2: ' + JSON.stringify([a4.text.slice(0, 400), a4.cta]));
+    const wantIds = [ID4.Dave, ID4.Joe, ID4.Manny, ID4.Mike].join('%2C');
+    f(new RegExp('admin\\.html\\?game=FDRND4&tpl=vegas&amt=2&ids=' + wantIds + '$').test(a5.url), '5: Add Vegas did not open Round Setup with the $ and teams: ' + a5.url);
+    r = await go({ url: fileUrl('admin.html', 'game=FDRND4&tpl=vegas&amt=2&ids=' + wantIds), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
+        { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, v: Object.values(foreignGameInstances).filter(function (x) { return x.format === 'vegas'; }), ed: (document.getElementById('exg-editor')||{}).innerText || '', e: window.__e })" }] });
+    report.tplVegas = J(r)[0];
+    const vg = report.tplVegas.v[0] || {};
+    f(report.tplVegas.step === report.tplVegas.money && report.tplVegas.v.length === 1 && vg.vegasPointVal === 2 && vg.vegasTeamA.join() === [ID4.Dave, ID4.Joe].join() && vg.vegasTeamB.join() === [ID4.Manny, ID4.Mike].join()
+        && /Team A: Dave & Joe/.test(report.tplVegas.ed) && /Swap teams/.test(report.tplVegas.ed), '5: Money did not get the Vegas as set: ' + JSON.stringify([report.tplVegas.step, vg, report.tplVegas.ed.slice(0, 300), report.tplVegas.e]));
+    f(!report.tplVegas.e.length, '5: Round Setup errors ' + report.tplVegas.e.join(' | '));
+
+    // 5b: ≡ ROUND MENU -> Add a game; Nassau $10 2 v 2 -> Side Bets' Add form, filled in.
+    r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 4000, preScript: APP + ERR, steps: [
+        { expression: "JSON.stringify({ menu: Array.prototype.map.call(document.querySelectorAll('#round-sheet-body #fd-menu-games button'), function (b) { return b.textContent; }) })" },
+        CLICK('#fd-menu-games [data-fdm="add"]'), { sleep: 300 }, { expression: SHEET },
+        CLICK('#fd-addgame [data-ag-q="nassau"]'), CLICK('#fd-addgame [data-ag-amt="10"]'), { sleep: 100 }, { expression: SHEET },
+        // The queue is read as Add is tapped (Side Bets takes it off on arrival).
+        { expression: "(function(){ var s0 = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (/^hardpan_paste_bets_v1_/.test(k)) s0.call(sessionStorage, '__q', v); return s0.apply(this, arguments); }; document.getElementById('fd-ag-cta').click(); return 'tap'; })()" }, { sleep: 1500 },
+        { expression: "JSON.stringify({ url: document.URL, q: sessionStorage.getItem('__q') })" }] });
+    const [rm0, rm1, rm2, rm3] = J(r);
+    report.menu = { items: rm0.menu, sheet: rm1.open, nassau: rm2.cta, url: rm3.url, queued: rm3.q };
+    f(rm0.menu.join('|') === '➕ Add a game|📋 Paste the whole round|🗓️ Paste a multi-round match', '5b: the Round Menu lacks the three items: ' + JSON.stringify(rm0.menu));
+    f(rm1.open, '5b: ≡ Add a game did not open the sheet');
+    f(/Team A: Manny Orozco & Joe Russo/.test(rm2.text) && /Add Nassau · \$10 each/.test(rm2.cta), '5b: Nassau config: ' + JSON.stringify([rm2.cta, rm2.text.slice(0, 300)]));
+    const qb = JSON.parse(rm3.q || '{}').bets || [];
+    f(/sidematches\.html\?game=FDRND4&hpfill=1$/.test(rm3.url) && qb.length === 1 && qb[0].a.join() === 'Manny Orozco,Joe Russo' && qb[0].b.join() === 'Mike Dunn,Dave Kirk' && qb[0].front === 10 && qb[0].overall === 10, '5b: Add Nassau did not hand Side Bets the bet: ' + JSON.stringify([rm3.url, qb]));
+    r = await go({ url: fileUrl('sidematches.html', 'game=FDRND4&hpfill=1'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR + "try{localStorage.setItem('hardpan_paste_bets_v1_FDRND4'," + JSON.stringify(rm3.q || '') + ")}catch(e){}", steps: [
+        { sleep: 1500 }, { expression: "JSON.stringify({ modal: getComputedStyle(document.getElementById('sidematch-modal')).display, fmt: document.getElementById('sm-format').value, front: document.getElementById('sm-front-stake').value, picks: typeof sidematchPickOrder !== 'undefined' ? sidematchPickOrder.map(String) : null, left: localStorage.getItem('hardpan_paste_bets_v1_FDRND4'), e: window.__e })" }] });
+    report.smFill = J(r)[0];
+    f(report.smFill.modal === 'flex' && report.smFill.fmt === 'nassau' && Number(report.smFill.front) === 10 && (report.smFill.picks || []).join() === [ID4.Manny, ID4.Joe, ID4.Mike, ID4.Dave].join() && !report.smFill.left && !report.smFill.e.length,
+        '5b: Side Bets did not open the Nassau filled in: ' + JSON.stringify(report.smFill));
+
+    // 5c: Skins $5, Dave out, no carry; All games rows; the two pastes.
+    r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 4000, preScript: APP + ERR, steps: [
+        { expression: "HardPanDoors.openAddGame() && 'open'" }, CLICK('#fd-addgame [data-ag-q="skins"]'), CLICK('#fd-addgame [data-ag-in="' + ID4.Dave + '"]'), CLICK('#fd-addgame [data-ag-amt="5"]'), CLICK('#fd-addgame [data-ag-carry]'), { sleep: 100 }, { expression: SHEET },
+        CLICK('#fd-ag-cta'), { sleep: 1500 }, { expression: "JSON.stringify({ url: document.URL })" }] });
+    const [k1, k2] = J(r);
+    f(/Add Skins · \$5 a skin/.test(k1.cta) && new RegExp('tpl=skins&amt=5&ids=' + [ID4.Manny, ID4.Joe, ID4.Mike].join('%2C') + '&carry=0$').test(k2.url), '5c: Skins quick start: ' + JSON.stringify([k1.cta, k2.url]));
+    r = await go({ url: fileUrl('admin.html', 'game=FDRND4&tpl=skins&amt=5&ids=' + [ID4.Manny, ID4.Joe, ID4.Mike].join('%2C') + '&carry=0'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
+        { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, sk: skinsInstances.map(function (s) { return { b: s.skinsBuyIn, c: s.skinsCarryOver, p: s.participantIds }; }), e: window.__e })" }] });
     report.tplSkins = J(r)[0];
-    f(report.tplSkins.step === report.tplSkins.money && (report.tplSkins.skins || []).join() === '2', '5: Skins quick start did not land on Money with a $2 Skins game: ' + JSON.stringify(report.tplSkins));
+    const sk = report.tplSkins.sk[0] || {};
+    f(report.tplSkins.step === report.tplSkins.money && report.tplSkins.sk.length === 1 && Number(sk.b) === 5 && sk.c === false && (sk.p || []).map(String).join() === [ID4.Manny, ID4.Joe, ID4.Mike].join(), '5c: Money did not get the Skins as set: ' + JSON.stringify(report.tplSkins));
+    r = await go({ url: fileUrl('admin.html', 'game=FDRND1&tpl=skins'), db: DB({ FDRND1: round() }), settleMs: 5000, preScript: APP + ERR, steps: [
+        { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, skins: skinsInstances.map(function (s) { return s.skinsBuyIn; }), e: window.__e })" }] });
+    report.tplSkinsPlain = J(r)[0];
+    f(report.tplSkinsPlain.step === report.tplSkinsPlain.money && (report.tplSkinsPlain.skins || []).join() === '2', '5c: a plain Skins template is no longer $2: ' + JSON.stringify(report.tplSkinsPlain));
+    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money$/, wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
+    report.allGames = {};
+    for (const id of Object.keys(ALL)) {
+        r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 3500, preScript: APP + ERR, steps: [
+            { expression: "HardPanDoors.openAddGame() && 'open'" }, CLICK('#fd-addgame [data-ag-all="' + id + '"]'), { sleep: 1200 }, { expression: "JSON.stringify({ url: document.URL })" }] });
+        report.allGames[id] = J(r)[0].url.split('/').pop();
+        f(ALL[id].test(J(r)[0].url), '5c: All games > ' + id + ' went to ' + J(r)[0].url);
+    }
+    r = await go({ url: fileUrl('sidematches.html', 'game=FDRND4&add=1&fmt=match'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
+        { sleep: 1000 }, { expression: "JSON.stringify({ modal: getComputedStyle(document.getElementById('sidematch-modal')).display, fmt: document.getElementById('sm-format').value, e: window.__e })" }] });
+    report.smMatch = J(r)[0];
+    f(report.smMatch.modal === 'flex' && report.smMatch.fmt === 'match' && !report.smMatch.e.length, '5c: Match play did not open Side Bets on Match play: ' + JSON.stringify(report.smMatch));
+    r = await go({ url: fileUrl('admin.html', 'game=FDRND4&fmt=bestball'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
+        { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, fmtStep: WIZARD_STEP_OF.format, sel: (document.querySelector('.fmt-card.selected, .fmt-card[aria-pressed=\"true\"], .fmt-card.active')||{}).id || null, e: window.__e })" }] });
+    report.fmtBestBall = J(r)[0];
+    f(report.fmtBestBall.step === report.fmtBestBall.fmtStep && report.fmtBestBall.sel === 'fmt-card-bestball' && !report.fmtBestBall.e.length, '5c: Best ball did not open the Format step with Best Ball picked: ' + JSON.stringify(report.fmtBestBall));
+    // The two pastes. A multi-round match: the trip builder, today = Day 1, this course, these golfers.
+    r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 3500, preScript: APP + ERR, steps: [
+        { expression: "HardPanDoors.openAddGame() && 'open'" }, CLICK('#fd-addgame [data-ag-go="paste"]'), { sleep: 1200 }, { expression: "JSON.stringify({ url: document.URL })" }] });
+    report.pasteRound = J(r)[0].url.split('/').pop();
+    f(/admin\.html\?game=FDRND4&paste=1$/.test(J(r)[0].url), '5c: Paste the whole round went to ' + J(r)[0].url);
+    r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 3500, preScript: APP + ERR, steps: [
+        { expression: "HardPanDoors.openAddGame() && 'open'" }, CLICK('#fd-addgame [data-ag-go="trip"]'), { sleep: 2500 },
+        { expression: "JSON.stringify({ url: document.URL, box: (document.getElementById('tb-box')||{}).value || '', note: (document.getElementById('fd-tb-note')||{}).innerText || '', open: !!(document.getElementById('tb-card')||{}).open, e: window.__e })" },
+        { expression: "(function(){ HardPanTripBuilderUI.read(); var S = HardPanTripBuilderUI._state(); return JSON.stringify({ days: S.plan.days.length, golfers: S.plan.golfers, course: S.plan.days[0] && S.plan.days[0].courseKey, review: document.getElementById('tb-review').innerText.slice(0, 300) }); })()" }] });
+    const [t1, t2] = J(r);
+    report.tripPaste = { url: t1.url.split('/').pop(), box: t1.box, note: t1.note, read: t2 };
+    f(/trip\.html#build$/.test(t1.url) && t1.open && /^TRIP: Caledonia trip\nDAY 1 - \w{3} \w{3} \d+ - Caledonia Golf\nGroup 1: Manny Orozco & Joe Russo vs Mike Dunn & Dave Kirk\n$/.test(t1.box) && /FDRND4/.test(t1.note) && /new round/.test(t1.note), '5c: the multi-round paste did not open the builder filled in: ' + JSON.stringify(t1));
+    f(t2.days === 1 && t2.course === 'caledonia' && t2.golfers.join() === 'Manny Orozco,Joe Russo,Mike Dunn,Dave Kirk', '5c: the builder did not read Day 1 back: ' + JSON.stringify(t2));
 
     // 6b: BACK FROM THE BACKGROUND after more than an hour: Main again, like a launch.
     r = await go({ url: fileUrl('index.html', 'game=FDRND1&group=1'), db: DB({ FDRND1: round() }), settleMs: 4000, preScript: APP + ERR, steps: [

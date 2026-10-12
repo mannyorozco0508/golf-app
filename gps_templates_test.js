@@ -26,7 +26,8 @@ test('the templates call only what the setup screens already do; Vegas / BBB onl
     // Vegas / Bingo Bango Bongo (gps-games) are NOT format cards: their templates add an
     // instance through extra-games-ui.js (its own engines), never a game-format token.
     assert.ok(!/data-format="(vegas|bbb)"|value="(vegas|bbb)"/i.test(a), 'no Vegas / BBB format card or option');
-    assert.ok(/HardPanExtraGames\.addGame\(foreignGameInstances, id, collectWizardPlayers\(\), 1\)/.test(block), 'the BBB / Vegas templates add their own instance');
+    // GPS-4's Quick start may pass its $ and golfers (window.__hpTplOpts); without them, $1 and everyone.
+    assert.ok(/HardPanExtraGames\.addGame\(foreignGameInstances, id, picked \|\| all, o && o\.amt \? o\.amt : 1\)/.test(block) && /const all = collectWizardPlayers\(\);/.test(block), 'the BBB / Vegas templates add their own instance');
     const consumer = require('./tools/gps-flag.js').applyFlag(a, false);
     assert.ok(!/gpsApplyTemplate|gps-bet-templates|gpsTemplateArrive/.test(consumer), 'HardPan only');
 });

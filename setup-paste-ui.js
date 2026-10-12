@@ -35,13 +35,44 @@
         return g.label;
     }
     // Nassau sides for a group: teams named -> those; two golfers -> them; else the review asks.
+    // picks: the 2v2 picker's tap order (first two = Team A, next two = Team B); an older
+    // { name: 'A' | 'B' } map still reads.
     function nassauSides(group, picks) {
         if (group.teams) return { a: group.teams[0], b: group.teams[1], how: 'teams' };
         if (group.players.length === 2) return { a: [group.players[0].name], b: [group.players[1].name], how: 'pair' };
+        if (Array.isArray(picks)) {
+            var pa = picks.slice(0, 2), pb = picks.slice(2, 4);
+            return pa.length && pb.length ? { a: pa, b: pb, how: 'picked' } : null;
+        }
         var p = picks || {};
         var a = group.players.filter(function (x) { return p[x.name] === 'A'; }).map(function (x) { return x.name; });
         var b = group.players.filter(function (x) { return p[x.name] === 'B'; }).map(function (x) { return x.name; });
         return a.length && b.length ? { a: a, b: b, how: 'picked' } : null;
+    }
+
+    // ---- THE 2v2 PICKER (same as Side Matches) ----------------------------------------
+    // Tap order: the first two tapped = Team A, the next two = Team B. Tapping a picked
+    // golfer again un-picks them (the rest move up). Swap teams = B first, then A.
+    function pickTap(order, name) {
+        var o = (order || []).slice(), i = o.indexOf(name);
+        if (i !== -1) o.splice(i, 1); else if (o.length < 4) o.push(name);
+        return o;
+    }
+    function pickSwap(order) { var o = order || []; return o.slice(2, 4).concat(o.slice(0, 2)); }
+    // Asked with no answer yet: 1st + 2nd listed = Team A, 3rd + 4th = Team B.
+    function pickDefault(group) { return group.players.slice(0, 4).map(function (p) { return p.name; }); }
+    var PICK_A = '#0f4c3a', PICK_B = '#1d3557';
+    function pickerHtml(names, order, attrs) {
+        var a = order.slice(0, 2), b = order.slice(2, 4);
+        var chips = names.map(function (n) {
+            var i = order.indexOf(n), side = i === -1 ? '' : i < 2 ? 'A' : 'B';
+            return '<button type="button" class="sp-chip sp-chip-' + (side || 'off') + '" ' + attrs + ' data-name="' + esc(n) + '" aria-pressed="' + !!side + '" style="min-height:36px;margin:4px 4px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;cursor:pointer;border:2px solid '
+                + (side === 'A' ? PICK_A + ';background:' + PICK_A + ';color:#fff;' : side === 'B' ? PICK_B + ';background:' + PICK_B + ';color:#fff;' : 'var(--border-mid,#ccc);background:var(--bg-card,#fff);color:inherit;') + '">'
+                + (side ? '<span style="font-size:.7rem;opacity:.85;margin-right:4px;">' + side + (i % 2 + 1) + '</span>' : '') + esc(n) + '</button>';
+        }).join('');
+        var line = function (t, xs, c) { return '<div class="sp-team-line" style="font-weight:800;color:' + c + ';">Team ' + t + ': ' + (xs[0] ? esc(xs[0]) : '__') + ' &amp; ' + (xs[1] ? esc(xs[1]) : '__') + '</div>'; };
+        return '<div>' + chips + '</div><div style="margin-top:6px;font-size:.85rem;">' + line('A', a, PICK_A) + line('B', b, PICK_B) + '</div>'
+            + '<button type="button" class="sp-swap btn-outline" ' + attrs + ' style="min-height:36px;margin-top:6px;padding:4px 12px;"' + (b.length ? '' : ' disabled') + '>⇄ Swap teams</button>';
     }
 
     // ---- TWO GOLFERS OR ONE? (never merged) -------------------------------------------
@@ -130,14 +161,22 @@
                     if (g.teams) h.push('<div class="sp-teams">' + esc(g.teams[0].join(' & ')) + ' <i>vs</i> ' + esc(g.teams[1].join(' & ')) + '</div>');
                     var games = d.games.concat(g.games);
                     if (g.games.length) h.push('<div class="sp-games">' + g.games.map(function (x) { return esc(gameText(x)); }).join(' · ') + '</div>');
-                    if (games.some(function (x) { return x.type === 'nassau'; })) {
-                        var key = d.n + ':' + gi, sides = nassauSides(g, st.picks[key]);
+                    var hasNassau = games.some(function (x) { return x.type === 'nassau'; }), hasVegas = games.some(function (x) { return x.type === 'vegas'; });
+                    if (hasNassau || hasVegas) {
+                        var key = d.n + ':' + gi;
+                        // Named in the paste (or a twosome): shown, never asked. Else the
+                        // 2v2 picker, pre-filled 1st + 2nd v 3rd + 4th.
                         if (!g.teams && g.players.length !== 2) {
-                            h.push('<div class="sp-pick"' + (st.skipNassau[key] ? ' style="opacity:.5"' : '') + '><b>Nassau — who plays whom?</b> Tap a golfer: A, then B, then off.<div>'
-                                + g.players.map(function (p) { var s = (st.picks[key] || {})[p.name] || ''; return '<button type="button" class="sp-chip sp-chip-' + (s || 'off') + '" data-key="' + key + '" data-name="' + esc(p.name) + '">' + esc(p.name) + (s ? ' · ' + s : '') + '</button>'; }).join('')
-                                + '</div><div class="sp-note">' + (sides ? 'Side A: ' + esc(sides.a.join(' & ')) + ' — Side B: ' + esc(sides.b.join(' & ')) : 'Pick both sides, or skip this Nassau.') + '</div>'
-                                + '<label class="sp-note"><input type="checkbox" class="sp-skip" data-key="' + key + '"' + (st.skipNassau[key] ? ' checked' : '') + '> Skip this Nassau</label></div>');
-                        } else h.push('<div class="sp-note">Nassau: ' + esc(sides.a.join(' & ')) + ' vs ' + esc(sides.b.join(' & ')) + '</div>');
+                            if (!st.picks[key]) st.picks[key] = pickDefault(g);
+                            var sides = nassauSides(g, st.picks[key]), what = hasNassau && hasVegas ? 'Nassau & Vegas' : hasNassau ? 'Nassau' : 'Vegas';
+                            h.push('<div class="sp-pick"' + (st.skipNassau[key] ? ' style="opacity:.5"' : '') + '><b>' + what + ' — who plays whom?</b> <span class="sp-note">First two tapped = Team A, next two = Team B. Tap again to un-pick.</span>'
+                                + pickerHtml(g.players.map(function (p) { return p.name; }), st.picks[key], 'data-key="' + key + '"')
+                                + (sides ? '' : '<div class="sp-note">Pick both teams' + (hasNassau ? ', or skip this Nassau.' : '.') + '</div>')
+                                + (hasNassau ? '<label class="sp-note" style="display:block;margin-top:6px;"><input type="checkbox" class="sp-skip" data-key="' + key + '"' + (st.skipNassau[key] ? ' checked' : '') + '> Skip this Nassau</label>' : '') + '</div>');
+                        } else {
+                            var named = nassauSides(g);
+                            h.push('<div class="sp-note sp-sides-named">' + what2(hasNassau, hasVegas) + ': ' + esc(named.a.join(' & ')) + ' vs ' + esc(named.b.join(' & ')) + '</div>');
+                        }
                     }
                     h.push('</div>');
                 });
@@ -150,6 +189,7 @@
             el.innerHTML = h.join('');
             wire();
         }
+        function what2(n, v) { return n && v ? 'Nassau & Vegas' : n ? 'Nassau' : 'Vegas'; }
         function check() {
             var m = [];
             plan.days.forEach(function (d) {
@@ -167,11 +207,13 @@
             Array.prototype.forEach.call(el.querySelectorAll('.sp-skip'), function (i) { i.onchange = function () { st.skipNassau[i.getAttribute('data-key')] = i.checked; draw(); }; });
             Array.prototype.forEach.call(el.querySelectorAll('.sp-chip'), function (b) {
                 b.onclick = function () {
-                    var k = b.getAttribute('data-key'), n = b.getAttribute('data-name');
-                    var p = st.picks[k] = st.picks[k] || {};
-                    p[n] = !p[n] ? 'A' : p[n] === 'A' ? 'B' : '';
+                    var k = b.getAttribute('data-key');
+                    st.picks[k] = pickTap(st.picks[k], b.getAttribute('data-name'));
                     draw();
                 };
+            });
+            Array.prototype.forEach.call(el.querySelectorAll('.sp-swap'), function (b) {
+                b.onclick = function () { var k = b.getAttribute('data-key'); st.picks[k] = pickSwap(st.picks[k]); draw(); };
             });
             var ed = el.querySelector('.sp-edit'); if (ed) ed.onclick = function () { if (opts.onEdit) opts.onEdit(); };
             var cf = el.querySelector('.sp-confirm'); if (cf) cf.onclick = function () { if (!check().length && opts.onConfirm) opts.onConfirm(resolve()); };
@@ -190,6 +232,9 @@
                     var key = d.n + ':' + gi;
                     var nas = d.games.concat(g.games).filter(function (x) { return x.type === 'nassau'; });
                     if (nas.length) g.nassau = st.skipNassau[key] ? null : nassauSides(g, st.picks[key]);
+                    // Vegas takes the picked sides when both are two golfers.
+                    var ps = !g.teams && st.picks[key] ? nassauSides(g, st.picks[key]) : null;
+                    if (ps && ps.a.length === 2 && ps.b.length === 2) g.vegasSides = [ps.a, ps.b];
                 });
             });
             return { days: days, players: plan.players };
@@ -225,7 +270,7 @@
             // takes the group's named teams, else Money shows 1st+2nd v 3rd+4th to check.
             games.filter(function (x) { return x.type === 'vegas' || x.type === 'bbb'; }).forEach(function (x) {
                 newGames.push({ type: x.type, perPoint: x.perPoint == null ? null : x.perPoint, flip: !!x.flip, group: g.label,
-                    players: g.players.map(function (p) { return p.name; }), teams: x.type === 'vegas' && g.teams ? g.teams : null });
+                    players: g.players.map(function (p) { return p.name; }), teams: x.type === 'vegas' ? (g.teams || g.vegasSides || null) : null });
             });
             var n = games.filter(function (x) { return x.type === 'nassau'; })[0];
             if (n && g.nassau) nassaus.push({ group: g.label, a: g.nassau.a, b: g.nassau.b, front: n.front, back: n.back, overall: n.overall, press: n.press });
@@ -273,6 +318,7 @@
 
     W.HardPanSetupPaste = { nearDupes: nearDupes, roundFormat: roundFormat, FORMAT_WORDS: FORMAT_WORDS, renderReview: renderReview, itineraryText: itineraryText, rosterText: rosterText, dayDraft: dayDraft, gameText: gameText,
         savePending: savePending, pending: pending, bindCodes: bindCodes, draftFor: draftFor, setDraft: setDraft, dropDraft: dropDraft,
-        queueBets: queueBets, betsFor: betsFor, setBets: setBets, nassauSides: nassauSides, time12: time12 };
+        queueBets: queueBets, betsFor: betsFor, setBets: setBets, nassauSides: nassauSides, time12: time12,
+        pickTap: pickTap, pickSwap: pickSwap, pickDefault: pickDefault, pickerHtml: pickerHtml };
     if (typeof module !== 'undefined' && module.exports) module.exports = W.HardPanSetupPaste;
 })();
