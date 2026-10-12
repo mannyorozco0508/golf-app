@@ -81,7 +81,22 @@
         var o = h && (h.osm || h);
         return o && o.tee ? o.tee : (o && o.mid ? o.mid : null);
     }
-    function ready(key) { var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length); }
+    // GPS READY = what the GPS screen will actually draw. In the app (GPS LIVE) that is
+    // GolfAPI data ONLY (gps-view osmRecord: "GolfAPI or nothing"): the bundled GolfAPI
+    // file's links, or a course pulled before. On the web: the bundled OSM holes.
+    function live() { try { return !!(W.HardPanGpsLive && W.HardPanGpsLive.on()); } catch (e) { return false; } }
+    function golfapiLink(key) {
+        var d = W.HardPanGolfApi, L = d && d.links;
+        if (!L || !key) return null;
+        if (L[key]) return key;
+        var pre = Object.keys(L).filter(function (k) { return k.indexOf(key + '_') === 0; })[0];   // thistle_27 -> thistle_27_cameron_stewart
+        return pre || null;
+    }
+    function ready(key) {
+        if (!key) return false;
+        if (live()) return !!golfapiLink(key) || /^gapi_\d+$/.test(key);
+        var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length);
+    }
     function stateOf(name) { var m = /\(([A-Z]{2})\b/.exec(name || ''); return m ? m[1] : ''; }
     function allCourses() {
         if (C.list) return C.list;
@@ -171,6 +186,8 @@
         };
         var needs = [];
         if (!W.HardPanGpsCourses) needs.push('gps-courses.js');
+        // The app's GolfAPI file (in the iOS build only; a 404 on the web is fine).
+        if (!W.HardPanGolfApi && !W.__fdGolfApiTried) { W.__fdGolfApiTried = 1; needs.push('gps-golfapi.js'); }
         STATES.forEach(function (s) { if (!(W.HardPanGpsCoverage && W.HardPanGpsCoverage[s])) needs.push('gps-coverage-' + s.toLowerCase() + '.js'); });
         var left = needs.length;
         draw();
@@ -189,11 +206,177 @@
             + '<button type="button" class="hp-row" data-hp-course="" data-hp-name="' + esc(raw) + '"><span><span class="n">Search online for “' + esc(raw) + '”</span><span class="s" style="display:block;">Every US course with a scorecard</span></span><span class="hp-badge setup">SET UP · 1 TAP</span></button>';
         fillPlaces(H.db, $('hp-results-list'));
     }
-    // A course: a GPS READY one starts the round at once; any other opens Round
-    // Setup's course search with the name typed, for the one tap that sets it up.
-    function pickCourse(key, name) {
-        ss(QUICK, JSON.stringify({ key: key || null, name: name, auto: !!(key && ready(key)) }));
+    // ---- A COURSE -> GPS ON HOLE 1 (gps-doors-fix) -----------------------------------
+    // Never through Round Setup's screens: the round is written here, in Round Setup's
+    // saved shape, the way the trip builder writes its rounds (organizerGate + a code
+    // from code-issuer.js + one set), then the scorecard opens on GPS at hole 1.
+    //   GPS READY (bundled holes)   the app's own card (or the shared one) -> the round
+    //   not set up yet              "Setting up GPS for <course>..." - gps-live.js find +
+    //                               course (the function's limits / owner exemption) -> gapi_<id>
+    //   anything that fails         the reason + "Play without GPS" + "Try another course"
+    var busy = false;
+    function timeout(p, ms, what) {
+        return new Promise(function (ok, no) {
+            var t = setTimeout(function () { no(Object.assign(new Error(what), { code: 'timeout' })); }, ms);
+            p.then(function (v) { clearTimeout(t); ok(v); }, function (e) { clearTimeout(t); no(e); });
+        });
+    }
+    function setupBox() { return $('hp-setup'); }
+    function setupSay(title, why, opts) {
+        var b = setupBox(); if (!b) return;
+        b.style.display = 'flex';
+        var o = opts || {};
+        b.querySelector('.hp-su-title').textContent = title;
+        b.querySelector('.hp-su-why').textContent = why || '';
+        b.querySelector('.hp-su-spin').style.display = o.working ? '' : 'none';
+        b.querySelector('.hp-su-list').innerHTML = o.list || '';
+        b.querySelector('.hp-su-acts').style.display = o.working ? 'none' : '';
+        var pw = b.querySelector('[data-hp-su="nogps"]'); if (pw) pw.style.display = o.noGps === false ? 'none' : '';
+    }
+    function setupClose() { var b = setupBox(); if (b) b.style.display = 'none'; busy = false; }
+    // The card: the shared one when it is there (Round Setup prefers it), else the app's own.
+    function presetCard(key) {
+        try {
+            /* global coursePresets, nineHoleLoops, remapNineHandicaps */
+            if (typeof nineHoleLoops !== 'undefined' && nineHoleLoops[key]) {
+                var L = nineHoleLoops[key], ks = Object.keys(L), out = [];
+                // THE NINES GPS HAS: thistle_27_cameron_stewart -> Cameron then Stewart
+                // (the first two in the list, Cameron / MacKay, have no GolfAPI holes).
+                var link = golfapiLink(key), m2 = link && link !== key ? link.slice(key.length + 1).split('_') : null;
+                if (m2 && m2.length === 2 && L[m2[0]] && L[m2[1]]) ks = m2;
+                remapNineHandicaps(L[ks[0]].data, true).forEach(function (h, i) { out.push({ hole: i + 1, par: h.par, hcpIndex: h.hcpIndex }); });
+                if (ks[1]) remapNineHandicaps(L[ks[1]].data, false).forEach(function (h, i) { out.push({ hole: i + 10, par: h.par, hcpIndex: h.hcpIndex }); });
+                return { data: out, nameSuffix: ' (' + L[ks[0]].name.split(' ')[0] + (ks[1] ? ' / ' + L[ks[1]].name.split(' ')[0] : '') + ')' };
+            }
+            if (typeof coursePresets !== 'undefined' && coursePresets[key] && coursePresets[key].data) return { data: coursePresets[key].data.map(function (h) { return { hole: h.hole, par: h.par, hcpIndex: h.hcpIndex }; }) };
+        } catch (e) {}
+        return null;
+    }
+    function sharedCard(key) {
+        if (!H.db) return Promise.resolve(null);
+        return timeout(H.db.ref('global_courses/' + key).once('value').then(function (s) { return s && s.val ? s.val() : null; }), 6000, 'course').then(function (c) {
+            var d = c && Array.isArray(c.data) ? c.data.filter(Boolean) : null;
+            return d && d.length >= 9 && d.every(function (h) { return h && h.par; }) ? { data: d.map(function (h, i) { return { hole: h.hole || i + 1, par: Number(h.par), hcpIndex: Number(h.hcpIndex || h.hcp || i + 1) }; }), name: c.name } : null;
+        }, function () { return null; });
+    }
+    function meName() {
+        var a = W.authBootState || {};
+        var n = a.displayName || a.name || (W.firebase && W.firebase.auth && (function () { try { var u = W.firebase.auth().currentUser; return u && u.displayName; } catch (e) { return null; } })());
+        return n ? String(n).split(' ')[0] : 'Me';
+    }
+    // The round, in Round Setup's saved shape; one golfer: you.
+    function roundPayload(key, name, card) {
+        return {
+            eventName: 'GPS round', roundDay: 'GPS round', settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar',
+            organizerToken: Array.from({ length: 32 }, function () { return Math.floor(Math.random() * 16).toString(16); }).join(''),
+            eventCategory: 'weekend', categoryIcon: '⛳', activeCourseKey: key, courseName: name, gameFormat: 'stroke', holeBetStake: 0,
+            additionalGames: {}, additionalGameInstances: {}, birdieGameEnabled: false, birdieUnitVal: 0,
+            matchScoring: 'net', matchScoringStyle: 'match', matchStake: 0, matchPressRule: 'none',
+            nassauType: 'team', nassauScoring: 'net', nassauStake: 0, nassauPressRule: 'none',
+            wolfPointVal: 0, wolfLoneMult: 2, wolfBlindMult: 3, wolfTieRule: 'carry', wolfLastPlaceRule: 'off',
+            stablefordPointVal: 0, groupSizeOverrides: { 0: 1 }, stablefordScoring: 'net',
+            stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 4, albatross: 5 },
+            dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsCarryOver: false,
+            courseData: card, startingHole: 1,
+            teeRating: { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 },
+            alohaAllowed: false, handicapBasis: 'as-entered',
+            players: [{ id: 101, name: meName(), hcp: '0', team: 'Team 1', squad: 'red', playingForMoney: true }]
+        };
+    }
+    function create(key, name, card, side) {
+        var G = W.organizerGate;
+        if (!H.db || !G || typeof W.issueUniqueCode !== 'function') return Promise.reject(new Error('This screen cannot start a round right now - reload the app.'));
+        var code;
+        return timeout(G.ensureOrganizer(H.db), 12000, 'sign-in').then(function (uid) {
+            return timeout(W.issueUniqueCode({ db: H.db, root: 'events' }), 12000, 'code').then(function (c) {
+                code = c;
+                var payload = G.stamp(roundPayload(key, name, card), uid);
+                return timeout(H.db.ref('events/' + code).set(payload), 15000, 'save');
+            });
+        }).then(function () {
+            if (side === 'gps') { addRecent(key, name); ls('hardpan_round_side', 'gps|' + code); }
+            else ls('hardpan_round_side', 'bets|' + code);
+            ls('lastRoomCode', code);
+            ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: name }));
+            W.location.href = 'index.html?game=' + encodeURIComponent(code);
+        });
+    }
+    function failWhy(e) {
+        if (e && e.code === 'timeout') return 'No answer from the server (' + e.message + ') - check your signal and try again.';
+        if (W.organizerGate && typeof W.organizerGate.isPermissionDenied === 'function' && W.organizerGate.isPermissionDenied(e)) return W.organizerGate.WALL || 'This account cannot start a new round.';
+        return (e && e.message) || String(e);
+    }
+    var pending = null;   // { key, name, card } for "Play without GPS"
+    function startRound(c) {
+        if (busy) return;
+        busy = true;
+        pending = { key: c.key, name: c.name, card: null, city: c.city, state: c.state };
+        var offline = W.navigator && W.navigator.onLine === false;
+        if (c.key && ready(c.key)) {
+            setupSay('Starting ' + c.name + '…', '', { working: true });
+            if (offline) { setupSay('No signal', 'Starting a round needs a moment of signal (one bar is enough). Try again in a minute.', {}); return; }
+            sharedCard(c.key).then(function (sc) {
+                var pc = presetCard(c.key);
+                // A 27-hole course is the pair of nines GPS has: their card and their name.
+                var nines = !!(pc && pc.nameSuffix);
+                var card = nines ? pc.data : ((sc && sc.data) || (pc && pc.data));
+                if (!card) throw new Error('No scorecard for ' + c.name + ' yet.');
+                pending.card = card;
+                return create(c.key, String(c.name).replace(/\s*\(.*\)\s*$/, nines ? '' : '$&') + (nines ? pc.nameSuffix : ''), card, 'gps');
+            }).catch(function (e) { setupSay('Could not start ' + c.name, failWhy(e), { noGps: !!pending.card }); try { console.error('[front door] start', e); } catch (x) {} });
+            return;
+        }
+        // NOT SET UP YET: pull it.
+        setupSay('Setting up GPS for ' + c.name + '…', 'This takes a few seconds the first time.', { working: true });
+        var pc0 = c.key ? presetCard(c.key) : null;
+        if (pc0) pending.card = pc0.data;
+        var L = W.HardPanGpsLive;
+        if (offline) { setupSay('No signal', 'Setting up GPS for a new course needs a connection.', { noGps: true }); return; }
+        if (!L || !L.on()) { setupSay('GPS setup is not available here', 'Play without GPS, or pick a course marked GPS READY.', { noGps: true }); return; }
+        // Pulled before by anyone (gps_links/<key>): no GolfAPI call, start now.
+        (c.key && pc0 ? L.ensure(c.key) : Promise.resolve(false)).then(function (have) {
+            if (have) { create(c.key, c.name + (pc0.nameSuffix || ''), pc0.data, 'gps').catch(function (e) { setupSay('Could not start ' + c.name, failWhy(e), { noGps: true }); }); return; }
+            findAndPull(c, L);
+        });
+    }
+    function findAndPull(c, L) {
+        L.find(c.name, { city: c.city || '', state: c.state || '' }).then(function (r) {
+            if (!r || r.status !== 'ok') { setupSay('Could not set up GPS for ' + c.name, L.message((r && r.status) || 'error') || 'No GPS found for this course.', { noGps: true }); return; }
+            // One clear match (city/state), or only one course at all: no question to ask.
+            if (r.clear || (r.matches || []).length === 1) { pull(r.clear || r.matches[0], c); return; }
+            var list = (r.matches || []).slice(0, 6).map(function (m) { return '<button type="button" class="hp-row" data-hp-pull="' + esc(m.id) + '" data-hp-pull-name="' + esc(m.name) + '"><span><span class="n">' + esc(m.name) + '</span><span class="s" style="display:block;">' + esc([m.city, m.state].filter(Boolean).join(', ')) + '</span></span></button>'; }).join('');
+            setupSay('Which ' + c.name + '?', list ? 'Pick the one you are playing.' : 'No GPS found for this course yet.', { list: list, noGps: true });
+            pending.matches = r.matches || [];
+        }, function (e) { setupSay('Could not set up GPS for ' + c.name, failWhy(e), { noGps: true }); });
+    }
+    function pull(m, c) {
+        var L = W.HardPanGpsLive;
+        setupSay('Setting up GPS for ' + (m.name || c.name) + '…', '', { working: true });
+        L.course(m.id).then(function (r) {
+            if (!r || r.status !== 'ready') { setupSay('Could not set up GPS for ' + (m.name || c.name), L.message((r && r.status) || 'error'), { noGps: !!pending.card }); return; }
+            var key = 'gapi_' + m.id;
+            return sharedCard(key).then(function (sc) {
+                var card = (sc && sc.data) || pending.card;
+                if (!card) { setupSay('GPS is ready, but there is no scorecard yet', 'Set this course up once in Round Setup (Search online), then it starts in one tap.', { noGps: false }); return; }
+                return create(key, (sc && sc.name) || m.name || c.name, card, 'gps');
+            });
+        }).catch(function (e) { setupSay('Could not set up GPS for ' + (m.name || c.name), failWhy(e), { noGps: !!pending.card }); });
+    }
+    // "Play without GPS": the same round, on the scorecard; with no card, Round Setup's search.
+    function playWithoutGps() {
+        var p = pending || {};
+        if (p.card && p.key) {
+            setupSay('Starting ' + p.name + '…', '', { working: true });
+            create(p.key, p.name, p.card, 'bets').catch(function (e) { setupSay('Could not start ' + p.name, failWhy(e), { noGps: false }); });
+            return;
+        }
+        ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false }));
         W.location.href = 'admin.html?start=quick';
+    }
+    function pickCourse(key, name, row) {
+        var all = allCourses();
+        var c = all.filter(function (x) { return key ? x.key === key : (x.name === name && !x.key); })[0] || { key: key || null, name: name };
+        startRound({ key: c.key, name: c.name || name, city: c.city || '', state: c.state || '' });
     }
     function gamesView() {
         var last = ls('lastRoomCode'), trip = ls('lastTripCode');
@@ -237,7 +420,14 @@
         if (!t) return;
         var b;
         if ((b = t.closest('[data-hp-door]'))) { var d = b.getAttribute('data-hp-door'); setDoor(d); show(d); return; }
-        if ((b = t.closest('[data-hp-course]'))) { pickCourse(b.getAttribute('data-hp-course'), b.getAttribute('data-hp-name')); return; }
+        if ((b = t.closest('[data-hp-course]'))) { pickCourse(b.getAttribute('data-hp-course'), b.getAttribute('data-hp-name'), b); return; }
+        if ((b = t.closest('[data-hp-pull]'))) { pull({ id: b.getAttribute('data-hp-pull'), name: b.getAttribute('data-hp-pull-name') }, pending || {}); return; }
+        if ((b = t.closest('[data-hp-su]'))) {
+            var su = b.getAttribute('data-hp-su');
+            if (su === 'nogps') playWithoutGps();
+            else { setupClose(); var q = $('hp-q'); if (q) { q.value = ''; q.focus(); } search(); }
+            return;
+        }
         if ((b = t.closest('[data-hp-open]'))) { W.location.href = 'index.html?game=' + encodeURIComponent(b.getAttribute('data-hp-open')); return; }
         if ((b = t.closest('[data-hp-trip]'))) { W.location.href = 'trip.html?trip=' + encodeURIComponent(b.getAttribute('data-hp-trip')); return; }
         if ((b = t.closest('[data-hp-act]'))) {
@@ -267,8 +457,44 @@
         if (q) q.addEventListener('input', search);
         var code = $('hp-code');
         if (code) code.addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+        // EVERY LAUNCH OPENS MAIN (Manny, 2026-10-12): the last door is highlighted and a
+        // round in progress offers Resume; #gps / #games are the in-app links' own.
         var h = (W.location.hash || '').replace('#', '');
-        show(h === 'gps' || h === 'games' || h === 'main' ? h : (door() || 'main'));
+        show(h === 'gps' || h === 'games' ? h : 'main');
+        mainDecor();
+        backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show('main'); mainDecor(); });
+    }
+    // The last door highlighted; "Resume <course>" for a round in progress.
+    function mainDecor() {
+        ['gps', 'games'].forEach(function (d) {
+            var c = W.document.querySelector('#v-main .hp-door.' + d);
+            if (!c) return;
+            c.classList.toggle('last', door() === d);
+            var tag = c.querySelector('.hp-last'); if (tag) tag.style.display = door() === d ? '' : 'none';
+        });
+        var box = $('hp-resume');
+        if (!box) return;
+        box.innerHTML = '';
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
+        timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
+            var d = snap && snap.val ? snap.val() : null;
+            if (!d || !d.players || !d.courseData) return;
+            var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
+            holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (any) thru = Math.max(thru, h); if (!every) all = false; });
+            if (all && thru) return;   // finished
+            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(d.courseName || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
+        }, function () {});
+    }
+    // BACK FROM THE BACKGROUND AFTER A WHILE (60 min): Main again, like a launch.
+    var AWAY_MS = 60 * 60 * 1000;
+    function backFromBackground(go) {
+        W.document.addEventListener('visibilitychange', function () {
+            if (W.document.visibilityState === 'hidden') { ls('hardpan_bg_at', String(Date.now())); return; }
+            var at = Number(ls('hardpan_bg_at') || 0);
+            ls('hardpan_bg_at', null);
+            if (at && Date.now() - at > AWAY_MS) go();
+        });
     }
 
     // ---- ROUND SETUP (admin.html) ----------------------------------------------------
@@ -379,6 +605,9 @@
     function scorecard() {
         var code = params().get('game');
         if (!code || !on()) return;
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '' }));
+        backFromBackground(function () { W.location.href = 'home.html'; });
         // Games-3: a green GPS button in the header.
         if (!$('fd-gps-btn')) {
             var b = W.document.createElement('button');
@@ -399,12 +628,12 @@
             || (data.moneyPool && data.moneyPool.enabled) || (data.additionalGames && Object.keys(data.additionalGames).length) || data.ryderCup || data.ryderCupRef;
         if (money) return '';
         var code = params().get('game');
-        return '<div id="fd-gps3" style="margin:12px 0;padding:14px;border-radius:16px;background:var(--bg-card);border:1px solid var(--border-mid);">'
+        return '<div id="fd-gps3" style="margin:12px 0;padding:14px;border-radius:16px;background:#ffffff;color:#1a1a1a;border:1px solid #d0e1db;color-scheme:light;">'
             + '<div style="font-size:.8rem;opacity:.75;margin-bottom:6px;">Just scores, no money.</div>'
             + '<a href="admin.html?game=' + encodeURIComponent(code) + '&step=players" style="display:block;font-weight:700;color:#0f4c3a;padding:8px 0;">+ Add a player</a>'
             + '<div style="font-weight:800;margin-top:6px;">Playing for something?</div><div style="font-size:.84rem;opacity:.8;">Add a Nassau, skins, Vegas or BBB. These scores carry over.</div>'
             + '<button type="button" class="btn-primary fd-gps3-add" style="margin-top:8px;background:#0f4c3a;border-color:#0f4c3a;">+ Add a game</button>'
-            + '<button type="button" class="btn-outline fd-gps3-map" style="margin-top:6px;">Save · back to map</button></div>';
+            + '<button type="button" class="btn-outline fd-gps3-map" style="margin-top:6px;background:#ffffff;color:#0f4c3a;border-color:#0f4c3a;">Save · back to map</button></div>';
     }
     if (W.document) W.document.addEventListener('click', function (ev) {
         var t = ev.target && ev.target.closest ? ev.target : null;
@@ -432,7 +661,7 @@
             var path = String(W.location.pathname || '');
             if (/admin\.html$/.test(path)) admin();
             else if (/index\.html$/.test(path) || /\/$/.test(path)) scorecard();
-            else if (/trip\.html$/.test(path)) trip();
+            else if (/trip\.html$/.test(path)) { trip(); if (on()) backFromBackground(function () { W.location.href = 'home.html'; }); }
         } catch (e) { try { console.error('[front door]', e); } catch (x) {} }
     }
     // GPS-4's quick starts: Round Setup's own templates (admin.html gpsApplyTemplate).
@@ -444,6 +673,21 @@
     ];
     W.HardPanDoors = { QUICK_STARTS: QUICK_STARTS, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
+    // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
+    // scorecard's "Connecting to game..." on the way). The app opens index.html with no
+    // round; it used to hop index -> admin -> home, drawing each. Now, as this file is read
+    // (in <head>), a page with no round goes straight to home.html and is never drawn.
+    (function launch() {
+        try {
+            if (!on()) return;
+            var path = String(W.location.pathname || ''), p = params();
+            var bare = !p.get('game') && !p.get('start') && !p.get('account') && !p.get('trip') && !p.get('season') && !p.get('copyFrom') && !p.get('coach') && !p.get('eventType');
+            if (bare && (/index\.html$/.test(path) || /\/$/.test(path) || /admin\.html$/.test(path))) {
+                W.document.documentElement.style.visibility = 'hidden';
+                W.location.replace('home.html');
+            }
+        } catch (e) {}
+    })();
     if (W.document && !/home\.html$/.test(String(W.location.pathname || ''))) {
         if (W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
     }

@@ -242,3 +242,16 @@ Rules that would need ADDING (additive; nothing existing changes):
   + Add a player / + Add a game / Save · back to map (typed score boxes unchanged).
 - Games: today's screens; a round stays on the card (no location) until the green 📍 GPS pill.
 - tools/front-door-check.js drives every screen in Chrome.
+- gps-doors-fix (2026-10-12, Manny's iPhone test): every launch opens Main (the last door
+  highlighted, "Resume <course>" for a round in progress; back from >60 min in the background =
+  Main again); a launch goes straight to home.html (no scorecard flash); these screens are always
+  the light theme; a course tap writes the round itself (organizerGate + code-issuer + one set, Round
+  Setup's saved shape) and opens GPS on hole 1 - never Round Setup. GPS READY in the app = GolfAPI
+  has the course (the app's GPS draws GolfAPI only); a course set up before by anyone (gps_links)
+  starts at once; any other is pulled ("Setting up GPS for ...", gps-live find + course); any failure
+  says why, with "Play without GPS" and "Try another course".
+  WHY THE PHONE WENT TO ROUND SETUP: the old path handed the course to Round Setup and auto-tapped
+  its Save 1.2 s later; on a phone Round Setup's own load of the fresh round (real Firebase) landed
+  after that and cleared the course, so Save stopped at "Pick a course first". The Chrome check's
+  stand-in database answers instantly, so the race never showed there. Reproduced in the iOS
+  Simulator (screenshots in ~/Desktop/claude-code-reports/sim-20261012/).

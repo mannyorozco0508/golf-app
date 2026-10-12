@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f4c3a">
+<meta name="color-scheme" content="light only">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>HardPan</title>
 <!-- HARDPAN HOME (gps-doors, 2026-10-12): the two front doors. HardPan app only -
@@ -13,11 +14,16 @@
      Round Setup's own Save; Start a round is the lobby's own path. -->
 <script src="./firebase-app-compat.js"></script>
 <script src="auth-boot.js"></script>
+<script src="organizer-gate.js"></script>
 <script src="./firebase-database-compat.js"></script>
 <script src="course-data.js"></script>
+<script src="code-issuer.js"></script>
+<script src="gps-config.js"></script>
+<script src="gps-live.js"></script>
 <style>
   :root { --hp-green: #0f4c3a; --hp-green-soft: #e2f1ea; --hp-navy: #1d3557; --hp-navy-soft: #e3e9f2; --hp-bg: #f0f4f2; --hp-card: #ffffff; --hp-text: #1a1a1a; --hp-muted: #555; --hp-line: #d0e1db; --hp-warn: #8a5a00; --hp-warn-soft: #fbefd9; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hp-bg: #0d1411; --hp-card: #18211d; --hp-text: #f1f4f2; --hp-muted: #a9b5af; --hp-line: #2c3a34; --hp-green-soft: #1d3a30; --hp-navy-soft: #1e2a3d; --hp-warn-soft: #3a2e15; } }
+  /* ALWAYS THE LIGHT THEME (Manny, 2026-10-12): these screens never follow the phone's dark mode. */
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--hp-bg); color: var(--hp-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
   .hp-view { display: none; min-height: 100vh; flex-direction: column; padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; }
@@ -56,6 +62,17 @@
   .hp-dash { border: 2px dashed #c9d3e0; background: transparent; color: var(--hp-navy); }
   .hp-status { font-size: 14px; color: var(--hp-muted); padding: 4px 2px; }
   .hp-err { color: #b42318; font-weight: 700; }
+  .hp-door { position: relative; }
+  .hp-door.last { box-shadow: 0 0 0 4px #f0f4f2, 0 0 0 7px #d9a400; }
+  .hp-last { position: absolute; top: 14px; right: 14px; font-size: 12px; font-weight: 800; letter-spacing: .5px; background: rgba(255,255,255,.2); border-radius: 999px; padding: 5px 10px; }
+  .hp-resume { display: block; width: 100%; margin: 0 0 14px; min-height: 52px; border: 2px solid var(--hp-green); background: #fff; color: var(--hp-green); border-radius: 16px; font: 800 16px/1.2 inherit; font-family: inherit; cursor: pointer; }
+  #hp-setup { position: fixed; inset: 0; z-index: 50; background: var(--hp-bg); display: none; flex-direction: column; justify-content: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; }
+  #hp-setup .hp-su-title { font-size: 24px; font-weight: 800; } #hp-setup .hp-su-why { font-size: 15px; color: var(--hp-muted); line-height: 1.45; }
+  .hp-su-spin { width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--hp-green-soft); border-top-color: var(--hp-green); animation: hpspin 0.9s linear infinite; }
+  @keyframes hpspin { to { transform: rotate(360deg); } }
+  .hp-su-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .hp-su-acts button { min-height: 54px; border-radius: 16px; font: 800 16px inherit; font-family: inherit; cursor: pointer; }
+  .hp-su-acts .p { background: var(--hp-green); color: #fff; border: 0; } .hp-su-acts .s { background: #fff; color: var(--hp-green); border: 2px solid var(--hp-green); }
 </style>
 </head>
 <body>
@@ -67,12 +84,15 @@
     <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>
     <span><span class="t">GPS</span><br><span class="d">Front, middle, back. Tap anywhere for yardage. Wind and plays-like.</span></span>
     <span class="go">Pick a course &rarr;</span>
+    <span class="hp-last" style="display:none;">LAST USED</span>
   </button>
   <button type="button" class="hp-door games" data-hp-door="games">
     <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"></path><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"></path></svg>
     <span><span class="t">Games &amp; Bets</span><br><span class="d">Nassau, skins, Vegas, BBB, trips and Cups. Who pays who, done for you.</span></span>
     <span class="go">Start or join a game &rarr;</span>
+    <span class="hp-last" style="display:none;">LAST USED</span>
   </button>
+  <div id="hp-resume"></div>
   <div class="hp-note">We'll remember your pick. Switch anytime from the top bar.</div>
   <div class="hp-foot">
     <button type="button" class="hp-link" data-hp-act="code">Have a game code?</button>
@@ -110,6 +130,14 @@
   <div class="hp-note" style="margin-top:auto;padding-top:20px;">No location needed here. Tap GPS inside any round for yardages.</div>
 </div>
 
+<!-- A course tap: starting / setting up GPS, and every way out of a failure. -->
+<div id="hp-setup" role="dialog" aria-live="polite">
+  <div class="hp-su-spin"></div>
+  <div class="hp-su-title"></div>
+  <div class="hp-su-why"></div>
+  <div class="hp-su-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  <div class="hp-su-acts"><button type="button" class="p" data-hp-su="nogps">Play without GPS (scorecard)</button><button type="button" class="s" data-hp-su="another">Try another course</button></div>
+</div>
 <script>
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",

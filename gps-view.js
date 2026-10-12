@@ -2923,7 +2923,7 @@
         + '#gps-overlay .gps-to-plays:empty{display:none;}'
         + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 10px);display:flex;align-items:stretch;gap:8px;height:54px;}'
         + '#gps-overlay .gps-door-add{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
-        + '#gps-overlay .gps-door-games{position:absolute;z-index:8;top:calc(env(safe-area-inset-top) + 8px);right:10px;border:0;border-radius:999px;padding:7px 14px;background:#1d3557;color:#fff;font:800 13px/1 ' + FONT + ';min-height:34px;cursor:pointer;}'
+        + '#gps-overlay .gps-door-games{position:absolute;z-index:8;top:calc(env(safe-area-inset-top) + 96px);left:10px;border:0;border-radius:999px;padding:7px 14px;background:#1d3557;color:#fff;font:800 13px/1 ' + FONT + ';min-height:34px;cursor:pointer;}'
         + '#gps-overlay .gps-addgame{position:absolute;inset:0;z-index:60;background:#f0f4f2;color:#1a1a1a;overflow:auto;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 20px);font-family:' + FONT + ';}'
         + '#gps-overlay .gps-ag-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;} #gps-overlay .gps-ag-back{width:44px;height:44px;border:0;background:none;font-size:30px;color:#0f4c3a;cursor:pointer;}'
         + '#gps-overlay .gps-ag-title{font-size:20px;font-weight:800;} #gps-overlay .gps-ag-sub{font-size:13px;color:#555;}'
