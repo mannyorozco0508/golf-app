@@ -128,3 +128,34 @@ test('Vegas and Bingo Bango Bongo by any of their names (gps-games): amount, bir
     assert.deepEqual(t('$5 nassau and $1 vegas'), [['nassau', undefined, undefined], ['vegas', 1, false]]);
     assert.deepEqual(P.tspGames('vegas').flags.map((f) => f.why), ['Vegas with no $ per point']);
 });
+
+test('sides named in brackets on the group line ("Manny & Joe vs Mike & Dave", "A/B v C/D"): filled in from the group, never asked', { skip }, () => {
+    const r = parse(`GROUP 1 - $5 NASSAU (Manny & Joe vs Mike & Dave)
+Manny Orozco (12)
+Mike Dunn (8)
+Joe Russo (15)
+Dave Kirk (10)
+GROUP 2 - $1 VEGAS (Al/Bo v Cy/Di)
+Al One 3
+Cy Three 5
+Bo Two 4
+Di Four 6
+GROUP 3 - $5 NASSAU (Manny & Zed vs Mike & Dave)
+Manny Orozco (12)
+Mike Dunn (8)
+Joe Russo (15)
+Dave Kirk (10)
+GROUP 4 - $5 NASSAU
+Ann A 1
+Bea B 2
+Cy C 3
+Di D 4`);
+    const g = r.days[0].groups;
+    assert.deepEqual(g[0].teams, [['Manny Orozco', 'Joe Russo'], ['Mike Dunn', 'Dave Kirk']]);
+    assert.deepEqual([g[0].games[0].type, g[0].games[0].front], ['nassau', 5], 'the bracket is not read as a game or a golfer');
+    assert.deepEqual(g[1].teams, [['Al One', 'Bo Two'], ['Cy Three', 'Di Four']]);
+    assert.deepEqual([g[1].games[0].type, g[1].games[0].perPoint], ['vegas', 1]);
+    assert.equal(g[2].teams, null, 'a name not in the group: asked, never guessed');
+    assert.equal(g[3].teams, null);
+    assert.deepEqual(why(r).filter((w) => /Who plays whom/.test(w)).length, 2, 'only Groups 3 and 4 ask');
+});

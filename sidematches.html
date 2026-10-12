@@ -1032,10 +1032,22 @@ html {
             // know how many groups exist before it can ask anything sensible.
             // GPS:BEGIN
             if (typeof spBetsOffer === 'function') spBetsOffer();
+            // GPS-4's Nassau quick start (front-door.js): the bet it queued opens in the
+            // ordinary Add form, filled in - the golfer checks it and taps Save.
+            if (urlParams.get('hpfill') === '1' && !window.__hpFilled && (currentData.players || []).length && window.HardPanSetupPaste) {
+                window.__hpFilled = true;
+                const qb = window.HardPanSetupPaste.betsFor(currentMode);
+                if (qb.length) { window.HardPanSetupPaste.setBets(currentMode, qb.slice(0, -1)); spBetsOffer(); spFillBet(qb[qb.length - 1]); }
+            }
             // GPS:END
             if (urlParams.get('add') === '1' && !window.__smAutoOpened && (currentData.players || []).length) {
                 window.__smAutoOpened = true;
                 openSideMatchModal();
+                // GPS:BEGIN
+                // GPS-4 "All games": that game picked in the form.
+                const hpFmt = urlParams.get('fmt'), smf = document.getElementById('sm-format');
+                if (hpFmt && smf && Array.prototype.some.call(smf.options, (o) => o.value === hpFmt)) { smf.value = hpFmt; onSideMatchFormatChange(); }
+                // GPS:END
             }
 
             // ?press=<wagerId> - arriving from the scorecard's PRESS control.

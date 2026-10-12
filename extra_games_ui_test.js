@@ -69,7 +69,7 @@ test('settlement: its own card and who-pays-whom, said to be separate from Who P
     assert.equal(X.settleHtml({ players, additionalGameInstances: { v: { format: 'vegas', vegasTeamA: ['11'] } } }, CD, {}), '', 'an unfinished Vegas setup settles nothing');
 });
 
-test('Round Setup editor: add, $ per point, BBB golfers, Vegas teams A -> B -> out (2 each), birdie flip, remove; BBB points never touched', { skip }, () => {
+test('Round Setup editor: add, $ per point, BBB golfers, Vegas 2v2 picker (tap order, re-tap un-picks, Swap teams), birdie flip, remove; BBB points never touched', { skip }, () => {
     const X = sandbox();
     const map = { sk: { format: 'skins', skinsBuyIn: 5 } };
     assert.ok(X.editorAct(map, players, 'add', 'bbb'));
@@ -80,12 +80,21 @@ test('Round Setup editor: add, $ per point, BBB golfers, Vegas teams A -> B -> o
     map[b].points = { h1: { bingo: 11 } };
     X.editorAct(map, players, 'amt', b, '2'); X.editorAct(map, players, 'bbbp', b, '14');
     assert.deepEqual([map[b].bbbPointVal, map[b].participantIds, map[b].points.h1.bingo], [2, ['11', '12', '13'], 11]);
-    X.editorAct(map, players, 'vside', v, '12');   // A -> B (B full: stays out)
-    assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB], [['11'], ['13', '14']]);
-    X.editorAct(map, players, 'vside', v, '14');   // B -> out
-    X.editorAct(map, players, 'vside', v, '12');   // out -> A
-    X.editorAct(map, players, 'vside', v, '14');   // out -> B
+    // The 2v2 picker: tap order, first two = Team A, next two = Team B; re-tap un-picks.
+    X.editorAct(map, players, 'vside', v, '12');   // un-pick 12: the rest move up
+    assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB], [['11', '13'], ['14']]);
+    ['11', '13', '14'].forEach((id) => X.editorAct(map, players, 'vside', v, id));   // all out
+    assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB], [[], []]);
+    ['13', '11', '14', '12'].forEach((id) => X.editorAct(map, players, 'vside', v, id));
+    assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB], [['13', '11'], ['14', '12']], 'first two tapped = A, next two = B');
+    X.editorAct(map, players, 'vside', v, '15');   // a fifth: full, stays out
+    assert.deepEqual(map[v].participantIds, ['13', '11', '14', '12']);
+    X.editorAct(map, players, 'vswap', v);
+    assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB], [['14', '12'], ['13', '11']], 'Swap teams');
+    ['14', '12', '13', '11'].forEach((id) => X.editorAct(map, players, 'vside', v, id));
+    ['11', '12', '13', '14'].forEach((id) => X.editorAct(map, players, 'vside', v, id));
     assert.deepEqual([map[v].vegasTeamA, map[v].vegasTeamB, map[v].participantIds], [['11', '12'], ['13', '14'], ['11', '12', '13', '14']]);
+    assert.match(X.editorHtml(map, players), /Team A: \w+ &amp; \w+[\s\S]*Team B: \w+ &amp; \w+[\s\S]*Swap teams/);
     X.editorAct(map, players, 'flip', v);
     assert.equal(map[v].vegasBirdieFlip, true);
     const html = X.editorHtml(map, players);

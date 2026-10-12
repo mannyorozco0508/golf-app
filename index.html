@@ -3884,6 +3884,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 const tick = document.getElementById('live-ticker-mount');
                 if (!fm && tick && tick.parentNode) { fm = document.createElement('div'); fm.id = 'fd-gps3-mount'; tick.parentNode.insertBefore(fm, tick); }
                 if (fm) fm.innerHTML = window.HardPanDoors.gpsRoundStrip(currentData);
+                if (typeof window.HardPanDoors.placeGpsPill === 'function') window.HardPanDoors.placeGpsPill();
             } catch (e) { /* the card draws as before */ }
         }
         // GPS:END
@@ -6277,10 +6278,27 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             const a = document.activeElement;
             if (a && a.classList && a.classList.contains('score-input')) return;   // still typing
             gpsScoreFrom = null;
-            goToAdjacentHole(1);
+            // NO AUTO-ADVANCE (Manny, 2026-10-12): the card STAYS on this hole - its
+            // totals and game cards in view - until the golfer taps Next. That Next
+            // also takes them back to GPS, on the new hole (below).
+            gpsNextToMap = h;
+        }, 0);
+    });
+    // NEXT AFTER A SCORE FROM THE MAP: the card's own Next moved the hole; GPS follows.
+    let gpsNextToMap = null;
+    document.addEventListener('click', (e) => {
+        if (gpsNextToMap == null) return;
+        const b = e.target && e.target.closest ? e.target.closest('.hole-view-nav-btn') : null;
+        if (!b) return;
+        const forward = /Next/.test(b.textContent || '');
+        const from = gpsNextToMap;
+        gpsNextToMap = null;
+        if (!forward) return;
+        setTimeout(() => {
+            if (Number(currentViewedHole) === from) return;   // the tap did not move the hole
             const kp = document.getElementById('kp-force-overlay');
             if (kp && kp.style.display === 'flex') return;
-            // Build 5: back to GPS only when the next hole has a green to measure to.
+            // Build 5: back to GPS only when the new hole has a green to measure to.
             if (window.HardPanGps && (!window.HardPanGps.holeHasData || window.HardPanGps.holeHasData(currentViewedHole))) window.HardPanGps.showSide('gps', { remember: false });
         }, 0);
     });

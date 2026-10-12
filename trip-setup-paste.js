@@ -251,7 +251,15 @@ function parseSetupPaste(text, opts) {
         if (gh) {
             var label = gh[1] && /^\d/.test(gh[1]) ? null : (gh[1].charAt(0).toUpperCase() + gh[1].slice(1).toLowerCase() + (gh[2] ? ' ' + gh[2] : ''));
             var timeG = gh[1] && /^\d/.test(gh[1]) ? gh[1] : null;
-            var sp = tspSplitGames(s.slice(gh[0].length));
+            // SIDES IN BRACKETS on the group line: "GROUP 1 - $5 NASSAU (Manny & Joe vs
+            // Mike & Dave)". Taken out of the line and matched to the group's golfers below.
+            var rest = s.slice(gh[0].length), vsSides = null;
+            rest = rest.replace(/\(([^()]*\s(?:vs\.?|v\.?|versus)\s[^()]*)\)/i, function (m0, inner) {
+                var two = inner.split(/\s+(?:vs\.?|v\.?|versus)\s+/i);
+                if (two.length === 2) vsSides = two.map(function (side) { return side.split(/\s*(?:&|\/|\+|,|\band\b)\s*/i).map(function (x) { return x.trim(); }).filter(Boolean); });
+                return ' ';
+            });
+            var sp = tspSplitGames(rest);
             if (/^team$/i.test(gh[1]) && group && !startGroup && group.players.length && !group.teams) {
                 // "Team 1: A, B" then "Team 2: C, D": two teams of one group.
                 var r1 = tspPlayersLine(sp.head);
@@ -264,6 +272,7 @@ function parseSetupPaste(text, opts) {
                 else if (sp.head) addPlayers(sp.head, ln, false);
             }
             if (sp.games) addGames(sp.games, ln, group.games);
+            if (vsSides && vsSides[0].length && vsSides[1].length) group.vsNames = vsSides;
             return;
         }
         // GOLFERS (with games after them, maybe).
@@ -279,6 +288,25 @@ function parseSetupPaste(text, opts) {
         if (d.groups.length) return;
         var prevWith = days.slice(0, i).reverse().filter(function (x) { return x.groups.length; })[0];
         if (prevWith) flags.push({ day: d.n, line: null, text: 'Day ' + d.n, why: 'No groups listed - use Day ' + prevWith.n + '\u2019s groups?', level: 'ask', sameAs: prevWith.n });
+    });
+    // TEAMS NAMED ON THE GROUP LINE: each name is a golfer of that group - the full name,
+    // or the one golfer whose first name (or name start) it is. All found: those are the
+    // sides, and nothing is asked. Any name not found: the review asks, as before.
+    days.forEach(function (d) {
+        d.groups.forEach(function (g) {
+            if (!g.vsNames || g.teams) { delete g.vsNames; return; }
+            var used = {}, ok = true;
+            var find = function (n) {
+                var k = String(n).toLowerCase().replace(/\.$/, '');
+                var hits = g.players.filter(function (p) { var pn = p.name.toLowerCase(); return !used[p.name] && (pn === k || pn.split(' ')[0] === k || pn.indexOf(k + ' ') === 0); });
+                if (hits.length !== 1) { ok = false; return null; }
+                used[hits[0].name] = 1;
+                return hits[0].name;
+            };
+            var t = g.vsNames.map(function (side) { return side.map(find); });
+            if (ok && t[0].length === t[1].length) g.teams = t;
+            delete g.vsNames;
+        });
     });
     // TEAMS from "Team 1: / Team 2:" lines.
     days.forEach(function (d) { d.groups.forEach(function (g) { if (g.pendingTeams) { if (g.pendingTeams.length === 2) g.teams = g.pendingTeams; delete g.pendingTeams; } }); });

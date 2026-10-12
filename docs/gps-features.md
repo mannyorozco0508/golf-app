@@ -242,3 +242,30 @@ Rules that would need ADDING (additive; nothing existing changes):
   + Add a player / + Add a game / Save · back to map (typed score boxes unchanged).
 - Games: today's screens; a round stays on the card (no location) until the green 📍 GPS pill.
 - tools/front-door-check.js drives every screen in Chrome.
+- gps-doors-fix (2026-10-12, Manny's iPhone test): every launch opens Main (the last door
+  highlighted, "Resume <course>" for a round in progress; back from >60 min in the background =
+  Main again); a launch goes straight to home.html (no scorecard flash); these screens are always
+  the light theme; a course tap writes the round itself (organizerGate + code-issuer + one set, Round
+  Setup's saved shape) and opens GPS on hole 1 - never Round Setup. GPS READY in the app = GolfAPI
+  has the course (the app's GPS draws GolfAPI only); a course set up before by anyone (gps_links)
+  starts at once; any other is pulled ("Setting up GPS for ...", gps-live find + course); any failure
+  says why, with "Play without GPS" and "Try another course".
+  WHY THE PHONE WENT TO ROUND SETUP: the old path handed the course to Round Setup and auto-tapped
+  its Save 1.2 s later; on a phone Round Setup's own load of the fresh round (real Firebase) landed
+  after that and cleared the course, so Save stopped at "Pick a course first". The Chrome check's
+  stand-in database answers instantly, so the race never showed there. Reproduced in the iOS
+  Simulator (screenshots in ~/Desktop/claude-code-reports/sim-20261012/).
+  Also on gps-doors-fix: NO AUTO-ADVANCE - the last score of a hole stays on that hole (totals and
+  game cards showing); only "Next ▶" moves on, and in a GPS round it takes the map to that hole too.
+  The green "📍 GPS" button sits in the hole's heading (the floating toggle is hidden in the app), so
+  it never covers a game card or the keypad bar. THE 2v2 PICKER (paste review and Round Setup's
+  Vegas): first two tapped = Team A, next two = Team B, a re-tap un-picks, "Team A: __ & __ / Team B:
+  __ & __" and Swap teams; asked only when the paste doesn't name the sides ("GROUP 1 - $5 NASSAU
+  (Manny & Joe vs Mike & Dave)", "A/B v C/D": matched to the group's golfers), pre-filled 1+2 v 3+4.
+  ADD A GAME (front-door.js, one sheet from GPS +, Tools, the card and ≡ Round Menu): Quick start
+  sets the $ and golfers / teams, then opens that game's own setup filled in (Side Bets' Add form for
+  a Nassau via the paste-bets queue; Round Setup's Money for Skins / Vegas / BBB via &amt &ids
+  &carry); All games lists every game, each to its normal setup (Side Bets add=1&fmt=, Round Setup
+  tpl= / fmt= / step=money); Paste the whole round; Paste a multi-round match = trip.html#build with
+  today as Day 1, this course, these golfers - Confirm makes every day a NEW round (Day 1 too); the
+  round it came from keeps its scores. Nothing in the sheet writes to Firebase.

@@ -21,6 +21,9 @@ const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round
 const T32 = fs.readFileSync(path.join(__dirname, 'fixtures/paste-round-32.txt'), 'utf8');
 const T32C = T32.replace(/ \((\d+)\)/g, ', $1');
 const T1 = 'GROUP 1 - $5 NASSAU\nManny Orozco (12)\nSean Cameron (8)\nBrian Blake (15)\nJP Peloso (10)\n';
+// Manny's paste, sides named in brackets, golfers listed NOT in side order (so the
+// 1+2 v 3+4 pre-fill would be wrong): no question, the sides as named.
+const TN = 'GROUP 1 - $5 NASSAU (Manny & Joe vs Mike & Dave)\nManny Orozco (12)\nMike Dunn (8)\nJoe Russo (15)\nDave Kirk (10)\n';
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});var _ce=console.error;console.error=function(){window.__e.push('console.error '+Array.prototype.join.call(arguments,' '));_ce.apply(console,arguments)};";
 
 function oldRound() {
@@ -38,8 +41,9 @@ async function run(code, db, text, typeFirst) {
     steps.push(
         { expression: "(function(){goToWizardStep(5); document.getElementById('sp-round-btn').click(); document.getElementById('sp-round-box').value=" + JSON.stringify(text) + "; return 'opened';})()" },
         { expression: "(function(){var b=Array.prototype.filter.call(document.querySelectorAll('#sp-round-modal button'),function(x){return /^Read it/.test(x.textContent);})[0]; b.click(); return 'read';})()" }, { sleep: 400 },
-        { expression: "JSON.stringify({ review: document.getElementById('sp-round-review').innerText, dupes: (document.querySelector('.sp-dupes')||{}).innerText||'', notset: (document.querySelector('.sp-notset')||{}).innerText||'' })" },
-        { expression: "(function(){['Manny Orozco','Sean Cameron','Brian Blake','Brian Blake','JP Peloso','JP Peloso'].forEach(function(n){var c=Array.prototype.filter.call(document.querySelectorAll('.sp-chip'),function(x){return x.getAttribute('data-name')===n;})[0]; if(c) c.click();}); var cf=document.querySelector('.sp-confirm'); cf.click(); return 'confirmed';})()" }, { sleep: 800 },
+        { expression: "JSON.stringify({ review: document.getElementById('sp-round-review').innerText, dupes: (document.querySelector('.sp-dupes')||{}).innerText||'', notset: (document.querySelector('.sp-notset')||{}).innerText||'', chips: document.querySelectorAll('.sp-chip').length, confirmOk: !document.querySelector('.sp-confirm').disabled })" },
+        // The 2v2 picker is pre-filled 1st + 2nd v 3rd + 4th: Confirm with no taps.
+        { expression: "(function(){var cf=document.querySelector('.sp-confirm'); cf.click(); return 'confirmed';})()" }, { sleep: 800 },
         { expression: "JSON.stringify({ step: currentWizardStep, review: (document.getElementById('wizard-step-7')||{}).innerText||'', status: (document.getElementById('sp-round-status')||{}).innerText||'', e: window.__e })" },
         { expression: "(function(){var b=Array.prototype.filter.call(document.querySelectorAll('#wizard-step-7 button'),function(x){return /Save/.test(x.textContent);})[0]; b.click(); return 'saved';})()" }, { sleep: 2500 },
         { expression: "JSON.stringify({ e: window.__e, w: (window.__coldWrites||[]).filter(function(w){return w.op==='update' && w.path==='events/" + code + "';}).map(function(w){return w.value;}) })" });
@@ -56,7 +60,8 @@ const BASE_DB = () => ({ events: {}, global_courses: {}, trips: {}, organizers: 
         { name: '32 new round', code: 'PSTNEW', text: T32, typeFirst: true, want: 32, kept: ['Muse Tester'] },
         { name: '32 saved round', code: 'PSTOLD', text: T32, old: true, want: 32, kept: ['Muse Tester'] },
         { name: '32 "Name, 12"', code: 'PSTCOM', text: T32C, typeFirst: false, want: 32, kept: [] },
-        { name: '1 group $5 Nassau', code: 'PSTONE', text: T1, typeFirst: false, want: 4, kept: [] }
+        { name: '1 group $5 Nassau', code: 'PSTONE', text: T1, typeFirst: false, want: 4, kept: [], sides: [['Manny Orozco', 'Sean Cameron'], ['Brian Blake', 'JP Peloso']], asked: true },
+        { name: '1 group, sides named', code: 'PSTNAM', text: TN, typeFirst: false, want: 4, kept: [], sides: [['Manny Orozco', 'Joe Russo'], ['Mike Dunn', 'Dave Kirk']], asked: false }
     ];
     const saved = {};
     for (const c of cases) {
@@ -100,6 +105,11 @@ const BASE_DB = () => ({ events: {}, global_courses: {}, trips: {}, organizers: 
             const sm = Object.keys(v).filter((k) => /^sideMatches\//.test(k)).map((k) => v[k]);
             rep.games = sm.map((x) => x.format + ' ' + x.teamAIds + 'v' + x.teamBIds + ' $' + x.frontStake);
             if (sm.length !== 1 || sm[0].frontStake !== 5 || 'scope' in sm[0]) fails.push(tag + ': one $5 team Nassau expected (no group scope on a 1-group round): ' + JSON.stringify(sm));
+            const ids1 = (list) => list.map((n) => String((v.players.find((p) => p.name === n) || {}).id));
+            if (sm[0] && (sm[0].teamAIds.join() !== ids1(c.sides[0]).join() || sm[0].teamBIds.join() !== ids1(c.sides[1]).join())) fails.push(tag + ': sides ' + sm[0].teamAIds + ' v ' + sm[0].teamBIds + ', expected ' + c.sides.map((x) => x.join(' & ')).join(' v '));
+            rep.asked = r.read.chips > 0;
+            if (rep.asked !== c.asked) fails.push(tag + (c.asked ? ': the sides were not asked' : ': the sides were named in the paste but the review still asked'));
+            if (!r.read.confirmOk) fails.push(tag + ': Confirm was not ready (pre-fill / named sides missing)');
             if (v.players.length !== 4) fails.push(tag + ': ' + v.players.length + ' golfers');
         }
     }

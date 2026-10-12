@@ -24,15 +24,15 @@ test('the doors show only in the app (or the check flag); the web pages are unch
     assert.match(read('gps-view.js'), /if \(doorsOn\(\)\) \{/, 'GPS-2 controls only in the app');
 });
 
-test('a front-door change: routes to existing screens, writes nothing itself', { skip }, () => {
+test('routes to existing screens; the ONE write is a new GPS round, through the organizer gate (Manny: a course tap creates the round)', { skip }, () => {
     const s = read('front-door.js').replace(/^\s*\/\/.*$/gm, '');
-    assert.ok(!/ref\([^)]*\)\.(set|update|push|remove|transaction)\(/.test(s), 'no Firebase write');
-    assert.ok((s.match(/\.ref\(/g) || []).every(() => true) && !/\.ref\([^)]*\)\.(?!once\()/.test(s), 'Firebase is only read (once)');
-    assert.match(s, /W\.selectHomeWidget\('quick'\)/, 'Start a round = the lobby’s own new-round path');
-    assert.match(s, /W\.saveSettings\(\)/, 'a GPS round is saved by Round Setup’s own Save');
-    assert.match(s, /W\.gpsApplyTemplate\(tpl\)/, 'quick starts = Round Setup’s own templates');
+    const writes = s.match(/ref\([^)]*\)\.(set|update|push|remove|transaction)\(/g) || [];
+    assert.deepEqual(writes, ["ref('events/' + code).set("], 'one write: the new round');
+    assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card\), uid\)/);
+    assert.match(s, /W\.issueUniqueCode\(\{ db: H\.db, root: 'events' \}\)/);
+    assert.match(s, /W\.selectHomeWidget\('quick'\)/, 'Start a round = the lobby\u2019s own new-round path');
+    assert.match(s, /W\.gpsApplyTemplate\(tpl\)/, 'quick starts = Round Setup\u2019s own templates');
     assert.match(s, /W\.spRoundOpen\(\)/, 'Paste the whole round = the existing paste');
-    assert.match(read('admin.html'), /if \(window\.HardPanDoors && window\.HardPanDoors\.afterSave\(modeKey\)\) return;/);
 });
 
 test('the mockups: Main, GPS-1, Games-1 on home.html; the colors; the remembered pick', { skip }, () => {
@@ -55,4 +55,15 @@ test('HardPan only: home.html and front-door.js are GPS files; every page loads 
     const gps = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
     assert.ok(/'front-door\.js'/.test(gps) && /'home\.html'/.test(gps));
     assert.ok(!/\$\d/.test(read('gps-view.js')), 'no price in gps-view.js (the quick-start amounts are front-door.js’s)');
+});
+
+test('gps-doors-fix: a launch goes straight to the doors; Main every launch; light only; GPS READY = what GPS draws; a course tap never opens Round Setup', { skip }, () => {
+    const s = read('front-door.js'), h = read('home.html');
+    assert.match(s, /\(function launch\(\) \{/); assert.match(s, /W\.document\.documentElement\.style\.visibility = 'hidden';\n\s*W\.location\.replace\('home\.html'\);/);
+    assert.match(s, /show\(h === 'gps' \|\| h === 'games' \? h : 'main'\);/, 'every launch opens Main');
+    assert.ok(!/prefers-color-scheme/.test(h) && /<meta name="color-scheme" content="light only">/.test(h), 'home.html never follows dark mode');
+    assert.match(s, /if \(live\(\)\) return !!golfapiLink\(key\)/, 'in the app, GPS READY = GolfAPI has it');
+    const pick = s.slice(s.indexOf('function startRound('), s.indexOf('function pickCourse('));
+    assert.ok(!/admin\.html\?start=quick/.test(pick.replace(/function playWithoutGps[\s\S]*$/, '')), 'a course tap writes the round itself (Round Setup only for Play without GPS with no card)');
+    assert.match(s, /if \(busy\) return;/, 'a double tap makes one round');
 });
