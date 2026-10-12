@@ -33,6 +33,10 @@
     <script src="vegas-engine.js"></script>
     <script src="extra-games-ui.js"></script>
     <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- Two front doors: GPS / Games & Bets, chosen once on this phone (HardPan app, gps-doors). -->
+    <script src="front-door.js"></script>
+    <!-- GPS:END -->
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -3557,6 +3561,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function showRoundReadyScreen(modeKey) {
+        // GPS:BEGIN
+        // A round started from the GPS front door opens straight on GPS.
+        if (window.HardPanDoors && window.HardPanDoors.afterSave(modeKey)) return;
+        // GPS:END
         document.getElementById('lobby-screen').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'none';
         document.getElementById('round-ready-screen').style.display = 'block';

@@ -213,6 +213,31 @@
         if (r.round != null && (!S || r.round !== S.eventCode)) return null;
         return r.side;
     }
+    function frontDoor() { try { return localStorage.getItem('hardpan_front_door'); } catch (e) { return null; } }
+    // The two front doors show in the app (Capacitor), or with window.__hardpanDoors.
+    function doorsOn() {
+        if (window.__hardpanDoors === true) return true;
+        try { return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
+    }
+    function roundPlayers() { try { return (typeof currentData !== 'undefined' && currentData && currentData.players) || []; } catch (e) { return []; } }   /* global currentData */
+    function openAddGame() {
+        if (!S) return;
+        var sh = S.el.querySelector('.gps-addgame');
+        if (!sh) return;
+        var box = sh.querySelector('.gps-ag-players');
+        box.textContent = '';
+        roundPlayers().forEach(function (p) { var sp = document.createElement('span'); sp.textContent = String(p.name || '').split(' ')[0]; box.appendChild(sp); });
+        // The quick starts (and their amounts) are the front door's (front-door.js).
+        var grid = sh.querySelector('.gps-ag-grid');
+        grid.textContent = '';
+        ((window.HardPanDoors && window.HardPanDoors.QUICK_STARTS) || []).forEach(function (q) {
+            var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-ag-tpl', q.tpl);
+            var t = document.createElement('b'); t.textContent = q.name; var d = document.createElement('span'); d.textContent = q.sub;
+            b.appendChild(t); b.appendChild(d); grid.appendChild(b);
+        });
+        sh.style.display = '';
+    }
+    function closeAddGame() { var sh = S && S.el.querySelector('.gps-addgame'); if (sh) sh.style.display = 'none'; }
     function lastSide() { return storedSide() === 'gps' ? 'gps' : 'bets'; }
     function rememberSide(side) {
         side = side === 'gps' ? 'gps' : 'bets';
@@ -2719,7 +2744,20 @@
         +     '<button type="button" class="gps-score"></button>'
         +     '<button type="button" class="gps-score-next" aria-label="Next hole">›</button>'
         +   '</div>'
+        +   '<button type="button" class="gps-door-add gps-float" style="display:none" aria-label="Add a game"><span class="gps-ico">\uFF0B</span><span class="gps-cap">Game</span></button>'
         +   '<button type="button" class="gps-tools gps-float" aria-label="Tools"><span class="gps-ico">⋯</span><span class="gps-cap">Tools</span></button>'
+        + '</div>'
+        // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
+        // GPS-4 "Add a game" - this round's golfers, a quick start, paste, full setup.
+        + '<button type="button" class="gps-door-games" style="display:none" aria-label="Games home">Games</button>'
+        + '<div class="gps-addgame" style="display:none" role="dialog" aria-label="Add a game">'
+        +   '<div class="gps-ag-head"><button type="button" class="gps-ag-back" aria-label="Back to map">\u2039</button><div><div class="gps-ag-title">Add a game</div><div class="gps-ag-sub">To this round \u00b7 your scores carry over</div></div></div>'
+        +   '<div class="gps-ag-h">PLAYING</div><div class="gps-ag-players"></div>'
+        +   '<div class="gps-ag-h">QUICK START</div><div class="gps-ag-grid"></div>'
+        +   '<div class="gps-ag-h">MORE</div>'
+        +   '<button type="button" class="gps-ag-row" data-ag-go="paste"><span><b>Paste the whole round</b><span>Groups, teams and games from one text</span></span><span>\u203A</span></button>'
+        +   '<button type="button" class="gps-ag-row" data-ag-go="full"><span><b>Full game setup</b><span>Every game, presses, side bets</span></span><span>\u203A</span></button>'
+        +   '<button type="button" class="gps-ag-not">Not now \u00b7 back to map</button>'
         + '</div>'
         // WHILE A GREEN OR A PIN IS BEING SET: its buttons take the bottom.
         + '<div class="gps-actions gps-float" style="display:none">'
@@ -2745,6 +2783,7 @@
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
+        +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
         + '</div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
@@ -2883,6 +2922,18 @@
         + '#gps-overlay .gps-to-plays{font-size:13px;color:#e5e7eb;font-weight:700;}'
         + '#gps-overlay .gps-to-plays:empty{display:none;}'
         + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 10px);display:flex;align-items:stretch;gap:8px;height:54px;}'
+        + '#gps-overlay .gps-door-add{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
+        + '#gps-overlay .gps-door-games{position:absolute;z-index:8;top:calc(env(safe-area-inset-top) + 8px);right:10px;border:0;border-radius:999px;padding:7px 14px;background:#1d3557;color:#fff;font:800 13px/1 ' + FONT + ';min-height:34px;cursor:pointer;}'
+        + '#gps-overlay .gps-addgame{position:absolute;inset:0;z-index:60;background:#f0f4f2;color:#1a1a1a;overflow:auto;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 20px);font-family:' + FONT + ';}'
+        + '#gps-overlay .gps-ag-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;} #gps-overlay .gps-ag-back{width:44px;height:44px;border:0;background:none;font-size:30px;color:#0f4c3a;cursor:pointer;}'
+        + '#gps-overlay .gps-ag-title{font-size:20px;font-weight:800;} #gps-overlay .gps-ag-sub{font-size:13px;color:#555;}'
+        + '#gps-overlay .gps-ag-h{font-size:13px;font-weight:800;letter-spacing:1px;color:#555;margin:18px 0 8px;}'
+        + '#gps-overlay .gps-ag-players{display:flex;flex-wrap:wrap;gap:8px;} #gps-overlay .gps-ag-players span{background:#fff;border:1px solid #d0e1db;border-radius:999px;padding:8px 14px;font-size:15px;font-weight:600;}'
+        + '#gps-overlay .gps-ag-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}'
+        + '#gps-overlay .gps-ag-grid button,#gps-overlay .gps-ag-row{display:flex;flex-direction:column;gap:4px;text-align:left;background:#fff;border:0;border-radius:16px;padding:16px;color:#1a1a1a;font:inherit;cursor:pointer;}'
+        + '#gps-overlay .gps-ag-grid b,#gps-overlay .gps-ag-row b{font-size:17px;font-weight:800;} #gps-overlay .gps-ag-grid span,#gps-overlay .gps-ag-row span span{font-size:14px;color:#555;}'
+        + '#gps-overlay .gps-ag-row{flex-direction:row;justify-content:space-between;align-items:center;width:100%;margin-bottom:10px;} #gps-overlay .gps-ag-row > span:first-child{display:flex;flex-direction:column;gap:3px;}'
+        + '#gps-overlay .gps-ag-not{display:block;margin:18px auto 0;border:0;background:none;font:700 15px ' + FONT + ';color:#555;padding:12px;cursor:pointer;}'
         + '#gps-overlay .gps-side-bets,#gps-overlay .gps-tools{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
         + '#gps-overlay .gps-ico{font-size:20px;line-height:1;color:#d9f99d;}'
         + '#gps-overlay .gps-cap{font-size:11px;font-weight:700;color:#c8d1ca;}'
@@ -3123,6 +3174,19 @@
             closeMenus();
             withShots(function () { stopReplayTimer(); S.replay = false; S.shotMode = true; render(); });
         });
+        // ➕ ADD A GAME (gps-doors): GPS-4 in the app; Round Setup for THIS round on the web.
+        on(el, '.gps-add-game', function () { if (!S) return; closeMenus(); if (doorsOn()) openAddGame(); else window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); });
+        on(el, '.gps-door-add', function () { openAddGame(); });
+        on(el, '.gps-door-games', function () { window.location.href = 'home.html#games'; });
+        on(el, '.gps-ag-back', function () { closeAddGame(); });
+        on(el, '.gps-ag-not', function () { closeAddGame(); });
+        el.addEventListener('click', function (ev) {
+            var b = ev.target && ev.target.closest ? ev.target.closest('[data-ag-tpl],[data-ag-go]') : null;
+            if (!b || !S) return;
+            var base = 'admin.html?game=' + encodeURIComponent(S.eventCode);
+            var tpl = b.getAttribute('data-ag-tpl'), go = b.getAttribute('data-ag-go');
+            window.location.href = tpl ? base + '&tpl=' + tpl : go === 'paste' ? base + '&paste=1' : base;
+        });
         on(el, '.gps-replay', function () {
             if (!S) return;
             closeMenus();
@@ -3221,6 +3285,13 @@
         window.addEventListener('pagehide', onPageHide);
         loadCourseRecord();
         loadCourseLocation();
+        // THE APP'S FRONT DOOR (gps-doors): Score and + Game at the bottom, Games at the top.
+        if (doorsOn()) {
+            var dAdd = el.querySelector('.gps-door-add'), dGames = el.querySelector('.gps-door-games'), cap = el.querySelector('.gps-side-bets .gps-cap');
+            if (dAdd) dAdd.style.display = '';
+            if (dGames) dGames.style.display = '';
+            if (cap) cap.textContent = 'Score';
+        }
         // After the card has drawn (mount runs inside its render), and never able
         // to throw into it.
         setTimeout(function () { try { land(); } catch (e) {} }, 0);
@@ -3253,6 +3324,9 @@
     function land() {
         if (!S || !S.pro) { if (storedSide() === 'gps') showSide('gps'); return; }
         if (storedSide() === 'bets') return;
+        // THE GAMES FRONT DOOR (gps-doors): the round opens on the card, and location is
+        // not asked for until the golfer taps 📍 GPS (or this round was left on GPS).
+        if (frontDoor() === 'games' && storedSide() !== 'gps') return;
         var mine = S;
         locationDenied(function (denied) {
             if (S !== mine || denied || S.userChoseSide) return;
@@ -3382,6 +3456,8 @@
     var api = {
         mount: mount, unmount: unmount, showSide: showSide, setHole: setHole, roundUpdated: roundUpdated,
         precacheCourse: precacheCourse,
+        // GPS-4 (the app's front door): the Add a game sheet over the map.
+        openAddGame: function () { if (S && S.side !== 'gps') showSide('gps'); openAddGame(); },
         // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
         hasGpsPro: hasGpsPro,
         isMounted: function () { return !!S; },

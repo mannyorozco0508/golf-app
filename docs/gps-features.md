@@ -228,3 +228,17 @@ Rules that would need ADDING (additive; nothing existing changes):
   lost, nothing written); it is a separate flow (makes a new trip), so Round Setup keeps its own.
 - tools/paste-round-check.js: Muse's text on a new round, on a saved round with a golfer
   already typed, with "Name, 12", and a 1-group $5 Nassau; then build 12 / main open them.
+
+## 14. Two front doors (branch gps-doors, 2026-10-12; Manny's mockups ~/Desktop/hardpan-mockups)
+- App only (Capacitor; window.__hardpanDoors for the checks); the HardPan web pages are unchanged.
+- home.html: Main (GPS green #0f4c3a / Games & Bets navy #1d3557, "Have a game code?", Sign in,
+  "We'll remember your pick"), GPS-1 (search, Near you with miles, Recent, GPS READY / SET UP · 1 TAP,
+  city/state), Games-1 (GPS | Games switch, + Start a round, game-code Join, your round, Trips & Cups,
+  Build a trip from one paste). The pick is kept (hardpan_front_door); the next open goes straight there.
+- GPS: a GPS READY course starts an ordinary round through Round Setup's own Save (you as the golfer)
+  and opens it on GPS (GPS-2, unchanged + "Score", "+ Game", a "Games" chip). + Game = GPS-4: the
+  round's golfers, quick start Nassau / Skins / Vegas / BBB (Round Setup's own templates, on Money),
+  Paste the whole round, Full game setup, Not now. GPS-3: the card of a no-money round offers
+  + Add a player / + Add a game / Save · back to map (typed score boxes unchanged).
+- Games: today's screens; a round stays on the card (no location) until the green 📍 GPS pill.
+- tools/front-door-check.js drives every screen in Chrome.

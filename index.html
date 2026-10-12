@@ -121,6 +121,10 @@
     <script src="vegas-engine.js"></script>
     <script src="extra-games-ui.js"></script>
     <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- Two front doors (HardPan app, gps-doors): the green GPS button, GPS-3 on a GPS round. -->
+    <script src="front-door.js"></script>
+    <!-- GPS:END -->
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -3872,6 +3876,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         renderHoleRecap();
         renderLiveSkins();
         renderLiveTicker();
+        // GPS:BEGIN
+        // GPS-3 (the app's front door): a GPS round with no money - add a player / a game.
+        if (window.HardPanDoors) {
+            try {
+                let fm = document.getElementById('fd-gps3-mount');
+                const tick = document.getElementById('live-ticker-mount');
+                if (!fm && tick && tick.parentNode) { fm = document.createElement('div'); fm.id = 'fd-gps3-mount'; tick.parentNode.insertBefore(fm, tick); }
+                if (fm) fm.innerHTML = window.HardPanDoors.gpsRoundStrip(currentData);
+            } catch (e) { /* the card draws as before */ }
+        }
+        // GPS:END
         if (document.getElementById('live-board-overlay')
             && document.getElementById('live-board-overlay').style.display === 'flex') {
             renderLiveBoard();   // keep the overlay live while it is open

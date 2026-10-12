@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c3a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>HardPan</title>
+<!-- HARDPAN HOME (gps-doors, 2026-10-12): the two front doors. HardPan app only -
+     the Consumer build does not ship this page. Main (two cards), GPS-1 (pick a
+     course) and Games-1 (games home), from Manny's approved mockups. Everything
+     else is an existing screen: a course pick starts an ordinary round through
+     Round Setup's own Save; Start a round is the lobby's own path. -->
+<script src="./firebase-app-compat.js"></script>
+<script src="auth-boot.js"></script>
+<script src="./firebase-database-compat.js"></script>
+<script src="course-data.js"></script>
+<style>
+  :root { --hp-green: #0f4c3a; --hp-green-soft: #e2f1ea; --hp-navy: #1d3557; --hp-navy-soft: #e3e9f2; --hp-bg: #f0f4f2; --hp-card: #ffffff; --hp-text: #1a1a1a; --hp-muted: #555; --hp-line: #d0e1db; --hp-warn: #8a5a00; --hp-warn-soft: #fbefd9; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hp-bg: #0d1411; --hp-card: #18211d; --hp-text: #f1f4f2; --hp-muted: #a9b5af; --hp-line: #2c3a34; --hp-green-soft: #1d3a30; --hp-navy-soft: #1e2a3d; --hp-warn-soft: #3a2e15; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--hp-bg); color: var(--hp-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+  .hp-view { display: none; min-height: 100vh; flex-direction: column; padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; }
+  .hp-view.on { display: flex; }
+  .hp-brand { font-size: 15px; font-weight: 800; letter-spacing: 3px; color: var(--hp-green); }
+  .hp-games .hp-brand { color: var(--hp-navy); }
+  .hp-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+  .hp-switch { display: flex; background: var(--hp-green-soft); border-radius: 999px; padding: 4px; gap: 4px; font-size: 14px; font-weight: 700; }
+  .hp-games .hp-switch { background: var(--hp-navy-soft); }
+  .hp-switch button { border: 0; background: none; border-radius: 999px; padding: 9px 16px; font: inherit; cursor: pointer; min-height: 40px; }
+  .hp-switch .gps { color: var(--hp-green); } .hp-switch .games { color: var(--hp-navy); }
+  .hp-switch .gps.on { background: var(--hp-green); color: #fff; } .hp-switch .games.on { background: var(--hp-navy); color: #fff; }
+  h1 { margin: 6px 0 14px; font-size: 28px; line-height: 1.15; font-weight: 800; }
+  #v-main h1 { font-size: 30px; }
+  .hp-door { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; text-align: left; width: 100%; border: 0; border-radius: 22px; padding: 26px 22px; min-height: 210px; color: #fff; cursor: pointer; font: inherit; margin-bottom: 16px; }
+  .hp-door.gps { background: var(--hp-green); } .hp-door.games { background: var(--hp-navy); }
+  .hp-door .t { font-size: 34px; font-weight: 800; } .hp-door .d { font-size: 16px; line-height: 1.4; opacity: .85; } .hp-door .go { font-size: 15px; font-weight: 700; }
+  .hp-note { font-size: 14px; line-height: 1.45; color: var(--hp-muted); text-align: center; }
+  .hp-foot { margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .hp-link { border: 0; background: none; font: inherit; font-size: 15px; font-weight: 700; color: var(--hp-green); padding: 12px 0; cursor: pointer; min-height: 44px; }
+  .hp-link.muted { color: var(--hp-muted); font-weight: 600; }
+  label.hp-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: var(--hp-muted); }
+  .hp-search { display: flex; align-items: center; gap: 10px; background: var(--hp-card); border: 1px solid var(--hp-line); border-radius: 14px; padding: 0 14px; height: 50px; }
+  .hp-search input, .hp-code input { border: 0; outline: none; font-size: 17px; flex: 1; background: transparent; color: var(--hp-text); font-family: inherit; min-width: 0; }
+  .hp-sec { margin-top: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .hp-sec-h { font-size: 13px; font-weight: 800; letter-spacing: 1px; color: var(--hp-muted); }
+  .hp-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--hp-card); border: 0; border-radius: 16px; padding: 16px; text-align: left; width: 100%; font: inherit; color: var(--hp-text); cursor: pointer; }
+  .hp-row .n { font-size: 17px; font-weight: 700; } .hp-row .s { font-size: 14px; color: var(--hp-muted); margin-top: 3px; }
+  .hp-badge { font-size: 12px; font-weight: 800; border-radius: 999px; padding: 6px 10px; white-space: nowrap; color: var(--hp-green); background: var(--hp-green-soft); }
+  .hp-badge.setup { color: var(--hp-warn); background: var(--hp-warn-soft); }
+  .hp-badge.navy { color: var(--hp-navy); background: var(--hp-navy-soft); }
+  .hp-big { display: flex; align-items: center; justify-content: center; height: 58px; border-radius: 16px; background: var(--hp-navy); color: #fff; font-size: 18px; font-weight: 800; border: 0; width: 100%; cursor: pointer; font-family: inherit; }
+  .hp-code { display: flex; gap: 8px; }
+  .hp-code input { height: 50px; border: 1px solid #c9d3e0; border-radius: 14px; padding: 0 14px; letter-spacing: 2px; background: var(--hp-card); text-transform: uppercase; }
+  .hp-code button { height: 50px; padding: 0 18px; border: 0; border-radius: 14px; background: var(--hp-navy-soft); color: var(--hp-navy); font-size: 16px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .hp-dash { border: 2px dashed #c9d3e0; background: transparent; color: var(--hp-navy); }
+  .hp-status { font-size: 14px; color: var(--hp-muted); padding: 4px 2px; }
+  .hp-err { color: #b42318; font-weight: 700; }
+</style>
+</head>
+<body>
+<!-- MAIN: two doors -->
+<div class="hp-view" id="v-main">
+  <div class="hp-brand" style="margin-top:24px;">HARDPAN</div>
+  <h1>What are we doing today?</h1>
+  <button type="button" class="hp-door gps" data-hp-door="gps">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"></path><circle cx="12" cy="10" r="2.6"></circle></svg>
+    <span><span class="t">GPS</span><br><span class="d">Front, middle, back. Tap anywhere for yardage. Wind and plays-like.</span></span>
+    <span class="go">Pick a course &rarr;</span>
+  </button>
+  <button type="button" class="hp-door games" data-hp-door="games">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"></path><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"></path></svg>
+    <span><span class="t">Games &amp; Bets</span><br><span class="d">Nassau, skins, Vegas, BBB, trips and Cups. Who pays who, done for you.</span></span>
+    <span class="go">Start or join a game &rarr;</span>
+  </button>
+  <div class="hp-note">We'll remember your pick. Switch anytime from the top bar.</div>
+  <div class="hp-foot">
+    <button type="button" class="hp-link" data-hp-act="code">Have a game code?</button>
+    <button type="button" class="hp-link muted" data-hp-act="signin">Sign in</button>
+  </div>
+</div>
+
+<!-- GPS-1: pick a course -->
+<div class="hp-view" id="v-gps">
+  <div class="hp-top"><div class="hp-brand">HARDPAN</div><div class="hp-switch" role="tablist"><button type="button" class="gps on" data-hp-door="gps" aria-pressed="true">GPS</button><button type="button" class="games" data-hp-door="games" aria-pressed="false">Games</button></div></div>
+  <h1>Where are you playing?</h1>
+  <label class="hp-label">Search courses
+    <span class="hp-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><input type="text" id="hp-q" placeholder="Course name or city" autocomplete="off" autocorrect="off" spellcheck="false"></span>
+  </label>
+  <div class="hp-sec" id="hp-results" style="display:none;"><div class="hp-sec-h">RESULTS</div><div id="hp-results-list" style="display:flex;flex-direction:column;gap:10px;"></div></div>
+  <div class="hp-sec" id="hp-near"><div class="hp-sec-h">NEAR YOU</div><div id="hp-near-list" style="display:flex;flex-direction:column;gap:10px;"><div class="hp-status">Finding courses near you&hellip;</div></div></div>
+  <div class="hp-sec" id="hp-recent" style="display:none;"><div class="hp-sec-h">RECENT</div><div id="hp-recent-list" style="display:flex;flex-direction:column;gap:10px;"></div></div>
+  <div id="hp-gps-status" class="hp-status" role="status"></div>
+  <div class="hp-note" style="margin-top:auto;padding-top:20px;">No sign-in needed for courses that are GPS ready.</div>
+</div>
+
+<!-- GAMES-1: games home -->
+<div class="hp-view hp-games" id="v-games">
+  <div class="hp-top"><div class="hp-brand">HARDPAN</div><div class="hp-switch" role="tablist"><button type="button" class="gps" data-hp-door="gps" aria-pressed="false">GPS</button><button type="button" class="games on" data-hp-door="games" aria-pressed="true">Games</button></div></div>
+  <h1>Games &amp; Bets</h1>
+  <button type="button" class="hp-big" data-hp-act="start">+ Start a round</button>
+  <label class="hp-label" style="margin-top:14px;">Have a game code?
+    <span class="hp-code"><input type="text" id="hp-code" placeholder="e.g. 4KX9TB" maxlength="8" autocapitalize="characters" autocorrect="off" spellcheck="false"><button type="button" data-hp-act="join">Join</button></span>
+  </label>
+  <div id="hp-code-msg" class="hp-status" role="status"></div>
+  <div class="hp-sec" id="hp-today" style="display:none;"><div class="hp-sec-h" id="hp-today-h">TODAY</div><div id="hp-today-card"></div></div>
+  <div class="hp-sec"><div class="hp-sec-h">TRIPS &amp; CUPS</div><div id="hp-trip-card"></div>
+    <button type="button" class="hp-row hp-dash" data-hp-act="build"><span class="n" style="font-size:15px;font-weight:800;">Build a trip from one paste</span><span style="font-size:20px;">&rsaquo;</span></button>
+  </div>
+  <div class="hp-note" style="margin-top:auto;padding-top:20px;">No location needed here. Tap GPS inside any round for yardages.</div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+</script>
+<script src="front-door.js"></script>
+<script>
+    if (window.HardPanHome) window.HardPanHome.start(db);
+</script>
+</body>
+</html>
