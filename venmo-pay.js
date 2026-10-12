@@ -117,9 +117,16 @@
     function mine(root) {
         var old = root.getElementById ? root.getElementById('vm-mine') : null;
         if (old) old.parentNode.removeChild(old);
-        var host = root.getElementById && root.getElementById('combined-settlement-summary');
+        var anchor = root.getElementById && root.getElementById('combined-settlement-summary');
         var ps = (S.data && S.data.players) || [];
-        if (!host || ps.length < 2) return;
+        if (!anchor || ps.length < 2) return;
+        // ITS OWN MOUNT, at the end of the page: the Results sections keep exactly their text.
+        var host = root.getElementById('vm-mount');
+        if (!host) {
+            host = root.createElement('div'); host.id = 'vm-mount';
+            var box = anchor.closest ? (anchor.closest('.container') || root.body) : root.body;
+            box.appendChild(host);
+        }
         var m = me(), h;
         if (!m) {
             h = '<div class="settle-card" id="vm-mine"><div class="settle-header">Venmo</div><div style="font-size:.85rem;margin:4px 0;">Which one are you? (for Pay with Venmo on your lines)</div>'
@@ -151,12 +158,18 @@
         if (t.closest('.vm-me-clear')) { try { W.localStorage.removeItem('golfapp_me_' + S.code); } catch (e) {} draw(); return; }
         if (t.closest('.vm-save')) save();
     }
+    var CSS = '.vm-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 8px;font-size:.84rem;} .vm-pay{display:inline-block;padding:7px 12px;border-radius:999px;background:#008CFF;color:#fff !important;font-weight:800;text-decoration:none;} .vm-web{font-size:.78rem;color:var(--text-muted);} .vm-paid,.vm-me{min-height:34px;padding:4px 10px;border-radius:999px;border:1px solid var(--border-mid);background:var(--bg-card);font-weight:700;cursor:pointer;} .vm-paid[aria-pressed=true]{background:var(--brand-green);color:#fff;border-color:var(--brand-green);} .vm-ask{color:var(--text-muted);font-style:italic;}';
+    function style() {
+        if (W.document.getElementById('vm-style')) return;
+        var st = W.document.createElement('style'); st.id = 'vm-style'; st.textContent = CSS;
+        W.document.head.appendChild(st);
+    }
     var bound = false;
     function draw() { try { decorate(W.document); } catch (e) { /* the page stays as it was */ } }
     // Called by settlement.html after every render of the round.
     function onRound(db, code, data) {
         S.db = db; S.code = code; S.data = data || {};
-        if (!bound && W.document) { bound = true; W.document.addEventListener('click', onClick); }
+        if (!bound && W.document) { bound = true; W.document.addEventListener('click', onClick); style(); }
         findTrip();
         draw();
     }
