@@ -205,3 +205,23 @@ Rules that would need ADDING (additive; nothing existing changes):
 - AFTER OCT 17 (needs the Ryder engine): per-match points (2-point matches), per-nine
   matches (startHole/endHole on a match), a stored target/captains on the Cup, and the
   scorecard's Cup card adding the other days.
+
+## 13. Pay with Venmo + Check my Index (branch gps-venmo)
+- Results page (settlement.html): each "X → Y $N" in Who Pays Who and each "X pays Y" on the
+  BBB / Vegas cards gets "Pay $N with Venmo" (+ a small "web" link and a phone-only "Mark paid"),
+  shown ONLY to X (the scorecard's "This is me": golfapp_me_<round>, or ?me=) and only when Y
+  has a username; else "Ask Y to add their Venmo in their profile."
+- "Your Venmo" box under Who Pays Who ("Which one are you?" first, if this phone doesn't know).
+  Saved (Manny's choice A/B, 2026-10-11): trips/<trip>/venmo/<golfer name, lower case> for a round in
+  a trip (round.tripCode, or the trip last opened on this phone that lists the round);
+  events/<round>/venmo/<playerId> for a round not in a trip. No rules change.
+- Links (checked 2026-10-11): app https://venmo.com/u/<user>?txn=pay&amount=N&note=HardPan · <trip/round>
+  (Venmo's app claims /u/*); web https://account.venmo.com/pay?txn=pay&recipients=<user>&amount=N&note=...
+  Not venmo://paycharge (reported broken for usernames since 2024).
+- No money through the app, no payment API, nothing about a payment stored. Money engines and
+  settlement-engine.js untouched (hash-pinned).
+- Check my Index: Round Setup → Players, every golfer row, and the trip builder's handicap box:
+  https://www.ghin.com/overview/ (a path the GHIN app claims) - the app if installed, else ghin.com.
+  Nothing fetched or stored; the golfer types the Index.
+- Trip builder: rounds now carry tripCode; when the app's Cup has fewer points than the paste
+  (2-point days), "first to" is pre-filled as half the app's total + ½ and flagged (Keep / type).

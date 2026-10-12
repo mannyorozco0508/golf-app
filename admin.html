@@ -5501,6 +5501,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             changed: () => { if (typeof updateWizardReview === 'function') updateWizardReview(); }
         });
     }
+    function gpsGhinLink(row) {
+        if (!row || row.querySelector('.p-ghin')) return;
+        let line = row.querySelector('.p-extra-line');
+        if (!line) { line = document.createElement('div'); line.className = 'p-extra-line'; row.appendChild(line); }
+        const a = document.createElement('a');
+        a.className = 'p-ghin';
+        a.href = 'https://www.ghin.com/overview/';
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'Check my Index \u2197';
+        a.setAttribute('aria-label', 'Check my Handicap Index in the GHIN app (opens GHIN)');
+        a.style.cssText = 'font-size:0.74rem;font-weight:700;color:var(--brand-green);text-decoration:none;margin-left:auto;padding:4px 2px;';
+        line.appendChild(a);
+    }
     function exgReviewRow(cfg) {
         const ps = collectWizardPlayers();
         const nm = (id) => { const p = ps.find((x) => String(x.id) === String(id)); return p ? String(p.name).split(' ')[0] : '?'; };
@@ -12043,6 +12057,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         appendTeeControl(row, teeKey);
         appendOrderControl(row);
         compactExtraLine(row);
+        // GPS:BEGIN
+        // CHECK MY INDEX (HardPan, gps-venmo): opens the GHIN app (ghin.com/overview/ is a
+        // link the GHIN app claims), else ghin.com. Nothing is fetched or stored - the
+        // golfer reads their Index there and types it into the box.
+        gpsGhinLink(row);
+        // GPS:END
         attachRowDrag(row);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();

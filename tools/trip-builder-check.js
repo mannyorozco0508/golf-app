@@ -123,7 +123,7 @@ async function look(tree, page, query, db) {
             if (r.text.length < 200) fails.push(tag + ': rendered almost nothing');
             if (/not found/i.test(r.text.slice(0, 400)) && page === 'trip.html') fails.push(tag + ': trip not found');
             if (page === 'trip.html' && rounds.some((c) => r.text.indexOf(db.trips[trip].rounds[c].label.replace(/^Day \d+ \u00b7 /, '')) === -1)) fails.push(tag + ': not every round is listed');
-            if (tree === HERE && page === 'trip.html' && /first to 8/i.test(TEXT.replace(/\u00bd/g, '.5')) && !/first to 8½ wins the Cup/.test(r.text)) fails.push(tag + ': the Cup rules card is missing');
+            if (tree === HERE && page === 'trip.html' && /first to 8/i.test(TEXT.replace(/\u00bd/g, '.5')) && !/first to 5½ wins the Cup/.test(r.text)) fails.push(tag + ': the Cup rules card is missing');
             if (tree === HERE && page === 'trip.html' && /Loser team/.test(TEXT) && !/Loser team buys dinner/.test(r.text)) fails.push(tag + ': the notes are missing');
             if (process.env.TB_SHOW === page) console.log('==== ' + tag + '\n' + r.text.slice(0, 2500));
         }

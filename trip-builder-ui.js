@@ -69,6 +69,7 @@
             }).join('') + '</div>');
         }
         // THE CUP
+        var tw = p.cup ? TB().effectiveToWin(p, list) : null;
         if (p.cup) {
             out.push('<div class="sp-day"><div class="sp-day-head">🏆 ' + esc(p.name || 'The Cup') + '</div>');
             p.teams.forEach(function (t, ti) {
@@ -76,11 +77,11 @@
                     + '<select data-tb="teams.' + ti + '.captain"><option value="">—</option>' + t.players.map(function (g) { return '<option' + (key(g) === key(t.captain) ? ' selected' : '') + '>' + esc(g) + '</option>'; }).join('') + '</select>'
                     + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">' + t.players.map(function (g) { return '<button type="button" class="tb-chip" data-tb-act="swapteam" data-tb-path="' + esc(g) + '" title="Move to the other team">' + esc(g) + ' ⇄</button>'; }).join('') + '</div></div>');
             });
-            out.push('<div class="sp-info">' + p.cup.pointsPerWin + ' point a match win, ½ a halve · first to <input type="number" step="0.5" min="0" data-tb="cup.toWin" value="' + esc(p.cup.toWin == null ? '' : p.cup.toWin) + '" style="width:64px;"> wins'
+            out.push('<div class="sp-info">' + p.cup.pointsPerWin + ' point a match win, ½ a halve · first to <input type="number" step="0.5" min="0" data-tb="cup.toWinManual" value="' + esc(tw == null ? '' : tw) + '" style="width:64px;"> wins'
                 + ' · the app’s Cup card counts the points; the target and captains are shown on the trip page.</div></div>');
         }
         // GOLFERS + HANDICAPS
-        out.push('<div class="sp-day"><div class="sp-day-head">Golfers' + (S.answers.hcp === 'later' ? '' : ' and handicaps') + '</div><div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;">'
+        out.push('<div class="sp-day"><div class="sp-day-head">Golfers' + (S.answers.hcp === 'later' ? '' : ' and handicaps <a class="p-ghin" href="https://www.ghin.com/overview/" target="_blank" rel="noopener" style="font-size:.74rem;font-weight:700;margin-left:6px;">Check my Index \u2197</a>') + '</div><div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;">'
             + p.golfers.map(function (g, gi) {
                 return '<input type="text" data-tb-rename="' + gi + '" value="' + esc(g) + '">' + (S.answers.hcp === 'later' ? '<span></span>' : '<input type="text" inputmode="decimal" placeholder="hcp" data-tb-hcp="' + esc(key(g)) + '" value="' + esc(S.hcps[key(g)] || '') + '" style="width:64px;">');
             }).join('') + '</div></div>');

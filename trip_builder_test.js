@@ -61,7 +61,8 @@ test('the questions: each one with the likely answer picked; nothing silently sk
     const q = TB.questions(plan(), LOOPS);
     const a = Object.fromEntries(q.map((x) => [x.id, x.answer]));
     assert.equal(a['pts-1'], 'one', 'Day 1 2-point / nines rule: counted 1, said so');
-    assert.equal(a['cup-towin'], 'ok');
+    assert.equal(a['cup-towin'], 'adjust', 'the Cup is 10 points, not 12: first to 5½ pre-filled, flagged');
+    assert.match(q.find((x) => x.id === 'cup-towin').text, /Your paste has 12 Cup points \(first to 8½\); the app’s Cup has 10 \(Day 1: the app counts 1 a match\)/);
     assert.equal(a['cup-scoring'], 'net');
     assert.equal(a['kp-2'], 'buyin'); assert.equal(a['kp-3'], 'buyin');
     assert.equal(a['evnassau-4'], 'permatch');
@@ -125,7 +126,10 @@ test('the Cup: ryder-cup.js\'s own config, one session per day, every match, Day
     assert.ok(!/stake|payout|press/i.test(JSON.stringify(cup)), 'a Cup carries no money');
     ['RND001', 'RND002', 'RND003', 'RND004'].forEach((c, i) => assert.deepEqual(r.updates['events/' + c].ryderCupRef, { host: 'RND001', sessionId: 'd' + (i + 1) + 's1' }));
     const b = r.updates['trips/TRIP01/builder'];
-    assert.deepEqual([b.cup.toWin, b.cup.teams.map((t) => t.captain).join(), b.cup.days[0].points, b.cup.days[0].nines], [8.5, 'Manny,Tom', 2, true]);
+    assert.deepEqual([b.cup.toWin, b.cup.toWinPasted, b.cup.teams.map((t) => t.captain).join(), b.cup.days[0].points, b.cup.days[0].nines], [5.5, 8.5, 'Manny,Tom', 2, true]);
+    const q2 = TB.questions(p, LOOPS); q2.find((x) => x.id === 'cup-towin').answer = 'keep';
+    assert.equal(build(p, q2).updates['trips/TRIP01/builder'].cup.toWin, 8.5, 'Keep 8½');
+    p.cup.toWinManual = 6; assert.equal(build(p, q2).updates['trips/TRIP01/builder'].cup.toWin, 6, 'typed on the review wins');
     assert.deepEqual(b.notes, ['Loser team buys dinner Friday.', 'Day 4: Captains can swap the singles order up to Thursday night.']);
 });
 
@@ -141,8 +145,8 @@ test('the Cup scoreboard (display only): ryder-cup.js\'s own totals across round
     const B = sb.HardPanCupBoard || sb.window && sb.window.HardPanCupBoard;
     const res = B.compute(r.updates['trips/TRIP01/builder'].cup, events);
     assert.deepEqual(res.sides.map((s) => [s.name, s.captain, s.official]), [['Team USA', 'Manny', 4], ['Team EURO', 'Tom', 2]]);
-    assert.deepEqual([res.toWin, res.available, res.winner], [8.5, 10, null]);
-    assert.match(B.html(res), /First to 8½ wins · Team USA needs 4½, Team EURO needs 6½ · 10 points in all/);
+    assert.deepEqual([res.toWin, res.available, res.winner], [5.5, 10, null]);
+    assert.match(B.html(res), /First to 5½ wins · Team USA needs 1½, Team EURO needs 3½ · 10 points in all/);
     res.toWin = 4; res.winner = res.sides[0];
     assert.match(B.html(res), /Team USA wins the Cup \(4\)/);
 });

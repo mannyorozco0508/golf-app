@@ -163,6 +163,33 @@
         return plan;
     }
 
+    // ---- THE CUP'S POINTS: what the paste implies v what the app's Cup counts ------
+    // The app counts 1 a match; a day the paste scores higher (2-point matches) makes
+    // the app's Cup smaller than the paste's, and "first to X" has to follow it.
+    function cupPoints(plan) {
+        var app = 0, pasted = 0;
+        if (!plan.cup) return { app: 0, pasted: 0 };
+        plan.days.forEach(function (d) {
+            var f = d.format;
+            if (!f || !f.type || f.type === 'scramble') return;
+            var n = 0;
+            d.groups.forEach(function (g) { n += g.matches.length; });
+            app += n;
+            pasted += n * (f.points && f.points > 1 ? f.points : 1);
+        });
+        return { app: app, pasted: pasted };
+    }
+    // The target that is saved: typed on the review > the adjusted one (when the
+    // Cup is smaller than the paste's) > the pasted one.
+    function effectiveToWin(plan, qs) {
+        var c = plan.cup;
+        if (!c) return null;
+        if (c.toWinManual != null) return c.toWinManual;
+        var pts = cupPoints(plan);
+        if (c.toWin != null && pts.app < pts.pasted && answer(qs, 'cup-towin', 'adjust') === 'adjust') return pts.app / 2 + 0.5;
+        return c.toWin;
+    }
+
     // ---- THE QUESTIONS (likely answer picked) ---------------------------------
     // Each: { id, day?, text, options: [{ v, label }], answer }
     function questions(plan, loops) {
@@ -172,7 +199,10 @@
         if (cup) {
             if (cup.pointsPerWin !== 1) add('cup-points', 'The app’s Cup scores 1 point a match win (½ a halve). You wrote ' + cup.pointsPerWin + '.',
                 [{ v: 'one', label: 'Use 1 point a match (note yours on the trip)' }, { v: 'note', label: 'Same, and I’ll keep score by hand' }], 'one');
-            if (cup.toWin != null) add('cup-towin', '"First to ' + fmtPts(cup.toWin) + '" is kept on the trip page. The Cup card shows the points, not the target yet.',
+            var cp = cupPoints(plan);
+            if (cup.toWin != null && cp.app < cp.pasted) add('cup-towin', 'Your paste has ' + fmtPts(cp.pasted) + ' Cup points (first to ' + fmtPts(cup.toWin) + '); the app\u2019s Cup has ' + fmtPts(cp.app) + ' (' + plan.days.filter(function (d) { return d.format && d.format.points > 1; }).map(function (d) { return 'Day ' + d.n; }).join(', ') + ': the app counts 1 a match). First to:',
+                [{ v: 'adjust', label: fmtPts(cp.app / 2 + 0.5) + ' (half of ' + fmtPts(cp.app) + ', plus \u00bd)' }, { v: 'keep', label: 'Keep ' + fmtPts(cup.toWin) }], 'adjust');
+            else if (cup.toWin != null) add('cup-towin', '"First to ' + fmtPts(cup.toWin) + '" is kept on the trip page. The Cup card shows the points, not the target yet.',
                 [{ v: 'ok', label: 'OK' }], 'ok');
             add('cup-scoring', 'Cup matches: with handicaps or gross?', [{ v: 'net', label: 'With handicaps (net)' }, { v: 'gross', label: 'Gross' }], 'net');
             var sideNames = plan.teams.map(function (t) { return t.name; });
@@ -337,7 +367,7 @@
                 dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsCarryOver: false,
                 courseData: course.courseData || null, startingHole: 1,
                 teeRating: { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 },
-                alohaAllowed: false, handicapBasis: 'as-entered', players: players,
+                alohaAllowed: false, handicapBasis: 'as-entered', players: players, tripCode: c.tripCode,
                 ownerUid: c.uid
             };
             if (pool) {
@@ -395,7 +425,7 @@
         updates['trips/' + c.tripCode + '/builder'] = {
             v: 1, at: c.now,
             cup: cup ? { name: plan.name || null, teams: plan.teams.map(function (t) { return { name: t.name, captain: t.captain || null, players: t.players }; }),
-                pointsPerWin: cup.pointsPerWin, halve: cup.halve, toWin: cup.toWin,
+                pointsPerWin: cup.pointsPerWin, halve: cup.halve, toWin: effectiveToWin(plan, qs), toWinPasted: cup.toWin,
                 days: plan.days.map(function (d) { return { day: d.n, format: d.format ? d.format.raw : null, points: d.format && d.format.points || 1, nines: !!(d.format && d.format.nines) }; }) } : null,
             notes: plan.notes.map(function (n) { return (n.day ? 'Day ' + n.day + ': ' : '') + n.text; })
                 .concat([].concat.apply([], plan.days.map(function (d) { return d.notes.map(function (t) { return 'Day ' + d.n + ': ' + t; }); })))
@@ -409,7 +439,7 @@
         return plan;
     }
 
-    var api = { parseTrip: parseTrip, questions: questions, build: build, matchCourses: matchCourses, readFormat: readFormat, times: times, names: names, fmtPts: fmtPts };
+    var api = { cupPoints: cupPoints, effectiveToWin: effectiveToWin, parseTrip: parseTrip, questions: questions, build: build, matchCourses: matchCourses, readFormat: readFormat, times: times, names: names, fmtPts: fmtPts };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.HardPanTripBuilder = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -60,6 +60,9 @@
 <script src="bbb-engine.js"></script>
 <script src="vegas-engine.js"></script>
 <script src="extra-games-ui.js"></script>
+<!-- Pay with Venmo on your own Who Pays Who lines (HardPan, gps-venmo): links only. -->
+<script src="venmo-pay.js"></script>
+<style>.vm-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 8px;font-size:.84rem;} .vm-pay{display:inline-block;padding:7px 12px;border-radius:999px;background:#008CFF;color:#fff !important;font-weight:800;text-decoration:none;} .vm-web{font-size:.78rem;color:var(--text-muted);} .vm-paid,.vm-me{min-height:34px;padding:4px 10px;border-radius:999px;border:1px solid var(--border-mid);background:var(--bg-card);font-weight:700;cursor:pointer;} .vm-paid[aria-pressed=true]{background:var(--brand-green);color:#fff;border-color:var(--brand-green);} .vm-ask{color:var(--text-muted);font-style:italic;}</style>
 <!-- GPS:END -->
 <script src="settlement-engine.js"></script>
 <script src="side-match-lines.js"></script>
@@ -759,6 +762,10 @@ html {
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
             renderReceiptScorecard();
+            // GPS:BEGIN
+            // Pay with Venmo beside the payer's own lines; their username box (venmo-pay.js).
+            if (window.HardPanVenmo) { try { window.HardPanVenmo.onRound(db, currentMode, currentData); } catch (e) {} }
+            // GPS:END
         });
     }
     // ONE RENDERER, ONE SENTENCE, FOUR PAGES. The decision is OfflineQueue's;
