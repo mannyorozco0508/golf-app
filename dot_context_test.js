@@ -644,7 +644,7 @@ describe('SERVICE WORKER', () => {
         const pages = fs.readdirSync(REPO_ROOT).filter(f => f.endsWith('.html'));
         const refs = pages.reduce((n, f) =>
             n + (read(f).match(/firebase-app-compat\.js|firebase-database-compat\.js/g) || []).length, 0);
-        assert.equal(refs, 26, 'local Firebase SDK reference count must hold');  // 26: season.html (v218) loads app + database compat like every consumer page  // 24: game.html (v186) loads app + database compat like every consumer page
+        assert.equal(refs, fs.existsSync(path.join(REPO_ROOT, 'home.html')) ? 28 : 26, 'local Firebase SDK reference count must hold');  // 28 with the HardPan home.html (gps-doors, 2026-10-12: app + database compat); Consumer stays 26  // 26: season.html (v218) loads app + database compat like every consumer page  // 24: game.html (v186) loads app + database compat like every consumer page
         pages.forEach(f => assert.ok(!read(f).includes('gstatic.com/firebasejs'), f + ' points at gstatic'));
     });
 });

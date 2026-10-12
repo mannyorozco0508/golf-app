@@ -32,7 +32,10 @@
     function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function $(id) { return W.document.getElementById(id); }
     function native() { try { return !!(W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function' && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
-    function on() { return W.__hardpanDoors === true || native(); }
+    // THE HARDPAN GPS APP: native AND carrying the Geolocation plugin (com.rattlegolf.gpsbeta
+    // registers it; the Consumer app does not ship it, nor this file).
+    function gpsApp() { try { return native() && !!(W.Capacitor.Plugins && W.Capacitor.Plugins.Geolocation); } catch (e) { return false; } }
+    function on() { return W.__hardpanDoors === true || gpsApp(); }
     function door() { var d = ls(KEY); return d === 'gps' || d === 'games' ? d : null; }
     function setDoor(d) { ls(KEY, d); }
     function params() { try { return new URLSearchParams(W.location.search); } catch (e) { return { get: function () { return null; } }; } }

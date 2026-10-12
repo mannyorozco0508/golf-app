@@ -17,7 +17,8 @@ const skip = ON ? false : 'Consumer tree: no front doors';
 
 test('the doors show only in the app (or the check flag); the web pages are unchanged', { skip }, () => {
     const s = read('front-door.js');
-    assert.match(s, /function on\(\) \{ return W\.__hardpanDoors === true \|\| native\(\); \}/);
+    assert.match(s, /function on\(\) \{ return W\.__hardpanDoors === true \|\| gpsApp\(\); \}/);
+    assert.match(s, /W\.Capacitor\.Plugins && W\.Capacitor\.Plugins\.Geolocation/, 'the HardPan GPS app, not any native app');
     assert.match(s, /if \(on\(\) && !p\.get\('game'\)/, 'Home -> home.html only in the app');
     assert.match(s, /if \(!code \|\| !on\(\)\) return;/, 'the scorecard GPS button only in the app');
     assert.match(read('gps-view.js'), /if \(doorsOn\(\)\) \{/, 'GPS-2 controls only in the app');

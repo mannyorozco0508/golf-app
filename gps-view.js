@@ -217,7 +217,7 @@
     // The two front doors show in the app (Capacitor), or with window.__hardpanDoors.
     function doorsOn() {
         if (window.__hardpanDoors === true) return true;
-        try { return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
+        try { var C = window.Capacitor; return !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && C.Plugins && C.Plugins.Geolocation); } catch (e) { return false; }
     }
     function roundPlayers() { try { return (typeof currentData !== 'undefined' && currentData && currentData.players) || []; } catch (e) { return []; } }   /* global currentData */
     function openAddGame() {
