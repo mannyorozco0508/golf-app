@@ -3272,21 +3272,139 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // "Paste the whole round" on this page.
     function spRoundOpen() { const m = document.getElementById('sp-round-modal'); if (m) { m.style.display = 'block'; document.getElementById('sp-round-review').innerHTML = ''; m.scrollIntoView({ block: 'start' }); } }
     function spRoundClose() { const m = document.getElementById('sp-round-modal'); if (m) m.style.display = 'none'; }
+    // READ IT and CONFIRM (gps-paste-fix, 2026-10-12). Confirm puts the golfers, the
+    // groups and the games into THIS round directly - no draft, no "Fill it in" - and
+    // checks that they landed. Every failure is said on screen and logged.
+    let spRoundSideMatches = [];   // team Nassaus from the paste: written by this round's Save
+    let spRoundNotes = [];         // what the paste asked for and the round can't hold (Review lists it)
+    function spRoundStatus(html, kind) {
+        let el = document.getElementById('sp-round-status');
+        if (!el) {
+            el = document.createElement('div'); el.id = 'sp-round-status'; el.setAttribute('role', 'status');
+            const b = document.getElementById('sp-round-btn');
+            if (b && b.parentNode) b.parentNode.insertBefore(el, b.nextSibling); else return;
+        }
+        el.style.cssText = 'margin:8px 0; padding:10px 12px; border-radius:12px; font-size:0.86rem; border:1px solid '
+            + (kind === 'fail' ? 'var(--accent-red)' : 'var(--brand-green)') + '; background:var(--bg-card);';
+        el.innerHTML = html;
+    }
+    function spRoundFail(where, e) {
+        const why = (e && e.message) || String(e);
+        try { console.error('[paste the whole round] ' + where + ' failed:', e); } catch (x) {}
+        const out = document.getElementById('sp-round-review');
+        const msg = '⚠️ ' + where + ' did not work: ' + why + '. Nothing was changed - try again, or use Paste Player List.';
+        if (out) out.innerHTML = '<p class="sp-note" style="color:var(--accent-red); font-weight:700;">' + escapeHtml(msg) + '</p>';
+        spRoundStatus(escapeHtml(msg), 'fail');
+        if (typeof uiFail === 'function') uiFail(msg);
+    }
     function spRoundRead() {
-        const S = window.HardPanSetupPaste, box = document.getElementById('sp-round-box'), out = document.getElementById('sp-round-review');
-        if (!S || typeof parseSetupPaste !== 'function' || !box.value.trim()) return;
-        const plan = parseSetupPaste(box.value, { year: new Date().getFullYear() });
-        if (!plan.days.length) { out.innerHTML = '<p class="sp-note">No golfers or games found in that text.</p>'; return; }
-        if (plan.days.length > 1) plan.flags.unshift({ day: null, line: null, text: '', why: 'This looks like ' + plan.days.length + ' days - only the first is set up here (use the trip page for a whole trip)', level: 'ask' });
-        plan.days = plan.days.slice(0, 1);
-        S.renderReview(out, plan, { mode: 'round', onEdit: () => { out.innerHTML = ''; },
-            onConfirm: (resolved) => {
-                const d = S.dayDraft(resolved.days[0]);
-                spRoundClose();
-                S.setDraft(currentMode, Object.assign(d, { applied: true }));
-                spDraftOffer(currentMode);
-                spApplyDraft(d, currentMode);
-            } });
+        try {
+            const S = window.HardPanSetupPaste, box = document.getElementById('sp-round-box'), out = document.getElementById('sp-round-review');
+            if (!box || !out) throw new Error('the paste box is missing');
+            if (!box.value.trim()) { out.innerHTML = '<p class="sp-note" style="font-weight:700;">Paste the round into the box first.</p>'; return; }
+            if (!S || typeof parseSetupPaste !== 'function') throw new Error('the paste reader did not load - reload the page');
+            out.innerHTML = '<p class="sp-note">Reading…</p>';
+            const plan = parseSetupPaste(box.value, { year: new Date().getFullYear() });
+            if (!plan.days.length) { out.innerHTML = '<p class="sp-note" style="font-weight:700;">No golfers or games found in that text.</p>'; return; }
+            if (plan.days.length > 1) plan.flags.unshift({ day: null, line: null, text: '', why: 'This looks like ' + plan.days.length + ' days - only the first is set up here (use the trip page for a whole trip)', level: 'ask' });
+            plan.days = plan.days.slice(0, 1);
+            S.renderReview(out, plan, { mode: 'round', onEdit: () => { out.innerHTML = ''; }, onConfirm: (resolved) => spRoundConfirm(resolved) });
+        } catch (e) { spRoundFail('Read it', e); }
+    }
+    function spRoundConfirm(resolved) {
+        try {
+            const S = window.HardPanSetupPaste;
+            const day = resolved.days[0];
+            const d = S.dayDraft(day);
+            const key = (n) => String(n || '').trim().toLowerCase();
+            // 1. THE GOLFERS, in group order. A golfer already on the list by the same
+            // name keeps their row (id, tee) and takes the pasted handicap; anyone else
+            // already on it is kept, as a last group. Nobody is merged by a near-match.
+            const existing = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim());
+            const pool = existing.slice();
+            const take = (name) => { const i = pool.findIndex((e) => key(e.name) === key(name)); return i === -1 ? null : pool.splice(i, 1)[0]; };
+            const rows = [], sizes = [];
+            day.groups.forEach((g) => {
+                g.players.forEach((p) => {
+                    const e = take(p.name);
+                    const row = e ? Object.assign({}, e) : { name: p.name, hcp: '', team: '', squad: rows.length % 2 ? 'blue' : 'red', playingForMoney: true };
+                    if (p.hcp !== '' && p.hcp != null) row.hcp = p.hcp;
+                    if (p.flight) row.flight = p.flight;
+                    rows.push(row);
+                });
+                if (g.players.length) sizes.push(g.players.length);
+            });
+            if (!rows.length) throw new Error('the paste has no golfers');
+            const kept = pool.slice();
+            if (kept.length) { sizes.push(kept.length); kept.forEach((p) => rows.push(p)); }
+            if (rows.some((p) => p.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            groupSizeOverrides = {};
+            sizes.forEach((n, i) => { groupSizeOverrides[i] = n; });
+            renderPlayerListHeaderAndWarning(rows.length);
+            rows.forEach((p) => appendPlayerFrom(p, false, rows.length));
+            updateCount();
+            const landed = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim()).length;
+            if (landed !== rows.length) throw new Error('only ' + landed + ' of ' + rows.length + ' golfers landed on the list');
+            // 2. THE FORMAT: one for the round, or none (listed).
+            const rf = S.roundFormat(day);
+            if (rf.set) {
+                const fx = day.games.concat([].concat.apply([], day.groups.map((g) => g.games))).find((x) => x.type === rf.set);
+                if (rf.set === 'wolf' && fx && fx.perPoint != null) gpsSetField('wolf-point-value', fx.perPoint);
+                selectFormatCard(rf.set);
+            } else if (d.nassau && !rf.notSet.length) selectFormatCard(SP_NASSAU_CARD);
+            // 3. THE MONEY, now: the 1v1 Nassau card, skins, Vegas, Bingo Bango Bongo.
+            spPendingMoney = d;
+            spArriveMoney(WIZARD_STEP_OF.action);
+            // 4. TEAM NASSAUS: written by this round's own Save, in the same update.
+            spRoundSideMatches = (d.bets || []).map((b) => ({ group: b.group, groupIndex: day.groups.findIndex((g) => g.label === b.group), a: b.a, b: b.b,
+                front: b.front, back: b.back, overall: b.overall, press: b.press }));
+            // 5. SAID IN PLACE.
+            const games = [];
+            spRoundSideMatches.forEach((x) => games.push('Nassau ' + x.group + ' (' + x.a.join(' & ') + ' v ' + x.b.join(' & ') + ')'));
+            if (d.nassau) games.push('Nassau ' + d.nassau.a.join(' & ') + ' v ' + d.nassau.b.join(' & '));
+            (d.skins || []).concat(d.extraSkins || []).forEach((x) => games.push('Skins $' + x.amount));
+            (d.newGames || []).forEach((x) => games.push((x.type === 'vegas' ? 'Vegas' : 'Bingo Bango Bongo') + ' $' + (x.perPoint == null ? 1 : x.perPoint) + '/pt ' + (x.group || '')));
+            if (rf.set) games.push('Format: ' + (S.FORMAT_WORDS[rf.set] || rf.set));
+            const extraSkins = (d.extraSkins || []).length;
+            const vegasNoTeams = (d.newGames || []).filter((x) => x.type === 'vegas' && !x.teams).map((x) => x.group);
+            spRoundClose();
+            spRoundStatus('<b>✓ Added ' + (rows.length - kept.length) + ' golfers in ' + day.groups.length + ' group' + (day.groups.length === 1 ? '' : 's') + '</b>'
+                + (kept.length ? ' (+ ' + kept.length + ' already on the list, kept as the last group: ' + escapeHtml(kept.map((p) => p.name).join(', ')) + ')' : '')
+                + (games.length ? '<div>Games: ' + escapeHtml(games.join(' · ')) + '</div>' : '')
+                + (rf.notSet.length ? '<div style="color:var(--warn-text); font-weight:700;">Not set up: ' + escapeHtml(rf.notSet.map((x) => x.label + ' (' + x.group + ')').join(', ')) + ' — ' + escapeHtml(rf.notSet[0].why) + '; everyone plays stroke play.</div>' : '')
+                + (extraSkins ? '' : '')
+                + (vegasNoTeams.length ? '<div style="color:var(--warn-text);">Vegas ' + escapeHtml(vegasNoTeams.join(', ')) + ': teams are the first two v the last two - change them on Money.</div>' : '')
+                + '<div class="sp-info">Everything is on Review &amp; Save below; nothing is saved until Save &amp; Start Round, and every step stays editable.</div>', 'ok');
+            spRoundNotes = [['Groups', sizes.length + ' groups (' + sizes.join(' / ') + ')']];
+            if (rf.notSet.length) spRoundNotes.push(['Not set up', rf.notSet.map((x) => x.label + ' (' + x.group + ')').join(', ') + ' — ' + rf.notSet[0].why + '; everyone plays stroke play']);
+            if (vegasNoTeams.length) spRoundNotes.push(['Vegas teams', vegasNoTeams.join(', ') + ': the first two v the last two — change on Games & Money']);
+            if (kept.length) spRoundNotes.push(['Kept from before', kept.map((p) => p.name).join(', ') + ' (last group)']);
+            // READY TO PLAY: straight to Review & Save.
+            goToWizardStep(WIZARD_STEP_OF.review);
+        } catch (e) { spRoundFail('Confirm', e); }
+    }
+    // The team Nassaus, as the payload keys the Save adds (same builder as the Action tab).
+    function spRoundSideMatchesForSave() {
+        const out = {};
+        if (!spRoundSideMatches.length || typeof buildNassauWagerPayload !== 'function') return out;
+        const ps = collectWizardPlayers();
+        const ids = (names) => (names || []).map((n) => { const p = ps.find((x) => String(x.name).trim().toLowerCase() === String(n).trim().toLowerCase()); return p ? String(p.id) : null; }).filter(Boolean);
+        const multi = Object.keys(groupSizeOverrides || {}).length > 1;
+        spRoundSideMatches.forEach((x, i) => {
+            const a = ids(x.a), b = ids(x.b);
+            if (!a.length || a.length !== b.length) return;
+            const pl = buildNassauWagerPayload({ teamAIds: a, teamBIds: b, frontStake: x.front, backStake: x.back, overallStake: x.overall,
+                pressRule: x.press === 'auto' ? '2down' : x.press === 'manual' ? 'anytime' : 'none', scoring: 'net', startHole: 1, createdAt: Date.now() + i });
+            if (multi && x.groupIndex >= 0) { pl.scope = 'group'; pl.ownerGroup = x.groupIndex + 1; }
+            out['sideMatches/sp' + Date.now().toString(36) + i] = pl;
+        });
+        return out;
+    }
+    function spRoundReviewRows() {
+        return spRoundSideMatches.map((x) => ['⚔️ Nassau', x.a.join(' & ') + ' v ' + x.b.join(' & ') + ' · $' + x.front + '/$' + x.back + '/$' + x.overall + ' · ' + x.group
+            + (x.press === 'auto' ? ' · auto press' : x.press === 'manual' ? ' · presses' : ' · no presses')]).concat(spRoundNotes);
     }
     // GPS:END
     // NOTHING FROM THE PREVIOUS FORMAT MAY FOLLOW THE ORGANIZER INTO A CUP.
@@ -3978,6 +4096,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // see wizardSideMatchLine above - never from the form.
         const sideMatchLine = wizardSideMatchLine();
         if (sideMatchLine) rows.push(['Side Match', sideMatchLine, 6, SEC_ACTION]);
+        // GPS:BEGIN
+        if (typeof spRoundReviewRows === 'function') spRoundReviewRows().forEach((r) => rows.push(r.concat([6, SEC_ACTION])));
+        // GPS:END
 
         // THE GATE IS PART OF REVIEW, drawn from the same read. Called after the rows
         // so a host sees what the round IS and then what it still needs.
@@ -12784,6 +12905,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 const nKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
                 payload[`sideMatches/${nKey}`] = setupNassau;
             }
+            // GPS:BEGIN
+            // Team Nassaus from "Paste the whole round": in this same Save.
+            if (typeof spRoundSideMatchesForSave === 'function') Object.assign(payload, spRoundSideMatchesForSave());
+            // GPS:END
 
             // AN EXISTING ROUND KEEPS THE MODE IT WAS PLAYED UNDER.
             //

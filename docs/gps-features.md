@@ -205,3 +205,26 @@ Rules that would need ADDING (additive; nothing existing changes):
 - AFTER OCT 17 (needs the Ryder engine): per-match points (2-point matches), per-nine
   matches (startHole/endHole on a match), a stored target/captains on the Cup, and the
   scorecard's Cup card adding the other days.
+
+## 13. "Paste the whole round" lands (branch gps-paste-fix, 2026-10-12)
+- Muse's report: Read it parsed 32 golfers; Confirm said nothing; Review & Save had 1 golfer.
+- Root cause: Confirm cleared the golfer list and handed the text to Paste Player List to
+  READ AGAIN; that second read returned silently when it found nobody (and the one golfer
+  already typed in was dropped either way). It also left a draft for a later "Fill it in",
+  set the WHOLE round to Wolf because Group 2 played Wolf, and queued team Nassaus for
+  Side Matches after Save. Read it returned silently on an empty box / a reader not loaded.
+- Now Confirm (admin.html spRoundConfirm): writes every golfer row itself, in group order
+  (a golfer already on the list keeps their row; others are kept as a last group), sets the
+  groups, checks that every golfer landed (else a visible error), fills Games & Money now
+  (1v1 Nassau card, skins, Vegas, BBB with their golfers/teams), keeps team Nassaus for this
+  round's own Save (same update, scope/ownerGroup like the Action tab), and opens Review &
+  Save with every golfer, the groups, every game and "Not set up". Every failure in Read it
+  / Confirm is shown on screen and logged.
+- "Name, 12" = "Name (12)". Near-duplicate names (Zach Corrano / Zach Carrano, Derrick /
+  Derrick J Doncaster, Bill / Billy Saley) are warned on the review; both always kept.
+- One scoring format a round: one format for every group is set; groups on different formats
+  (Wolf, Best Ball, Scramble, Stableford) set none and are listed as "not set up".
+- Trip builder: its one-round path needs DAY lines - this text reads 0 days there (no golfers
+  lost, nothing written); it is a separate flow (makes a new trip), so Round Setup keeps its own.
+- tools/paste-round-check.js: Muse's text on a new round, on a saved round with a golfer
+  already typed, with "Name, 12", and a 1-group $5 Nassau; then build 12 / main open them.

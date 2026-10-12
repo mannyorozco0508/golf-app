@@ -44,6 +44,48 @@
         return a.length && b.length ? { a: a, b: b, how: 'picked' } : null;
     }
 
+    // ---- TWO GOLFERS OR ONE? (never merged) -------------------------------------------
+    // Same name twice, the same first + last name with a middle initial between, or one
+    // or two letters apart with the same first name: "Zach Corrano" / "Zach Carrano",
+    // "Derrick Doncaster" / "Derrick J Doncaster". Both are always kept; the review says so.
+    function lev(a, b) {
+        var m = a.length, n = b.length, d = [], i, j;
+        for (i = 0; i <= m; i++) { d[i] = [i]; }
+        for (j = 1; j <= n; j++) d[0][j] = j;
+        for (i = 1; i <= m; i++) for (j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        return d[m][n];
+    }
+    function nearDupes(names) {
+        var out = [], norm = function (n) { return String(n || '').toLowerCase().replace(/[.']/g, '').replace(/\s+/g, ' ').trim(); };
+        for (var i = 0; i < names.length; i++) for (var j = i + 1; j < names.length; j++) {
+            var a = norm(names[i]), b = norm(names[j]), ta = a.split(' '), tb = b.split(' ');
+            var same = a === b;
+            var middle = ta.length !== tb.length && ta[0] === tb[0] && ta[ta.length - 1] === tb[tb.length - 1];
+            var close = ta[0] === tb[0] && a.length > 5 && lev(a, b) <= 2;
+            // "Bill Saley" / "Billy Saley": the same surname, one first name the start of the other.
+            var nick = ta.length > 1 && tb.length > 1 && ta[ta.length - 1] === tb[tb.length - 1] && ta[0] !== tb[0] && (ta[0].indexOf(tb[0]) === 0 || tb[0].indexOf(ta[0]) === 0);
+            if (same || middle || close || nick) out.push({ a: names[i], b: names[j], same: same });
+        }
+        return out;
+    }
+    // ---- ONE SCORING FORMAT A ROUND ------------------------------------------------------
+    // A round has one format card. One format for every group (or one group): set it.
+    // Different groups on different formats (Wolf here, Scramble there): none is set -
+    // each is listed as "not set up", with why. Never dropped silently.
+    var FORMAT_WORDS = { wolf: 'Wolf', bestball: 'Best Ball', scramble: 'Scramble', stableford: 'Stableford', hilo: 'Hi-Lo', ryder: 'Team Match', stroke: 'Stroke Play' };
+    function roundFormat(day) {
+        var per = day.groups.map(function (g) { return day.games.concat(g.games).filter(function (x) { return x.format; }).map(function (x) { return x.type; })[0] || null; });
+        var kinds = per.filter(Boolean).filter(function (t, i, a) { return a.indexOf(t) === i; });
+        var all = per.every(Boolean) || day.games.some(function (x) { return x.format; });
+        if (kinds.length === 1 && (all || day.groups.length <= 1)) return { set: kinds[0], notSet: [] };
+        var notSet = [];
+        day.groups.forEach(function (g, gi) {
+            if (per[gi]) notSet.push({ group: g.label, type: per[gi], label: FORMAT_WORDS[per[gi]] || per[gi],
+                why: kinds.length > 1 ? 'the round has one scoring format and the groups differ' : 'only some groups play it' });
+        });
+        return { set: null, notSet: notSet };
+    }
+
     // ---- THE REVIEW -------------------------------------------------------------------
     // opts: { mode: 'trip' | 'round', onConfirm(resolved), onEdit() }
     function renderReview(el, plan, opts) {
@@ -62,6 +104,13 @@
             if (asks.length) h.push('<div class="sp-box sp-ask"><b>Questions</b><ul>' + asks.map(function (f) { return '<li>' + (f.day ? 'Day ' + f.day + ': ' : '') + esc(f.why) + '</li>'; }).join('') + '</ul></div>');
             if (skips.length) h.push('<div class="sp-box sp-skip"><b>Skipped (not a game in this app)</b><ul>' + skips.map(function (f) { return '<li>' + esc(f.text) + '</li>'; }).join('') + '</ul></div>');
             if (warns.length) h.push('<div class="sp-box sp-warn"><b>Check these</b><ul>' + warns.map(function (f) { return '<li>' + (f.line ? 'Line ' + f.line + ': ' : '') + esc(f.why) + (f.text && f.text !== f.why ? ' — “' + esc(f.text) + '”' : '') + '</li>'; }).join('') + '</ul></div>');
+            var dupes = nearDupes(plan.days.reduce(function (a, d) { d.groups.forEach(function (g) { g.players.forEach(function (p) { a.push(p.name); }); }); return a; }, []));
+            if (dupes.length) h.push('<div class="sp-box sp-warn sp-dupes"><b>Two golfers, or one typed twice?</b> Both are kept \u2014 fix a name in the text if it\u2019s one person.<ul>' + dupes.map(function (x) { return '<li>' + esc(x.a) + ' / ' + esc(x.b) + (x.same ? ' (same name twice)' : '') + '</li>'; }).join('') + '</ul></div>');
+            if (opts.mode === 'round' && plan.days[0]) {
+                var rf = roundFormat(plan.days[0]);
+                if (rf.notSet.length) h.push('<div class="sp-box sp-warn sp-notset"><b>Not set up</b> (' + esc(rf.notSet[0].why) + '; everyone plays stroke play \u2014 pick a format on the Games step if you want one):<ul>' + rf.notSet.map(function (x) { return '<li>' + esc(x.label) + ' \u2014 ' + esc(x.group) + '</li>'; }).join('') + '</ul></div>');
+                else if (rf.set) h.push('<div class="sp-box sp-info">Format: ' + esc(FORMAT_WORDS[rf.set] || rf.set) + ' for the round</div>');
+            }
             if (info.length) h.push('<div class="sp-box sp-info">Ignored: ' + info.map(function (f) { return '“' + esc(f.text) + '”'; }).join(', ') + '</div>');
             plan.days.forEach(function (d) {
                 h.push('<div class="sp-day" data-day="' + d.n + '"><div class="sp-day-head">Day ' + d.n + ' · ');
@@ -222,7 +271,7 @@
     function betsFor(code) { var b = lsGet(BETS + code); return b && b.bets && b.bets.length ? b.bets : []; }
     function setBets(code, bets) { if (bets.length) lsSet(BETS + code, { at: Date.now(), bets: bets }); else lsDel(BETS + code); }
 
-    W.HardPanSetupPaste = { renderReview: renderReview, itineraryText: itineraryText, rosterText: rosterText, dayDraft: dayDraft, gameText: gameText,
+    W.HardPanSetupPaste = { nearDupes: nearDupes, roundFormat: roundFormat, FORMAT_WORDS: FORMAT_WORDS, renderReview: renderReview, itineraryText: itineraryText, rosterText: rosterText, dayDraft: dayDraft, gameText: gameText,
         savePending: savePending, pending: pending, bindCodes: bindCodes, draftFor: draftFor, setDraft: setDraft, dropDraft: dropDraft,
         queueBets: queueBets, betsFor: betsFor, setBets: setBets, nassauSides: nassauSides, time12: time12 };
     if (typeof module !== 'undefined' && module.exports) module.exports = W.HardPanSetupPaste;
