@@ -943,7 +943,9 @@
                     note.innerHTML = '<b>Day 1 = today, this course, these golfers.</b> Add the other days below (a line like <b>DAY 2 - Tue Oct 13 - True Blue</b>, then the groups and games), a Cup line and TEAMS if it is a match, then Read it → Confirm.'
                         + '<div style="margin-top:4px;">Confirm creates the trip and every day as a new round, Day 1 included. Your round <b>' + esc(pf.from || '') + '</b> keeps its scores where it is.</div>';
                     box.parentNode.insertBefore(note, box);
-                    try { box.focus(); box.setSelectionRange(box.value.length, box.value.length); } catch (e) {}
+                    // No focus: the keyboard would cover the note; a tap in the box types at the end.
+                    note.style.scrollMarginTop = 'calc(env(safe-area-inset-top) + 16px)';   // clear of the status bar
+                    note.scrollIntoView({ block: 'start' });
                 }
             } catch (e) {}
         }, 300);
