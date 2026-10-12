@@ -3295,7 +3295,6 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const msg = '⚠️ ' + where + ' did not work: ' + why + '. Nothing was changed - try again, or use Paste Player List.';
         if (out) out.innerHTML = '<p class="sp-note" style="color:var(--accent-red); font-weight:700;">' + escapeHtml(msg) + '</p>';
         spRoundStatus(escapeHtml(msg), 'fail');
-        if (typeof uiFail === 'function') uiFail(msg);
     }
     function spRoundRead() {
         try {
