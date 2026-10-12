@@ -137,6 +137,9 @@ function tspPlayer(tok) {
 }
 // A line of golfers: commas, "&", "and", "/", "+"; "vs" / "v" makes two teams.
 function tspPlayersLine(s) {
+    // "Manny Orozco, 12" is a handicap, not a second golfer called "12": a comma
+    // followed by a number alone reads as "Manny Orozco (12)".
+    s = String(s || '').replace(/,\s*([+-]?\d{1,2}(?:\.\d)?)\s*(?=$|[,;&\/]|\s+(?:vs\.?|v\.?|versus)\s)/gi, ' ($1)');
     var sides = s.split(/\s+(?:vs\.?|v\.?|versus)\s+/i);
     var teams = sides.length === 2 ? [] : null;
     var players = [], bad = [];
