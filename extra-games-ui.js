@@ -19,7 +19,7 @@
 (function () {
     'use strict';
     var W = window;
-    var FORMATS = { bbb: { icon: '🎯', label: 'Bingo Bango Bongo' }, vegas: { icon: '🎰', label: 'Vegas' } };
+    var FORMATS = { bbb: { icon: '🟢', label: 'Bingo Bango Bongo' }, vegas: { icon: '🔢', label: 'Vegas' } };
     var KIND_LABEL = { bingo: 'Bingo · first on', bango: 'Bango · closest', bongo: 'Bongo · first in' };
     var ctx = null;
 
