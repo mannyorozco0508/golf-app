@@ -87,6 +87,15 @@
 <script src="pool-engine.js"></script>
     <script src="course-data.js"></script>
     <script src="code-issuer.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- The trip builder (HardPan, gps-builder): one paste -> one review -> the trip and
+         every round set up. The Cup's builder and the side-match builder it reuses. -->
+    <script src="challenges.js"></script>
+    <script src="ryder-cup.js"></script>
+    <script src="trip-builder.js"></script>
+    <script src="trip-builder-ui.js"></script>
+    <script src="cup-scoreboard.js"></script>
+    <!-- GPS:END -->
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -347,6 +356,15 @@ html {
              teams, games and handicaps in one paste. A review first; Confirm fills the two
              boxes below (their own review + Apply as always) and keeps each day's groups
              and games on this phone, for that day's Round Setup to fill in after Build Trip. -->
+        <details class="settle-card" id="tb-card" style="margin-bottom:12px;" open>
+            <summary style="font-weight:bold; cursor:pointer;">🗓️ Build the whole trip from one paste (days, Cup, groups, games)</summary>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">Describe the trip once: TRIP name, the Cup line and TEAMS, then each DAY with its course, tee times, Format and groups ("Group 1 (9:10): Manny &amp; Joe vs Tom &amp; Rick &ndash; $5 Nassau"). One review, then Confirm creates the trip and every round, set up.</p>
+            <textarea id="tb-box" rows="10" style="width:100%; font-size:0.84rem;" placeholder="TRIP: Myrtle Cup&#10;Ryder Cup style. Team USA vs Team EURO. First to 8.5 wins.&#10;TEAMS&#10;Team USA: Manny (captain), Joe, Mike, Dave&#10;Team EURO: Tom (captain), Rick, Steve, Paul&#10;DAY 1 - Tue Oct 13 - Caledonia, 9:10 &amp; 9:20&#10;Format: Four-ball&#10;Group 1 (9:10): Manny &amp; Joe vs Tom &amp; Rick - $5 Nassau"></textarea>
+            <div class="form-group" style="margin:8px 0;"><label>Year these dates are in</label><input type="number" id="tb-year" min="2024" max="2099" value="2026" style="max-width:120px;"></div>
+            <button type="button" class="btn-outline" onclick="HardPanTripBuilderUI.read()">Read it &rarr;</button>
+            <div id="tb-review" style="margin-top:10px;"></div>
+            <style>.tb-row{margin:4px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;} .tb-group{border-top:1px dashed var(--border-faint);margin-top:6px;padding-top:6px;} .tb-game{margin:4px 0;} .tb-game input[type=number]{padding:4px;} .tb-x{border:0;background:none;color:var(--text-muted);font-weight:800;min-height:32px;cursor:pointer;} .tb-chip{min-height:34px;padding:4px 10px;border-radius:999px;border:1px solid var(--brand-green);background:var(--bg-card);font-weight:700;cursor:pointer;}</style>
+        </details>
         <details class="settle-card" id="sp-trip-card" style="margin-bottom:12px;" open>
             <summary style="font-weight:bold; cursor:pointer;">📋 Paste the whole trip (days, groups, games)</summary>
             <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">A group chat, an email or a list: dates, courses, tee times, groups, teams ("A &amp; B vs C &amp; D"), games ($5 Nassau, $2 skins, wolf, best ball&hellip;) and handicaps.</p>
@@ -5146,6 +5164,18 @@ html {
                 renderPrizeSpotInputs(); // build the $ inputs once before points race tries to sync payouts against them
             }
             renderRoundsList();
+            // GPS:BEGIN
+            // Built by the trip builder: the Cup's own rules, captains and the notes.
+            if (window.HardPanTripBuilderUI) {
+                let tbm = document.getElementById('tb-trip-mount');
+                if (!tbm) { tbm = document.createElement('div'); tbm.id = 'tb-trip-mount'; const nm = document.getElementById('manage-trip-name'); if (nm && nm.parentNode) nm.parentNode.insertBefore(tbm, nm.nextSibling); }
+                try { tbm.innerHTML = window.HardPanTripBuilderUI.tripCardHtml(tripData); } catch (e) { tbm.innerHTML = ''; }
+                // The running Cup (display only, cup-scoreboard.js): every round's own Ryder result.
+                let cbm = document.getElementById('cup-board-mount');
+                if (!cbm) { cbm = document.createElement('div'); cbm.id = 'cup-board-mount'; tbm.parentNode.insertBefore(cbm, tbm); }
+                if (window.HardPanCupBoard) { try { window.HardPanCupBoard.watch(db, tripData, cbm); } catch (e) { cbm.innerHTML = ''; } }
+            }
+            // GPS:END
             renderTournamentsList();
             refreshTripComputations();
         });

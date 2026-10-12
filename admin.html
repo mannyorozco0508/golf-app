@@ -3961,6 +3961,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}`, 6, SEC_ACTION]);
         });
         Object.values(captureSkinsInstances()).forEach(cfg => {
+            // GPS:BEGIN
+            // Bingo Bango Bongo / Vegas ride in the same map: their own line, not "Skins".
+            if (cfg && (cfg.format === 'bbb' || cfg.format === 'vegas')) { rows.push(exgReviewRow(cfg).concat([6, SEC_ACTION])); return; }
+            // GPS:END
             const n = (cfg.participantIds || collectWizardPlayers().map(p => p.id)).length;
             const mode = cfg.skinsPotFormat === 'split' ? 'Gross & Net' : (cfg.skinsPotFormat === 'net' ? 'Net' : 'Gross');
             rows.push(['\uD83E\uDD69 Skins',
@@ -5496,6 +5500,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             players: () => collectWizardPlayers(),
             changed: () => { if (typeof updateWizardReview === 'function') updateWizardReview(); }
         });
+    }
+    function exgReviewRow(cfg) {
+        const ps = collectWizardPlayers();
+        const nm = (id) => { const p = ps.find((x) => String(x.id) === String(id)); return p ? String(p.name).split(' ')[0] : '?'; };
+        if (cfg.format === 'vegas') {
+            const teams = (cfg.vegasTeamA || []).map(nm).join(' & ') + ' v ' + (cfg.vegasTeamB || []).map(nm).join(' & ');
+            return ['\uD83D\uDD22 Vegas', `$${cfg.vegasPointVal || 0}/pt \u00B7 ${teams}${cfg.vegasBirdieFlip ? ' \u00B7 birdie flip' : ''}`];
+        }
+        const n = (cfg.participantIds || ps.map((p) => p.id)).length;
+        return ['\uD83D\uDFE2 Bingo Bango Bongo', `$${cfg.bbbPointVal || 0}/pt \u00B7 ${n} players`];
     }
     // After a round is loaded: a copied round starts with no BBB points; a reopened
     // one keeps its held points in step with the course, so Save never writes back

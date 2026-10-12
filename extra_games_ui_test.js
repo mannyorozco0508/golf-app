@@ -89,7 +89,7 @@ test('Round Setup editor: add, $ per point, BBB golfers, Vegas teams A -> B -> o
     X.editorAct(map, players, 'flip', v);
     assert.equal(map[v].vegasBirdieFlip, true);
     const html = X.editorHtml(map, players);
-    assert.match(html, /\+ 🎯 Bingo Bango Bongo/); assert.match(html, /Birdie flips the other team/);
+    assert.match(html, /\+ 🟢 Bingo Bango Bongo/); assert.match(html, /Birdie flips the other team/);
     X.editorAct(map, players, 'remove', v);
     assert.deepEqual(Object.keys(map).sort(), [b, 'sk'].sort(), 'skins untouched');
     assert.equal(X.editorAct(map, players, 'remove', 'sk'), false, 'the editor cannot touch a skins game');
