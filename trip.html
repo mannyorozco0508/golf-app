@@ -97,6 +97,9 @@
     <script src="cup-scoreboard.js"></script>
     <!-- Two front doors (HardPan app): trip.html#build opens the trip builder. -->
     <script src="front-door.js"></script>
+    <!-- Points League (HardPan, gps-league): the week's points from each group's 2 v 2 Nassau. -->
+    <script src="league-engine.js"></script>
+    <script src="league-ui.js"></script>
     <!-- GPS:END -->
     <style>
         :root {
@@ -706,6 +709,14 @@ html {
 
     <div id="trip-placeholder-warning" style="display:none; background:var(--warn-bg); border:2px solid var(--warn-border); border-radius:10px; padding:14px; margin-bottom:14px; font-size:0.82rem; color:var(--warn-text);"></div>
 
+    <!-- GPS:BEGIN -->
+    <!-- POINTS LEAGUE (HardPan, gps-league): league-ui.js draws it; hidden until set up
+         (the organizer sees "Set up the Points League"). -->
+    <details class="trip-section" id="league-section" style="display:none;" open>
+        <summary>🏅 Points League</summary>
+        <div class="trip-section-body"><div id="league-card"></div></div>
+    </details>
+    <!-- GPS:END -->
     <details class="trip-section" open>
         <summary>🏆 Cumulative Leaderboard</summary>
         <div class="trip-section-body">
@@ -728,6 +739,10 @@ html {
         <div class="trip-section-body">
             <p class="trip-section-sub">Settle up for real over Venmo — this is just the math.</p>
             <div id="trip-money-settlement"></div>
+            <!-- GPS:BEGIN -->
+            <!-- The Points League's own "who gets paid" (settled separately; not part of the above). -->
+            <div id="league-settle"></div>
+            <!-- GPS:END -->
         </div>
     </details>
 
@@ -3127,6 +3142,9 @@ html {
             awardsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the awards.</div>`;
             pointsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:14px; font-size:0.85rem;">Link a round above to see the points race.</div>`;
             document.getElementById('trip-placeholder-warning').style.display = 'none';
+            // GPS:BEGIN
+            leagueRender([]);
+            // GPS:END
             renderTripRoster();
             renderTripIdentityQuestions();
             return;
@@ -3158,6 +3176,9 @@ html {
                 renderTripMoneySettlement();
                 renderTripAwards();
                 renderPointsRace();
+                // GPS:BEGIN
+                leagueRender(cachedCountedResults);
+                // GPS:END
             })
             .catch(err => {
                 scoreContainer.innerHTML = `<div style="color:var(--accent-red); text-align:center; padding:14px; font-size:0.85rem;">⚠️ Error loading rounds: ${err.message}</div>`;
@@ -4303,6 +4324,16 @@ html {
         return standings;
     }
 
+    // GPS:BEGIN
+    // POINTS LEAGUE (gps-league): the trip's counted rounds, read-only; the organizer edits.
+    function leagueRender(rounds) {
+        if (!window.HardPanLeague) return;
+        try {
+            window.HardPanLeague.render({ code: currentTripCode, trip: tripData || {}, rounds: (rounds || []).map((r) => ({ code: r.code, label: r.label, data: r.data })),
+                organizer: hasTripOrganizerAuthority(), db: typeof db !== 'undefined' ? db : null });
+        } catch (e) { console.error('[league]', e); }
+    }
+    // GPS:END
     function renderPointsRace() {
         const container = document.getElementById('trip-points-race');
         if (cachedRoundResults.length === 0) return;
