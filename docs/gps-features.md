@@ -295,3 +295,16 @@ Rules that would need ADDING (additive; nothing existing changes):
   counts (results are read whenever drawn). "Who gets paid" is its own card under Trip Money Settlement,
   settled separately - Who Pays Who and every settlement are untouched. Checks: league_engine_test.js,
   tools/league-check.js (organizer + golfer + build 12 / web app).
+- gps-points (2026-10-13): the league made a general POINTS GAME. Add a game > All games > "Points game"
+  (points.html?game=<round>&setup=1) and the trip page card. One setup screen: rounds (this round only, or
+  several - the trip's rounds incl. later ones when this phone has opened the round's trip, else rounds added
+  by game code), format & points (every round: four-ball / foursomes / scramble / singles; Nassau-style
+  front/back/18 or a plain 18-hole match with win/halve points; any round its own, editable later), teams
+  (each round's own 2 v 2 / 1 v 1 bets, or the same 2 v 2 sides every round - scored from each round's scores
+  by the match engine; a singles round splits each pairing into two 1 v 1s), golfers (none picked, Select
+  all), money (the Weekly game's payout setup: % presets or exact $ per place adding up to the pot) and the
+  live line. Results are read-only: four-ball / singles from the match engine, a Cup round's matches from the
+  Ryder engine (front/back by the match engine for four-ball / singles), foursomes / scramble tapped in.
+  Kept at events/<round>/pointsGame (this round, or rounds by code) or trips/<trip>/league (the trip's
+  rounds) - no rules change. Results page: its own "who gets paid" card. Checks: league_engine_test.js,
+  tools/league-check.js, tools/points-check.js.

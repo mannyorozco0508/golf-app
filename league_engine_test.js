@@ -65,15 +65,15 @@ test('a round in progress: only decided segments count; a segment closed early c
     assert.equal(st.rows[0].pts, 1); assert.equal(st.rows[0].w + st.rows[0].l + st.rows[0].h, 0, 'no W/L/H until all three are decided');
 });
 
-test('only 2 v 2 Nassaus count; presses and other side bets are ignored; the round is never written to', { skip }, () => {
+test('2 v 2 Nassaus and 2 v 2 match-play bets give the sides (Manny: "from its Nassau/match"); 1 v 1 and presses ignored in a four-ball round; the round is never written to', { skip }, () => {
     const r = round('R1', names24.slice(0, 4), ['A']);
     r.data.sideMatches.x1 = { format: 'nassau', teamAIds: ['101'], teamBIds: ['103'], scoring: 'net' };
     r.data.sideMatches.x2 = { format: 'match', teamAIds: ['101', '102'], teamBIds: ['103', '104'], scoring: 'net' };
     r.data.sideMatches.sm0.pressRule = '2down';
     const before = JSON.stringify(r.data);
     const st = L.leagueState({ league: { on: true } }, [r], calc, holesFor);
-    assert.equal(st.matches.length, 1);
-    assert.equal(st.rows.find((x) => x.name === 'G01').pts, 3, 'presses add no points');
+    assert.equal(st.matches.length, 2, 'the Nassau and the 2 v 2 match bet; not the 1 v 1');
+    assert.equal(st.rows.find((x) => x.name === 'G01').pts, 6, 'two matches won, presses add no points');
     assert.equal(JSON.stringify(r.data), before, 'read-only');
 });
 
@@ -169,4 +169,76 @@ test('ONLY THE LEAGUE\'S GOLFERS (Manny: 10 of us): mixed matches score for the 
     assert.deepEqual(st.pay.placeCents, [10000, 6000, 4000], '1st $100 / 2nd $60 / 3rd $40');
     assert.equal(st.pay.payCents.G01, 10000);
     assert.ok(!('G02' in st.pay.payCents) && !('G03' in st.pay.payCents), 'non-league golfers are never paid');
+});
+
+test('POINTS GAME - same teams every round: each pairing scored from every round\'s scores by the engine (no Side Bets needed); individual standings', { skip }, () => {
+    // Round 1 groups in order; round 2 shuffled, and with no Side Bets at all.
+    const r1 = round('R1', names24.slice(0, 8), ['A', 'B']);
+    const r2 = round('R2', ['G01', 'G03', 'G02', 'G04', 'G05', 'G07', 'G06', 'G08'], ['H', 'H']);
+    r2.data.sideMatches = {};
+    // Same teams: G01 & G02 v G03 & G04. In round 2 G01/G02 are on 3/4 putts... scores make A = G01,G03 side.
+    const game = { pointsGame: { on: true, teamsMode: 'same', teams: [{ a: ['G01', 'G02'], b: ['G03', 'G04'] }], players: ['G01', 'G02', 'G03', 'G04'] } };
+    const st = L.leagueState(game, [r1, r2], calc, holesFor);
+    assert.equal(st.matches.length, 2, 'one match per round for the one pairing');
+    assert.deepEqual(st.matches.map((m) => m.source), ['team', 'team']);
+    assert.deepEqual(st.matches[0].seg, { front: 'A', back: 'A', total: 'A' }, 'round 1: G01 & G02 won every hole');
+    // Round 2: G01 (3s) & G02 (4s) v G03 (3s) & G04 (4s): the round's group "A" was G01 + G03 -> both best balls 3 = halved.
+    assert.deepEqual(st.matches[1].seg, { front: 'H', back: 'H', total: 'H' });
+    const pts = Object.fromEntries(st.rows.map((x) => [x.name, x.pts]));
+    assert.deepEqual([pts.G01, pts.G02, pts.G03, pts.G04], [4.5, 4.5, 1.5, 1.5], 'individual standings');
+    const missing = L.leagueState({ pointsGame: Object.assign({}, game.pointsGame, { teams: [{ a: ['G01', 'G09'], b: ['G03', 'G04'] }] }) }, [r1, r2], calc, holesFor);
+    assert.equal(missing.matches.length, 0, 'a pairing whose four did not all play that round is not a match');
+});
+
+test('POINTS GAME - only the chosen rounds count; null = every round (later ones too)', { skip }, () => {
+    const r1 = round('R1', names24.slice(0, 4), ['A']), r2 = round('R2', names24.slice(0, 4), ['A']);
+    assert.equal(L.leagueState({ league: { on: true, rounds: ['R2'] } }, [r1, r2], calc, holesFor).rows.find((x) => x.name === 'G01').pts, 3);
+    assert.equal(L.leagueState({ league: { on: true } }, [r1, r2], calc, holesFor).rows.find((x) => x.name === 'G01').pts, 6);
+    assert.equal(L.leagueState({ pointsGame: { on: true, rounds: ['R1'] } }, [r1], calc, holesFor).rows.find((x) => x.name === 'G01').pts, 3, 'one round');
+});
+
+test('POINTS GAME - $ per place (the Weekly game\'s "exact dollar amounts"): must add up to the pot; ties split', { skip }, () => {
+    const cfg = L.leagueConfig({ league: { on: true, payMode: 'usd', placesUsd: [100, 60, 40] } });
+    const rows = (pts) => { const rs = pts.map((p, i) => ({ name: 'P' + i, pts: p })); rs.forEach((r, i) => { r.rank = rs[i - 1] && rs[i - 1].pts === r.pts ? rs[i - 1].rank : i + 1; }); return rs; };
+    let p = L.leaguePayouts(rows([9, 8, 7, 6, 5, 4, 3, 2, 1, 0]), cfg);
+    assert.deepEqual([p.valid, p.potCents, p.placeCents], [true, 20000, [10000, 6000, 4000]]);
+    p = L.leaguePayouts(rows([9, 8, 8, 6, 5, 4, 3, 2, 1, 0]), cfg);
+    assert.deepEqual([p.payCents.P1, p.payCents.P2], [5000, 5000], 'tied 2nd split 2nd + 3rd');
+    p = L.leaguePayouts(rows([9, 8, 7, 6, 5, 4, 3, 2, 1]), cfg);
+    assert.equal(p.valid, false, '$200 of places on a $180 pot is refused'); assert.match(p.why, /\$200, not the \$180 pot/);
+});
+
+test('EACH ROUND ITS OWN FORMAT AND POINTS: singles 1 v 1 as an 18-hole match (win 2 / halve 1); scramble and foursomes tapped by hand; four-ball Nassau by default', { skip }, () => {
+    // R1: default four-ball Nassau 1/1/1. R2: singles, 18-hole match, win 2 / halve 1. R3: scramble (no engine).
+    const r1 = round('R1', names24.slice(0, 4), ['A']);
+    const r2 = round('R2', names24.slice(0, 4), ['A']);
+    r2.data.sideMatches = { s1: { format: 'match', teamAIds: ['101'], teamBIds: ['103'], scoring: 'net', createdAt: 1 }, s2: { format: 'match', teamAIds: ['102'], teamBIds: ['104'], scoring: 'net', createdAt: 2 } };
+    const r3 = round('R3', names24.slice(0, 4), ['B']);
+    const game = { league: { on: true, players: ['G01', 'G02', 'G03', 'G04'], perRound: { R2: { format: 'singles', mode: 'match', win: 2, halve: 1 }, R3: { format: 'scramble' } },
+        overrides: { 'R3~sm0': { front: 'A', back: 'H', total: 'A' } } } };
+    const st = L.leagueState(game, [r1, r2, r3], calc, holesFor);
+    const m = (id) => st.matches.find((x) => x.id === id);
+    assert.deepEqual([m('R1~sm0').mode, m('R1~sm0').format], ['nassau', 'fourball']);
+    assert.deepEqual([m('R2~s1').mode, m('R2~s1').seg], ['match', { front: 'NA', back: 'NA', total: 'A' }], 'singles: G01 (3s) beat G03 (4s)');
+    assert.deepEqual(m('R3~sm0').seg, { front: 'A', back: 'H', total: 'A' }, 'scramble: only what the organizer tapped (the scores say B, but scramble has no engine)');
+    const pts = Object.fromEntries(st.rows.map((x) => [x.name, x.pts]));
+    // G01: R1 3 + R2 win 2 + R3 (front 1 + back 0.5 + 18 1 = 2.5) = 7.5. G03: 0 + 0 + 0.5 = 0.5.
+    assert.deepEqual([pts.G01, pts.G03], [7.5, 0.5]);
+    const g1 = st.rows.find((x) => x.name === 'G01');
+    assert.deepEqual([g1.w, g1.l, g1.h], [3, 0, 0]);
+    // A round with no taps yet in a no-engine format: nothing counts.
+    const st2 = L.leagueState({ league: { on: true, perRound: { R3: { format: 'foursomes' } } } }, [r3], calc, holesFor);
+    assert.deepEqual(st2.matches[0].seg, { front: null, back: null, total: null });
+});
+
+test('A CUP ROUND: matches from the Ryder engine (the adapter); 18 from the Cup, front / back from the match engine for four-ball', { skip }, () => {
+    const r = round('R1', names24.slice(0, 4), [(h) => (h <= 9 ? 'A' : 'B')]);
+    r.data.sideMatches = {};
+    const ryder = (round) => round.code === 'R1' ? [{ id: 'm1', format: 'fourball', a: ['G01', 'G02'], b: ['G03', 'G04'], aIds: ['101', '102'], bIds: ['103', '104'], total: 'H' }] : [];
+    const st = L.leagueState({ league: { on: true } }, [r], calc, holesFor, ryder);
+    assert.equal(st.matches.length, 1);
+    assert.deepEqual([st.matches[0].source, st.matches[0].seg], ['cup', { front: 'A', back: 'B', total: 'H' }]);
+    assert.equal(st.rows.find((x) => x.name === 'G01').pts, 1.5);
+    const asMatch = L.leagueState({ league: { on: true, def: { mode: 'match', win: 2, halve: 1 } } }, [r], calc, holesFor, ryder);
+    assert.equal(asMatch.rows.find((x) => x.name === 'G01').pts, 1, 'an 18-hole match halved = 1 each');
 });

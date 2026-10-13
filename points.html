@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="light only">
+    <link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
+    <title>Points game</title>
+    <!-- POINTS GAME (HardPan, gps-points): one page for a round's or a trip's Points game -
+         setup, standings, match results and "who gets paid". ?game=<round> (from Add a game)
+         or ?trip=<trip>[&organizer=<token>]. The math is league-engine.js, the screens
+         league-ui.js; the rounds are only read. -->
+    <script src="./firebase-app-compat.js"></script>
+    <script src="auth-boot.js"></script>
+    <script src="./firebase-database-compat.js"></script>
+    <script src="handicap.js"></script>
+    <script src="match-engine.js"></script>
+    <script src="action-model.js"></script>
+    <script src="ryder-cup.js"></script>
+    <script src="league-engine.js"></script>
+    <script src="league-ui.js"></script>
+    <style>
+        :root { color-scheme: light; --brand-green: #0f4c3a; --navy: #1d3557; --bg-page: #f0f4f2; --bg-card: #ffffff; --text-main: #1a1a1a; --text-muted: #5b6b64;
+                --border-faint: #e2ebe7; --border-mid: #d0e1db; --warn-text: #9a3412; --accent-red: #b91c1c; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg-page); color: var(--text-main); font-family: -apple-system, system-ui, sans-serif;
+               padding: calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+        .pg-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .pg-back { min-width: 44px; min-height: 44px; border: 0; background: #fff; border-radius: 12px; font-size: 1.5rem; color: var(--brand-green); }
+        .pg-title { font-weight: 800; font-size: 1.25rem; color: var(--brand-green); }
+        .pg-sub { font-size: .8rem; color: var(--text-muted); }
+        .settle-card, .pg-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+        .trip-section-sub { font-size: .8rem; color: var(--text-muted); }
+        .form-group { margin: 12px 0; } .form-group > label { display: block; font-weight: 800; font-size: .85rem; margin-bottom: 4px; }
+        input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--border-mid); border-radius: 8px; background: #fff; color: inherit; min-height: 36px; }
+        button { font: inherit; cursor: pointer; }
+        .btn-primary { min-height: 48px; padding: 8px 16px; border: 0; border-radius: 12px; background: var(--brand-green); color: #fff; font-weight: 800; }
+        .btn-primary:disabled { opacity: .45; }
+        .btn-outline { min-height: 44px; padding: 6px 14px; border: 1px solid var(--brand-green); border-radius: 12px; background: #fff; color: var(--brand-green); font-weight: 700; }
+        .btn-outline-sm { min-height: 34px; padding: 4px 10px; border: 1px solid var(--brand-green); border-radius: 999px; background: #fff; color: var(--brand-green); font-weight: 700; }
+        .btn-outline-sm:disabled { opacity: .45; }
+        .pg-status { padding: 14px; text-align: center; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="pg-head"><button type="button" class="pg-back" id="pg-back" aria-label="Back">&lsaquo;</button>
+        <div><div class="pg-title">&#x1F3C5; Points game</div><div class="pg-sub" id="pg-sub"></div></div></div>
+    <div class="pg-card"><div id="league-card"><div class="pg-status">Loading&hellip;</div></div></div>
+    <div id="league-settle"></div>
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    (function () {
+        'use strict';
+        const q = new URLSearchParams(location.search);
+        const game = (q.get('game') || '').toUpperCase(), tripQ = (q.get('trip') || '').toUpperCase(), token = q.get('organizer');
+        const $ = (id) => document.getElementById(id);
+        const say = (t) => { $('league-card').innerHTML = '<div class="pg-status">' + t + '</div>'; };
+        $('pg-back').onclick = () => { location.href = game ? 'index.html?game=' + encodeURIComponent(game) : 'trip.html?trip=' + encodeURIComponent(tripQ) + (token ? '&organizer=' + encodeURIComponent(token) : ''); };
+        const read = (p) => db.ref(p).once('value').then((s) => s.val(), () => null);
+        const loadRound = (code, label) => read('events/' + code).then((d) => (d ? { code, label: label || d.courseName || code, data: d } : null));
+        const uid = () => Promise.resolve(window.authReady).then((u) => u, () => null);
+        function start(o) { window.HardPanLeague.render(Object.assign({ db }, o)); }
+        if (tripQ) {
+            // A TRIP's game: every round of the trip; the organizer by the trip's organizer link.
+            read('trips/' + tripQ).then((t) => {
+                if (!t) { say('Trip ' + tripQ + ' not found (or not signed in).'); return; }
+                $('pg-sub').textContent = (t.name || 'Trip') + ' · ' + tripQ;
+                const rows = t.rounds || {};
+                const codes = Object.keys(rows).filter((c) => rows[c].countsTowardTrip !== false);
+                Promise.all(codes.map((c) => loadRound(c, rows[c].label))).then((rs) => {
+                    start({ holder: t, key: 'league', base: 'trips/' + tripQ + '/league', ctx: { tripCode: tripQ }, rounds: rs.filter(Boolean),
+                        organizer: !t.organizerToken || (token && String(token) === String(t.organizerToken)) });
+                });
+            });
+            return;
+        }
+        if (!game) { say('Open a round first, then Add a game › Points game.'); return; }
+        // A ROUND's game. Its trip, if this phone has opened it and the round is one of its rounds.
+        Promise.all([read('events/' + game), uid()]).then(([d, me]) => {
+            if (!d) { say('Round ' + game + ' not found.'); return; }
+            $('pg-sub').textContent = (d.courseName || 'Round') + ' · ' + game;
+            const organizer = !d.ownerUid || (me && String(me) === String(d.ownerUid));
+            let last = null; try { last = localStorage.getItem('lastTripCode'); } catch (e) { last = null; }
+            (last ? read('trips/' + last) : Promise.resolve(null)).then((t) => {
+                const inTrip = !!(t && t.rounds && t.rounds[game]);
+                const own = d.pointsGame && d.pointsGame.on !== false ? d.pointsGame : null;
+                const tripGame = inTrip && t.league && t.league.on !== false && (!Array.isArray(t.league.rounds) || t.league.rounds.indexOf(game) !== -1) ? t.league : null;
+                const codes = inTrip ? Object.keys(t.rounds).filter((c) => t.rounds[c].countsTowardTrip !== false)
+                    : [game].concat(own && Array.isArray(own.rounds) ? own.rounds.filter((c) => c !== game) : []);
+                Promise.all(codes.map((c) => (c === game ? Promise.resolve({ code: game, label: inTrip ? (t.rounds[game].label || d.courseName) : d.courseName || game, data: d }) : loadRound(c, inTrip ? t.rounds[c].label : null)))).then((rs) => {
+                    const rounds = rs.filter(Boolean);
+                    const ctx = { thisRound: game, tripCode: inTrip ? last : null, addable: !inTrip, loadRound: (c) => loadRound(c) };
+                    if (own || !tripGame) start({ holder: d, key: 'pointsGame', base: 'events/' + game + '/pointsGame', ctx, rounds, organizer });
+                    else start({ holder: t, key: 'league', base: 'trips/' + last + '/league', ctx, rounds, organizer: organizer || (!t.organizerToken) });
+                    if (q.get('setup') === '1' && organizer && !(own || tripGame)) window.HardPanLeague.openSetup();
+                });
+            });
+        });
+    })();
+</script>
+</body>
+</html>

@@ -197,7 +197,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     f(s1.add && s1.games && s1.cap === 'Score' && s1.score, '5: GPS-2 lacks Score / + Game / the Games chip: ' + JSON.stringify(s1));
     f(a1.open && a1.bg === 'rgb(240, 244, 242)' && /Manny · Joe · Mike · Dave/.test(a1.text) && a1.quick.join() === 'nassau,skins,vegas,bbb', '5: + did not open the Add a game sheet (light, golfers, 4 quick starts): ' + JSON.stringify([a1.open, a1.bg, a1.quick, a1.text.slice(0, 120)]));
     f(/Paste the whole round/.test(a1.text) && /Paste a multi-round match \/ trip/.test(a1.text), '5: the sheet lacks the two pastes');
-    ['nassau', 'match', 'strokebet', 'skins', 'vegas', 'bbb', 'wolf', 'dots', 'nines', 'kp', 'presses', 'side', 'bestball', 'stableford', 'scramble', 'hilo', 'ryder', 'cup'].forEach((g) => f(a1.all.indexOf(g) !== -1, '5: All games lacks ' + g));
+    ['points', 'nassau', 'match', 'strokebet', 'skins', 'vegas', 'bbb', 'wolf', 'dots', 'nines', 'kp', 'presses', 'side', 'bestball', 'stableford', 'scramble', 'hilo', 'ryder', 'cup'].forEach((g) => f(a1.all.indexOf(g) !== -1, '5: All games lacks ' + g));
     f(/Team A: Manny Orozco & Joe Russo/.test(a2.text) && /Team B: Mike Dunn & Dave Kirk/.test(a2.text), '5: Vegas was not pre-filled 1+2 v 3+4: ' + a2.text.slice(0, 400));
     f(/Team A: Manny Orozco & Mike Dunn/.test(a3.text) && /Team B: Dave Kirk & __/.test(a3.text) && a3.ctaOff, '5: un-picking Joe did not move the rest up (or Add was not held): ' + a3.text.slice(0, 400));
     f(/Team A: Dave Kirk & Joe Russo/.test(a4.text) && /Team B: Manny Orozco & Mike Dunn/.test(a4.text) && /Add Vegas · \$2 a point/.test(a4.cta) && !a4.ctaOff, '5: re-pick + Swap + $2: ' + JSON.stringify([a4.text.slice(0, 400), a4.cta]));

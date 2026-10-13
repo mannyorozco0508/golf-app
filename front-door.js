@@ -724,6 +724,7 @@
     var AG_DEF = { nassau: 5, skins: 2, vegas: 1, bbb: 1 };
     var BETS_KEY = 'hardpan_paste_bets_v1_';   // setup-paste-ui.js's queue: Side Bets "Fill it in"
     var ALL_GAMES = [
+        { id: 'points', ico: '\uD83C\uDFC5', name: 'Points game', sub: 'Individual points over this round or several \u00b7 a pot for the top places', go: 'points' },
         { id: 'nassau', ico: '💵', name: 'Nassau', sub: 'Front · back · total, 1 v 1 or 2 v 2, presses', go: 'sm', fmt: 'nassau' },
         { id: 'match', ico: '⚔️', name: 'Match play', sub: 'One overall match, 1 v 1 or teams', go: 'sm', fmt: 'match' },
         { id: 'strokebet', ico: '🏌️', name: 'Stroke play bet', sub: 'So much a hole + overall', go: 'sm', fmt: 'stroke' },
@@ -887,6 +888,7 @@
         if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
         if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;
         if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step;
+        if (g.go === 'points') return 'points.html' + base + '&setup=1';
         return null;
     }
     // A MULTI-ROUND MATCH / TRIP: the trip builder, filled in with today as Day 1.
