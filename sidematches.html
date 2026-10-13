@@ -86,6 +86,9 @@
     <!-- GPS:BEGIN -->
     <!-- Bets kept from a pasted round (HardPan, gps-paste): filled in here, saved by the organizer. -->
     <script src="setup-paste-ui.js"></script>
+    <!-- Points game (HardPan, gps-points): this round's league matches, live, as their own card. -->
+    <script src="league-engine.js"></script>
+    <script src="league-ui.js"></script>
     <!-- GPS:END -->
     <script src="product-links.js"></script>
     <style>
@@ -1032,6 +1035,18 @@ html {
             // know how many groups exist before it can ask anything sensible.
             // GPS:BEGIN
             if (typeof spBetsOffer === 'function') spBetsOffer();
+            // POINTS GAME (gps-points): this round's league matches, live, as their own card.
+            if (window.HardPanLeagueCard) {
+                try {
+                    const pgDraw = () => {
+                        let pm = document.getElementById('pg-round-mount');
+                        const t = document.getElementById('main-title');
+                        if (!pm && t && t.parentNode) { pm = document.createElement('div'); pm.id = 'pg-round-mount'; t.parentNode.insertBefore(pm, t.nextSibling); }
+                        if (pm) pm.innerHTML = window.HardPanLeagueCard.html(currentData, currentMode, pgDraw);
+                    };
+                    pgDraw();
+                } catch (e) { /* Side Bets draws as before */ }
+            }
             // GPS-4's Nassau quick start (front-door.js): the bet it queued opens in the
             // ordinary Add form, filled in - the golfer checks it and taps Save.
             if (urlParams.get('hpfill') === '1' && !window.__hpFilled && (currentData.players || []).length && window.HardPanSetupPaste) {

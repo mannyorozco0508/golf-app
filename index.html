@@ -124,6 +124,9 @@
     <!-- GPS:BEGIN -->
     <!-- Two front doors (HardPan app, gps-doors): the green GPS button, GPS-3 on a GPS round. -->
     <script src="front-door.js"></script>
+    <!-- Points game (HardPan, gps-points): this round's league matches, live, as their own card. -->
+    <script src="league-engine.js"></script>
+    <script src="league-ui.js"></script>
     <!-- GPS:END -->
     <style>
         :root {
@@ -3885,6 +3888,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 if (!fm && tick && tick.parentNode) { fm = document.createElement('div'); fm.id = 'fd-gps3-mount'; tick.parentNode.insertBefore(fm, tick); }
                 if (fm) fm.innerHTML = window.HardPanDoors.gpsRoundStrip(currentData);
                 if (typeof window.HardPanDoors.placeGpsPill === 'function') window.HardPanDoors.placeGpsPill();
+            } catch (e) { /* the card draws as before */ }
+        }
+        // POINTS GAME (gps-points): this round's league matches, live, as their own card.
+        if (window.HardPanLeagueCard) {
+            try {
+                let pm = document.getElementById('pg-round-mount');
+                const tick2 = document.getElementById('live-ticker-mount');
+                if (!pm && tick2 && tick2.parentNode) { pm = document.createElement('div'); pm.id = 'pg-round-mount'; tick2.parentNode.insertBefore(pm, tick2); }
+                if (pm) pm.innerHTML = window.HardPanLeagueCard.html(currentData, new URLSearchParams(location.search).get('game'), () => { try { renderCardWidgets(); } catch (e) {} });
             } catch (e) { /* the card draws as before */ }
         }
         // GPS:END

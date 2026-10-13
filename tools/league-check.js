@@ -6,7 +6,7 @@
 //
 // Cold Chrome, a stand-in database: a 24-golfer trip with two rounds ALREADY PLAYED
 // (six 2 v 2 Nassaus each, partners changed), and no league yet.
-//   1  The organizer: "Set up the Points League" -> the form ($20, NOBODY picked, Select
+//   1  The organizer: "Set up a Points game" -> the form ($20, NOBODY picked, Select
 //      all, a live "10 golfers · pot $200 · 1st $100 / 2nd $60 / 3rd $40") -> picks 10 of the
 //      24 -> Save writes ONE node, trips/<code>/league -> the standings: only the 10, "Pot
 //      $200", W-L-H; mixed matches score for the league golfer; the played rounds count.
@@ -67,6 +67,7 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
         { sleep: 1500 }, { expression: READ },                                                            // 0 not set up
         TAP('#league-card [data-lg="setup"]'), { sleep: 300 }, { expression: READ },                      // 1 the form: nobody picked
         { expression: "(function(){ " + JSON.stringify(TEN) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'ten'; })()" }, { sleep: 200 },
+        TAP('#league-card [data-lg-tm="change"]'), { sleep: 200 },   // the Nassau path (10 of 24 would default to league pairings - points-check.js covers those)
         TAP('#league-card [data-lg="save"]'), { sleep: 2500 }, { expression: READ },                      // 2 saved -> standings
         TAP('#league-card .lg-row'), { sleep: 300 }, { expression: READ },                                // 3 a golfer's matches
         TAP('#league-card [data-lg="results"]'), { sleep: 300 }, { expression: READ },                    // 4 match results
@@ -76,9 +77,10 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
         TAP('#league-card [data-lg="addmatch"]'), { sleep: 2500 }, { expression: READ }] });            // 7 added
     const s = J(r);
     report.organizer = { notSetUp: s[0].card.slice(0, 120), form: s[1].card.slice(0, 260), table: s[2].card.slice(0, 500), player: s[3].card.slice(0, 600), settle: s[2].settle, writes: s[7].writes.map((w) => w.op + ' ' + w.path) };
-    f(s[0].sec !== 'none' && /Set up the Points League/.test(s[0].card), '1: the organizer has no "Set up the Points League": ' + JSON.stringify(s[0]));
-    f(/Buy-in per golfer/.test(s[1].card) && /Golfers in the league \(0 of 24\)/.test(s[1].card) && /^0 golfers · pot \$0$/m.test(s[1].card) && /Select all/.test(s[1].card) && /Adds up to 100%/.test(s[1].card), '1: the setup form defaults (nobody picked): ' + s[1].card.slice(0, 400));
+    f(s[0].sec !== 'none' && /Set up a Points game/.test(s[0].card), '1: the organizer has no "Set up a Points game": ' + JSON.stringify(s[0]));
+    f(/Buy-in per golfer/.test(s[1].card) && /Golfers in the game \(0 of 24\)/.test(s[1].card) && /^0 golfers · pot \$0$/m.test(s[1].card) && /Select all/.test(s[1].card) && /Split the pot by percentage/.test(s[1].card) && /Format & points/.test(s[1].card), '1: the setup form defaults (nobody picked): ' + s[1].card.slice(0, 400));
     const w2 = s[2].writes;
+    w2.splice(0, w2.length, ...w2.filter((w) => !/pointsGameRef$/.test(w.path)));
     f(w2.length === 1 && w2[0].op === 'update' && w2[0].path === 'trips/TRLG01/league' && w2[0].value.buyIn === 20 && JSON.stringify(w2[0].value.players) === JSON.stringify(TEN) && JSON.stringify(w2[0].value.places) === '[50,30,20]' && w2[0].value.on === true, '1: Save did not write one league node with the ten: ' + JSON.stringify(w2));
     f(s[2].rows === 10 && /Pot \$200 \(10 × \$20\) · 1st \$100, 2nd \$60, 3rd \$40/.test(s[2].card) && /W-L-H/.test(s[2].card) && !/Oz Kane|Pete Lang|Steve Cole/.test(s[2].card.split('Tap a golfer')[1] || ''), '1: the standings (only the ten): ' + s[2].card.slice(0, 700));
     f(!/Oz Kane|Pete Lang|Steve Cole|Paul Webb/.test(s[2].settle), '4: a non-league golfer in "who gets paid": ' + s[2].settle);
@@ -89,8 +91,8 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
     f(/Team A: Max Bell & Ned Ross/.test(s[6].card) && /Team B: Oz Kane & Pete Lang/.test(s[6].card), '3: the 2v2 picker for a hand-entered match: ' + s[6].card.slice(-500));
     const mw = s[7].writes.filter((w) => /league\/manual\//.test(w.path));
     f(mw.length === 1 && JSON.stringify(mw[0].value.a) === '["Max Bell","Ned Ross"]' && mw[0].value.round === 'LGRD02', '3: the hand-entered match: ' + JSON.stringify(mw));
-    f(s[7].writes.every((w) => /^trips\/TRLG01\/league(\/|$)/.test(w.path)), '1-3: something other than the league node was written: ' + JSON.stringify(s[7].writes.map((w) => w.path)));
-    f(/Points League — who gets paid/.test(s[2].settle) && /Settle this separately/.test(s[2].settle) && /\$200/.test(s[2].settle) && /Joe Russo · 6 pts\$80/.test(s[2].settle) && /not part of Who Pays Who/.test(s[2].settle), '4: the "who gets paid" card: ' + s[2].settle);
+    f(s[7].writes.every((w) => /^trips\/TRLG01\/league(\/|$)/.test(w.path) || /^events\/LGRD0[12]\/pointsGameRef$/.test(w.path)), '1-3: something other than the league node (and the rounds\' pointers) was written: ' + JSON.stringify(s[7].writes.map((w) => w.path)));
+    f(/Points game — who gets paid/.test(s[2].settle) && /Settle this separately/.test(s[2].settle) && /\$200/.test(s[2].settle) && /Joe Russo · 6 pts\$80/.test(s[2].settle) && /not part of Who Pays Who/.test(s[2].settle), '4: the "who gets paid" card: ' + s[2].settle);
     f(!s[7].e.length, '1-3: page errors ' + s[7].e.join(' | '));
 
     // 4b: the trip money settlement reads the same with and without the league.
@@ -103,7 +105,7 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
     r = await go({ url: fileUrl('trip.html', 'trip=TRLG01'), db: DB({ on: true, buyIn: 20, places: [50, 30, 20], players: TEN }), preScript: ERR, steps: [{ sleep: 1500 }, { expression: READ }] });
     const g = J(r)[0];
     report.golfer = g.card.slice(0, 200);
-    f(g.sec !== 'none' && g.rows === 10 && !/Match results|League setup|Set up the Points League/.test(g.card) && !g.e.length, '5: a golfer\'s view: ' + JSON.stringify([g.sec, g.rows, g.card.slice(-200), g.e]));
+    f(g.sec !== 'none' && g.rows === 10 && !/Match results|Setup|Set up a Points game/.test(g.card) && !g.e.length, '5: a golfer\'s view: ' + JSON.stringify([g.sec, g.rows, g.card.slice(-200), g.e]));
     // 5b: no league: a golfer sees nothing.
     r = await go({ url: fileUrl('trip.html', 'trip=TRLG01'), db: DB(null), preScript: ERR, steps: [{ sleep: 1500 }, { expression: READ }] });
     f(J(r)[0].sec === 'none', '5: with no league a golfer should see no league section');
@@ -124,12 +126,14 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
     f(lv[2].live === '24 golfers · pot $720 · 1st $360 / 2nd $216 / 3rd $144', '1b: Select all: ' + lv[2].live);
     f(/at least two/.test(lv[3].card) && !lv[3].writes.length, '1b: Save took a league of one: ' + JSON.stringify(lv[3].writes));
 
-    // 6: places that don't add to 100%.
+    // 6: exact dollar amounts that don't add up to the pot: Save refuses.
     r = await go({ url: ORG, db: DB(null), preScript: ERR, steps: [{ sleep: 1500 }, TAP('#league-card [data-lg="setup"]'), { sleep: 200 }, TAP('#league-card [data-lg="all"]'), { sleep: 200 },
-        { expression: "(function(){ var i = document.querySelector('#league-card [data-lg-f=\"place.2\"]'); i.value = '10'; i.dispatchEvent(new Event('input', { bubbles: true })); return 'typed'; })()" },
+        { expression: "(function(){ var s = document.querySelector('#league-card [data-lg-pm]'); s.value = 'usd'; s.dispatchEvent(new Event('change', { bubbles: true })); return 'usd'; })()" }, { sleep: 200 },
+        { expression: "JSON.stringify({ sum: (document.querySelector('#league-card .lg-sum')||{}).textContent || '' })" },
         TAP('#league-card [data-lg="save"]'), { sleep: 800 }, { expression: READ }] });
-    const b6 = J(r)[0];
-    f(/must add up to 100%/.test(b6.card) && !b6.writes.length, '6: Save took places adding to 90%: ' + JSON.stringify([b6.card.slice(-200), b6.writes]));
+    const b6s = J(r);
+    f(/Adds up to \$200 of the \$480 pot — must match/.test(b6s[0].sum), '6: the $ places line: ' + b6s[0].sum);
+    f(/not the \$480 pot/.test(b6s[1].card) && !b6s[1].writes.length, '6: Save took $ places that do not add up to the pot: ' + JSON.stringify([b6s[1].card.slice(-200), b6s[1].writes]));
 
     // 7: older apps open the rounds and the trip with a league in it.
     for (const tree of process.argv.slice(2).map((t) => path.resolve(t))) {

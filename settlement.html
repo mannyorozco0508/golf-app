@@ -2674,6 +2674,33 @@ html {
         `;
     }
 </script>
+<!-- GPS:BEGIN -->
+<!-- POINTS GAME (HardPan, gps-points): a round's own Points game - "who gets paid" as its own
+     card, settled separately (not part of Who Pays Who). Its rounds are read, never written. -->
+<div id="pg-card" style="display:none;"></div>
+<div id="pg-settle" style="max-width:640px;margin:0 auto 24px;padding:0 12px;"></div>
+<script src="ryder-cup.js"></script>
+<script src="league-engine.js"></script>
+<script src="league-ui.js"></script>
+<script>
+    (function () {
+        try {
+            const code = String(new URLSearchParams(location.search).get('game') || '').toUpperCase();
+            if (!code || !window.HardPanLeague) return;
+            const read = (p) => db.ref(p).once('value').then((s) => s.val(), () => null);
+            read('events/' + code).then((d) => {
+                const g = d && d.pointsGame;
+                if (!g || g.on === false) return;
+                const codes = [code].concat(Array.isArray(g.rounds) ? g.rounds.filter((c) => c !== code) : []);
+                Promise.all(codes.map((c) => (c === code ? Promise.resolve(d) : read('events/' + c)).then((x) => (x ? { code: c, label: x.courseName || c, data: x } : null)))).then((rs) => {
+                    window.HardPanLeague.render({ holder: d, key: 'pointsGame', base: 'events/' + code + '/pointsGame', ctx: { thisRound: code }, rounds: rs.filter(Boolean), organizer: false, db,
+                        ids: { card: 'pg-card', settle: 'pg-settle', section: 'pg-none' } });
+                });
+            });
+        } catch (e) { /* the rest of the page still settles */ }
+    })();
+</script>
+<!-- GPS:END -->
 
 </body>
 </html>
