@@ -276,3 +276,22 @@ Rules that would need ADDING (additive; nothing existing changes):
   load with an 8 s limit; the location ask has a 15 s limit (iOS's first-launch prompt stops the plugin's
   own timeout) with "Couldn't get your location yet · Tap to retry", and a late answer is still used; a
   failure opening a door shows the light retry card, which reloads Home.
+- gps-league (2026-10-13): POINTS LEAGUE, the week's individual points race on the trip page. New files only:
+  league-engine.js (pure) and league-ui.js. Every round each group plays 2 v 2; points come from the group's
+  own 2 v 2 Nassau in Side Bets, READ through the one match engine the same way Side Bets calls it (net or
+  gross as set up; presses ignored): front 9 / back 9 / 18 = 1 pt each (editable) to each golfer on the
+  winning side, a halve = half each. A segment counts once the engine closes it, or once all its holes are
+  played level (halved). The organizer can set any segment by hand (A / B / half; Auto = back to the scores)
+  or enter a match for a group with no Nassau (2v2 picker). Standings: points over every counted round;
+  tiebreak most matches won (more of the match's points than the other side), then shared. Pot = buy-in
+  ($20) x league golfers; places 50/30/20 % (editable, must add to 100; fewer golfers than places =
+  re-scaled), ties split the places they cover, integer cents. Stored ONLY at trips/<code>/league
+  ({ on, buyIn, players | null = everyone, pts, places, overrides, manual }) - the trips node's existing
+  rules allow it, no rules change. Only the PICKED golfers are in the league (Manny, 2026-10-13: 10 of the trip):
+  setup starts with nobody picked, "Select all", and a live "10 golfers · pot $200 · 1st $100 / 2nd $60 /
+  3rd $40"; a league golfer scores when his side wins even with non-league partners or opponents; nobody
+  else is ever in the standings, the pot or "who gets paid". (Live trips reads need a signed-in user - an
+  anonymous session is refused.) Rounds are never written; a round played before the league was set up
+  counts (results are read whenever drawn). "Who gets paid" is its own card under Trip Money Settlement,
+  settled separately - Who Pays Who and every settlement are untouched. Checks: league_engine_test.js,
+  tools/league-check.js (organizer + golfer + build 12 / web app).
