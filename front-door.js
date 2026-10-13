@@ -56,16 +56,29 @@
         return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
     }
     // The phone's position, asked only on the GPS door's course list.
+    // NEVER WAITS FOREVER (gps-doors-black): the first ask shows iOS's location prompt,
+    // and the plugin's own timeout doesn't run while the prompt is up. After LOC_MS the
+    // list says so with "Tap to retry"; an answer arriving later is still used.
+    var LOC_MS = 15000;
     function position(done) {
-        var Cap = W.Capacitor, G = Cap && Cap.Plugins && Cap.Plugins.Geolocation;
+        var Cap = W.Capacitor, G = Cap && Cap.Plugins && Cap.Plugins.Geolocation, settled = false;
+        var once = function (p, why) { if (settled) { if (p) done(p, 'late'); return; } settled = true; clearTimeout(timer); done(p, why); };
+        var timer = setTimeout(function () { once(null, 'timeout'); }, LOC_MS);
         try {
             if (native() && G && typeof G.getCurrentPosition === 'function') {
-                G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { done([p.coords.latitude, p.coords.longitude]); }, function () { done(null); });
+                G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function () { once(null, 'denied'); });
                 return;
             }
-            if (W.navigator.geolocation) { W.navigator.geolocation.getCurrentPosition(function (p) { done([p.coords.latitude, p.coords.longitude]); }, function () { done(null); }, { timeout: 10000, maximumAge: 300000 }); return; }
+            if (W.navigator.geolocation) { W.navigator.geolocation.getCurrentPosition(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function () { once(null, 'denied'); }, { timeout: 10000, maximumAge: 300000 }); return; }
         } catch (e) {}
-        done(null);
+        once(null, 'none');
+    }
+    // A data file that never answers can't hold GPS-1 up either.
+    var LOAD_MS = 8000;
+    function loadScriptTimed(src, done) {
+        var fired = false, fin = function (ok) { if (fired) return; fired = true; clearTimeout(t); done(ok); };
+        var t = setTimeout(function () { fin(false); }, LOAD_MS);
+        try { loadScript(src, fin); } catch (e) { fin(false); }
     }
 
     // ---- THE COURSES (GPS-1) -----------------------------------------------------
@@ -156,9 +169,31 @@
     var H = { db: null };
     function show(view) {
         ['main', 'gps', 'games'].forEach(function (v) { var el = $('v-' + v); if (el) el.classList.toggle('on', v === view); });
-        if (view === 'gps') gpsView();
-        if (view === 'games') gamesView();
+        try {
+            if (view === 'gps') gpsView();
+            if (view === 'games') gamesView();
+        } catch (e) {
+            try { console.error('[front door] ' + view, e); } catch (x) {}
+            stuck('Something went wrong opening ' + (view === 'gps' ? 'GPS' : 'Games') + '.');
+        }
         try { W.scrollTo(0, 0); } catch (e) {}
+    }
+    // THE WAY OUT OF ANY STUCK SCREEN: a light card with "Tap to retry" (reloads Home).
+    function stuck(msg) {
+        try {
+            W.document.documentElement.style.visibility = '';
+            var el = $('fd-stuck');
+            if (!el) {
+                el = W.document.createElement('div');
+                el.id = 'fd-stuck'; el.setAttribute('role', 'alert');
+                el.style.cssText = 'position:fixed;inset:0;z-index:2147483646;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:#f0f4f2;color:#1a1a1a;color-scheme:light;font-family:-apple-system,system-ui,sans-serif;text-align:center;visibility:visible;';
+                (W.document.body || W.document.documentElement).appendChild(el);
+            }
+            el.innerHTML = '<div style="font-weight:800;font-size:1.15rem;color:#0f4c3a;">HardPan</div><div class="fd-stuck-msg" style="font-size:.95rem;"></div>'
+                + '<button type="button" style="min-height:52px;min-width:200px;border:0;border-radius:14px;background:#0f4c3a;color:#fff;font-weight:800;font-size:1.05rem;">Tap to retry</button>';
+            el.querySelector('.fd-stuck-msg').textContent = msg || 'This is taking too long.';
+            el.querySelector('button').onclick = function () { try { W.location.replace('home.html'); } catch (e) { W.location.href = 'home.html'; } };
+        } catch (e) {}
     }
     function gpsView() {
         var draw = function () {
@@ -173,6 +208,7 @@
         };
         var nearDraw = function () {
             var box = $('hp-near-list');
+            if (!C.here && C.why === 'timeout') { box.innerHTML = '<div class="hp-status">Couldn\u2019t get your location yet. <button type="button" class="hp-retry" data-hp-retry="near" style="min-height:40px;margin-left:4px;border:1px solid #0f4c3a;border-radius:999px;background:#fff;color:#0f4c3a;font-weight:800;padding:4px 14px;">Tap to retry</button><br>Search works without it.</div>'; return; }
             if (!C.here) { box.innerHTML = '<div class="hp-status">Turn on location for this app to see courses near you. Search works without it.</div>'; return; }
             var list = allCourses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(C.here, c.pt) }; })
                 .filter(function (x) { return x.d <= 60; }).sort(function (a, b) { return (b.c.ready - a.c.ready) || (a.d - b.d); }).slice(0, 5);
@@ -182,7 +218,7 @@
         var near = function () {
             if (C.asked) { nearDraw(); return; }
             C.asked = true;
-            position(function (p) { C.here = p; nearDraw(); draw(); });
+            position(function (p, why) { if (!p && C.here) return; C.here = p; C.why = why || null; nearDraw(); draw(); });
         };
         var needs = [];
         if (!W.HardPanGpsCourses) needs.push('gps-courses.js');
@@ -192,7 +228,7 @@
         var left = needs.length;
         draw();
         if (!left) { near(); return; }
-        needs.forEach(function (src) { loadScript(src, function () { if (--left === 0) { C.list = null; draw(); near(); } }); });
+        needs.forEach(function (src) { loadScriptTimed(src, function () { if (--left === 0) { C.list = null; draw(); near(); } }); });
     }
     function search() {
         var inp = $('hp-q'), box = $('hp-results');
@@ -420,6 +456,7 @@
         if (!t) return;
         var b;
         if ((b = t.closest('[data-hp-door]'))) { var d = b.getAttribute('data-hp-door'); setDoor(d); show(d); return; }
+        if (t.closest('[data-hp-retry]')) { C.asked = false; C.why = null; var nb = $('hp-near-list'); if (nb) nb.innerHTML = '<div class="hp-status">Finding courses near you\u2026</div>'; gpsView(); return; }
         if ((b = t.closest('[data-hp-course]'))) { pickCourse(b.getAttribute('data-hp-course'), b.getAttribute('data-hp-name'), b); return; }
         if ((b = t.closest('[data-hp-pull]'))) { pull({ id: b.getAttribute('data-hp-pull'), name: b.getAttribute('data-hp-pull-name') }, pending || {}); return; }
         if ((b = t.closest('[data-hp-su]'))) {
@@ -966,12 +1003,13 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
     // round; it used to hop index -> admin -> home, drawing each. Now, as this file is read
     // (in <head>), a page with no round goes straight to home.html and is never drawn.
+    var LAUNCH_MS = 5000;
     (function launch() {
         try {
             if (!on()) return;
@@ -980,6 +1018,12 @@
             if (bare && (/index\.html$/.test(path) || /\/$/.test(path) || /admin\.html$/.test(path))) {
                 W.document.documentElement.style.visibility = 'hidden';
                 W.location.replace('home.html');
+                // Still here after LAUNCH_MS (the hop to Home never happened): never a blank or
+                // black screen - the page shows again with "Tap to retry".
+                setTimeout(function () {
+                    var go = function () { stuck('Opening HardPan is taking longer than it should.'); };
+                    if (W.document.body) go(); else W.document.addEventListener('DOMContentLoaded', go);
+                }, LAUNCH_MS);
             }
         } catch (e) {}
     })();
