@@ -77,7 +77,7 @@
                 $('pg-sub').textContent = (t.name || 'Trip') + ' · ' + tripQ;
                 const rows = t.rounds || {};
                 const codes = Object.keys(rows).filter((c) => rows[c].countsTowardTrip !== false);
-                Promise.all(codes.map((c) => loadRound(c, rows[c].label))).then((rs) => {
+                Promise.all(codes.map((c) => loadRound(c, rows[c].label).then((r) => (r ? Object.assign(r, { date: rows[c].date || null }) : r)))).then((rs) => {
                     start({ holder: t, key: 'league', base: 'trips/' + tripQ + '/league', ctx: { tripCode: tripQ }, rounds: rs.filter(Boolean),
                         organizer: !t.organizerToken || (token && String(token) === String(t.organizerToken)) });
                 });
@@ -97,7 +97,8 @@
                 const tripGame = inTrip && t.league && t.league.on !== false && (!Array.isArray(t.league.rounds) || t.league.rounds.indexOf(game) !== -1) ? t.league : null;
                 const codes = inTrip ? Object.keys(t.rounds).filter((c) => t.rounds[c].countsTowardTrip !== false)
                     : [game].concat(own && Array.isArray(own.rounds) ? own.rounds.filter((c) => c !== game) : []);
-                Promise.all(codes.map((c) => (c === game ? Promise.resolve({ code: game, label: inTrip ? (t.rounds[game].label || d.courseName) : d.courseName || game, data: d }) : loadRound(c, inTrip ? t.rounds[c].label : null)))).then((rs) => {
+                const dateOf = (c) => (inTrip && t.rounds[c] && t.rounds[c].date) || null;
+                Promise.all(codes.map((c) => (c === game ? Promise.resolve({ code: game, label: inTrip ? (t.rounds[game].label || d.courseName) : d.courseName || game, date: dateOf(game), data: d }) : loadRound(c, inTrip ? t.rounds[c].label : null).then((r) => (r ? Object.assign(r, { date: dateOf(c) }) : r))))).then((rs) => {
                     const rounds = rs.filter(Boolean);
                     const ctx = { thisRound: game, tripCode: inTrip ? last : null, addable: !inTrip, loadRound: (c) => loadRound(c) };
                     if (own || !tripGame) start({ holder: d, key: 'pointsGame', base: 'events/' + game + '/pointsGame', ctx, rounds, organizer });

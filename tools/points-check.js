@@ -13,6 +13,9 @@
 //   C  From a round of a trip (this phone opened the trip): Several rounds = the trip's, same
 //      teams every round (one pairing) -> trips/<trip>/league; individual standings.
 //   D  Results (settlement.html) of a round with a Points game: "who gets paid", its own card.
+//   F  League pairings (6 of 8 -> the default): Make pairings = a 2 v 2 + singles; pointers in the
+//      rounds; LIVE: a score written while the page is open moves the matches (no reload).
+//   G  The round's own "Points game" card on the scorecard and on Action, live.
 //   E  Every <old tree> (build 12, the web app) opens a round carrying a Points game: 0 errors.
 // The rounds' own data is never written (only the pointsGame / league node).
 // ============================================================================
@@ -80,8 +83,8 @@ const TYPE = (sel, v) => ({ expression: "(function(){ var s = document.querySele
         TAP('#league-card [data-lg="save"]'), { sleep: 2000 }, { expression: READ }] });
     const b = J(r);
     report.B = { form: (b[0].card.match(/A round of its own[\s\S]{0,300}/) || [''])[0], table: b[1].card.slice(0, 400), writes: b[1].writes.map((w) => JSON.stringify(w.value).slice(0, 300)) };
-    const wb = b[1].writes[0] || { value: {} };
-    f(b[1].writes.length === 1 && wb.path === 'events/PGRD01/pointsGame' && JSON.stringify(wb.value.rounds) === '["PGRD01","PGRD02"]' && wb.value.perRound && wb.value.perRound.PGRD02 && wb.value.perRound.PGRD02.format === 'fourball' && wb.value.perRound.PGRD02.mode === 'nassau', 'B: several rounds + a round of its own: ' + JSON.stringify(wb));
+    const wb = b[1].writes.find((w) => w.path === 'events/PGRD01/pointsGame') || { value: {} };
+    f(b[1].writes.filter((w) => !/pointsGameRef$/.test(w.path)).length === 1 && b[1].writes.some((w) => w.path === 'events/PGRD02/pointsGameRef' && w.value.round === 'PGRD01') && wb.path === 'events/PGRD01/pointsGame' && JSON.stringify(wb.value.rounds) === '["PGRD01","PGRD02"]' && wb.value.perRound && wb.value.perRound.PGRD02 && wb.value.perRound.PGRD02.format === 'fourball' && wb.value.perRound.PGRD02.mode === 'nassau', 'B: several rounds + a round of its own: ' + JSON.stringify(wb));
     // Round 2 four-ball Nassau: Manny & Joe (3) beat Mike & Dave (4) -> +3; Tom & Rick (3) v Steve & Paul (4) -> +3. Manny: 2 + 3 = 5.
     f(/Manny Orozco ▸\s*5\s*2-0-0/.test(b[1].card) && /Tom Hale ▸\s*5\s*2-0-0/.test(b[1].card) && /Rick Pace ▸\s*4\s*1-0-1/.test(b[1].card) && /6 matches so far/.test(b[1].card), 'B: both rounds count, each its own format: ' + b[1].card.slice(0, 700));
 
@@ -94,8 +97,8 @@ const TYPE = (sel, v) => ({ expression: "(function(){ var s = document.querySele
     const c = J(r);
     report.C = { form: c[1].card.slice(0, 200), table: c[2].card.slice(0, 500), writes: c[2].writes.map((w) => w.op + ' ' + w.path) };
     f(/Every round of this trip, and rounds added to it later/.test(c[1].card) && /Paul Webb & Steve Cole/.test(c[1].card), 'C: the trip rounds / the pairing in the form: ' + c[1].card.slice(0, 600));
-    const wc = c[2].writes[0] || { value: {} };
-    f(c[2].writes.length === 1 && wc.path === 'trips/TRPG01/league' && wc.value.rounds == null && wc.value.teamsMode === 'same' && JSON.stringify(wc.value.teams) === '[{"a":["Paul Webb","Steve Cole"],"b":["Manny Orozco","Joe Russo"]}]', 'C: the trip game: ' + JSON.stringify(wc));
+    const wc = c[2].writes.find((w) => w.path === 'trips/TRPG01/league') || { value: {} };
+    f(c[2].writes.filter((w) => !/pointsGameRef$/.test(w.path)).length === 1 && wc.path === 'trips/TRPG01/league' && wc.value.rounds == null && wc.value.teamsMode === 'same' && JSON.stringify(wc.value.teams) === '[{"a":["Paul Webb","Steve Cole"],"b":["Manny Orozco","Joe Russo"]}]', 'C: the trip game: ' + JSON.stringify(wc));
     // Same teams, both rounds, four-ball Nassau: Manny & Joe (3) beat Paul & Steve (4) twice -> 6 each; everyone else 0, individually ranked.
     f(/Joe Russo ▸\s*6\s*2-0-0/.test(c[2].card) && /Manny Orozco ▸\s*6\s*2-0-0/.test(c[2].card) && /Paul Webb ▸\s*0\s*0-2-0/.test(c[2].card) && /2 matches so far/.test(c[2].card) && /same teams every round/.test(c[2].card), 'C: same-teams standings: ' + c[2].card.slice(0, 700));
 
@@ -109,11 +112,59 @@ const TYPE = (sel, v) => ({ expression: "(function(){ var s = document.querySele
     const d0 = J(r)[0];
     f(!d0.pg && !d0.e.length, 'D: Results with no Points game shows a card / errors: ' + JSON.stringify(d0));
 
+    // F: LEAGUE PAIRINGS (a league smaller than the field defaults to them): 6 of the 8 -> Pairings ->
+    // "Make pairings" = one 2 v 2 + "2 left -> singles" (1 v 1); written under the league, and each
+    // round gets its pointer (events/<round>/pointsGameRef) for its scorecard card.
+    const THRU8 = (() => { const r3 = round('PGRD03'); Object.keys(r3.scores).forEach((k) => { if (Number(/_h(\d+)$/.exec(k)[1]) > 8) delete r3.scores[k]; }); return r3.scores; })();
+    const SIX = ['Manny Orozco', 'Joe Russo', 'Mike Dunn', 'Tom Hale', 'Steve Cole', 'Paul Webb'];
+    const partial = (d) => { const r3 = round('PGRD03'); Object.keys(r3.scores).forEach((k) => { if (Number(/_h(\d+)$/.exec(k)[1]) > 7) delete r3.scores[k]; }); r3.sideMatches = {}; d.events.PGRD03 = r3; d.trips.TRPG01.rounds.PGRD03 = { label: 'Day 3', addedAt: 3, date: '2026-10-15' }; };
+    r = await go({ url: fileUrl('points.html', 'game=PGRD01&setup=1'), db: DB(partial), preScript: ERR + "try{localStorage.setItem('lastTripCode','TRPG01')}catch(e){}", steps: [
+        { sleep: 1500 }, TAP('#league-card [data-lg-rm="several"]'),
+        { expression: "(function(){ " + JSON.stringify(SIX) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'six'; })()" }, { sleep: 200 }, { expression: READ },
+        TAP('#league-card [data-lg="save"]'), { sleep: 1500 }, TAP('#league-card [data-lg="pairings"]'), { sleep: 300 }, { expression: READ },
+        TAP('#league-card [data-lg-pr="PGRD03"]'), { sleep: 200 }, TAP('#league-card [data-lg="autopair"]'), { sleep: 1500 }, { expression: READ },
+        // LIVE: Manny makes a score on the 8th while the page is open.
+        { deliver: { path: 'events/PGRD03/scores', value: THRU8 } }, { sleep: 1500 }, { expression: READ }] });
+    const fl = J(r);
+    report.F = { teams: (fl[0].card.match(/2\. Teams[\s\S]{0,160}/) || [''])[0], pairings: fl[2].card.slice(0, 600), live: fl[3].card.slice(0, 600), writes: fl[3].writes.map((w) => w.op + ' ' + w.path) };
+    f(/League pairings/.test(fl[0].card) && /The game’s own matches, set round by round from the league golfers only/.test(fl[0].card), 'F: league pairings is not the default for 6 of 8: ' + fl[0].card.slice(0, 600));
+    const wsave = fl[3].writes.find((w) => w.path === 'trips/TRPG01/league');
+    f(wsave && wsave.value.teamsMode === 'league', 'F: setup did not save teamsMode league: ' + JSON.stringify(wsave && wsave.value));
+    f(/Pairings/.test(fl[1].card) && /Make pairings/.test(fl[1].card), 'F: the Pairings screen: ' + fl[1].card.slice(0, 400));
+    const pw = fl[3].writes.filter((w) => w.path === 'trips/TRPG01/league/pairings/PGRD03');
+    const pv = pw.length ? pw[0].value : [];
+    f(pv.length === 2 && pv[0].a.length === 2 && pv[1].a.length === 1 && new Set(pv.flatMap((t) => t.a.concat(t.b))).size === 6, 'F: Make pairings (one 2 v 2 + singles from the six): ' + JSON.stringify(pv));
+    f(fl[3].writes.some((w) => w.path === 'events/PGRD03/pointsGameRef' && w.value.trip === 'TRPG01'), 'F: no pointer in the round for its scorecard: ' + JSON.stringify(fl[3].writes.map((w) => w.path)));
+    f(/UP thru 7|All square thru 7/.test(fl[2].card) && /\(singles\)/.test(fl[2].card), 'F: pairings with live lines thru 7: ' + fl[2].card.slice(0, 600));
+    f(/thru 8/.test(fl[3].card) && !/thru 7/.test(fl[3].card), 'F: LIVE - a score on the 8th did not move the matches to thru 8 without a reload: ' + fl[3].card.slice(0, 600));
+    f(!fl[3].e.length, 'F: errors ' + fl[3].e.join(' | '));
+
+    // G: the round's own card on the scorecard and on Action ("Points game: ..."), live.
+    const withPairs = DB((d) => { partial(d); d.events.PGRD03.pointsGameRef = { trip: 'TRPG01' };
+        d.trips.TRPG01.league = { on: true, players: SIX, teamsMode: 'league', pairings: { PGRD03: [{ a: ['Manny Orozco', 'Tom Hale'], b: ['Joe Russo', 'Paul Webb'] }, { a: ['Mike Dunn'], b: ['Steve Cole'] }] } }; });
+    r = await go({ url: fileUrl('index.html', 'game=PGRD03&group=1'), db: withPairs, preScript: ERR + "window.__hardpanDoors = true;", settleMs: 5000, steps: [{ sleep: 1500 },
+        { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" },
+        { deliver: { path: 'events/PGRD03', value: Object.assign({}, withPairs.events.PGRD03, { scores: THRU8 }) } }, { sleep: 1500 },
+        { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" }] });
+    const g = J(r);
+    report.G = { scorecard: g[0].card, after: g[1].card };
+    // Manny 3 & Tom 3 v Joe 4 & Paul 5: 7 UP thru 7. Mike 4 v Steve 4: all square.
+    f(/Points game/.test(g[0].card) && /Manny Orozco & Tom Hale v Joe Russo & Paul Webb/.test(g[0].card) && /Manny & Tom 7 UP thru 7/.test(g[0].card) && /Mike Dunn v Steve Cole \(singles\)/.test(g[0].card) && /All square thru 7/.test(g[0].card) && /Standings ›/.test(g[0].card), 'G: the scorecard card: ' + JSON.stringify(g[0]));
+    f(/Manny & Tom 8 UP thru 8/.test(g[1].card), 'G: the scorecard card did not move live: ' + g[1].card);
+    f(!g[1].e.length, 'G: scorecard errors ' + g[1].e.join(' | '));
+    r = await go({ url: fileUrl('sidematches.html', 'game=PGRD03'), db: withPairs, preScript: ERR, settleMs: 5000, steps: [{ sleep: 1500 }, { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" }] });
+    const ga = J(r)[0];
+    report.Gaction = ga.card;
+    f(/Points game/.test(ga.card) && /Manny & Tom 7 UP thru 7/.test(ga.card) && !ga.e.length, 'G: the Action card: ' + JSON.stringify(ga));
+    r = await go({ url: fileUrl('index.html', 'game=PGRD02&group=1'), db: DB(), preScript: ERR + "window.__hardpanDoors = true;", settleMs: 4000, steps: [{ sleep: 1000 }, { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" }] });
+    const g0 = J(r)[0];
+    f(!g0.card && !g0.e.length, 'G: a round with no Points game shows a card / errors: ' + JSON.stringify(g0));
+
     // E: older apps open a round carrying a Points game.
     for (const tree of process.argv.slice(2).map((t) => path.resolve(t))) {
         const old = require(path.join(tree, 'tools/lib/cold-arrival.js'));
         for (const [page, q] of [['index.html', 'game=PGRD01'], ['settlement.html', 'game=PGRD01'], ['admin.html', 'game=PGRD01'], ['trip.html', 'trip=TRPG01']]) {
-            const db = DB((x) => { x.events.PGRD01.pointsGame = withGame.events.PGRD01.pointsGame; x.trips.TRPG01.league = { on: true, players: NAMES, teamsMode: 'same', teams: [{ a: ['Paul Webb', 'Steve Cole'], b: ['Manny Orozco', 'Joe Russo'] }] }; });
+            const db = DB((x) => { x.events.PGRD01.pointsGame = withGame.events.PGRD01.pointsGame; x.trips.TRPG01.league = { on: true, players: NAMES, teamsMode: 'league', pairings: { PGRD01: [{ a: ['Manny Orozco', 'Tom Hale'], b: ['Joe Russo', 'Paul Webb'] }, { a: ['Mike Dunn'], b: ['Steve Cole'] }] } }; x.events.PGRD02.pointsGameRef = { trip: 'TRPG01' }; });
             const o = await old.arriveCold({ url: old.fileUrl(page, q), db, settleMs: 4000, viewport: { width: 390, height: 844 }, preScript: ERR, steps: [{ expression: "JSON.stringify({ e: window.__e, n: document.body.innerText.length })" }] });
             const x = o.ok ? JSON.parse(o.value[0]) : { e: ['did not load: ' + o.reason], n: 0 };
             report[path.basename(tree) + ' ' + page] = x;

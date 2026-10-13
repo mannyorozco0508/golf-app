@@ -55,7 +55,12 @@ function leagueConfig(trip) {
         overrides: l.overrides || {},
         manual: l.manual || {},
         rounds: Array.isArray(l.rounds) && l.rounds.length ? l.rounds.map(String) : null,
-        teamsMode: l.teamsMode === 'same' ? 'same' : 'change',
+        teamsMode: l.teamsMode === 'same' ? 'same' : l.teamsMode === 'league' ? 'league' : 'change',
+        // LEAGUE PAIRINGS (Manny, 2026-10-13): per round, the game's own matches from the league
+        // golfers only - { <round>: [{ a: [names], b: [names] }] }, 2 v 2 or 1 v 1 - whatever
+        // groups they are in. Scored from each golfer's own hole scores.
+        pairings: Object.keys(l.pairings || {}).reduce(function (o, k) { var v = l.pairings[k]; v = Array.isArray(v) ? v : Object.keys(v || {}).map(function (x) { return v[x]; });
+            o[k] = v.filter(function (t) { return t && Array.isArray(t.a) && Array.isArray(t.b) && t.a.length && t.a.length === t.b.length; }).map(function (t) { return { a: t.a.map(String), b: t.b.map(String) }; }); return o; }, {}),
         teams: Array.isArray(l.teams) ? l.teams.filter(function (t) { return t && Array.isArray(t.a) && Array.isArray(t.b) && t.a.length && t.b.length; })
             .map(function (t) { return { a: t.a.map(String), b: t.b.map(String) }; }) : [],
         scoring: l.scoring === 'gross' ? 'gross' : 'net',
@@ -86,6 +91,12 @@ function leagueEngineScores(format) { return format === 'fourball' || format ===
 // calc(sm, data) is the caller's: the same calculateMatchEngine call Side Bets makes.
 // A segment is decided once the engine closes it (won), or once every hole of it has
 // been played by both sides with the match level (halved). Otherwise null (not yet).
+// LIVE: where the 18 stands now (A up > 0) and holes played, from the same engine result.
+function leagueLive(calcOut) {
+    if (!calcOut || !Array.isArray(calcOut.activeMatches)) return null;
+    var m = calcOut.activeMatches.filter(function (x) { return x.id === '18' && !x.pressNum; })[0];
+    return m ? { status: m.status, thru: calcOut.maxThru || 0, closed: !!m.closed, result: m.finalResult || null } : null;
+}
 function leagueSegments(calcOut, holes, scores, aIds, bIds) {
     var out = { front: null, back: null, total: null };
     if (!calcOut || !Array.isArray(calcOut.activeMatches)) return out;
@@ -129,14 +140,15 @@ function leagueRoundMatches(round, calc, holesFor, rc, ryder) {
         if (aIds.length !== size || bIds.length !== size) return;      // 2 v 2, or 1 v 1 for singles
         var a = aIds.map(function (id) { return byId[id] && byId[id].name; }), b = bIds.map(function (id) { return byId[id] && byId[id].name; });
         if (a.concat(b).some(function (n) { return !n; })) return;
-        var seg = { front: null, back: null, total: null };
+        var seg = { front: null, back: null, total: null }, live = null;
         if (leagueEngineScores(rc.format)) {
             var res = null;
             try { res = calc ? calc(sm, data) : null; } catch (e) { res = null; }
             var holes = holesFor ? holesFor(sm, data) : (data.courseData || []);
             seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
+            live = leagueLive(res);
         }
-        out.push({ id: round.code + '~' + smId, round: round.code, label: round.label || round.code, group: sm.ownerGroup || null,
+        out.push({ id: round.code + '~' + smId, live: live, round: round.code, label: round.label || round.code, group: sm.ownerGroup || null,
             a: a, b: b, seg: seg, source: 'nassau' });
     });
     return out;
@@ -162,15 +174,57 @@ function leagueSameTeamMatches(round, cfg, calc, holesFor, rc) {
         var aIds = t.a.map(function (n) { return idOf[leagueKey(n)]; }), bIds = t.b.map(function (n) { return idOf[leagueKey(n)]; });
         if (aIds.concat(bIds).some(function (x) { return !x; })) return;   // not all four in this round
         var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
-        var seg = { front: null, back: null, total: null };
+        var seg = { front: null, back: null, total: null }, live = null;
         if (leagueEngineScores(rc.format)) {
             var res = null;
             try { res = calc ? calc(sm, data) : null; } catch (e) { res = null; }
             var holes = holesFor ? holesFor(sm, data) : (data.courseData || []);
             seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
+            live = leagueLive(res);
         }
-        out.push({ id: round.code + '~team' + i, round: round.code, label: round.label || round.code, group: null,
+        out.push({ id: round.code + '~team' + i, live: live, round: round.code, label: round.label || round.code, group: null,
             a: t.a.slice(), b: t.b.slice(), seg: seg, source: 'team' });
+    });
+    return out;
+}
+
+// LEAGUE PAIRINGS: the round's pairings, each golfer found in this round - or, when the
+// day's groups are separate round codes, in another round of the same day (dayRounds). The
+// golfers are put into one stand-in round (fresh ids, their own scores, this round's card)
+// and the engine scores it. Nothing is written.
+function leaguePairingMatches(round, cfg, calc, holesFor, rc, dayRounds) {
+    var list = (cfg.pairings || {})[round.code] || [];
+    if (!list.length) return [];
+    var pool = [round].concat((dayRounds ? dayRounds(round) : []).filter(function (r) { return r && r.code !== round.code; }));
+    var find = function (name) {
+        for (var i = 0; i < pool.length; i++) {
+            var ps = ((pool[i].data || {}).players) || [];
+            for (var j = 0; j < ps.length; j++) if (ps[j] && leagueKey(ps[j].name) === leagueKey(name)) return { r: pool[i], p: ps[j] };
+        }
+        return null;
+    };
+    var data = (round && round.data) || {};
+    var out = [];
+    list.forEach(function (t, i) {
+        var hits = t.a.concat(t.b).map(find);
+        if (hits.some(function (x) { return !x; })) {
+            out.push({ id: round.code + '~pair' + i, round: round.code, label: round.label || round.code, group: null, a: t.a.slice(), b: t.b.slice(), seg: { front: null, back: null, total: null }, source: 'pairing', missing: true });
+            return;
+        }
+        var vPlayers = [], vScores = {};
+        hits.forEach(function (h, k) {
+            var id = 9001 + k, src = (h.r.data || {}).scores || {};
+            vPlayers.push(Object.assign({}, h.p, { id: id }));
+            Object.keys(src).forEach(function (key) { var m = /^p(.+)_h(\d+)$/.exec(key); if (m && String(m[1]) === String(h.p.id)) vScores['p' + id + '_h' + m[2]] = src[key]; });
+        });
+        var n = t.a.length, aIds = vPlayers.slice(0, n).map(function (p) { return String(p.id); }), bIds = vPlayers.slice(n).map(function (p) { return String(p.id); });
+        var vdata = { players: vPlayers, scores: vScores, courseData: data.courseData || [] };
+        var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
+        var res = null;
+        try { res = calc ? calc(sm, vdata) : null; } catch (e) { res = null; }
+        var holes = holesFor ? holesFor(sm, vdata) : (vdata.courseData || []);
+        out.push({ id: round.code + '~pair' + i, round: round.code, label: round.label || round.code, group: null, a: t.a.slice(), b: t.b.slice(),
+            seg: leagueSegments(res, holes, vScores, aIds, bIds), live: leagueLive(res), source: 'pairing' });
     });
     return out;
 }
@@ -178,12 +232,14 @@ function leagueSameTeamMatches(round, cfg, calc, holesFor, rc) {
 // ---- EVERY MATCH OF THE TRIP, overrides applied --------------------------------------
 // rounds: [{ code, label, data }] in trip order. A round set up AFTER it was played still
 // counts: the results are read from its scores whenever the league is drawn.
-function leagueMatches(rounds, cfg, calc, holesFor, ryder) {
+function leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds) {
     if (!cfg) return [];
     var all = [];
     (rounds || []).forEach(function (r) {
         var rc = leagueRoundOf(cfg, r.code);
-        all = all.concat(cfg.teamsMode === 'same' ? leagueSameTeamMatches(r, cfg, calc, holesFor, rc) : leagueRoundMatches(r, calc, holesFor, rc, ryder));
+        all = all.concat(cfg.teamsMode === 'same' ? leagueSameTeamMatches(r, cfg, calc, holesFor, rc)
+            : cfg.teamsMode === 'league' ? leaguePairingMatches(r, cfg, calc, holesFor, rc, dayRounds)
+            : leagueRoundMatches(r, calc, holesFor, rc, ryder));
     });
     Object.keys(cfg.manual || {}).sort().forEach(function (id) {
         var m = cfg.manual[id];
@@ -244,7 +300,7 @@ function leagueStandings(matches, cfg, players) {
             if (!r) return;
             row.pts += r.pts;
             if (r.result === 'W') row.w++; else if (r.result === 'L') row.l++; else if (r.result === 'H') row.h++;
-            row.matches.push({ id: m.id, label: m.label, group: m.group, side: r.side, format: m.format, mode: m.mode, partner: (r.side === 'A' ? m.a : m.b).filter(function (n) { return leagueKey(n) !== leagueKey(row.name); }),
+            row.matches.push({ id: m.id, label: m.label, group: m.group, side: r.side, format: m.format, mode: m.mode, live: m.live || null, a: m.a, b: m.b, partner: (r.side === 'A' ? m.a : m.b).filter(function (n) { return leagueKey(n) !== leagueKey(row.name); }),
                 opponents: r.side === 'A' ? m.b : m.a, seg: m.seg, set: m.set || {}, pts: r.pts, result: r.result });
         });
     });
@@ -314,6 +370,31 @@ function leaguePayoutsUsd(rows, cfg, potC) {
 
 // The league's golfers: as set, or everyone in any round of the trip (by name, as the trip
 // page matches golfers across rounds).
+// DEFAULT PAIRINGS for a round: the league golfers playing it, two v two; an odd number
+// leaves two for a 1 v 1 singles worth the same points (one left: sits out). Who plays singles
+// rotates: the golfers with the fewest singles in the earlier rounds' pairings go first; the rest
+// are paired so partners change from round to round (the order turns by the round's index).
+function leagueAutoPairings(names, cfg, roundIndex, earlierCodes) {
+    var list = (names || []).slice().sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });
+    var singlesCount = {};
+    (earlierCodes || []).forEach(function (c) { ((cfg && cfg.pairings && cfg.pairings[c]) || []).forEach(function (t) { if (t.a.length === 1) t.a.concat(t.b).forEach(function (n) { singlesCount[leagueKey(n)] = (singlesCount[leagueKey(n)] || 0) + 1; }); }); });
+    var k = roundIndex || 0, n = list.length;
+    var turned = list.slice(k % Math.max(n, 1)).concat(list.slice(0, k % Math.max(n, 1)));
+    var singles = [];
+    if (n % 4 === 2 || n % 4 === 3) {
+        singles = turned.slice().sort(function (x, y) { return (singlesCount[leagueKey(x)] || 0) - (singlesCount[leagueKey(y)] || 0); }).slice(0, 2);
+    }
+    var rest = turned.filter(function (x) { return singles.indexOf(x) === -1; });
+    var out = [];
+    // Partners change: interleave so neighbours in one round's order don't pair again next round.
+    var step = (k % 2) ? 2 : 1, order = [];
+    for (var s0 = 0; s0 < step; s0++) for (var i = s0; i < rest.length; i += step) order.push(rest[i]);
+    for (var j = 0; j + 3 < order.length; j += 4) out.push({ a: [order[j], order[j + 1]], b: [order[j + 2], order[j + 3]] });
+    if (singles.length === 2) out.push({ a: [singles[0]], b: [singles[1]] });
+    var left = order.slice(Math.floor(order.length / 4) * 4);
+    return { pairings: out, sittingOut: left };
+}
+
 function leaguePlayers(cfg, rounds) {
     if (cfg && cfg.players) return cfg.players.slice();
     var seen = {}, out = [];
@@ -327,21 +408,21 @@ function leaguePlayers(cfg, rounds) {
 }
 
 // Everything the screens draw, in one call.
-function leagueState(trip, rounds, calc, holesFor, ryder) {
+function leagueState(trip, rounds, calc, holesFor, ryder, dayRounds) {
     var cfg = leagueConfig(trip);
     if (!cfg) return null;
     if (cfg.rounds) rounds = (rounds || []).filter(function (r) { return cfg.rounds.indexOf(String(r.code)) !== -1; });
     var players = leaguePlayers(cfg, rounds);
-    var matches = leagueMatches(rounds, cfg, calc, holesFor, ryder);
+    var matches = leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds);
     var rows = leagueStandings(matches, cfg, players);
     return { cfg: cfg, players: players, matches: matches, rows: rows, pay: leaguePayouts(rows, cfg) };
 }
 
 if (typeof window !== 'undefined') {
-    window.HardPanLeagueEngine = { roundCfg: leagueRoundCfg, roundOf: leagueRoundOf, FORMATS: LEAGUE_FORMATS, sameTeamMatches: leagueSameTeamMatches, config: leagueConfig, matches: leagueMatches, roundMatches: leagueRoundMatches, segments: leagueSegments, matchFor: leagueMatchFor,
+    window.HardPanLeagueEngine = { autoPairings: leagueAutoPairings, pairingMatches: leaguePairingMatches, live: leagueLive, roundCfg: leagueRoundCfg, roundOf: leagueRoundOf, FORMATS: LEAGUE_FORMATS, sameTeamMatches: leagueSameTeamMatches, config: leagueConfig, matches: leagueMatches, roundMatches: leagueRoundMatches, segments: leagueSegments, matchFor: leagueMatchFor,
         standings: leagueStandings, payouts: leaguePayouts, players: leaguePlayers, state: leagueState, key: leagueKey, DEFAULTS: LEAGUE_DEFAULTS };
 }
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
+    module.exports = { leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
         leagueStandings: leagueStandings, leaguePayouts: leaguePayouts, leaguePlayers: leaguePlayers, leagueState: leagueState, leagueKey: leagueKey, LEAGUE_DEFAULTS: LEAGUE_DEFAULTS };
 }

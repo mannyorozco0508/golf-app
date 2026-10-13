@@ -242,3 +242,46 @@ test('A CUP ROUND: matches from the Ryder engine (the adapter); 18 from the Cup,
     const asMatch = L.leagueState({ league: { on: true, def: { mode: 'match', win: 2, halve: 1 } } }, [r], calc, holesFor, ryder);
     assert.equal(asMatch.rows.find((x) => x.name === 'G01').pts, 1, 'an 18-hole match halved = 1 each');
 });
+
+test('LEAGUE PAIRINGS: the game\'s own 2 v 2 / 1 v 1 from league golfers in different groups, scored from their own hole scores; live "2 UP thru 7"', { skip }, () => {
+    // 12 golfers in 3 groups; G01 & G05 (groups 1 and 2) v G09 & G10 (group 3); singles G02 v G06.
+    const r = round('R1', names24.slice(0, 12), ['A', 'B', 'H'], 7);
+    // Rewrite the scores: G01 3s, G05 4s, G09 4s, G10 5s -> A best 3 v B best 4: A wins every hole. G02 4 v G06 4: level.
+    const sc = { G01: 3, G05: 4, G09: 4, G10: 5, G02: 4, G06: 4 };
+    Object.keys(r.data.scores).forEach((k) => { const id = Number(/^p(\d+)_/.exec(k)[1]); const nm = r.data.players.find((p) => p.id === id).name; if (sc[nm]) r.data.scores[k] = sc[nm]; });
+    const game = { league: { on: true, teamsMode: 'league', players: ['G01', 'G05', 'G09', 'G10', 'G02', 'G06'], pairings: { R1: [{ a: ['G01', 'G05'], b: ['G09', 'G10'] }, { a: ['G02'], b: ['G06'] }] } } };
+    const st = L.leagueState(game, [r], calc, holesFor);
+    assert.equal(st.matches.length, 2, 'only the pairings - not the groups\' own Nassaus');
+    const m0 = st.matches[0], m1 = st.matches[1];
+    assert.deepEqual([m0.source, m0.live.status, m0.live.thru], ['pairing', 7, 7], 'A 7 UP thru 7');
+    assert.deepEqual(m0.seg, { front: 'A', back: null, total: null }, 'thru 7 at 7 up: the front is closed (2 to play), the 18 is not (11 to play)');
+    assert.deepEqual([m1.live.status, m1.live.thru, m1.a, m1.b], [0, 7, ['G02'], ['G06']], 'singles all square thru 7');
+});
+
+test('LEAGUE PAIRINGS across round codes: a golfer in another round of the same day is found there (each group its own round)', { skip }, () => {
+    const g1 = round('D1A', names24.slice(0, 4), ['A']);       // G01-G04
+    const g2 = round('D1B', names24.slice(4, 8), ['A']);       // G05-G08 (own ids 101..)
+    const game = { league: { on: true, teamsMode: 'league', players: ['G01', 'G05', 'G03', 'G07'], pairings: { D1A: [{ a: ['G01', 'G05'], b: ['G03', 'G07'] }] } } };
+    const day = (rd) => [g1, g2];
+    const st = L.leagueState(game, [g1, g2], calc, holesFor, null, day);
+    // G01 3s & G05 3s (both "A" side of their own rounds) v G03 4s & G07 4s.
+    assert.equal(st.matches.length, 1);
+    assert.deepEqual(st.matches[0].seg, { front: 'A', back: 'A', total: 'A' });
+    const without = L.leagueState(game, [g1, g2], calc, holesFor, null, null);
+    assert.equal(without.matches[0].missing, true, 'without the day\'s other rounds the golfers are not found - said, not guessed');
+});
+
+test('DEFAULT PAIRINGS: 10 golfers = two 2 v 2 + one 1 v 1; singles rotate round to round; odd one sits out', { skip }, () => {
+    const ten = ['Al', 'Bo', 'Cy', 'Di', 'Ed', 'Fy', 'Gus', 'Hal', 'Ike', 'Jo'];
+    const p1 = L.leagueAutoPairings(ten, { pairings: {} }, 0, []);
+    assert.deepEqual(p1.pairings.map((t) => t.a.length + 'v' + t.b.length), ['2v2', '2v2', '1v1']);
+    assert.equal(new Set(p1.pairings.flatMap((t) => t.a.concat(t.b))).size, 10, 'everyone plays once');
+    const s1 = p1.pairings[2].a.concat(p1.pairings[2].b);
+    const p2 = L.leagueAutoPairings(ten, { pairings: { R1: p1.pairings } }, 1, ['R1']);
+    const s2 = p2.pairings[2].a.concat(p2.pairings[2].b);
+    assert.ok(!s2.some((n) => s1.includes(n)), 'round 2 singles are two other golfers: ' + s1 + ' / ' + s2);
+    const pa = (p) => p.pairings.filter((t) => t.a.length === 2).flatMap((t) => [t.a.slice().sort().join('+'), t.b.slice().sort().join('+')]);
+    assert.ok(pa(p2).filter((x) => pa(p1).includes(x)).length <= 1, 'partners mostly change');
+    const nine = L.leagueAutoPairings(ten.slice(0, 9), { pairings: {} }, 0, []);
+    assert.deepEqual([nine.pairings.map((t) => t.a.length + 'v' + t.b.length), nine.sittingOut.length], [['2v2', '2v2'], 1]);
+});

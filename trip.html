@@ -4329,7 +4329,8 @@ html {
     function leagueRender(rounds) {
         if (!window.HardPanLeague) return;
         try {
-            window.HardPanLeague.render({ code: currentTripCode, trip: tripData || {}, rounds: (rounds || []).map((r) => ({ code: r.code, label: r.label, data: r.data })),
+            const meta = (tripData && tripData.rounds) || {};
+            window.HardPanLeague.render({ code: currentTripCode, trip: tripData || {}, rounds: (rounds || []).map((r) => ({ code: r.code, label: r.label, date: (meta[r.code] || {}).date || null, data: r.data })),
                 organizer: hasTripOrganizerAuthority(), db: typeof db !== 'undefined' ? db : null });
         } catch (e) { console.error('[league]', e); }
     }

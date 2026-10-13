@@ -46,12 +46,12 @@
     }
     // A CUP ROUND's own matches, from the Ryder engine (ryder-cup.js, read-only): who played
     // whom and the 18-hole result once decided. null when the round has no Cup.
-    function ryder(round) {
+    function ryder(round, list) {
         try {
             if (typeof resolveRyderCupForRound !== 'function' || typeof computeRyderMatchResult !== 'function' || typeof ryderCupConfig !== 'function') return null;   /* global resolveRyderCupForRound, computeRyderMatchResult, ryderCupConfig, ryderMatchRoster, hasRyderCup */
             var d = (round && round.data) || {}, ref = d.ryderCupRef;
             if (!(ref && ref.host) && !(typeof hasRyderCup === 'function' && hasRyderCup(d))) return null;
-            var hostR = ref && ref.host ? S.rounds.filter(function (r) { return String(r.code) === String(ref.host); })[0] : null;
+            var hostR = ref && ref.host ? (list || S.rounds).filter(function (r) { return String(r.code) === String(ref.host); })[0] : null;
             var res = resolveRyderCupForRound(d, hostR ? hostR.data : null, round.code);
             if (!res || !res.cup) return null;
             var cfg = ryderCupConfig(res.cup); if (!cfg) return null;
@@ -69,7 +69,33 @@
     }
     function settings() { return (S.holder && S.holder[S.key]) || null; }
     function setSettings(v) { S.holder = S.holder || {}; S.holder[S.key] = v; }
-    function state() { return E() ? E().state(S.holder, S.rounds, calc, holesFor, ryder) : null; }
+    // THE SAME DAY's other rounds (when a day's groups are separate round codes): by the trip's
+    // round dates; a round with no date is its own day.
+    function dayRoundsOf(list) {
+        return function (round) { return round.date ? list.filter(function (r) { return r.date && r.date === round.date; }) : [round]; };
+    }
+    function state() { return E() ? E().state(S.holder, S.rounds, calc, holesFor, function (r) { return ryder(r, S.rounds); }, dayRoundsOf(S.rounds)) : null; }
+    // LIVE: each round's scores are listened to, so the standings and every match move as
+    // scores come in (not only when the page opens).
+    var LIVE = { subs: {}, scores: {}, t: null };
+    function liveWatch() {
+        if (!S.db || typeof S.db.ref !== 'function') return;
+        S.rounds.forEach(function (r) {
+            var code = String(r.code);
+            if (LIVE.scores[code]) r.data.scores = LIVE.scores[code];
+            if (LIVE.subs[code]) return;
+            var ref = S.db.ref('events/' + code + '/scores');
+            if (!ref || typeof ref.on !== 'function') return;
+            LIVE.subs[code] = true;
+            ref.on('value', function (snap) {
+                var v = (snap && typeof snap.val === 'function' ? snap.val() : null) || {};
+                LIVE.scores[code] = v;
+                S.rounds.forEach(function (x) { if (String(x.code) === code && x.data) x.data.scores = v; });
+                if (S.form) return;                       // never redraw under a half-filled setup
+                clearTimeout(LIVE.t); LIVE.t = setTimeout(function () { render(); }, 400);
+            });
+        });
+    }
     function write(path, val) {
         if (!S.db || !S.base) return Promise.reject(new Error('not connected'));
         return S.db.ref(S.base + (path ? '/' + path : '')).set(val);
@@ -86,6 +112,7 @@
             S.holder = o.holder || {}; S.key = o.key || 'league'; S.base = o.base; S.ctx = o.ctx || {}; S.rounds = o.rounds || []; S.organizer = !!o.organizer; S.db = o.db || S.db;
             if (o.ids) S.ids = Object.assign({}, S.ids, o.ids);
             mount();
+            if (o.live !== false) liveWatch();
         }
         var sec = $(S.ids.section), card = $(S.ids.card), settle = $(S.ids.settle);
         if (!card) return;
@@ -93,6 +120,7 @@
         if (sec) sec.style.display = st || S.organizer ? '' : 'none';
         if (S.form) { card.innerHTML = formHtml(); if (settle) settle.innerHTML = ''; return; }
         if (S.view === 'results' && st && S.organizer) { card.innerHTML = resultsHtml(st); if (settle) settle.innerHTML = settleHtml(st); return; }
+        if (S.view === 'pairings' && st && S.organizer) { card.innerHTML = pairingsHtml(st); if (settle) settle.innerHTML = settleHtml(st); return; }
         if (!st) {
             card.innerHTML = S.organizer ? '<p class="trip-section-sub">Each group plays 2 v 2; front 9, back 9 and 18 each earn points for the golfers on the winning side, added up over the rounds you pick. The pot pays the top places.</p>'
                 + '<button type="button" class="btn-primary" data-lg="setup">🏅 Set up a Points game</button>' : '';
@@ -128,7 +156,7 @@
             if (open) h.push('<tr><td></td><td colspan="4" style="padding:0 4px 8px;font-size:.8rem;">' + (r.matches.length ? r.matches.map(matchLine).join('') : '<div style="color:var(--text-muted);">No matches yet.</div>') + '</td></tr>');
         });
         h.push('</tbody></table>');
-        if (S.organizer) h.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="btn-outline" data-lg="results">✏️ Match results</button><button type="button" class="btn-outline" data-lg="setup">⚙️ Setup</button></div>');
+        if (S.organizer) h.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' + (st.cfg.teamsMode === 'league' ? '<button type="button" class="btn-primary" data-lg="pairings">\uD83D\uDC65 Pairings</button>' : '') + '<button type="button" class="btn-outline" data-lg="results">✏️ Match results</button><button type="button" class="btn-outline" data-lg="setup">⚙️ Setup</button></div>');
         return h.join('');
     }
     function segText(v) { return v === 'H' ? 'halved' : v ? v : '…'; }
@@ -137,8 +165,84 @@
             var v = m.seg[k], won = v && v !== 'H' && v === m.side;
             return SEG[k] + ' ' + (v ? (v === 'H' ? '½' : won ? 'won' : 'lost') : '…') + (m.set[k] ? '*' : '');
         };
-        return '<div class="lg-match" style="margin:3px 0;">' + esc(m.label) + (m.group ? ' · G' + esc(m.group) : '') + ': with ' + esc(m.partner.join(' & ') || '—') + ' v ' + esc(m.opponents.join(' & '))
+        var lv = liveText(m.live, m.a, m.b, m.seg);
+        return '<div class="lg-match" style="margin:3px 0;">' + esc(m.label) + (m.group ? ' · G' + esc(m.group) : '') + ': ' + (m.partner.length ? 'with ' + esc(m.partner.join(' & ')) : 'singles') + ' v ' + esc(m.opponents.join(' & ')) + (lv ? ' \u00b7 <b>' + esc(lv) + '</b>' : '')
             + ' — ' + ['front', 'back', 'total'].map(seg).join(', ') + ' → <b>' + ptsText(m.pts) + ' pt' + (m.pts === 1 ? '' : 's') + '</b>' + (m.result ? ' (' + m.result + ')' : '') + '</div>';
+    }
+
+    // "Manny & JP 2 UP thru 7" / "All square thru 7" / "Manny & JP won 3&2", from the engine.
+    function first(n) { return String(n || '').split(' ')[0]; }
+    function liveText(lv, a, b, seg) {
+        if (!lv || !lv.thru) return '';
+        var side = function (xs) { return xs.map(first).join(' & '); };
+        if (lv.closed || (seg && seg.total && seg.total !== 'NA')) {
+            if (lv.status === 0) return 'Halved';
+            return side(lv.status > 0 ? a : b) + ' won' + (lv.result ? ' ' + lv.result.replace(/^.*?(\d+(?:&\d+| up))$/, '$1') : '');
+        }
+        if (lv.status === 0) return 'All square thru ' + lv.thru;
+        return side(lv.status > 0 ? a : b) + ' ' + Math.abs(lv.status) + ' UP thru ' + lv.thru;
+    }
+
+    // ---- PAIRINGS (league pairings: the game's own matches, round by round) --------------
+    // From the league golfers playing that round (or that day), whatever their groups: 2 v 2,
+    // with "2 left → singles" (1 v 1, the same points) for an odd number. "Make pairings" fills
+    // the round (singles rotate); every match can be removed and picked again.
+    var PR = { round: null, size: 2, order: [] };
+    function roundGolfers(cfg, code) {
+        var r = S.rounds.filter(function (x) { return String(x.code) === String(code); })[0];
+        if (!r) return [];
+        var day = dayRoundsOf(S.rounds)(r), seen = {};
+        [r].concat(day).forEach(function (x) { ((x.data && x.data.players) || []).forEach(function (p) { if (p && p.name) seen[p.name.toLowerCase()] = p.name; }); });
+        return (cfg.players || []).filter(function (n) { return seen[String(n).toLowerCase()]; });
+    }
+    function pairingsHtml(st) {
+        var cfg = st.cfg, rounds = usedRounds(st);
+        if (!PR.round || !rounds.some(function (r) { return String(r.code) === PR.round; })) PR.round = rounds.length ? String(rounds[0].code) : null;
+        var h = ['<div style="font-weight:800;margin-bottom:4px;">\uD83D\uDC65 Pairings</div><div class="trip-section-sub" style="margin:0 0 8px;">The Points game\u2019s own matches, round by round, from the league golfers only \u2014 whatever groups they are in. Each match is scored from the golfers\u2019 own hole scores (' + esc(cfg.scoring) + '). No Nassau or side bet needed.</div>'];
+        h.push('<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;">' + rounds.map(function (r) { var on = String(r.code) === PR.round, n = ((cfg.pairings || {})[r.code] || []).length; return chipBtn('data-lg-pr="' + esc(r.code) + '"', on, esc(r.label || r.code) + (n ? ' \u00b7 ' + n : '')); }).join('') + '</div>');
+        if (!PR.round) return h.join('') + '<button type="button" class="btn-outline" data-lg="back">\u2039 Back to the standings</button>';
+        var list = (cfg.pairings || {})[PR.round] || [], golfers = roundGolfers(cfg, PR.round), used = {};
+        list.forEach(function (t) { t.a.concat(t.b).forEach(function (n) { used[n.toLowerCase()] = 1; }); });
+        var free = golfers.filter(function (n) { return !used[n.toLowerCase()]; });
+        var ms = st.matches.filter(function (m) { return String(m.round) === PR.round; });
+        h.push(list.length ? list.map(function (t, i) {
+            var m = ms.filter(function (x) { return x.id === PR.round + '~pair' + i; })[0], lv = m ? liveText(m.live, t.a, t.b, m.seg) : '';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;border-top:1px solid var(--border-faint);padding:6px 0;"><span><b>' + esc(t.a.join(' & ')) + '</b> v <b>' + esc(t.b.join(' & ')) + '</b>' + (t.a.length === 1 ? ' <span class="trip-section-sub">(singles)</span>' : '')
+                + (m && m.missing ? ' <span style="color:var(--warn-text);">\u2014 not all in this round</span>' : lv ? ' \u00b7 ' + esc(lv) : '') + '</span><button type="button" class="btn-outline-sm" data-lg-prdel="' + i + '">Remove</button></div>';
+        }).join('') : '<div class="trip-section-sub">No pairings for this round yet.</div>');
+        h.push('<div style="margin-top:8px;"><button type="button" class="btn-primary" data-lg="autopair">Make pairings</button> <span class="trip-section-sub">' + golfers.length + ' league golfers playing this round</span></div>');
+        if (free.length) {
+            var note = free.length === 2 ? '2 left \u2192 singles' : free.length === 1 ? '1 left \u2192 sits out (or add a match by hand)' : free.length + ' left';
+            var o = PR.order, sz = PR.size;
+            h.push('<div style="margin-top:10px;font-weight:700;">' + esc(note) + '</div><div>' + chipBtn('data-lg-psz="2"', sz === 2, '2 v 2') + chipBtn('data-lg-psz="1"', sz === 1, '1 v 1 singles') + '</div>'
+                + '<div class="trip-section-sub">' + (sz === 1 ? 'First tapped = A, the next = B.' : 'First two tapped = Team A, next two = Team B.') + ' Tap again to un-pick.</div><div>'
+                + free.map(function (n) { var i = o.indexOf(n), side = i === -1 ? '' : i < sz ? 'A' : 'B'; return chipBtn('data-lg-pp="' + esc(n) + '"', !!side, (side ? side + ' ' : '') + esc(n), side === 'B' ? '#1d3557' : '#0f4c3a'); }).join('') + '</div>'
+                + '<button type="button" class="btn-outline-sm" data-lg="paddswap">\u21C4 Swap</button> <button type="button" class="btn-outline-sm" data-lg="padd"' + (o.length === sz * 2 ? '' : ' disabled') + '>+ Add this match</button>');
+        }
+        h.push('<div style="margin-top:12px;"><button type="button" class="btn-outline" data-lg="back">\u2039 Back to the standings</button></div>');
+        return h.join('');
+    }
+    function savePairings(code, list) {
+        write('pairings/' + code, list.length ? list : null).then(function () {
+            var s2 = settings() || {}; s2.pairings = Object.assign({}, s2.pairings || {});
+            if (list.length) s2.pairings[code] = list; else delete s2.pairings[code];
+            setSettings(s2); pointRounds([code]); render();
+        }, function (e) { if (typeof W.uiFail === 'function') W.uiFail('\u26A0\uFE0F NOT SAVED\n' + (e && e.message || e)); });
+    }
+    function autoPair() {
+        var cfg = E().config(S.holder), rounds = usedRounds({ cfg: cfg }), idx = rounds.map(function (r) { return String(r.code); }).indexOf(PR.round);
+        var res = E().autoPairings(roundGolfers(cfg, PR.round), cfg, Math.max(idx, 0), rounds.slice(0, Math.max(idx, 0)).map(function (r) { return String(r.code); }));
+        savePairings(PR.round, res.pairings);
+    }
+    // A POINTER IN EACH ROUND so its scorecard can show the round's Points game matches
+    // (events/<round>/pointsGameRef: { trip } or { round: <the round holding the game> }).
+    function pointRounds(codes) {
+        if (!S.db) return;
+        var ref = /^trips\//.test(S.base) ? { trip: S.base.split('/')[1] } : { round: S.base.split('/')[1] };
+        (codes || []).forEach(function (c) {
+            if (ref.round && String(ref.round) === String(c)) return;
+            try { S.db.ref('events/' + c + '/pointsGameRef').set(ref); } catch (e) {}
+        });
     }
 
     // ---- WHO GETS PAID (its own card) ---------------------------------------------------
@@ -163,7 +267,7 @@
             roundsMode: S.ctx.thisRound ? (c && (c.rounds ? c.rounds.length > 1 : true) && S.key === 'league' ? 'several' : (c && c.rounds && c.rounds.length > 1 ? 'several' : 'one')) : 'several',
             rounds: c && c.rounds ? c.rounds.slice() : cands.map(function (r) { return String(r.code); }),
             later: S.ctx.tripCode ? !(c && c.rounds) : false,
-            teamsMode: c ? c.teamsMode : 'change', teams: c ? c.teams.map(function (t) { return { a: t.a.slice(), b: t.b.slice() }; }) : [], scoring: c ? c.scoring : 'net',
+            teamsMode: c ? c.teamsMode : 'change', teamsSaved: !!c, teams: c ? c.teams.map(function (t) { return { a: t.a.slice(), b: t.b.slice() }; }) : [], scoring: c ? c.scoring : 'net',
             pts: c ? Object.assign({}, c.pts) : { front: 1, back: 1, total: 1 },
             // A NEW GAME STARTS WITH NOBODY PICKED (Manny, 2026-10-13); "Select all" is one tap.
             players: c ? (c.players ? c.players.slice() : allNames().slice()) : [],
@@ -227,9 +331,11 @@
         }).join(''));
         h.push('</div>');
         // 2. TEAMS
-        h.push('<div class="form-group"><label>2. Teams</label><div>' + chipBtn('data-lg-tm="change"', f.teamsMode === 'change', 'Teams change each round') + chipBtn('data-lg-tm="same"', f.teamsMode === 'same', 'Same teams every round') + '</div>');
-        if (f.teamsMode === 'change') h.push('<div class="trip-section-sub">Each round’s groups: their 2 v 2 Nassau in Side Bets, or entered under Match results with the 2v2 picker.</div>');
-        else {
+        var tmode = teamsModeOf(f, names);
+        h.push('<div class="form-group"><label>2. Teams</label><div>' + chipBtn('data-lg-tm="league"', tmode === 'league', 'League pairings') + chipBtn('data-lg-tm="change"', tmode === 'change', 'Use each group\u2019s 2v2 Nassau') + chipBtn('data-lg-tm="same"', tmode === 'same', 'Same teams every round') + '</div>');
+        if (tmode === 'league') h.push('<div class="trip-section-sub">The game\u2019s own matches, set round by round from the league golfers only (\uD83D\uDC65 Pairings after Save) \u2014 whatever groups they are in; 2 v 2, and 2 left \u2192 singles. Scored from each golfer\u2019s own hole scores (' + chipBtn('data-lg-sc="net"', f.scoring === 'net', 'net') + chipBtn('data-lg-sc="gross"', f.scoring === 'gross', 'gross') + ').</div>');
+        else if (tmode === 'change') h.push('<div class="trip-section-sub">Each round’s groups: their 2 v 2 Nassau in Side Bets, or entered under Match results with the 2v2 picker.</div>');
+        else if (tmode === 'same') {
             h.push('<div class="trip-section-sub">Pick the 2 v 2 sides once: first two tapped = Team A, next two = Team B, then Add. Every round they all play, the scores decide it (' + chipBtn('data-lg-sc="net"', f.scoring === 'net', 'net') + chipBtn('data-lg-sc="gross"', f.scoring === 'gross', 'gross') + ').</div>');
             h.push(f.teams.map(function (t, i) { return '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border-faint);padding:4px 0;"><span><b>' + esc(t.a.join(' & ')) + '</b> v <b>' + esc(t.b.join(' & ')) + '</b></span><button type="button" class="btn-outline-sm" data-lg-tdel="' + i + '">Remove</button></div>'; }).join(''));
             var o = S.pickOrder, used = {};
@@ -285,13 +391,19 @@
         if (!f.perRound[code]) f.perRound[code] = JSON.parse(JSON.stringify(f.def));
         return f.perRound[code];
     }
+    // A league smaller than the field defaults to its own pairings; the whole field to each
+    // group's Nassau - until the organizer picks one.
+    function teamsModeOf(f, names) {
+        if (f.teamsTouched || f.teamsSaved) return f.teamsMode;
+        return f.players.length && f.players.length < (names || []).length ? 'league' : 'change';
+    }
     function saveForm() {
         var f = S.form, cfg = formCfg(), eng = E();
         var fail = function (m) { f.msg = m; render(); };
         if (!(cfg.buyIn >= 0)) return fail('Type the buy-in.');
         if (f.players.length < 2) return fail('Pick the golfers in the game (at least two).');
         if (f.roundsMode === 'several' && !f.later && !f.rounds.length) return fail('Pick the rounds.');
-        if (f.teamsMode === 'same' && !f.teams.length) return fail('Add the 2 v 2 teams (or pick "Teams change each round").');
+        if (teamsModeOf(f, formNames()) === 'same' && !f.teams.length) return fail('Add the 2 v 2 teams (or pick "Teams change each round").');
         var pay = eng.payouts(f.players.map(function (p, i) { return { name: p, rank: i + 1 }; }), cfg);
         if (!pay.valid) return fail(f.payMode === 'usd' ? pay.why + '.' : 'The places must add up to 100%.');
         // WHERE IT IS KEPT: a trip's rounds -> the trip (the trip page shows it); this round only,
@@ -303,7 +415,7 @@
         Object.keys(f.perRound).forEach(function (k) { if (JSON.stringify(f.perRound[k]) !== JSON.stringify(f.def)) per[k] = f.perRound[k]; });
         var val = { on: true, buyIn: cfg.buyIn, players: f.players.slice(), pts: f.def.pts, def: f.def, perRound: Object.keys(per).length ? per : null,
             rounds: f.roundsMode === 'one' ? [String(S.ctx.thisRound)] : (f.later ? null : f.rounds.slice()),
-            teamsMode: f.teamsMode, teams: f.teamsMode === 'same' ? f.teams : null, scoring: f.scoring,
+            teamsMode: teamsModeOf(f, formNames()), teams: teamsModeOf(f, formNames()) === 'same' ? f.teams : null, scoring: f.scoring,
             payMode: f.payMode, places: cfg.places, placesUsd: f.payMode === 'usd' ? cfg.placesUsd : null,
             overrides: keep.overrides || null, manual: keep.manual || null, at: Date.now() };
         if (!S.db) return fail('Not connected.');
@@ -311,6 +423,7 @@
             if (base !== S.base) { S.base = base; S.key = toTrip ? 'league' : 'pointsGame'; S.holder = {}; }
             var v = JSON.parse(JSON.stringify(val)); Object.keys(v).forEach(function (k) { if (v[k] === null) delete v[k]; });
             setSettings(Object.assign({}, settings() || {}, v));
+            pointRounds((v.rounds || S.rounds.map(function (r) { return String(r.code); })));
             S.form = null; render();
         }, function (e) { fail('Not saved: ' + (e && e.message || e)); });
     }
@@ -337,7 +450,7 @@
             if (!ms.length) h.push('<div class="trip-section-sub">' + (st.cfg.teamsMode === 'same' ? 'None of the teams played this round together yet.' : 'No 2 v 2 Nassau in this round yet.') + '</div>');
             ms.forEach(function (m) {
                 h.push('<div class="lg-res" data-lg-match="' + esc(m.id) + '" style="border:1px solid var(--border-faint);border-radius:10px;padding:8px;margin:6px 0;">'
-                    + '<div style="font-weight:700;">' + (m.group ? 'Group ' + esc(m.group) + ': ' : '') + 'A ' + esc(m.a.join(' & ')) + ' v B ' + esc(m.b.join(' & ')) + (m.source === 'manual' ? ' <span class="trip-section-sub">(entered by hand)</span>' : '') + '</div>'
+                    + '<div style="font-weight:700;">' + (m.group ? 'Group ' + esc(m.group) + ': ' : '') + 'A ' + esc(m.a.join(' & ')) + ' v B ' + esc(m.b.join(' & ')) + (m.source === 'manual' ? ' <span class="trip-section-sub">(entered by hand)</span>' : '') + (liveText(m.live, m.a, m.b, m.seg) ? ' <span class="trip-section-sub">\u00b7 ' + esc(liveText(m.live, m.a, m.b, m.seg)) + '</span>' : '') + '</div>'
                     + ['front', 'back', 'total'].map(function (k) {
                         var o = ((st.cfg.overrides || {})[m.id] || {})[k] || null;
                         var chip = function (v, label) { var on = (o || 'auto') === v; return '<button type="button" data-lg-set="' + k + ':' + v + '" style="min-height:34px;min-width:44px;margin:2px;border-radius:999px;border:1px solid var(--brand-green);font-weight:800;' + (on ? 'background:var(--brand-green);color:#fff;' : 'background:var(--bg-card);') + '">' + label + '</button>'; };
@@ -406,13 +519,17 @@
             if ((b = t.closest('[data-lg-rm]'))) { f.roundsMode = b.getAttribute('data-lg-rm'); render(); return; }
             if ((b = t.closest('[data-lg-rd]'))) { var rc = b.getAttribute('data-lg-rd'); f.rounds = f.rounds.indexOf(rc) !== -1 ? f.rounds.filter(function (x) { return x !== rc; }) : f.rounds.concat([rc]); render(); return; }
             if ((b = t.closest('[data-lg-later]'))) { f.later = !!b.checked; if (!f.later && !f.rounds.length) f.rounds = S.rounds.map(function (r) { return String(r.code); }); render(); return; }
-            if ((b = t.closest('[data-lg-tm]'))) { f.teamsMode = b.getAttribute('data-lg-tm'); S.pickOrder = []; render(); return; }
+            if ((b = t.closest('[data-lg-tm]'))) { f.teamsMode = b.getAttribute('data-lg-tm'); f.teamsTouched = true; S.pickOrder = []; render(); return; }
             if ((b = t.closest('[data-lg-sc]'))) { f.scoring = b.getAttribute('data-lg-sc'); render(); return; }
             if ((b = t.closest('[data-lg-tp]'))) { var tp = b.getAttribute('data-lg-tp'), o1 = S.pickOrder.slice(), i1 = o1.indexOf(tp); if (i1 !== -1) o1.splice(i1, 1); else if (o1.length < 4) o1.push(tp); S.pickOrder = o1; render(); return; }
             if ((b = t.closest('[data-lg-tdel]'))) { f.teams.splice(Number(b.getAttribute('data-lg-tdel')), 1); render(); return; }
             if ((b = t.closest('[data-lg-rco]'))) { var oc = b.getAttribute('data-lg-rco'); f.openRound = f.openRound === oc ? null : oc; render(); return; }
             if ((b = t.closest('[data-lg-rcx]'))) { delete f.perRound[b.getAttribute('data-lg-rcx')]; render(); return; }
         }
+        if ((b = t.closest('[data-lg-pr]'))) { PR.round = b.getAttribute('data-lg-pr'); PR.order = []; render(); return; }
+        if ((b = t.closest('[data-lg-psz]'))) { PR.size = Number(b.getAttribute('data-lg-psz')); PR.order = []; render(); return; }
+        if ((b = t.closest('[data-lg-pp]'))) { var pp = b.getAttribute('data-lg-pp'), po = PR.order.slice(), pi = po.indexOf(pp); if (pi !== -1) po.splice(pi, 1); else if (po.length < PR.size * 2) po.push(pp); PR.order = po; render(); return; }
+        if ((b = t.closest('[data-lg-prdel]'))) { var cl = (((settings() || {}).pairings || {})[PR.round] || []).slice(); cl.splice(Number(b.getAttribute('data-lg-prdel')), 1); savePairings(PR.round, cl); return; }
         if ((b = t.closest('[data-lg-set]'))) { var mEl = b.closest('[data-lg-match]'), sv = b.getAttribute('data-lg-set').split(':'); if (mEl) setSeg(mEl.getAttribute('data-lg-match'), sv[0], sv[1]); return; }
         if ((b = t.closest('[data-lg-del]'))) { delManual(b.getAttribute('data-lg-del')); return; }
         if ((b = t.closest('[data-lg-round]'))) { S.pickRound = b.getAttribute('data-lg-round'); S.pickOrder = []; render(); return; }
@@ -431,6 +548,10 @@
             else if (a === 'tswap' && f) { S.pickOrder = S.pickOrder.slice(2, 4).concat(S.pickOrder.slice(0, 2)); render(); }
             else if (a === 'tadd' && f && S.pickOrder.length === 4) { f.teams.push({ a: S.pickOrder.slice(0, 2), b: S.pickOrder.slice(2, 4) }); S.pickOrder = []; render(); }
             else if (a === 'results') { S.view = 'results'; render(); }
+            else if (a === 'pairings') { S.view = 'pairings'; PR.order = []; render(); }
+            else if (a === 'autopair') autoPair();
+            else if (a === 'paddswap') { var z = PR.size; PR.order = PR.order.slice(z, z * 2).concat(PR.order.slice(0, z)); render(); }
+            else if (a === 'padd' && PR.order.length === PR.size * 2) { var cur = (((settings() || {}).pairings || {})[PR.round] || []).slice(); var z2 = PR.size; cur.push({ a: PR.order.slice(0, z2), b: PR.order.slice(z2, z2 * 2) }); PR.order = []; savePairings(PR.round, cur); }
             else if (a === 'back') { S.view = 'table'; render(); }
             else if (a === 'swap') { var sz = pickSize(); S.pickOrder = S.pickOrder.slice(sz, sz * 2).concat(S.pickOrder.slice(0, sz)); render(); }
             else if (a === 'addmatch') addManual();
@@ -464,6 +585,53 @@
         var c = $(S.ids.card);
         if (c && !c.__lg) { c.__lg = true; c.addEventListener('click', click); c.addEventListener('input', input); c.addEventListener('change', change); }
     }
+    // ---- THE ROUND'S OWN CARD (scorecard and Action): "Points game: …" -------------------
+    // This round's Points game matches with where each stands now, drawn from the round's live
+    // data on every redraw; the game itself (a trip's or a round's) is read once.
+    var RC = { code: null, holder: null, others: [], meta: {}, loading: false, link: null };
+    function cardDb() { try { return typeof db !== 'undefined' ? db : null; } catch (e) { return null; } }   /* global db */
+    function roundCardHtml(data, code, redraw) {
+        code = String(code || '').toUpperCase();
+        if (!code || !data || !E()) return '';
+        var own = data.pointsGame && data.pointsGame.on !== false ? data.pointsGame : null, ref = data.pointsGameRef || null;
+        if (!own && !(ref && (ref.trip || ref.round))) return '';
+        if (RC.code !== code) RC = { code: code, holder: null, others: [], meta: {}, loading: false, link: null };
+        var d0 = cardDb();
+        var read = function (p) { return d0 ? d0.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }) : Promise.resolve(null); };
+        var loadRounds = function (codes) { return Promise.all(codes.map(function (c) { return read('events/' + c).then(function (x) { return x ? { code: c, label: (RC.meta[c] || {}).label || x.courseName || c, date: (RC.meta[c] || {}).date || null, data: x } : null; }); })).then(function (rs) { RC.others = rs.filter(Boolean); }); };
+        if (own) { RC.holder = { pointsGame: own }; RC.link = 'points.html?game=' + encodeURIComponent(code); }
+        if (!RC.loading && (!RC.holder || own)) {
+            RC.loading = true;
+            var done = function () { if (typeof redraw === 'function') redraw(); };
+            if (own) loadRounds((own.rounds || []).filter(function (c) { return c !== code; })).then(done);
+            else if (ref.round) read('events/' + ref.round).then(function (h) {
+                if (!h || !h.pointsGame) return;
+                RC.holder = { pointsGame: h.pointsGame }; RC.link = 'points.html?game=' + encodeURIComponent(ref.round);
+                RC.others = [{ code: ref.round, label: h.courseName || ref.round, data: h }];
+                return loadRounds((h.pointsGame.rounds || []).filter(function (c) { return c !== code && c !== ref.round; })).then(function () { RC.others.push({ code: ref.round, label: h.courseName || ref.round, data: h }); });
+            }).then(done);
+            else read('trips/' + ref.trip).then(function (t) {
+                if (!t || !t.league || t.league.on === false) return;
+                RC.holder = { league: t.league }; RC.meta = t.rounds || {}; RC.link = 'points.html?trip=' + encodeURIComponent(ref.trip);
+                // Only the same day's other rounds are needed (a pairing across round codes).
+                var date = (RC.meta[code] || {}).date;
+                return loadRounds(date ? Object.keys(RC.meta).filter(function (c) { return c !== code && (RC.meta[c] || {}).date === date; }) : []);
+            }).then(done);
+        }
+        if (!RC.holder) return '';
+        var rounds = [{ code: code, label: (RC.meta[code] || {}).label || data.courseName || code, date: (RC.meta[code] || {}).date || null, data: data }].concat(RC.others.filter(function (r) { return r.code !== code; }));
+        var st = null;
+        try { st = E().state(RC.holder, rounds, calc, holesFor, function (r) { return ryder(r, rounds); }, dayRoundsOf(rounds)); } catch (e) { st = null; }
+        if (!st) return '';
+        var ms = st.matches.filter(function (m) { return String(m.round) === code; });
+        if (!ms.length) return '';
+        return '<div class="pg-round-card" style="margin:10px 0;padding:12px;border-radius:14px;background:#ffffff;color:#1a1a1a;border:2px solid #0f4c3a;color-scheme:light;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;"><b style="color:#0f4c3a;">\uD83C\uDFC5 Points game</b>' + (RC.link ? '<a href="' + esc(RC.link) + '" style="color:#0f4c3a;font-weight:800;text-decoration:none;">Standings \u203A</a>' : '') + '</div>'
+            + ms.map(function (m) { var lv = liveText(m.live, m.a, m.b, m.seg); return '<div style="padding:6px 0;border-top:1px solid #e2ebe7;font-size:.9rem;"><b>' + esc(m.a.join(' & ')) + '</b> v <b>' + esc(m.b.join(' & ')) + '</b>' + (m.a.length === 1 ? ' <span style="color:#5b6b64;">(singles)</span>' : '') + '<div style="color:#0f4c3a;font-weight:700;">' + esc(m.missing ? 'Not all in this round' : lv || 'Not started') + '</div></div>'; }).join('')
+            + '</div>';
+    }
+    W.HardPanLeagueCard = { html: roundCardHtml };
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
     W.HardPanLeague = { render: function (o) { render(o); }, _state: function () { return S; }, calc: calc, holesFor: holesFor, openSetup: openForm };
 })();

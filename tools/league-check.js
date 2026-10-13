@@ -67,6 +67,7 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
         { sleep: 1500 }, { expression: READ },                                                            // 0 not set up
         TAP('#league-card [data-lg="setup"]'), { sleep: 300 }, { expression: READ },                      // 1 the form: nobody picked
         { expression: "(function(){ " + JSON.stringify(TEN) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'ten'; })()" }, { sleep: 200 },
+        TAP('#league-card [data-lg-tm="change"]'), { sleep: 200 },   // the Nassau path (10 of 24 would default to league pairings - points-check.js covers those)
         TAP('#league-card [data-lg="save"]'), { sleep: 2500 }, { expression: READ },                      // 2 saved -> standings
         TAP('#league-card .lg-row'), { sleep: 300 }, { expression: READ },                                // 3 a golfer's matches
         TAP('#league-card [data-lg="results"]'), { sleep: 300 }, { expression: READ },                    // 4 match results
@@ -79,6 +80,7 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
     f(s[0].sec !== 'none' && /Set up a Points game/.test(s[0].card), '1: the organizer has no "Set up a Points game": ' + JSON.stringify(s[0]));
     f(/Buy-in per golfer/.test(s[1].card) && /Golfers in the game \(0 of 24\)/.test(s[1].card) && /^0 golfers · pot \$0$/m.test(s[1].card) && /Select all/.test(s[1].card) && /Split the pot by percentage/.test(s[1].card) && /Format & points/.test(s[1].card), '1: the setup form defaults (nobody picked): ' + s[1].card.slice(0, 400));
     const w2 = s[2].writes;
+    w2.splice(0, w2.length, ...w2.filter((w) => !/pointsGameRef$/.test(w.path)));
     f(w2.length === 1 && w2[0].op === 'update' && w2[0].path === 'trips/TRLG01/league' && w2[0].value.buyIn === 20 && JSON.stringify(w2[0].value.players) === JSON.stringify(TEN) && JSON.stringify(w2[0].value.places) === '[50,30,20]' && w2[0].value.on === true, '1: Save did not write one league node with the ten: ' + JSON.stringify(w2));
     f(s[2].rows === 10 && /Pot \$200 \(10 × \$20\) · 1st \$100, 2nd \$60, 3rd \$40/.test(s[2].card) && /W-L-H/.test(s[2].card) && !/Oz Kane|Pete Lang|Steve Cole/.test(s[2].card.split('Tap a golfer')[1] || ''), '1: the standings (only the ten): ' + s[2].card.slice(0, 700));
     f(!/Oz Kane|Pete Lang|Steve Cole|Paul Webb/.test(s[2].settle), '4: a non-league golfer in "who gets paid": ' + s[2].settle);
@@ -89,7 +91,7 @@ const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector
     f(/Team A: Max Bell & Ned Ross/.test(s[6].card) && /Team B: Oz Kane & Pete Lang/.test(s[6].card), '3: the 2v2 picker for a hand-entered match: ' + s[6].card.slice(-500));
     const mw = s[7].writes.filter((w) => /league\/manual\//.test(w.path));
     f(mw.length === 1 && JSON.stringify(mw[0].value.a) === '["Max Bell","Ned Ross"]' && mw[0].value.round === 'LGRD02', '3: the hand-entered match: ' + JSON.stringify(mw));
-    f(s[7].writes.every((w) => /^trips\/TRLG01\/league(\/|$)/.test(w.path)), '1-3: something other than the league node was written: ' + JSON.stringify(s[7].writes.map((w) => w.path)));
+    f(s[7].writes.every((w) => /^trips\/TRLG01\/league(\/|$)/.test(w.path) || /^events\/LGRD0[12]\/pointsGameRef$/.test(w.path)), '1-3: something other than the league node (and the rounds\' pointers) was written: ' + JSON.stringify(s[7].writes.map((w) => w.path)));
     f(/Points game — who gets paid/.test(s[2].settle) && /Settle this separately/.test(s[2].settle) && /\$200/.test(s[2].settle) && /Joe Russo · 6 pts\$80/.test(s[2].settle) && /not part of Who Pays Who/.test(s[2].settle), '4: the "who gets paid" card: ' + s[2].settle);
     f(!s[7].e.length, '1-3: page errors ' + s[7].e.join(' | '));
 

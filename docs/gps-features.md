@@ -308,3 +308,12 @@ Rules that would need ADDING (additive; nothing existing changes):
   Kept at events/<round>/pointsGame (this round, or rounds by code) or trips/<trip>/league (the trip's
   rounds) - no rules change. Results page: its own "who gets paid" card. Checks: league_engine_test.js,
   tools/league-check.js, tools/points-check.js.
+  LEAGUE PAIRINGS (2026-10-13; the default when the game's golfers are fewer than the field): per round,
+  the game's own matches from the league golfers only (2 v 2, or 1 v 1 singles worth the same points),
+  whatever groups they are in - 👥 Pairings: "Make pairings" (odd counts: "2 left → singles", singles rotate,
+  partners change), the 2v2 / 1v1 picker, Remove. Scored from each golfer's own hole scores by the match
+  engine (a stand-in round; a golfer in another round code of the same day - by the trip's round dates - is
+  read there). "Use each group's 2v2 Nassau" stays an option. LIVE: the trip page and points.html listen to
+  each round's scores; each match shows "Manny & JP 2 UP thru 7". Each round gets events/<round>/
+  pointsGameRef ({ trip } / { round }), so its scorecard and Action show "🏅 Points game" with that round's
+  matches, live, and "Standings ›".
