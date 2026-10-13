@@ -154,3 +154,19 @@ test('PURE and separate: no DOM, no database, no money engine but the match engi
     const s = fs.readFileSync(path.join(__dirname, 'league-engine.js'), 'utf8').replace(/\/\/.*$/gm, '');
     assert.ok(!/document\.|\.ref\(|firebase|settle|calculateMoney|calculateSettlement|trip-pots|tripPot/.test(s), 'no DOM / db / other engine');
 });
+
+test('ONLY THE LEAGUE\'S GOLFERS (Manny: 10 of us): mixed matches score for the league golfer; nobody else is in the standings or the pot', { skip }, () => {
+    // Group 1: G01 & G02 v G03 & G04, A sweeps. Group 2: G05 & G06 v G07 & G08, all halved.
+    const r = round('R1', names24.slice(0, 8), ['A', 'H']);
+    const ten = ['G01', 'G04', 'G05', 'G09', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15'];
+    const st = L.leagueState({ league: { on: true, players: ten } }, [r], calc, holesFor);
+    assert.deepEqual(st.rows.map((x) => x.name).sort(), ten.slice().sort(), 'only the ten');
+    const row = (n) => st.rows.find((x) => x.name === n);
+    assert.equal(row('G01').pts, 3, 'his side won - his partner G02 is not in the league');
+    assert.deepEqual(row('G01').matches[0].partner, ['G02']);
+    assert.equal(row('G04').pts, 0); assert.equal(row('G05').pts, 1.5, 'halved with three non-league golfers');
+    assert.equal(st.pay.potCents, 20000, '10 x $20');
+    assert.deepEqual(st.pay.placeCents, [10000, 6000, 4000], '1st $100 / 2nd $60 / 3rd $40');
+    assert.equal(st.pay.payCents.G01, 10000);
+    assert.ok(!('G02' in st.pay.payCents) && !('G03' in st.pay.payCents), 'non-league golfers are never paid');
+});

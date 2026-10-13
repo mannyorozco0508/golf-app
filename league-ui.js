@@ -116,7 +116,9 @@
     // ---- SETUP -----------------------------------------------------------------------
     function openForm() {
         var c = (E() && E().config(S.trip)) || null, names = allNames();
-        S.form = { buyIn: c ? c.buyIn : 20, players: c && c.players ? c.players.slice() : names.slice(), all: !(c && c.players), pts: c ? Object.assign({}, c.pts) : { front: 1, back: 1, total: 1 },
+        // A NEW LEAGUE STARTS WITH NOBODY PICKED (Manny, 2026-10-13: "only 10 of us are in the
+        // league"); "Select all" is one tap. An older league saved as "everyone" opens all picked.
+        S.form = { buyIn: c ? c.buyIn : 20, players: c ? (c.players ? c.players.slice() : names.slice()) : [], pts: c ? Object.assign({}, c.pts) : { front: 1, back: 1, total: 1 },
             places: c ? c.places.slice() : [50, 30, 20], names: names, msg: '' };
         render();
     }
@@ -126,7 +128,9 @@
         return '<div class="lg-form">'
             + '<div style="font-weight:800;margin-bottom:6px;">🏅 Points League setup</div>'
             + '<div class="form-group"><label>Buy-in per golfer ($)</label>' + inp('buyIn', f.buyIn, 90) + '</div>'
-            + '<div class="form-group"><label>Golfers in the league (' + f.players.length + ' of ' + f.names.length + ')</label><div style="display:flex;flex-wrap:wrap;gap:6px;">'
+            + '<div class="lg-live" role="status" style="font-weight:800;color:var(--brand-green);margin:4px 0 10px;">' + esc(liveLine()) + '</div>'
+            + '<div class="form-group"><label>Golfers in the league (' + f.players.length + ' of ' + f.names.length + ') \u00b7 only they score, and only they share the pot</label>'
+            + '<div style="margin:2px 0 6px;"><button type="button" class="btn-outline-sm" data-lg="all">Select all</button> <button type="button" class="btn-outline-sm" data-lg="none">Clear</button></div><div style="display:flex;flex-wrap:wrap;gap:6px;">'
             + f.names.map(function (n) { var on = f.players.indexOf(n) !== -1; return '<button type="button" class="tb-chip" data-lg-pl="' + esc(n) + '" aria-pressed="' + on + '" style="min-height:36px;padding:4px 10px;border-radius:999px;border:1px solid var(--brand-green);font-weight:700;' + (on ? 'background:var(--brand-green);color:#fff;' : 'background:var(--bg-card);') + '">' + (on ? '✓ ' : '') + esc(n) + '</button>'; }).join('')
             + (f.names.length ? '' : '<span class="trip-section-sub">No golfers in the trip’s rounds yet — everyone will be in once they are.</span>') + '</div></div>'
             + '<div class="form-group"><label>Points to each winning golfer</label>Front 9 ' + inp('pts.front', f.pts.front) + ' Back 9 ' + inp('pts.back', f.pts.back) + ' 18 ' + inp('pts.total', f.pts.total) + '</div>'
@@ -138,11 +142,25 @@
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="btn-primary" data-lg="save">Save</button><button type="button" class="btn-outline" data-lg="cancel">Cancel</button>'
             + (E() && E().config(S.trip) ? '<button type="button" class="btn-outline" data-lg="off" style="color:var(--accent-red);">Turn the league off</button>' : '') + '</div></div>';
     }
+    // "10 golfers · pot $200 · 1st $100 / 2nd $60 / 3rd $40", as the golfers and numbers change.
+    function liveLine() {
+        var f = S.form, n = f.players.length, eng = E();
+        var buy = Number(f.buyIn) || 0, places = f.places.map(function (x) { return Number(x) || 0; }).filter(function (x) { return x > 0; });
+        var head = n + ' golfer' + (n === 1 ? '' : 's') + ' \u00b7 pot ' + money(Math.round(buy * 100) * n);
+        if (!eng || !n) return head;
+        var rows = f.players.map(function (p, i) { return { name: p, rank: i + 1 }; });
+        var pay = eng.payouts(rows, { buyIn: buy, places: places });
+        if (!pay.valid) return head + ' \u00b7 the places must add up to 100%';
+        return head + ' \u00b7 ' + pay.placeCents.map(function (c, i) { return ORD[i] + ' ' + money(c); }).join(' / ');
+    }
     function saveForm() {
         var f = S.form, sum = f.places.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
         if (Math.abs(sum - 100) > 0.001) { f.msg = 'The paid places must add up to 100%.'; render(); return; }
         if (!(Number(f.buyIn) >= 0)) { f.msg = 'Type the buy-in.'; render(); return; }
-        var all = f.players.length === f.names.length;
+        if (f.players.length < 2) { f.msg = 'Pick the golfers in the league (at least two).'; render(); return; }
+        // The picked golfers are stored by name, always - never "everyone" - so a golfer added
+        // to the trip later is not in the league unless picked.
+        var all = false;
         update({ on: true, buyIn: Number(f.buyIn), players: all ? null : f.players.slice(), pts: { front: Number(f.pts.front) || 0, back: Number(f.pts.back) || 0, total: Number(f.pts.total) || 0 },
             places: f.places.map(Number), at: Date.now() }).then(function () {
             S.trip.league = Object.assign({}, S.trip.league || {}, { on: true, buyIn: Number(f.buyIn), players: all ? null : f.players.slice(), pts: { front: Number(f.pts.front) || 0, back: Number(f.pts.back) || 0, total: Number(f.pts.total) || 0 }, places: f.places.map(Number) });
@@ -230,6 +248,8 @@
             else if (a === 'cancel') { S.form = null; render(); }
             else if (a === 'save') saveForm();
             else if (a === 'off') { update({ on: false }).then(function () { S.trip.league = Object.assign({}, S.trip.league, { on: false }); S.form = null; render(); }); }
+            else if (a === 'all' && S.form) { S.form.players = S.form.names.slice(); render(); }
+            else if (a === 'none' && S.form) { S.form.players = []; render(); }
             else if (a === 'place+' && S.form) { S.form.places.push(0); render(); }
             else if (a === 'place-' && S.form) { S.form.places.pop(); render(); }
             else if (a === 'results') { S.view = 'results'; render(); }
@@ -247,6 +267,7 @@
         else if (/^place\./.test(k)) S.form.places[Number(k.slice(6))] = Number(v) || 0;
         var sum = S.form.places.reduce(function (a, b) { return a + (Number(b) || 0); }, 0), el = document.querySelector('#league-card .lg-sum');
         if (el) { var ok = Math.abs(sum - 100) < 0.001; el.style.color = ok ? 'var(--brand-green)' : 'var(--warn-text)'; el.textContent = 'Adds up to ' + Math.round(sum * 100) / 100 + '%' + (ok ? '' : ' — must be 100%'); }
+        var live = document.querySelector('#league-card .lg-live'); if (live) live.textContent = liveLine();
     }
     function mount() {
         var c = $('league-card');

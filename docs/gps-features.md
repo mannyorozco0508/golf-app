@@ -287,7 +287,11 @@ Rules that would need ADDING (additive; nothing existing changes):
   ($20) x league golfers; places 50/30/20 % (editable, must add to 100; fewer golfers than places =
   re-scaled), ties split the places they cover, integer cents. Stored ONLY at trips/<code>/league
   ({ on, buyIn, players | null = everyone, pts, places, overrides, manual }) - the trips node's existing
-  rules allow it, no rules change. Rounds are never written; a round played before the league was set up
+  rules allow it, no rules change. Only the PICKED golfers are in the league (Manny, 2026-10-13: 10 of the trip):
+  setup starts with nobody picked, "Select all", and a live "10 golfers · pot $200 · 1st $100 / 2nd $60 /
+  3rd $40"; a league golfer scores when his side wins even with non-league partners or opponents; nobody
+  else is ever in the standings, the pot or "who gets paid". (Live trips reads need a signed-in user - an
+  anonymous session is refused.) Rounds are never written; a round played before the league was set up
   counts (results are read whenever drawn). "Who gets paid" is its own card under Trip Money Settlement,
   settled separately - Who Pays Who and every settlement are untouched. Checks: league_engine_test.js,
   tools/league-check.js (organizer + golfer + build 12 / web app).
