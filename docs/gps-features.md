@@ -276,3 +276,10 @@ Rules that would need ADDING (additive; nothing existing changes):
   load with an 8 s limit; the location ask has a 15 s limit (iOS's first-launch prompt stops the plugin's
   own timeout) with "Couldn't get your location yet · Tap to retry", and a late answer is still used; a
   failure opening a door shows the light retry card, which reloads Home.
+- gps-trip-paste (2026-10-12): ONE paste box on the trip page in HardPan - the trip builder. "Paste the
+  whole trip", the itinerary and golfers boxes and the by-hand days are under "More ways" (closed; a review
+  filling in opens it). "DAY 1 - Tue Oct 13 - Caledonia, 9:10 & 9:20" now reads as Oct 13 at Caledonia
+  (the itinerary box drops "DAY n"; "Paste the whole trip" reads the date after "DAY n" and cleans the course
+  name with tspCleanCourse: no weekday, date or tee time); the online course search gets the course name
+  only; a TEAMS section and "TRIP:" lines are the Cup's, never groups; "Group 1 (9:10): ..." takes the
+  bracketed tee time. The Consumer trip page is unchanged.

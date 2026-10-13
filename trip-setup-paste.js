@@ -156,6 +156,26 @@ function tspPlayersLine(s) {
     return { players: players, teams: teams && teams[0].length && teams[1].length ? teams : null, bad: bad };
 }
 
+// A COURSE NAME, CLEAN (gps-trip-paste): "DAY 1", weekdays, dates and tee times out, so
+// "Tue Oct 13 - Caledonia, 9:10 & 9:20" searches as "Caledonia".
+var TSP_MONTH_RE = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?';
+function tspCleanCourse(name) {
+    var t = String(name == null ? '' : name);
+    t = t.replace(/^\s*day\s*\d+\b[\s,:.-]*/i, '')
+        .replace(/\b(?:sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat)(?:day|nesday|rsday|urday|sday)?\b\.?,?/ig, ' ')
+        .replace(new RegExp('\\b' + TSP_MONTH_RE + '\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?\\b', 'ig'), ' ')
+        .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ' ')
+        .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, ' ')
+        .replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)/ig, ' ')
+        .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
+        .replace(/\b(?:tee times?|at)\b\s*$/i, ' ')
+        .replace(/(?:\s*[&,]\s*)+$/, '')
+        .replace(/^[\s—–,:;&-]+|[\s—–,:;&-]+$/g, '')
+        .replace(/\s*[—–]\s*/g, ' - ').replace(/\s+-\s+-\s+/g, ' - ')
+        .replace(/\s{2,}/g, ' ').trim();
+    return t || null;
+}
+
 // ---- THE PLAN --------------------------------------------------------------------------
 // opts: { year } (dates with no year). Returns
 //   { days: [{ n, date, dateUnsure, weekday, time, courseName, nines, undecided, options,
@@ -184,12 +204,21 @@ function parseSetupPaste(text, opts) {
         r.bad.forEach(function (b) { flag(ln, b, 'Not a name I can read - left out', 'warn'); });
         return true;
     };
-    var blankBefore = false;
+    var blankBefore = false, inTeams = false, tripTeams = [];
     lines.forEach(function (rawLine, idx) {
         var ln = idx + 1;
         var s = tspClean(rawLine);
         if (!s) { blankBefore = true; return; }
         var startGroup = blankBefore; blankBefore = false;
+        // THE TRIP'S OWN LINES (gps-trip-paste): "TRIP: name" and a TEAMS section are the
+        // Cup's, never a group - the trip builder sets the Cup up.
+        if (/^(?:trip|trip name|event)\s*:\s*\S/i.test(s) && !days.length) { flag(ln, s, 'Trip name - set on the trip itself', 'info'); return; }
+        if (/^teams?\s*:?\s*$/i.test(s)) { inTeams = true; return; }
+        if (inTeams) {
+            var tl = /^([^:]{1,40}):\s*(.+)$/.exec(s);
+            if (tl && !/^(group|grp|foursome|day)\b/i.test(tl[1])) { tripTeams.push({ name: tl[1].trim(), players: tl[2] }); return; }
+            inTeams = false;
+        }
         // "same groups" / "same foursomes": the day before's groups again.
         if (/^same (groups|foursomes|pairings|teams)\b/i.test(s) || /\bsame (groups|foursomes|pairings)\b/i.test(s) && days.length > 1) {
             var prev = days[days.length - 2];
@@ -206,34 +235,36 @@ function parseSetupPaste(text, opts) {
         // A DAY: a date, a weekday, or "Day 2".
         var sameAsBefore = /\bsame (groups|foursomes|pairings|teams)\b/i.test(s);
         if (sameAsBefore) s = s.replace(/[\s,;-]*\bsame (groups|foursomes|pairings|teams)\b[\s,;.-]*/i, ' ').replace(/\s+/g, ' ').trim();
-        var dayText = tspDateText(s);
+        // "DAY 1 - Tue Oct 13 - Caledonia": the "DAY 1" comes off first, so the date is read.
+        var dayN = /^day\s*(\d+)\b[\s,:.-]*/i.exec(s);
+        var core = dayN ? s.slice(dayN[0].length) : s;
+        var dayText = tspDateText(core);
         var it = typeof tripItinParseLine === 'function' ? tripItinParseLine(dayText, { year: o.year }) : null;
-        var wd = /^(?:on\s+)?(sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b[\s,:-]*(?:at\s+)?/i.exec(s);
-        var dayN = /^day\s*(\d+)\b[\s,:-]*/i.exec(s);
+        var wd = /^(?:on\s+)?(sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b[\s,:-]*(?:at\s+)?/i.exec(core);
         // "Saturday game!!!" is a title, not a day at a course called "game!!!": a
         // weekday with no date and no tee time whose rest is chatter.
         if (wd && !(it && it.date)) {
-            var after = s.slice(wd[0].length);
+            var after = core.slice(wd[0].length);
             if (!(typeof tripItinTime === 'function' && tripItinTime(after)) && (/!/.test(after) || /^(game|games|golf|round|rounds|trip|golf trip|plans?|tee times?)\b/i.test(after.trim()) || !after.trim())) {
                 if (after.trim()) { flag(ln, s, 'Not understood - ignored', days.length ? 'warn' : 'info'); return; }
             }
         }
         if ((it && it.date) || wd || dayN) {
-            var split = tspSplitGames(it && it.date ? dayText : s);
+            var split = tspSplitGames(it && it.date ? dayText : core);
             var d = newDay(s);
             if (it && it.date) {
                 var it2 = tripItinParseLine(split.head, { year: o.year }) || it;
                 d.date = it2.date || it.date; d.dateUnsure = !!it2.usedDefaultYear; d.time = it2.time || null;
-                d.courseName = it2.courseName || null; if (it2.nines) d.nines = it2.nines;
+                d.courseName = tspCleanCourse(it2.courseName); if (it2.nines) d.nines = it2.nines;
                 if (it2.undecided) { d.undecided = true; d.options = it2.options; }
                 if (!d.courseName && !d.undecided) flag(ln, s, 'A day with no course name', 'ask');
             } else {
-                var rest = split.head.slice((wd || dayN)[0].length);
+                var rest = wd ? split.head.slice(wd[0].length) : split.head;
                 d.weekday = wd ? TSP_WEEKDAY_SHORT[TSP_WEEKDAYS[wd[1].toLowerCase()]] : null;
                 var t = typeof tripItinTime === 'function' ? tripItinTime(rest) : null;
                 d.time = t ? t.time : null;
                 var c = typeof tripItinCourse === 'function' ? tripItinCourse(rest) : null;
-                d.courseName = c ? c.name : null; if (c && c.nines) d.nines = c.nines;
+                d.courseName = c ? tspCleanCourse(c.name) : null; if (c && c.nines) d.nines = c.nines;
                 flag(ln, s, (wd ? d.weekday : 'Day ' + dayN[1]) + ' has no date - pick it on review', 'ask');
                 if (!d.courseName) flag(ln, s, 'A day with no course name', 'ask');
             }
@@ -246,11 +277,12 @@ function parseSetupPaste(text, opts) {
             return;
         }
         // A GROUP: "Group 1: ...", "Foursome A - ...", "8:24 - ...", "Team 1: ...".
-        var gh = /^(group|grp|foursome|fourball|threesome|pairing|tee time|team|flight)\s*([A-Z0-9]{0,3})\b\s*[:.)-]?\s*/i.exec(s)
+        // "Group 1 (9:10): ..." - a tee time in brackets is the group's time, not a golfer.
+        var gh = /^(group|grp|foursome|fourball|threesome|pairing|tee time|team|flight)\s*([A-Z0-9]{0,3})\b\s*(?:\((\d{1,2}:\d{2}\s*(?:am|pm)?)\)\s*)?[:.)-]?\s*/i.exec(s)
             || /^(\d{1,2}:\d{2}\s*(?:am|pm)?)\s*[:-]\s*/i.exec(s);
         if (gh) {
             var label = gh[1] && /^\d/.test(gh[1]) ? null : (gh[1].charAt(0).toUpperCase() + gh[1].slice(1).toLowerCase() + (gh[2] ? ' ' + gh[2] : ''));
-            var timeG = gh[1] && /^\d/.test(gh[1]) ? gh[1] : null;
+            var timeG = gh[1] && /^\d/.test(gh[1]) ? gh[1] : (gh[3] || null);
             // SIDES IN BRACKETS on the group line: "GROUP 1 - $5 NASSAU (Manny & Joe vs
             // Mike & Dave)". Taken out of the line and matched to the group's golfers below.
             var rest = s.slice(gh[0].length), vsSides = null;
@@ -344,7 +376,8 @@ function parseSetupPaste(text, opts) {
         });
     });
     roster.forEach(function (r) { if (!r.hcp && hcpBy[r.name.toLowerCase()] != null) r.hcp = hcpBy[r.name.toLowerCase()]; });
-    return { days: days, players: roster, flags: flags };
+    if (tripTeams.length) flags.push({ day: null, line: null, text: tripTeams.map(function (t) { return t.name; }).join(' v '), why: 'Cup teams (' + tripTeams.map(function (t) { return t.name; }).join(' v ') + ') are set up by Build the whole trip - not made into groups here', level: 'info' });
+    return { days: days, players: roster, flags: flags, tripTeams: tripTeams };
 }
 
 // A day's games for one group (the day's + the group's own), and the format card to use.
@@ -357,6 +390,6 @@ function tspDayFormat(day) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { parseSetupPaste: parseSetupPaste, tspGames: tspGames, tspPlayersLine: tspPlayersLine, tspPlayer: tspPlayer, tspClean: tspClean,
+    module.exports = { parseSetupPaste: parseSetupPaste, tspCleanCourse: tspCleanCourse, tspGames: tspGames, tspPlayersLine: tspPlayersLine, tspPlayer: tspPlayer, tspClean: tspClean,
         tspSplitGames: tspSplitGames, tspGroupGames: tspGroupGames, tspDayFormat: tspDayFormat, TSP_UNKNOWN: TSP_UNKNOWN };
 }

@@ -320,6 +320,27 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     report.build = J(r)[0];
     f(report.build.form !== 'none' && report.build.open, '7: trip.html#build did not open the trip builder: ' + JSON.stringify(report.build));
 
+    // 7b: ONE PASTE BOX (gps-trip-paste): the trip builder; the older pastes and by-hand under
+    // "More ways" (closed). The old itinerary box reads "DAY 1 - Tue Oct 13 - Caledonia, 9:10" as
+    // Oct 13 at Caledonia (the saved course); "Paste the whole trip" doesn't make TEAMS lines into
+    // groups; the online course search gets the course name only.
+    const ITIN = 'DAY 1 - Tue Oct 13 - Caledonia, 9:10 & 9:20\nDAY 2 - Wed Oct 14 - True Blue, 10:00';
+    const CUP = 'TRIP: Myrtle Cup\nTEAMS\nTeam USA: Manny, Joe, Mike, Dave\nTeam EURO: Tom, Rick, Steve, Paul\nDAY 1 - Tue Oct 13 - Caledonia, 9:10 & 9:20\nGroup 1 (9:10): Manny & Joe vs Tom & Rick - $5 Nassau\nGroup 2 (9:20): Mike & Dave vs Steve & Paul';
+    r = await go({ url: fileUrl('trip.html', '') + '#build', db: DB(), preScript: APP + ERR + "window.__q = []; var f0 = window.fetch; window.fetch = function (u) { u = String(u); if (/course-search/.test(u)) { window.__q.push(decodeURIComponent((/[?&]q=([^&]*)/.exec(u) || [])[1] || '')); return Promise.resolve({ json: function () { return Promise.resolve({ status: 'ok', courses: [] }); } }); } return f0.apply(this, arguments); };", steps: [{ sleep: 800 },
+        { expression: "JSON.stringify({ builder: !!(document.getElementById('tb-card')||{}).open, moreOpen: !!(document.getElementById('tp-more')||{}).open, inMore: ['sp-trip-card','itin-paste-card','golfer-paste-card','day-planner-card','build-trip-btn'].filter(function (id) { var e = document.getElementById(id); return e && e.closest('#tp-more-body'); }), boxes: Array.prototype.filter.call(document.querySelectorAll('#create-trip-form textarea'), function (t) { return !t.closest('#tp-more'); }).map(function (t) { return t.id; }) })" },
+        { expression: "(function(){ document.getElementById('itin-paste-box').value = " + JSON.stringify(ITIN) + "; document.getElementById('itin-year').value = '2026'; reviewItinerary(); return 'read'; })()" }, { sleep: 400 },
+        { expression: "JSON.stringify({ review: document.getElementById('itin-review').innerText, open: document.getElementById('tp-more').open, plan: (typeof itinPlan !== 'undefined' && itinPlan) ? itinPlan.rows.map(function (r) { return [r.ok, r.date, r.courseName, r.key || r.courseKey || null]; }) : null })" },
+        { expression: "(function(){ document.getElementById('sp-trip-box').value = " + JSON.stringify(CUP) + "; document.getElementById('sp-trip-year').value = '2026'; spTripRead(); return 'read'; })()" }, { sleep: 400 },
+        { expression: "JSON.stringify({ review: document.getElementById('sp-trip-review').innerText })" },
+        { expression: "(function(){ itinLookupCourse('Tue Oct 13 - Caledonia, 9:10 & 9:20'); return 'asked'; })()" }, { sleep: 600 },
+        { expression: "JSON.stringify({ q: window.__q, e: window.__e })" }] });
+    const [tp0, tp1, tp2, tp3] = J(r);
+    report.onePaste = { layout: tp0, itin: tp1.plan, cup: tp2.review.slice(0, 300), searched: tp3.q };
+    f(tp0.builder && !tp0.moreOpen && tp0.inMore.length === 5 && tp0.boxes.join() === 'tb-box', '7b: not ONE paste box with the rest under More ways: ' + JSON.stringify(tp0));
+    f(tp1.plan && tp1.plan.length === 2 && tp1.plan[0][0] && tp1.plan[0][1] === '2026-10-13' && tp1.plan[1][1] === '2026-10-14' && !/No date/.test(tp1.review) && /Caledonia Golf & Fish Club/.test(tp1.review) && tp1.open, '7b: the itinerary box did not read the DAY lines / match Caledonia: ' + JSON.stringify(tp1));
+    f(!/Team USA:|Team S\b|Group.*Team USA/.test(tp2.review) && /Ignored:[^\n]*Team USA v Team EURO/.test(tp2.review) && /Group 1 · 9:10\nManny, Joe, Tom, Rick/.test(tp2.review) && /Caledonia/.test(tp2.review) && !/Tue Oct 13 - Caledonia/.test(tp2.review) && /Manny/.test(tp2.review), '7b: Paste the whole trip read TEAMS as groups or kept the date in the course: ' + tp2.review.slice(0, 500));
+    f(tp3.q.join() === 'Caledonia' && !tp3.e.length, '7b: the online search was not given the course name only: ' + JSON.stringify(tp3));
+
     // 8: the web pages (no app flag).
     r = await go({ url: fileUrl('admin.html', ''), db: DB({ FDRND1: round() }), preScript: ERR, steps: [{ expression: "JSON.stringify({ url: document.URL, lobby: getComputedStyle(document.getElementById('lobby-screen')).display })" }] });
     report.webAdmin = J(r)[0];

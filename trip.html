@@ -367,6 +367,31 @@ html {
             <div id="tb-review" style="margin-top:10px;"></div>
             <style>.tb-row{margin:4px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;} .tb-group{border-top:1px dashed var(--border-faint);margin-top:6px;padding-top:6px;} .tb-game{margin:4px 0;} .tb-game input[type=number]{padding:4px;} .tb-x{border:0;background:none;color:var(--text-muted);font-weight:800;min-height:32px;cursor:pointer;} .tb-chip{min-height:34px;padding:4px 10px;border-radius:999px;border:1px solid var(--brand-green);background:var(--bg-card);font-weight:700;cursor:pointer;}</style>
         </details>
+        <!-- ONE PASTE BOX (gps-trip-paste): the trip builder above. Everything else - the
+             older pastes and the by-hand setup - is under "More ways" (moved there on load). -->
+        <details class="settle-card" id="tp-more" style="margin-bottom:12px;">
+            <summary style="font-weight:bold; cursor:pointer;">More ways to set up a trip (paste rounds, paste golfers, by hand)</summary>
+            <div id="tp-more-body" style="margin-top:10px;"></div>
+        </details>
+        <script>
+            (function () {
+                function more() {
+                    var body = document.getElementById('tp-more-body'), box = document.getElementById('tp-more');
+                    if (!body || body.__done) return;
+                    body.__done = true;
+                    ['sp-trip-card', 'itin-paste-card', 'golfer-paste-card', 'day-planner-card', 'itin-ready-note', 'build-trip-btn'].forEach(function (id) {
+                        var el = document.getElementById(id);
+                        if (el) body.appendChild(el);
+                    });
+                    // A review filling in under "More ways" opens it, so nothing happens out of sight.
+                    try {
+                        var mo = new MutationObserver(function () { if (box) box.open = true; });
+                        ['sp-trip-review', 'itin-review', 'setup-golfers-review'].forEach(function (id) { var el = document.getElementById(id); if (el) mo.observe(el, { childList: true }); });
+                    } catch (e) {}
+                }
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', more); else more();
+            })();
+        </script>
         <details class="settle-card" id="sp-trip-card" style="margin-bottom:12px;" open>
             <summary style="font-weight:bold; cursor:pointer;">📋 Paste the whole trip (days, groups, games)</summary>
             <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0;">A group chat, an email or a list: dates, courses, tee times, groups, teams ("A &amp; B vs C &amp; D"), games ($5 Nassau, $2 skins, wolf, best ball&hellip;) and handicaps.</p>
@@ -901,6 +926,10 @@ html {
             out.innerHTML = '<p style="color:var(--warn-text); font-weight:bold;">Put the year in first &mdash; a date like 10/13 does not carry one.</p>';
             return;
         }
+        // GPS:BEGIN
+        // "DAY 1 - Tue Oct 13 - Caledonia": the "DAY 1" off, so the date is read (gps-trip-paste).
+        if (/^\s*day\s*\d+\b/im.test(box.value)) box.value = box.value.split(/\r?\n/).map((l) => l.replace(/^\s*day\s*\d+\b[\s,:.-]*/i, '')).join('\n');
+        // GPS:END
         itinPlan = tripItinPlan(box.value, {
             year: year,
             known: itinKnownCourses(),
@@ -1015,6 +1044,10 @@ html {
     // { ok, key, name } imported and ready | { choices } a facility answered with
     // several courses | { error } could not ask, nothing matched, or no card.
     async function itinLookupCourse(name) {
+        // GPS:BEGIN
+        // Only the course is searched: no "DAY 1", weekday, date or tee time (gps-trip-paste).
+        if (typeof tspCleanCourse === 'function') name = tspCleanCourse(name) || name;
+        // GPS:END
         const payload = await itinFetchJson(tripCourseApiBase()
             + '/api/course-search?q=' + encodeURIComponent(name));
         if (!payload || payload.status !== 'ok') {
