@@ -2,8 +2,10 @@
   "appId": "com.rattlegolf.gpsbeta",
   "appName": "HardPan GPS",
   "webDir": "www",
+  "backgroundColor": "#f0f4f2",
   "ios": {
     "path": "ios",
+    "backgroundColor": "#f0f4f2",
     "includePlugins": [
       "@capacitor/filesystem",
       "@capacitor/share",

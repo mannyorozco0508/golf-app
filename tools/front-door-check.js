@@ -25,6 +25,8 @@
 //   6  GPS-3: the card of a no-money round offers Add a player / Add a game.
 //   7  trip.html#build opens the trip builder.
 //   8  The HardPan web pages (no app flag): no door anywhere.
+//   9  Never stuck: location that never answers -> Tap to retry; GPS-1 breaking -> the
+//      light retry card, which reloads Home.
 // ============================================================================
 'use strict';
 const path = require('path');
@@ -274,6 +276,33 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     report.tripPaste = { url: t1.url.split('/').pop(), box: t1.box, note: t1.note, read: t2 };
     f(/trip\.html#build$/.test(t1.url) && t1.open && /^TRIP: Caledonia trip\nDAY 1 - \w{3} \w{3} \d+ - Caledonia Golf\nGroup 1: Manny Orozco & Joe Russo vs Mike Dunn & Dave Kirk\n$/.test(t1.box) && /FDRND4/.test(t1.note) && /new round/.test(t1.note), '5c: the multi-round paste did not open the builder filled in: ' + JSON.stringify(t1));
     f(t2.days === 1 && t2.course === 'caledonia' && t2.golfers.join() === 'Manny Orozco,Joe Russo,Mike Dunn,Dave Kirk', '5c: the builder did not read Day 1 back: ' + JSON.stringify(t2));
+
+    // 9: NEVER STUCK (gps-doors-black). a) Location that never answers (the first-launch
+    // prompt left up): after LOC_MS, "Couldn't get your location yet" + Tap to retry; the
+    // retry with location answering lists Near you. b) GPS-1 throwing: the retry card, not a
+    // half-drawn screen. c) The retry card reloads Home.
+    const HANG = "window.__geoAnswer = false; try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: function () { return 1; }, clearWatch: function () {}, getCurrentPosition: function (ok) { if (window.__geoAnswer) setTimeout(function () { ok({ coords: { latitude: " + CAL[0] + ", longitude: " + CAL[1] + ", accuracy: 5 } }); }, 10); } } }); } catch (e) {}";
+    r = await go({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2500, preScript: APP + HANG + ERR, steps: [
+        { tap: '#v-main .hp-door.gps' }, { sleep: 4000 },
+        { expression: "JSON.stringify({ near: document.getElementById('hp-near-list').innerText, ms: HardPanDoors.LOC_MS })" },
+        { sleep: 12500 },
+        { expression: "JSON.stringify({ near: document.getElementById('hp-near-list').innerText, retry: !!document.querySelector('#hp-near-list [data-hp-retry]'), view: (document.querySelector('.hp-view.on')||{}).id })" },
+        { expression: "(function(){ window.__geoAnswer = true; document.querySelector('#hp-near-list [data-hp-retry]').click(); return 'retry'; })()" }, { sleep: 2500 },
+        { expression: "JSON.stringify({ near: document.getElementById('hp-near-list').innerText, e: window.__e })" }] });
+    const [h0, h1, h2] = J(r);
+    report.locHang = { waiting: h0.near, after: h1.near, retried: h2.near.slice(0, 120) };
+    f(/Finding courses near you/.test(h0.near) && h0.ms === 15000, '9a: while location is unanswered, GPS-1 should say it is finding courses: ' + JSON.stringify(h0));
+    f(/Couldn’t get your location yet/.test(h1.near) && h1.retry && h1.view === 'v-gps', '9a: no "Tap to retry" after the location wait: ' + JSON.stringify(h1));
+    f(/Caledonia/.test(h2.near) && !h2.e.length, '9a: Tap to retry did not list Near you once location answered: ' + JSON.stringify(h2));
+    r = await go({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2500, preScript: APP + GEO + ERR + "Object.defineProperty(window, 'HardPanGpsCourses', { configurable: true, get: function () { throw new Error('test: GPS-1 broke'); }, set: function () {} });", steps: [
+        { tap: '#v-main .hp-door.gps' }, { sleep: 1500 },
+        { expression: "JSON.stringify({ stuck: !!document.getElementById('fd-stuck') && getComputedStyle(document.getElementById('fd-stuck')).display !== 'none', text: (document.getElementById('fd-stuck')||{}).innerText || '', bg: document.getElementById('fd-stuck') ? getComputedStyle(document.getElementById('fd-stuck')).backgroundColor : null })" },
+        { expression: "(function(){ document.querySelector('#fd-stuck button').click(); return 'tap'; })()" }, { sleep: 2000 },
+        { expression: "JSON.stringify({ url: document.URL, view: (document.querySelector('.hp-view.on')||{}).id || null })" }] });
+    const [st0, st1] = J(r);
+    report.stuck = { card: st0.text.replace(/\n/g, ' | '), after: st1 };
+    f(st0.stuck && /Tap to retry/.test(st0.text) && st0.bg === 'rgb(240, 244, 242)', '9b: GPS-1 breaking did not show the light retry card: ' + JSON.stringify(st0));
+    f(/home\.html$/.test(st1.url) && st1.view === 'v-main', '9c: Tap to retry did not reload Home: ' + JSON.stringify(st1));
 
     // 6b: BACK FROM THE BACKGROUND after more than an hour: Main again, like a launch.
     r = await go({ url: fileUrl('index.html', 'game=FDRND1&group=1'), db: DB({ FDRND1: round() }), settleMs: 4000, preScript: APP + ERR, steps: [

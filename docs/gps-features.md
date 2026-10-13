@@ -269,3 +269,10 @@ Rules that would need ADDING (additive; nothing existing changes):
   tpl= / fmt= / step=money); Paste the whole round; Paste a multi-round match = trip.html#build with
   today as Day 1, this course, these golfers - Confirm makes every day a NEW round (Day 1 too); the
   round it came from keeps its scores. Nothing in the sheet writes to Firebase.
+- gps-doors-black (2026-10-12, a one-time black screen on Manny's iPhone after tapping GPS on the
+  doors, first launch after Cmd+R; no log). Not reproduced in the Simulator. Hardened so nothing can stay
+  black: the WebView background is the light theme (#f0f4f2) instead of the system's black in dark mode;
+  the launch hop to Home has a 5 s watchdog (the page comes back with "Tap to retry"); GPS-1's data files
+  load with an 8 s limit; the location ask has a 15 s limit (iOS's first-launch prompt stops the plugin's
+  own timeout) with "Couldn't get your location yet · Tap to retry", and a late answer is still used; a
+  failure opening a door shows the light retry card, which reloads Home.

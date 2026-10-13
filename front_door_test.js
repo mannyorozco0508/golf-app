@@ -67,3 +67,16 @@ test('gps-doors-fix: a launch goes straight to the doors; Main every launch; lig
     assert.ok(!/admin\.html\?start=quick/.test(pick.replace(/function playWithoutGps[\s\S]*$/, '')), 'a course tap writes the round itself (Round Setup only for Play without GPS with no card)');
     assert.match(s, /if \(busy\) return;/, 'a double tap makes one round');
 });
+
+test('gps-doors-black: never stuck - the launch hop has a watchdog, GPS-1 waits are limited, the app background is light', { skip }, () => {
+    const s = read('front-door.js');
+    const launch = s.slice(s.indexOf('(function launch() {'), s.indexOf('})();', s.indexOf('(function launch() {')));
+    assert.match(launch, /visibility = 'hidden';\s*W\.location\.replace\('home\.html'\);[\s\S]*setTimeout\([\s\S]*stuck\(/, 'the hidden launch page comes back with Tap to retry if the hop to Home never happens');
+    assert.match(s, /var LAUNCH_MS = 5000;/); assert.match(s, /var LOC_MS = 15000;/); assert.match(s, /var LOAD_MS = 8000;/);
+    assert.match(s, /needs\.forEach\(function \(src\) \{ loadScriptTimed\(/, 'GPS-1 data files load with a time limit');
+    assert.match(s, /function stuck\(msg\)[\s\S]*Tap to retry[\s\S]*location\.replace\('home\.html'\)/, 'the retry card reloads Home');
+    assert.match(s, /catch \(e\) \{\s*try \{ console\.error\('\[front door\] ' \+ view, e\); \} catch \(x\) \{\}\s*stuck\(/, 'a failure opening a door shows the retry card');
+    const cfg = JSON.parse(read('gps-beta/capacitor.config.json'));
+    assert.equal(cfg.backgroundColor, '#f0f4f2', 'the WebView background is the light theme, never black in dark mode');
+    assert.equal(cfg.ios.backgroundColor, '#f0f4f2');
+});
