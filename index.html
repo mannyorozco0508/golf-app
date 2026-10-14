@@ -9154,7 +9154,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // GPS:BEGIN
         // REFUSED, NOT AN OUTAGE (gps-trapfix): never retried - the op leaves the queue now -
         // and the golfer is told plainly, with "Exit this round".
-        p.catch(function (err) {
+        p.then(null, function (err) {
             if (!(op && q && store && typeof q.isPermanent === 'function' && q.isPermanent(err))) return;
             try { q.confirm(store, op.id); } catch (e) {}
             lastDrop += 1;
