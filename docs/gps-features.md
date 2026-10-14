@@ -327,3 +327,14 @@ Rules that would need ADDING (additive; nothing existing changes):
   against every other pair, from the golfers' own hole scores, whatever groups; points a match win 1 / halve ½
   (or front / back / 18), each golfer his pair's points; each pair's record live ("Manny & JP: 3-1, 3 pts"),
   also on the round's scorecard card. "Two 2v2 + singles" stays an option. Stored at <game>/pairs/<round>, rrPts.
+- gps-ui-fixes (2026-10-13, Manny's phone on 3421d6c): Mark shot = a distance measure for now (tap 1 "📍 0 yds",
+  the yards live from that spot, tap 2 "Shot: N yds" and that spot is the new start; nothing saved - the shot /
+  club code is kept as markShotWithClub); the yardage box BACK over FRONT; the score bar "‹ Hole N · … ›" and,
+  once the signed-in golfer's score is in, "Hole 1 · 4" (resolvedMeId, or the only golfer); zoom on the LEFT
+  edge, half way down; GPS from Games goes back to the round in progress on GPS (the last round, under 12 h, not
+  finished) - the course picker only without one or from Tools › "Pick another course" (home.html#pick); the Add
+  a game sheet scrolls over the GPS screen (blockPull lets #fd-addgame / .gps-scroll-ok through); Games home
+  lists every trip this phone opened (hardpan_trips_v1, read after sign-in, one retry) + "Open a trip" by code,
+  and the trip page remembers its organizer link (hardpan_trip_tokens_v1); the trip page's Points game card for
+  the organizer link, a remembered one, or the signed-in owner of the trip or any of its rounds; Near you takes
+  a course's city / state from the GolfAPI data when the shared record has none. Check: tools/ui-fixes-check.js.

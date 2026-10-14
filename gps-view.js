@@ -2319,7 +2319,23 @@
     // while GPS is showing. The map's own gestures are unaffected - MapLibre has
     // the event before it bubbles here. There is no left/right hole swipe on the
     // GPS side to keep (holes change with the arrows).
+    // THE SIGNED-IN GOLFER'S SCORE on a hole: the card's own "who am I" (resolvedMeId), or the
+    // only golfer of a one-golfer round. null when not entered.
+    function myScore(hole) {
+        try {
+            var d = typeof currentData !== 'undefined' ? currentData : null;   /* global currentData, resolvedMeId */
+            if (!d || !d.players) return null;
+            var id = typeof resolvedMeId === 'function' ? resolvedMeId() : null;
+            if (id == null && d.players.length === 1) id = d.players[0].id;
+            if (id == null) return null;
+            var v = (d.scores || {})['p' + id + '_h' + hole];
+            return v && Number(v) > 0 ? Number(v) : null;
+        } catch (e) { return null; }
+    }
     function blockPull(e) {
+        // A sheet over the map scrolls (the Add a game list was stuck at Skins): only the map is held still.
+        var t = e && e.target;
+        if (t && t.closest && t.closest('#fd-addgame, .gps-scroll-ok')) return;
         if (S && S.side === 'gps' && e.cancelable) e.preventDefault();
     }
 
@@ -2450,7 +2466,9 @@
         show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
         txt('.gps-green-view', S.view === 'green' ? '⛳ Hole' : '⛳ Green');
         show('.gps-zoom', S.view !== 'green');
-        txt('.gps-score', 'Hole ' + S.hole + ' · Enter Score');
+        // Once the signed-in golfer's score is in: "Hole 1 · 4" (Manny, 2026-10-13).
+        var mine = myScore(S.hole);
+        txt('.gps-score', 'Hole ' + S.hole + ' · ' + (mine != null ? mine : 'Enter Score'));
         var scoreOn = !setting && typeof S.openScore === 'function';
         show('.gps-score', scoreOn);
         // While a green is being set its buttons take the bottom; the bottom row,
@@ -2523,8 +2541,28 @@
         render();
         return true;
     }
-    // ONE TAP (gps-features): the shot, here (the GPS position), then the club.
+    // MARK SHOT = A DISTANCE MEASURE, FOR NOW (Manny, 2026-10-13). Tap 1: this spot, "0 yds", and
+    // the button counts the yards from it live as you walk. Tap 2: "Shot: 247 yds", and that spot
+    // is the new start. No club, nothing saved. (The shot / club code below is kept for later.)
     function markShotHere() {
+        if (!S) return;
+        if (!fix) { flash('No GPS position yet'); return; }
+        if (!S.measureFrom) { S.measureFrom = fix.pt; S.measureShot = null; render(); return; }
+        var m = G.haversineMeters(S.measureFrom, fix.pt);
+        S.measureShot = { text: G.shownDistance(m, units()) + (units() === 'm' ? ' m' : ' yds'), at: Date.now() };
+        S.measureFrom = fix.pt;
+        flash('Shot: ' + S.measureShot.text);
+        render();
+        setTimeout(function () { if (S) render(); }, 4100);
+    }
+    function measureLabel() {
+        if (!S || !S.measureFrom) return '\uD83D\uDCCD Mark shot';
+        if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Shot: ' + S.measureShot.text;
+        var d = fix ? G.haversineMeters(S.measureFrom, fix.pt) : 0;
+        return '\uD83D\uDCCD ' + G.shownDistance(d, units()) + (units() === 'm' ? ' m' : ' yds');
+    }
+    // ONE TAP (gps-features): the shot, here (the GPS position), then the club. Kept for later.
+    function markShotWithClub() {
         if (!S) return;
         if (!fix) { flash('No GPS position yet - or tap the map: Tools \u203A Mark shots'); return; }
         withShots(function () {
@@ -2563,7 +2601,7 @@
     function drawShots() {
         var A = shotsApi();
         var mb = S && S.el.querySelector('.gps-mark-shot');
-        if (mb) mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none';
+        if (mb) { mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none'; if (S && mb.textContent !== measureLabel()) mb.textContent = measureLabel(); }
         // Markers whenever this hole has shots; the bar only while marking / replaying / moving.
         var mode = !!(S && (S.shotMode || S.replay || S.shotAdjust));
         var on = !!(S && A && S.mode === 'measure' && (mode || A.shots(S.eventCode, S.hole).length));
@@ -2712,8 +2750,9 @@
         +   '<div class="gps-yardbox gps-float">'
         +     '<div class="gps-num gps-num-mid"><div class="gps-lbl gps-lbl-mid">CENTER</div><div class="gps-big gps-m">—</div><div class="gps-plays" style="visibility:hidden"></div></div>'
         +     '<div class="gps-fb">'
-        +       '<div class="gps-num gps-num-f"><div class="gps-lbl" aria-label="Front">F</div><div class="gps-big gps-f">—</div></div>'
+        // BACK on top, FRONT under it (Manny, 2026-10-13) - the green as it lies from the fairway.
         +       '<div class="gps-num gps-num-b"><div class="gps-lbl" aria-label="Back">B</div><div class="gps-big gps-b">—</div></div>'
+        +       '<div class="gps-num gps-num-f"><div class="gps-lbl" aria-label="Front">F</div><div class="gps-big gps-f">—</div></div>'
         +     '</div>'
         +   '</div>'
         + '</div>'
@@ -2724,10 +2763,11 @@
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
         + '</div>'
-        // RIGHT SIDE STACK: wind, zoom, the green view.
+        // ZOOM: the LEFT edge, half way down the screen, always there (Manny, 2026-10-13).
+        + '<button type="button" class="gps-zoom gps-zoom-left gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
+        // RIGHT SIDE STACK: wind, the green view.
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
-        +   '<button type="button" class="gps-zoom gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
         +   '<button type="button" class="gps-mark-shot gps-float" style="display:none" aria-label="Mark shot here">\uD83D\uDCCD Mark shot</button>'
         + '</div>'
@@ -2743,6 +2783,7 @@
         + '<div class="gps-bottom">'
         +   '<button type="button" class="gps-side-bets gps-float" aria-label="Scorecard"><span class="gps-ico">▤</span><span class="gps-cap">Card</span></button>'
         +   '<div class="gps-scorebox gps-float">'
+        +     '<button type="button" class="gps-score-prev" aria-label="Previous hole">‹</button>'
         +     '<button type="button" class="gps-score"></button>'
         +     '<button type="button" class="gps-score-next" aria-label="Next hole">›</button>'
         +   '</div>'
@@ -2786,6 +2827,7 @@
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
+        +   '<button type="button" class="gps-menu-item gps-pick-course" style="display:none">\u26F3 Pick another course</button>'
         + '</div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
@@ -2876,6 +2918,7 @@
         + '#gps-overlay .gps-verify{font-size:13px;line-height:1.35;color:#f4f4ef;padding:6px 10px;border-left:3px solid #fb923c;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
         + '#gps-overlay .gps-verify.gps-open{white-space:normal;}'
         // RIGHT SIDE STACK
+        + '#gps-overlay .gps-zoom-left{position:absolute;z-index:5;left:8px;top:50%;transform:translateY(-50%);}'
         + '#gps-overlay .gps-right{position:absolute;z-index:5;right:8px;top:var(--gps-top-b);display:flex;flex-direction:column;align-items:flex-end;gap:8px;}'
         + '#gps-overlay .gps-right > *{min-width:56px;min-height:44px;box-sizing:border-box;font-weight:800;font-size:14px;padding:6px 9px;display:flex;align-items:center;justify-content:center;gap:4px;}'
         + '#gps-overlay .gps-wind{font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
@@ -2941,6 +2984,7 @@
         + '#gps-overlay .gps-cap{font-size:11px;font-weight:700;color:#c8d1ca;}'
         + '#gps-overlay .gps-scorebox{flex:1 1 auto;min-width:0;display:flex;overflow:hidden;background:rgba(217,249,157,.92);border-color:#d9f99d;}'
         + '#gps-overlay .gps-score{flex:1 1 auto;min-width:0;color:#0b0f0c;font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;}'
+        + '#gps-overlay .gps-score-prev{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-right:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-score-next{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-left:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-banner{position:absolute;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(var(--gps-attrib-h) + 74px);padding:10px 14px;border-radius:999px;font-weight:800;font-size:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
         + '#gps-overlay.gps-banner-up .gps-banner{bottom:calc(var(--gps-attrib-h) + 128px);}'
@@ -3138,6 +3182,7 @@
         on(el, '.gps-hole-btn', openPicker);
         on(el, '.gps-tools', toggleTools);
         on(el, '.gps-score-next', function () { closeMenus(); if (S && S.stepHole) S.stepHole(1); });
+        on(el, '.gps-score-prev', function () { closeMenus(); if (S && S.stepHole) S.stepHole(-1); });
         // Any Tools item closes the menu once it has done its job.
         var tmenu = el.querySelector('.gps-tools-menu');
         if (tmenu) tmenu.addEventListener('click', function () { closeMenus(); });
@@ -3179,6 +3224,7 @@
         // ➕ ADD A GAME (gps-doors): GPS-4 in the app; Round Setup for THIS round on the web.
         on(el, '.gps-add-game', function () { if (!S) return; closeMenus(); if (doorsOn()) openAddGame(); else window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); });
         on(el, '.gps-door-add', function () { openAddGame(); });
+        on(el, '.gps-pick-course', function () { closeMenus(); window.location.href = 'home.html#pick'; });
         on(el, '.gps-door-games', function () { window.location.href = 'home.html#games'; });
         on(el, '.gps-ag-back', function () { closeAddGame(); });
         on(el, '.gps-ag-not', function () { closeAddGame(); });
@@ -3289,6 +3335,7 @@
         loadCourseLocation();
         // THE APP'S FRONT DOOR (gps-doors): Score and + Game at the bottom, Games at the top.
         if (doorsOn()) {
+            var dPick = el.querySelector('.gps-pick-course'); if (dPick) dPick.style.display = doorsOn() ? '' : 'none';
             var dAdd = el.querySelector('.gps-door-add'), dGames = el.querySelector('.gps-door-games'), cap = el.querySelector('.gps-side-bets .gps-cap');
             if (dAdd) dAdd.style.display = '';
             if (dGames) dGames.style.display = '';

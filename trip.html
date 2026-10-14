@@ -4325,13 +4325,29 @@ html {
     }
 
     // GPS:BEGIN
+    // WHO MAY SET UP THE POINTS GAME (Manny, 2026-10-13: no card on his phone): the organizer link,
+    // or one this phone was opened with before, or - signed in - the trip's owner or the owner of any
+    // of its rounds (the account that owns the rounds IS the organizer, as for Round Setup).
+    function leagueOrganizer(rounds) {
+        if (hasTripOrganizerAuthority()) return true;
+        try {
+            const tk = JSON.parse(localStorage.getItem('hardpan_trip_tokens_v1') || '{}') || {};
+            if (tripData && tripData.organizerToken && tk[currentTripCode] && String(tk[currentTripCode]) === String(tripData.organizerToken)) return true;
+        } catch (e) { /* no stored link */ }
+        const u = (window.firebase && firebase.auth && firebase.auth().currentUser) || null;
+        if (!u || u.isAnonymous) return false;
+        if (tripData && tripData.ownerUid && String(tripData.ownerUid) === String(u.uid)) return true;
+        return (rounds || []).some((r) => r && r.data && r.data.ownerUid && String(r.data.ownerUid) === String(u.uid));
+    }
     // POINTS LEAGUE (gps-league): the trip's counted rounds, read-only; the organizer edits.
     function leagueRender(rounds) {
         if (!window.HardPanLeague) return;
         try {
             const meta = (tripData && tripData.rounds) || {};
             window.HardPanLeague.render({ code: currentTripCode, trip: tripData || {}, rounds: (rounds || []).map((r) => ({ code: r.code, label: r.label, date: (meta[r.code] || {}).date || null, data: r.data })),
-                organizer: hasTripOrganizerAuthority(), db: typeof db !== 'undefined' ? db : null });
+                organizer: leagueOrganizer(rounds), db: typeof db !== 'undefined' ? db : null });
+            // Signed in after this drew: once more, so the owner check can see the account.
+            if (!leagueRender.authWaited && window.authReady) { leagueRender.authWaited = true; Promise.resolve(window.authReady).then(() => leagueRender(rounds), () => {}); }
         } catch (e) { console.error('[league]', e); }
     }
     // GPS:END

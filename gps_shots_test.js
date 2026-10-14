@@ -74,11 +74,15 @@ test('one-tap Mark shot: the club, the yards, wind, slope and plays-like saved w
     assert.equal(A.setLast('ZNBLP8', 3, { club: 'Dr' }), null, 'no shot on that hole: nothing');
 });
 
-test('the GPS screen: 📍 Mark shot (one tap, GPS position), the club picker (skippable), Move it on the map; labels show club + yards', { skip }, () => {
+test('the GPS screen: 📍 Mark shot = a distance measure for now (Manny, 2026-10-13: tap 1 = 0 yds, live yards, tap 2 = "Shot: N yds", the new start; nothing saved); the shot / club code kept for later', { skip }, () => {
     const v = read('gps-view.js');
     assert.ok(/class="gps-mark-shot gps-float"[^>]*>\\uD83D\\uDCCD Mark shot</.test(v), 'the button is on the GPS screen, not under Tools');
     assert.ok(/on\(el, '\.gps-mark-shot', function \(\) \{ closeMenus\(\); markShotHere\(\); \}\)/.test(v));
-    assert.ok(/function markShotHere\(\) \{[\s\S]{0,300}addShot\(fix\.pt, 'here'\)[\s\S]{0,60}openClubSheet\(\)/.test(v), 'marks at the GPS fix, then asks the club');
+    const mark = v.slice(v.indexOf('function markShotHere('), v.indexOf('function measureLabel('));
+    assert.ok(/if \(!S\.measureFrom\) \{ S\.measureFrom = fix\.pt;/.test(mark) && /S\.measureShot = \{ text: /.test(mark) && /S\.measureFrom = fix\.pt;\s*flash\('Shot: '/.test(mark), 'tap 1 starts; tap 2 = "Shot: N", that spot the new start');
+    assert.ok(!/addShot|openClubSheet|localStorage|\.ref\(/.test(mark), 'the measure saves nothing and asks no club');
+    assert.ok(/function measureLabel\(\)[\s\S]{0,400}G\.haversineMeters\(S\.measureFrom, fix\.pt\)/.test(v), 'the button counts the yards from the spot, live');
+    assert.ok(/function markShotWithClub\(\) \{[\s\S]{0,300}addShot\(fix\.pt, 'here'\)[\s\S]{0,60}openClubSheet\(\)/.test(v), 'the shot + club code is kept for later');
     assert.ok(/class="gps-club-skip">Skip</.test(v) && /class="gps-club-move">Move it on the map</.test(v));
     assert.ok(/if \(S\.shotAdjust\) \{ moveLastShot\(pt\); return; \}/.test(v), 'after "Move it", a map tap moves the last shot');
     const det = v.slice(v.indexOf('function shotDetails('), v.indexOf('function addShot('));

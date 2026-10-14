@@ -138,9 +138,21 @@
         var bits = [];
         var place = c.city || c.state ? [c.city, c.state].filter(Boolean).join(', ') : '';
         if (c.key) { try { var L = JSON.parse(ls(LOC + c.key) || 'null'); if (L && (L.city || L.state)) place = [L.city, L.state].filter(Boolean).join(', '); } catch (e) {} }
+        // Still only a state (or nothing): the app's GolfAPI course has its city (Manny, 2026-10-13:
+        // Myrtlewood, Man O' War, True Blue showed none).
+        if (c.key && (!place || place.indexOf(',') === -1)) { var ga = golfapiPlace(c.key); if (ga) place = ga; }
         if (place) bits.push(place);
         if (dist != null) bits.push((dist < 10 ? dist.toFixed(1) : Math.round(dist)) + ' mi');
         return bits.join(' · ');
+    }
+    function golfapiPlace(key) {
+        try {
+            var G = W.HardPanGolfApi, id = G && G.links && G.links[key];
+            if (!id || !G.courses) return '';
+            var all = Array.isArray(G.courses) ? G.courses : Object.keys(G.courses).map(function (k) { return G.courses[k]; });
+            var c = all.filter(function (x) { return x && (String(x.id) === String(id) || String(x.id).indexOf(String(id)) === 0); })[0];
+            return c && (c.city || c.state) ? [c.city, c.state].filter(Boolean).join(', ') : '';
+        } catch (e) { return ''; }
     }
     function rowHtml(c, dist) {
         return '<button type="button" class="hp-row" data-hp-course="' + esc(c.key || '') + '" data-hp-name="' + esc(c.name) + '">'
@@ -437,25 +449,60 @@
                     + '<span style="font-size:15px;font-weight:700;color:var(--hp-navy);">Open the round ›</span></button>';
             }, function () { today.style.display = 'none'; });
         } else today.style.display = 'none';
+        // TRIPS & CUPS: every trip this phone has opened (as organizer or golfer), not only the last
+        // one (Manny, 2026-10-13: "Myrtle Beach 2026" vanished). Trips are read only once signed in
+        // (the live database refuses a trip to a session that is not), with one retry.
         var tc = $('hp-trip-card');
         tc.innerHTML = '';
-        if (trip && H.db) {
-            H.db.ref('trips/' + trip).once('value').then(function (s) {
-                var t = s && s.val ? s.val() : null;
-                if (!t) return;
-                var rows = Object.keys(t.rounds || {}).map(function (k) { return t.rounds[k]; });
-                var dates = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
-                var wd = function (iso) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(iso + 'T12:00:00').getDay()]; };
-                var span = dates.length ? ' · ' + wd(dates[0]) + (dates.length > 1 ? '–' + wd(dates[dates.length - 1]) : '') : '';
-                tc.innerHTML = '<button type="button" class="hp-row" data-hp-trip="' + esc(trip) + '"><span><span class="n" style="font-size:16px;font-weight:800;">' + esc(t.name || 'Trip') + '</span><span class="s" style="display:block;">' + rows.length + ' round' + (rows.length === 1 ? '' : 's') + span + '</span></span><span style="font-size:20px;">›</span></button>';
-            }, function () {});
-        }
+        var codes = myTrips();
+        var rowsHtml = {};
+        var draw = function () {
+            tc.innerHTML = codes.map(function (c) { return rowsHtml[c] || ''; }).join('')
+                + '<div style="display:flex;gap:6px;margin-top:6px;"><input id="hp-trip-code" placeholder="Trip code" autocapitalize="characters" style="flex:1;min-height:40px;border:1px solid #d0e1db;border-radius:10px;padding:0 10px;font:inherit;text-transform:uppercase;"><button type="button" class="hp-btn" data-hp-act="tripcode" style="min-height:40px;">Open a trip</button></div>';
+        };
+        draw();
+        if (!codes.length || !H.db) return;
+        var load = function (tries) {
+            Promise.resolve(W.authReady).catch(function () {}).then(function () {
+                codes.forEach(function (code) {
+                    H.db.ref('trips/' + code).once('value').then(function (s) {
+                        var t = s && s.val ? s.val() : null;
+                        if (!t) return;
+                        var rows = Object.keys(t.rounds || {}).map(function (k) { return t.rounds[k]; });
+                        var dates = rows.map(function (r) { return r.date; }).filter(Boolean).sort();
+                        var wd = function (iso) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(iso + 'T12:00:00').getDay()]; };
+                        var span = dates.length ? ' · ' + wd(dates[0]) + (dates.length > 1 ? '–' + wd(dates[dates.length - 1]) : '') : '';
+                        rowsHtml[code] = '<button type="button" class="hp-row" data-hp-trip="' + esc(code) + '" style="margin-bottom:6px;"><span><span class="n" style="font-size:16px;font-weight:800;">' + esc(t.name || 'Trip') + '</span><span class="s" style="display:block;">' + rows.length + ' round' + (rows.length === 1 ? '' : 's') + span + '</span></span><span style="font-size:20px;">›</span></button>';
+                        draw();
+                    }, function () { if (tries < 1) setTimeout(function () { load(tries + 1); }, 1500); });
+                });
+            });
+        };
+        load(0);
+    }
+    // The trips this phone knows: each one opened on the trip page (organizer or not), newest first,
+    // and the last one remembered before this list existed.
+    var TRIPS = 'hardpan_trips_v1';
+    function myTrips() {
+        var list = []; try { list = JSON.parse(ls(TRIPS) || '[]'); } catch (e) { list = []; }
+        if (!Array.isArray(list)) list = [];
+        var last = ls('lastTripCode');
+        if (last && list.indexOf(last) === -1) list.push(last);
+        return list.filter(function (c) { return /^[A-Z0-9]{4,10}$/.test(String(c)); }).slice(0, 12);
+    }
+    function rememberTrip(code, token) {
+        code = String(code || '').toUpperCase();
+        if (!/^[A-Z0-9]{4,10}$/.test(code)) return;
+        var list = myTrips().filter(function (c) { return c !== code; });
+        list.unshift(code);
+        ls(TRIPS, JSON.stringify(list.slice(0, 12)));
+        if (token) { var tk = {}; try { tk = JSON.parse(ls('hardpan_trip_tokens_v1') || '{}') || {}; } catch (e) { tk = {}; } tk[code] = token; ls('hardpan_trip_tokens_v1', JSON.stringify(tk)); }
     }
     function homeClick(ev) {
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
         var b;
-        if ((b = t.closest('[data-hp-door]'))) { var d = b.getAttribute('data-hp-door'); setDoor(d); show(d); return; }
+        if ((b = t.closest('[data-hp-door]'))) { var d = b.getAttribute('data-hp-door'); setDoor(d); if (d === 'gps' && backToGpsRound()) return; show(d); return; }
         if (t.closest('[data-hp-retry]')) { C.asked = false; C.why = null; var nb = $('hp-near-list'); if (nb) nb.innerHTML = '<div class="hp-status">Finding courses near you\u2026</div>'; gpsView(); return; }
         if ((b = t.closest('[data-hp-course]'))) { pickCourse(b.getAttribute('data-hp-course'), b.getAttribute('data-hp-name'), b); return; }
         if ((b = t.closest('[data-hp-pull]'))) { pull({ id: b.getAttribute('data-hp-pull'), name: b.getAttribute('data-hp-pull-name') }, pending || {}); return; }
@@ -474,6 +521,7 @@
             else if (a === 'start') { ss(QUICK, null); W.location.href = 'admin.html?start=quick'; }
             else if (a === 'build') W.location.href = 'trip.html#build';
             else if (a === 'join') join();
+            else if (a === 'tripcode') { var tci = $('hp-trip-code'), tcv = String((tci && tci.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (tcv.length >= 4) W.location.href = 'trip.html?trip=' + encodeURIComponent(tcv); }
         }
     }
     function join() {
@@ -487,6 +535,22 @@
             else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + code + '. Check it with whoever set it up.'; }
         }, function () { W.location.href = 'index.html?game=' + code; });
     }
+    // THE GPS ROUND IN PROGRESS (Manny, 2026-10-13: GPS from Games went to "Where are you playing?").
+    // The last round, from the last 12 hours and not finished (mainDecor checks the scores), opens
+    // again on GPS at its hole. The course picker only without one, or from "Pick another course".
+    function activeRound() {
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return null;
+        if (H.activeChecked && H.active !== lr.code) return null;
+        return lr.code;
+    }
+    function backToGpsRound() {
+        var code = activeRound();
+        if (!code) return false;
+        ls('hardpan_round_side', 'gps|' + code);
+        W.location.href = 'index.html?game=' + encodeURIComponent(code);
+        return true;
+    }
     function homeStart(db) {
         H.db = db;
         W.document.addEventListener('click', homeClick);
@@ -497,7 +561,9 @@
         // EVERY LAUNCH OPENS MAIN (Manny, 2026-10-12): the last door is highlighted and a
         // round in progress offers Resume; #gps / #games are the in-app links' own.
         var h = (W.location.hash || '').replace('#', '');
-        show(h === 'gps' || h === 'games' ? h : 'main');
+        if (h === 'pick') { setDoor('gps'); show('gps'); }
+        else if (h === 'gps' && backToGpsRound()) return;
+        else show(h === 'gps' || h === 'games' ? h : 'main');
         mainDecor();
         backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show('main'); mainDecor(); });
     }
@@ -519,6 +585,7 @@
             if (!d || !d.players || !d.courseData) return;
             var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
             holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (any) thru = Math.max(thru, h); if (!every) all = false; });
+            H.activeChecked = true; H.active = (all && thru) ? null : lr.code;
             if (all && thru) return;   // finished
             box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(d.courseName || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
         }, function () {});
@@ -963,6 +1030,7 @@
 
     // ---- TRIP (trip.html#build) ---------------------------------------------------------
     function trip() {
+        try { var tp = params(); if (tp.get('trip')) rememberTrip(tp.get('trip'), tp.get('organizer')); } catch (e) {}
         if ((W.location.hash || '') !== '#build') return;
         setTimeout(function () {
             try {
@@ -1005,7 +1073,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

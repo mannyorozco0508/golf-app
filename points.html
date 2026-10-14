@@ -78,8 +78,11 @@
                 const rows = t.rounds || {};
                 const codes = Object.keys(rows).filter((c) => rows[c].countsTowardTrip !== false);
                 Promise.all(codes.map((c) => loadRound(c, rows[c].label).then((r) => (r ? Object.assign(r, { date: rows[c].date || null }) : r)))).then((rs) => {
+                    let tk = {}; try { tk = JSON.parse(localStorage.getItem('hardpan_trip_tokens_v1') || '{}') || {}; } catch (e) { tk = {}; }
+                    const u = firebase.auth && firebase.auth().currentUser;
+                    const owner = !!(u && !u.isAnonymous && ((t.ownerUid && String(t.ownerUid) === String(u.uid)) || rs.some((r) => r && r.data && r.data.ownerUid && String(r.data.ownerUid) === String(u.uid))));
                     start({ holder: t, key: 'league', base: 'trips/' + tripQ + '/league', ctx: { tripCode: tripQ }, rounds: rs.filter(Boolean),
-                        organizer: !t.organizerToken || (token && String(token) === String(t.organizerToken)) });
+                        organizer: !t.organizerToken || (token && String(token) === String(t.organizerToken)) || (tk[tripQ] && String(tk[tripQ]) === String(t.organizerToken)) || owner });
                 });
             });
             return;
