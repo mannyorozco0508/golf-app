@@ -79,7 +79,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     ['+ Start a round', 'Have a game code?', 'TRIPS & CUPS', 'Build a trip from one paste', 'No location needed here.'].forEach((t) => f(g1.text.indexOf(t) !== -1, '2: Games-1 lacks "' + t + '"'));
     f(reo.view === 'v-main' && reo.last.join() === 'games' && reo.tag !== 'none', '2: the reopen must open MAIN with Games & Bets highlighted: ' + JSON.stringify(reo));
     f(/No round with the code ZZZZZZ/.test(bad.msg), '2: a wrong code was not said: ' + bad.msg);
-    f(/index\.html\?game=FDRND1$/.test(good.url), '2: Join did not open the round: ' + good.url);
+    f(/index\.html\?game=FDRND1&spectate=1$/.test(good.url), '2: Join did not open the round: ' + good.url);
     if (m1.e.length) fails.push('1: errors ' + m1.e.join(' | '));
     r = await go({ url: fileUrl('home.html', '') + '#games', db: DB(), preScript: APP + ERR + "try{localStorage.setItem('hardpan_front_door','games')}catch(e){}", steps: [
         { tap: '#v-games [data-hp-act="start"]' }, { sleep: 4500 }, { expression: "JSON.stringify({ url: document.URL, quick: !!document.getElementById('fd-quick') })" }] });

@@ -52,9 +52,9 @@ test('gpsWind: signed-in only; the course point to 3 decimals; one ask per point
 });
 
 test('the app: off by default (NWS), the key never in the app, the course point only, Apple\'s attribution with its data', () => {
-    const cfg = fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8'), live = fs.readFileSync(path.join(__dirname, 'gps-live.js'), 'utf8');
     const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
     if (!ON) return;
+    const cfg = fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8'), live = fs.readFileSync(path.join(__dirname, 'gps-live.js'), 'utf8');
     const view = fs.readFileSync(path.join(__dirname, 'gps-view.js'), 'utf8');
     assert.match(cfg, /weatherkit: false,/);
     assert.match(live, /function wind\(lat, lon\) \{ return call\('gpsWind', \{ lat: Math\.round\(Number\(lat\) \* 1e3\) \/ 1e3/);
