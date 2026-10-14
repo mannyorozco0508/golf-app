@@ -33,6 +33,9 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // the app behaves exactly as build 8 (OpenStreetMap only). The data itself
     // ships in the iOS build only (tools/build-gps-app.js); the web never has it.
     golfapi: true,
+    // APPLE WEATHERKIT for live wind (gpsWind): OFF until Apple's WeatherKit key is set on the
+    // server and gpsWind is deployed (Manny's OK). Off, or failing: NWS, as always.
+    weatherkit: false,
     // GPS LIVE (gps-live, 2026-10-10): any US course from GolfAPI through our Cloud
     // Functions (gps-live.js). OpenStreetMap OFF - kept, one setting away: build 10
     // is osm: true, live: false. liveBase: where gpsSearch / gpsCourse answer.

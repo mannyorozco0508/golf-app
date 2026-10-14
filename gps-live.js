@@ -139,6 +139,9 @@
         }).catch(function () { return { status: 'error' }; });
     }
     function search(name) { return call('gpsSearch', { name: String(name || '').trim() }); }
+    // LIVE WIND from Apple WeatherKit (gpsWind; Apple's key and token stay on the server). The
+    // COURSE's point, three decimals - never the golfer's position.
+    function wind(lat, lon) { return call('gpsWind', { lat: Math.round(Number(lat) * 1e3) / 1e3, lon: Math.round(Number(lon) * 1e3) / 1e3 }); }
 
     // ---- FINDING A SAVED COURSE IN GOLFAPI (gps-features) ------------------------------
     // GolfAPI's name search is STRICT: "Legacy Golf Resort" finds nothing when GolfAPI
@@ -229,5 +232,5 @@
     };
     function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
 
-    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, message: message, _store: store };
+    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
 })();
