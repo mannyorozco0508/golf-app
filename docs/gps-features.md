@@ -348,3 +348,13 @@ Rules that would need ADDING (additive; nothing existing changes):
   point. App: gps-config weatherkit: true makes it the first source, NWS the fallback (a failure skips WeatherKit 10
   min); the dial shows the Apple Weather mark + "Other data sources" link with its data. Free: 500,000 calls/month
   with the developer membership; past that Apple refuses (paid tiers are opt-in). Not deployed.
+- gps-share (2026-10-13): the Round Menu's "Share" (replaces "Show QR code", app only): the GAME CODE big + Copy
+  ("Have the HardPan app? Games › Have a game code? › type this. You get the round + GPS for this course."),
+  👀 Spectator (QR + Copy link + the iOS share sheet; the link is the view-only leaderboard, so build 12 / the web
+  open it view-only), ✏️ Scorekeeper (organizer only): a group → "Make a scorekeeper code" → CODE-N-KEY + its link
+  (index.html?game=&group=N&sk=KEY) + QR; Revoke makes a new code. The round stores only SHA-256 of the key at
+  events/<code>/scoreKeys/<N>. The game code typed in the app opens ?spectate=1: view-only (canWritePlayer and
+  canScoreBox say no), a "👀 Spectating" badge, no setup / delete / Add a game / Enter Score, GPS for the course
+  kept; the round's organizer keeps full access. ?group=N with a code on that group needs the matching sk, else
+  view-only + "scorekeeper code not valid"; a group with no code works as before. APP-SIDE ONLY: the database
+  rules that would enforce it are a plan (docs/rules-plan-spectators.md), for the main session after Oct 17.

@@ -2376,6 +2376,42 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     let currentMode = urlParams.get('game');
     let hasGroupLock = urlParams.get('group') !== null;
     let lockedGroup = urlParams.get('group') ? parseInt(urlParams.get('group'), 10) : null;
+    // GPS:BEGIN
+    // SPECTATING AND SCOREKEEPER CODES (HardPan, gps-share, 2026-10-13). App-side only - the
+    // database rules that would ENFORCE these are a plan (docs/rules-plan-spectators.md).
+    //   ?spectate=1 (the game code typed in the app, a spectator link): view-only - no score
+    //     boxes, no setup, edit, delete or Add a game; GPS for the course stays. The round's
+    //     organizer opening it this way keeps their access (canReachSetup).
+    //   ?group=N&sk=<code>: a group's scorekeeper. When the organizer has made a code for that
+    //     group (events/<code>/scoreKeys/<N> = its SHA-256, never the code itself), the code
+    //     must match or the card is view-only; "Revoke" makes a new code. A group with no code:
+    //     exactly as before.
+    const hpSpectateParam = urlParams.get('spectate') === '1';
+    let hpKeyState = 'none';            // 'none' | 'pending' | 'ok' | 'bad'
+    let hpKeyFor = null;
+    function hpSpectating() { return hpSpectateParam && !hasGroupLock && !(typeof canReachSetup === 'function' && canReachSetup()); }
+    window.hpSpectating = hpSpectating;
+    function hpSha256(text) {
+        try {
+            if (!(window.crypto && window.crypto.subtle && window.TextEncoder)) return Promise.resolve(null);
+            return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text))).then((b) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, '0')).join(''));
+        } catch (e) { return Promise.resolve(null); }
+    }
+    // After each snapshot: does this group's scorekeeper code match? Redraws once it knows.
+    function hpCheckGroupKey() {
+        if (!hasGroupLock) { hpKeyState = 'none'; return; }
+        const want = currentData && currentData.scoreKeys && currentData.scoreKeys[String(lockedGroup)];
+        if (!want) { hpKeyState = 'none'; hpKeyFor = null; return; }
+        if (hpKeyFor === want && (hpKeyState === 'ok' || hpKeyState === 'bad')) return;
+        hpKeyFor = want; hpKeyState = 'pending';
+        hpSha256(String(urlParams.get('sk') || '').trim().toUpperCase()).then((h) => {
+            hpKeyState = h && h === want ? 'ok' : 'bad';
+            try { if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hpKeyState === 'bad'); } catch (e) { /* the badge waits */ }
+            try { renderScorecard(); } catch (e) { /* the card redraws on the next snapshot */ }
+        });
+    }
+    window.hpKeyState = () => hpKeyState;
+    // GPS:END
     let selectedGroup = lockedGroup ? lockedGroup : "all";
     let currentViewMode = 'hole';
     // WHICH MATCH DRIVES THE HANDICAP DOTS. Display state only - never written to
@@ -2685,6 +2721,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // disappears by itself as the server echoes each score back - there
             // is no second source of truth and nothing to reconcile.
             currentData = incoming || {};
+            // GPS:BEGIN
+            hpCheckGroupKey();
+            if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hasGroupLock && hpKeyState === 'bad');
+            // GPS:END
             if (window.OfflineQueue && currentData && currentData.players) {
                 try {
                     var pend = window.OfflineQueue.peek(localStorage) || [];
@@ -8129,6 +8169,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const overlay = document.getElementById('group-pick-overlay');
         const body = document.getElementById('group-pick-body');
         if (!overlay || !body) return;
+        // GPS:BEGIN
+        // Spectating: nothing to pick - the card is view-only.
+        if (hpSpectating()) { overlay.style.display = 'none'; return; }
+        // GPS:END
         const ask = (typeof roundRoleShouldAsk === 'function') && roundRoleShouldAsk({
             hasGroupLock: hasGroupLock,
             isOrganizer: roundOwnerHere(),
@@ -8417,6 +8461,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // shown a read-only card he was also the owner of.
     function canScoreBox(playerId, groupOf, multiGroup) {
         if (roundSuperseded()) return false;
+        // GPS:BEGIN
+        // The same two gates as canWritePlayer: a spectator; a group whose scorekeeper code does not match.
+        if (hpSpectating()) return false;
+        if (hasGroupLock && hpKeyState !== 'none' && hpKeyState !== 'ok') return false;
+        // GPS:END
         if (!multiGroup) return true;
         var g = groupOf ? groupOf[playerId] : null;
         if (hasGroupLock) return String(g) === String(lockedGroup);
@@ -8964,6 +9013,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // v191: a retired round takes no score from anyone - the organizer's
         // override included. The live round is the one the banner points at.
         if (roundSuperseded()) return false;
+        // GPS:BEGIN
+        // A spectator writes nothing; a group whose scorekeeper code does not match, nothing.
+        if (hpSpectating()) return false;
+        if (hasGroupLock && hpKeyState !== 'none' && hpKeyState !== 'ok') return false;
+        // GPS:END
         // THE ONE NEW EXCEPTION. Requires BOTH a matching organizer token AND the
         // final-review context; either alone grants nothing.
         if (frOrganizerEditContext && hasOrganizerAuthority()) return true;
