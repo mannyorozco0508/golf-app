@@ -3494,8 +3494,9 @@
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;
-        // A manual wind was for the hole just left: back to live wind, asked again.
-        clearManualWind(); closeWindSheet(); S.windKick = true;
+        // A manual wind STAYS for the whole round (Manny, 2026-10-13) - only "Use live wind" clears
+        // it. A new hole closes the dial and asks for the live reading again.
+        closeWindSheet(); S.windKick = true;
         S.target = null; S.targetMoved = false;
         S.framed = null;
         frameHole(false);
