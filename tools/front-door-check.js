@@ -112,7 +112,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { expression: "(function(){ sessionStorage.clear(); location.href = 'home.html'; return 'reopen'; })()" }, { sleep: 3500 },
         { expression: "JSON.stringify({ view: (document.querySelector('.hp-view.on')||{}).id, last: Array.prototype.map.call(document.querySelectorAll('#v-main .hp-door.last'), function (b) { return b.classList.contains('gps') ? 'gps' : 'games'; }) })" },
         // With a round in progress GPS goes back to it (gps-ui-fixes); the picker is "Pick another course".
-        { expression: "(function(){ location.href = 'home.html#pick'; return 'pick'; })()" }, { sleep: 2500 },
+        { expression: "(function(){ location.hash = 'pick'; location.reload(); return 'pick'; })()" }, { sleep: 3000 },
         { expression: "JSON.stringify({ recent: Array.prototype.map.call(document.querySelectorAll('#hp-recent-list .hp-row'), function (b) { return b.innerText.replace(/\\s+/g,' '); }) })" }] });
     const [p1, p2, p3, p4, p5] = J(r);
     report.gps1 = { view: p1.view, near: p1.near, results: p2.results.slice(0, 3) };
