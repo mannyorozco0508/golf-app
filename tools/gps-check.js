@@ -621,7 +621,8 @@ function usgsFallbackFails(tag, g, why) {
         R.forEach((g, k) => { if (g.sheet || g.getPro) fails.push(`osm read ${k}: the upgrade sheet / link shown to a Pro user: ` + JSON.stringify([g.sheet, g.getPro])); });
         // Wave 2: no override and no paywall -> HardPan GPS (Pro), the full screen.
         if (gps.hasPro !== true || gps.basicMode || gps.tier !== null) fails.push('osm: a phone with no override is not Pro: ' + JSON.stringify([gps.hasPro, gps.basicMode, gps.tier]));
-        if (JSON.stringify(gps.labels) !== '["CENTER","F","B"]') fails.push('osm: labels ' + JSON.stringify(gps.labels));
+        if (JSON.stringify(gps.labels) !== '["CENTER","B","F"]')   // BACK on top, FRONT under (gps-ui-fixes, 2026-10-13)
+        fails.push('osm: labels ' + JSON.stringify(gps.labels));
         if (gps.f !== EXPECT.front || gps.m !== EXPECT.center || gps.b !== EXPECT.back) fails.push(`osm: F/C/B ${gps.f}/${gps.m}/${gps.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (gps.acc !== '±6 yds') fails.push('osm: accuracy ' + gps.acc);
         if (!gps.highAccuracy || gps.watches !== 1) fails.push('osm: watch on GPS: ' + gps.watches + ' high=' + gps.highAccuracy);

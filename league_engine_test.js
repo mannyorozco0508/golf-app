@@ -285,3 +285,89 @@ test('DEFAULT PAIRINGS: 10 golfers = two 2 v 2 + one 1 v 1; singles rotate round
     const nine = L.leagueAutoPairings(ten.slice(0, 9), { pairings: {} }, 0, []);
     assert.deepEqual([nine.pairings.map((t) => t.a.length + 'v' + t.b.length), nine.sittingOut.length], [['2v2', '2v2'], 1]);
 });
+
+test('A ROUND THAT STARTS ON THE 10th (startingHole = 10: 10-18 then 1-9): nothing closes early; scored over the whole card', { skip }, () => {
+    const PO = loadJsFile('play-order.js');
+    // The engine handed the card IN PLAY ORDER (10..18, 1..9), as the scorecard does for the main game.
+    const calcPO = (sm, data) => {
+        const byId = {}; (data.players || []).forEach((p) => { byId[String(p.id)] = p; });
+        const t1 = sm.teamAIds.map((id) => Object.assign({}, byId[String(id)], { team: 'Team 1' }));
+        const t2 = sm.teamBIds.map((id) => Object.assign({}, byId[String(id)], { team: 'Team 2' }));
+        const holes = PO.playOrder(AM.sideMatchHoles(sm, data.courseData || []), 10);
+        return ME.calculateMatchEngine(t1.concat(t2), holes, data.scores || {}, sm.scoring || 'net', 'nassau', 'none', 0, 0, []);
+    };
+    // A wins 10-14, 15-18 halved, then B wins 1-9. Played so far: 10-14 only (5 holes).
+    const plan = (h) => (h >= 10 && h <= 14 ? 'A' : h >= 15 ? 'H' : 'B');
+    const mk = (thruHoles) => {
+        const r = round('S10', names24.slice(0, 4), [plan]);
+        Object.keys(r.data.scores).forEach((k) => { const h = Number(/_h(\d+)$/.exec(k)[1]); if (thruHoles.indexOf(h) === -1) delete r.data.scores[k]; });
+        r.data.startingHole = 10;
+        r.data.sideMatches.sm0.startHole = 10;     // the group's Nassau "from hole 10"
+        return r;
+    };
+    const league = (r) => ({ league: { on: true, players: names24.slice(0, 4), teamsMode: 'change' } });
+    // CONTROL - the bug this guards: the group's bet "from hole 10" hands the engine holes 10-18 only, so it
+    // has no 18-hole match at all (holes 1-9 dropped). The Points game must not inherit that.
+    const ctl = mk([10, 11, 12, 13, 14]);
+    const ctlRes = calcPO(ctl.data.sideMatches.sm0, ctl.data);
+    assert.ok(!ctlRes.activeMatches.some((x) => x.id === '18'), 'control: the "from hole 10" bet has no 18 in the engine');
+    const early = mk([10, 11, 12, 13, 14]);
+    const st = L.leagueState(league(early), [early], calcPO, holesFor);
+    const m = st.matches[0];
+    assert.deepEqual(m.seg, { front: null, back: 'A', total: null }, 'thru 5 (10-14): the back is won (5 up, 4 to play: 15-18); the 18 and the front are open');
+    assert.equal(m.seg.total, null, 'the 18 is NOT closed at 5 up thru 5 - 13 holes are still to play');
+    assert.equal(m.seg.front, null, 'nothing on the front yet');
+    assert.deepEqual([m.live.status, m.live.thru, m.live.closed], [5, 5, false], 'A 5 UP thru 5');
+    // The same through 14 played holes (10-18, 1-5): A 5 up after the back, then B wins 1-5 -> all square thru 14.
+    const mid = mk([10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5]);
+    const sm = L.leagueState(league(mid), [mid], calcPO, holesFor).matches[0];
+    assert.deepEqual([sm.seg.back, sm.seg.front, sm.seg.total, sm.live.status, sm.live.thru], ['A', null, null, 0, 14], 'back won by A; the 18 all square thru 14, still open');
+    // All 18: front B (9-0), back A (5 up), 18 B (4 down overall).
+    const done = mk(Array.from({ length: 18 }, (_, i) => i + 1));
+    const sd = L.leagueState(league(done), [done], calcPO, holesFor);
+    assert.deepEqual(sd.matches[0].seg, { front: 'B', back: 'A', total: 'B' });
+    assert.deepEqual([sd.matches[0].live.closed, sd.matches[0].live.result], [true, '4 up']);
+    const pts = Object.fromEntries(sd.rows.map((x) => [x.name, x.pts]));
+    assert.deepEqual([pts.G01, pts.G03], [1, 2]);
+    // The same for a LEAGUE PAIRING in a start-on-10 round.
+    const pr = mk([10, 11, 12, 13, 14]);
+    const sp = L.leagueState({ league: { on: true, players: names24.slice(0, 4), teamsMode: 'league', pairings: { S10: [{ a: ['G01', 'G02'], b: ['G03', 'G04'] }] } } }, [pr], calcPO, holesFor).matches[0];
+    assert.deepEqual([sp.seg.total, sp.live.status, sp.live.thru], [null, 5, 5], 'a league pairing: 5 UP thru 5, the 18 still open');
+});
+
+test('ROUND-ROBIN BEST BALL: 5 pairs, every pair v every other (10 matches), win 1 / halve ½, each player gets his pair\'s points; records', { skip }, () => {
+    // 10 golfers, each with one score on every hole: pair best balls P1 3, P2 4, P3 4, P4 5, P5 5.
+    const ten = ['Al', 'Bo', 'Cy', 'Di', 'Ed', 'Fy', 'Gus', 'Hal', 'Ike', 'Jo'];
+    const each = { Al: 3, Bo: 6, Cy: 4, Di: 6, Ed: 4, Fy: 6, Gus: 5, Hal: 6, Ike: 5, Jo: 6 };
+    const players = ten.map((name, i) => ({ id: 201 + i, name, hcp: '0' }));
+    const scores = {}; for (let h = 1; h <= 18; h++) players.forEach((p) => { scores['p' + p.id + '_h' + h] = each[p.name]; });
+    const r = { code: 'RR1', label: 'Day 1', data: { players, scores, sideMatches: {}, courseData: HOLES, startingHole: 10 } };
+    const pairs = [['Al', 'Bo'], ['Cy', 'Di'], ['Ed', 'Fy'], ['Gus', 'Hal'], ['Ike', 'Jo']];
+    const st = L.leagueState({ league: { on: true, players: ten, teamsMode: 'rr', pairs: { RR1: pairs } } }, [r], calc, holesFor);
+    assert.equal(st.matches.length, 10, '5 pairs: 10 matches');
+    assert.ok(st.matches.every((m) => m.source === 'rr' && m.mode === 'match'));
+    const pts = Object.fromEntries(st.rows.map((x) => [x.name, x.pts]));
+    assert.deepEqual([pts.Al, pts.Bo, pts.Cy, pts.Ed, pts.Gus, pts.Jo], [4, 4, 2.5, 2.5, 0.5, 0.5], 'P1 4-0; P2 / P3 2-1-1; P4 / P5 0-3-1; each player his pair\'s points');
+    assert.equal(st.rows.reduce((a, x) => a + x.pts, 0), 20, '10 matches x 1 point x 2 players a side');
+    const rec = L.leagueRoundRobinRecords(st.matches, st.cfg, 'RR1');
+    assert.deepEqual(rec.map((x) => x.pair.join(' & ') + ': ' + x.w + '-' + x.l + (x.h ? '-' + x.h : '') + ', ' + x.pts + ' pts'),
+        ['Al & Bo: 4-0, 4 pts', 'Cy & Di: 2-1-1, 2.5 pts', 'Ed & Fy: 2-1-1, 2.5 pts', 'Gus & Hal: 0-3-1, 0.5 pts', 'Ike & Jo: 0-3-1, 0.5 pts']);
+    const g = st.rows.find((x) => x.name === 'Al'); assert.deepEqual([g.w, g.l, g.h], [4, 0, 0]);
+    // Optional front / back / 18 per match.
+    const nas = L.leagueState({ league: { on: true, players: ten, teamsMode: 'rr', pairs: { RR1: pairs }, rrPts: { mode: 'nassau' } } }, [r], calc, holesFor);
+    assert.equal(Object.fromEntries(nas.rows.map((x) => [x.name, x.pts])).Al, 12, '4 wins x 3 points');
+});
+
+test('ROUND-ROBIN PAIRS: "Make pairs" rotates partners day to day - 10 golfers over 9 days partner everyone once; an odd one sits out', { skip }, () => {
+    const ten = ['Al', 'Bo', 'Cy', 'Di', 'Ed', 'Fy', 'Gus', 'Hal', 'Ike', 'Jo'];
+    const seen = {};
+    for (let d = 0; d < 9; d++) {
+        const p = L.leagueAutoPairs(ten, d);
+        assert.equal(p.pairs.length, 5);
+        assert.equal(new Set(p.pairs.flat()).size, 10);
+        p.pairs.forEach((pr) => { const k = pr.slice().sort().join('+'); seen[k] = (seen[k] || 0) + 1; });
+    }
+    assert.equal(Object.keys(seen).length, 45, 'all 45 partnerships, once each'); assert.ok(Object.values(seen).every((n) => n === 1));
+    const odd = L.leagueAutoPairs(ten.slice(0, 9), 0);
+    assert.deepEqual([odd.pairs.length, odd.sittingOut.length], [4, 1]);
+});
