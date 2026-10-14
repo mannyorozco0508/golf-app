@@ -338,3 +338,23 @@ Rules that would need ADDING (additive; nothing existing changes):
   and the trip page remembers its organizer link (hardpan_trip_tokens_v1); the trip page's Points game card for
   the organizer link, a remembered one, or the signed-in owner of the trip or any of its rounds; Near you takes
   a course's city / state from the GolfAPI data when the shared record has none. Check: tools/ui-fixes-check.js.
+- gps-zoom-right (2026-10-13): zoom on the RIGHT edge, half way down (right thumb); placeZoom keeps it under the
+  right-hand stack (wind, Green, Mark shot) when that reaches the middle - never on top (checked 390x844, 375x667).
+- gps-wind (2026-10-13): a MANUAL wind sticks for the whole round, every hole, until "Use live wind" (it was this
+  hole only); the box reads "Manual" / "Live · 4 min ago"; the dial shows the source and time ("Live · NWS ·
+  updated 4 min ago (as of 2:14 PM)"). APPLE WEATHERKIT, built and OFF: gpsWind (firebase-functions/weather-core.js)
+  signs Apple's ES256 token on the server (WEATHERKIT_KEY secret + KEY_ID / TEAM_ID / SERVICE_ID params), asks
+  currentWeather for the course point (3 decimals), returns mph / gusts / direction / °F / asOf, 10 min cache per
+  point. App: gps-config weatherkit: true makes it the first source, NWS the fallback (a failure skips WeatherKit 10
+  min); the dial shows the Apple Weather mark + "Other data sources" link with its data. Free: 500,000 calls/month
+  with the developer membership; past that Apple refuses (paid tiers are opt-in). Not deployed.
+- gps-share (2026-10-13): the Round Menu's "Share" (replaces "Show QR code", app only): the GAME CODE big + Copy
+  ("Have the HardPan app? Games › Have a game code? › type this. You get the round + GPS for this course."),
+  👀 Spectator (QR + Copy link + the iOS share sheet; the link is the view-only leaderboard, so build 12 / the web
+  open it view-only), ✏️ Scorekeeper (organizer only): a group → "Make a scorekeeper code" → CODE-N-KEY + its link
+  (index.html?game=&group=N&sk=KEY) + QR; Revoke makes a new code. The round stores only SHA-256 of the key at
+  events/<code>/scoreKeys/<N>. The game code typed in the app opens ?spectate=1: view-only (canWritePlayer and
+  canScoreBox say no), a "👀 Spectating" badge, no setup / delete / Add a game / Enter Score, GPS for the course
+  kept; the round's organizer keeps full access. ?group=N with a code on that group needs the matching sk, else
+  view-only + "scorekeeper code not valid"; a group with no code works as before. APP-SIDE ONLY: the database
+  rules that would enforce it are a plan (docs/rules-plan-spectators.md), for the main session after Oct 17.

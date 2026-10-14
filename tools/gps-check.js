@@ -1070,18 +1070,18 @@ function usgsFallbackFails(tag, g, why) {
         const OBS = '/stations/KXXX/observations/latest';
         // LIVE: the measured wind and gusts, the age, the arrow.
         if (w0.windMph !== '12 g 20 mph') fails.push('wind: box reads ' + JSON.stringify(w0.windMph) + ' (expected the observation: 12 g 20 mph)');
-        if (w0.windTag !== 'updated just now') fails.push('wind: the age reads ' + JSON.stringify(w0.windTag));
+        if (w0.windTag !== 'Live · just now') fails.push('wind: the age reads ' + JSON.stringify(w0.windTag));
         if (w0.windRot !== windRotFor(w0.bearing)) fails.push(`wind: arrow turned ${w0.windRot}, expected ${windRotFor(w0.bearing)} (to the SE, on a map turned ${w0.bearing})`);
         const wb = w0.windBox, mp = w0.boxes.map;
         if (!wb || !w0.boxes.top || wb.r < mp.r - 20 || wb.l < (mp.l + mp.r) / 2 || wb.t < w0.boxes.top.b || wb.t > w0.boxes.top.b + 30) fails.push('wind: not at the top of the right-hand stack: ' + JSON.stringify([wb, w0.boxes.top]));
         if (hitBox(wb, w0.scoreBox)) fails.push('wind: covers the score button');
         if (JSON.stringify(first) !== JSON.stringify([want, '/gridpoints/XXX/1,2/stations', OBS])) fails.push(`wind: first look asked ${JSON.stringify(first)}, expected the COURSE point ${want}, its stations, the latest observation (and nothing on the reload)`);
         if (w1.windMph !== w0.windMph) fails.push('wind: not shown from the phone after a reload: ' + w1.windMph);
-        if (JSON.stringify(between('a', 'b')) !== JSON.stringify([OBS]) || w2.windTag !== 'updated just now') fails.push('wind: 11 minutes old was not asked again (once, the observation only): ' + JSON.stringify([between('a', 'b'), w2.windTag]));
+        if (JSON.stringify(between('a', 'b')) !== JSON.stringify([OBS]) || w2.windTag !== 'Live · just now') fails.push('wind: 11 minutes old was not asked again (once, the observation only): ' + JSON.stringify([between('a', 'b'), w2.windTag]));
         if (nwsWind.some((u) => u.indexOf(ME[0].toFixed(3)) !== -1 && u.indexOf(ME[1].toFixed(3)) !== -1 && want.indexOf(ME[0].toFixed(3)) === -1)) fails.push('wind: the golfer\'s position went to the weather service');
         // THE DIAL: a sheet from the bottom, on the live wind, never over the target or the numbers.
         const rel0 = String(Math.round((((135 - w2.bearing) % 360 + 360) % 360) / 5) * 5 % 360);
-        if (!d3.windSheet || d3.windDial !== rel0 || d3.windLive || d3.windRead !== 'From NW · 12 mph · gusts 20' || d3.windState !== 'Live · updated just now') fails.push('wind: the dial did not open on the live wind: ' + JSON.stringify([d3.windSheet, d3.windDial, rel0, d3.windLive, d3.windRead, d3.windState]));
+        if (!d3.windSheet || d3.windDial !== rel0 || d3.windLive || d3.windRead !== 'From NW · 12 mph · gusts 20' || !/^Live · NWS · updated just now/.test(d3.windState || '')) fails.push('wind: the dial did not open on the live wind: ' + JSON.stringify([d3.windSheet, d3.windDial, rel0, d3.windLive, d3.windRead, d3.windState]));
         const sh = d3.windSheetBox;
         if (!sh || sh.l > 0 || sh.r < 390 || sh.b < 840 || sh.t < 300) fails.push('wind: the dial is not a sheet from the bottom: ' + JSON.stringify(sh));
         if (sh && d3.target && d3.target.b > sh.t) fails.push('wind: the sheet covers the target: ' + JSON.stringify([d3.target, sh]));
@@ -1090,19 +1090,20 @@ function usgsFallbackFails(tag, g, why) {
         if (!g || !dl || Math.abs((g.l + g.r) / 2 - (dl.l + dl.r) / 2) > 2 || g.t > dl.t + 4) fails.push('wind: no green flag at the top of the dial: ' + JSON.stringify([g, dl]));
         // DRAGGED into the face, 15 mph: manual, the box turned with it, the words a weather app uses.
         const intoFace = 'From ' + compass(hb('1')) + ' · ';
-        if (!d4.windManual || d4.windDial !== '180' || d4.windMph !== '15 mph' || d4.windTag !== 'manual' || Math.abs(Number(d4.windRot) - 180) > 2 || d4.windRead !== intoFace + '15 mph' || d4.windState !== 'Manual · this hole only' || !d4.windLive || d4.windSlider !== '15') fails.push('wind: drag into the face, 15 mph - ' + JSON.stringify([d4.windManual, d4.windDial, d4.windMph, d4.windTag, d4.windRot, d4.windRead, intoFace, d4.windState, d4.windLive, d4.windSlider]));
+        if (!d4.windManual || d4.windDial !== '180' || d4.windMph !== '15 mph' || d4.windTag !== 'Manual' || Math.abs(Number(d4.windRot) - 180) > 2 || d4.windRead !== intoFace + '15 mph' || d4.windState !== 'Manual · every hole this round' || !d4.windLive || d4.windSlider !== '15') fails.push('wind: drag into the face, 15 mph - ' + JSON.stringify([d4.windManual, d4.windDial, d4.windMph, d4.windTag, d4.windRot, d4.windRead, intoFace, d4.windState, d4.windLive, d4.windSlider]));
         if (d5.windMph !== '22 mph' || d5.windSlider !== '22' || d5.windRead !== intoFace + '22 mph') fails.push('wind: the slider - ' + JSON.stringify([d5.windMph, d5.windSlider, d5.windRead]));
         if (d6.windSheet || !d6.windManual || d6.windMph !== '22 mph') fails.push('wind: Done - ' + JSON.stringify([d6.windSheet, d6.windManual, d6.windMph]));
         if (w0.plays && d6.plays === w0.plays) fails.push('wind: plays ~ did not follow the manual wind: ' + d6.plays);
         if (!d7.windManual || d7.windMph !== '22 mph') fails.push('wind: the manual wind did not survive a reload on its hole: ' + JSON.stringify([d7.windManual, d7.windMph]));
-        // THE NEXT HOLE: back on live wind, and asked right away.
-        if (!/^Hole 2\b/.test(h8.title || '') || h8.windManual || h8.windMph !== '12 g 20 mph') fails.push('wind: hole 2 is not back on live wind: ' + JSON.stringify([h8.title, h8.windManual, h8.windMph]));
+        // THE NEXT HOLE: the manual wind STICKS for the round, every hole (Manny, 2026-10-13), until
+        // "Use live wind"; the live reading is still asked for right away.
+        if (!/^Hole 2\b/.test(h8.title || '') || !h8.windManual || h8.windMph !== '22 mph' || h8.windTag !== 'Manual') fails.push('wind: the manual wind did not stick on hole 2: ' + JSON.stringify([h8.title, h8.windManual, h8.windMph, h8.windTag]));
         if (JSON.stringify(between('c', 'd')) !== JSON.stringify([OBS])) fails.push('wind: a new hole did not ask right away: ' + JSON.stringify(between('c', 'd')));
-        if (!/^Hole 1\b/.test(h9.title || '') || h9.windManual) fails.push('wind: back on hole 1 the manual wind came back: ' + JSON.stringify([h9.title, h9.windManual]));
+        if (!/^Hole 1\b/.test(h9.title || '') || !h9.windManual || h9.windMph !== '22 mph') fails.push('wind: back on hole 1 the manual wind is gone: ' + JSON.stringify([h9.title, h9.windManual, h9.windMph]));
         if (!l10.windSheet || l10.windManual || l10.windLive || !/^Live · /.test(l10.windState || '') || l10.windMph !== '12 g 20 mph') fails.push('wind: "Use live wind" did not go back: ' + JSON.stringify([l10.windSheet, l10.windManual, l10.windState, l10.windMph]));
         if (y11.windManual || y11.windMph !== '12 g 20 mph') fails.push('wind: a manual wind from another day is still used: ' + JSON.stringify([y11.windManual, y11.windMph]));
         // OFFLINE: the last reading with its age up to an hour, then "Wind -" (still settable).
-        if (o12.windMph !== '12 g 20 mph' || o12.windTag !== 'updated 50 min ago') fails.push('wind: offline at 50 minutes - ' + JSON.stringify([o12.windMph, o12.windTag]));
+        if (o12.windMph !== '12 g 20 mph' || o12.windTag !== 'Live · 50 min ago') fails.push('wind: offline at 50 minutes - ' + JSON.stringify([o12.windMph, o12.windTag]));
         if (o13.windMph !== 'Wind –' || o13.windTag) fails.push('wind: offline past an hour - ' + JSON.stringify([o13.windMph, o13.windTag]));
         if (!o14.windSheet) fails.push('wind: with no reading the dial does not open');
         if (wo.reads[0].windMph !== 'Wind –' || wo.reads[0].windManual) fails.push('wind: with no weather service the box reads ' + JSON.stringify(wo.reads[0].windMph));

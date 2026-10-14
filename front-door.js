@@ -526,14 +526,19 @@
     }
     function join() {
         var i = $('hp-code'), msg = $('hp-code-msg');
+        // A SCOREKEEPER CODE (gps-share): "TADPJH-2-K7Q9X" = round, group, key -> that group's card.
+        var sk = /^\s*([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})\s*$/i.exec(String((i && i.value) || ''));
+        if (sk) { W.location.href = 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase(); return; }
         var code = String((i && i.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (code.length < 4) { if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'Type the game code (letters and numbers).'; } return; }
-        if (!H.db) { W.location.href = 'index.html?game=' + code; return; }
+        // A GAME CODE OPENS THE ROUND AS A SPECTATOR (view-only, with GPS); the round's own
+        // organizer and golfers keep their access (the scorecard decides).
+        if (!H.db) { W.location.href = 'index.html?game=' + code + '&spectate=1'; return; }
         if (msg) { msg.className = 'hp-status'; msg.textContent = 'Checking ' + code + '…'; }
         H.db.ref('events/' + code + '/players').once('value').then(function (s) {
-            if (s && s.exists && s.exists()) W.location.href = 'index.html?game=' + code;
+            if (s && s.exists && s.exists()) W.location.href = 'index.html?game=' + code + '&spectate=1';
             else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + code + '. Check it with whoever set it up.'; }
-        }, function () { W.location.href = 'index.html?game=' + code; });
+        }, function () { W.location.href = 'index.html?game=' + code + '&spectate=1'; });
     }
     // THE GPS ROUND IN PROGRESS (Manny, 2026-10-13: GPS from Games went to "Where are you playing?").
     // The last round, from the last 12 hours and not finished (mainDecor checks the scores), opens
@@ -730,11 +735,12 @@
         // The heading is redrawn on every hole change: put the button back each time.
         try {
             var pending2 = false;
-            new MutationObserver(function () { if (pending2) return; pending2 = true; setTimeout(function () { pending2 = false; placeGpsPill(); placeMenuItems(); }, 50); })
+            new MutationObserver(function () { if (pending2) return; pending2 = true; setTimeout(function () { pending2 = false; placeGpsPill(); placeMenuItems(); placeShareButton(); }, 50); })
                 .observe(W.document.body, { childList: true, subtree: true });
         } catch (e) {}
         placeGpsPill();
         placeMenuItems();
+        placeShareButton();
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
@@ -846,6 +852,7 @@
     }
     function openAddGame() {
         if (!agCode()) return false;
+        if (spectating()) return true;   // a spectator adds nothing (the sheet does not open)
         AG.q = null;
         agList();
         agSheet().style.display = '';
@@ -1028,6 +1035,148 @@
         body.insertBefore(box, body.firstChild);
     }
 
+    // ---- SPECTATING (gps-share) ----------------------------------------------------------------
+    // The scorecard says when the viewer is a spectator (or a scorekeeper whose code does not
+    // match): a "Spectating" badge, and none of setup, edit, delete, Add a game or score entry.
+    // GPS for the course stays (it needs no edit rights).
+    var SPEC = { on: false, badKey: false };
+    function spectatorMode(on, badKey) {
+        SPEC.on = !!on; SPEC.badKey = !!badKey;
+        var d = W.document, root = d.documentElement;
+        root.classList.toggle('hp-spectating', SPEC.on || SPEC.badKey);
+        if (!$('hp-spec-style')) {
+            var st = d.createElement('style'); st.id = 'hp-spec-style';
+            st.textContent = 'html.hp-spectating #setup-entry-mount,html.hp-spectating #end-round-mount,html.hp-spectating #fd-menu-games,html.hp-spectating #fd-gps3,'
+                + 'html.hp-spectating #gps-overlay .gps-door-add,html.hp-spectating #gps-overlay .gps-add-game,html.hp-spectating #gps-overlay .gps-scorebox .gps-score,'
+                + 'html.hp-spectating .score-input-wrapper input:not([disabled]){display:none !important;}'
+                + '#hp-spec-badge{position:fixed;z-index:2147482000;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);background:#1d3557;color:#fff;font:800 12px/1 -apple-system,system-ui,sans-serif;padding:6px 12px;border-radius:999px;letter-spacing:.04em;pointer-events:none;}';
+            d.head.appendChild(st);
+        }
+        var b = $('hp-spec-badge');
+        if (SPEC.on || SPEC.badKey) {
+            if (!b) { b = d.createElement('div'); b.id = 'hp-spec-badge'; d.body.appendChild(b); }
+            b.textContent = SPEC.badKey ? '\uD83D\uDC40 Spectating \u00b7 scorekeeper code not valid' : '\uD83D\uDC40 Spectating';
+        } else if (b) b.parentNode.removeChild(b);
+    }
+    function spectating() { return SPEC.on || SPEC.badKey; }
+
+    // ---- SHARE (gps-share): the Round Menu's "Share" replaces "Show QR code" ---------------------
+    function cd() { try { return typeof currentData !== 'undefined' ? currentData : null; } catch (e) { return null; } }   /* global currentData */
+    function shareBase() { try { return typeof shareBaseUrl === 'function' ? shareBaseUrl() : ''; } catch (e) { return ''; } }   /* global shareBaseUrl */
+    function isOrganizer() { try { return typeof canReachSetup === 'function' && canReachSetup(); } catch (e) { return false; } }   /* global canReachSetup */
+    function joinUrl(path) { var b = shareBase(); return (b ? (b.charAt(b.length - 1) === '/' ? b : b + '/') : '') + path; }
+    function spectatorUrl(code) { return joinUrl('leaderboard.html?game=' + encodeURIComponent(code)); }
+    function keyUrl(code, g, key) { return joinUrl('index.html?game=' + encodeURIComponent(code) + '&group=' + g + '&sk=' + encodeURIComponent(key)); }
+    function placeShareButton() {
+        if (!on() || !agCode()) return;
+        var m = $('qr-share-mount');
+        if (!m || m.getAttribute('data-hp-share') === '1') return;
+        m.setAttribute('data-hp-share', '1');
+        m.innerHTML = '<button type="button" class="btn-outline qr-open-btn" data-hp-share-open="1">\uD83D\uDCE4 Share</button>';
+        m.querySelector('button').addEventListener('click', function () { try { if (typeof W.toggleRoundSheet === 'function') W.toggleRoundSheet(false); } catch (e) {} openShare(); });
+        // index.html redraws this mount: keep "Share" there.
+        try { new MutationObserver(function () { if (m.getAttribute('data-hp-share') !== '1' || !m.querySelector('[data-hp-share-open]')) { m.removeAttribute('data-hp-share'); placeShareButton(); } }).observe(m, { childList: true }); } catch (e) {}
+    }
+    var SH = { group: null, keys: {} };
+    function shareSheet() {
+        var el = $('fd-share');
+        if (el) return el;
+        el = W.document.createElement('div');
+        el.id = 'fd-share'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Share this round');
+        el.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483000;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#f0f4f2;color:#1a1a1a;color-scheme:light;font-family:-apple-system,system-ui,sans-serif;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box;';
+        el.addEventListener('click', shareClick);
+        W.document.body.appendChild(el);
+        return el;
+    }
+    function qr(text) { try { return typeof qrSvgFor === 'function' ? qrSvgFor(text, { size: 200 }) : ''; } catch (e) { return ''; } }   /* global qrSvgFor */
+    function openShare() {
+        var code = agCode();
+        if (!code) return;
+        var el = shareSheet(), d = cd() || {}, org = isOrganizer();
+        var groups = typeof computeGroupBoundaries === 'function' ? computeGroupBoundaries((d.players || []).length, d.groupSizeOverrides || {}) : [{ group: 1, startIdx: 0, size: (d.players || []).length }];   /* global computeGroupBoundaries */
+        var btn = 'min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;font-weight:800;font-size:.95rem;';
+        var h = ['<div style="display:flex;align-items:center;gap:10px;"><button type="button" data-sh="close" aria-label="Back" style="min-width:44px;min-height:44px;border:0;background:#fff;border-radius:12px;font-size:1.5rem;color:#0f4c3a;">\u2039</button><div style="font-weight:800;font-size:1.2rem;color:#0f4c3a;">Share this round</div></div>'];
+        // THE GAME CODE, big and copyable.
+        h.push('<div style="margin:16px 0;padding:16px;border-radius:16px;background:#fff;border:1px solid #d0e1db;text-align:center;">'
+            + '<div style="font-size:.75rem;font-weight:800;letter-spacing:.08em;color:#5b6b64;">GAME CODE</div>'
+            + '<div class="fd-share-code" style="font:800 2.6rem/1.1 ui-monospace,Menlo,monospace;letter-spacing:.12em;color:#0f4c3a;margin:6px 0;user-select:all;-webkit-user-select:all;">' + esc(code) + '</div>'
+            + '<button type="button" data-sh="copycode" style="' + btn + '">Copy code</button>'
+            + '<div style="font-size:.85rem;margin-top:10px;">Have the HardPan app? <b>Games \u203A Have a game code?</b> \u203A type this. You get the round + GPS for this course.</div></div>');
+        // SPECTATOR (the default).
+        var su = spectatorUrl(code);
+        h.push('<div style="padding:14px;border-radius:16px;background:#fff;border:1px solid #d0e1db;margin-bottom:12px;">'
+            + '<div style="font-weight:800;font-size:1.05rem;">\uD83D\uDC40 Spectator</div><div style="font-size:.82rem;color:#5b6b64;margin:2px 0 8px;">View-only: scores, leaderboard, matches, bets, results, live. Nothing to type in.</div>'
+            + '<div style="display:flex;justify-content:center;">' + qr(su) + '</div>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;"><button type="button" data-sh="share" data-url="' + esc(su) + '" style="' + btn + 'background:#0f4c3a;color:#fff;">Share\u2026</button><button type="button" data-sh="copy" data-url="' + esc(su) + '" style="' + btn + '">Copy link</button></div></div>');
+        // SCOREKEEPER (the organizer only): a group, its own code / link / QR; Revoke.
+        if (org) {
+            h.push('<div style="padding:14px;border-radius:16px;background:#fff;border:1px solid #d0e1db;">'
+                + '<div style="font-weight:800;font-size:1.05rem;">\u270F\uFE0F Scorekeeper</div><div style="font-size:.82rem;color:#5b6b64;margin:2px 0 8px;">Lets one person enter scores for ONE group only. You can revoke it.</div><div>'
+                + groups.map(function (g) { var on2 = SH.group === g.group; return '<button type="button" data-sh-group="' + g.group + '" style="' + btn + 'margin:0 6px 6px 0;' + (on2 ? 'background:#0f4c3a;color:#fff;' : '') + '">Group ' + g.group + '</button>'; }).join('') + '</div>');
+            if (SH.group != null) {
+                var g = SH.group, key = SH.keys[g], has = !!(d.scoreKeys && d.scoreKeys[String(g)]);
+                if (key) {
+                    var u = keyUrl(code, g, key), typed = code + '-' + g + '-' + key;
+                    h.push('<div style="display:flex;justify-content:center;margin-top:6px;">' + qr(u) + '</div>'
+                        + '<div style="text-align:center;font:800 1.3rem/1.2 ui-monospace,Menlo,monospace;letter-spacing:.06em;margin:6px 0;user-select:all;-webkit-user-select:all;">' + esc(typed) + '</div>'
+                        + '<div style="font-size:.8rem;color:#5b6b64;text-align:center;">In the app: Games \u203A Have a game code? \u203A type this code.</div>'
+                        + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;"><button type="button" data-sh="share" data-url="' + esc(u) + '" style="' + btn + 'background:#0f4c3a;color:#fff;">Share\u2026</button><button type="button" data-sh="copy" data-url="' + esc(u) + '" style="' + btn + '">Copy link</button><button type="button" data-sh="newkey" style="' + btn + 'border-color:#b91c1c;color:#b91c1c;">Revoke \u00b7 new code</button></div>');
+                } else {
+                    h.push('<div style="font-size:.85rem;margin:6px 0;">' + (has ? 'Group ' + g + ' has a scorekeeper code (made earlier, not shown again). Make a new one to share it here \u2014 the old one stops working.' : 'No scorekeeper code for Group ' + g + ' yet.') + '</div>'
+                        + '<button type="button" data-sh="newkey" style="' + btn + 'background:#0f4c3a;color:#fff;">' + (has ? 'Revoke \u00b7 new code' : 'Make a scorekeeper code') + '</button>');
+                }
+            }
+            h.push('</div>');
+        }
+        h.push('<div data-sh-msg="1" role="status" style="font-size:.85rem;font-weight:700;color:#0f4c3a;min-height:1.2em;margin-top:10px;text-align:center;"></div>');
+        el.innerHTML = h.join('');
+        el.style.display = '';
+    }
+    function shareSay(t) { var m = W.document.querySelector('#fd-share [data-sh-msg]'); if (m) m.textContent = t; }
+    function copyText(t) {
+        var ok = function () { shareSay('Copied'); };
+        try { if (W.navigator.clipboard && W.navigator.clipboard.writeText) { W.navigator.clipboard.writeText(t).then(ok, function () { shareSay(t); }); return; } } catch (e) {}
+        shareSay(t);
+    }
+    function shareUrl(u) {
+        var Sh = W.Capacitor && W.Capacitor.Plugins && W.Capacitor.Plugins.Share;
+        if (Sh && typeof Sh.share === 'function') { Sh.share({ title: 'Follow our round', url: u }).catch(function () {}); return; }
+        if (W.navigator.share) { W.navigator.share({ title: 'Follow our round', url: u }).catch(function () {}); return; }
+        copyText(u);
+    }
+    function newKey() {
+        var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', out = '', buf = new Uint8Array(6);
+        try { W.crypto.getRandomValues(buf); } catch (e) { for (var i = 0; i < 6; i++) buf[i] = Math.floor(Math.random() * 256); }
+        for (var j = 0; j < 6; j++) out += A.charAt(buf[j] % A.length);
+        return out;
+    }
+    function sha256(t) {
+        try { return W.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(t))).then(function (b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join(''); }); }
+        catch (e) { return Promise.reject(e); }
+    }
+    function makeKey(g) {
+        var code = agCode(), key = newKey(), d0 = (function () { try { return typeof db !== 'undefined' ? db : null; } catch (e) { return null; } })();   /* global db */
+        if (!d0) { shareSay('Not connected.'); return; }
+        sha256(key).then(function (hash) { return d0.ref('events/' + code + '/scoreKeys/' + g).set(hash); }).then(function () {
+            SH.keys[g] = key; var d = cd(); if (d) { d.scoreKeys = Object.assign({}, d.scoreKeys || {}); d.scoreKeys[String(g)] = 'set'; }
+            openShare(); shareSay('Scorekeeper code for Group ' + g + ' made' + (d && d.scoreKeys ? '' : '') + '.');
+        }, function (e) { shareSay('Not saved: ' + (e && e.message || e)); });
+    }
+    function shareClick(ev) {
+        var t = ev.target && ev.target.closest ? ev.target : null;
+        if (!t) return;
+        var b;
+        if ((b = t.closest('[data-sh-group]'))) { SH.group = Number(b.getAttribute('data-sh-group')); openShare(); return; }
+        if ((b = t.closest('[data-sh]'))) {
+            var a = b.getAttribute('data-sh');
+            if (a === 'close') $('fd-share').style.display = 'none';
+            else if (a === 'copycode') copyText(agCode());
+            else if (a === 'copy') copyText(b.getAttribute('data-url'));
+            else if (a === 'share') shareUrl(b.getAttribute('data-url'));
+            else if (a === 'newkey' && SH.group != null && isOrganizer()) makeKey(SH.group);
+        }
+    }
+
     // ---- TRIP (trip.html#build) ---------------------------------------------------------
     function trip() {
         try { var tp = params(); if (tp.get('trip')) rememberTrip(tp.get('trip'), tp.get('organizer')); } catch (e) {}
@@ -1073,7 +1222,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

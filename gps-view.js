@@ -1885,16 +1885,19 @@
     // ---- MANUAL WIND (build 3; THE DIAL and THIS HOLE ONLY in build 7) -----------
     // Tap the wind box: a sheet from the bottom with a dial - drag the arrow to
     // where the wind blows (up = toward the green), snapped to 5 degrees - and mph
-    // (- / +, a 0-40 slider). Kept on this phone only, for THIS HOLE of this course
-    // today: the next hole is back on live wind, and so is tomorrow. Stored as a
-    // compass direction.
+    // (- / +, a 0-40 slider). Kept on this phone only, for THIS ROUND, every hole,
+    // until "Use live wind" (Manny, 2026-10-13: it used to be this hole only).
+    // Tomorrow is back on live wind. Stored as a compass direction, so it points
+    // the right way on every hole.
     var MANUAL_WIND = 'hardpan_wind_manual_v2';
     var WIND_MAX_MPH = 40;
     function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
     function manualWind() {
         var m = lsGet(MANUAL_WIND);
         if (!m || m.day !== today() || typeof m.toDeg !== 'number' || typeof m.mph !== 'number') return null;
-        if (!S || m.course !== S.courseKey || m.hole !== S.hole) return null;
+        if (!S || m.course !== S.courseKey) return null;
+        // This round, every hole (a setting from before this change: its own hole only).
+        if (m.round != null ? String(m.round) !== String(S.eventCode || '') : m.hole !== S.hole) return null;
         return m;
     }
     function clearManualWind() { try { localStorage.removeItem(MANUAL_WIND); } catch (x) {} }
@@ -1909,7 +1912,7 @@
         var live = liveWind(), m = manualWind();
         var tempF = live && typeof live.tempF === 'number' ? live.tempF : null;
         if (m) return { mph: m.mph, toDeg: m.toDeg, fromDeg: (m.toDeg + 180) % 360, tempF: tempF, manual: true };
-        if (live && !live.none) return { mph: live.mph, gustMph: live.gustMph || null, toDeg: live.toDeg, fromDeg: live.fromDeg, tempF: tempF, at: live.at, src: live.src };
+        if (live && !live.none) return { mph: live.mph, gustMph: live.gustMph || null, toDeg: live.toDeg, fromDeg: live.fromDeg, tempF: tempF, at: live.at, src: live.src, obsAt: live.obsAt || null };
         return live ? { none: true, outside: !!live.outside, tempF: tempF } : null;
     }
     // The hole's direction: tee -> green (the hole view turns the map to it).
@@ -1919,6 +1922,9 @@
         // No tee: the way the map is turned NOW (not the last hole's camera).
         return S.map && typeof S.map.getBearing === 'function' ? S.map.getBearing() : (S.camera ? S.camera.bearing : 0);
     }
+    // Where a live reading came from, in words.
+    function srcName(src) { return src === 'weatherkit' ? '\uF8FF Weather' : src === 'hourly' ? 'NWS forecast' : 'NWS'; }
+    function clockText(t) { var d = new Date(t), h = d.getHours(), m = d.getMinutes(); return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM'); }
     function ageText(at) {
         var min = Math.floor(Math.max(0, Date.now() - at) / 60000);
         return min < 1 ? 'updated just now' : 'updated ' + min + ' min ago';
@@ -1983,13 +1989,16 @@
         var sl = sh.querySelector('.gps-ws-slider');
         if (sl && String(sl.value) !== String(d.mph)) sl.value = String(d.mph);
         var st = sh.querySelector('.gps-ws-state');
-        if (st) st.textContent = m ? 'Manual · this hole only' : (live && !live.none ? 'Live · ' + ageText(live.at) : 'No live wind - set it here');
+        if (st) st.textContent = m ? 'Manual · every hole this round' : (live && !live.none ? 'Live · ' + srcName(live.src) + ' · ' + ageText(live.at) + (live.obsAt ? ' (as of ' + clockText(live.obsAt) + ')' : '') : 'No live wind - set it here');
+        // APPLE WEATHER'S ATTRIBUTION, whenever its data is shown (Apple's WeatherKit terms).
+        var at = sh.querySelector('.gps-ws-attrib');
+        if (at) at.style.display = !m && live && live.src === 'weatherkit' ? '' : 'none';
         var lb = sh.querySelector('.gps-ws-live');
         if (lb) lb.style.display = m ? '' : 'none';
     }
     function saveManualWind() {
         if (!S || !S.windDraft) return;
-        lsSet(MANUAL_WIND, { day: today(), course: S.courseKey, hole: S.hole, mph: S.windDraft.mph, toDeg: Math.round((holeBearing() + S.windDraft.rel) % 360) });
+        lsSet(MANUAL_WIND, { day: today(), course: S.courseKey, round: String(S.eventCode || ''), hole: S.hole, mph: S.windDraft.mph, toDeg: Math.round((holeBearing() + S.windDraft.rel) % 360) });
         syncWind();
         syncWindSheet();
     }
@@ -2059,6 +2068,20 @@
         S.windInFlight = true;
         S.windAskedAt = Date.now();
         var done = function () { mine.windInFlight = false; };
+        // APPLE WEATHERKIT FIRST, when it is switched on (gps-config weatherkit: true - it needs
+        // the gpsWind function and Apple's key, both server-side). The course's own point; the
+        // golfer's position never. Anything but a reading: NWS, exactly as before.
+        var cfgW = (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {};
+        // A failed WeatherKit ask is not repeated for 10 minutes (NWS answers meanwhile).
+        if (cfgW.weatherkit && !(S.windWkOffUntil > Date.now()) && window.HardPanGpsLive && typeof window.HardPanGpsLive.wind === 'function') {
+            window.HardPanGpsLive.wind(pt[0], pt[1]).then(function (r) {
+                if (r && r.status === 'ok' && typeof r.mph === 'number') {
+                    lsSet(key, { at: Date.now(), src: 'weatherkit', obsAt: r.asOf ? Date.parse(r.asOf) || null : null, mph: r.mph, gustMph: r.gustMph || null, toDeg: r.toDeg, fromDeg: r.fromDeg, tempF: typeof r.tempF === 'number' ? r.tempF : null });
+                    done(); if (S === mine) syncWind();
+                } else { mine.windWkOffUntil = Date.now() + WIND_FRESH_MS; done(); if (S === mine) fetchWind(); }
+            }, function () { mine.windWkOffUntil = Date.now() + WIND_FRESH_MS; done(); if (S === mine) fetchWind(); });
+            return;
+        }
         var cached = lsGet(ptKey);
         if (cached && Date.now() - cached.at >= NWS_POINT_MS) cached = null;
         if (cached && cached.outside) {
@@ -2148,7 +2171,7 @@
         if (!has) { txt('.gps-wind-mph', 'Wind –'); txt('.gps-wind-tag', ''); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
         w = ew;
         txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + (w.gustMph ? ' g ' + w.gustMph : '') + ' mph');
-        txt('.gps-wind-tag', w.manual ? 'manual' : ageText(w.at));
+        txt('.gps-wind-tag', w.manual ? 'Manual' : 'Live · ' + ageText(w.at).replace(/^updated /, ''));
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
         // is straight up), which is how the map is turned in the hole's view.
@@ -2163,7 +2186,7 @@
         box.classList.toggle('gps-wind-northup', northUp);
         arrow.style.transform = 'rotate(' + rot + 'deg)';
         box.setAttribute('data-rot', String(rot));
-        box.setAttribute('aria-label', 'Wind ' + (w.mph === 0 ? 'calm' : w.mph + ' mph' + (w.gustMph ? ' gusting ' + w.gustMph : '') + ' from ' + G.compassName(w.fromDeg)) + (w.manual ? ', set by you for this hole' : ', ' + ageText(w.at)) + (northUp ? ', map north up' : '') + '. Tap to set it.');
+        box.setAttribute('aria-label', 'Wind ' + (w.mph === 0 ? 'calm' : w.mph + ' mph' + (w.gustMph ? ' gusting ' + w.gustMph : '') + ' from ' + G.compassName(w.fromDeg)) + (w.manual ? ', set by you for this round' : ', live from ' + srcName(w.src) + ', ' + ageText(w.at)) + (northUp ? ', map north up' : '') + '. Tap to set it.');
         if (windSheetOpen()) syncWindSheet();
     }
 
@@ -2373,6 +2396,18 @@
         try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
     }
 
+    // ZOOM, HALF WAY DOWN THE RIGHT EDGE - unless the right-hand stack (wind, Green, Mark shot)
+    // reaches that far (a short phone): then just under it, never on top of it.
+    function placeZoom() {
+        var z = S && S.el && S.el.querySelector('.gps-zoom');
+        var stack = S && S.el && S.el.querySelector('.gps-right');
+        if (!z || !stack || typeof z.getBoundingClientRect !== 'function') return;
+        var h = z.offsetHeight || 44, vh = window.innerHeight || 0, top = vh / 2 - h / 2, low = 0;
+        Array.prototype.forEach.call(stack.children, function (c) { if (c.offsetParent !== null) { var b = c.getBoundingClientRect(); if (b.height) low = Math.max(low, b.bottom); } });
+        if (low && top < low + 8) top = low + 8;
+        var want = Math.round(top) + 'px';
+        if (z.style.top !== want || z.style.transform !== 'none') { z.style.top = want; z.style.transform = 'none'; }
+    }
     function render() {
         if (!S || !G) return;
         var u = units();
@@ -2508,6 +2543,7 @@
         drawHoleAsk();
         drawHazards();
         drawShots();
+        placeZoom();
         placePills();
         syncWind();
     }
@@ -2763,8 +2799,9 @@
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
         + '</div>'
-        // ZOOM: the LEFT edge, half way down the screen, always there (Manny, 2026-10-13).
-        + '<button type="button" class="gps-zoom gps-zoom-left gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
+        // ZOOM: the RIGHT edge, half way down the screen, for the right thumb (Manny, 2026-10-13);
+        // placeZoom keeps it clear of the right-hand stack (wind, Green, Mark shot).
+        + '<button type="button" class="gps-zoom gps-zoom-side gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         // RIGHT SIDE STACK: wind, the green view.
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
@@ -2838,6 +2875,7 @@
         + '<div class="gps-wind-sheet gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
         +   '<div class="gps-ws-head"><div class="gps-ws-title">Wind<small class="gps-ws-state"></small></div>'
         +     '<button type="button" class="gps-ws-live">Use live wind</button><button type="button" class="gps-ws-done">Done</button></div>'
+        +   '<div class="gps-ws-attrib" style="display:none;font-size:11px;font-weight:600;line-height:1.3;color:#c8d1ca;margin:2px 0 6px;">\uF8FF Weather \u00b7 <a href="https://weatherkit.apple.com/legal-attribution.html" target="_blank" rel="noopener" style="color:#c8d1ca;">Other data sources</a></div>'
         +   '<div class="gps-dial" tabindex="0" role="slider" aria-label="Where the wind blows - up is toward the green" aria-valuemin="0" aria-valuemax="355">'
         +     '<span class="gps-dial-green" aria-hidden="true"><svg viewBox="0 0 12 16" width="11" height="15"><path d="M2 1v14" stroke="#ffffff" stroke-width="1.6"/><path d="M2.8 1.5h8l-2.4 2.6 2.4 2.6h-8z" fill="#4ade80"/></svg>green</span>'
         +     '<span class="gps-dial-ticks" aria-hidden="true"></span>'
@@ -2918,7 +2956,7 @@
         + '#gps-overlay .gps-verify{font-size:13px;line-height:1.35;color:#f4f4ef;padding:6px 10px;border-left:3px solid #fb923c;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
         + '#gps-overlay .gps-verify.gps-open{white-space:normal;}'
         // RIGHT SIDE STACK
-        + '#gps-overlay .gps-zoom-left{position:absolute;z-index:5;left:8px;top:50%;transform:translateY(-50%);}'
+        + '#gps-overlay .gps-zoom-side{position:absolute;z-index:5;right:8px;top:50%;transform:translateY(-50%);}'
         + '#gps-overlay .gps-right{position:absolute;z-index:5;right:8px;top:var(--gps-top-b);display:flex;flex-direction:column;align-items:flex-end;gap:8px;}'
         + '#gps-overlay .gps-right > *{min-width:56px;min-height:44px;box-sizing:border-box;font-weight:800;font-size:14px;padding:6px 9px;display:flex;align-items:center;justify-content:center;gap:4px;}'
         + '#gps-overlay .gps-wind{font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
@@ -3456,8 +3494,9 @@
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;
-        // A manual wind was for the hole just left: back to live wind, asked again.
-        clearManualWind(); closeWindSheet(); S.windKick = true;
+        // A manual wind STAYS for the whole round (Manny, 2026-10-13) - only "Use live wind" clears
+        // it. A new hole closes the dial and asks for the live reading again.
+        closeWindSheet(); S.windKick = true;
         S.target = null; S.targetMoved = false;
         S.framed = null;
         frameHole(false);

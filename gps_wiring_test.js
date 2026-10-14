@@ -150,11 +150,12 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
     assert.strictEqual(cfg.golfapi, true, 'the GolfAPI kill switch is a plain boolean, on');
+    assert.strictEqual(cfg.weatherkit, false, 'Apple WeatherKit is off until its key is set and gpsWind is deployed (NWS meanwhile)');
     assert.strictEqual(cfg.imagery, 'esri', 'Esri stays the default');
     // GOOGLE STAYS OFF (2026-10-08): its terms forbid offline storage and use
     // with a non-Google map, and this app falls back to Esri / USGS.
@@ -267,12 +268,13 @@ test('manual wind: on this phone only, THIS HOLE today only, and it drives plays
     const v = read('gps-view.js');
     assert.ok(/var MANUAL_WIND = 'hardpan_wind_manual_v2';/.test(v));
     assert.ok(/if \(!m \|\| m\.day !== today\(\)/.test(v), 'gone the next day');
-    assert.ok(/if \(!S \|\| m\.course !== S\.courseKey \|\| m\.hole !== S\.hole\) return null;/.test(v), 'this hole of this course only');
-    assert.ok(/S\.mode = 'measure'; S\.draft = null;\s*\/\/[^\n]*\n\s*clearManualWind\(\); closeWindSheet\(\); S\.windKick = true;/.test(v), 'a new hole: back on live wind, asked right away');
+    assert.ok(/if \(!S \|\| m\.course !== S\.courseKey\) return null;/.test(v) && /if \(m\.round != null \? String\(m\.round\) !== String\(S\.eventCode \|\| ''\) : m\.hole !== S\.hole\) return null;/.test(v), 'this course, THIS ROUND, every hole (Manny, 2026-10-13)');
+    assert.ok(/S\.mode = 'measure'; S\.draft = null;\s*(\/\/[^\n]*\n\s*)+closeWindSheet\(\); S\.windKick = true;/.test(v), 'a new hole keeps the manual wind; the live reading is asked again');
+    assert.equal((v.match(/clearManualWind\(\)/g) || []).length, 2, 'cleared ONLY by "Use live wind" (the definition + that one call)');
     const sec = v.slice(v.indexOf('// ---- MANUAL WIND (build 3'), v.indexOf('function fetchWind('));
     assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|\.ref\(|db\./.test(sec), 'the manual wind is never sent anywhere');
     assert.ok(/var w = effectiveWind\(\), has = !!\(w && !w\.none\);/.test(v), 'plays ~ uses whatever wind is showing');
-    assert.ok(/Use live wind/.test(v) && /txt\('\.gps-wind-tag', w\.manual \? 'manual' : ageText\(w\.at\)\)/.test(v));
+    assert.ok(/Use live wind/.test(v) && /txt\('\.gps-wind-tag', w\.manual \? 'Manual' : 'Live · ' \+ ageText\(w\.at\)\.replace\(\/\^updated \/, ''\)\)/.test(v), '"Manual" / "Live · N min ago"');
 });
 
 test('build 7 wind dial: a sheet from the bottom, drag any angle in 5s, green at the top, mph 0-40, Done', { skip }, () => {
