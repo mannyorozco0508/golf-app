@@ -1058,7 +1058,7 @@
         if (!$('hp-spec-style')) {
             var st = d.createElement('style'); st.id = 'hp-spec-style';
             st.textContent = 'html.hp-spectating #setup-entry-mount,html.hp-spectating #end-round-mount,html.hp-spectating #fd-menu-games,html.hp-spectating #fd-gps3,'
-                + 'html.hp-spectating #gps-overlay .gps-door-add,html.hp-spectating #gps-overlay .gps-add-game,html.hp-spectating #gps-overlay .gps-scorebox .gps-score,'
+                + 'html.hp-spectating #gps-overlay .gps-door-add,html.hp-spectating #gps-overlay .gps-add-game,'
                 + 'html.hp-spectating .score-input-wrapper input:not([disabled]){display:none !important;}'
                 + '#hp-spec-badge{position:fixed;z-index:2147482000;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);background:#1d3557;color:#fff;font:800 12px/1 -apple-system,system-ui,sans-serif;padding:6px 12px;border-radius:999px;letter-spacing:.04em;pointer-events:none;}';
             d.head.appendChild(st);

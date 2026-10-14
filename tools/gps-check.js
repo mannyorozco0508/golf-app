@@ -610,7 +610,7 @@ function usgsFallbackFails(tag, g, why) {
         if (gps.zoomBtn !== '1x') fails.push('osm: zoom button reads ' + gps.zoomBtn);
         fails.push(...arcFails('osm', gps));
         if (!/±6 yds/.test(gps.popInfo || '') && gps.popInfo !== null) fails.push('osm: the credits popup info line: ' + gps.popInfo);
-        if (gps.score !== 'Hole 1 · Enter Score') fails.push('osm: score button reads ' + gps.score);
+        if (gps.score !== 'Enter score') fails.push('osm: score button reads ' + gps.score);
         // Redesign: on the card, ONE "📍 GPS" button; on the map, the Card button back.
         if (!arrive.toggle || !/📍 GPS/.test(arrive.toggle) || !arrive.toggleOnScreen) fails.push('osm: the GPS button is not on the card: ' + arrive.toggle);
         if (!gps.cardBtn || gps.toggleOnScreen) fails.push('osm: on the map, the Card button / no GPS pill: ' + JSON.stringify([gps.cardBtn, gps.toggleOnScreen]));
@@ -988,7 +988,7 @@ function usgsFallbackFails(tag, g, why) {
     out.score = sc; bail(out, sc);
     {
         const [g0, g1] = sc.reads;
-        if (g0.score !== 'Hole 1 · Enter Score' || !g0.scoreBox) fails.push('score: button ' + JSON.stringify([g0.score, g0.scoreBox]));
+        if (g0.score !== 'Enter score' || !g0.scoreBox) fails.push('score: button ' + JSON.stringify([g0.score, g0.scoreBox]));
         const sb = g0.scoreboxBox, mp = g0.boxes.map;
         if (!sb || !mp || Math.abs((sb.l + sb.r) / 2 - (mp.l + mp.r) / 2) > 2) fails.push('score: the Enter Score box is not centered: ' + JSON.stringify([sb, mp]));
         if (sb && g0.boxes.attrib && sb.b > g0.boxes.attrib.t) fails.push('score: the button sits on the attribution');
@@ -1143,7 +1143,7 @@ function usgsFallbackFails(tag, g, why) {
         if (g.title !== `Hole ${tc.hole} · Par ${sb.p[tc.key].data[tc.hole - 1].par}`) fails.push(`${tag}: title ${g.title}`);
         if (g.m !== String(Math.round(total))) fails.push(`${tag}: center ${g.m}, tee -> center is ${Math.round(total)}`);
         fails.push(...arcFails(tag, g), ...teeInView(tag, g), ...pillFails(tag, g, true));
-        if (g.score !== `Hole ${tc.hole} · Enter Score`) fails.push(`${tag}: score button ${g.score}`);
+        if (g.score !== 'Enter score') fails.push(`${tag}: score button ${g.score}`);
         if (g.windMph !== '12 g 20 mph' || g.windRot !== windRotFor(g.bearing)) fails.push(`${tag}: wind ${g.windMph} turned ${g.windRot} (expected 12 g 20 mph, ${windRotFor(g.bearing)})`);
         if (g.midLbl !== 'CENTER' || g.editPinEl) fails.push(`${tag}: Edit Pin is still on the screen: ` + JSON.stringify([g.midLbl, g.editPinEl]));
         if (cr.dump.writes.length) fails.push(`${tag}: just looking wrote ` + cr.dump.writes.map((x) => x.path).join(', '));
@@ -1573,7 +1573,7 @@ function usgsFallbackFails(tag, g, why) {
         if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
         if (f2.acc !== '±6 yds' || f2.title !== 'Hole 1 · Par ' + sb.p.caledonia.data[0].par) fails.push('free: title / accuracy ' + JSON.stringify([f2.title, f2.acc]));
-        if (f2.score !== 'Hole 1 · Enter Score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.score, f2.getPro]));
+        if (f2.score !== 'Enter score' || !f2.getPro) fails.push('free: Enter Score / Get HardPan GPS: ' + JSON.stringify([f2.score, f2.getPro]));
         if (f2.targetRow || f2.fix || f2.set || f2.wind || f2.plays) fails.push('free: a Pro feature is showing: ' + JSON.stringify({ target: f2.targetRow, fix: f2.fix, set: f2.set, wind: f2.wind, plays: f2.plays }));
         if (!f3.sheet) fails.push('free: "Get HardPan GPS" did not open the sheet');
         if (f4.gpsShown || f4.scoreInputs !== a.reads[0].scoreInputs || f4.scoreInputs < 4) fails.push('free: Bets is not the same card: ' + JSON.stringify([f4.scoreInputs, a.reads[0].scoreInputs]));

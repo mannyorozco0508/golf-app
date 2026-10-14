@@ -2344,17 +2344,92 @@
     // GPS side to keep (holes change with the arrows).
     // THE SIGNED-IN GOLFER'S SCORE on a hole: the card's own "who am I" (resolvedMeId), or the
     // only golfer of a one-golfer round. null when not entered.
-    function myScore(hole) {
+    // WHOSE SCORE THE GPS SCREEN SHOWS (Manny, 2026-10-14): the golfer this phone picked ("who are
+    // you"); else a scorekeeper's first golfer in their group; else player 1 - the organizer (Round
+    // Setup's first row, "Me" on a GPS-door round), which is also what a spectator who picked no one
+    // sees. Read only: nothing here writes.
+    // THE GOLFER THE GPS SCREEN SHOWS (Manny, 2026-10-14): picked on this phone with the name tag
+    // ("Manny ▾"), kept per round (hardpan_gps_golfer_<code>); else the golfer this phone said it
+    // is; else a scorekeeper's first golfer; else player 1 (the organizer). Viewing only - entering
+    // a score is still the card's own box for that golfer.
+    function roundData() { try { return typeof currentData !== 'undefined' ? currentData : null; } catch (e) { return null; } }   /* global currentData, resolvedMeId, lockedGroup, playerGroupOf */
+    function pickKey() { return 'hardpan_gps_golfer_' + String((S && S.eventCode) || ''); }
+    function groupOf(id) { try { var g = typeof playerGroupOf === 'function' ? playerGroupOf(id) : null; return g == null ? 1 : Number(g) || 1; } catch (e) { return 1; } }
+    function groupsOf(d) { var gs = []; (d.players || []).forEach(function (p) { var g = groupOf(p.id); if (gs.indexOf(g) === -1) gs.push(g); }); return gs.sort(function (a, b) { return a - b; }); }
+    function inGroup(d, g) { return (d.players || []).filter(function (p) { return groupOf(p.id) === g; }); }
+    function lockedG() { try { return typeof lockedGroup !== 'undefined' && lockedGroup ? Number(lockedGroup) : null; } catch (e) { return null; } }
+    function picked(d) {
+        var v = null; try { v = localStorage.getItem(pickKey()); } catch (e) { v = null; }
+        return v != null && (d.players || []).some(function (p) { return String(p.id) === String(v); }) ? v : null;
+    }
+    function scoreFor() {
         try {
-            var d = typeof currentData !== 'undefined' ? currentData : null;   /* global currentData, resolvedMeId */
-            if (!d || !d.players) return null;
-            var id = typeof resolvedMeId === 'function' ? resolvedMeId() : null;
-            if (id == null && d.players.length === 1) id = d.players[0].id;
-            if (id == null) return null;
-            var v = (d.scores || {})['p' + id + '_h' + hole];
-            return v && Number(v) > 0 ? Number(v) : null;
+            var d = roundData();
+            if (!d || !d.players || !d.players.length) return null;
+            var id = picked(d);
+            if (id == null && typeof resolvedMeId === 'function') id = resolvedMeId();
+            if (id == null && lockedG()) { var mine = inGroup(d, lockedG())[0]; if (mine) id = mine.id; }
+            if (id == null) id = d.players[0].id;
+            return { id: id, scores: d.scores || {}, player: d.players.filter(function (p) { return String(p.id) === String(id); })[0] || null };
         } catch (e) { return null; }
     }
+    function shortName(d, p) {
+        var parts = String((p && p.name) || '').trim().split(/\s+/), first = parts[0] || 'Golfer';
+        var same = (d.players || []).filter(function (q) { return q !== p && String(q.name || '').trim().split(/\s+/)[0] === first; }).length;
+        return same && parts[1] ? first + ' ' + parts[1].charAt(0) + '.' : first;
+    }
+    function setPick(id, dir) {
+        try { localStorage.setItem(pickKey(), String(id)); } catch (e) {}
+        if (dir && S) {
+            var col = S.el.querySelector('.gps-score-col');
+            if (col) { col.classList.remove('gps-slide-l', 'gps-slide-r'); void col.offsetWidth; col.classList.add(dir > 0 ? 'gps-slide-l' : 'gps-slide-r'); }
+        }
+        render();
+    }
+    // The sheet: groups (more than one), then that group's golfers. first = the "Who are you?" ask.
+    function openWho(first, group) {
+        var d = roundData(); if (!S || !d || !d.players) return;
+        var sh = S.el.querySelector('.gps-who-sheet'), list = sh.querySelector('.gps-who-list'), skip = sh.querySelector('.gps-who-skip');
+        var gs = groupsOf(d), cur = scoreFor();
+        list.textContent = '';
+        var title = first ? 'Who are you?' : 'Whose score?';
+        if (group == null && gs.length > 1 && !lockedG()) {
+            sh.querySelector('.gps-who-title').textContent = title + ' Your group:';
+            gs.forEach(function (g) { var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-who-group', g); b.textContent = 'Group ' + g; if (cur && cur.player && groupOf(cur.player.id) === g) b.className = 'on'; list.appendChild(b); });
+        } else {
+            var g0 = group != null ? group : (lockedG() || (cur && cur.player ? groupOf(cur.player.id) : gs[0]));
+            sh.querySelector('.gps-who-title').textContent = title + (gs.length > 1 ? ' Group ' + g0 : '');
+            inGroup(d, g0).forEach(function (p) { var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-who-id', p.id); b.textContent = String(p.name || 'Golfer'); if (cur && String(cur.id) === String(p.id)) b.className = 'on'; list.appendChild(b); });
+            sh.setAttribute('data-who-g', g0);
+        }
+        skip.style.display = first ? '' : 'none';
+        sh.setAttribute('data-who-first', first ? '1' : '');
+        sh.style.display = '';
+    }
+    function closeWho() { var sh = S && S.el.querySelector('.gps-who-sheet'); if (sh) sh.style.display = 'none'; }
+    function whoAsked() { try { return localStorage.getItem('hardpan_gps_whoasked_' + String(S.eventCode || '')) === '1'; } catch (e) { return true; } }
+    // FIRST OPEN, NO PICK: "Who are you?" once per round on this phone (the app; more than one golfer).
+    function maybeAskWho() {
+        var d = roundData();
+        if (!S || S.side !== 'gps' || !doorsOn() || !d || !d.players || d.players.length < 2 || whoAsked()) return;
+        if (picked(d) != null || (typeof resolvedMeId === 'function' && resolvedMeId() != null)) return;
+        try { localStorage.setItem('hardpan_gps_whoasked_' + String(S.eventCode || ''), '1'); } catch (e) {}
+        openWho(true);
+    }
+    // Swipe on the score: the next / previous golfer in the shown golfer's group.
+    function flipGolfer(dir) {
+        var d = roundData(), cur = scoreFor(); if (!d || !cur || !cur.player) return;
+        var list = inGroup(d, groupOf(cur.player.id)); if (list.length < 2) return;
+        var i = list.indexOf(cur.player), n = list[(i + dir + list.length) % list.length];
+        setPick(n.id, dir);
+    }
+    function myScore(hole) {
+        var w = scoreFor();
+        if (!w) return null;
+        var v = w.scores['p' + w.id + '_h' + hole];
+        return v && Number(v) > 0 ? Number(v) : null;
+    }
+    function readOnlyHere() { try { return !!(window.HardPanDoors && typeof window.HardPanDoors.spectating === 'function' && window.HardPanDoors.spectating()); } catch (e) { return false; } }
     function blockPull(e) {
         // A sheet over the map scrolls (the Add a game list was stuck at Skins): only the map is held still.
         var t = e && e.target;
@@ -2501,9 +2576,15 @@
         show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
         txt('.gps-green-view', S.view === 'green' ? '⛳ Hole' : '⛳ Green');
         show('.gps-zoom', S.view !== 'green');
-        // Once the signed-in golfer's score is in: "Hole 1 · 4" (Manny, 2026-10-13).
-        var mine = myScore(S.hole);
-        txt('.gps-score', 'Hole ' + S.hole + ' · ' + (mine != null ? mine : 'Enter Score'));
+        // THE SCORE BUTTON (Manny, 2026-10-14): no score yet -> "Enter score"; scored -> just the
+        // number, big. A spectator sees the number (or "No score yet") and cannot open the editor.
+        var mine = myScore(S.hole), ro = readOnlyHere();
+        txt('.gps-score', mine != null ? String(mine) : (ro ? 'No score yet' : 'Enter score'));
+        var dd = roundData(), who = scoreFor(), many = !!(dd && dd.players && dd.players.length > 1);
+        txt('.gps-who', many && who && who.player ? ((groupsOf(dd).length > 1 ? 'Group ' + groupOf(who.player.id) + ' \u00b7 ' : '') + shortName(dd, who.player) + ' \u25BE') : '');
+        show('.gps-who', many && !setting);
+        var sb = S.el.querySelector('.gps-score');
+        if (sb) { sb.classList.toggle('gps-score-num', mine != null); sb.classList.toggle('gps-score-ro', ro); }
         var scoreOn = !setting && typeof S.openScore === 'function';
         show('.gps-score', scoreOn);
         // While a green is being set its buttons take the bottom; the bottom row,
@@ -2546,6 +2627,7 @@
         placeZoom();
         placePills();
         syncWind();
+        maybeAskWho();
     }
     // ---- SHOT BY SHOT (gps-features): mark, then replay - on this phone only ------
     function shotsApi() { return window.HardPanGpsShots || null; }
@@ -2821,12 +2903,14 @@
         +   '<button type="button" class="gps-side-bets gps-float" aria-label="Scorecard"><span class="gps-ico">▤</span><span class="gps-cap">Card</span></button>'
         +   '<div class="gps-scorebox gps-float">'
         +     '<button type="button" class="gps-score-prev" aria-label="Previous hole">‹</button>'
-        +     '<button type="button" class="gps-score"></button>'
+        +     '<div class="gps-score-col"><button type="button" class="gps-who" style="display:none" aria-label="Whose score - pick a golfer"></button><button type="button" class="gps-score"></button></div>'
         +     '<button type="button" class="gps-score-next" aria-label="Next hole">›</button>'
         +   '</div>'
         +   '<button type="button" class="gps-door-add gps-float" style="display:none" aria-label="Add a game"><span class="gps-ico">\uFF0B</span><span class="gps-cap">Game</span></button>'
         +   '<button type="button" class="gps-tools gps-float" aria-label="Tools"><span class="gps-ico">⋯</span><span class="gps-cap">Tools</span></button>'
         + '</div>'
+        // WHOSE SCORE (gps-start10): pick your group (more than one), then a golfer in it.
+        + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
         // GPS-4 "Add a game" - this round's golfers, a quick start, paste, full setup.
         + '<button type="button" class="gps-door-games" style="display:none" aria-label="Games home">Games</button>'
@@ -3022,6 +3106,18 @@
         + '#gps-overlay .gps-cap{font-size:11px;font-weight:700;color:#c8d1ca;}'
         + '#gps-overlay .gps-scorebox{flex:1 1 auto;min-width:0;display:flex;overflow:hidden;background:rgba(217,249,157,.92);border-color:#d9f99d;}'
         + '#gps-overlay .gps-score{flex:1 1 auto;min-width:0;color:#0b0f0c;font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;}'
+        + '#gps-overlay .gps-score.gps-score-num{font-size:30px;line-height:1;}#gps-overlay .gps-score.gps-score-ro{cursor:default;}'
+        + '#gps-overlay .gps-score-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;touch-action:pan-y;}'
+        + '#gps-overlay .gps-score-col .gps-score{flex:1 1 auto;}'
+        + '#gps-overlay .gps-who{flex:0 0 auto;background:none;border:0;color:#0b0f0c;font-size:12px;font-weight:800;line-height:1;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;}'
+        + '#gps-overlay .gps-score-col.gps-slide-l{animation:gpsSlideL .22s ease-out;}#gps-overlay .gps-score-col.gps-slide-r{animation:gpsSlideR .22s ease-out;}'
+        + '@keyframes gpsSlideL{from{transform:translateX(40%);opacity:.2;}to{transform:none;opacity:1;}}@keyframes gpsSlideR{from{transform:translateX(-40%);opacity:.2;}to{transform:none;opacity:1;}}'
+        + '#gps-overlay .gps-who-sheet{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;}'
+        + '#gps-overlay .gps-who-card{width:100%;max-width:520px;max-height:70%;overflow:auto;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 14px);}'
+        + '#gps-overlay .gps-who-title{font-weight:800;font-size:17px;margin-bottom:10px;}'
+        + '#gps-overlay .gps-who-list button{display:block;width:100%;min-height:48px;margin:0 0 8px;border:1px solid #0f4c3a;border-radius:12px;background:#fff;color:#0f4c3a;font-weight:800;font-size:16px;text-align:left;padding:0 14px;}'
+        + '#gps-overlay .gps-who-list button.on{background:#0f4c3a;color:#fff;}'
+        + '#gps-overlay .gps-who-skip{display:block;width:100%;min-height:44px;border:0;background:none;color:#555;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-score-prev{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-right:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-score-next{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-left:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-banner{position:absolute;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(var(--gps-attrib-h) + 74px);padding:10px 14px;border-radius:999px;font-weight:800;font-size:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
@@ -3322,7 +3418,39 @@
         on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
         var wsheet = el.querySelector('.gps-wind-sheet');
         if (wsheet) { wsheet.addEventListener('click', windSheetClick); bindDial(wsheet); }
-        on(el, '.gps-score', function () { if (S && typeof S.openScore === 'function') S.openScore(S.hole); });
+        on(el, '.gps-score', function () {
+            if (!S || (S.swipedAt && Date.now() - S.swipedAt < 450)) return;
+            var w = scoreFor();
+            if (typeof S.openScore === 'function' && !readOnlyHere()) S.openScore(S.hole, w ? w.id : null);
+        });
+        on(el, '.gps-who', function () { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); });
+        var whoSheet = el.querySelector('.gps-who-sheet');
+        if (whoSheet) whoSheet.addEventListener('click', function (ev) {
+            var t = ev.target, b;
+            var sh = S && S.el.querySelector('.gps-who-sheet');
+            if (!sh) return;
+            if ((b = t.closest('[data-who-group]'))) { openWho(sh.getAttribute('data-who-first') === '1', Number(b.getAttribute('data-who-group'))); return; }
+            if ((b = t.closest('[data-who-id]'))) { closeWho(); setPick(b.getAttribute('data-who-id')); return; }
+            if (t.closest('.gps-who-skip')) {
+                var d = roundData(), g = Number(sh.getAttribute('data-who-g')) || lockedG() || (d ? groupsOf(d)[0] : 1), f = d ? inGroup(d, g)[0] : null;
+                closeWho(); if (f) setPick(f.id); return;
+            }
+            if (t === sh) closeWho();
+        });
+        // SWIPE the score left / right: the next / previous golfer (a quick slide).
+        (function () {
+            var col = el.querySelector('.gps-score-col'), x0 = null, y0 = null;
+            if (!col) return;
+            col.addEventListener('pointerdown', function (e) { x0 = e.clientX; y0 = e.clientY; });
+            col.addEventListener('pointerup', function (e) {
+                if (x0 == null) return;
+                var dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+                if (Math.abs(dx) < 40 || Math.abs(dy) > 30) return;
+                if (S) S.swipedAt = Date.now();
+                flipGolfer(dx < 0 ? 1 : -1);
+            });
+            col.addEventListener('pointercancel', function () { x0 = null; });
+        })();
         on(el, '.gps-get-pro', openSheet);
         on(el, '.gps-sheet-close', closeSheet);
         window.addEventListener('offline', onOffline);
@@ -3549,6 +3677,7 @@
         // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
         hasGpsPro: hasGpsPro,
         isMounted: function () { return !!S; },
+        hole: function () { return S ? Number(S.hole) : null; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,
         // Build 5: does hole n have a green (or tee) to measure to? The card asks
