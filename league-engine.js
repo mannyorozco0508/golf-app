@@ -91,28 +91,57 @@ function leagueEngineScores(format) { return format === 'fourball' || format ===
 // calc(sm, data) is the caller's: the same calculateMatchEngine call Side Bets makes.
 // A segment is decided once the engine closes it (won), or once every hole of it has
 // been played by both sides with the match level (halved). Otherwise null (not yet).
-// LIVE: where the 18 stands now (A up > 0) and holes played, from the same engine result.
-function leagueLive(calcOut) {
-    if (!calcOut || !Array.isArray(calcOut.activeMatches)) return null;
-    var m = calcOut.activeMatches.filter(function (x) { return x.id === '18' && !x.pressNum; })[0];
-    return m ? { status: m.status, thru: calcOut.maxThru || 0, closed: !!m.closed, result: m.finalResult || null } : null;
-}
-function leagueSegments(calcOut, holes, scores, aIds, bIds) {
-    var out = { front: null, back: null, total: null };
-    if (!calcOut || !Array.isArray(calcOut.activeMatches)) return out;
-    var played = function (h) {
-        var has = function (ids) { return ids.some(function (id) { var v = scores && scores['p' + id + '_h' + h]; return v && Number(v) > 0; }); };
-        return has(aIds) && has(bIds);
-    };
-    LEAGUE_SEGS.forEach(function (seg) {
-        var m = calcOut.activeMatches.filter(function (x) { return x.id === LEAGUE_ENGINE_IDS[seg] && !x.pressNum; })[0];
-        if (!m) return;
-        if (m.closed) { out[seg] = m.status > 0 ? 'A' : 'B'; return; }
-        var range = (holes || []).filter(function (h) { var n = Number(h.hole); return n >= m.startHole && n <= m.endHole; });
-        if (range.length && range.every(function (h) { return played(h.hole); })) out[seg] = m.status > 0 ? 'A' : m.status < 0 ? 'B' : 'H';
+// HOLE BY HOLE, IN ANY ORDER (gps-points-start10, 2026-10-13). A group that starts on the 10th
+// plays 10-18 then 1-9; the engine's own close-out counts the holes still to play in the order
+// it is handed them, and on a start-on-10 card it can close the 18 (and presses) before holes
+// 1-9 are played. The Points game does not use the engine's close-out at all: it takes the
+// engine's hole-by-hole winners (holeLog - who won each hole, net as set up) and decides each
+// segment itself: won once the lead is bigger than the segment's holes NOT YET PLAYED - by
+// anyone's count, whatever order they are played in - halved once all are played level.
+// Every league match is scored over the whole card (start = hole 1). The money engines are
+// untouched: this only reads.
+function leagueHoleDiffs(calcOut) {
+    var out = {}, log = (calcOut && calcOut.holeLog) || {};
+    Object.keys(log).forEach(function (h) {
+        var w = log[h] && log[h].holeWinner;
+        if (w == null) return;
+        out[String(h)] = w === calcOut.t1Name ? 1 : w === calcOut.t2Name ? -1 : 0;
     });
     return out;
 }
+var LEAGUE_RANGE = { front: [1, 9], back: [10, 18], total: [1, 18] };
+function leagueSegState(calcOut, holes, seg) {
+    var diffs = leagueHoleDiffs(calcOut), r = LEAGUE_RANGE[seg];
+    // The segment's holes on THIS card (a nine-hole card has only its own nine).
+    var mine = (holes || []).map(function (h) { return Number(h.hole); }).filter(function (n) { return n >= r[0] && n <= r[1]; });
+    if (!mine.length) return null;
+    var status = 0, played = 0;
+    mine.forEach(function (n) { var d = diffs[String(n)]; if (d === undefined) return; played++; status += d; });
+    var left = mine.length - played;
+    var decided = played > 0 && (left === 0 || Math.abs(status) > left);
+    return { status: status, played: played, left: left, decided: decided };
+}
+// LIVE: where the 18 stands now (A up > 0), holes played, and the result once decided.
+function leagueLive(calcOut, holes) {
+    if (!calcOut) return null;
+    var t = leagueSegState(calcOut, holes || [], 'total');
+    if (!t) return null;
+    return { status: t.status, thru: t.played, closed: t.decided,
+        result: !t.decided ? null : t.left === 0 ? (t.status === 0 ? 'halved' : Math.abs(t.status) + ' up') : Math.abs(t.status) + '&' + t.left };
+}
+function leagueSegments(calcOut, holes, scores, aIds, bIds) {
+    var out = { front: null, back: null, total: null };
+    if (!calcOut) return out;
+    LEAGUE_SEGS.forEach(function (seg) {
+        var st = leagueSegState(calcOut, holes, seg);
+        if (st && st.decided) out[seg] = st.status > 0 ? 'A' : st.status < 0 ? 'B' : 'H';
+    });
+    return out;
+}
+// The whole card, in hole order, for every league match (start = hole 1).
+function leagueWholeCard(sm) { return Object.assign({}, sm, { startHole: 1 }); }
+function leagueCardHoles(data) { return ((data && data.courseData) || []).slice().sort(function (a, b) { return Number(a.hole) - Number(b.hole); }); }
+
 function leagueRoundMatches(round, calc, holesFor, rc, ryder) {
     rc = rc || leagueRoundCfg();
     var data = (round && round.data) || {};
@@ -124,7 +153,7 @@ function leagueRoundMatches(round, calc, holesFor, rc, ryder) {
         if (rc.mode === 'nassau' && leagueEngineScores(c.format) && calc && c.aIds && c.bIds) {
             var sm = { format: 'nassau', teamAIds: c.aIds, teamBIds: c.bIds, scoring: c.scoring || 'net', startHole: 1 };
             var res = null; try { res = calc(sm, data); } catch (e) { res = null; }
-            var sg = leagueSegments(res, holesFor ? holesFor(sm, data) : (data.courseData || []), data.scores || {}, c.aIds, c.bIds);
+            var sg = leagueSegments(res, leagueCardHoles(data), data.scores || {}, c.aIds, c.bIds);
             seg.front = sg.front; seg.back = sg.back;
         }
         return { id: round.code + '~cup' + (c.id || i), round: round.code, label: round.label || round.code, group: null, a: c.a, b: c.b, seg: seg, source: 'cup', format: c.format };
@@ -142,11 +171,11 @@ function leagueRoundMatches(round, calc, holesFor, rc, ryder) {
         if (a.concat(b).some(function (n) { return !n; })) return;
         var seg = { front: null, back: null, total: null }, live = null;
         if (leagueEngineScores(rc.format)) {
-            var res = null;
-            try { res = calc ? calc(sm, data) : null; } catch (e) { res = null; }
-            var holes = holesFor ? holesFor(sm, data) : (data.courseData || []);
+            var whole = leagueWholeCard(sm), res = null;
+            try { res = calc ? calc(whole, data) : null; } catch (e) { res = null; }
+            var holes = leagueCardHoles(data);
             seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
-            live = leagueLive(res);
+            live = leagueLive(res, holes);
         }
         out.push({ id: round.code + '~' + smId, live: live, round: round.code, label: round.label || round.code, group: sm.ownerGroup || null,
             a: a, b: b, seg: seg, source: 'nassau' });
@@ -176,11 +205,11 @@ function leagueSameTeamMatches(round, cfg, calc, holesFor, rc) {
         var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
         var seg = { front: null, back: null, total: null }, live = null;
         if (leagueEngineScores(rc.format)) {
-            var res = null;
-            try { res = calc ? calc(sm, data) : null; } catch (e) { res = null; }
-            var holes = holesFor ? holesFor(sm, data) : (data.courseData || []);
+            var whole = leagueWholeCard(sm), res = null;
+            try { res = calc ? calc(whole, data) : null; } catch (e) { res = null; }
+            var holes = leagueCardHoles(data);
             seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
-            live = leagueLive(res);
+            live = leagueLive(res, holes);
         }
         out.push({ id: round.code + '~team' + i, live: live, round: round.code, label: round.label || round.code, group: null,
             a: t.a.slice(), b: t.b.slice(), seg: seg, source: 'team' });
@@ -222,9 +251,9 @@ function leaguePairingMatches(round, cfg, calc, holesFor, rc, dayRounds) {
         var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
         var res = null;
         try { res = calc ? calc(sm, vdata) : null; } catch (e) { res = null; }
-        var holes = holesFor ? holesFor(sm, vdata) : (vdata.courseData || []);
+        var holes = leagueCardHoles(vdata);
         out.push({ id: round.code + '~pair' + i, round: round.code, label: round.label || round.code, group: null, a: t.a.slice(), b: t.b.slice(),
-            seg: leagueSegments(res, holes, vScores, aIds, bIds), live: leagueLive(res), source: 'pairing' });
+            seg: leagueSegments(res, holes, vScores, aIds, bIds), live: leagueLive(res, holes), source: 'pairing' });
     });
     return out;
 }
@@ -423,6 +452,6 @@ if (typeof window !== 'undefined') {
         standings: leagueStandings, payouts: leaguePayouts, players: leaguePlayers, state: leagueState, key: leagueKey, DEFAULTS: LEAGUE_DEFAULTS };
 }
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
+    module.exports = { leagueSegState: leagueSegState, leagueHoleDiffs: leagueHoleDiffs, leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
         leagueStandings: leagueStandings, leaguePayouts: leaguePayouts, leaguePlayers: leaguePlayers, leagueState: leagueState, leagueKey: leagueKey, LEAGUE_DEFAULTS: LEAGUE_DEFAULTS };
 }
