@@ -9,7 +9,8 @@
 //      tap 2 "Shot: N yds" and that spot is the new start; nothing saved.
 //   2  The yardage box: BACK on top, FRONT under it.
 //   3  The bottom bar: "‹" before "Hole N · …"; once his score is in, "Hole 1 · 4".
-//   4  Zoom on the LEFT edge, half way down.
+//   4  Zoom on the RIGHT edge, half way down (right thumb), never over wind / Green / Mark shot
+//      (also on a short phone).
 //   5  GPS from Games goes back to the round in progress (GPS side); the course picker only
 //      without one, or from Tools › "Pick another course" (home.html#pick).
 //   6  The Add a game sheet scrolls over the GPS screen (the map's own touch hold lets it).
@@ -50,7 +51,7 @@ const GPSREAD = "JSON.stringify({ mark: (document.querySelector('#gps-overlay .g
     // 1-4, 6: the GPS screen.
     let r = await go({ url: fileUrl('index.html', 'game=UIRND1&gpstier=pro'), db: DB({ UIRND1: one }), webgl: true, settleMs: 5000, preScript: IDX, steps: [
         { sleep: 2500 },
-        { expression: "JSON.stringify({ side: window.HardPanGps && HardPanGps.side(), bTop: (document.querySelector('#gps-overlay .gps-num-b')||{getBoundingClientRect:function(){return{}}}).getBoundingClientRect().top, fTop: (document.querySelector('#gps-overlay .gps-num-f')||{getBoundingClientRect:function(){return{}}}).getBoundingClientRect().top, order: Array.prototype.map.call(document.querySelectorAll('#gps-overlay .gps-fb .gps-lbl'), function(x){ return x.textContent; }).join(''), zoom: (function(){ var z = document.querySelector('#gps-overlay .gps-zoom'); if (!z) return null; var b = z.getBoundingClientRect(); return { l: b.left, mid: b.top + b.height / 2, vh: innerHeight, shown: getComputedStyle(z).display !== 'none' }; })(), prev: !!document.querySelector('#gps-overlay .gps-scorebox .gps-score-prev'), pick: (document.querySelector('#gps-overlay .gps-pick-course')||{style:{}}).style.display, e: window.__e })" },
+        { expression: "JSON.stringify({ side: window.HardPanGps && HardPanGps.side(), bTop: (document.querySelector('#gps-overlay .gps-num-b')||{getBoundingClientRect:function(){return{}}}).getBoundingClientRect().top, fTop: (document.querySelector('#gps-overlay .gps-num-f')||{getBoundingClientRect:function(){return{}}}).getBoundingClientRect().top, order: Array.prototype.map.call(document.querySelectorAll('#gps-overlay .gps-fb .gps-lbl'), function(x){ return x.textContent; }).join(''), zoom: (function(){ var z = document.querySelector('#gps-overlay .gps-zoom'); if (!z) return null; var b = z.getBoundingClientRect(); var hits = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-right > *'), function (c) { if (c.offsetParent === null) return false; var r = c.getBoundingClientRect(); return r.height && !(r.bottom <= b.top || r.top >= b.bottom || r.right <= b.left || r.left >= b.right); }).map(function (c) { return c.className; }); return { r: innerWidth - b.right, mid: b.top + b.height / 2, vh: innerHeight, shown: getComputedStyle(z).display !== 'none', overlaps: hits, stack: Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-right > *'), function (c) { return c.offsetParent !== null; }).map(function (c) { return c.className.split(' ')[0]; }) }; })(), prev: !!document.querySelector('#gps-overlay .gps-scorebox .gps-score-prev'), pick: (document.querySelector('#gps-overlay .gps-pick-course')||{style:{}}).style.display, e: window.__e })" },
         { expression: GPSREAD },
         { tap: '#gps-overlay .gps-mark-shot' }, { sleep: 300 }, { expression: GPSREAD },                                     // tap 1: 0 yds
         { expression: "(function(){ __walk(33.451284, -79.153438); return 'walked ~109 yds'; })()" }, { sleep: 400 }, { expression: GPSREAD },   // live
@@ -65,7 +66,13 @@ const GPSREAD = "JSON.stringify({ mark: (document.querySelector('#gps-overlay .g
     report.gps = { layout: g[0], start: g[1].mark, tap1: g[2].mark, walked: g[3].mark, tap2: [g[4].mark, g[4].msg], after: g[5].mark, scoreBefore: g[1].score, prev: g[6].score, next: g[7].score, sheet: g[8] };
     f(g[0].side === 'gps', '0: did not land on GPS: ' + JSON.stringify(g[0]));
     f(g[0].order === 'BF' && g[0].bTop < g[0].fTop, '2: the yardage box is not BACK over FRONT: ' + JSON.stringify([g[0].order, g[0].bTop, g[0].fTop]));
-    f(g[0].zoom && g[0].zoom.shown && g[0].zoom.l < 20 && Math.abs(g[0].zoom.mid - g[0].zoom.vh / 2) < 30, '4: zoom is not on the left edge half way down: ' + JSON.stringify(g[0].zoom));
+    f(g[0].zoom && g[0].zoom.shown && g[0].zoom.r < 20 && Math.abs(g[0].zoom.mid - g[0].zoom.vh / 2) < 30 && !g[0].zoom.overlaps.length, '4: zoom is not on the RIGHT edge half way down, clear of the right-hand stack: ' + JSON.stringify(g[0].zoom));
+    // A short phone (375 x 667): still on the right edge, never on top of wind / Green / Mark shot.
+    const small = await go({ url: fileUrl('index.html', 'game=UIRND1&gpstier=pro'), db: DB({ UIRND1: one }), webgl: true, settleMs: 5000, viewport: { width: 375, height: 667 }, preScript: IDX, steps: [{ sleep: 2500 },
+        { expression: "JSON.stringify({ " + "zoom: (function(){ var z = document.querySelector('#gps-overlay .gps-zoom'); if (!z) return null; var b = z.getBoundingClientRect(); var hits = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-right > *'), function (c) { if (c.offsetParent === null) return false; var r = c.getBoundingClientRect(); return r.height && !(r.bottom <= b.top || r.top >= b.bottom || r.right <= b.left || r.left >= b.right); }).map(function (c) { return c.className; }); return { r: innerWidth - b.right, mid: b.top + b.height / 2, vh: innerHeight, shown: getComputedStyle(z).display !== 'none', overlaps: hits, stack: Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-right > *'), function (c) { return c.offsetParent !== null; }).map(function (c) { return c.className.split(' ')[0]; }) }; })()" + " })" }] });
+    const gz = J(small)[0];
+    report.zoomSmall = gz.zoom;
+    f(gz.zoom && gz.zoom.shown && gz.zoom.r < 20 && !gz.zoom.overlaps.length && gz.zoom.stack.indexOf('gps-mark-shot') !== -1, '4: on a short phone the zoom overlaps the right-hand stack: ' + JSON.stringify(gz.zoom));
     f(g[0].prev && g[0].pick === '', '3/5: no "‹" in the score bar, or no "Pick another course" in Tools: ' + JSON.stringify([g[0].prev, g[0].pick]));
     f(g[1].markOn && /Mark shot/.test(g[1].mark), '1: Mark shot is not on the GPS screen: ' + JSON.stringify(g[1]));
     f(/^📍 0 yds$/.test(g[2].mark), '1: tap 1 is not "0 yds": ' + g[2].mark);

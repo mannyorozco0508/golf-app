@@ -2373,6 +2373,18 @@
         try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
     }
 
+    // ZOOM, HALF WAY DOWN THE RIGHT EDGE - unless the right-hand stack (wind, Green, Mark shot)
+    // reaches that far (a short phone): then just under it, never on top of it.
+    function placeZoom() {
+        var z = S && S.el && S.el.querySelector('.gps-zoom');
+        var stack = S && S.el && S.el.querySelector('.gps-right');
+        if (!z || !stack || typeof z.getBoundingClientRect !== 'function') return;
+        var h = z.offsetHeight || 44, vh = window.innerHeight || 0, top = vh / 2 - h / 2, low = 0;
+        Array.prototype.forEach.call(stack.children, function (c) { if (c.offsetParent !== null) { var b = c.getBoundingClientRect(); if (b.height) low = Math.max(low, b.bottom); } });
+        if (low && top < low + 8) top = low + 8;
+        var want = Math.round(top) + 'px';
+        if (z.style.top !== want || z.style.transform !== 'none') { z.style.top = want; z.style.transform = 'none'; }
+    }
     function render() {
         if (!S || !G) return;
         var u = units();
@@ -2508,6 +2520,7 @@
         drawHoleAsk();
         drawHazards();
         drawShots();
+        placeZoom();
         placePills();
         syncWind();
     }
@@ -2763,8 +2776,9 @@
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
         + '</div>'
-        // ZOOM: the LEFT edge, half way down the screen, always there (Manny, 2026-10-13).
-        + '<button type="button" class="gps-zoom gps-zoom-left gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
+        // ZOOM: the RIGHT edge, half way down the screen, for the right thumb (Manny, 2026-10-13);
+        // placeZoom keeps it clear of the right-hand stack (wind, Green, Mark shot).
+        + '<button type="button" class="gps-zoom gps-zoom-side gps-float" data-zoom="1x" aria-pressed="false" aria-label="Zoom in 2x around the target">' + MAG_SVG + '</button>'
         // RIGHT SIDE STACK: wind, the green view.
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
@@ -2918,7 +2932,7 @@
         + '#gps-overlay .gps-verify{font-size:13px;line-height:1.35;color:#f4f4ef;padding:6px 10px;border-left:3px solid #fb923c;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}'
         + '#gps-overlay .gps-verify.gps-open{white-space:normal;}'
         // RIGHT SIDE STACK
-        + '#gps-overlay .gps-zoom-left{position:absolute;z-index:5;left:8px;top:50%;transform:translateY(-50%);}'
+        + '#gps-overlay .gps-zoom-side{position:absolute;z-index:5;right:8px;top:50%;transform:translateY(-50%);}'
         + '#gps-overlay .gps-right{position:absolute;z-index:5;right:8px;top:var(--gps-top-b);display:flex;flex-direction:column;align-items:flex-end;gap:8px;}'
         + '#gps-overlay .gps-right > *{min-width:56px;min-height:44px;box-sizing:border-box;font-weight:800;font-size:14px;padding:6px 9px;display:flex;align-items:center;justify-content:center;gap:4px;}'
         + '#gps-overlay .gps-wind{font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
