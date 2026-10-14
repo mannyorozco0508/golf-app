@@ -2722,9 +2722,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // is no second source of truth and nothing to reconcile.
             currentData = incoming || {};
             // GPS:BEGIN
-            // GONE FROM THE SERVER (gps-trapfix): online, and the server has no such round - say so
-            // over everything, with "Exit this round" (the phone's own copy is never a way back in).
-            if (!incoming && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
+            // GONE FROM THE SERVER (gps-trapfix): online, the server has no such round, and this phone
+            // had it (it keeps a copy of what the server last sent) - say so over everything, with "Exit this
+            // round". A round not saved yet (a player arriving early) is left to the card's own words.
+            if (!incoming && window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, currentMode) && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
             hpCheckGroupKey();
             if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hasGroupLock && hpKeyState === 'bad');
             // GPS:END
@@ -9149,18 +9150,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         p.then(function () {
             if (op && q && store) { try { q.confirm(store, op.id); } catch (e) {} }
             renderOfflineBadge();
-        }, function (err) {
-            // GPS:BEGIN
-            // REFUSED, NOT AN OUTAGE (gps-trapfix): never retried - the op leaves the queue now -
-            // and the golfer is told plainly, with "Exit this round".
-            if (op && q && store && typeof q.isPermanent === 'function' && q.isPermanent(err)) {
-                try { q.confirm(store, op.id); } catch (e) {}
-                lastDrop += 1;
-                if (window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'refused');
-            }
-            // GPS:END
+        }, function () { renderOfflineBadge(); });
+        // GPS:BEGIN
+        // REFUSED, NOT AN OUTAGE (gps-trapfix): never retried - the op leaves the queue now -
+        // and the golfer is told plainly, with "Exit this round".
+        p.catch(function (err) {
+            if (!(op && q && store && typeof q.isPermanent === 'function' && q.isPermanent(err))) return;
+            try { q.confirm(store, op.id); } catch (e) {}
+            lastDrop += 1;
             renderOfflineBadge();
+            if (window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'refused');
         });
+        // GPS:END
         renderOfflineBadge();
         // ARMED HERE, not at arrival: there is now something to retry.
         ensureRetryTimer();
