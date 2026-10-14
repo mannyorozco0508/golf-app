@@ -155,6 +155,16 @@ function firebaseStub(dbJson, auth) {
           for (var i = 0; i < parts.length && node != null; i++) node = node[parts[i]];
           return node === undefined ? null : node;
         }
+        // window.__coldRefuse (2026-10-14) IS WHAT THE SERVER DOES WHEN THE RULES SAY NO:
+        // a regex source (or true for every path); a matching write REJECTS at once with
+        // the measured PERMISSION_DENIED shape and lands nothing. Opt-in, off by default.
+        function refused(op, v) {
+          var rx = window.__coldRefuse, p = parts.join('/');
+          if (!rx || (rx !== true && !new RegExp(rx).test(p))) return null;
+          window.__coldWrites.push({ op: op, path: p, value: v, refused: true });
+          var e = new Error('PERMISSION_DENIED: Permission denied'); e.code = 'PERMISSION_DENIED';
+          return Promise.reject(e);
+        }
         var api = {
           key: 'STUB',
           on: function (ev, cb) {
@@ -194,9 +204,11 @@ function firebaseStub(dbJson, auth) {
           //
           // Opt-in and off by default, so every existing check is untouched.
           set: function (v) {
+            var rf = refused('set', v); if (rf) return rf;
             if (window.__coldOffline) { window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v, offline: true }); return new Promise(function () {}); }
             window.__coldWrites.push({ op: 'set', path: parts.join('/'), value: v }); applyWrite(parts, v, true); return Promise.resolve(); },
           update: function (v) {
+            var rf = refused('update', v); if (rf) return rf;
             if (window.__coldOffline) { window.__coldWrites.push({ op: 'update', path: parts.join('/'), value: v, offline: true }); return new Promise(function () {}); }
             window.__coldWrites.push({ op: 'update', path: parts.join('/'), value: v });
             // A ROOT update() IS A MULTI-PATH WRITE: its keys are paths, which is
@@ -207,6 +219,7 @@ function firebaseStub(dbJson, auth) {
             return Promise.resolve();
           },
           remove: function () {
+            var rf = refused('remove', null); if (rf) return rf;
             if (window.__coldOffline) { window.__coldWrites.push({ op: 'remove', path: parts.join('/'), offline: true }); return new Promise(function () {}); }
             window.__coldWrites.push({ op: 'remove', path: parts.join('/') }); applyWrite(parts, null, true); return Promise.resolve(); },
           push: function () { return api; }
