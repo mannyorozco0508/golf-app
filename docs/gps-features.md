@@ -317,3 +317,13 @@ Rules that would need ADDING (additive; nothing existing changes):
   each round's scores; each match shows "Manny & JP 2 UP thru 7". Each round gets events/<round>/
   pointsGameRef ({ trip } / { round }), so its scorecard and Action show "🏅 Points game" with that round's
   matches, live, and "Standings ›".
+  START ON THE 10th (2026-10-13): every Points game match is handed the whole card (start = hole 1) and
+  decided by the Points game from the engine's hole-by-hole winners (holeLog), in any order: won once the lead
+  is bigger than the segment's unplayed holes, halved once all are played level. The engine's own close-out
+  (which, on a start-on-10 card or a bet "from hole 10", can drop holes 1-9) is not used. Money engines untouched.
+  ROUND-ROBIN BEST BALL (2026-10-13; the default when the league's pairs are an odd number - 10 golfers = 5
+  pairs): per round the pairs (👥 Pairs & round-robin: "Make pairs" - the circle method, every golfer partners
+  every other once over n-1 days - or tap two, + Add this pair); every pair plays an 18-hole best-ball match
+  against every other pair, from the golfers' own hole scores, whatever groups; points a match win 1 / halve ½
+  (or front / back / 18), each golfer his pair's points; each pair's record live ("Manny & JP: 3-1, 3 pts"),
+  also on the round's scorecard card. "Two 2v2 + singles" stays an option. Stored at <game>/pairs/<round>, rrPts.

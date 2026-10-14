@@ -15,6 +15,8 @@
 //   D  Results (settlement.html) of a round with a Points game: "who gets paid", its own card.
 //   F  League pairings (6 of 8 -> the default): Make pairings = a 2 v 2 + singles; pointers in the
 //      rounds; LIVE: a score written while the page is open moves the matches (no reload).
+//   H  Round-robin best ball (3 pairs -> the default): Make pairs, every pair v every pair, the pairs'
+//      records live, the scorecard card.
 //   G  The round's own "Points game" card on the scorecard and on Action, live.
 //   E  Every <old tree> (build 12, the web app) opens a round carrying a Points game: 0 errors.
 // The rounds' own data is never written (only the pointsGame / league node).
@@ -120,14 +122,15 @@ const TYPE = (sel, v) => ({ expression: "(function(){ var s = document.querySele
     const partial = (d) => { const r3 = round('PGRD03'); Object.keys(r3.scores).forEach((k) => { if (Number(/_h(\d+)$/.exec(k)[1]) > 7) delete r3.scores[k]; }); r3.sideMatches = {}; d.events.PGRD03 = r3; d.trips.TRPG01.rounds.PGRD03 = { label: 'Day 3', addedAt: 3, date: '2026-10-15' }; };
     r = await go({ url: fileUrl('points.html', 'game=PGRD01&setup=1'), db: DB(partial), preScript: ERR + "try{localStorage.setItem('lastTripCode','TRPG01')}catch(e){}", steps: [
         { sleep: 1500 }, TAP('#league-card [data-lg-rm="several"]'),
-        { expression: "(function(){ " + JSON.stringify(SIX) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'six'; })()" }, { sleep: 200 }, { expression: READ },
+        { expression: "(function(){ " + JSON.stringify(SIX) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'six'; })()" }, { sleep: 200 },
+        TAP('#league-card [data-lg-tm="league"]'), { sleep: 200 }, { expression: READ },   // "Two 2v2 + singles" (3 pairs would default to round-robin)
         TAP('#league-card [data-lg="save"]'), { sleep: 1500 }, TAP('#league-card [data-lg="pairings"]'), { sleep: 300 }, { expression: READ },
         TAP('#league-card [data-lg-pr="PGRD03"]'), { sleep: 200 }, TAP('#league-card [data-lg="autopair"]'), { sleep: 1500 }, { expression: READ },
         // LIVE: Manny makes a score on the 8th while the page is open.
         { deliver: { path: 'events/PGRD03/scores', value: THRU8 } }, { sleep: 1500 }, { expression: READ }] });
     const fl = J(r);
     report.F = { teams: (fl[0].card.match(/2\. Teams[\s\S]{0,160}/) || [''])[0], pairings: fl[2].card.slice(0, 600), live: fl[3].card.slice(0, 600), writes: fl[3].writes.map((w) => w.op + ' ' + w.path) };
-    f(/League pairings/.test(fl[0].card) && /The game’s own matches, set round by round from the league golfers only/.test(fl[0].card), 'F: league pairings is not the default for 6 of 8: ' + fl[0].card.slice(0, 600));
+    f(/Two 2v2 \+ singles/.test(fl[0].card) && /The game’s own matches, set round by round from the league golfers only/.test(fl[0].card), 'F: "Two 2v2 + singles" (league pairings) not chosen: ' + fl[0].card.slice(0, 600));
     const wsave = fl[3].writes.find((w) => w.path === 'trips/TRPG01/league');
     f(wsave && wsave.value.teamsMode === 'league', 'F: setup did not save teamsMode league: ' + JSON.stringify(wsave && wsave.value));
     f(/Pairings/.test(fl[1].card) && /Make pairings/.test(fl[1].card), 'F: the Pairings screen: ' + fl[1].card.slice(0, 400));
@@ -159,6 +162,35 @@ const TYPE = (sel, v) => ({ expression: "(function(){ var s = document.querySele
     r = await go({ url: fileUrl('index.html', 'game=PGRD02&group=1'), db: DB(), preScript: ERR + "window.__hardpanDoors = true;", settleMs: 4000, steps: [{ sleep: 1000 }, { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" }] });
     const g0 = J(r)[0];
     f(!g0.card && !g0.e.length, 'G: a round with no Points game shows a card / errors: ' + JSON.stringify(g0));
+
+    // H: ROUND-ROBIN BEST BALL (an odd number of pairs -> the default): 6 golfers = 3 pairs; Make pairs;
+    // every pair v every pair; each pair's record, live; the scorecard card shows the records.
+    const FULL3 = round('PGRD03').scores;
+    r = await go({ url: fileUrl('points.html', 'game=PGRD01&setup=1'), db: DB(partial), preScript: ERR + "try{localStorage.setItem('lastTripCode','TRPG01')}catch(e){}", steps: [
+        { sleep: 1500 }, TAP('#league-card [data-lg-rm="several"]'),
+        { expression: "(function(){ " + JSON.stringify(SIX) + ".forEach(function(n){ var c = document.querySelector('#league-card [data-lg-pl=\"' + n + '\"]'); if (c) c.click(); }); return 'six'; })()" }, { sleep: 200 }, { expression: READ },
+        TAP('#league-card [data-lg="save"]'), { sleep: 1500 }, TAP('#league-card [data-lg="pairings"]'), { sleep: 300 },
+        TAP('#league-card [data-lg-pr="PGRD03"]'), { sleep: 200 }, TAP('#league-card [data-lg="autopairs"]'), { sleep: 1500 }, { expression: READ },
+        { deliver: { path: 'events/PGRD03/scores', value: FULL3 } }, { sleep: 1500 }, { expression: READ }] });
+    const hr = J(r);
+    report.H = { teams: (hr[0].card.match(/2\. Teams[\s\S]{0,260}/) || [''])[0], records: (hr[1].card.match(/Pairs & round-robin[\s\S]{0,700}/) || [''])[0], after: (hr[2].card.match(/Day 3 · 3 pairs[\s\S]{0,400}/) || [''])[0] };
+    f(/Round-robin best ball/.test(hr[0].card) && /Every pair plays an 18-hole best-ball match against EVERY other pair/.test(hr[0].card), 'H: round-robin is not the default for 3 pairs: ' + hr[0].card.slice(0, 700));
+    const hsave = hr[2].writes.find((w) => w.path === 'trips/TRPG01/league');
+    f(hsave && hsave.value.teamsMode === 'rr' && hsave.value.rrPts && hsave.value.rrPts.win === 1 && hsave.value.rrPts.halve === 0.5, 'H: setup did not save round-robin (win 1 / halve ½): ' + JSON.stringify(hsave && hsave.value));
+    const hp = hr[2].writes.find((w) => w.path === 'trips/TRPG01/league/pairs/PGRD03');
+    f(hp && hp.value.length === 3 && new Set(hp.value.flat()).size === 6, 'H: Make pairs: ' + JSON.stringify(hp && hp.value));
+    f(/0-0, 0 pts \(2 playing\)/.test(hr[1].card) && /The 3 matches/.test(hr[1].card), 'H: records while playing (thru 7): ' + hr[1].card.slice(0, 900));
+    const recs3 = ((hr[2].card.match(/Day 3 · 3 pairs([\s\S]*?)The 3 matches/) || [])[1] || '').match(/: \d+-\d+(?:-\d+)?, [\d.]+ pts/g) || [];
+    const ptsSum = recs3.reduce((a, x) => a + Number(/, ([\d.]+) pts/.exec(x)[1]), 0);
+    f(recs3.length === 3 && !/playing\)/.test(hr[2].card.split('The 3 matches')[0]) && ptsSum === 3 && /: 2-0, 2 pts/.test(hr[2].card), 'H: LIVE - full scores did not finish the records (3 matches = 3 points): ' + JSON.stringify(recs3));
+    f(!hr[2].e.length, 'H: errors ' + hr[2].e.join(' | '));
+    const rrDb = DB((d) => { partial(d); d.events.PGRD03.pointsGameRef = { trip: 'TRPG01' }; d.events.PGRD03.scores = FULL3;
+        d.trips.TRPG01.league = { on: true, players: SIX, teamsMode: 'rr', pairs: { PGRD03: [['Manny Orozco', 'Joe Russo'], ['Mike Dunn', 'Tom Hale'], ['Steve Cole', 'Paul Webb']] } }; });
+    r = await go({ url: fileUrl('index.html', 'game=PGRD03&group=1'), db: rrDb, preScript: ERR + "window.__hardpanDoors = true;", settleMs: 5000, steps: [{ sleep: 1500 }, { expression: "JSON.stringify({ card: (document.getElementById('pg-round-mount')||{}).innerText || '', e: window.__e })" }] });
+    const hc = J(r)[0];
+    report.Hcard = hc.card;
+    // Best balls: Manny 3 & Joe 4 = 3; Mike 4 & Tom 3 = 3; Steve 4 & Paul 5 = 4 -> M&J v M&T halved; both beat S&P.
+    f(/round-robin/.test(hc.card) && /Manny Orozco & Joe Russo: 1-0-1, 1\.5 pts/.test(hc.card) && /Mike Dunn & Tom Hale: 1-0-1, 1\.5 pts/.test(hc.card) && /Steve Cole & Paul Webb: 0-2, 0 pts/.test(hc.card) && !hc.e.length, 'H: the scorecard round-robin card: ' + JSON.stringify(hc));
 
     // E: older apps open a round carrying a Points game.
     for (const tree of process.argv.slice(2).map((t) => path.resolve(t))) {

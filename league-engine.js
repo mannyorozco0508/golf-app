@@ -55,7 +55,14 @@ function leagueConfig(trip) {
         overrides: l.overrides || {},
         manual: l.manual || {},
         rounds: Array.isArray(l.rounds) && l.rounds.length ? l.rounds.map(String) : null,
-        teamsMode: l.teamsMode === 'same' ? 'same' : l.teamsMode === 'league' ? 'league' : 'change',
+        teamsMode: l.teamsMode === 'same' ? 'same' : l.teamsMode === 'league' ? 'league' : l.teamsMode === 'rr' ? 'rr' : 'change',
+        // ROUND-ROBIN BEST BALL (Manny, 2026-10-13: 10 golfers = 5 pairs): per round the pairs
+        // ({ <round>: [[n, n], ...] }); every pair plays an 18-hole best-ball match against every
+        // other pair. rrPts: { mode: 'match' (win / halve, default 1 / ½) | 'nassau' (front / back / 18) }.
+        pairs: Object.keys(l.pairs || {}).reduce(function (o, k) { var v = l.pairs[k]; v = Array.isArray(v) ? v : Object.keys(v || {}).map(function (x) { return v[x]; });
+            o[k] = v.filter(function (pr) { return Array.isArray(pr) && pr.length === 2 && pr[0] && pr[1]; }).map(function (pr) { return [String(pr[0]), String(pr[1])]; }); return o; }, {}),
+        rrPts: (function (r) { r = r || {}; return { mode: r.mode === 'nassau' ? 'nassau' : 'match', win: num(r.win, 1), halve: num(r.halve, 0.5),
+            pts: { front: num((r.pts || {}).front, 1), back: num((r.pts || {}).back, 1), total: num((r.pts || {}).total, 1) } }; })(l.rrPts),
         // LEAGUE PAIRINGS (Manny, 2026-10-13): per round, the game's own matches from the league
         // golfers only - { <round>: [{ a: [names], b: [names] }] }, 2 v 2 or 1 v 1 - whatever
         // groups they are in. Scored from each golfer's own hole scores.
@@ -258,6 +265,48 @@ function leaguePairingMatches(round, cfg, calc, holesFor, rc, dayRounds) {
     return out;
 }
 
+// ROUND-ROBIN: every pair of the round against every other pair - each an 18-hole best-ball
+// match from the golfers' own hole scores, scored like a league pairing (the whole card, order-free).
+function leagueRoundRobinMatches(round, cfg, calc, holesFor, rc, dayRounds) {
+    var prs = (cfg.pairs || {})[round.code] || [];
+    if (prs.length < 2) return [];
+    var list = [], ids = [];
+    for (var i = 0; i < prs.length; i++) for (var j = i + 1; j < prs.length; j++) { list.push({ a: prs[i], b: prs[j] }); ids.push(i + 'v' + j); }
+    var shadow = { pairings: {} }; shadow.pairings[round.code] = list; shadow.scoring = cfg.scoring;
+    return leaguePairingMatches(round, shadow, calc, holesFor, rc, dayRounds).map(function (m, k) {
+        m.id = round.code + '~rr' + ids[k]; m.source = 'rr'; return m;
+    });
+}
+// A PAIR'S RECORD in a round: "Manny & JP: 3-1, 3 pts".
+function leagueRoundRobinRecords(matches, cfg, roundCode) {
+    var prs = (cfg.pairs || {})[roundCode] || [], out = prs.map(function (pr) { return { pair: pr, w: 0, l: 0, h: 0, pts: 0, open: 0 }; });
+    var key = function (pr) { return pr.map(leagueKey).join('|'); };
+    var at = {}; prs.forEach(function (pr, i) { at[key(pr)] = i; });
+    (matches || []).filter(function (m) { return m.source === 'rr' && String(m.round) === String(roundCode); }).forEach(function (m) {
+        [['A', m.a], ['B', m.b]].forEach(function (sd) {
+            var i = at[key(sd[1])]; if (i === undefined) return;
+            var r = leagueMatchFor(m, cfg, sd[1][0]);
+            if (!r) return;
+            out[i].pts += r.pts;
+            if (r.result === 'W') out[i].w++; else if (r.result === 'L') out[i].l++; else if (r.result === 'H') out[i].h++; else out[i].open++;
+        });
+    });
+    return out;
+}
+// DEFAULT PAIRS for a round, partners rotating day to day (the circle method: over n-1 rounds
+// every golfer partners every other once). An odd golfer out sits out that round.
+function leagueAutoPairs(names, roundIndex) {
+    var list = (names || []).slice().sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });
+    var out = [], sit = [];
+    if (list.length % 2) { var k0 = (roundIndex || 0) % list.length; sit = [list[k0]]; list.splice(k0, 1); }
+    var n = list.length; if (n < 2) return { pairs: [], sittingOut: sit.concat(list) };
+    var fixed = list[0], rest = list.slice(1), k = (roundIndex || 0) % (n - 1);
+    rest = rest.slice(k).concat(rest.slice(0, k));
+    out.push([fixed, rest[0]]);
+    for (var i = 1; i < n / 2; i++) out.push([rest[i], rest[n - 1 - i]]);
+    return { pairs: out, sittingOut: sit };
+}
+
 // ---- EVERY MATCH OF THE TRIP, overrides applied --------------------------------------
 // rounds: [{ code, label, data }] in trip order. A round set up AFTER it was played still
 // counts: the results are read from its scores whenever the league is drawn.
@@ -268,6 +317,7 @@ function leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds) {
         var rc = leagueRoundOf(cfg, r.code);
         all = all.concat(cfg.teamsMode === 'same' ? leagueSameTeamMatches(r, cfg, calc, holesFor, rc)
             : cfg.teamsMode === 'league' ? leaguePairingMatches(r, cfg, calc, holesFor, rc, dayRounds)
+            : cfg.teamsMode === 'rr' ? leagueRoundRobinMatches(r, cfg, calc, holesFor, rc, dayRounds)
             : leagueRoundMatches(r, calc, holesFor, rc, ryder));
     });
     Object.keys(cfg.manual || {}).sort().forEach(function (id) {
@@ -279,6 +329,7 @@ function leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds) {
     });
     all.forEach(function (m) {
         var rc = leagueRoundOf(cfg, m.round);
+        if (m.source === 'rr') rc = { format: 'fourball', mode: cfg.rrPts.mode, win: cfg.rrPts.win, halve: cfg.rrPts.halve, pts: cfg.rrPts.pts };
         m.format = m.format || rc.format; m.mode = rc.mode; m.ptsCfg = rc.mode === 'match' ? { win: rc.win, halve: rc.halve } : rc.pts;
         if (rc.mode === 'match') { m.seg.front = 'NA'; m.seg.back = 'NA'; }
         var o = (cfg.overrides || {})[m.id];
@@ -448,10 +499,10 @@ function leagueState(trip, rounds, calc, holesFor, ryder, dayRounds) {
 }
 
 if (typeof window !== 'undefined') {
-    window.HardPanLeagueEngine = { autoPairings: leagueAutoPairings, pairingMatches: leaguePairingMatches, live: leagueLive, roundCfg: leagueRoundCfg, roundOf: leagueRoundOf, FORMATS: LEAGUE_FORMATS, sameTeamMatches: leagueSameTeamMatches, config: leagueConfig, matches: leagueMatches, roundMatches: leagueRoundMatches, segments: leagueSegments, matchFor: leagueMatchFor,
+    window.HardPanLeagueEngine = { rrMatches: leagueRoundRobinMatches, rrRecords: leagueRoundRobinRecords, autoPairs: leagueAutoPairs, autoPairings: leagueAutoPairings, pairingMatches: leaguePairingMatches, live: leagueLive, roundCfg: leagueRoundCfg, roundOf: leagueRoundOf, FORMATS: LEAGUE_FORMATS, sameTeamMatches: leagueSameTeamMatches, config: leagueConfig, matches: leagueMatches, roundMatches: leagueRoundMatches, segments: leagueSegments, matchFor: leagueMatchFor,
         standings: leagueStandings, payouts: leaguePayouts, players: leaguePlayers, state: leagueState, key: leagueKey, DEFAULTS: LEAGUE_DEFAULTS };
 }
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { leagueSegState: leagueSegState, leagueHoleDiffs: leagueHoleDiffs, leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
+    module.exports = { leagueRoundRobinMatches: leagueRoundRobinMatches, leagueRoundRobinRecords: leagueRoundRobinRecords, leagueAutoPairs: leagueAutoPairs, leagueSegState: leagueSegState, leagueHoleDiffs: leagueHoleDiffs, leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
         leagueStandings: leagueStandings, leaguePayouts: leaguePayouts, leaguePlayers: leaguePlayers, leagueState: leagueState, leagueKey: leagueKey, LEAGUE_DEFAULTS: LEAGUE_DEFAULTS };
 }

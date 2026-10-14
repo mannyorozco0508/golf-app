@@ -120,7 +120,7 @@
         if (sec) sec.style.display = st || S.organizer ? '' : 'none';
         if (S.form) { card.innerHTML = formHtml(); if (settle) settle.innerHTML = ''; return; }
         if (S.view === 'results' && st && S.organizer) { card.innerHTML = resultsHtml(st); if (settle) settle.innerHTML = settleHtml(st); return; }
-        if (S.view === 'pairings' && st && S.organizer) { card.innerHTML = pairingsHtml(st); if (settle) settle.innerHTML = settleHtml(st); return; }
+        if (S.view === 'pairings' && st && S.organizer) { card.innerHTML = st.cfg.teamsMode === 'rr' ? pairsHtml(st) : pairingsHtml(st); if (settle) settle.innerHTML = settleHtml(st); return; }
         if (!st) {
             card.innerHTML = S.organizer ? '<p class="trip-section-sub">Each group plays 2 v 2; front 9, back 9 and 18 each earn points for the golfers on the winning side, added up over the rounds you pick. The pot pays the top places.</p>'
                 + '<button type="button" class="btn-primary" data-lg="setup">🏅 Set up a Points game</button>' : '';
@@ -156,7 +156,7 @@
             if (open) h.push('<tr><td></td><td colspan="4" style="padding:0 4px 8px;font-size:.8rem;">' + (r.matches.length ? r.matches.map(matchLine).join('') : '<div style="color:var(--text-muted);">No matches yet.</div>') + '</td></tr>');
         });
         h.push('</tbody></table>');
-        if (S.organizer) h.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' + (st.cfg.teamsMode === 'league' ? '<button type="button" class="btn-primary" data-lg="pairings">\uD83D\uDC65 Pairings</button>' : '') + '<button type="button" class="btn-outline" data-lg="results">✏️ Match results</button><button type="button" class="btn-outline" data-lg="setup">⚙️ Setup</button></div>');
+        if (S.organizer) h.push('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' + (st.cfg.teamsMode === 'league' ? '<button type="button" class="btn-primary" data-lg="pairings">\uD83D\uDC65 Pairings</button>' : st.cfg.teamsMode === 'rr' ? '<button type="button" class="btn-primary" data-lg="pairings">\uD83D\uDC65 Pairs &amp; round-robin</button>' : '') + '<button type="button" class="btn-outline" data-lg="results">✏️ Match results</button><button type="button" class="btn-outline" data-lg="setup">⚙️ Setup</button></div>');
         return h.join('');
     }
     function segText(v) { return v === 'H' ? 'halved' : v ? v : '…'; }
@@ -222,6 +222,44 @@
         h.push('<div style="margin-top:12px;"><button type="button" class="btn-outline" data-lg="back">\u2039 Back to the standings</button></div>');
         return h.join('');
     }
+    // ---- ROUND-ROBIN: the round's pairs, every pair v every pair, each pair's record ------------
+    function recText(x) { return x.pair.join(' & ') + ': ' + x.w + '-' + x.l + (x.h ? '-' + x.h : '') + ', ' + ptsText(x.pts) + ' pt' + (x.pts === 1 ? '' : 's') + (x.open ? ' (' + x.open + ' playing)' : ''); }
+    function pairsHtml(st) {
+        var cfg = st.cfg, rounds = usedRounds(st);
+        if (!PR.round || !rounds.some(function (r) { return String(r.code) === PR.round; })) PR.round = rounds.length ? String(rounds[0].code) : null;
+        var h = ['<div style="font-weight:800;margin-bottom:4px;">\uD83D\uDC65 Pairs &amp; round-robin</div><div class="trip-section-sub" style="margin:0 0 8px;">Each pair plays an 18-hole best-ball match against every other pair (' + esc(cfg.scoring) + ', ' + (cfg.rrPts.mode === 'match' ? 'win ' + ptsText(cfg.rrPts.win) + ' / halve ' + ptsText(cfg.rrPts.halve) : 'front / back / 18 = ' + ptsText(cfg.rrPts.pts.front) + ' / ' + ptsText(cfg.rrPts.pts.back) + ' / ' + ptsText(cfg.rrPts.pts.total)) + '), from the golfers\u2019 own hole scores, whatever groups they are in.</div>'];
+        h.push('<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;">' + rounds.map(function (r) { var on = String(r.code) === PR.round, n = ((cfg.pairs || {})[r.code] || []).length; return chipBtn('data-lg-pr="' + esc(r.code) + '"', on, esc(r.label || r.code) + (n ? ' \u00b7 ' + n + ' pairs' : '')); }).join('') + '</div>');
+        if (!PR.round) return h.join('') + '<button type="button" class="btn-outline" data-lg="back">\u2039 Back to the standings</button>';
+        var prs = (cfg.pairs || {})[PR.round] || [], golfers = roundGolfers(cfg, PR.round), used = {};
+        prs.forEach(function (pr) { pr.forEach(function (n) { used[n.toLowerCase()] = 1; }); });
+        var free = golfers.filter(function (n) { return !used[n.toLowerCase()]; });
+        if (prs.length) {
+            var rec = E().rrRecords(st.matches, cfg, PR.round);
+            h.push('<div class="lg-rr-records" style="margin:6px 0;">' + rec.map(function (x, i) { return '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;border-top:1px solid var(--border-faint);padding:6px 0;"><b>' + esc(recText(x)) + '</b><button type="button" class="btn-outline-sm" data-lg-pairdel="' + i + '">Remove</button></div>'; }).join('') + '</div>');
+            var ms = st.matches.filter(function (m) { return String(m.round) === PR.round && m.source === 'rr'; });
+            h.push('<details><summary style="font-weight:700;cursor:pointer;">The ' + ms.length + ' matches</summary>' + ms.map(function (m) { var lv = liveText(m.live, m.a, m.b, m.seg); return '<div style="font-size:.85rem;padding:3px 0;">' + esc(m.a.join(' & ')) + ' v ' + esc(m.b.join(' & ')) + (lv ? ' \u00b7 ' + esc(lv) : m.missing ? ' \u2014 not all in this round' : '') + '</div>'; }).join('') + '</details>');
+        } else h.push('<div class="trip-section-sub">No pairs for this round yet.</div>');
+        h.push('<div style="margin-top:8px;"><button type="button" class="btn-primary" data-lg="autopairs">Make pairs</button> <span class="trip-section-sub">' + golfers.length + ' league golfers playing this round' + (golfers.length % 2 ? ' \u00b7 one sits out' : '') + '</span></div>');
+        if (free.length) {
+            var o = PR.order.slice(0, 2);
+            h.push('<div style="margin-top:10px;font-weight:700;">' + free.length + ' without a partner \u2014 tap two, then Add</div><div>'
+                + free.map(function (n) { var on = o.indexOf(n) !== -1; return chipBtn('data-lg-pp2="' + esc(n) + '"', on, (on ? '\u2713 ' : '') + esc(n)); }).join('') + '</div>'
+                + '<button type="button" class="btn-outline-sm" data-lg="pairadd"' + (o.length === 2 ? '' : ' disabled') + '>+ Add this pair</button>');
+        }
+        h.push('<div style="margin-top:12px;"><button type="button" class="btn-outline" data-lg="back">\u2039 Back to the standings</button></div>');
+        return h.join('');
+    }
+    function savePairs(code, list) {
+        write('pairs/' + code, list.length ? list : null).then(function () {
+            var s2 = settings() || {}; s2.pairs = Object.assign({}, s2.pairs || {});
+            if (list.length) s2.pairs[code] = list; else delete s2.pairs[code];
+            setSettings(s2); pointRounds([code]); render();
+        }, function (e) { if (typeof W.uiFail === 'function') W.uiFail('\u26A0\uFE0F NOT SAVED\n' + (e && e.message || e)); });
+    }
+    function autoPairs() {
+        var cfg = E().config(S.holder), rounds = usedRounds({ cfg: cfg }), idx = Math.max(rounds.map(function (r) { return String(r.code); }).indexOf(PR.round), 0);
+        savePairs(PR.round, E().autoPairs(roundGolfers(cfg, PR.round), idx).pairs);
+    }
     function savePairings(code, list) {
         write('pairings/' + code, list.length ? list : null).then(function () {
             var s2 = settings() || {}; s2.pairings = Object.assign({}, s2.pairings || {});
@@ -267,6 +305,7 @@
             roundsMode: S.ctx.thisRound ? (c && (c.rounds ? c.rounds.length > 1 : true) && S.key === 'league' ? 'several' : (c && c.rounds && c.rounds.length > 1 ? 'several' : 'one')) : 'several',
             rounds: c && c.rounds ? c.rounds.slice() : cands.map(function (r) { return String(r.code); }),
             later: S.ctx.tripCode ? !(c && c.rounds) : false,
+            rrPts: JSON.parse(JSON.stringify(c ? c.rrPts : { mode: 'match', win: 1, halve: 0.5, pts: { front: 1, back: 1, total: 1 } })),
             teamsMode: c ? c.teamsMode : 'change', teamsSaved: !!c, teams: c ? c.teams.map(function (t) { return { a: t.a.slice(), b: t.b.slice() }; }) : [], scoring: c ? c.scoring : 'net',
             pts: c ? Object.assign({}, c.pts) : { front: 1, back: 1, total: 1 },
             // A NEW GAME STARTS WITH NOBODY PICKED (Manny, 2026-10-13); "Select all" is one tap.
@@ -332,7 +371,13 @@
         h.push('</div>');
         // 2. TEAMS
         var tmode = teamsModeOf(f, names);
-        h.push('<div class="form-group"><label>2. Teams</label><div>' + chipBtn('data-lg-tm="league"', tmode === 'league', 'League pairings') + chipBtn('data-lg-tm="change"', tmode === 'change', 'Use each group\u2019s 2v2 Nassau') + chipBtn('data-lg-tm="same"', tmode === 'same', 'Same teams every round') + '</div>');
+        h.push('<div class="form-group"><label>2. Teams</label><div>' + chipBtn('data-lg-tm="rr"', tmode === 'rr', 'Round-robin best ball') + chipBtn('data-lg-tm="league"', tmode === 'league', 'Two 2v2 + singles') + chipBtn('data-lg-tm="change"', tmode === 'change', 'Use each group\u2019s 2v2 Nassau') + chipBtn('data-lg-tm="same"', tmode === 'same', 'Same teams every round') + '</div>');
+        if (tmode === 'rr') {
+            var rp = f.rrPts, rnum = function (k, v) { return '<input type="number" inputmode="decimal" min="0" step="0.5" data-lg-rr="' + k + '" value="' + esc(v) + '" style="width:60px;">'; };
+            h.push('<div class="trip-section-sub">Pairs of league golfers, set round by round (\uD83D\uDC65 Pairs after Save; "Make pairs" rotates partners day to day). Every pair plays an 18-hole best-ball match against EVERY other pair, from each golfer\u2019s own hole scores \u2014 groups don\u2019t matter (' + chipBtn('data-lg-sc="net"', f.scoring === 'net', 'net') + chipBtn('data-lg-sc="gross"', f.scoring === 'gross', 'gross') + '). Each golfer gets his pair\u2019s points.</div>'
+                + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;"><select data-lg-rrm="1"><option value="match"' + (rp.mode === 'match' ? ' selected' : '') + '>Points a match: win / halve</option><option value="nassau"' + (rp.mode === 'nassau' ? ' selected' : '') + '>Points a match: front / back / 18</option></select>'
+                + (rp.mode === 'match' ? 'Win ' + rnum('win', rp.win) + ' Halve ' + rnum('halve', rp.halve) : 'Front ' + rnum('pts.front', rp.pts.front) + ' Back ' + rnum('pts.back', rp.pts.back) + ' 18 ' + rnum('pts.total', rp.pts.total)) + '</div>');
+        }
         if (tmode === 'league') h.push('<div class="trip-section-sub">The game\u2019s own matches, set round by round from the league golfers only (\uD83D\uDC65 Pairings after Save) \u2014 whatever groups they are in; 2 v 2, and 2 left \u2192 singles. Scored from each golfer\u2019s own hole scores (' + chipBtn('data-lg-sc="net"', f.scoring === 'net', 'net') + chipBtn('data-lg-sc="gross"', f.scoring === 'gross', 'gross') + ').</div>');
         else if (tmode === 'change') h.push('<div class="trip-section-sub">Each round’s groups: their 2 v 2 Nassau in Side Bets, or entered under Match results with the 2v2 picker.</div>');
         else if (tmode === 'same') {
@@ -393,9 +438,13 @@
     }
     // A league smaller than the field defaults to its own pairings; the whole field to each
     // group's Nassau - until the organizer picks one.
+    // A league smaller than the field: its own matches - round-robin best ball when the pairs are
+    // an odd number (10 golfers = 5 pairs), else two 2v2 (+ singles). The whole field: each group's
+    // Nassau. Until the organizer picks one.
     function teamsModeOf(f, names) {
         if (f.teamsTouched || f.teamsSaved) return f.teamsMode;
-        return f.players.length && f.players.length < (names || []).length ? 'league' : 'change';
+        if (!(f.players.length && f.players.length < (names || []).length)) return 'change';
+        return Math.floor(f.players.length / 2) % 2 === 1 ? 'rr' : 'league';
     }
     function saveForm() {
         var f = S.form, cfg = formCfg(), eng = E();
@@ -415,7 +464,7 @@
         Object.keys(f.perRound).forEach(function (k) { if (JSON.stringify(f.perRound[k]) !== JSON.stringify(f.def)) per[k] = f.perRound[k]; });
         var val = { on: true, buyIn: cfg.buyIn, players: f.players.slice(), pts: f.def.pts, def: f.def, perRound: Object.keys(per).length ? per : null,
             rounds: f.roundsMode === 'one' ? [String(S.ctx.thisRound)] : (f.later ? null : f.rounds.slice()),
-            teamsMode: teamsModeOf(f, formNames()), teams: teamsModeOf(f, formNames()) === 'same' ? f.teams : null, scoring: f.scoring,
+            teamsMode: teamsModeOf(f, formNames()), teams: teamsModeOf(f, formNames()) === 'same' ? f.teams : null, scoring: f.scoring, rrPts: f.rrPts,
             payMode: f.payMode, places: cfg.places, placesUsd: f.payMode === 'usd' ? cfg.placesUsd : null,
             overrides: keep.overrides || null, manual: keep.manual || null, at: Date.now() };
         if (!S.db) return fail('Not connected.');
@@ -529,6 +578,8 @@
         if ((b = t.closest('[data-lg-pr]'))) { PR.round = b.getAttribute('data-lg-pr'); PR.order = []; render(); return; }
         if ((b = t.closest('[data-lg-psz]'))) { PR.size = Number(b.getAttribute('data-lg-psz')); PR.order = []; render(); return; }
         if ((b = t.closest('[data-lg-pp]'))) { var pp = b.getAttribute('data-lg-pp'), po = PR.order.slice(), pi = po.indexOf(pp); if (pi !== -1) po.splice(pi, 1); else if (po.length < PR.size * 2) po.push(pp); PR.order = po; render(); return; }
+        if ((b = t.closest('[data-lg-pp2]'))) { var p2 = b.getAttribute('data-lg-pp2'), o2 = PR.order.slice(0, 2), i2 = o2.indexOf(p2); if (i2 !== -1) o2.splice(i2, 1); else if (o2.length < 2) o2.push(p2); PR.order = o2; render(); return; }
+        if ((b = t.closest('[data-lg-pairdel]'))) { var cl2 = (((settings() || {}).pairs || {})[PR.round] || []).slice(); cl2.splice(Number(b.getAttribute('data-lg-pairdel')), 1); savePairs(PR.round, cl2); return; }
         if ((b = t.closest('[data-lg-prdel]'))) { var cl = (((settings() || {}).pairings || {})[PR.round] || []).slice(); cl.splice(Number(b.getAttribute('data-lg-prdel')), 1); savePairings(PR.round, cl); return; }
         if ((b = t.closest('[data-lg-set]'))) { var mEl = b.closest('[data-lg-match]'), sv = b.getAttribute('data-lg-set').split(':'); if (mEl) setSeg(mEl.getAttribute('data-lg-match'), sv[0], sv[1]); return; }
         if ((b = t.closest('[data-lg-del]'))) { delManual(b.getAttribute('data-lg-del')); return; }
@@ -550,6 +601,8 @@
             else if (a === 'results') { S.view = 'results'; render(); }
             else if (a === 'pairings') { S.view = 'pairings'; PR.order = []; render(); }
             else if (a === 'autopair') autoPair();
+            else if (a === 'autopairs') autoPairs();
+            else if (a === 'pairadd' && PR.order.length === 2) { var cur2 = (((settings() || {}).pairs || {})[PR.round] || []).slice(); cur2.push(PR.order.slice(0, 2)); PR.order = []; savePairs(PR.round, cur2); }
             else if (a === 'paddswap') { var z = PR.size; PR.order = PR.order.slice(z, z * 2).concat(PR.order.slice(0, z)); render(); }
             else if (a === 'padd' && PR.order.length === PR.size * 2) { var cur = (((settings() || {}).pairings || {})[PR.round] || []).slice(); var z2 = PR.size; cur.push({ a: PR.order.slice(0, z2), b: PR.order.slice(z2, z2 * 2) }); PR.order = []; savePairings(PR.round, cur); }
             else if (a === 'back') { S.view = 'table'; render(); }
@@ -561,6 +614,7 @@
         var t = ev.target, f = S.form;
         if (!f || !t || !t.getAttribute) return;
         if (t.getAttribute('data-lg-rcs')) { var ks = t.getAttribute('data-lg-rcs').split('|'), tg = rcTarget(ks[0]); tg[ks[1]] = t.value; render(); return; }
+        if (t.getAttribute('data-lg-rrm')) { f.rrPts.mode = t.value; render(); return; }
         if (t.getAttribute('data-lg-pm')) { f.payMode = t.value; render(); }
         else if (t.getAttribute('data-lg-pre')) { f.preset = t.value; render(); }
     }
@@ -568,6 +622,7 @@
         var t = ev.target, f = S.form;
         if (!f || !t || !t.getAttribute) return;
         if (t.getAttribute('data-lg-code')) { f.addCode = t.value; return; }
+        if (t.getAttribute('data-lg-rr')) { var kr = t.getAttribute('data-lg-rr'), vr = Number(t.value) || 0; if (/^pts\./.test(kr)) f.rrPts.pts[kr.slice(4)] = vr; else f.rrPts[kr] = vr; return; }
         if (t.getAttribute('data-lg-rcn')) { var kn = t.getAttribute('data-lg-rcn').split('|'), tn = rcTarget(kn[0]), v0 = Number(t.value) || 0; if (/^pts\./.test(kn[1])) tn.pts[kn[1].slice(4)] = v0; else tn[kn[1]] = v0; return; }
         var k = t.getAttribute('data-lg-f');
         if (!k) return;
@@ -625,6 +680,13 @@
         if (!st) return '';
         var ms = st.matches.filter(function (m) { return String(m.round) === code; });
         if (!ms.length) return '';
+        if (st.cfg.teamsMode === 'rr') {
+            var recs = E().rrRecords(st.matches, st.cfg, code);
+            return '<div class="pg-round-card" style="margin:10px 0;padding:12px;border-radius:14px;background:#ffffff;color:#1a1a1a;border:2px solid #0f4c3a;color-scheme:light;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;"><b style="color:#0f4c3a;">\uD83C\uDFC5 Points game \u00b7 round-robin</b>' + (RC.link ? '<a href="' + esc(RC.link) + '" style="color:#0f4c3a;font-weight:800;text-decoration:none;">Standings \u203A</a>' : '') + '</div>'
+                + recs.map(function (x) { return '<div style="padding:5px 0;border-top:1px solid #e2ebe7;font-size:.9rem;font-weight:700;">' + esc(recText(x)) + '</div>'; }).join('')
+                + '</div>';
+        }
         return '<div class="pg-round-card" style="margin:10px 0;padding:12px;border-radius:14px;background:#ffffff;color:#1a1a1a;border:2px solid #0f4c3a;color-scheme:light;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;"><b style="color:#0f4c3a;">\uD83C\uDFC5 Points game</b>' + (RC.link ? '<a href="' + esc(RC.link) + '" style="color:#0f4c3a;font-weight:800;text-decoration:none;">Standings \u203A</a>' : '') + '</div>'
             + ms.map(function (m) { var lv = liveText(m.live, m.a, m.b, m.seg); return '<div style="padding:6px 0;border-top:1px solid #e2ebe7;font-size:.9rem;"><b>' + esc(m.a.join(' & ')) + '</b> v <b>' + esc(m.b.join(' & ')) + '</b>' + (m.a.length === 1 ? ' <span style="color:#5b6b64;">(singles)</span>' : '') + '<div style="color:#0f4c3a;font-weight:700;">' + esc(m.missing ? 'Not all in this round' : lv || 'Not started') + '</div></div>'; }).join('')
