@@ -552,8 +552,14 @@
     function backToGpsRound() {
         var code = activeRound();
         if (!code) return false;
-        ls('hardpan_round_side', 'gps|' + code);
-        W.location.href = 'index.html?game=' + encodeURIComponent(code);
+        var open = function () { ls('hardpan_round_side', 'gps|' + code); W.location.href = 'index.html?game=' + encodeURIComponent(code); };
+        if (!H.db || H.activeChecked) { open(); return true; }
+        // ASKED FIRST (gps-trapfix): a round the server no longer has is never reopened - the
+        // picker instead. No answer (no signal) still reopens it: the offline round is a feature.
+        timeout(H.db.ref('events/' + code + '/players').once('value'), 5000, 'round').then(function (s) {
+            if (s && typeof s.exists === 'function' && !s.exists()) { forgetRound(code, true); show('gps'); mainDecor(); }
+            else open();
+        }, open);
         return true;
     }
     function homeStart(db) {
@@ -566,7 +572,9 @@
         // EVERY LAUNCH OPENS MAIN (Manny, 2026-10-12): the last door is highlighted and a
         // round in progress offers Resume; #gps / #games are the in-app links' own.
         var h = (W.location.hash || '').replace('#', '');
-        if (h === 'pick') { setDoor('gps'); show('gps'); }
+        // "Pick another course" (gps-trapfix): the picker, ALWAYS, and the round it came from is
+        // no longer the one Resume / the GPS door goes back to (Games › your round still has it).
+        if (h === 'pick') { var lrp = null; try { lrp = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lrp = null; } if (lrp && lrp.code) forgetRound(lrp.code, false); setDoor('gps'); show('gps'); }
         else if (h === 'gps' && backToGpsRound()) return;
         else show(h === 'gps' || h === 'games' ? h : 'main');
         mainDecor();
@@ -587,7 +595,10 @@
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
         timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
             var d = snap && snap.val ? snap.val() : null;
-            if (!d || !d.players || !d.courseData) return;
+            // GONE from the server (gps-trapfix): forgotten here - no Resume, and the GPS door
+            // opens the picker.
+            if (!d) { forgetRound(lr.code, true); return; }
+            if (!d.players || !d.courseData) return;
             var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
             holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (any) thru = Math.max(thru, h); if (!every) all = false; });
             H.activeChecked = true; H.active = (all && thru) ? null : lr.code;
@@ -1060,6 +1071,71 @@
     }
     function spectating() { return SPEC.on || SPEC.badKey; }
 
+    // ---- A ROUND THIS PHONE CANNOT WRITE TO NEVER TRAPS IT (gps-trapfix, 2026-10-14) ----------
+    // Manny's TADPJH: the round was gone from the server, the phone kept its own copy, every
+    // score was refused, and Resume / the GPS door / "Pick another course" all led back to it.
+    // forgetRound: this round is no longer the one the doors go back to. gone = the server has
+    // no such round: its stored copy and its queued changes go too (they can never land).
+    function forgetRound(code, gone) {
+        code = String(code || '').toUpperCase();
+        if (!code) return;
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        if (lr && String(lr.code || '').toUpperCase() === code) ls('hardpan_last_round', null);
+        if (H.active === code || !H.active) { H.activeChecked = true; H.active = null; }
+        if (!gone) return;
+        var sd = String(ls('hardpan_round_side') || '');
+        if (sd === 'gps|' + code || sd === 'bets|' + code) ls('hardpan_round_side', null);
+        if (String(ls('lastRoomCode') || '').toUpperCase() === code) ls('lastRoomCode', null);
+        dropQueued(code);
+        ls('golfapp_snap_v1_' + code, null);
+    }
+    // The queued changes for this round only (offline-queue.js keeps one list for every round).
+    function dropQueued(code) {
+        try {
+            var q = JSON.parse(ls('golfapp_wq_v1') || '[]');
+            if (!Array.isArray(q)) return;
+            var keep = q.filter(function (op) { return !(op && typeof op.path === 'string' && (op.path === 'events/' + code || op.path.indexOf('events/' + code + '/') === 0)); });
+            if (keep.length !== q.length) ls('golfapp_wq_v1', JSON.stringify(keep));
+        } catch (e) {}
+    }
+    // The message, over everything (the GPS screen included), with "Exit this round".
+    //   'gone'    the server has no such round (deleted, or never saved).
+    //   'refused' the server refused a change (this phone may not write to it).
+    var STUCK = { code: null, why: null };
+    function stuckRound(code, why) {
+        code = String(code || '').toUpperCase();
+        if (!code || (STUCK.code === code && (STUCK.why === why || STUCK.why === 'gone'))) return;
+        STUCK.code = code; STUCK.why = why;
+        if (why === 'gone') forgetRound(code, true); else forgetRound(code, false);
+        var d = W.document, el = $('hp-stuck-round');
+        if (!el) {
+            el = d.createElement('div'); el.id = 'hp-stuck-round'; el.setAttribute('role', 'alertdialog');
+            el.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;color-scheme:light;';
+            (d.body || d.documentElement).appendChild(el);
+        }
+        var gone = why === 'gone';
+        var btn = 'display:block;width:100%;min-height:52px;border-radius:14px;font-weight:800;font-size:1.05rem;margin-top:10px;';
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div style="font-weight:800;font-size:1.15rem;color:#9b1c1c;">⚠️ ' + (gone ? 'Round ' + esc(code) + ' isn’t on the server any more' : 'You can’t save to this round') + '</div>'
+            + '<div style="font-size:.95rem;margin-top:8px;line-height:1.4;">' + (gone
+                ? 'It was deleted, or it never finished saving. Nothing entered here can be saved. Exit and start a new round.'
+                : 'The server refused your change to round ' + esc(code) + '. This phone isn’t allowed to write to it, so new scores won’t save. Your other rounds are fine.') + '</div>'
+            + '<button type="button" data-hp-exit style="' + btn + 'border:0;background:#0f4c3a;color:#fff;">Exit this round</button>'
+            + (gone ? '' : '<button type="button" data-hp-view style="' + btn + 'border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;">Keep looking (view-only)</button>')
+            + '</div>';
+        el.style.display = 'flex';
+        el.querySelector('[data-hp-exit]').onclick = function () { exitRound(code, gone); };
+        var v = el.querySelector('[data-hp-view]');
+        if (v) v.onclick = function () { W.__hpReadOnly = true; spectatorMode(true, false); el.style.display = 'none'; try { if (typeof renderScorecard === 'function') renderScorecard(); } catch (e) {} };   /* global renderScorecard */
+    }
+    // Exit: the round is forgotten here (and its unsendable changes), then the course picker.
+    function exitRound(code, gone) {
+        forgetRound(code, true);
+        if (!gone) ls('golfapp_snap_v1_' + String(code).toUpperCase(), null);
+        var to = on() ? 'home.html#pick' : 'admin.html';
+        try { W.location.replace(to); } catch (e) { W.location.href = to; }
+    }
+
     // ---- SHARE (gps-share): the Round Menu's "Share" replaces "Show QR code" ---------------------
     function cd() { try { return typeof currentData !== 'undefined' ? currentData : null; } catch (e) { return null; } }   /* global currentData */
     function shareBase() { try { return typeof shareBaseUrl === 'function' ? shareBaseUrl() : ''; } catch (e) { return ''; } }   /* global shareBaseUrl */
@@ -1222,7 +1298,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

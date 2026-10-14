@@ -358,3 +358,11 @@ Rules that would need ADDING (additive; nothing existing changes):
   kept; the round's organizer keeps full access. ?group=N with a code on that group needs the matching sk, else
   view-only + "scorekeeper code not valid"; a group with no code works as before. APP-SIDE ONLY: the database
   rules that would enforce it are a plan (docs/rules-plan-spectators.md), for the main session after Oct 17.
+
+## gps-trapfix (2026-10-14): a round this phone cannot write to never traps it
+TADPJH was gone from the server; the phone kept opening its stored copy, every score was refused,
+and Resume / the GPS door / Pick another course led back to it. Now: a gone round (this phone had
+it, the server answers null) or a refused write shows a sheet with "Exit this round" (refused:
+also "Keep looking (view-only)"); a refused change leaves the queue at once; Exit forgets the round
+and opens the picker; Pick another course always opens the picker; the GPS door asks the server
+before reopening (no answer = offline, still reopens). Check: tools/trap-check.js.
