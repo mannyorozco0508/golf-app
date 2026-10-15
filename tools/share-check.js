@@ -57,13 +57,13 @@ const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
     // 2: a spectator (not the organizer), one-group round.
     r = await go({ url: fileUrl('index.html', 'game=SHRND1&spectate=1'), db: DB({ SHRND1: round('someone-else') }), preScript: APP + ERR, steps: [{ sleep: 2000 }, { expression: CARD },
-        { tap: '#fd-gps-btn' }, { sleep: 2500 }, { expression: "JSON.stringify({ side: window.HardPanGps && HardPanGps.side && HardPanGps.side(), score: (function(){ var b = document.querySelector('#gps-overlay .gps-score'); return b ? getComputedStyle(b).display : null; })(), add: (function(){ var b = document.querySelector('#gps-overlay .gps-door-add'); return b ? getComputedStyle(b).display : null; })() })" }], webgl: true });
+        { tap: '#fd-gps-btn' }, { sleep: 2500 }, { expression: "JSON.stringify({ side: window.HardPanGps && HardPanGps.side && HardPanGps.side(), score: (function(){ var b = document.querySelector('#gps-overlay .gps-score'); return b ? b.innerText.trim() : null; })(), add: (function(){ var b = document.querySelector('#gps-overlay .gps-door-add'); return b ? getComputedStyle(b).display : null; })() })" }], webgl: true });
     const [s2, s2g] = J(r);
     report.spectator = { card: s2, gps: s2g };
     f(s2.enabled === 0 && s2.inputs > 0, '2: a spectator has score boxes to type in: ' + JSON.stringify(s2));
     f(/Spectating/.test(s2.badge || ''), '2: no "Spectating" badge: ' + JSON.stringify(s2.badge));
     f(!s2.setup && s2.addGame === false, '2: a spectator sees setup or Add a game: ' + JSON.stringify([s2.setup, s2.addGame]));
-    f(s2g.side === 'gps' && s2g.score === 'none' && s2g.add === 'none', '2: a spectator\'s GPS (open, with no Enter Score / + Game): ' + JSON.stringify(s2g));
+    f(s2g.side === 'gps' && s2g.score !== 'Enter score' && /^(No score yet|\d+)$/.test(s2g.score || '') && s2g.add === 'none', '2: a spectator\'s GPS (open, a read-only score, no Enter score / + Game): ' + JSON.stringify(s2g));
     f(!s2.e.length, '2: errors ' + s2.e.join(' | '));
     // The same round, opened plainly (no spectate): as before - one group, the card is writable.
     r = await go({ url: fileUrl('index.html', 'game=SHRND1'), db: DB({ SHRND1: round('someone-else') }), preScript: APP + ERR, steps: [{ sleep: 2000 }, { expression: CARD }] });

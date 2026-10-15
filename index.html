@@ -2391,6 +2391,25 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     let hpKeyFor = null;
     function hpSpectating() { return window.__hpReadOnly === true || (hpSpectateParam && !hasGroupLock && !(typeof canReachSetup === 'function' && canReachSetup())); }
     window.hpSpectating = hpSpectating;
+    // THE TEE MOVED (gps-start10, 2026-10-14): Round Setup saved "Start on 10" (or this group's own
+    // tee) while the round was open on 1. Before anyone has a score, the card - and GPS with it -
+    // goes to the new first hole; a round already being played is left where it is.
+    let hpStartWas = null;
+    function hpFollowStart() {
+        try {
+            if (!currentData || !Array.isArray(currentData.courseData) || typeof groupStartHole !== 'function') return;
+            const start = groupStartHole(currentData, currentData.courseData, lockedGroup);
+            const was = hpStartWas;
+            hpStartWas = start;
+            if (was == null || was === start) return;
+            const sc = currentData.scores || {};
+            if (Object.keys(sc).some(k => Number(sc[k]) > 0)) return;
+            const at = currentData.courseData.find(h => Number(h.hole) === Number(start));
+            if (!at) return;
+            currentViewedHole = at.hole;
+            try { localStorage.removeItem('hardpan_last_hole_' + currentMode); } catch (e) {}
+        } catch (e) {}
+    }
     function hpSha256(text) {
         try {
             if (!(window.crypto && window.crypto.subtle && window.TextEncoder)) return Promise.resolve(null);
@@ -2726,6 +2745,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // had it (it keeps a copy of what the server last sent) - say so over everything, with "Exit this
             // round". A round not saved yet (a player arriving early) is left to the card's own words.
             if (!incoming && window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, currentMode) && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
+            hpFollowStart();
             hpCheckGroupKey();
             if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hasGroupLock && hpKeyState === 'bad');
             // GPS:END
@@ -6312,12 +6332,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // own Next does and GPS comes back on it. The KP question, when the hole has
     // one, comes first, on the card. Leaving the card any other way cancels this.
     let gpsScoreFrom = null;
-    function gpsOpenScore(hole) {
+    function gpsOpenScore(hole, playerId) {
         const g = window.HardPanGps;
         gpsScoreFrom = Number(hole);
         if (g) g.showSide('bets', { remember: false });
         const all = Array.from(document.querySelectorAll('.score-input[data-hole="' + Number(hole) + '"]:not([disabled])'));
-        const box = all.find(i => !String(i.value || '').trim()) || all[0];
+        // THE GOLFER THE GPS SCREEN SHOWS (gps-start10): their own box, when this phone may score them.
+        const theirs = playerId != null ? all.find(i => i.getAttribute('data-player-id') === String(playerId)) : null;
+        const box = theirs || all.find(i => !String(i.value || '').trim()) || all[0];
         if (box) {
             try { box.scrollIntoView({ block: 'center' }); } catch (e) {}
             try { box.focus(); } catch (e) {}
@@ -6360,6 +6382,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     });
     let gpsPrecacheAsked = false;
     function gpsFollowHoleView() {
+        try { if (currentMode && currentViewedHole != null) localStorage.setItem('hardpan_last_hole_' + currentMode, String(currentViewedHole)); } catch (e) {}
         const g = window.HardPanGps;
         if (!g || !currentMode || !currentData) return;
         const key = gpsCourseKey();
@@ -12707,6 +12730,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         // On first load, land on the first hole that's missing a score - not always hole 1,
         // so picking back up mid-round drops you right where scoring left off.
+        // GPS:BEGIN
+        // RESUME = THE LAST HOLE THIS PHONE WAS ON (gps-start10, 2026-10-14), when it is a hole of
+        // this round; kept per round by gpsFollowHoleView.
+        if (currentViewedHole === null) {
+            try {
+                const lh = Number(localStorage.getItem('hardpan_last_hole_' + currentMode));
+                const at = lh ? (courseData || []).find(h => Number(h.hole) === lh) : null;
+                if (at) currentViewedHole = at.hole;
+            } catch (e) {}
+        }
+        // GPS:END
         if (currentViewedHole === null) {
             // IN PLAY ORDER (2026-10-04), so a group that went off the 10th lands
             // on the 10th and picks up where IT left off - not on hole 1, which it

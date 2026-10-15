@@ -8,7 +8,7 @@
 //   1  Mark shot = a measure: tap 1 "📍 0 yds", the yards from that spot live as he walks,
 //      tap 2 "Shot: N yds" and that spot is the new start; nothing saved.
 //   2  The yardage box: BACK on top, FRONT under it.
-//   3  The bottom bar: "‹" before "Hole N · …"; once his score is in, "Hole 1 · 4".
+//   3  The bottom bar: "‹" before "Hole N · …"; once his score is in, just "4" (2026-10-14).
 //   4  Zoom on the RIGHT edge, half way down (right thumb), never over wind / Green / Mark shot
 //      (also on a short phone).
 //   5  GPS from Games goes back to the round in progress (GPS side); the course picker only
@@ -82,8 +82,8 @@ const GPSREAD = "JSON.stringify({ mark: (document.querySelector('#gps-overlay .g
     const again = Number((/(\d+) yds/.exec(g[5].mark) || [])[1]);
     f(again >= 50 && again <= 60, '1: the second spot is not the new start: ' + g[5].mark);
     f(g[1].shots === g[5].shots, '1: Mark shot saved something: ' + JSON.stringify([g[1].shots, g[5].shots]));
-    f(g[1].score === 'Hole 2 · Enter Score', '3: the bar on the unscored hole: ' + g[1].score);
-    f(g[6].score === 'Hole 1 · 4' && g[7].score === 'Hole 2 · Enter Score', '3: ‹ back to hole 1 shows his score ("Hole 1 · 4"), › on to hole 2: ' + JSON.stringify([g[6].score, g[7].score]));
+    f(g[1].score === 'Enter score', '3: the bar on the unscored hole: ' + g[1].score);
+    f(g[6].score === '4' && g[7].score === 'Enter score', '3: ‹ back to hole 1 shows his score ("Hole 1 · 4"), › on to hole 2: ' + JSON.stringify([g[6].score, g[7].score]));
     const sh = g[8];
     f(!sh.sheetHeld && sh.mapHeld && sh.scrolls && sh.top > 0 && sh.last, '6: the Add a game sheet does not scroll over the GPS screen: ' + JSON.stringify(g[8]));
     f(!g[7].e.length, 'GPS screen errors: ' + g[7].e.join(' | '));

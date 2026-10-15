@@ -366,3 +366,18 @@ it, the server answers null) or a refused write shows a sheet with "Exit this ro
 also "Keep looking (view-only)"); a refused change leaves the queue at once; Exit forgets the round
 and opens the picker; Pick another course always opens the picker; the GPS door asks the server
 before reopening (no answer = offline, still reopens). Check: tools/trap-check.js.
+
+## gps-start10 (2026-10-14): start on 10, whose score, the score button
+- GPS follows the card's play order (startingHole / my group's groupStartingHoles): opens on 10,
+  Next 10..18 then 1..9, Prev back along play order. A round changed to start on 10 while open
+  (no scores yet) moves to 10. Resume reopens the last hole this phone was on
+  (localStorage hardpan_last_hole_<code>). Scores save to the real hole number (the card's own path).
+- The score button: no score -> "Enter score"; scored -> just the number, big. Whose: the golfer this
+  phone picked; else a scorekeeper's first golfer in their group; else player 1 (the organizer) -
+  also what a spectator who picked no one sees. Spectators see it read-only (tap does nothing).
+- Build number 15 prepared (gps-beta CURRENT_PROJECT_VERSION). Check: tools/hole10-check.js.
+- The name tag over the score ("Manny ▾", "Group 2 · Manny ▾" with more than one group): tap -> pick
+  the group, then a golfer; kept per round (hardpan_gps_golfer_<code>). First open with no pick asks
+  "Who are you?" once (hardpan_gps_whoasked_<code>; Skip = the group's first golfer). Swipe the score
+  left / right = next / previous golfer in the group. The score button opens the SHOWN golfer's own
+  box (when this phone may score them). Spectators use the tag to view only. Nothing new is written.
