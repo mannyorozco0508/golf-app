@@ -2615,7 +2615,24 @@
         // THE SCORE BUTTON (Manny, 2026-10-14): no score yet -> "Enter score"; scored -> just the
         // number, big. A spectator sees the number (or "No score yet") and cannot open the editor.
         var mine = myScore(S.hole), ro = readOnlyHere();
-        txt('.gps-score', mine != null ? String(mine) : (ro ? 'No score yet' : 'Enter score'));
+        // THE CARD'S OWN MARK ON THE NUMBER (Manny, 2026-10-16): score-marks.js - double circle eagle or
+        // better, circle birdie, plain par, box bogey, double box double bogey or worse. Gross, display only.
+        var sbtn = S.el.querySelector('.gps-score');
+        if (sbtn) {
+            var holePar = (typeof S.holeMeta === 'function' && (S.holeMeta(S.hole) || {}).par) || S.par;
+            var mk = mine != null && typeof scoreMark === 'function' ? scoreMark(mine, holePar) : '';   /* global scoreMark */
+            var want = mine != null ? 'n|' + mine + '|' + mk : 't|' + (ro ? 'No score yet' : 'Enter score');
+            if (sbtn.getAttribute('data-shown') !== want) {
+                sbtn.setAttribute('data-shown', want);
+                sbtn.textContent = '';
+                if (mine != null) {
+                    var num = document.createElement('span');
+                    num.className = 'gps-score-n' + (mk ? ' mark-' + mk : '');
+                    num.textContent = String(mine);
+                    sbtn.appendChild(num);
+                } else sbtn.textContent = ro ? 'No score yet' : 'Enter score';
+            }
+        }
         var dd = roundData(), who = scoreFor(), many = !!(dd && dd.players && dd.players.length > 1);
         txt('.gps-who', many && who && who.player ? ((groupsOf(dd).length > 1 ? 'Group ' + groupOf(who.player.id) + ' \u00b7 ' : '') + shortName(dd, who.player) + ' \u25BE') : '');
         show('.gps-who', many && !setting);
@@ -3147,6 +3164,14 @@
         + '#gps-overlay .gps-scorebox{flex:1 1 auto;min-width:0;display:flex;overflow:hidden;background:rgba(217,249,157,.92);border-color:#d9f99d;}'
         + '#gps-overlay .gps-score{flex:1 1 auto;min-width:0;color:#0b0f0c;font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;}'
         + '#gps-overlay .gps-score.gps-score-num{font-size:30px;line-height:1;}#gps-overlay .gps-score.gps-score-ro{cursor:default;}'
+        // The marks around the big number: a fixed 34px shape (two digits widen it), inside the
+        // button's own height - the button never grows. Under par red, over par the number's colour.
+        + '#gps-overlay .gps-score-n{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 8px;box-sizing:border-box;line-height:1;}'
+        + '#gps-overlay .gps-score.gps-score-num .gps-score-n[class*="mark-"]{font-size:22px;}'
+        + '#gps-overlay .gps-score-n.mark-birdie{box-shadow:inset 0 0 0 2px #c1121f;border-radius:50%;}'
+        + '#gps-overlay .gps-score-n.mark-eagle{box-shadow:inset 0 0 0 2px #c1121f,inset 0 0 0 4px #d9f99d,inset 0 0 0 6px #c1121f;border-radius:50%;}'
+        + '#gps-overlay .gps-score-n.mark-bogey{box-shadow:inset 0 0 0 2px #0b0f0c;border-radius:3px;}'
+        + '#gps-overlay .gps-score-n.mark-double{box-shadow:inset 0 0 0 2px #0b0f0c,inset 0 0 0 4px #d9f99d,inset 0 0 0 6px #0b0f0c;border-radius:3px;}'
         + '#gps-overlay .gps-score-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;touch-action:pan-y;}'
         + '#gps-overlay .gps-score-col .gps-score{flex:1 1 auto;}'
         + '#gps-overlay .gps-who{flex:0 0 auto;background:none;border:0;color:#0b0f0c;font-size:12px;font-weight:800;line-height:1;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;}'

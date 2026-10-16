@@ -26,6 +26,7 @@
 // Matches card - and on the bare link, the Side Matches card too.
 // ============================================================================
 
+const { marksLegend } = require('./helpers/hardpan-marks.js');   // gps-marks: the Receipt legend's Bogey / Double bogey (HardPan)
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -191,7 +192,7 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
             // the fixture holds its capture day. That segment is the one allowed to differ.
             const undate = t => t.replace(/\|[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}\|/g, '|<date>|');
             assertV196Mounts(assert, id => ({ text: undate(strip(el(id))), html: el(id) }),
-                { pool: v142(PREV[k].mainPool), summary: undate(PREV[k].summary), 'receipt-scorecard': undate(PREV[k].scorecard) },
+                { pool: v142(PREV[k].mainPool), summary: undate(PREV[k].summary), 'receipt-scorecard': marksLegend(undate(PREV[k].scorecard)) },
                 { norm: undate, equal: ['receipt-scorecard'] });
             void noFinalResults; void sendMove;   // subsumed: the proof reads the raw capture
             assert.equal(strip(withoutSideMatches(el('settle-content'))), PREV[k].contentWithoutSideMatches);

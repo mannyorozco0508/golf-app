@@ -27,6 +27,7 @@
 // section is identical character for character.
 // ============================================================================
 
+const { marksLegend } = require('./helpers/hardpan-marks.js');   // gps-marks: the Receipt legend's Bogey / Double bogey (HardPan)
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -219,7 +220,7 @@ const sendMove = t => { const n = t.split('|📄 Print / Save Receipt|').length 
                 .replace('|A tied place is one row with the combined amount — the split is under Net Finish below', '');
             if (k === 'three-tied-legacy') pool = pool.replace('|$33.33 each|', '|Bobby Blue $33.34 · Sammy Sage $33.33 · Tommy Teal $33.33|');
             assertV196Mounts(assert, id => ({ text: undate(el.text(id)), html: el.raw(id) }),
-                { pool, summary: undate(PREV[k].summary), 'settle-content': PREV[k].content, 'receipt-scorecard': undate(PREV[k].scorecard) },
+                { pool, summary: undate(PREV[k].summary), 'settle-content': PREV[k].content, 'receipt-scorecard': marksLegend(undate(PREV[k].scorecard)) },
                 { norm: undate, equal: ['settle-content', 'receipt-scorecard'] });
             void noFinalResults; void sendMove;   // subsumed: the proof reads the raw capture
         });

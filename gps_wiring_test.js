@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');

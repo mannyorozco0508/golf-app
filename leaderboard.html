@@ -41,6 +41,9 @@
          scorecard-rows.js draws the card's rows - this page draws no cell. Both
          after money-engine.js / action-model.js, whose globals they read. -->
     <script src="score-marks.js"></script>
+    <!-- GPS:BEGIN -->
+    <script src="score-marks-hp.js"></script>   <!-- HardPan: the bogey / double bogey boxes on top of score-marks.js -->
+    <!-- GPS:END -->
     <script src="scorecard-rows.js"></script>
     <!-- v215: the Aloha bet's rules, BEFORE settlement-engine.js because that file
          calls into them. Every page that settles loads this: the call is guarded by
@@ -244,6 +247,10 @@
         .sc-stack .receipt-table .rt-sec { background: var(--nassau-box-bg); font-weight: bold; }
         .sc-stack .receipt-table tr.rt-net td { color: var(--text-muted); font-style: italic; }
         .sc-stack .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
+        /* GPS:BEGIN */
+        .sc-stack .receipt-table td.mark-bogey { box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a); border-radius: 3px; }
+        .sc-stack .receipt-table td.mark-double { box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--text-main, #1a1a1a); border-radius: 3px; }
+        /* GPS:END */
         .sc-stack .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--accent-red), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--accent-red); border-radius: 50%; }
         /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
            through tabs during a real Nassau. Segments stack; presses indent under the
