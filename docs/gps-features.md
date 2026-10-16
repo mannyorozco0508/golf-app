@@ -381,3 +381,14 @@ before reopening (no answer = offline, still reopens). Check: tools/trap-check.j
   "Who are you?" once (hardpan_gps_whoasked_<code>; Skip = the group's first golfer). Swipe the score
   left / right = next / previous golfer in the group. The score button opens the SHOWN golfer's own
   box (when this phone may score them). Spectators use the tag to view only. Nothing new is written.
+
+## gps-marks (2026-10-16): standard golf marks on every score (HardPan)
+score-marks.js is NOT edited (it is pinned byte-identical with the money files). score-marks-hp.js
+(GPS_SHELL; loaded right after it on index, settlement, leaderboard and shared.html, in GPS blocks)
+wraps scoreMark / scoreMarkClass: 'bogey' (box) and 'double' (double box, double bogey or worse);
+birdie / eagle and blank / 0 / no par unchanged. Same shapes on the GPS score button (the number in a
+34px shape; the button never grows), the live Full Scorecard (a smaller shape INSIDE the score box,
+with a gap; the card's older shape-box-1/2 give way), the Receipt / PDF (screen + print; the legend
+names all four) and shared.html. Gross only, display only. Consumer tree unchanged. Check:
+tools/marks-check.js; score_marks_test.js. The regular app gets the boxes when gps-features goes to
+main after Oct 17 (Manny, 2026-10-16).

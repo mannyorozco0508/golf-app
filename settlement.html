@@ -41,6 +41,9 @@
          is what dialog_sweep_test.js forbids. -->
     <script src="ui-dialogs.js"></script>
     <script src="score-marks.js"></script>
+    <!-- GPS:BEGIN -->
+    <script src="score-marks-hp.js"></script>   <!-- HardPan: the bogey / double bogey boxes on top of score-marks.js -->
+    <!-- GPS:END -->
     <script src="money-engine.js"></script>
     <!-- The scorecard rows live once, in scorecard-rows.js (2026-09-16): the
          Full Scorecard below and the leaderboard's tap-a-name card draw from it.
@@ -309,6 +312,22 @@
                         inset 0 0 0 6px var(--accent-red);
             border-radius: 50%;
         }
+        /* GPS:BEGIN */
+        /* HARDPAN: a box for a bogey, a double box for a double bogey or worse (score-marks.js). */
+        .receipt-table td.mark-bogey, .legend-bogey { box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a); border-radius: 3px; }
+        .receipt-table td.mark-double, .legend-double {
+            box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a),
+                        inset 0 0 0 3px var(--bg-card),
+                        inset 0 0 0 5px var(--text-main, #1a1a1a);
+            border-radius: 3px;
+        }
+        .legend-bogey, .legend-double { margin-left: 10px; }
+        /* The cells are narrow: a doubled mark gets a little room so it never sits on the digit,
+           and the legend's shapes keep their size in the flex row. */
+        .receipt-table td.mark-double, .receipt-table td.mark-eagle { padding-left: 7px; padding-right: 7px; }
+        .receipt-legend .legend-dot { flex: 0 0 14px; height: 14px; }
+        .receipt-legend .legend-dot.legend-bogey, .receipt-legend .legend-dot.legend-double { border-radius: 3px; }
+        /* GPS:END */
         /* Net rows sit tight under their golfer's gross row and are visually
            quieter, so the card still scans as one row per golfer. */
         /* NET IS SECONDARY, NOT INVISIBLE. At 0.72em in --text-muted this row was
@@ -498,6 +517,19 @@
                             inset 0 0 0 6px #c1121f !important;
                 border-radius: 50% !important;
             }
+            /* GPS:BEGIN */
+            .receipt-table td.mark-bogey, .legend-bogey, .receipt-table td.mark-double, .legend-double {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .receipt-table td.mark-bogey, .legend-bogey { box-shadow: inset 0 0 0 2px #1a1a1a !important; border-radius: 3px !important; }
+            .receipt-table td.mark-double, .legend-double {
+                box-shadow: inset 0 0 0 2px #1a1a1a,
+                            inset 0 0 0 4px #ffffff,
+                            inset 0 0 0 6px #1a1a1a !important;
+                border-radius: 3px !important;
+            }
+            /* GPS:END */
         }
             /* "MAY CHANGE WHEN OTHERS SYNC" (2026-10-06). One line, under the title,
            on every reading page. It is a CAVEAT, not an error: the numbers are
@@ -1125,6 +1157,10 @@ html {
                 <span class="legend-dot legend-eagle"></span> Eagle or better
                 ${netMatters ? '<span style="margin-left:10px;">net rows show the score after handicap strokes</span>' : ''}
             </div></div>`;
+        // GPS:BEGIN
+        // The legend names the HardPan boxes too - when they are drawn (score-marks-hp.js loaded).
+        if (typeof scoreMark === 'function' && scoreMark(5, 4) === 'bogey') html = html.replace('<span class="legend-dot legend-eagle"></span> Eagle or better', '$& <span class="legend-dot legend-bogey"></span> Bogey <span class="legend-dot legend-double"></span> Double bogey or worse');
+        // GPS:END
         return html;
     }
 

@@ -33,6 +33,7 @@
 // compared by value. Nothing else is normalised.
 // ============================================================================
 
+const { marksLegend } = require('./helpers/hardpan-marks.js');   // gps-marks: the legend's Bogey / Double bogey (HardPan)
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -152,7 +153,7 @@ const sendMoved = m => Object.assign({}, m, { summary: noFinalResults(sendMove(m
 const { assertV196Mounts } = require('./helpers/results-payout-v196.js');
 const v196 = (r, prev) => assertV196Mounts(assert, id => ({ text: norm(strip0(r.raw(id))), html: r.raw(id) }),
     { pool: wave30(prev.pool), summary: wave30(prev.summary), 'settle-content': wave30(prev.settle),
-      'receipt-scorecard': wave30(prev.scorecard) }, { norm, equal: ['settle-content', 'receipt-scorecard'] });
+      'receipt-scorecard': marksLegend(wave30(prev.scorecard)) }, { norm, equal: ['settle-content', 'receipt-scorecard'] });
 
 describe('THE BASELINE: finished receipts read exactly as they did at 8a02234', () => {
     const prev = JSON.parse(read('receipt_final_prev.fixture.json'));

@@ -21,6 +21,7 @@
 // cannot drift apart.
 // ============================================================================
 
+const { marksLegend } = require('./helpers/hardpan-marks.js');   // gps-marks: the Receipt legend's Bogey / Double bogey (HardPan)
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -136,7 +137,7 @@ describe('THE PAGE RENDERS CHARACTER FOR CHARACTER WHAT IT RENDERED', () => {
         MOUNTS.forEach(m => { if (m !== 'settle-content') assert.ok(PREV.rounds[k].text[m].length > 500, m + ' was captured with content'); });
         const t = PREV.rounds[k].text;
         assertV196Mounts(assert, id => ({ text: el.text(id), html: el.raw(id) }),
-            { pool: t['money-pool-section'], summary: t['combined-settlement-summary'], 'settle-content': t['settle-content'], 'receipt-scorecard': t['receipt-scorecard'] },
+            { pool: t['money-pool-section'], summary: t['combined-settlement-summary'], 'settle-content': t['settle-content'], 'receipt-scorecard': marksLegend(t['receipt-scorecard']) },
             { norm: undate, equal: ['settle-content', 'receipt-scorecard'] });
         // the v195b / v152 transforms this golden carried are subsumed: the button
         // cell and Final Results are read out of the raw capture by the proof

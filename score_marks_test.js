@@ -8,6 +8,7 @@ const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
 
 const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const SM = loadJsFile('score-marks.js');
+const SM0 = SM;
 const PAGE = ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
 
 describe('SCORE MARKS — gross score against par, nothing else', () => {
@@ -18,10 +19,38 @@ describe('SCORE MARKS — gross score against par, nothing else', () => {
         assert.equal(SM.scoreMark(1, 3), 'eagle', 'par 3, hole in one');
     });
 
-    test('par, bogey and worse get nothing', () => {
-        assert.equal(SM.scoreMark(4, 4), '');
-        assert.equal(SM.scoreMark(5, 4), '');
-        assert.equal(SM.scoreMark(9, 4), '');
+    // HARDPAN (the GPS tree, 2026-10-16): a box for a bogey, a double box for a double bogey or
+    // worse. The Consumer tree (GPS blocks stripped) still marks nothing above par.
+    // score-marks.js itself never moves (it is pinned with the money files): the boxes are
+    // score-marks-hp.js, loaded after it on every HardPan page.
+    const HP = fs.existsSync(path.join(REPO_ROOT, 'score-marks-hp.js'));
+    test('par gets nothing; above par: a box (bogey), a double box (double bogey or worse) - HardPan only', () => {
+        const SM = HP ? require(path.join(REPO_ROOT, 'score-marks-hp.js')) : SM0;
+        assert.equal(SM.scoreMark(4, 4), '', 'par');
+        assert.equal(SM.scoreMark(3, 3), '', 'par 3 par');
+        assert.equal(SM.scoreMark(5, 4), HP ? 'bogey' : '', 'bogey on a par 4');
+        assert.equal(SM.scoreMark(4, 3), HP ? 'bogey' : '', 'bogey on a par 3');
+        assert.equal(SM.scoreMark(6, 5), HP ? 'bogey' : '', 'bogey on a par 5');
+        assert.equal(SM.scoreMark(6, 4), HP ? 'double' : '', 'double bogey');
+        assert.equal(SM.scoreMark(7, 4), HP ? 'double' : '', 'triple is double-or-worse');
+        assert.equal(SM.scoreMark(9, 4), HP ? 'double' : '', 'a big number is double-or-worse');
+        assert.equal(SM.scoreMark('5', '4'), HP ? 'bogey' : '', 'strings, as inputs hand back');
+        assert.equal(SM.scoreMarkClass(5, 4), HP ? ' mark-bogey' : '');
+        assert.equal(SM.scoreMarkClass(6, 4), HP ? ' mark-double' : '');
+        assert.equal(SM.scoreMarkClass(4, 4), '', 'par: no class at all');
+    });
+    test('score-marks.js alone still marks nothing above par (it is unchanged)', () => {
+        assert.equal(SM0.scoreMark(5, 4), '');
+        assert.equal(SM0.scoreMark(9, 4), '');
+    });
+    test('the birdie / eagle names and classes are unchanged', () => {
+        assert.equal(SM.scoreMarkClass(3, 4), ' mark-birdie');
+        assert.equal(SM.scoreMarkClass(2, 4), ' mark-eagle');
+    });
+    test('blank / 0 / no par still return nothing above par too', () => {
+        const SM = HP ? require(path.join(REPO_ROOT, 'score-marks-hp.js')) : SM0;
+        ['', null, undefined, 0, '0'].forEach(v => assert.equal(SM.scoreMark(v, 4), ''));
+        [0, '', null, undefined].forEach(p => assert.equal(SM.scoreMark(9, p), ''));
     });
 
     test('albatross and better still count as eagle-or-better', () => {
@@ -94,7 +123,7 @@ function fixture() {
 function expectedMarks(cd, p, scores) {
     const out = [];
     cd.forEach(h => p.forEach(pl => {
-        const m = SM.scoreMark(scores[`p${pl.id}_h${h.hole}`], h.par);
+        const m = (fs.existsSync(path.join(REPO_ROOT, 'score-marks-hp.js')) ? require(path.join(REPO_ROOT, 'score-marks-hp.js')) : SM).scoreMark(scores[`p${pl.id}_h${h.hole}`], h.par);
         if (m) out.push(`${pl.name}:${h.hole}:${m}`);
     }));
     return out.sort();
@@ -106,7 +135,7 @@ function expectedMarks(cd, p, scores) {
 // OUT/IN/TOTAL, and everything else is a hole score in course order.
 function receiptMarks(cd, p, scores) {
     const sb = loadHtmlInlineScript('settlement.html',
-        ['score-marks.js', 'match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']);
+        ['score-marks.js'].concat(fs.existsSync(path.join(REPO_ROOT, 'score-marks-hp.js')) ? ['score-marks-hp.js'] : []).concat(['match-engine.js', 'money-engine.js', 'action-model.js', 'settlement-engine.js']));
     vm.runInContext(`currentData = ${JSON.stringify({ gameFormat: 'stroke', players: p, courseData: cd, scores })};` +
         `window.__out = buildReceiptScorecard();`, sb);
     const html = sb.window.__out;
@@ -124,7 +153,7 @@ function receiptMarks(cd, p, scores) {
             if (/rt-sec/.test(cell)) return;       // OUT / IN / TOTAL
             const hole = cd[holeIdx];
             holeIdx++;
-            const mk = /mark-(birdie|eagle)/.exec(cell);
+            const mk = /mark-(birdie|eagle|bogey|double)/.exec(cell);
             if (mk && hole) found.push(`${name}:${hole.hole}:${mk[1]}`);
         });
     });
@@ -138,6 +167,11 @@ describe('BOTH SCORECARDS MARK THE SAME HOLES', () => {
     test('the fixture genuinely produces birdies AND eagles', () => {
         assert.ok(expected.some(x => /birdie/.test(x)), 'no birdies to test');
         assert.ok(expected.some(x => /eagle/.test(x)), 'no eagles to test');
+    });
+    test('HardPan: the fixture produces double bogeys too, and the Receipt boxes them', () => {
+        if (!fs.existsSync(path.join(REPO_ROOT, 'score-marks-hp.js'))) return;
+        assert.ok(expected.some(x => /double/.test(x)), 'no double bogeys to test');
+        assert.ok(receiptMarks(cd, p, scores).found.some(x => /double/.test(x)), 'the Receipt drew no double box');
     });
 
     test('REGRESSION: the Receipt marks exactly the expected holes', () => {

@@ -27,6 +27,7 @@
 // WHAT MINI-DOM CANNOT PROVE: the pill's rect, the font sizes, "level with the
 // title on the right". tools/receipt-send-check.js measures those in Chrome.
 // ============================================================================
+const { marksLegend } = require('./helpers/hardpan-marks.js');   // gps-marks: the legend's Bogey / Double bogey (HardPan)
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -115,7 +116,7 @@ describe('THE BASELINE, and today differs from it by exactly the move and the la
         const today = mounts(sb);
         assert.equal(prev.finished.summary.split(OLD_TOKEN).length - 1, 1, 'the old token occurs once in the capture');
         assertV196Mounts(assert, id => ({ text: norm(strip0(raw(sb, id))), html: raw(sb, id) }),
-            { pool: prev.finished.pool, summary: prev.finished.summary, 'settle-content': prev.finished.settle, 'receipt-scorecard': prev.finished.scorecard },
+            { pool: prev.finished.pool, summary: prev.finished.summary, 'settle-content': prev.finished.settle, 'receipt-scorecard': marksLegend(prev.finished.scorecard) },
             { norm, equal: ['settle-content', 'receipt-scorecard'] });
         assert.equal(today.actions, '|' + LABEL + '|');
         void OLD_TOKEN_GONE;
@@ -124,7 +125,8 @@ describe('THE BASELINE, and today differs from it by exactly the move and the la
         assert.equal(prev.live.settle.split(WAVE29_LIVE_WAS).length - 1, 1,
             'the pre-Wave-29 live MATCH NET line must occur exactly once in the capture');
         const expected = Object.assign({}, prev.live, {
-            settle: prev.live.settle.split(WAVE29_LIVE_WAS).join(WAVE29_LIVE_NOW)
+            settle: prev.live.settle.split(WAVE29_LIVE_WAS).join(WAVE29_LIVE_NOW),
+            scorecard: marksLegend(prev.live.scorecard)
         });
         assert.deepEqual(mounts(arrive(round(9))), expected);
     });

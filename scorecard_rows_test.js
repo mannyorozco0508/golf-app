@@ -24,6 +24,7 @@
 // TOT; scorecardRowsHtml() lays them out as the Receipt's single line of 18.
 // The board will lay the same cells out as two stacked nines.
 // ============================================================================
+const { unmarkHardPan } = require('./helpers/hardpan-marks.js');
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,7 +58,7 @@ describe('THE RECEIPT RENDERS BYTE FOR BYTE WHAT IT RENDERED AT 8d2eabf', () => 
     });
     Object.keys(R).forEach(k => {
         test(`${k}: identical`, () => {
-            assert.equal(receiptHtml(R[k]), PREV.html[k]);
+            assert.equal(unmarkHardPan(receiptHtml(R[k])), PREV.html[k]);   // gps-marks: the HardPan boxes taken back off (helpers/hardpan-marks.js)
         });
     });
 });
