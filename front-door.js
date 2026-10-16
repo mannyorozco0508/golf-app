@@ -111,6 +111,28 @@
         var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length);
     }
     function stateOf(name) { var m = /\(([A-Z]{2})\b/.exec(name || ''); return m ? m[1] : ''; }
+    // THE NAME A GOLFER READS (Manny, 2026-10-15): "Thistle Golf Club", not "Thistle Golf Club (NC -
+    // 27 Hole)" - a trailing "(XX ...)" that starts with a state is the directory's note, and the
+    // city line under it says where. Any other bracket ("(Yelm)", "(Red/Blue)") stays.
+    function nameKey(name) { return shownName(name).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    function shownName(name) { return String(name || '').replace(/\s*\((?:[A-Z]{2})\b[^)]*\)\s*$/, '') || String(name || ''); }
+    // A COURSE'S POINT when its own key has no bundled holes: a 27-hole club's first nine
+    // (thistle_27 -> thistle_27_cameron), else its GolfAPI club's lat / lng.
+    function golfapiCourse(key) {
+        var d = W.HardPanGolfApi, k = golfapiLink(key), id = k && d && d.links && d.links[k];
+        return id && d.courses ? d.courses[id] || null : null;
+    }
+    function coursePoint(key) {
+        var p = bundledPoint(key);
+        if (p) return p;
+        var b = bundled();
+        if (b && key) {
+            var nine = Object.keys(b).filter(function (k) { return k.indexOf(key + '_') === 0 && b[k] && b[k].holes; }).sort()[0];
+            if (nine) { p = bundledPoint(nine); if (p) return p; }
+        }
+        var ga = golfapiCourse(key);
+        return ga && isFinite(ga.lat) && isFinite(ga.lng) ? [ga.lat, ga.lng] : null;
+    }
     function allCourses() {
         if (C.list) return C.list;
         var out = [], seen = {};
@@ -119,20 +141,42 @@
             (g.items || []).forEach(function (i) {
                 if (!i || !i.id || seen[i.id]) return;
                 seen[i.id] = 1;
-                out.push({ key: i.id, name: i.name, ready: ready(i.id), pt: bundledPoint(i.id), state: stateOf(i.name), city: '' });
+                var ga = golfapiCourse(i.id);
+                out.push({ key: i.id, name: i.name, ready: ready(i.id), pt: coursePoint(i.id), state: stateOf(i.name) || (ga && ga.state) || '', city: (ga && ga.city) || '' });
             });
+        });
+        // THE APP'S GOLFAPI COURSES no directory row names (a course pulled for the app): by
+        // their club's point, GPS READY (gapi_<id>, the key a pulled course goes by).
+        var gd = W.HardPanGolfApi, linked = {};
+        if (gd && gd.links) Object.keys(gd.links).forEach(function (k) { linked[gd.links[k]] = 1; });
+        if (gd && gd.courses) Object.keys(gd.courses).forEach(function (id) {
+            var c = gd.courses[id];
+            if (!c || linked[id] || !isFinite(c.lat) || !/^\d+$/.test(String(id))) return;
+            var nm = String(c.club || '') + (c.course && c.holes >= 18 && String(c.course).toLowerCase() !== String(c.club).toLowerCase() ? ' (' + c.course + ')' : '');
+            if (!nm || out.some(function (o) { return nameKey(o.name) === nameKey(nm); })) return;
+            out.push({ key: 'gapi_' + id, name: nm, ready: true, pt: [c.lat, c.lng], state: c.state || '', city: c.city || '' });
         });
         var cov = W.HardPanGpsCoverage || {};
         Object.keys(cov).forEach(function (st) {
             ((cov[st] && cov[st].rows) || []).forEach(function (r) {
                 // [osm id, name, city, greens, lines, holes, bundle-ready, lat, lon]
-                var nm = String(r[1] || '');
-                if (!nm || out.some(function (c) { return c.name.toLowerCase().indexOf(nm.toLowerCase()) === 0; })) return;
+                var nm = String(r[1] || ''), nk = nameKey(nm);
+                // The same course under the directory's spelling ("Tri-Mountain" / "Tri Mountain")
+                // is listed once: the directory's row, which carries the key.
+                var same = nm ? out.filter(function (c) { return nameKey(c.name).indexOf(nk) === 0; })[0] : null;
+                if (same) { if (!same.city && r[2]) same.city = r[2]; if (!same.state) same.state = st; if (!same.pt && r[7] != null) same.pt = [r[7], r[8]]; return; }
+                if (!nm) return;
                 out.push({ key: null, osm: r[0], name: nm, city: r[2] || '', state: st, ready: false, pt: r[7] != null ? [r[7], r[8]] : null });
             });
         });
         C.list = out;
         return out;
+    }
+    var NEAR_MI = 25, NEAR_MAX = 8;
+    function nearList(here) {
+        if (!here) return [];
+        return allCourses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(here, c.pt) }; })
+            .filter(function (x) { return x.d <= NEAR_MI; }).sort(function (a, b) { return a.d - b.d; }).slice(0, NEAR_MAX);
     }
     function where(c, dist) {
         var bits = [];
@@ -147,7 +191,7 @@
     }
     function golfapiPlace(key) {
         try {
-            var G = W.HardPanGolfApi, id = G && G.links && G.links[key];
+            var G = W.HardPanGolfApi, lk = golfapiLink(key), id = G && G.links && lk && G.links[lk];
             if (!id || !G.courses) return '';
             var all = Array.isArray(G.courses) ? G.courses : Object.keys(G.courses).map(function (k) { return G.courses[k]; });
             var c = all.filter(function (x) { return x && (String(x.id) === String(id) || String(x.id).indexOf(String(id)) === 0); })[0];
@@ -156,7 +200,7 @@
     }
     function rowHtml(c, dist) {
         return '<button type="button" class="hp-row" data-hp-course="' + esc(c.key || '') + '" data-hp-name="' + esc(c.name) + '">'
-            + '<span><span class="n">' + esc(c.name) + '</span><span class="s" style="display:block;">' + esc(where(c, dist)) + '</span></span>'
+            + '<span><span class="n">' + esc(shownName(c.name)) + '</span><span class="s" style="display:block;">' + esc(where(c, dist)) + '</span></span>'
             + (c.ready ? '<span class="hp-badge">GPS READY</span>' : '<span class="hp-badge setup">SET UP · 1 TAP</span>') + '</button>';
     }
     // The city/state line for an app course, read once and kept (the setup list's own cache).
@@ -222,9 +266,12 @@
             var box = $('hp-near-list');
             if (!C.here && C.why === 'timeout') { box.innerHTML = '<div class="hp-status">Couldn\u2019t get your location yet. <button type="button" class="hp-retry" data-hp-retry="near" style="min-height:40px;margin-left:4px;border:1px solid #0f4c3a;border-radius:999px;background:#fff;color:#0f4c3a;font-weight:800;padding:4px 14px;">Tap to retry</button><br>Search works without it.</div>'; return; }
             if (!C.here) { box.innerHTML = '<div class="hp-status">Turn on location for this app to see courses near you. Search works without it.</div>'; return; }
-            var list = allCourses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(C.here, c.pt) }; })
-                .filter(function (x) { return x.d <= 60; }).sort(function (a, b) { return (b.c.ready - a.c.ready) || (a.d - b.d); }).slice(0, 5);
-            box.innerHTML = list.length ? list.map(function (x) { return rowHtml(x.c, x.d); }).join('') : '<div class="hp-status">No courses we know of within 60 miles — search above.</div>';
+            // NEAREST FIRST (Manny, 2026-10-15): distance only - GPS READY is a badge, not a rank;
+            // within 25 miles, up to 8. Within about a mile: "You're at ..." on top, one tap to start.
+            var list = nearList(C.here);
+            var at = list[0] && list[0].d <= 1 ? list[0] : null;
+            box.innerHTML = (at ? '<div class="hp-at"><div class="hp-at-h">YOU\u2019RE AT</div>' + rowHtml(at.c, at.d) + '</div>' : '')
+                + (list.length ? list.slice(at ? 1 : 0).map(function (x) { return rowHtml(x.c, x.d); }).join('') : '<div class="hp-status">No courses we know of within 25 miles — search above.</div>');
             fillPlaces(H.db, box);
         };
         var near = function () {
@@ -283,18 +330,20 @@
     }
     function setupClose() { var b = setupBox(); if (b) b.style.display = 'none'; busy = false; }
     // The card: the shared one when it is there (Round Setup prefers it), else the app's own.
-    function presetCard(key) {
+    // opts.front / opts.back: the nines picked in "Which nines?" (back 'none' = 9 holes), built the
+    // way Round Setup builds them (admin.html: remapNineHandicaps, "Club (Front / Back)" or
+    // "Club (Front Only)"), so courseGpsKey and golfapiMatch find that pairing.
+    function presetCard(key, opts) {
         try {
             /* global coursePresets, nineHoleLoops, remapNineHandicaps */
             if (typeof nineHoleLoops !== 'undefined' && nineHoleLoops[key]) {
                 var L = nineHoleLoops[key], ks = Object.keys(L), out = [];
-                // THE NINES GPS HAS: thistle_27_cameron_stewart -> Cameron then Stewart
-                // (the first two in the list, Cameron / MacKay, have no GolfAPI holes).
-                var link = golfapiLink(key), m2 = link && link !== key ? link.slice(key.length + 1).split('_') : null;
-                if (m2 && m2.length === 2 && L[m2[0]] && L[m2[1]]) ks = m2;
+                var f = opts && L[opts.front] ? opts.front : ks[0];
+                var bk = opts && (opts.back === 'none' || L[opts.back]) ? opts.back : (ks[1] || 'none');
+                ks = bk === 'none' ? [f] : [f, bk];
                 remapNineHandicaps(L[ks[0]].data, true).forEach(function (h, i) { out.push({ hole: i + 1, par: h.par, hcpIndex: h.hcpIndex }); });
                 if (ks[1]) remapNineHandicaps(L[ks[1]].data, false).forEach(function (h, i) { out.push({ hole: i + 10, par: h.par, hcpIndex: h.hcpIndex }); });
-                return { data: out, nameSuffix: ' (' + L[ks[0]].name.split(' ')[0] + (ks[1] ? ' / ' + L[ks[1]].name.split(' ')[0] : '') + ')' };
+                return { data: out, nameSuffix: ' (' + L[ks[0]].name.split(' ')[0] + (ks[1] ? ' / ' + L[ks[1]].name.split(' ')[0] : ' Only') + ')' };
             }
             if (typeof coursePresets !== 'undefined' && coursePresets[key] && coursePresets[key].data) return { data: coursePresets[key].data.map(function (h) { return { hole: h.hole, par: h.par, hcpIndex: h.hcpIndex }; }) };
         } catch (e) {}
@@ -313,8 +362,13 @@
         return n ? String(n).split(' ')[0] : 'Me';
     }
     // The round, in Round Setup's saved shape; one golfer: you.
-    function roundPayload(key, name, card) {
-        return {
+    function roundPayload(key, name, card, opts) {
+        var o = opts || {};
+        var start = o.start === 10 && (card || []).some(function (h) { return Number(h.hole) === 10; }) ? 10 : 1;
+        var tee = o.tee ? { teeKey: o.tee.key, teeName: o.tee.name, slope: o.tee.slope, courseRating: o.tee.courseRating, par: o.tee.par, allowance: 100 }
+            : { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 };
+        var extra = o.tournament ? { tournamentMode: true } : {};
+        return Object.assign({
             eventName: 'GPS round', roundDay: 'GPS round', settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar',
             organizerToken: Array.from({ length: 32 }, function () { return Math.floor(Math.random() * 16).toString(16); }).join(''),
             eventCategory: 'weekend', categoryIcon: '⛳', activeCourseKey: key, courseName: name, gameFormat: 'stroke', holeBetStake: 0,
@@ -325,20 +379,20 @@
             stablefordPointVal: 0, groupSizeOverrides: { 0: 1 }, stablefordScoring: 'net',
             stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 4, albatross: 5 },
             dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsCarryOver: false,
-            courseData: card, startingHole: 1,
-            teeRating: { teeKey: '', teeName: '', slope: null, courseRating: null, par: null, allowance: 100 },
+            courseData: card, startingHole: start,
+            teeRating: tee,
             alohaAllowed: false, handicapBasis: 'as-entered',
             players: [{ id: 101, name: meName(), hcp: '0', team: 'Team 1', squad: 'red', playingForMoney: true }]
-        };
+        }, extra);
     }
-    function create(key, name, card, side) {
+    function create(key, name, card, side, opts) {
         var G = W.organizerGate;
         if (!H.db || !G || typeof W.issueUniqueCode !== 'function') return Promise.reject(new Error('This screen cannot start a round right now - reload the app.'));
         var code;
         return timeout(G.ensureOrganizer(H.db), 12000, 'sign-in').then(function (uid) {
             return timeout(W.issueUniqueCode({ db: H.db, root: 'events' }), 12000, 'code').then(function (c) {
                 code = c;
-                var payload = G.stamp(roundPayload(key, name, card), uid);
+                var payload = G.stamp(roundPayload(key, name, card, opts), uid);
                 return timeout(H.db.ref('events/' + code).set(payload), 15000, 'save');
             });
         }).then(function () {
@@ -357,33 +411,35 @@
     var pending = null;   // { key, name, card } for "Play without GPS"
     function startRound(c) {
         if (busy) return;
+        // ASKED FIRST (Manny, 2026-10-15): which nines, start on 1 or 10, the tee, tournament mode.
+        if (!c.opts) { openStartOptions(c); return; }
         busy = true;
-        pending = { key: c.key, name: c.name, card: null, city: c.city, state: c.state };
+        pending = { key: c.key, name: c.name, card: null, city: c.city, state: c.state, opts: c.opts };
         var offline = W.navigator && W.navigator.onLine === false;
         if (c.key && ready(c.key)) {
             setupSay('Starting ' + c.name + '…', '', { working: true });
             if (offline) { setupSay('No signal', 'Starting a round needs a moment of signal (one bar is enough). Try again in a minute.', {}); return; }
             sharedCard(c.key).then(function (sc) {
-                var pc = presetCard(c.key);
+                var pc = presetCard(c.key, c.opts);
                 // A 27-hole course is the pair of nines GPS has: their card and their name.
                 var nines = !!(pc && pc.nameSuffix);
                 var card = nines ? pc.data : ((sc && sc.data) || (pc && pc.data));
                 if (!card) throw new Error('No scorecard for ' + c.name + ' yet.');
                 pending.card = card;
-                return create(c.key, String(c.name).replace(/\s*\(.*\)\s*$/, nines ? '' : '$&') + (nines ? pc.nameSuffix : ''), card, 'gps');
+                return create(c.key, String(c.name).replace(/\s*\(.*\)\s*$/, nines ? '' : '$&') + (nines ? pc.nameSuffix : ''), card, 'gps', c.opts);
             }).catch(function (e) { setupSay('Could not start ' + c.name, failWhy(e), { noGps: !!pending.card }); try { console.error('[front door] start', e); } catch (x) {} });
             return;
         }
         // NOT SET UP YET: pull it.
         setupSay('Setting up GPS for ' + c.name + '…', 'This takes a few seconds the first time.', { working: true });
-        var pc0 = c.key ? presetCard(c.key) : null;
+        var pc0 = c.key ? presetCard(c.key, c.opts) : null;
         if (pc0) pending.card = pc0.data;
         var L = W.HardPanGpsLive;
         if (offline) { setupSay('No signal', 'Setting up GPS for a new course needs a connection.', { noGps: true }); return; }
         if (!L || !L.on()) { setupSay('GPS setup is not available here', 'Play without GPS, or pick a course marked GPS READY.', { noGps: true }); return; }
         // Pulled before by anyone (gps_links/<key>): no GolfAPI call, start now.
         (c.key && pc0 ? L.ensure(c.key) : Promise.resolve(false)).then(function (have) {
-            if (have) { create(c.key, c.name + (pc0.nameSuffix || ''), pc0.data, 'gps').catch(function (e) { setupSay('Could not start ' + c.name, failWhy(e), { noGps: true }); }); return; }
+            if (have) { create(c.key, String(c.name).replace(/\s*\(.*\)\s*$/, pc0.nameSuffix ? '' : '$&') + (pc0.nameSuffix || ''), pc0.data, 'gps', c.opts).catch(function (e) { setupSay('Could not start ' + c.name, failWhy(e), { noGps: true }); }); return; }
             findAndPull(c, L);
         });
     }
@@ -406,7 +462,7 @@
             return sharedCard(key).then(function (sc) {
                 var card = (sc && sc.data) || pending.card;
                 if (!card) { setupSay('GPS is ready, but there is no scorecard yet', 'Set this course up once in Round Setup (Search online), then it starts in one tap.', { noGps: false }); return; }
-                return create(key, (sc && sc.name) || m.name || c.name, card, 'gps');
+                return create(key, (sc && sc.name) || m.name || c.name, card, 'gps', pending.opts);
             });
         }).catch(function (e) { setupSay('Could not set up GPS for ' + (m.name || c.name), failWhy(e), { noGps: !!pending.card }); });
     }
@@ -415,11 +471,94 @@
         var p = pending || {};
         if (p.card && p.key) {
             setupSay('Starting ' + p.name + '…', '', { working: true });
-            create(p.key, p.name, p.card, 'bets').catch(function (e) { setupSay('Could not start ' + p.name, failWhy(e), { noGps: false }); });
+            create(p.key, p.name, p.card, 'bets', p.opts).catch(function (e) { setupSay('Could not start ' + p.name, failWhy(e), { noGps: false }); });
             return;
         }
         ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false }));
         W.location.href = 'admin.html?start=quick';
+    }
+    // ---- THE QUICK-START'S QUESTIONS (gps-oct15): what Round Setup asks, before the round exists ----
+    // The tees: the course record's rated tees (global_courses/<key>.tees), the same list as Round
+    // Setup's Players step (admin.html courseTeeChoices).
+    function teeList(raw) { if (!raw) return []; if (Array.isArray(raw)) return raw; if (typeof raw === 'object') return Object.keys(raw).sort(function (a, b) { return Number(a) - Number(b); }).map(function (k) { return raw[k]; }); return []; }
+    function teeChoices(course) {
+        var out = [];
+        if (!course || !course.tees) return out;
+        ['male', 'female'].forEach(function (g) {
+            teeList(course.tees[g]).forEach(function (t, i) {
+                if (!t) return;
+                var slope = Number(t.slope != null ? t.slope : t.slope_rating), rating = Number(t.rating != null ? t.rating : t.course_rating);
+                var par = Number(t.parTotal != null ? t.parTotal : t.par_total);
+                if (!(par > 0)) { var hs = teeList(t.holes); if (hs.length) par = hs.reduce(function (sum, h) { return sum + (Number(h && h.par) || 0); }, 0); }
+                if (!(slope > 0) || !(rating > 0) || !(par > 0)) return;
+                out.push({ key: g + ':' + i, gender: g, name: String(t.name || t.tee_name || 'Tee'), slope: slope, courseRating: rating, par: par });
+            });
+        });
+        return out;
+    }
+    function loadTees(key) {
+        if (!H.db || !key) return Promise.resolve([]);
+        return timeout(H.db.ref('global_courses/' + key + '/tees').once('value').then(function (s) { return teeChoices({ tees: s && s.val ? s.val() : null }); }), 6000, 'tees').then(null, function () { return []; });
+    }
+    function optsBox() {
+        var el = $('hp-opts');
+        if (el) return el;
+        el = W.document.createElement('div'); el.id = 'hp-opts'; el.setAttribute('role', 'dialog');
+        el.style.cssText = 'position:fixed;inset:0;z-index:60;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;';
+        (W.document.body || W.document.documentElement).appendChild(el);
+        return el;
+    }
+    function openStartOptions(c) {
+        var L = typeof nineHoleLoops !== 'undefined' && c.key ? nineHoleLoops[c.key] : null;
+        var el = optsBox(), sel = 'width:100%;min-height:46px;font-size:16px;border:1px solid #0f4c3a;border-radius:12px;padding:0 10px;background:#fff;color:#1a1a1a;';
+        var lab = 'display:block;font-weight:800;font-size:14px;margin:12px 0 6px;color:#0f4c3a;';
+        var nine = L ? Object.keys(L).map(function (k) { return '<option value="' + esc(k) + '">' + esc(L[k].name) + '</option>'; }).join('') : '';
+        var ks = L ? Object.keys(L) : [];
+        el.innerHTML = '<div style="width:100%;max-width:520px;max-height:88%;overflow:auto;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div style="font-weight:800;font-size:19px;">' + esc(shownName(c.name)) + '</div>'
+            + (L ? '<div style="font-weight:800;font-size:16px;margin-top:10px;">Which nines?</div>'
+                + '<label style="' + lab + '" for="hp-o-front">Front 9</label><select id="hp-o-front" style="' + sel + '">' + nine + '</select>'
+                + '<label style="' + lab + '" for="hp-o-back">Back 9</label><select id="hp-o-back" style="' + sel + '">' + nine + '<option value="none">9 holes only</option></select>' : '')
+            + '<div id="hp-o-startbox"><span style="' + lab + '">Start on</span><div style="display:flex;gap:8px;">'
+            + '<button type="button" data-o-start="1" style="flex:1;min-height:46px;border-radius:12px;font-weight:800;font-size:16px;">Hole 1</button>'
+            + '<button type="button" data-o-start="10" style="flex:1;min-height:46px;border-radius:12px;font-weight:800;font-size:16px;">Hole 10</button></div></div>'
+            + '<label style="' + lab + '" for="hp-o-tee">Tee</label><select id="hp-o-tee" style="' + sel + '"><option value="">Loading tees\u2026</option></select>'
+            + '<label style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;font-weight:700;font-size:15px;"><input type="checkbox" id="hp-o-tourney" style="width:22px;height:22px;"> Tournament mode (distance only)</label>'
+            + '<button type="button" data-o="go" style="display:block;width:100%;min-height:52px;margin-top:14px;border:0;border-radius:14px;background:#0f4c3a;color:#fff;font-weight:800;font-size:17px;">Start round</button>'
+            + '<button type="button" data-o="cancel" style="display:block;width:100%;min-height:44px;margin-top:6px;border:0;background:none;color:#555;font-weight:700;font-size:15px;">Cancel</button></div>';
+        var o = { start: 1, tees: [] };
+        if (L) { $('hp-o-front').value = ks[0]; $('hp-o-back').value = ks[1] || 'none'; }
+        var paint = function () {
+            var nineOnly = L && $('hp-o-back').value === 'none';
+            if (nineOnly) o.start = 1;
+            $('hp-o-startbox').style.display = nineOnly ? 'none' : '';
+            Array.prototype.forEach.call(el.querySelectorAll('[data-o-start]'), function (b) {
+                var on = Number(b.getAttribute('data-o-start')) === o.start;
+                b.style.background = on ? '#0f4c3a' : '#fff'; b.style.color = on ? '#fff' : '#0f4c3a'; b.style.border = '1px solid #0f4c3a';
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        };
+        paint();
+        if (L) { $('hp-o-front').onchange = paint; $('hp-o-back').onchange = paint; }
+        loadTees(c.key).then(function (list) {
+            o.tees = list;
+            var t = $('hp-o-tee'); if (!t) return;
+            t.innerHTML = list.length ? list.map(function (x, i) { return '<option value="' + i + '">' + esc(x.name + (x.gender === 'female' ? ' (W)' : '') + ' \u00b7 ' + x.courseRating + ' / ' + x.slope) + '</option>'; }).join('') + '<option value="">No tee</option>'
+                : '<option value="">No rated tees for this course</option>';
+        });
+        el.onclick = function (ev) {
+            var t = ev.target, b;
+            if ((b = t.closest('[data-o-start]'))) { o.start = Number(b.getAttribute('data-o-start')) === 10 ? 10 : 1; paint(); return; }
+            if (t.closest('[data-o="cancel"]') || t === el) { el.style.display = 'none'; return; }
+            if (t.closest('[data-o="go"]')) {
+                var ti = $('hp-o-tee') ? $('hp-o-tee').value : '';
+                var opts = { start: o.start, tee: ti !== '' && o.tees[Number(ti)] ? o.tees[Number(ti)] : null, tournament: !!($('hp-o-tourney') && $('hp-o-tourney').checked) };
+                if (L) { opts.front = $('hp-o-front').value; opts.back = $('hp-o-back').value; if (opts.back === opts.front) opts.back = 'none'; }
+                el.style.display = 'none';
+                startRound(Object.assign({}, c, { opts: opts }));
+            }
+        };
+        el.style.display = 'flex';
     }
     function pickCourse(key, name, row) {
         var all = allCourses();

@@ -107,7 +107,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { expression: "JSON.stringify({ view: (document.querySelector('.hp-view.on')||{}).id, near: Array.prototype.map.call(document.querySelectorAll('#hp-near-list .hp-row'), function (b) { return b.innerText.replace(/\\s+/g,' '); }).slice(0,3), text: document.getElementById('v-gps').innerText.slice(0,300) })" },
         { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Caled'; i.dispatchEvent(new Event('input', { bubbles: true })); return 'typed'; })()" }, { sleep: 300 },
         { expression: "JSON.stringify({ results: Array.prototype.map.call(document.querySelectorAll('#hp-results-list .hp-row'), function (b) { return b.innerText.replace(/\\s+/g,' '); }) })" },
-        { expression: "(function(){ var b = document.querySelector('#hp-results-list [data-hp-course=\"caledonia\"]'); b.click(); b.click(); return 'double tap'; })()" }, { sleep: 6000 },
+        { expression: "(function(){ var b = document.querySelector('#hp-results-list [data-hp-course=\"caledonia\"]'); b.click(); b.click(); var go = document.querySelector('#hp-opts [data-o=\"go\"]'); if (go) { go.click(); go.click(); } return 'double tap'; })()" }, { sleep: 6000 },
         { expression: "JSON.stringify({ url: document.URL, side: localStorage.getItem('hardpan_round_side'), write: localStorage.getItem('__fdWrite'), writes: Number(localStorage.getItem('__fdWrites')||0), requests: performance.getEntriesByType('navigation').map(function(x){return x.name;}), e: window.__e })" },
         { expression: "(function(){ sessionStorage.clear(); location.href = 'home.html'; return 'reopen'; })()" }, { sleep: 3500 },
         { expression: "JSON.stringify({ view: (document.querySelector('.hp-view.on')||{}).id, last: Array.prototype.map.call(document.querySelectorAll('#v-main .hp-door.last'), function (b) { return b.classList.contains('gps') ? 'gps' : 'games'; }) })" },
@@ -135,7 +135,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { sleep: 1500 }, { expression: TOKEN },
         { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Prestwick'; i.dispatchEvent(new Event('input', { bubbles: true })); return 'typed'; })()" }, { sleep: 300 },
         { expression: "JSON.stringify({ results: Array.prototype.map.call(document.querySelectorAll('#hp-results-list .hp-row'), function (b) { return b.innerText.replace(/\\s+/g,' '); }) })" },
-        { expression: "(function(){ document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); return JSON.stringify({ title: document.querySelector('#hp-setup .hp-su-title').textContent }); })()" }, { sleep: 5000 },
+        { expression: "(function(){ document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); var go = document.querySelector('#hp-opts [data-o=\"go\"]'); if (go) { go.click(); go.click(); } return JSON.stringify({ title: document.querySelector('#hp-setup .hp-su-title').textContent }); })()" }, { sleep: 5000 },
         { expression: "JSON.stringify({ url: document.URL, write: localStorage.getItem('__fdWrite'), side: localStorage.getItem('hardpan_round_side'), setup: (document.getElementById('hp-setup')||{}).innerText || '', e: window.__e })" }] });
     const [n1, n2, n3] = J(r);
     const nw = n3.write ? JSON.parse(n3.write) : null, ncode = nw && nw.path.split('/')[1];
@@ -148,11 +148,11 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     r = await go({ url: fileUrl('home.html', '#gps'), db: DB(), settleMs: 3000,
         preScript: APP + GEO + ERR + KEEP + LIVE({ status: 'limit' }, { status: 'limit' }), steps: [
         { sleep: 1500 }, { expression: TOKEN },
-        { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Prestwick'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); return 'tap'; })()" }, { sleep: 2500 },
+        { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Prestwick'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); var go = document.querySelector('#hp-opts [data-o=\"go\"]'); if (go) { go.click(); go.click(); } return 'tap'; })()" }, { sleep: 2500 },
         { expression: "JSON.stringify({ shown: getComputedStyle(document.getElementById('hp-setup')).display, title: document.querySelector('#hp-setup .hp-su-title').textContent, why: document.querySelector('#hp-setup .hp-su-why').textContent, buttons: Array.prototype.map.call(document.querySelectorAll('#hp-setup .hp-su-acts button'), function (b) { return getComputedStyle(b).display === 'none' ? '' : b.textContent; }).filter(Boolean) })" },
         { tap: '#hp-setup [data-hp-su="another"]' }, { sleep: 300 },
         { expression: "JSON.stringify({ shown: getComputedStyle(document.getElementById('hp-setup')).display, view: (document.querySelector('.hp-view.on')||{}).id })" },
-        { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Prestwick'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); return 'tap again'; })()" }, { sleep: 2500 },
+        { expression: "(function(){ var i = document.getElementById('hp-q'); i.value = 'Prestwick'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#hp-results-list [data-hp-course=\"prestwick\"]').click(); var go = document.querySelector('#hp-opts [data-o=\"go\"]'); if (go) { go.click(); go.click(); } return 'tap again'; })()" }, { sleep: 2500 },
         { tap: '#hp-setup [data-hp-su="nogps"]' }, { sleep: 5000 },
         { expression: "JSON.stringify({ url: document.URL, side: localStorage.getItem('hardpan_round_side'), write: localStorage.getItem('__fdWrite') })" }] });
     const [l1, l2, l3] = J(r);
