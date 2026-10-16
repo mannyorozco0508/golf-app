@@ -1269,8 +1269,10 @@
     }
     // Exit: the round is forgotten here (and its unsendable changes), then the course picker.
     function exitRound(code, gone) {
-        forgetRound(code, true);
-        if (!gone) ls('golfapp_snap_v1_' + String(code).toUpperCase(), null);
+        // GONE: nothing queued for it can ever land - its copy and its queue go. REFUSED: only the refused
+        // change was dropped (index.html); the golfer's other unsent scores stay queued (audit 2026-10-16).
+        forgetRound(code, !!gone);
+        if (gone) ls('golfapp_snap_v1_' + String(code).toUpperCase(), null);
         var to = on() ? 'home.html#pick' : 'admin.html';
         try { W.location.replace(to); } catch (e) { W.location.href = to; }
     }
@@ -1289,8 +1291,11 @@
         m.setAttribute('data-hp-share', '1');
         m.innerHTML = '<button type="button" class="btn-outline qr-open-btn" data-hp-share-open="1">\uD83D\uDCE4 Share</button>';
         m.querySelector('button').addEventListener('click', function () { try { if (typeof W.toggleRoundSheet === 'function') W.toggleRoundSheet(false); } catch (e) {} openShare(); });
-        // index.html redraws this mount: keep "Share" there.
-        try { new MutationObserver(function () { if (m.getAttribute('data-hp-share') !== '1' || !m.querySelector('[data-hp-share-open]')) { m.removeAttribute('data-hp-share'); placeShareButton(); } }).observe(m, { childList: true }); } catch (e) {}
+        // index.html redraws this mount: keep "Share" there. ONE observer per mount (audit 2026-10-16:
+        // one was added on every redraw, so a round collected hundreds).
+        if (!m.__hpShareObs) {
+            try { m.__hpShareObs = new MutationObserver(function () { if (m.getAttribute('data-hp-share') !== '1' || !m.querySelector('[data-hp-share-open]')) { m.removeAttribute('data-hp-share'); placeShareButton(); } }); m.__hpShareObs.observe(m, { childList: true }); } catch (e) {}
+        }
     }
     var SH = { group: null, keys: {} };
     function shareSheet() {
@@ -1372,8 +1377,11 @@
     function makeKey(g) {
         var code = agCode(), key = newKey(), d0 = (function () { try { return typeof db !== 'undefined' ? db : null; } catch (e) { return null; } })();   /* global db */
         if (!d0) { shareSay('Not connected.'); return; }
-        sha256(key).then(function (hash) { return d0.ref('events/' + code + '/scoreKeys/' + g).set(hash); }).then(function () {
-            SH.keys[g] = key; var d = cd(); if (d) { d.scoreKeys = Object.assign({}, d.scoreKeys || {}); d.scoreKeys[String(g)] = 'set'; }
+        var made = null;
+        sha256(key).then(function (hash) { made = hash; return d0.ref('events/' + code + '/scoreKeys/' + g).set(hash); }).then(function () {
+            // The local copy holds the HASH, as the server does (audit 2026-10-16: it held 'set', so a
+            // phone locked to that group judged its own code wrong until the next snapshot).
+            SH.keys[g] = key; var d = cd(); if (d) { d.scoreKeys = Object.assign({}, d.scoreKeys || {}); d.scoreKeys[String(g)] = made; }
             openShare(); shareSay('Scorekeeper code for Group ' + g + ' made' + (d && d.scoreKeys ? '' : '') + '.');
         }, function (e) { shareSay('Not saved: ' + (e && e.message || e)); });
     }

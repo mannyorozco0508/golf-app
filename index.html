@@ -2465,7 +2465,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function hpSha256(text) {
         try {
             if (!(window.crypto && window.crypto.subtle && window.TextEncoder)) return Promise.resolve(null);
-            return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text))).then((b) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, '0')).join(''));
+            return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text))).then((b) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, '0')).join(''), () => null);
         } catch (e) { return Promise.resolve(null); }
     }
     // After each snapshot: does this group's scorekeeper code match? Redraws once it knows.
@@ -2476,7 +2476,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (hpKeyFor === want && (hpKeyState === 'ok' || hpKeyState === 'bad')) return;
         hpKeyFor = want; hpKeyState = 'pending';
         hpSha256(String(urlParams.get('sk') || '').trim().toUpperCase()).then((h) => {
-            hpKeyState = h && h === want ? 'ok' : 'bad';
+            // No hash at all (no SubtleCrypto here): the app cannot judge the code - not 'bad', which
+            // would lock a real scorekeeper out (audit 2026-10-16).
+            hpKeyState = h == null ? 'none' : (h === want ? 'ok' : 'bad');
             try { if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hpKeyState === 'bad'); } catch (e) { /* the badge waits */ }
             try { renderScorecard(); } catch (e) { /* the card redraws on the next snapshot */ }
         });
@@ -6453,9 +6455,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 holeMeta: gpsHoleMeta, holeList: gpsHoleList, gotoHole: gpsGotoHole,
                 stepHole: gpsStepHole
             });
+        } else if (typeof g.courseKey === 'function' && g.courseKey() && g.courseKey() !== key) {
+            // THE COURSE CHANGED UNDER AN OPEN GPS (audit 2026-10-16): Round Setup saved another course
+            // or other nines. The old course's greens must not stay on screen - mount again on the new one.
+            const wasGps = typeof g.side === 'function' && g.side() === 'gps';
+            g.unmount();
+            gpsFollowHoleView();
+            if (wasGps && window.HardPanGps && window.HardPanGps.isMounted()) window.HardPanGps.showSide('gps', { remember: false });
+            return;
         } else {
             g.setHole(currentViewedHole, par);
-            g.roundUpdated(currentData);
+            g.roundUpdated(currentData, { canFix: roundOwnerHere() });
         }
         // The round opened WITH SIGNAL: store the course's USGS imagery on the
         // phone for later. Sized from the course, never from the golfer.

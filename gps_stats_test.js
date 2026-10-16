@@ -89,5 +89,5 @@ test('on this phone only: no Firebase anywhere in it; the Tools item opens it; t
     const v = read('gps-view.js');
     assert.ok(/class="gps-menu-item gps-my-stats">My stats</.test(v));
     assert.ok(/on\(el, '\.gps-my-stats'[\s\S]{0,400}HardPanGpsStats\.open\(statsCtx\(\)\)/.test(v));
-    assert.ok(/function roundUpdated\(round\)[\s\S]{0,400}St\.refresh\(statsCtx\(\)\)/.test(v));
+    assert.ok(/function roundUpdated\(round(?:, opts)?\)[\s\S]{0,600}St\.refresh\(statsCtx\(\)\)/.test(v));
 });
