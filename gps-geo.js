@@ -1241,6 +1241,30 @@
         });
         return into;
     }
+    // THE NINES WE HAVE (Thistle, 2026-10-15): GolfAPI keeps a 27-hole club as 18-hole pairings
+    // ("Cameron + Stewart", "MacKay + Cameron"). Each is split into its two nines - holes 1-9 the
+    // first named, 10-18 the second, renumbered 1-9 - so ANY pairing, in either order, or one nine
+    // alone, is made from data already in the file. A nine seen twice (Cameron) is kept once.
+    // Real 9-hole records stay as they are.
+    function golfapiNines(all) {
+        var out = [], seen = {};
+        all.forEach(function (c) {
+            if (!c) return;
+            if (c.holes === 9) { out.push(c); return; }
+            var parts = String(c.course || '').split(/\s*\+\s*/);
+            if (c.holes !== 18 || parts.length !== 2 || !c.h) return;
+            parts.forEach(function (lab, i) {
+                var k = String(c.club || '').toLowerCase() + '|' + lab.toLowerCase();
+                if (seen[k]) return;
+                var h = {}, n = 0;
+                for (var j = 1; j <= 9; j++) { var src = c.h[j + 9 * i] || c.h[String(j + 9 * i)]; if (src) { h[String(j)] = src; n++; } }
+                if (!n) return;
+                seen[k] = 1;
+                out.push({ id: c.id + '#' + (i + 1), club: c.club, course: lab, city: c.city, state: c.state, lat: c.lat, lng: c.lng, holes: 9, h: h, fetched: c.fetched, updated: c.updated });
+            });
+        });
+        return out;
+    }
     function golfapiRecord(courses) {
         var holes = {};
         courses.forEach(function (c, i) { golfapiHoles(c, 9 * i, holes); });
@@ -1269,15 +1293,24 @@
             return want.every(function (w) { return hsHas(have, w) || (w.length >= 4 && hj.indexOf(w) !== -1); });
         };
         var m = String(name || '').match(/\(\s*([^()\/]+?)\s*\/\s*([^()\/]+?)\s*\)/);
-        if (m) {
+        // ONE NINE ("Thistle Golf Club (MacKay)" - a 9-hole round): that nine alone.
+        var m1 = m ? null : String(name || '').match(/\(\s*([^()\/]+?)\s*\)\s*$/);
+        if (m || m1) {
             var clubW = hsWords(String(name).replace(/\(.*\)/, ''));
+            var nines = golfapiNines(all);
             var nine = function (label) {
-                var lw = hsWords(label);
-                var hit = all.filter(function (c) { return c.holes === 9 && near(c) && covers(clubW, hsWords(c.club)) && covers(lw, words(c)); });
+                var lw = hsWords(String(label).replace(/\b(nine|only)\b/gi, ''));
+                if (!lw.length) return null;
+                var hit = nines.filter(function (c) { return near(c) && covers(clubW, hsWords(c.club)) && covers(lw, hsWords(c.course)); });
                 return hit.length === 1 ? hit[0] : null;
             };
-            var a = nine(m[1]), b = nine(m[2]);
-            if (a && b && a !== b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
+            if (m) {
+                var a = nine(m[1]), b = nine(m[2]);
+                if (a && b && a !== b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
+            } else {
+                var one = nine(m1[1]);
+                if (one) return { record: golfapiRecord([one]), how: 'the nine "' + one.course + '"' };
+            }
         }
         // "Prestwick CC" is "Prestwick Country Club": a scorecard name's CC / GC
         // abbreviations name no course (GolfAPI only - the OSM picker keeps its words).
@@ -1303,7 +1336,7 @@
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
-        golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, ellipseRing: ellipseRing,
+        golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, golfapiNines: golfapiNines, ellipseRing: ellipseRing,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

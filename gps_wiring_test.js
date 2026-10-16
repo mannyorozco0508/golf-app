@@ -828,6 +828,9 @@ test('GolfAPI links reach the trip rounds\' own keys (Thistle "thistle_cameron_s
     assert.ok(m && m.record.golfapiIds[0] === 'CS' && /as thistle_27_cameron_stewart/.test(m.how), m && m.how);
     // Without links: the name matches - but only in the same order.
     data.links = {};
-    assert.equal(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T).record.golfapiIds[0], 'CS');
-    assert.equal(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', null, 18, T), null, 'Stewart front, Cameron back is a different round');
+    // ANY PAIRING FROM THE NINES (gps-oct15): the record is split into its nines, and the round's
+    // order is kept - Stewart front, Cameron back is Stewart's holes then Cameron's, never the
+    // 18 as stored.
+    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T).record.golfapiIds, ['CS#1', 'CS#2']);
+    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', null, 18, T).record.golfapiIds, ['CS#2', 'CS#1'], 'Stewart front, Cameron back: in that order');
 });

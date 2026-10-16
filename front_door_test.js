@@ -30,7 +30,7 @@ test('routes to existing screens; the ONE write is a new GPS round, through the 
     assert.deepEqual(writes, ["ref('events/' + code).set(", "ref('events/' + code + '/scoreKeys/' + g).set("], 'two writes: the new round, and (Share, organizer) a group\u2019s scorekeeper code - its SHA-256 only');
     assert.match(s, /sha256\(key\)\.then\(function \(hash\) \{ return d0\.ref\('events\/' \+ code \+ '\/scoreKeys\/' \+ g\)\.set\(hash\); \}\)/, 'the hash, never the code');
     assert.match(s, /else if \(a === 'newkey' && SH\.group != null && isOrganizer\(\)\) makeKey\(SH\.group\);/, 'the organizer only');
-    assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card\), uid\)/);
+    assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card, opts\), uid\)/);
     assert.match(s, /W\.issueUniqueCode\(\{ db: H\.db, root: 'events' \}\)/);
     assert.match(s, /W\.selectHomeWidget\('quick'\)/, 'Start a round = the lobby\u2019s own new-round path');
     assert.match(s, /W\.gpsApplyTemplate\(tpl\)/, 'quick starts = Round Setup\u2019s own templates');

@@ -171,6 +171,15 @@
             else localStorage.setItem(TIER_KEY, m[1]);
         } catch (e) {}
     }
+    // TOURNAMENT MODE (Rules of Golf 4.3: distance only in competition; Manny, 2026-10-15).
+    // On for this round when the organizer set it (the round's tournamentMode - every phone in the
+    // round, and no golfer can turn it off); else this phone's own switch (GPS Tools). On: no wind
+    // (none shown, none fetched), no plays-like, no slope / elevation, no club picks - the plain
+    // front / middle / back, the tap distance and Mark shot stay.
+    var TOURNEY_KEY = 'hardpan_tournament_phone';
+    function tourneyRound() { try { var d = typeof currentData !== 'undefined' ? currentData : (S && S.round); return !!(d && d.tournamentMode === true); } catch (e) { return !!(S && S.round && S.round.tournamentMode === true); } }   /* global currentData */
+    function tourneyPhone() { try { return localStorage.getItem(TOURNEY_KEY) === '1'; } catch (e) { return false; } }
+    function tournament() { return tourneyRound() || tourneyPhone(); }
     function hasGpsPro() {
         var t = null;
         try { t = localStorage.getItem(TIER_KEY); } catch (e) {}
@@ -431,8 +440,28 @@
         if (S && S.courseLoc) return S.courseLoc;
         var rec = S && osmRecord(S.courseKey), pts = [];
         if (rec && rec.holes) Object.keys(rec.holes).forEach(function (n) { var o = rec.holes[n].osm; if (o && o.mid) pts.push(o.mid); });
-        if (!pts.length) return null;
+        if (!pts.length) return clubPoint();
         return [pts.reduce(function (a, q) { return a + q[0]; }, 0) / pts.length, pts.reduce(function (a, q) { return a + q[1]; }, 0) / pts.length];
+    }
+    // NEVER THE WHOLE WORLD (Thistle MacKay, 2026-10-15): with no green and no location, the club -
+    // a bundled nine of this course (thistle_27_*), else the GolfAPI club's lat / lng by name.
+    function clubPoint() {
+        try {
+            var base = String((S && S.round && S.round.activeCourseKey) || '').toLowerCase();
+            var all = window.HardPanGpsCourses || {};
+            if (base) {
+                var k = Object.keys(all).filter(function (x) { return x !== base && x.indexOf(base + '_') === 0 && all[x] && all[x].holes; }).sort()[0];
+                var rec = k && G.osmCourse(all, k), pts = [];
+                if (rec && rec.holes) Object.keys(rec.holes).forEach(function (n) { var o = rec.holes[n].osm || rec.holes[n]; if (o && o.mid) pts.push(o.mid); });
+                if (pts.length) return [pts.reduce(function (a, q) { return a + q[0]; }, 0) / pts.length, pts.reduce(function (a, q) { return a + q[1]; }, 0) / pts.length];
+            }
+            var d = window.HardPanGolfApi, club = String((S && S.round && S.round.courseName) || '').replace(/\(.*\)/, '').trim().toLowerCase();
+            if (d && d.courses && club) {
+                var ids = Object.keys(d.courses).filter(function (id) { var c = d.courses[id]; return c && isFinite(c.lat) && String(c.club || '').toLowerCase() === club; });
+                if (ids.length) { var c0 = d.courses[ids[0]]; return [c0.lat, c0.lng]; }
+            }
+        } catch (e) {}
+        return null;
     }
     function loadCourseLocation(done) {
         var key = S.courseKey, mine = S;
@@ -670,7 +699,7 @@
     // THE WHOLE COURSE'S HEIGHTS, ONCE, when the round opens with signal - for the
     // phones that never picked the course in setup (gps-offline.js; course points only).
     function prefetchCourseElevs() {
-        if (!S || S.elevPrefetch || cfg().elevOnTee !== false) return;
+        if (!S || S.elevPrefetch || cfg().elevOnTee !== false || tournament()) return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         var mine = S;
         S.elevPrefetch = true;
@@ -2050,7 +2079,7 @@
         });
     }
     function fetchWind() {
-        if (!S || S.windInFlight || typeof fetch !== 'function') return;
+        if (!S || S.windInFlight || typeof fetch !== 'function' || tournament()) return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         var pt = coursePoint();
         if (!pt) return;
@@ -2147,8 +2176,8 @@
         if (!S) return;
         var box = S.el.querySelector('.gps-wind');
         if (!box) return;
-        // Free (no HardPan GPS): no wind, and no request for it.
-        if (!S.pro) { box.style.display = 'none'; return; }
+        // Free (no HardPan GPS): no wind, and no request for it. Tournament mode: the same.
+        if (!S.pro || tournament()) { box.style.display = 'none'; closeWindSheet(); syncPlays(); return; }
         syncPlays();
         var w = lsGet(windKey()), now = Date.now();
         // Right away on opening GPS or a new hole (S.windKick), else every 10 minutes;
@@ -2231,6 +2260,7 @@
         // hole by hole on the tee - the whole course's heights come once, at setup,
         // with a download, or when the round opens with signal (prefetchCourseElevs).
         if (cfg().elevOnTee === false) return;
+        if (tournament()) return;   // tournament mode: no slope / elevation at all
         if (!S || !S.pro || S.side !== 'gps' || S.elevInFlight || typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         if (S.elevFailedAt && Date.now() - S.elevFailedAt < 60000) return;
@@ -2275,6 +2305,7 @@
     // To the aim (CENTER / PIN: target null), or to any point on the hole (the
     // target): its height from the tee -> green line, like the golfer's.
     function playsTo(targetPt) {
+        if (tournament()) return null;
         if (!S || !S.pro || S.mode !== 'measure') return null;
         var r = resolved(), o = origin(r), aim = targetPt || aimAt(r);
         if (!r || !o || !aim || !inUS(aim)) return null;
@@ -2575,6 +2606,11 @@
         // GREEN / HOLE: the green alone, or back to the whole hole.
         show('.gps-green-view', S.pro && !!S.map && !noGreen && S.mode === 'measure');
         txt('.gps-green-view', S.view === 'green' ? '⛳ Hole' : '⛳ Green');
+        // TOURNAMENT: the badge for a playing partner or an official, and the Tools switch.
+        var tq = tournament();
+        show('.gps-tourney', tq);
+        txt('.gps-tourney-toggle', tourneyRound() ? '\uD83C\uDFC6 Tournament mode: On (set by the organizer)' : (tq ? '\uD83C\uDFC6 Tournament mode: On' : '\uD83C\uDFC6 Tournament mode: Off'));
+        var tt = S.el.querySelector('.gps-tourney-toggle'); if (tt) tt.setAttribute('aria-disabled', tourneyRound() ? 'true' : 'false');
         show('.gps-zoom', S.view !== 'green');
         // THE SCORE BUTTON (Manny, 2026-10-14): no score yet -> "Enter score"; scored -> just the
         // number, big. A spectator sees the number (or "No score yet") and cannot open the editor.
@@ -2642,6 +2678,7 @@
         if (!from) return {};
         var yd = Math.round(G.haversineMeters(from, pt) / G.M_PER_YD);
         var brg = G.bearingDeg(from, pt);
+        if (tournament()) return { yd: yd };
         var w = effectiveWind(), has = !!(w && !w.none);
         var e0 = r ? (prev ? lineElev(r, from) : elevAt(r.tee)) : null, e1 = r ? lineElev(r, pt) : null;
         var pl = G.playsLike({ yards: yd, elevFromFt: e0, elevToFt: e1, windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
@@ -2690,7 +2727,7 @@
     }
     function openClubSheet() {
         var A = shotsApi(), sh = S && S.el.querySelector('.gps-clubs');
-        if (!A || !sh) return;
+        if (!A || !sh || tournament()) return;
         var code = S.eventCode, hole = S.hole;
         var list = A.shots(code, hole), last = list[list.length - 1];
         var head = sh.querySelector('.gps-clubs-head');
@@ -2877,6 +2914,7 @@
         // UNDER THE TOP PANEL: accuracy and source, the green's size, notes.
         + '<div class="gps-under">'
         +   '<div class="gps-sub gps-float"><span class="gps-acc"></span><span class="gps-src"></span></div>'
+        +   '<div class="gps-tourney gps-float" style="display:none" aria-label="Tournament mode: distance only">TOURNAMENT</div>'
         +   '<div class="gps-green-dims gps-float" style="display:none"></div>'
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
@@ -2944,6 +2982,7 @@
         +   '<button type="button" class="gps-menu-item gps-rechoose" style="display:none">Choose hole 1 again</button>'
         +   '<button type="button" class="gps-menu-item gps-refresh-gps" style="display:none">Refresh GPS data</button>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
+        +   '<button type="button" class="gps-menu-item gps-tourney-toggle"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
@@ -3088,6 +3127,7 @@
         + '#gps-overlay .gps-target-row{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-radius:999px;font-weight:800;font-size:15px;color:#ffffff;white-space:nowrap;}'
         + '#gps-overlay .gps-to-plays{font-size:13px;color:#e5e7eb;font-weight:700;}'
         + '#gps-overlay .gps-to-plays:empty{display:none;}'
+        + '#gps-overlay .gps-tourney{align-self:flex-start;background:#9b1c1c;color:#fff;border-color:#9b1c1c;font-weight:800;font-size:11px;letter-spacing:.08em;padding:4px 10px;border-radius:999px;}'
         + '#gps-overlay .gps-bottom{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 10px);display:flex;align-items:stretch;gap:8px;height:54px;}'
         + '#gps-overlay .gps-door-add{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
         + '#gps-overlay .gps-door-games{position:absolute;z-index:8;top:calc(env(safe-area-inset-top) + 96px);left:10px;border:0;border-radius:999px;padding:7px 14px;background:#1d3557;color:#fff;font:800 13px/1 ' + FONT + ';min-height:34px;cursor:pointer;}'
@@ -3328,6 +3368,11 @@
         on(el, '.gps-prev', function () { if (S && S.stepHole) S.stepHole(-1); });
         on(el, '.gps-next', function () { if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-units', function () { setUnits(units() === 'm' ? 'yd' : 'm'); render(); });
+        on(el, '.gps-tourney-toggle', function () {
+            if (tourneyRound()) { flash('Tournament mode is on for this round - only the organizer can turn it off (Round Setup)'); return; }
+            try { if (tourneyPhone()) localStorage.removeItem(TOURNEY_KEY); else localStorage.setItem(TOURNEY_KEY, '1'); } catch (e) {}
+            closeMenus(); S.windKick = true; render();
+        });
         on(el, '.gps-refresh-gps', function () {
             if (!S) return;
             closeMenus();
@@ -3677,6 +3722,7 @@
         // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
         hasGpsPro: hasGpsPro,
         isMounted: function () { return !!S; },
+        tournament: function () { return tournament(); },
         hole: function () { return S ? Number(S.hole) : null; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,

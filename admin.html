@@ -1660,6 +1660,12 @@ html {
             </select>
             <div id="tee-start-note" style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;"></div>
         </div>
+        <!-- GPS:BEGIN -->
+        <div id="gps-tournament-box" class="extra-settings-box" style="margin-top:12px;">
+            <label style="display:flex; align-items:center; gap:10px; color:var(--brand-green); font-weight:700;"><input type="checkbox" id="gps-tournament-mode" style="width:22px; height:22px;"> Tournament mode (GPS: distance only)</label>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">Rules of Golf 4.3: no wind, no slope / plays-like on any phone in this round. Only you can turn it off.</div>
+        </div>
+        <!-- GPS:END -->
 
         <div id="nine-loop-selector" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🔄 Modular 9-Hole Loop Selector</label>
@@ -11874,6 +11880,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 if (typeof teeStartChanged === 'function') teeStartChanged();
                 if (typeof syncTeeStartVisibility === 'function') syncTeeStartVisibility();
             }
+            // GPS:BEGIN
+            { const tm = document.getElementById('gps-tournament-mode'); if (tm) tm.checked = data.tournamentMode === true; }
+            // GPS:END
             if (document.getElementById("greenie-carryover")) {
                 // An existing round without the flag was played under the old rule and
                 // must show as OFF, not as the new default.
@@ -13010,6 +13019,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const slowTimer = setTimeout(() => {
                 if (saveBtn) saveBtn.innerText = '\u23F3 Still saving \u2014 keep this page open.';
             }, SAVE_SLOW_MS);
+            // GPS:BEGIN
+            // TOURNAMENT MODE (2026-10-15): true when ticked; null (this is an update) removes it, so a
+            // round without it is shaped exactly as before.
+            { const tm = document.getElementById('gps-tournament-mode'); if (tm) payload.tournamentMode = tm.checked ? true : null; }
+            // GPS:END
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js), in the order the rules
             // dictate: the token is awaited, organizers/<uid>/firstSeenAt is written
             // (write-once - a second press is refused and that is expected), and the
