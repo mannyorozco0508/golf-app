@@ -220,7 +220,7 @@
     },
     "seasons": {
       "$seasonCode": {
-        ".read": "auth != null && auth.token.email != null",
+        ".read": "auth != null",
         ".write": "auth != null && auth.token.email != null && (!data.exists() || newData.exists())",
         ".validate": "newData.hasChildren(['ownerEmail'])",
         "ownerEmail": {

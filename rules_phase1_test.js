@@ -84,7 +84,7 @@ test('TRIPS: frozen on live today; after the migration the owner edits again, go
     assert.strictEqual(W(P1, data(true), GOLFER, '/trips/T9WL/identity/TR1/101', 'golfer'), true, 'a golfer says who they are');
     assert.strictEqual(W(P1, data(true), anon('x'), '/trips/T9WL/name', 'pwned'), false, 'nobody else');
     assert.strictEqual(W(P1, data(false), MANNY, '/trips/T9WL/name', 'x'), false, 'before the migration it stays frozen (as live)');
-    assert.ok(MIG['trips/TF93GJ/ownerUid'] === MANNY.uid && Object.keys(MIG).length === 21, 'the migration patch covers the owner-less trips');
+    assert.ok(MIG['trips/TF93GJ/ownerUid'] === MANNY.uid && Object.keys(MIG).length === 6 && !MIG['trips/Z28Y/ownerUid'], 'the migration: Manny on TF93GJ / 3SKVBL / 9WLQ63 / FYYQ95, two organizers, the 15 owner-less trips left alone (Manny 2026-10-17)');
 });
 test('TOURNAMENTS: today\'s web scorecard (no sign-in) still scores; the round record is fixed', () => {
     KEEPS('a team score from the web scorecard, signed out', (r, d) => W(r, d, OUT, '/tournaments/TONE/scores/team1_h2', 4));
@@ -115,4 +115,13 @@ test('TRIPS: a golfer\'s anonymous phone opens the trip link (live: email sign-i
     assert.strictEqual(targaryen.database(LIVE, data(false)).as(GOLFER).read('/trips/T9WL', NOW).allowed, false, 'control: live refuses an anonymous golfer');
     assert.strictEqual(targaryen.database(P1, data(true)).as(GOLFER).read('/trips/T9WL', NOW).allowed, true, 'phase 1: any signed-in phone');
     assert.strictEqual(targaryen.database(P1, data(true)).as(OUT).read('/trips/T9WL', NOW).allowed, false, 'signed out: no');
+});
+
+test('SEASONS: a golfer\'s anonymous phone opens the season link (live: email sign-in only)', () => {
+    const d = data(true); d.seasons = { S1: { ownerEmail: 'o@x.test', name: 'Tuesdays' } };
+    const dl = data(false); dl.seasons = d.seasons;
+    assert.strictEqual(targaryen.database(LIVE, dl).as(GOLFER).read('/seasons/S1', NOW).allowed, false, 'control: live refuses an anonymous golfer');
+    assert.strictEqual(targaryen.database(P1, d).as(GOLFER).read('/seasons/S1', NOW).allowed, true, 'phase 1: any signed-in phone');
+    assert.strictEqual(targaryen.database(P1, d).as(OUT).read('/seasons/S1', NOW).allowed, false, 'signed out: no');
+    assert.strictEqual(JSON.stringify(P1.rules.seasons.$seasonCode['.write']), JSON.stringify(LIVE.rules.seasons.$seasonCode['.write']), 'season writes are live\'s, unchanged');
 });

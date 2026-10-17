@@ -74,6 +74,11 @@ T.ownerUid = { '.validate': "(!data.exists() && auth != null && newData.val() ==
 T.identity = Object.assign({}, T.identity, { '.write': "auth != null && root.child('trips/' + $tripCode).exists()" });
 T.league = { '.write': "auth != null && auth.token.email != null && root.child('trips/' + $tripCode).exists()" };
 
+// ---- SEASONS (mailbox 005, Manny: the same as trips) --------------------------------------
+// LIVE lets only an EMAIL sign-in READ a season, so a season link never opens on a golfer's
+// anonymous phone. Any signed-in phone reads it. (Writes are unchanged from live.)
+R.seasons.$seasonCode['.read'] = 'auth != null';
+
 // ---- GLOBAL COURSES (audit C3) ------------------------------------------------------------
 const GC = R.global_courses.$courseId;
 // Users CREATE a course card; nobody rewrites one from a phone. gapi_* / gca_* are the server's
