@@ -2046,11 +2046,14 @@ html {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
         const restore = setControlPending(pressedEl, '\u23F3 Creating...');
-        issueUniqueCode({ db, root: 'trips' }).then(code => {
+        // THE TRIP IS ITS CREATOR'S (Manny 2026-10-17, the phase-1 rules): ownerUid is the signed-in
+        // uid (anonymous too), stamped like the planner path's rounds - the rules refuse a trip without it.
+        let ownerUid = null;
+        window.organizerGate.ensureOrganizer(db).then((uid) => { ownerUid = uid; return issueUniqueCode({ db, root: 'trips' }); }).then(code => {
             // Same as the planner path above: mint here, leave holding it.
             const tripToken = makeOrganizerToken();
             return db.ref(`trips/${code}`)
-                .set({ name: name, createdAt: Date.now(), rounds: {}, organizerToken: tripToken })
+                .set({ name: name, createdAt: Date.now(), rounds: {}, organizerToken: tripToken, ownerUid: ownerUid })
                 .then(() => { window.location.href = `trip.html?trip=${code}&organizer=${tripToken}`; });
         }).catch(err => {
             restore();
