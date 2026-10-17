@@ -10644,6 +10644,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         },
         close: closeCardInPopup
     });
+    // GPS:BEGIN
+    // ANDROID (android-gps, 2026-10-17): the Round Menu sheet closes on Back, as its
+    // scrim does on a tap. Without it a press went straight past the open sheet and
+    // out of the round. Priority 3: a modal opened from the sheet sits above it.
+    if (window.GolfBack && window.Capacitor && typeof window.Capacitor.getPlatform === 'function'
+        && window.Capacitor.getPlatform() === 'android') window.GolfBack.register({
+        name: 'round-sheet', priority: 3,
+        isOpen: function () {
+            const sh = document.getElementById('round-sheet');
+            return !!sh && sh.classList.contains('open');
+        },
+        close: function () { toggleRoundSheet(false); }
+    });
+    // GPS:END
 
     if (window.GolfBack) window.GolfBack.register({
         name: 'finish-round-review', priority: 1,

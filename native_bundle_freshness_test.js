@@ -104,9 +104,29 @@ const sha = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('
 // found in a native bundle is drift: the "carries nothing the repo does not
 // ship" test below names it.
 const gpsFlag = require('./tools/gps-flag.js');
-const filesFor = () => FILES;
-const expectedSha = (f) => gpsFlag.isText(f)
-    ? crypto.createHash('sha256').update(gpsFlag.applyFlag(read(f), false, f)).digest('hex')
+
+// THE ANDROID APP CAN BE THE GPS BUILD (android-gps, 2026-10-17), AND WHICH BUILD IT
+// IS IS DECLARED, NEVER DETECTED. The declaration is the one Android already makes:
+// @capacitor/geolocation in capacitor.config.ts's android.includePlugins - the plugin
+// front-door.js reads as "this is the GPS app". Reading the bundle to decide would let
+// a wrong bundle pick whichever mode it passes. GPS declared: android/'s bundle and
+// www/app (which cap sync android copies) are held, byte for byte, to what
+// tools/build-gps-app.js writes - SHARED + CONSUMER + GPS_SHELL with the GPS flag ON -
+// and the iOS bundle is still held to the Consumer build exactly as before.
+const ANDROID_GPS = (() => {
+    const block = /\n  android:\s*\{([\s\S]*?)\n  \},/.exec(read('capacitor.config.ts'));
+    const list = block && /includePlugins:\s*\[([^\]]*)\]/.exec(block[1]);
+    return !!list && /'@capacitor\/geolocation'/.test(list[1]);
+})();
+const GPS_BUILD = [...new Set(declared('SHARED_SHELL').concat(declared('CONSUMER_SHELL')).concat(GPS_FILES))];
+// The GolfAPI course data: gitignored, so build-gps-app.js copies it only when it is
+// there. Allowed in a GPS bundle only as an exact copy of golfapi/gps-golfapi.js.
+const GOLFAPI_SRC = path.join(REPO_ROOT, 'golfapi', 'gps-golfapi.js');
+const GOLFAPI_SHIPPED = 'gps-golfapi.js';
+const gpsMode = dir => ANDROID_GPS && (dir === ANDROID || dir === WEBDIR);
+const filesFor = (dir) => gpsMode(dir) ? GPS_BUILD : FILES;
+const expectedSha = (f, dir) => gpsFlag.isText(f)
+    ? crypto.createHash('sha256').update(gpsFlag.applyFlag(read(f), gpsMode(dir), f)).digest('hex')
     : sha(path.join(REPO_ROOT, f));
 const RESYNC = 'node sync-mobile-web.js && npx cap sync ios';
 
@@ -285,7 +305,9 @@ describe('THE NATIVE BUNDLE MATCHES THE REPO', () => {
 // the platform and the command in plain words, and so the iOS block above is
 // byte-for-byte what it was.
 // ---------------------------------------------------------------------------
-const RESYNC_ANDROID = 'node sync-mobile-web.js && npx cap sync android';
+const RESYNC_ANDROID = ANDROID_GPS
+    ? 'GPS_APP_DEST=www/app node tools/build-gps-app.js && npx cap sync android'
+    : 'node sync-mobile-web.js && npx cap sync android';
 const ANDROID_REL = 'android/app/src/main/assets/public/';
 const ANDROID_ABSENT = ANDROID_REL + ' does not exist - this tree has never run '
     + '`' + RESYNC_ANDROID + '`. That is a fresh clone, not a stale bundle: nothing can '
@@ -296,6 +318,34 @@ const ANDROID_ABSENT = ANDROID_REL + ' does not exist - this tree has never run 
 const CAPACITOR_OWN_ANDROID = ['cordova.js', 'cordova_plugins.js', 'capacitor.config.json'];
 
 describe('THE ANDROID BUNDLE MATCHES THE REPO', () => {
+
+    // WHICH BUILD ANDROID SHIPS, READ AND CHECKED (android-gps). Positive first: the
+    // declaration has to parse, and in GPS mode the list has to be the Consumer list
+    // plus the GPS files - not a shorter list that would compare less.
+    test('the Android build is declared, and its file list is the build it declares', () => {
+        assert.match(read('capacitor.config.ts'), /\n  android:\s*\{[\s\S]*?includePlugins:/,
+            'capacitor.config.ts declares no android.includePlugins - the mode cannot be read');
+        const want = ANDROID_GPS ? GPS_BUILD : FILES;
+        assert.deepEqual(filesFor(ANDROID), want);
+        assert.ok(FILES.every(f => filesFor(ANDROID).includes(f)),
+            'the Android list must hold every Consumer file whichever build it is');
+        if (ANDROID_GPS) {
+            assert.ok(['gps-view.js', 'front-door.js', 'home.html'].every(f => filesFor(ANDROID).includes(f)),
+                'Android is declared the GPS app, so its list must carry the GPS files');
+            assert.ok(GPS_FILES.length >= 10, 'GPS_SHELL parsed to ' + GPS_FILES.length + ' files');
+        }
+        // The iOS bundle is the Consumer build whatever Android declares.
+        assert.deepEqual(filesFor(NATIVE), FILES);
+    });
+
+    test('a GPS bundle carries the GolfAPI data only as an exact copy of golfapi/',
+        { skip: AND.present ? false : ANDROID_ABSENT }, () => {
+        const shipped = path.join(ANDROID, GOLFAPI_SHIPPED);
+        if (!fs.existsSync(shipped)) return;
+        assert.ok(ANDROID_GPS, 'gps-golfapi.js is in a bundle declared Consumer');
+        assert.ok(fs.existsSync(GOLFAPI_SRC), 'the bundle has gps-golfapi.js but golfapi/gps-golfapi.js is not in this tree');
+        assert.equal(sha(shipped), sha(GOLFAPI_SRC), 'the shipped GolfAPI data is not golfapi/gps-golfapi.js. Run: ' + RESYNC_ANDROID);
+    });
 
     // POSITIVE FIRST, for the assertion below that is otherwise "none of these is
     // present": if the Tournament list parses to nothing, that check is vacuous.
@@ -350,7 +400,8 @@ describe('THE ANDROID BUNDLE MATCHES THE REPO', () => {
 
     test('the Android bundle carries nothing the repo does not ship',
         { skip: AND.present ? false : ANDROID_ABSENT }, () => {
-        const extra = AND.entries.filter(f => !filesFor(ANDROID).includes(f) && !CAPACITOR_OWN_ANDROID.includes(f));
+        const extra = AND.entries.filter(f => !filesFor(ANDROID).includes(f) && !CAPACITOR_OWN_ANDROID.includes(f)
+            && !(ANDROID_GPS && f === GOLFAPI_SHIPPED));
         assert.deepEqual(extra, [],
             'the Android bundle contains ' + extra.length + ' file(s) that are neither '
             + 'declared in ' + SYNC_SCRIPT + ' nor written by Capacitor: ' + extra.join(', ')

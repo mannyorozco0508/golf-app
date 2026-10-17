@@ -154,6 +154,13 @@ const config: CapacitorConfig = {
     },
     FirebaseMessaging: {
       presentationOptions: ['badge', 'sound', 'alert']
+    },
+    // ANDROID ONLY (android-gps, 2026-10-17): the SystemBars plugin does no inset
+    // handling of its own - MainActivity.java pads the WebView between the bars.
+    // 'css' (the default) let the page scroll under the status bar and logged
+    // "Error injecting safe area CSS" on every launch. iOS has no insetsHandling.
+    SystemBars: {
+      insetsHandling: 'disable'
     }
   }
 };

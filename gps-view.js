@@ -8395,9 +8395,41 @@
         return true;
     }
 
+    // ANDROID HARDWARE BACK (android-gps, 2026-10-17). One layer per press, the top one
+    // first, closed by the same function its own control uses; with nothing over the
+    // map, the map goes back to the card exactly as its ‹ does. backLayer() only looks
+    // (null = nothing GPS is on screen); back() closes that layer. front-door.js calls
+    // them, and only from the Android back button - iOS has none, the web never does.
+    var BACK_LAYERS = [
+        ['.gps-wind-sheet', 'wind', function () { closeWindSheet(); }],
+        ['.gps-clubs', 'clubs', function () { closeClubSheet(); }],
+        ['.gps-who-sheet', 'who', function () { closeWho(); }],
+        ['.gps-addgame', 'add-game', function () { closeAddGame(); }],
+        ['.gps-sheet', 'sheet', function () { closeSheet(); }],
+        ['.gps-credit-pop', 'credits', function () { closeCredits(); }],
+        ['.gps-picker', 'picker', function () { closeMenus(); }],
+        ['.gps-tools-menu', 'tools', function () { closeMenus(); }]
+    ];
+    function backLayer() {
+        if (!S || !S.el || S.side !== 'gps') return null;
+        for (var i = 0; i < BACK_LAYERS.length; i++) {
+            var e = S.el.querySelector(BACK_LAYERS[i][0]);
+            if (e && e.style.display !== 'none') return BACK_LAYERS[i][1];
+        }
+        return 'map';
+    }
+    function back() {
+        var layer = backLayer();
+        if (!layer) return null;
+        if (layer === 'map') { S.userChoseSide = true; showSide('bets'); return layer; }
+        for (var i = 0; i < BACK_LAYERS.length; i++) if (BACK_LAYERS[i][1] === layer) BACK_LAYERS[i][2]();
+        return layer;
+    }
+
     var api = {
         mount: mount, unmount: unmount, showSide: showSide, setHole: setHole, roundUpdated: roundUpdated,
         precacheCourse: precacheCourse,
+        backLayer: backLayer, back: back,
         // GPS-4 (the app's front door): the Add a game sheet over the map.
         openAddGame: function () { if (S && S.pro && S.side !== 'gps') showSide('gps'); openAddGame(); },
         // THE ONE CHECK for GPS Map (an active trial or subscription).

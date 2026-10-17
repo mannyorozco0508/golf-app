@@ -4360,6 +4360,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         close: function () { wizardBack(currentWizardStep); }
     });
 
+    // ANDROID (android-gps, 2026-10-17): the Setup Coach goes back one question per
+    // press, through its own on-screen Back - which on the first question is "← Home",
+    // the setup lobby. Without it a press left the coach for Home with the answers lost.
+    if (window.GolfBack && isAndroidShell()) window.GolfBack.register({
+        name: 'coach-step', priority: 5,
+        isOpen: function () {
+            const c = document.getElementById('coach-screen');
+            return !!c && c.style.display === 'block';
+        },
+        close: function () { coachBack(); }
+    });
+
     // WHAT THE SIDE MATCH WILL ACTUALLY BE, or that it will not be saved.
     //
     // The review covered the main format, the stacked games and the extras, and said
@@ -8793,12 +8805,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } catch (e) { return null; }
     }
 
+    // THE ANDROID SHELL (android-gps, 2026-10-17). Every Android-only difference on this
+    // page asks this one question; iOS and the web answer false and behave as before.
+    function isAndroidShell() {
+        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
+        catch (e) { return false; }
+    }
+
     function syncNotifyCard() {
         var card = document.getElementById('notify-card');
         if (!card) return;
         var native = false;
         try { native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
         catch (e) { native = false; }
+        // ANDROID HAS NO PUSH (no google-services.json, no push plugin): the switches
+        // would promise notifications that can never arrive. Hidden, and nothing read.
+        if (isAndroidShell()) native = false;
         card.style.display = native ? 'block' : 'none';
         if (!native) return;
         var uid = notifyUid();
@@ -10820,6 +10842,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function syncOauthLinkRow() {
         var card = document.getElementById('oauth-link-card');
         if (!card) return;
+        // ANDROID: no Link Apple / Link Google - the same dead end as the sign-in
+        // buttons (android-gps, 2026-10-17; see syncOauthCard).
+        if (isAndroidShell()) { if (card.style.display !== 'none') card.style.display = 'none'; return; }
         var u = null;
         try { u = window.firebase && firebase.auth && firebase.auth().currentUser; } catch (e) { u = null; }
         var linked = (window.oauthSignin && typeof oauthSignin.linkedProviders === 'function')
@@ -10838,6 +10863,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // that stops it adopting somebody else's account on
     // credential-already-in-use - which is the move that made the stray one.
     function oauthLinkTap(which) {
+        if (isAndroidShell()) return;   // not drawn on Android (syncOauthLinkRow)
         if (!oauthReady()) return setTextOnce(document.getElementById('oauth-link-status'),
             'Sign-in is not ready yet. Wait a moment and try again.');
         var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
@@ -10863,6 +10889,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function oauthTap(which) {
+        if (isAndroidShell()) return;   // not drawn on Android (syncOauthCard)
         var btn = document.getElementById(which === 'apple' ? 'oauth-apple' : 'oauth-google');
         if (!oauthReady()) {
             tapFail(btn, 'Sign-in is not ready yet. Wait a moment and try again.');
@@ -11204,15 +11231,35 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             try { return (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null; }
             catch (e) { return null; }
         })();
+        // ANDROID: EMAIL IS THE ONLY WAY IN (android-gps, 2026-10-17). Apple and Google
+        // left the app for Chrome and never came back - the button sat on "Opening..."
+        // with nothing to say why - because the native sign-in plugin is iOS-only. On
+        // Android neither button is drawn, the email card is the card, and the "Keep
+        // this organizer" heading and one-tap lead go with the buttons they described.
+        // Decided in each `want`, never by a second pass: this subtree is observed, and
+        // two writes that undo each other are the mutation loop setTextOnce exists for.
+        const android = isAndroidShell();
         ['oauth-apple', 'oauth-google'].forEach(id => {
             const b = document.getElementById(id);
-            const want = linked ? 'none' : '';
+            const want = (linked || android) ? 'none' : '';
             if (b && b.style.display !== want) b.style.display = want;
         });
         // THE EMAIL LINK IS THE THIRD WAY IN, and it closes with the other two.
         const toggle = document.getElementById('oauth-email-toggle');
-        const tWant = linked ? 'none' : '';
+        const tWant = (linked || android) ? 'none' : '';
         if (toggle && toggle.style.display !== tWant) toggle.style.display = tWant;
+        if (android) {
+            const aWant = linked ? '' : 'none';
+            ['oauth-title', 'oauth-lead'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.style.display !== aWant) el.style.display = aWant;
+            });
+            if (!linked) {
+                emailFallbackShown = true;
+                const card = document.getElementById('email-link-card');
+                if (card && card.style.display !== '') card.style.display = '';
+            }
+        }
         if (linked) {
             // Signed in with the card already open - the state a golfer is in the
             // moment a sign-in completes inside the panel - shuts it.

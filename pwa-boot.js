@@ -423,8 +423,37 @@
         }
     }
 
+    function androidShell() {
+        try {
+            var C = window.Capacitor;
+            return !!(C && typeof C.getPlatform === 'function' && C.getPlatform() === 'android');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ANDROID: A PAGE'S TOP LEVEL GOES HOME (android-gps, 2026-10-17). history.back()
+    // went wherever the WebView had last been - from a round straight to Home, from Home
+    // back into a round. The pages Home opens (the round, setup, a trip, a season, a
+    // tournament) go to Home with nothing open; the screens opened from inside a round
+    // (Results, Matches, Skins...) go back the way they came. Home itself has no
+    // pwa-boot.js - front-door.js owns its back button, and only Home's Main minimises.
+    // iOS and the web never reach this: no back button, and androidShell() is false.
+    var HOME_OPENS = ['index.html', 'admin.html', 'trip.html', 'season.html', 'tournament.html', ''];
+    function androidTopLevel(canGoBack) {
+        var page = '';
+        try { page = String(location.pathname || '').split('/').pop().toLowerCase(); } catch (e) { page = ''; }
+        if (HOME_OPENS.indexOf(page) === -1 && canGoBack && typeof history !== 'undefined' && history && typeof history.back === 'function') {
+            history.back();
+            return 'history';
+        }
+        try { location.href = 'home.html'; } catch (e) { return 'none'; }
+        return 'home';
+    }
+
     // Returns the name of the layer that acted, or 'history' / 'minimize' / 'none'
-    // when nothing was open. Tests read that; the listener ignores it.
+    // when nothing was open (Android: 'history' or 'home'). Tests read that; the
+    // listener ignores it.
     function pressBack(info) {
         var sorted = backProbes.slice().sort(function (a, b) { return a.priority - b.priority; });
         for (var i = 0; i < sorted.length; i++) {
@@ -438,6 +467,7 @@
             return probe.name;
         }
         var canGoBack = !!(info && info.canGoBack);
+        if (androidShell()) return androidTopLevel(canGoBack);
         if (canGoBack && typeof history !== 'undefined' && history && typeof history.back === 'function') {
             history.back();
             return 'history';

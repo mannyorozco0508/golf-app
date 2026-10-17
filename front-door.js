@@ -32,6 +32,7 @@
     function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function $(id) { return W.document.getElementById(id); }
     function native() { try { return !!(W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function' && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
+    function android() { try { return !!(W.Capacitor && typeof W.Capacitor.getPlatform === 'function' && W.Capacitor.getPlatform() === 'android'); } catch (e) { return false; } }
     // THE HARDPAN GPS APP: native AND carrying the Geolocation plugin (com.rattlegolf.gpsbeta
     // registers it; the Consumer app does not ship it, nor this file).
     function gpsApp() { try { return native() && !!(W.Capacitor.Plugins && W.Capacitor.Plugins.Geolocation); } catch (e) { return false; } }
@@ -67,8 +68,27 @@
         if (code === 1 || code === 'PERMISSION_DENIED' || /denied|permission|not authori[sz]ed|disabled|not enabled/.test(m)) return 'denied';
         return 'timeout';
     }
+    // ANDROID ASKS ONCE, FOR PRECISE (android-gps, 2026-10-17). A low-accuracy ask is a
+    // coarse-only permission on Android - a fix 2 km off - and the map's high-accuracy
+    // watch then asked again to upgrade it: two prompts. Android asks for precise here,
+    // and LOC_MS starts when the permission dialog is answered, never while it is up.
+    // iOS and the web keep the path below exactly as it was.
+    function grantedOn(st) { return !!st && (st.location === 'granted' || st.coarseLocation === 'granted'); }
+    function positionAndroid(G, done) {
+        var settled = false, timer = null;
+        var once = function (p, why) { if (settled) { if (p) done(p, 'late'); return; } settled = true; clearTimeout(timer); done(p, why); };
+        var known = typeof G.checkPermissions === 'function' ? Promise.resolve().then(function () { return G.checkPermissions(); }) : Promise.resolve(null);
+        known.then(function (st) {
+            return grantedOn(st) ? st : G.requestPermissions({ permissions: ['location'] });
+        }).then(function (st) {
+            if (!grantedOn(st)) { once(null, 'denied'); return; }
+            timer = setTimeout(function () { once(null, 'timeout'); }, LOC_MS);
+            return G.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); });
+        }).then(null, function (e) { once(null, whyNot(e)); });
+    }
     function position(done) {
         var Cap = W.Capacitor, G = Cap && Cap.Plugins && Cap.Plugins.Geolocation, settled = false;
+        if (native() && android() && G && typeof G.requestPermissions === 'function' && typeof G.getCurrentPosition === 'function') { positionAndroid(G, done); return; }
         var once = function (p, why) { if (settled) { if (p) done(p, 'late'); return; } settled = true; clearTimeout(timer); done(p, why); };
         var timer = setTimeout(function () { once(null, 'timeout'); }, LOC_MS);
         try {
@@ -2822,6 +2842,56 @@
         }, function () { return false; });
     }
 
+    // ---- ANDROID HARDWARE BACK (android-gps, 2026-10-17) ----------------------------
+    // One layer per press, the top one first: this file's own full-screen sheets (Start
+    // options; Add a game; Share), then whatever
+    // gps-view.js has on screen (its sheets, then the map back to the card), then on Home
+    // the GPS / Games view back to Main. Nothing open: pwa-boot.js takes a page's top
+    // level to Home, and on Home only Main minimises the app.
+    // ANDROID ONLY. iOS has no back button and the web never presses one; armBack()
+    // returns before registering anything unless Capacitor says android.
+    function shownId(id) { var e = $(id); return !!(e && e.style.display !== 'none'); }
+    function backLayer() {
+        if (shownId('hp-opts')) return 'start-options';
+        if (shownId('fd-addgame')) return 'add-game';
+        if (shownId('fd-share')) return 'share';
+        var G = W.HardPanGps, g = G && typeof G.backLayer === 'function' ? G.backLayer() : null;
+        if (g) return 'gps-' + g;
+        var main = $('v-main');
+        if (main && !main.classList.contains('on')) return 'home-view';
+        return null;
+    }
+    function back() {
+        var layer = backLayer();
+        if (layer === 'start-options') $('hp-opts').style.display = 'none';
+        else if (layer === 'add-game') closeAddGame();
+        else if (layer === 'share') $('fd-share').style.display = 'none';
+        else if (layer && layer.indexOf('gps-') === 0) W.HardPanGps.back();
+        else if (layer === 'home-view') show('main');
+        return layer;
+    }
+    function armBack() {
+        if (!native() || !android()) return false;
+        var GB = W.GolfBack;
+        if (GB && typeof GB.register === 'function') {
+            // The sheets are above everything (z-index 2147483000); the map sits under a
+            // page's modals, so a modal over it closes first (pwa-boot's priority 2).
+            GB.register({ name: 'front-door-sheet', priority: 1, isOpen: function () { var l = backLayer(); return !!l && l.indexOf('gps-') !== 0 && l !== 'home-view'; }, close: back });
+            GB.register({ name: 'gps', priority: 4, isOpen: function () { var l = backLayer(); return !!l && l.indexOf('gps-') === 0; }, close: back });
+            return true;
+        }
+        // HOME has no pwa-boot.js: its own listener, and Main is the one place a press
+        // leaves the app (minimised, the round kept warm - as pwa-boot does).
+        var App = W.Capacitor.Plugins && W.Capacitor.Plugins.App;
+        if (!App || typeof App.addListener !== 'function') return false;
+        App.addListener('backButton', function () {
+            if (back()) return;
+            if (typeof App.minimizeApp === 'function') App.minimizeApp();
+        });
+        return true;
+    }
+    armBack();
+
     W.HardPanDoors = { dayLabel: dayLabel, historyList: historyList, recapHref: recapHref, joinGroups: joinGroups, seenRound: seenRound, roundResult: roundResult, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
@@ -2833,6 +2903,7 @@
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
+    W.HardPanBack = { layer: backLayer, back: back, position: position };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
     // round; it used to hop index -> admin -> home, drawing each. Now, as this file is read
