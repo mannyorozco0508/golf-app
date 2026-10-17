@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!-- DRAFT FOR MANNY'S REVIEW (store-legal, 2026-10-17). The open-source software, data and services HardPan ships or shows, with the notices their licences ask for. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Acknowledgements — HardPan</title>
+<style>
+    :root { --forest: #0E2B1F; --lime: #93C01F; --cream: #F6F4EC; --ink: #1a1a1a; --muted: #5a6560; --line: #d8d5c8; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--cream); color: var(--ink); margin: 0; padding: 24px 16px 64px 16px; line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; }
+    .brand { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; background: #0B0F0C; border-radius: 14px; padding: 4px 16px 4px 2px; line-height: 1; }
+    .brand img { display: block; width: 52px; height: 52px; flex: 0 0 auto; }
+    .brand-word { color: #F2EDE4; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.05em; }
+    .rule { height: 3px; width: 56px; background: var(--lime); margin: 12px auto 0 auto; border-radius: 2px; }
+    h1 { font-size: 1.45rem; color: var(--forest); margin: 28px 0 6px 0; }
+    h2 { font-size: 1.05rem; color: var(--forest); margin: 30px 0 8px 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+    .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    p, li { font-size: 0.95rem; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    .callout { background: #fff; border-left: 4px solid var(--lime); border-radius: 6px; padding: 14px 16px; margin: 18px 0; }
+    .callout strong { color: var(--forest); }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.9rem; }
+    th { background: var(--forest); color: var(--cream); text-align: left; padding: 8px 10px; }
+    td { border-bottom: 1px solid var(--line); padding: 8px 10px; vertical-align: top; background: #fff; }
+    a { color: var(--forest); }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
+        text-align: center; color: var(--muted); font-size: 0.85rem; }
+    footer a { margin: 0 8px; }
+</style>
+</head>
+<body>
+<body>
+<div class="wrap">
+
+<header>
+    <div class="brand"><img src="hardpan-icon.svg" alt="" width="52" height="52"><span class="brand-word">HARDPAN</span></div>
+    <div class="rule"></div>
+</header>
+
+<h1>Acknowledgements</h1>
+<p class="updated">Last updated: 17 October 2026</p>
+
+<p>HardPan is built on open-source software and open data. Thank you to the people who make them. Each is used under the licence named here.</p>
+
+<h2>Weather</h2>
+<div class="callout">
+    <strong>&#63743; Weather</strong><br>
+    Live wind in HardPan GPS can come from Apple Weather. Apple Weather data sources and attribution: <a href="https://weatherkit.apple.com/legal-attribution.html">weatherkit.apple.com/legal-attribution.html</a>
+</div>
+<p>When Apple Weather is not in use, wind comes from the U.S. National Weather Service (<a href="https://www.weather.gov">weather.gov</a>), a public-domain source.</p>
+
+<h2>Maps and course data</h2>
+<table>
+    <tr><th>Source</th><th>Notice</th></tr>
+    <tr><td>OpenStreetMap</td><td>Hole and green outlines: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. The data is available under the Open Database License (ODbL) 1.0, <a href="https://opendatacommons.org/licenses/odbl/1-0/">opendatacommons.org/licenses/odbl/1-0</a>.</td></tr>
+    <tr><td>Esri World Imagery</td><td>Powered by <a href="https://www.esri.com">Esri</a>. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Used under Esri's terms of use.</td></tr>
+    <tr><td>USGS The National Map</td><td>Imagery: USDA, USGS The National Map: Orthoimagery. U.S. Government work, public domain.</td></tr>
+    <tr><td>GolfAPI (golfapi.io)</td><td>Course details and hole positions for HardPan GPS courses, used under GolfAPI's terms.</td></tr>
+    <tr><td>golfcourseapi.com</td><td>Published scorecards found by the online course search, used under its terms.</td></tr>
+</table>
+
+<h2>Software</h2>
+<table>
+    <tr><th>Software</th><th>Licence</th></tr>
+    <tr><td>MapLibre GL JS 5.24.0</td><td>BSD 3-Clause. Copyright &copy; 2023, MapLibre contributors. All rights reserved. Redistribution and use in source and binary forms, with or without modification, are permitted provided that the conditions in the licence are met; the software is provided "as is" without warranty. Full text: <a href="https://github.com/maplibre/maplibre-gl-js/blob/v5.24.0/LICENSE.txt">github.com/maplibre/maplibre-gl-js</a>.</td></tr>
+    <tr><td>Firebase JavaScript SDK 9.22.2 (Google)</td><td>Apache License 2.0, <a href="https://www.apache.org/licenses/LICENSE-2.0">apache.org/licenses/LICENSE-2.0</a>. Copyright Google LLC.</td></tr>
+    <tr><td>Capacitor 8 (core, App, Filesystem, Geolocation, Push Notifications, Share) - Ionic</td><td>MIT License. Copyright &copy; 2017-present Drifty Co.</td></tr>
+    <tr><td>Capacitor Firebase Authentication and Messaging 8.5.2 - Robin Genz</td><td>Apache License 2.0.</td></tr>
+    <tr><td>qrcode-generator 2.0.4 - Kazuhiko Arase</td><td>MIT License. Copyright &copy; 2009 Kazuhiko Arase. "QR Code" is a registered trademark of DENSO WAVE INCORPORATED.</td></tr>
+</table>
+<p>The MIT License, in short: permission is granted, free of charge, to use, copy, modify, merge, publish, distribute, sublicense and sell copies of the software, provided the copyright notice and this permission notice are included; the software is provided "as is", without warranty of any kind.</p>
+
+<footer>
+    <a href="privacy.html">Privacy</a> ·
+    <a href="terms.html">Terms</a> ·
+    <a href="support.html">Support</a> ·
+    <a href="acknowledgements.html">Acknowledgements</a>
+    <div style="margin-top:10px;">HardPan</div>
+</footer>
+
+</div>
+</body>
+</html>
