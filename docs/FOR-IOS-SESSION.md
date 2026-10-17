@@ -49,6 +49,18 @@ were reproduced on an iPhone.
    - fa6e9d7 retired casino imagery (Vegas got 🔢). This list was missed, and 🎲 reads
      as gambling.
 
+7. **The `auth-boot.js` start race. Fixed for Android only; check iOS.**
+   - `auth-boot.js` starts on `setTimeout(0)`, on the assumption that this runs after the page's inline `firebase.initializeApp`.
+   - Android's WebView ran it mid-parse, `fb.auth()` threw "no Firebase App", `authReady` rejected, and admin.html refused setup to the round's own creator.
+   - Android now tries once more after `load` (job 003). iOS is unchanged.
+   - If an iPhone ever shows "This round's setup belongs to its organizer" on a round it just made, this is why.
+
+8. **The players-first hand-off doesn't continue (seen on Android; iOS not checked).**
+   - Repro: Vegas from Add a game with one golfer → Players step → add 3 golfers → "Save golfers · set up Vegas ›".
+   - The players save to the round (4 in RTDB), but the hand-off doesn't happen: `hardpan_ag_next` stays at `stage: 'players'`, so `showRoundReadyScreen` → `afterSave` never ran. `saveSettings()` stopped early with no visible message.
+   - Not root-caused: the round created from the GPS door has no `courseKey`, only `courseName`, which may matter.
+   - My tap automation was slow on this run, so treat it as unproven until reproduced by hand.
+
 ## Shared files android-gps changed (all Android-gated)
 
 Every behaviour change asks `Capacitor.getPlatform() === 'android'`. iOS and the web take
@@ -59,6 +71,7 @@ the old path unchanged, and `android_gps_fixes_test.js` asserts the iOS half of 
 | `front-door.js` | `positionAndroid()`: Android asks once for precise location; Back closes front-door and GPS sheets, and Home's GPS/Games view (`armBack`) |
 | `gps-view.js` | `backLayer()` / `back()` added to the API (called only by Android Back) |
 | `pwa-boot.js` | `androidTopLevel()`: on Android, an empty press at a page's top level goes to Home |
+| `auth-boot.js` | `retryAfterLoad()`: on Android only, "no Firebase App" waits for `load` and signs in once more (job 003) |
 | `admin.html` | `isAndroidShell()`; no Apple/Google/Link buttons, email card shown; Notifications card hidden; Setup Coach back probe |
 | `index.html` | Round Menu sheet back probe (Android only) |
 | `capacitor.config.ts` | `plugins.SystemBars.insetsHandling = 'disable'` (Android reads it; Capacitor iOS has no such key) |

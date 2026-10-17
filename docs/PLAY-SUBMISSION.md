@@ -1,12 +1,12 @@
 # HardPan Golf for Google Play: submission prep (job 001)
 
-Prepared 2026-10-17 on `android-gps` for the build **0.2 (versionCode 4)**, package `com.rattlegolf.app`,
+Prepared 2026-10-17 on `android-gps` for the build **0.2 (versionCode 5)**, package `com.rattlegolf.app`,
 under the Rattle Golf LLC organization account (still in Google's verification).
 Nothing here has been entered in Play Console. Paste from this file once the account is verified.
 
 Ground rules for this first release (Manny, 2026-10-17):
 - **GPS is described as included.** The listing never mentions a trial, a subscription, prices or "paid". Paid GPS goes in when Play Billing ships.
-- **App access is email sign-in only.** Google and Apple sign-in are hidden on Android in 0.2 (4).
+- **App access is email sign-in only.** Google and Apple sign-in are hidden on Android (since 0.2 (4)).
 
 ---
 
@@ -16,9 +16,9 @@ Ground rules for this first release (Manny, 2026-10-17):
 |---|---|---|---|
 | G1 | **Live privacy policy is out of date.** golf-app-5a5.pages.dev/privacy.html says "Last updated 23 September 2026" and "HardPan has no accounts and asks for no email address". It never mentions GPS location, Esri/USGS, the weather service or account deletion. | Play checks the policy against the Data safety form (section 2). As it stands they contradict each other, which is a common rejection. The newer draft in the repo (`privacy.html`, 17 Oct) covers most of it but is iOS-worded (App Store purchases, RevenueCat, Sign in with Apple, iPhone push), has no Google Play wording, and is not deployed. | Manny: approve an Android-correct policy and deploy it |
 | G2 | **No account-deletion web page.** golf-app-5a5.pages.dev/delete-account.html is a catch-all that serves the scorecard. rattlegolf.com has no website (mail records only). | Play requires a public URL where a user can ask for account and data deletion without installing the app. | Manny: approve the text in §5; then host it |
-| G3 | **Organizer locked out of their own round's setup on Android.** Vegas/BBB with one golfer → "This round's setup belongs to its organizer". Cause: an `auth-boot.js` start race (outbox/002). | A reviewer following "add a game" can hit it. | Approve the fix (002) |
+| G3 | ~~Organizer locked out of their own round's setup on Android~~. **Fixed in 0.2 (5)** (job 003): `auth-boot.js` tries again after `load` on Android. On the emulator, Vegas with one golfer now opens the Players step for the round's creator. | — | Done |
 | G4 | **Server account deletion (`accountDelete`) is not deployed.** Live, it answers 404. | In-app Delete account still works: the client-side delete runs when the function is missing. Data left behind that way: anything the client may not remove (see §5). The Data safety "deletion" answer must match what really happens. | Manny: deploy or accept |
-| G5 | **Screenshots.** The 10 in `~/Desktop/HardPan-screenshots-v2/final-10` are iPhone (1320×2868, 2.17:1). Play's limit is 2:1, and they show iOS. | They are rejected at upload. | Done: 8 Android drafts in `docs/play-assets/screenshots/` (1080×2160, 2:1). Reshoot with the demo round for polish (§6). |
+| G5 | **Screenshots.** The 10 in `~/Desktop/HardPan-screenshots-v2/final-10` are iPhone (1320×2868, 2.17:1). Play's limit is 2:1, and they show iOS. | They are rejected at upload. | Done: 8 Android shots on a clean 0.2 (5) install with the 5RZ8GE demo round, in `docs/play-assets/screenshots/` (1080×2160). The demo round's "Test" names and "App Review demo (TEST round)" title show in 06–07 (§6). |
 | G6 | **"Trial" and "founder pass" words inside the app.** The Account sheet on Android says "the free trial and a founder pass stay with the rounds already set up on it". | The listing says GPS is included, and nothing can be bought on Android. In-app copy that promises a trial is misleading. | Listed for the iOS session (`docs/FOR-IOS-SESSION.md` #5) |
 | G7 | **Money-game wording and the gambling policy.** The app records friendly side games (Nassau, skins, Vegas, BBB) and shows who owes whom. It never takes, holds or moves money (confirmed in code, §3). The Vegas row uses a 🎲 icon. | Reviewers can read "bets / who pays who" as gambling. Keep the listing on "side games" and "settle up between yourselves", target 18+, and answer IARC as in §3. Swap the 🎲 icon (`docs/FOR-IOS-SESSION.md` #6). | Manny (icon via the iOS session) |
 | G8 | **Shared bugs a reviewer could meet**: a GPS READY course that "cannot start" (Talking Stick South), "No rated tees" when tees exist, "&" dropped in the trip builder. | They look broken in review. The review path in §4 avoids them. | iOS session (`docs/FOR-IOS-SESSION.md`) |
@@ -161,7 +161,7 @@ Account deletion: Home → Sign in (Account) → Delete account (shown once sign
 2. If you do create one, sign in with it once on the emulator to make the account.
 3. Put the address and the mailbox password **only** in Play Console → App access → "Add instructions / credentials". **Never** in this repo, the mailbox, or a commit.
 
-Avoid in review until G3 is fixed: adding Vegas or BBB to a round with one golfer.
+(G3 fixed in 0.2 (5).)
 
 ---
 
@@ -203,22 +203,19 @@ Check G4 before publishing the "we delete" list. Without the server function, so
 | Phone screenshots | JPEG or 24-bit PNG, no alpha; sides 320–3840 px; long side ≤ 2× short side; at least 2, up to 8 | **8 drafts**: `docs/play-assets/screenshots/`, all 1080×2160 JPEG (2:1, no alpha), from the Android emulator, cropped below the status bar |
 | iPhone set (`final-10`) | — | **Not usable**: 1320×2868 = 2.17:1, and iOS chrome |
 
-Draft screenshots: 01 Home (two doors), 02 Near you, 03–04 GPS on Caledonia hole 1, 05 Add a game, 06 the 5RZ8GE demo round, 07 Points game setup, 08 Share with QR.
-For the final set, reshoot on a clean install:
-- Use the demo round's names (Alex / Blake / Casey / Drew), not "Me".
-- Avoid 06's "Paste your organizer link" box.
-- Add the leaderboard and Results ("who owes whom") screens.
+Screenshots (clean install, 0.2 (5), demo round 5RZ8GE): 01 Home, 02 Near you (Caledonia), 03 GPS hole 4 (151 to centre), 04 GPS near the green (41), 05 scorecard (Alex / Blake / Casey / Drew), 06 full leaderboard, 07 Results (settle summary), 08 Share with QR.
+Left for Manny: 06 and 07 show the demo data's names ("Casey Test" etc.) and its title "App Review demo (TEST round)". For polished store images, a round made for screenshots needs a database write, which is your call.
 
 ---
 
-## 7. Release checklist: 0.2 (versionCode 4)
+## 7. Release checklist: 0.2 (versionCode 5)
 
-- [x] `app-release.aab` builds: `android/app/build/outputs/bundle/release/app-release.aab`, 5,766,812 bytes, sha256 `374da8b2…38d7` (commit `6c3f619`).
-- [x] versionName **0.2**, versionCode **4**, package **com.rattlegolf.app**.
+- [x] `app-release.aab` builds: `android/app/build/outputs/bundle/release/app-release.aab`, 5,767,389 bytes, sha256 `26cc9636…2e8a` (job 003 commit).
+- [x] versionName **0.2**, versionCode **5**, package **com.rattlegolf.app**.
 - [x] Signed with the upload key, SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Enroll in Play App Signing at first upload.
 - [x] **targetSdk 36**, minSdk 24. Play rule (developer.android.com, updated 2026-10-16): since **31 Aug 2026**, new apps and updates must target **Android 16 (API 36)** or higher. An extension to 1 Nov 2026 can be requested. **Met.**
 - [x] Portrait only. No background location. No ads. No billing.
-- [ ] Gaps G1–G4 resolved.
+- [ ] Gaps G1, G2, G4 resolved (G3 done in 0.2 (5)). Drafts for G1/G2: `docs/legal/` (not deployed).
 - [ ] Internal testing track first, then closed testing. New personal accounts need a 12-tester closed test; organization accounts don't. Confirm in Play Console once verified.
 
 **Permissions in the AAB, with justification:**

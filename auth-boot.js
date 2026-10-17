@@ -71,11 +71,38 @@
         settle.resolve(user.uid);
     }
 
+    // ANDROID: ONE MORE TRY ONCE THE PAGE HAS LOADED (android-gps, 2026-10-17). The
+    // zero-delay timer below is meant to fire after the parse, after the page's inline
+    // initializeApp. Android's WebView parses a long page in chunks and runs the timer
+    // between them, so fb.auth() threw "no Firebase App" - and on admin.html that left
+    // the round's own creator refused at setup (organizerDoor got no uid). On Android
+    // only, that one error waits for `load`, when every inline script has run, and asks
+    // once more; anything else, or a second failure, fails exactly as before. iOS and
+    // the web are unchanged.
+    var retriedAfterLoad = false;
+    function androidShell() {
+        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
+        catch (e) { return false; }
+    }
+    function noFirebaseApp(e) {
+        return !!e && (e.code === 'app/no-app' || /no firebase app/i.test(String(e.message || '')));
+    }
+    function retryAfterLoad() {
+        if (retriedAfterLoad) return false;
+        retriedAfterLoad = true;
+        var again = function () { setTimeout(signIn, 0); };
+        if (document.readyState === 'complete') again(); else window.addEventListener('load', again);
+        return true;
+    }
+
     function signIn() {
         var fb = window.firebase;
         if (!fb || typeof fb.auth !== 'function') return fail('sdk-absent');
         var auth;
-        try { auth = fb.auth(); } catch (e) { return fail('auth-unavailable', e); }
+        try { auth = fb.auth(); } catch (e) {
+            if (androidShell() && noFirebaseApp(e) && retryAfterLoad()) return;
+            return fail('auth-unavailable', e);
+        }
         if (!auth || typeof auth.onAuthStateChanged !== 'function') return fail('auth-unavailable');
 
         var decided = false;

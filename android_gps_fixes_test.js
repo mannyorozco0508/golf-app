@@ -335,6 +335,57 @@ describe('4. BACK: one layer per press on Android; nothing armed on iOS', () => 
 });
 
 // ---------------------------------------------------------------------------
+// G3 (job 003): auth-boot.js's zero-delay start ran before the page's inline
+// initializeApp on Android, fb.auth() threw "no Firebase App", authReady rejected,
+// and admin.html refused setup to the round's own creator.
+describe('G3. AUTH BOOT: Android tries again after load; iOS fails as before', () => {
+    function bootAuth(platform) {
+        const sb = windowFor(platform, 'admin.html');
+        sb.document.readyState = 'loading';
+        const onLoad = [];
+        sb.addEventListener = (name, fn) => { if (name === 'load') onLoad.push(fn); };
+        let initialized = false;
+        const auth = {
+            onAuthStateChanged(cb) { cb(null); return () => {}; },
+            signInAnonymously: () => Promise.resolve({ user: { uid: 'anon-9' } })
+        };
+        sb.firebase = {
+            auth() {
+                if (!initialized) throw Object.assign(new Error("No Firebase App '[DEFAULT]' has been created"), { code: 'app/no-app' });
+                return auth;
+            }
+        };
+        load(sb, 'auth-boot.js');
+        return { sb, onLoad, init: () => { initialized = true; } };
+    }
+
+    test('Android: "no Firebase App" waits for load, then signs in - authReady resolves', { skip }, async () => {
+        const { sb, onLoad, init } = bootAuth('android');
+        sb.__advance(0);                         // the zero-delay start, mid-parse
+        await settle();
+        assert.equal(sb.authBootState.status, 'pending', 'it gave up before the page loaded');
+        assert.equal(onLoad.length, 1, 'no second try was armed for load');
+        init();                                  // the page's inline initializeApp has run
+        sb.document.readyState = 'complete';
+        onLoad.forEach(f => f());
+        sb.__advance(0);
+        await settle();
+        assert.equal(sb.authBootState.status, 'signed-in');
+        assert.equal(await sb.authReady, 'anon-9');
+    });
+
+    test('iOS UNCHANGED: the same error fails at once, as "auth-unavailable"', { skip }, async () => {
+        const { sb, onLoad } = bootAuth('ios');
+        sb.__advance(0);
+        await settle();
+        assert.equal(sb.authBootState.status, 'failed');
+        assert.equal(sb.authBootState.reason, 'auth-unavailable');
+        assert.equal(onLoad.length, 0, 'iOS armed a retry');
+        await assert.rejects(sb.authReady);
+    });
+});
+
+// ---------------------------------------------------------------------------
 describe('5. THE STATUS BAR: Android only, native, no page CSS changed', () => {
     test('SystemBars does no inset handling; MainActivity pads the WebView between the bars', () => {
         const cfg = read('capacitor.config.ts');

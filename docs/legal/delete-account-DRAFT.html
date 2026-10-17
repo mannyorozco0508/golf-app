@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- DRAFT FOR MANNY (job 003, 2026-10-17). NOT DEPLOYED. Play's account-deletion page.
+     "What is deleted / what stays" matches the CLIENT delete path in account-exit.js as it
+     runs today: the accountDelete Cloud Function is NOT deployed (live answers 404), so the
+     app falls back to the client delete. Two lines depend on whether the stage-2 delete rule
+     (database.rules.stage2delete.json) is live - see the NEEDS-MANNY note. The email-request
+     timeframe is a promise Manny must make: placeholder until he answers. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete your HardPan account</title>
+<style>
+    :root { --forest: #0E2B1F; --lime: #93C01F; --cream: #F6F4EC; --ink: #1a1a1a; --muted: #5a6560; --line: #d8d5c8; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--cream); color: var(--ink); margin: 0; padding: 24px 16px 64px 16px; line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.45rem; color: var(--forest); margin: 28px 0 6px 0; }
+    h2 { font-size: 1.05rem; color: var(--forest); margin: 30px 0 8px 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+    p, li { font-size: 0.95rem; }
+    ol, ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    .callout { background: #fff; border-left: 4px solid var(--lime); border-radius: 6px; padding: 14px 16px; margin: 18px 0; }
+    a { color: var(--forest); }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Delete your HardPan account</h1>
+<p>HardPan is made by Rattle Golf LLC. You can delete your account in the app, or ask us by email.</p>
+
+<h2>In the app (immediate)</h2>
+<ol>
+<li>Open HardPan and tap <strong>Sign in</strong> (or <strong>Account</strong>) on the home screen.</li>
+<li>Tap <strong>Delete account</strong>. It appears once you are signed in.</li>
+<li>Read the warning and tap <strong>Delete account</strong> again to confirm.</li>
+</ol>
+<p>You need a signal: if a step can't reach our servers, nothing is deleted and the app asks you to try again.</p>
+
+<h2>By email</h2>
+<p>If you can't open the app, email <a href="mailto:support@rattlegolf.com?subject=Delete%20my%20HardPan%20account">support@rattlegolf.com</a> from the address you signed in with, with the subject <strong>"Delete my HardPan account"</strong>. We reply to confirm and delete the account within <strong>[TIMEFRAME — Manny to set]</strong>.</p>
+
+<h2>What is deleted</h2>
+<ul>
+<li>Your sign-in: your email address and your account id.</li>
+<li>Your saved groups (My Groups), and the co-organizer links those groups gave other people.</li>
+<li>On iPhone: your notification token and notification choices.</li>
+</ul>
+
+<h2>What stays</h2>
+<ul>
+<li><strong>Rounds.</strong> A round belongs to everyone who played it, so it is not deleted with your account: the scores stay under its game code, for the golfers who have it. An organizer can erase a round with End &amp; Wipe Round, or email us its code.</li>
+<li><strong>Two small records with your old account id</strong>: the date you were first seen and, if you had one, a founder pass. They hold no name or email, and nobody can read them once the account is gone. <em>[Only if the stage-2 delete rule is not live — see note.]</em></li>
+<li><strong>A daily count of course lookups</strong> made by your old account id (used to limit lookups). It holds no name or email.</li>
+<li><strong>Green positions</strong> you set while playing. They never carried your name or account.</li>
+</ul>
+
+<div class="callout"><p>Signing out is not the same as deleting: it only ends the session on that device, and your account stays.</p></div>
+
+<footer>Rattle Golf LLC · <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> · <a href="privacy.html">Privacy Policy</a></footer>
+</div>
+</body>
+</html>
