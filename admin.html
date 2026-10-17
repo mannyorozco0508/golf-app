@@ -7652,7 +7652,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const link = async (x) => {
             gpsSetupShow('busy', 'Setting up GPS — ' + x.name + '…');
-            const c = await L.course(x.id, key);
+            // The round code goes along: the function links our course (gps_links) only
+            // for the organizer of a saved round on it - else after the save (linkRound).
+            const c = await L.course(x.id, key, currentMode);
             if (mine !== gpsSetupSeq) return;
             if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status, c), searchOnline); return; }
             gpsSetupMatch(key);
@@ -8376,10 +8378,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 say('Not sent: ' + ((decided && decided.reason) || 'the decider said no') + '.');
                 return;
             }
+            // WHO AND WHAT, NOT TOKENS AND WORDS (audit H5, 2026-10-16). The sender reads
+            // this account's devices itself and says what its 'test' template says; the ID
+            // token is how it knows which account. The tokens read above only decide
+            // whether there is a phone to send to.
+            var idToken = await firebase.auth().currentUser.getIdToken();
             var res = await fetch(courseApiBase() + '/api/push-send', {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ decided: decided, tokens: tokens, extra: { test: '1' } })
+                headers: { 'content-type': 'application/json', authorization: 'Bearer ' + idToken },
+                body: JSON.stringify({ template: 'test', params: {} })
             });
             var out = null;
             try { out = await res.json(); } catch (e) { out = null; }
@@ -13048,6 +13055,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // never nominates itself; then the save is remembered.
                 if (!loadedExistingRound) offerRetire(currentMode, payload, payload.ownerUid || null);
                 recordSavedRound(currentMode);
+                // GPS:BEGIN
+                // THE GPS LINK, NOW THAT THE ROUND EXISTS: gpsCourse links our course key only for
+                // the organizer of a saved round on that course (gps-live.js linkRound). Never awaited.
+                if (window.HardPanGpsLive && typeof window.HardPanGpsLive.linkRound === 'function') window.HardPanGpsLive.linkRound(currentMode, payload.activeCourseKey);
+                // GPS:END
                 if (tripLinkCode) {
                     return db.ref(`trips/${tripLinkCode}/rounds/${currentMode}`).set({
                         label: selectedCourseName,

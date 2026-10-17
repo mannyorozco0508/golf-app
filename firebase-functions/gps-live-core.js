@@ -13,11 +13,13 @@
 // gps_courses/<id>, gps_links/<key> and its own gps_usage/<uid>):
 //   gps_courses/<courseId>        the stripped course (stripCourse) - forever
 //   global_courses/gapi_<id>      its scorecard: pars, handicaps, tees (created once, never overwritten)
-//   gps_links/<ourKey>            our course key -> courseId (first link wins)
+//   gps_links/<ourKey>            our course key -> courseId (first link wins - and only
+//                                 the ORGANIZER of a live round on that course may make it;
+//                                 only an owner may change or remove it: gpsUnlink)
 //   gps_search/<query>            a search's results, 30 days
 //   gps_meta/known/<id>           every course a search returned: may it be pulled?
 //   gps_meta/left                 GolfAPI's apiRequestsLeft, after every call
-//   gps_meta/day/<yyyymmdd>       pulls today, everyone
+//   gps_meta/day/<yyyymmdd>       pulls and uncached searches today, everyone
 //   gps_meta/lock/<id>            one pull per course, however many phones tap
 //   gps_usage/<uid>/<yyyymmdd>    this golfer's pulls / searches today
 //   gps_log/<push>                every call: who, what, cost, calls left, result
@@ -31,7 +33,8 @@ const BASE = 'https://www.golfapi.io/api/v2.3';
 // node gps_meta/config (closed to phones; Manny edits it in the Firebase console's
 // DATA view - no code, no deploy; read again within a minute), e.g.
 //   gps_meta/config = { userPullsPerDay: 15, pullsPerDay: 50, floor: 50,
-//                       userSearchesPerDay: 20, ownerUids: "uid1,uid2" }
+//                       userSearchesPerDay: 20, searchesPerDay: 200,
+//                       userWindPerDay: 120, ownerUids: "uid1,uid2" }
 // OWNERS (ALERT_UIDS, plus config.ownerUids) have NO per-golfer daily cap and are
 // not stopped by the day's ceiling; the floor (calls left) still applies to everyone.
 const LIMIT_MESSAGE = "You've hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.";
@@ -40,6 +43,14 @@ const DEFAULTS = {
     userPullsPerDay: 15,    // NEW courses per golfer per day (owners: no cap)
     pullsPerDay: 50,        // NEW courses per day, everyone - the ceiling
     userSearchesPerDay: 20, // uncached searches per golfer per day
+    // THE SEARCH CEILING (audit H2, 2026-10-16): uncached searches per day, EVERYONE.
+    // The per-golfer cap alone is no cap - a script can mint a fresh uid per search -
+    // so the day's total stops too. Owners pass it (their searches still count).
+    searchesPerDay: 200,
+    // AN UNCACHED SEARCH NEEDS A REAL ACCOUNT (audit H2): anonymous uids are free to
+    // mint, and each uncached search is a paid GolfAPI call. A cached answer still
+    // serves anyone signed in, guests included. The app says "signin".
+    searchNeedsAccount: true,
     searchDays: 30,         // a search's answer is kept this long
     pullNeedsAccount: true, // anonymous may search and open cached courses; a NEW pull needs Apple / Google / email
     lockMs: 120000,
@@ -63,6 +74,8 @@ function queryKey(name) { return String(name || '').toLowerCase().replace(/[^a-z
 function cleanName(name) { return String(name || '').replace(/\s+/g, ' ').trim(); }
 const ID_RE = /^\d{6,30}$/;
 const KEY_RE = /^[A-Za-z0-9_-]{1,80}$/;
+// A round code (code-issuer.js: six characters; older rounds may differ in length).
+const CODE_RE = /^[A-Z0-9]{3,12}$/;
 
 // The app's own naming: CLUB (COURSE) when they differ (course-import-rules.js).
 function displayName(club, course) {
@@ -105,12 +118,14 @@ function cardRecord(s, at) {
 
 // Only sane numbers / booleans from the database: a typo can never lift the floor to 0
 // or the caps to a million.
-const LIMITS = { floor: [10, 500], userPullsPerDay: [0, 200], pullsPerDay: [0, 1000], userSearchesPerDay: [0, 500], searchDays: [1, 365] };
+const LIMITS = { floor: [10, 500], userPullsPerDay: [0, 200], pullsPerDay: [0, 1000], userSearchesPerDay: [0, 500], searchesPerDay: [0, 5000], searchDays: [1, 365],
+    userWindPerDay: [0, 2000] };   // gpsWind's per-golfer cap (weather-core.js reads the same node)
 function cleanConfig(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
     Object.keys(LIMITS).forEach((k) => { const v = Number(raw[k]); if (raw[k] != null && Number.isFinite(v) && v >= LIMITS[k][0] && v <= LIMITS[k][1]) out[k] = Math.floor(v); });
     if (typeof raw.pullNeedsAccount === 'boolean') out.pullNeedsAccount = raw.pullNeedsAccount;
+    if (typeof raw.searchNeedsAccount === 'boolean') out.searchNeedsAccount = raw.searchNeedsAccount;
     const owners = Array.isArray(raw.ownerUids) ? raw.ownerUids : String(raw.ownerUids || '').split(',');
     out.ownerUids = owners.map((x) => String(x).trim()).filter((x) => /^[A-Za-z0-9_-]{6,128}$/.test(x));
     return out;
@@ -180,9 +195,24 @@ function createCore(deps) {
         let results = hit && hit.at > t - c.searchDays * DAY_MS ? hit.results || [] : null;
         let cost = 0;
         if (!results) {
+            const owner = c.owners.has(who.uid);
+            // A GUEST GETS CACHED ANSWERS ONLY: this one would call GolfAPI, so it needs
+            // Apple / Google / email (the app shows MESSAGES.signin). Before the floor and
+            // the counters, so a refused guest spends nothing and counts nothing.
+            if (c.searchNeedsAccount && who.anonymous && !owner) { await log({ uid: who.uid, act: 'search', q, result: 'signin' }); return { status: 'signin', results: [] }; }
             const l = await left();
             if (l != null && l - 0.1 < c.floor) { await alert('floor', { left: l, floor: c.floor }); await log({ uid: who.uid, act: 'search', q, result: 'floor' }); return { status: 'soon', results: [] }; }
-            if (!c.owners.has(who.uid) && !(await count(`gps_usage/${who.uid}/${day}/searches`, c.userSearchesPerDay))) { await log({ uid: who.uid, act: 'search', q, result: 'limit' }); return { status: 'limit', results: [], message: LIMIT_MESSAGE }; }
+            const mine = `gps_usage/${who.uid}/${day}/searches`, all = `gps_meta/day/${day}/searches`;
+            if (!owner && !(await count(mine, c.userSearchesPerDay))) { await log({ uid: who.uid, act: 'search', q, result: 'limit' }); return { status: 'limit', results: [], message: LIMIT_MESSAGE }; }
+            // THE DAY'S SEARCH CEILING, everyone (owners exempt, but counted - as pulls are).
+            // The golfer's own count is given back: the ceiling, not they, said no.
+            if (owner) await db.transaction(all, (cur) => (Number(cur) || 0) + 1);
+            else if (!(await count(all, c.searchesPerDay))) {
+                await uncount(mine);
+                await alert('searchcap', { day, max: c.searchesPerDay });
+                await log({ uid: who.uid, act: 'search', q, result: 'searchcap' });
+                return { status: 'searchcap', results: [] };
+            }
             const body = await call('/clubs?' + new URLSearchParams({ name, country: 'usa' }).toString(), 0.1, who);
             cost = 0.1;
             results = [];
@@ -211,10 +241,38 @@ function createCore(deps) {
         if (!ID_RE.test(id)) throw bad('No such course.');
         const ourKey = input && input.ourKey != null ? String(input.ourKey) : null;
         if (ourKey != null && !KEY_RE.test(ourKey)) throw bad('No such course key.');
+        const roundCode = input && input.roundCode != null ? String(input.roundCode).toUpperCase() : null;
+        if (roundCode != null && !CODE_RE.test(roundCode)) throw bad('No such round.');
         const t = now(), day = dayKey(t), c = await settings();
+        const owner = c.owners.has(who.uid);
+        // WHO MAY LINK (audit H3, 2026-10-16). gps_links/<key> tells EVERY later golfer
+        // which GolfAPI course one of our courses is, so a wrong link is wrong GPS for
+        // everyone. It used to be anyone, guests included, first link forever. Now:
+        //   - an OWNER (ALERT_UIDS / config.ownerUids) may link, and may replace a link;
+        //   - anyone else only as the ORGANIZER of a live round ON THAT COURSE: the round
+        //     code comes along, events/<code> must exist (a deleted round is gone), carry
+        //     ownerUid === this uid and activeCourseKey === this key, and not have been
+        //     replaced (supersededBy). A round carries no timestamp to test "recent" on;
+        //     the round existing, being theirs and being on this course is the test;
+        //   - and even then never over an existing link (the first link wins).
+        // A refused link refuses nothing else: the course still comes back.
+        const organizes = async () => {
+            if (!roundCode) return false;
+            const ev = await db.get('events/' + roundCode);
+            return !!(ev && typeof ev === 'object' && ev.ownerUid && String(ev.ownerUid) === who.uid
+                && String(ev.activeCourseKey || '') === ourKey && !ev.supersededBy);
+        };
         const link = async () => {
             if (!ourKey || ourKey === 'gapi_' + id) return;
             if (!(await db.get('global_courses/' + ourKey + '/name'))) return;   // only a real course of ours
+            const was = await db.get('gps_links/' + ourKey);
+            if (was === id) return;
+            if (owner) {
+                await db.set('gps_links/' + ourKey, id);
+                await log({ uid: who.uid, act: 'link', key: ourKey, id, was: was || null, result: was ? 'relinked' : 'linked' });
+                return;
+            }
+            if (was || !(await organizes())) { await log({ uid: who.uid, act: 'link', key: ourKey, id, result: was ? 'kept' : 'refused' }); return; }
             await db.transaction('gps_links/' + ourKey, (cur) => (cur ? undefined : id));   // the first link wins
         };
         const cached = await db.get('gps_courses/' + id);
@@ -231,7 +289,6 @@ function createCore(deps) {
         const l = await left();
         if (l != null && l - 2 < c.floor) { await alert('floor', { left: l, floor: c.floor }); return done('soon'); }
         const mine = `gps_usage/${who.uid}/${day}/pulls`, all = `gps_meta/day/${day}/pulls`;
-        const owner = c.owners.has(who.uid);
         // Every pull is still COUNTED for the owner (the log and usage stay honest); the cap is just not applied.
         if (owner) await db.transaction(mine, (cur) => (Number(cur) || 0) + 1);
         else if (!(await count(mine, c.userPullsPerDay))) {
@@ -277,7 +334,22 @@ function createCore(deps) {
             await db.set('gps_meta/lock/' + id, null);
         }
     }
-    return { search, course, cfg };
+
+    // ---- UNLINK (owners only; audit H3) ----
+    // The way back from a wrong link: removes gps_links/<key>, so the next organizer
+    // of a round on that course can link it again. The course itself is kept.
+    async function unlink(auth, input) {
+        const who = need(auth);
+        const ourKey = String((input && input.ourKey) || '');
+        if (!KEY_RE.test(ourKey)) throw bad('No such course key.');
+        const c = await settings();
+        if (!c.owners.has(who.uid)) { await log({ uid: who.uid, act: 'unlink', key: ourKey, result: 'denied' }); return { status: 'denied' }; }
+        const was = await db.get('gps_links/' + ourKey);
+        await db.set('gps_links/' + ourKey, null);
+        await log({ uid: who.uid, act: 'unlink', key: ourKey, was: was || null, result: 'ok' });
+        return { status: 'ok', was: was || null };
+    }
+    return { search, course, unlink, settings, cfg };
 }
 
-module.exports = { createCore, cleanConfig, LIMIT_MESSAGE, normalCourse, cardRecord, displayName, queryKey, dayKey, DEFAULTS };
+module.exports = { createCore, cleanConfig, LIMIT_MESSAGE, normalCourse, cardRecord, displayName, queryKey, dayKey, DEFAULTS, ID_RE, KEY_RE };

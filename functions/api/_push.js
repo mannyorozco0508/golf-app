@@ -36,6 +36,8 @@
 // a hand-rolled signer usually goes wrong.
 // ============================================================================
 
+import { buildFromTemplate } from './_push_templates.js';
+
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 // FCM HTTP v1 answers 404 UNREGISTERED and 400 INVALID_ARGUMENT for a token that
@@ -182,13 +184,109 @@ export async function sendOne(sa, token, decided, extra, deps) {
     return { sent: false, reason: 'upstream_error', status: status };
 }
 
+// ---------------------------------------------------------------------------
+// WHO IS ASKING (audit H5, 2026-10-16). The route was an open relay: no auth, the
+// caller's tokens, the caller's words. Now every send carries the caller's
+// Firebase ID token (Authorization: Bearer <idToken>), checked HERE against
+// Google's securetoken keys with WebCrypto - RS256, the key named by `kid`,
+// aud = the project, iss = securetoken.google.com/<project>, not expired, not
+// issued in the future, a uid in `sub`. The uid it yields is the only identity
+// this route believes.
+const FIREBASE_PROJECT_ID = 'golfapp-9fb21';
+const SECURETOKEN_JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+const DB_URL = 'https://golfapp-9fb21-default-rtdb.firebaseio.com';
+const SKEW_S = 300;
+
+const refused = (reason) => ({ status: 'refused', reason });
+
+function b64urlBytes(s) {
+    const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+}
+const b64urlJson = (s) => JSON.parse(new TextDecoder().decode(b64urlBytes(s)));
+
+// Google's public keys, kept as long as Google's Cache-Control says. INJECTED in
+// tests (deps.jwks), so no test ever reaches the network.
+let jwksCache = null;
+async function googleJwks(deps) {
+    const now = (deps && deps.now) || Date.now();
+    if (jwksCache && jwksCache.until > now) return jwksCache.keys;
+    const doFetch = (deps && deps.fetch) || globalThis.fetch;
+    const res = await doFetch(SECURETOKEN_JWKS_URL);
+    if (!res || !res.ok) return null;
+    const body = await res.json();
+    const m = /max-age=(\d+)/.exec((res.headers && res.headers.get && res.headers.get('cache-control')) || '');
+    jwksCache = { keys: body, until: now + (m ? Number(m[1]) * 1000 : 3600000) };
+    return body;
+}
+
+// { uid } or { error }. Never throws.
+export async function verifyIdToken(idToken, deps) {
+    const d = deps || {};
+    const subtle = d.subtle || (globalThis.crypto && globalThis.crypto.subtle);
+    const projectId = d.projectId || FIREBASE_PROJECT_ID;
+    const nowS = Math.floor((d.now || Date.now()) / 1000);
+    if (!subtle) return { error: 'no_crypto' };
+    const parts = typeof idToken === 'string' ? idToken.split('.') : [];
+    if (parts.length !== 3) return { error: 'bad_token' };
+    let header, claims;
+    try { header = b64urlJson(parts[0]); claims = b64urlJson(parts[1]); } catch (e) { return { error: 'bad_token' }; }
+    if (!header || header.alg !== 'RS256' || typeof header.kid !== 'string') return { error: 'bad_token' };
+    if (!claims || claims.aud !== projectId || claims.iss !== 'https://securetoken.google.com/' + projectId) return { error: 'bad_token' };
+    if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 128) return { error: 'bad_token' };
+    if (!(Number(claims.exp) > nowS) || !(Number(claims.iat) <= nowS + SKEW_S)) return { error: 'expired' };
+    if (claims.auth_time != null && !(Number(claims.auth_time) <= nowS + SKEW_S)) return { error: 'bad_token' };
+    let set;
+    try { set = d.jwks ? await d.jwks() : await googleJwks(d); } catch (e) { set = null; }
+    const jwk = set && Array.isArray(set.keys) ? set.keys.find((k) => k && k.kid === header.kid) : null;
+    if (!jwk) return { error: 'unknown_key' };
+    try {
+        const key = await subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+        const ok = await subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(parts[2]), new TextEncoder().encode(parts[0] + '.' + parts[1]));
+        if (!ok) return { error: 'bad_signature' };
+    } catch (e) { return { error: 'bad_signature' }; }
+    return { uid: claims.sub };
+}
+
+// THE RECIPIENT'S TOKENS ARE READ HERE, never taken from the body. pushTokens/<uid>
+// is readable only by that uid (database.rules.json), and this Worker holds no
+// database credential of its own - so it reads with the CALLER's ID token, which
+// can only ever reach the caller's own phones. null: the read failed.
+export async function readOwnTokens(uid, idToken, deps) {
+    const doFetch = (deps && deps.fetch) || globalThis.fetch;
+    let res;
+    try { res = await doFetch(DB_URL + '/pushTokens/' + encodeURIComponent(uid) + '.json?auth=' + encodeURIComponent(idToken)); } catch (e) { return null; }
+    if (!res || !res.ok) return null;
+    let raw;
+    try { raw = await res.json(); } catch (e) { return null; }
+    const rows = raw && typeof raw === 'object' ? raw : {};
+    return Object.keys(rows).map((k) => rows[k] && rows[k].token).filter((t) => typeof t === 'string' && t && t.length <= 400);
+}
+
 // The route's whole job, so POST /api/push-send stays as thin as
 // /api/course-search is.
+//   d: { env, idToken, template, params, roundCode?, recipients? }
+// WHO RECEIVES: the caller's own devices. A round code + recipient player ids is
+// refused (recipients_unsupported): finding another golfer's phone means reading
+// pushTokens of a uid that is not the caller's, which the rules forbid and this
+// Worker has no credential to do. When that exists, it is decided HERE, from the
+// round, never from the body's say-so.
 export async function handleSend(d) {
     const sa = readServiceAccount(d.env);
     if (!sa) return unavailable('not_configured');
-    if (!d.decided || !d.decided.send) return unavailable('nothing_to_send');
-    const tokens = (d.tokens || []).filter((t) => typeof t === 'string' && t);
+    if (!d.idToken) return refused('signin');
+    const who = await verifyIdToken(d.idToken, d);
+    if (who.error) return refused(who.error === 'unknown_key' || who.error === 'no_crypto' ? who.error : 'signin');
+    if (d.roundCode != null || (Array.isArray(d.recipients) && d.recipients.length)) return refused('recipients_unsupported');
+    const built = buildFromTemplate(d.template, d.params, { uid: who.uid, now: d.now || Date.now() });
+    if (built.error) return refused(built.error);
+    const decided = built.decided;
+    if (!decided || !decided.send) return unavailable('nothing_to_send');
+    const tokens = await readOwnTokens(who.uid, d.idToken, d);
+    if (tokens == null) return unavailable('tokens_unreadable');
     if (!tokens.length) return unavailable('no_device');
 
     // ONE AUTH FOR THE WHOLE FAN-OUT. A person with a phone and a watch is two
@@ -199,7 +297,7 @@ export async function handleSend(d) {
     const results = [];
     for (let i = 0; i < tokens.length; i++) {
         results.push(Object.assign({ token: tokens[i].slice(0, 12) + '...' },
-            await sendOne(sa, tokens[i], d.decided, d.extra, Object.assign({}, d, { accessToken: auth }))));
+            await sendOne(sa, tokens[i], decided, decided.extra || {}, Object.assign({}, d, { accessToken: auth }))));
     }
     return {
         status: 'ok',
@@ -211,7 +309,9 @@ export async function handleSend(d) {
 
 export function toResponse(out, init) {
     return new Response(JSON.stringify(out), {
-        status: (init && init.status) || (out.status === 'ok' ? 200 : 503),
+        // A refusal is the caller's fault (401 no / bad sign-in, 403 the rest), never a 503.
+        status: (init && init.status) || (out.status === 'ok' ? 200
+            : out.status === 'refused' ? (/^(signin|expired|bad_token|bad_signature)$/.test(out.reason) ? 401 : 403) : 503),
         headers: Object.assign({
             'content-type': 'application/json; charset=utf-8',
             'cache-control': 'no-store'

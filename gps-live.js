@@ -6,8 +6,12 @@
 // Cloud Functions (firebase-functions/), on a tap only:
 //   search(name)           -> gpsSearch: GolfAPI's courses by that name (city / state,
 //                             GPS or not, already set up or not)
-//   course(id, ourKey)     -> gpsCourse: the course's GPS (and its scorecard, written
-//                             by the function to global_courses/gapi_<id>)
+//   course(id, ourKey, roundCode) -> gpsCourse: the course's GPS (and its scorecard,
+//                             written by the function to global_courses/gapi_<id>);
+//                             the round code lets the function link our course key
+//                             (only for the round's organizer, on that round's course)
+//   linkRound(code, key)   -> the same link once the round is SAVED (setup picks the
+//                             course before events/<code> exists); 0 GolfAPI calls
 // and reads, with no function and no GolfAPI call:
 //   gps_links/<ourKey>     which GolfAPI course one of our courses is
 //   gps_courses/<id>       that course (the shape gps-golfapi.js ships)
@@ -43,7 +47,7 @@
     function lsGet(k) { try { var v = W.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { W.localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     function offline() { return typeof navigator !== 'undefined' && navigator.onLine === false; }
-    var ID_RE = /^\d{6,30}$/, KEY_RE = /^[A-Za-z0-9_-]{1,80}$/;
+    var ID_RE = /^\d{6,30}$/, KEY_RE = /^[A-Za-z0-9_-]{1,80}$/, CODE_RE = /^[A-Za-z0-9]{3,12}$/;
 
     // What this phone kept, back in memory at load.
     (function restore() {
@@ -130,18 +134,37 @@
         if (!user || typeof user.getIdToken !== 'function') return Promise.resolve({ status: 'signin' });
         var base = String(cfg().liveBase).replace(/\/+$/, '');
         return user.getIdToken().then(function (tok) {
-            var ctl = typeof AbortController === 'function' ? new AbortController() : null;
-            var t = ctl ? setTimeout(function () { ctl.abort(); }, CALL_MS) : null;
-            return fetch(base + '/' + name, { method: 'POST', credentials: 'omit', signal: ctl ? ctl.signal : undefined,
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ data: payload }) })
-                .then(function (r) { return r.json(); })
-                .then(function (j) { if (t) clearTimeout(t); return (j && j.result) || { status: 'error', message: (j && j.error && j.error.message) || '' }; });
+            return appCheckToken().then(function (ac) {
+                var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+                var t = ctl ? setTimeout(function () { ctl.abort(); }, CALL_MS) : null;
+                var headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+                if (ac) headers['X-Firebase-AppCheck'] = ac;
+                return fetch(base + '/' + name, { method: 'POST', credentials: 'omit', signal: ctl ? ctl.signal : undefined,
+                    headers: headers, body: JSON.stringify({ data: payload }) })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) { if (t) clearTimeout(t); return (j && j.result) || { status: 'error', message: (j && j.error && j.error.message) || '' }; });
+            });
         }).catch(function () { return { status: 'error' }; });
+    }
+    // APP CHECK (the functions enforce it): the token from the Firebase App Check SDK
+    // when the app has it (firebase.appCheck()), else none - and the function refuses.
+    // Never throws; a failed token is sent as none.
+    function appCheckToken() {
+        try {
+            if (!W.firebase || typeof W.firebase.appCheck !== 'function') return Promise.resolve(null);
+            return Promise.resolve(W.firebase.appCheck().getToken(false)).then(function (r) { return r && typeof r.token === 'string' ? r.token : null; }, function () { return null; });
+        } catch (e) { return Promise.resolve(null); }
     }
     function search(name) { return call('gpsSearch', { name: String(name || '').trim() }); }
     // LIVE WIND from Apple WeatherKit (gpsWind; Apple's key and token stay on the server). The
-    // COURSE's point, three decimals - never the golfer's position.
-    function wind(lat, lon) { return call('gpsWind', { lat: Math.round(Number(lat) * 1e3) / 1e3, lon: Math.round(Number(lon) * 1e3) / 1e3 }); }
+    // COURSE's point, three decimals - never the golfer's position. The round's course key
+    // (and its GolfAPI id, when the phone knows it) goes along: the function answers only for
+    // a point within 5 km of where IT says that course is.
+    function wind(lat, lon, courseKey) {
+        var p = { lat: Math.round(Number(lat) * 1e3) / 1e3, lon: Math.round(Number(lon) * 1e3) / 1e3 };
+        if (courseKey && KEY_RE.test(String(courseKey))) { p.courseKey = String(courseKey); var gid = idFor(courseKey); if (ID_RE.test(String(gid || ''))) p.courseId = String(gid); }
+        return call('gpsWind', p);
+    }
 
     // ---- FINDING A SAVED COURSE IN GOLFAPI (gps-features) ------------------------------
     // GolfAPI's name search is STRICT: "Legacy Golf Resort" finds nothing when GolfAPI
@@ -208,13 +231,29 @@
         };
         return next(0).catch(function () { return { status: 'error' }; });
     }
-    function course(id, ourKey) {
+    function course(id, ourKey, roundCode) {
         var payload = { courseId: String(id) };
         if (ourKey && KEY_RE.test(ourKey)) payload.ourKey = ourKey;
+        if (payload.ourKey && roundCode && CODE_RE.test(String(roundCode))) payload.roundCode = String(roundCode).toUpperCase();
         return call('gpsCourse', payload).then(function (r) {
             if (r && r.status === 'ready' && r.course) { r.course.id = String(id); add(r.course, ourKey && KEY_RE.test(ourKey) ? ourKey : null); }
             return r;
         });
+    }
+    // THE LINK, ONCE THE ROUND IS SAVED (audit H3). The function links our course key
+    // only for the organizer of a saved round on that course, and setup picks the
+    // course BEFORE the round is saved - so after the save, a course this phone got
+    // from the function (it is in gps_courses: 0 GolfAPI calls) is offered again with
+    // the round code. Only when the database does not already have that link.
+    function linkRound(code, key) {
+        key = String(key || '');
+        if (!on() || !CODE_RE.test(String(code || '')) || !KEY_RE.test(key) || /^gapi_/.test(key)) return Promise.resolve(false);
+        var id = store.links[key];
+        if (!id || !store.courses[id]) return Promise.resolve(false);
+        return readOnce('gps_links/' + key).then(function (have) {
+            if (String(have || '') === id) return false;
+            return course(id, key, code).then(function (r) { return !!(r && r.status === 'ready'); });
+        }).catch(function () { return false; });
     }
     // What the golfer reads for each answer.
     var MESSAGES = {
@@ -226,7 +265,9 @@
         busy: 'Someone is setting up this course right now - try again in a minute',
         unknown: 'Search for the course first',
         offline: 'No signal - GPS for a new course needs a connection',
-        signin: 'Sign in to search GPS courses',
+        signin: 'Sign in (Apple, Google or email) to search for GPS courses',
+        searchcap: 'GPS course search is resting for today - courses already set up still work. Try again tomorrow.',
+        denied: 'Only an admin can do that',
         error: 'GPS is not available right now - try again',
         off: '',
     };
@@ -236,5 +277,5 @@
         return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error;
     }
 
-    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
+    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, linkRound: linkRound, wind: wind, message: message, _store: store };
 })();

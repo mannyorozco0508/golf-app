@@ -10,12 +10,17 @@
 // into a Response. If logic accumulates here it accumulates somewhere that
 // cannot be tested without a service-account key.
 //
-// WHAT CALLS IT. Not a browser. The decision - what to say, to whom, how often -
-// is push-notify.js, which runs where the event happens; this route is given a
-// DECISION and a list of tokens and does the one thing a browser cannot: hold a
-// credential. Until Manny's checklist steps 4 and 5 exist it answers
+// WHAT CALLS IT. Not a browser. Whether to send is push-notify.js, which runs
+// where the event happens; this route does the one thing a browser cannot: hold
+// a credential. Until Manny's checklist steps 4 and 5 exist it answers
 // not_configured and spends nothing, which is the whole point of shipping it
 // inert.
+//
+// WHAT IT ACCEPTS (audit H5, 2026-10-16): Authorization: Bearer <Firebase ID
+// token>, and a body of { template, params } - a template id from
+// _push_templates.js and its small, checked parameters. No tokens, no words: the
+// recipients' tokens are read by the server (the caller's own devices) and the
+// words are the template's. A body that names other recipients is refused.
 // ============================================================================
 
 import { handleSend, toResponse } from './_push.js';
@@ -40,10 +45,11 @@ export async function onRequestPost(context) {
     // exactly the answers the app most needs to read, and a response a browser
     // will not let it read is indistinguishable from the network being down.
     const cors = { headers: corsHeadersFor(context.request) };
+    const bearer = /^Bearer\s+(\S+)$/i.exec(String(context.request.headers.get('Authorization') || ''));
     return toResponse(await handleSend({
         env: context.env || {},
-        decided: d.decided,
-        tokens: Array.isArray(d.tokens) ? d.tokens : [],
-        extra: d.extra && typeof d.extra === 'object' ? d.extra : {}
+        idToken: bearer ? bearer[1] : null,
+        template: d.template, params: d.params,
+        roundCode: d.roundCode, recipients: d.recipients
     }), cors);
 }

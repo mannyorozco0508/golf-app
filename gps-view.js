@@ -2119,7 +2119,7 @@
         var cfgW = (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {};
         // A failed WeatherKit ask is not repeated for 10 minutes (NWS answers meanwhile).
         if (cfgW.weatherkit && !(S.windWkOffUntil > Date.now()) && window.HardPanGpsLive && typeof window.HardPanGpsLive.wind === 'function') {
-            window.HardPanGpsLive.wind(pt[0], pt[1]).then(function (r) {
+            window.HardPanGpsLive.wind(pt[0], pt[1], S.courseKey).then(function (r) {
                 if (r && r.status === 'ok' && typeof r.mph === 'number') {
                     lsSet(key, { at: Date.now(), src: 'weatherkit', obsAt: r.asOf ? Date.parse(r.asOf) || null : null, mph: r.mph, gustMph: r.gustMph || null, toDeg: r.toDeg, fromDeg: r.fromDeg, tempF: typeof r.tempF === 'number' ? r.tempF : null });
                     done(); if (S === mine) syncWind();
