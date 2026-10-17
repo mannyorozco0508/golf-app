@@ -2648,6 +2648,11 @@
         } else if (S.geoError) {
             msg = 'Cannot find you right now. Step out from under trees or cover and give it a moment.';
         }
+        // AN iPAD WITH NO GPS (mailbox 004: the listing supports iPad). A Wi-Fi iPad has no GPS chip:
+        // iOS places it from Wi-Fi to hundreds of metres, or not at all on a course - one sentence
+        // instead of wild yardages. A cellular iPad gets a real fix and never sees it.
+        var ipadMsg = ipadNoGps(S.geoError, fix);
+        if (ipadMsg) msg = ipadMsg;
         txt('.gps-msg', msg);
         show('.gps-msg', !!msg);
 
@@ -3787,6 +3792,20 @@
         done(false);
     }
 
+    var IPAD_NO_GPS_M = 100;   // a fix worse than this on an iPad is Wi-Fi, not GPS
+    var IPAD_NO_GPS = 'GPS needs a phone (or a cellular iPad) with location \u2014 this iPad can\u2019t place you on the course. Scores, games and the card all work here.';
+    function isIpad() {
+        try {
+            var n = navigator;
+            return /iPad/.test(String(n.userAgent || '')) || (/Macintosh/.test(String(n.userAgent || '')) && (n.maxTouchPoints || 0) > 1);
+        } catch (e) { return false; }
+    }
+    // The iPad sentence, or '' (pure apart from the device check; gps_ipad_test.js).
+    function ipadNoGps(geoError, f) {
+        if (!isIpad() || geoError === 'denied') return '';
+        if (geoError === 'unavailable' || geoError === 'timeout' || geoError === 'unsupported') return IPAD_NO_GPS;
+        return (f && typeof f.acc === 'number' && f.acc > IPAD_NO_GPS_M) ? IPAD_NO_GPS : '';
+    }
     // opts.remember false: a visit to the card that is not the golfer leaving
     // GPS (Enter Score, the KP question) - the next landing is still GPS.
     function showSide(side, opts) {
@@ -3890,6 +3909,8 @@
         hasGpsPro: hasGpsPro,
         // The paywall's disclosure text for a store offer (pure; gps_entitlement_test.js).
         paywallText: function (o) { return sheetText(o); },
+        // The Wi-Fi iPad sentence (gps_ipad_test.js).
+        ipadNoGps: ipadNoGps,
         isMounted: function () { return !!S; },
         courseKey: function () { return S ? S.courseKey : null; },
         tournament: function () { return tournament(); },

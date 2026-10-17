@@ -63,7 +63,7 @@ course. The GPS screen must say so cleanly instead of showing wild yardages:
   better than that within the fix timeout, show one sentence: "GPS needs a phone (or a cellular
   iPad) with location - this iPad can't place you on the course. Scores, games and the card all
   work here." and keep the card one tap away. Games and scoring never depend on location.
-- Done on this branch in gps-view.js (see the 004 report) once the paywall work there is merged.
+- Done on this branch: gps-view.js ipadNoGps() (gps_ipad_test.js). "Location is off" keeps its own words.
 
 ## What is NOT done here, and why
 - No change to ios/'s webDir, plugins or location strings yet: that IS the release switch, and the
