@@ -12,10 +12,11 @@ summary of who owes whom from the group's own agreed games; players settle up be
 outside the app. There is no payment processing, no deposits, no wagering with the app or any
 operator, and no cash-out.
 
-GPS (the paid part, an auto-renewing yearly subscription with a 7-day free trial) shows yardages to
-the front, middle and back of the green and to any point tapped on the map. Location is used on the
-device only, while the app is open; a position leaves the phone only when the golfer taps "set the
-green here" while standing on a green.
+GPS is the paid part: every GPS feature (the map, yardages to the front / middle / back of the green
+and to any point tapped, wind) needs the GPS Map subscription - an auto-renewing yearly subscription
+with a 7-day free trial for new subscribers. Games, scoring, joining, the leaderboard and settling up
+are free and never ask for it. Location is used on the device only, while the app is open; a
+position leaves the phone only when the golfer taps "set the green here" while standing on a green.
 
 To try it without being on a golf course:
 1. Open the app. On Home, tap Games, then Join, and enter the code 5RZ8GE. This opens a sample
@@ -24,10 +25,12 @@ To try it without being on a golf course:
    view-only. Settle shows the friendly "who owes who" summary (no money moves in the app).
 2. To start your own round: Games > Start a round, pick any course from the search, add a
    couple of golfer names, Save. Scores entered there are yours.
-3. GPS: tap GPS on Home and pick a course. Off the course, the map still opens on that course and
-   shows the holes and greens; yardages are measured from your position, so away from a course they
-   are large numbers (this is expected). The subscription screen is reached from the GPS screen
-   (Pro features); Restore Purchases is on that screen.
+3. GPS: tap GPS on Home (or "📍 GPS" on the scorecard of 5RZ8GE). The subscription screen opens:
+   tap "Start 7-day free trial" - in review the sandbox App Store account starts the trial, and the
+   GPS map opens straight away. Restore Purchases, Terms and Privacy are on that screen. Off the
+   course, the map still opens on the course and shows the holes and greens; yardages are measured
+   from your position, so away from a course they are large numbers (this is expected).
+   Tapping "Not now" goes back to the scorecard / Home - games never need the subscription.
 Sign-in is optional (Apple, Google or an email link) and only needed to keep rounds across devices.
 Account deletion: Account > Delete account (in the app).
 
@@ -61,7 +64,7 @@ Data linked to you (all for **App Functionality** only):
 | Identifiers > User ID | The Firebase account id |
 | Identifiers > Device ID | The push notification token (only if notifications are allowed) |
 | User Content > Other User Content | Rounds: scores, handicaps, games |
-| Purchases > Purchase History | When the GPS subscription ships (Apple / the purchase SDK) |
+| Purchases > Purchase History | The GPS Map subscription (Apple / RevenueCat) |
 
 Data not linked to you: none. Not collected: health, financial info, contacts, browsing / search
 history (course searches are sent to the course service to answer them, not stored with the
