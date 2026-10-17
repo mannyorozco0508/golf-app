@@ -1,3 +1,11 @@
+> **SUPERSEDED - CURRENT PRICING (Manny, 2026-10-17, mailbox 007).** Games, scoring, joining, the
+> scorecard, the leaderboard and settling up are FREE (the organizer passes and the 21-day trial
+> below are gone). HardPan GPS is the paid part from v2.0: EVERY GPS feature is behind a 7-day free
+> trial, then the auto-renewing yearly "GPS Map" subscription (com.rattlegolf.app.gpsmap.yearly,
+> group "HardPan Plus"). Founding price $24.99/year for the first 1,000 subscribers (the number is
+> a setting, gps_meta/config.foundingCap), kept while they stay subscribed; then $34.99/year for new
+> subscribers. There is no free GPS tier. Everything below is history.
+
 # HardPan (consumer) — v1.1 Monetization Spec
 
 Rewritten 2026-09-14, revised twice the same day: after the round-code
