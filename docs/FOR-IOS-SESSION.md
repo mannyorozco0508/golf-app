@@ -63,7 +63,17 @@ were reproduced on an iPhone.
    - **The bounce.** On the scorecard, `front-door.js` ~L1049-1058 waits only for `agPlayers().length` (**any** golfer), then calls `agQuick(agq)`.
      `agQuick` → `agPlayersFirst(tpl)` counts `currentData.players` again, and at that moment `currentData` is the phone's **stored copy** of the round, `golfapp_snap_v1_LX83Z6`, saved before the golfers were added.
      Measured: stored copy **1** golfer, live round **4**. So 1 < 4 sends the golfer back to Players, and `agNext` is reset to `stage: 'players'`. It loops.
-   - **Shared:** the same `front-door.js` and the same offline snapshot ship in the iOS GPS build. Whether iOS hits it depends only on whether the stored copy draws before the live data, which is likely there too.
+   - **Shared:** the same `front-door.js` and the same offline snapshot ship in the iOS GPS build.
+   - **Reproduced in desktop Chrome, no Capacitor (job 011).** `docs/repro/players-first-loop.js` arrives cold at `index.html?game=PFLOOP&agq=vegas` on the cold-arrival harness (stubbed Firebase, nothing live) and touches nothing. Live round 4 golfers, `hardpan_ag_next` at `stage: 'game'`:
+     | Stored copy | Live data arrives | Lands on |
+     |---|---|---|
+     | 1 golfer | after 1500 ms | `admin.html?game=PFLOOP&step=players`: **the loop** |
+     | none | after 1500 ms | `index.html?game=PFLOOP`, 4 golfers |
+     | 1 golfer | at once | `index.html?game=PFLOOP`, 4 golfers |
+     | 4 golfers | after 1500 ms | `index.html?game=PFLOOP`, 4 golfers |
+     So it is not Android. It takes both a stale stored copy **and** a live round slower than the first 150 ms tick. A real phone on a course has both, because the stored copy is always the one from before Players was opened. **Expect it on iPhone on Monday** if the round is started from the GPS door with one golfer and a 4-golfer game is picked.
+     - The 1500 ms is my stand-in for a network, not a measurement of one.
+     - Likely workaround for Monday (reasoned from the last row, not measured on a phone): add the golfers first, let the scorecard load them, then pick the game.
    - **Fix options for the iOS session** (not done here):
      - wait for `agPlayers().length >= agNeed(agq)` (still capped at 80 ticks) instead of `length`; or
      - skip the players-first check once `nx.stage === 'game'` (the golfers were just saved); or

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — HardPan</title>
+<style>
+    :root { --forest: #0E2B1F; --lime: #93C01F; --cream: #F6F4EC; --ink: #1a1a1a; --muted: #5a6560; --line: #d8d5c8; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--cream); color: var(--ink); margin: 0; padding: 24px 16px 64px 16px; line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.45rem; color: var(--forest); margin: 28px 0 6px 0; }
+    h2 { font-size: 1.05rem; color: var(--forest); margin: 30px 0 8px 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+    .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+    p, li { font-size: 0.95rem; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    .callout { background: #fff; border-left: 4px solid var(--lime); border-radius: 6px; padding: 14px 16px; margin: 18px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.9rem; }
+    th { background: var(--forest); color: var(--cream); text-align: left; padding: 8px 10px; }
+    td { border-bottom: 1px solid var(--line); padding: 8px 10px; vertical-align: top; background: #fff; }
+    a { color: var(--forest); }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>HardPan Privacy Policy</h1>
+<p class="updated">Last updated: 17 October 2026 · Rattle Golf LLC</p>
+
+<div class="callout">
+<p><strong>The short version.</strong> HardPan keeps your group's golf: names, scores and the games you play. It makes you an anonymous account so the rounds you start stay yours. An email address is asked for only if you choose to sign in. Your GPS position is used on your phone to measure yardages and is not sent to us, with one exception you control (setting a green, below). No ads, no analytics, no tracking, and nothing is sold.</p>
+</div>
+
+<h2>Who we are</h2>
+<p>HardPan is made by Rattle Golf LLC. Questions or requests: <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a>.</p>
+
+<h2>What we collect, and why</h2>
+<table>
+<tr><th>What</th><th>When</th><th>Why</th></tr>
+<tr><td>An anonymous account id</td><td>Automatically, the first time you open the app or site</td><td>So the rounds and groups you set up belong to you, and to limit how many course lookups one account can make in a day. It has no name or email on it.</td></tr>
+<tr><td>Your email address</td><td>Only if you choose to sign in with an email link (on iPhone you may also use Sign in with Apple or Google)</td><td>So you can keep your rounds and groups across devices. Firebase (Google) sends the sign-in email for us.</td></tr>
+<tr><td>Golfers' names, handicaps, scores and games</td><td>When you or your group type them in</td><td>To run the scorecard, leaderboard and games for everyone with the round's code.</td></tr>
+<tr><td>A green's position</td><td>Only when you tap "set the green here" on the GPS screen</td><td>To fix that hole's green for your round. The saved point carries no account id and no name.</td></tr>
+<tr><td>Course searches</td><td>When you search for a course to play</td><td>Sent through our server to our course-data provider to answer the search. Not kept with your account.</td></tr>
+</table>
+
+<h2>Your location</h2>
+<ul>
+<li>HardPan asks for location only to show yardages on the GPS screen, and only while the app is open. It never asks for background location.</li>
+<li>Your position stays on your phone. It turns into yardages on the screen and is not sent to us, stored in your account, or put in a link.</li>
+<li>The one exception is "set the green here": that saves the spot you are standing on as the green, without your name or account.</li>
+<li>"Near you" (nearby courses) is worked out on your phone.</li>
+<li>You can switch location off at any time in your phone's settings. Scores, games and the scorecard work without it.</li>
+</ul>
+
+<h2>Services that help run HardPan</h2>
+<p>These receive only what they need to do their job, and none of them receive anything to track you:</p>
+<ul>
+<li><strong>Google Firebase</strong> (Authentication, Realtime Database, Cloud Functions): your account, round data and course searches. Google processes it for us as a service provider.</li>
+<li><strong>GolfAPI</strong> (golfapi.io), through our server: the course name you search for and course ids. Never your position or name.</li>
+<li><strong>GolfCourseAPI</strong> (golfcourseapi.com), through our Cloudflare Worker: the course name or town you type, to find a published scorecard. Never your position or name.</li>
+<li><strong>Esri (ArcGIS)</strong> and the <strong>U.S. Geological Survey</strong> (USGS): the satellite map on the GPS screen. Your phone asks them for map tiles of the course, and they see that request and your internet address. USGS also gives heights for points on the course (for "plays like").</li>
+<li><strong>U.S. National Weather Service</strong> (api.weather.gov): the wind. Your phone sends the course's location, not yours, and the service sees your internet address.</li>
+<li><strong>Apple</strong>, on iPhone only: Sign in with Apple if you use it, and push notifications if you allow them (your device's notification token and your notification choices are stored so a round can notify you).</li>
+</ul>
+
+<h2>What we don't do</h2>
+<ul>
+<li>No ads, and no advertising or analytics SDKs.</li>
+<li>No selling or renting of your information, and no sharing for anyone's advertising.</li>
+<li>No purchases in the app today. HardPan does not take, hold or move money; the "who owes whom" summary is information for your group, who settle up between themselves.</li>
+</ul>
+
+<h2>Kept on your device only</h2>
+<p>Dark mode, your last roster, recent rounds and courses, which golfer is you, downloaded course maps and any scores waiting for a signal are kept on your phone (or in your browser) and are not sent to us, except that waiting scores are sent to the round once you're back online.</p>
+
+<h2>Who can see a round</h2>
+<p>A round is shared by its game code. Anyone with the code can watch it, and the people you give a scorekeeper link can score it. There is no public list of rounds and no public profile.</p>
+
+<h2>How long we keep it</h2>
+<p>Rounds are kept so your group can look back at them, until the organizer wipes the round or asks us to. Your account is kept until you delete it.</p>
+
+<h2>Deleting your data</h2>
+<ul>
+<li><strong>Your account:</strong> in the app, open Account and tap Delete account. That deletes your sign-in (email and account id) and your saved groups straight away. See <a href="delete-account.html">delete-account</a> for exactly what is deleted and what stays.</li>
+<li><strong>A round:</strong> the organizer can use End &amp; Wipe Round.</li>
+<li><strong>Anything else, or if you can't open the app:</strong> email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> from the address you signed in with (or with the round code).</li>
+</ul>
+
+<h2>Children</h2>
+<p>HardPan is not directed at children under 13 and does not knowingly collect information from them. If you think a child's information is in HardPan, email us and we will delete it.</p>
+
+<h2>Security</h2>
+<p>Everything is sent over encrypted connections (HTTPS). Database rules let only the right people change a round or an account.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the date at the top changes, and an important change is shown in the app.</p>
+
+<footer>Rattle Golf LLC · <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a></footer>
+</div>
+</body>
+</html>

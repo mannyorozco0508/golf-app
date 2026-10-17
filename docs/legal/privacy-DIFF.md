@@ -31,5 +31,5 @@ Add these back when they ship.
 
 ## Open points for Manny
 1. Publishing date and who signs off.
-2. Resolved (job 006): retention wording kept as drafted.
-3. Resolved (job 006): dropped. The draft now says only that the date at the top changes when the policy changes.
+2. Resolved (job 011): no time limit; "kept until the organizer wipes the round or asks us to".
+3. Resolved (job 011): kept. "If this policy changes, the date at the top changes, and an important change is shown in the app."
