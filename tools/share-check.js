@@ -48,7 +48,9 @@ const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
         { expression: "JSON.stringify({ url: document.URL.split('/').pop() })" }] });
     const j1 = J(r)[0];
     f(j1.url === 'index.html?game=SHRND1&spectate=1', '1: the game code did not open the round as a spectator: ' + j1.url);
-    r = await go({ url: fileUrl('home.html', '') + '#games', db: DB({ SHRND1: round('someone-else') }), preScript: APP + ERR, steps: [{ sleep: 1500 },
+    // Two groups of two (URGENT-002: Join now checks the group exists - a 4-golfer round is ONE group,
+    // so Group 2 of it is refused with a sentence, tools/join-stuck-check.js).
+    r = await go({ url: fileUrl('home.html', '') + '#games', db: DB({ SHRND1: round('someone-else', { groupSizeOverrides: { 0: 2 } }) }), preScript: APP + ERR, steps: [{ sleep: 1500 },
         { expression: "(function(){ var i = document.getElementById('hp-code'); i.value = 'SHRND1-2-k7q9xm'; document.querySelector('[data-hp-act=\"join\"]').click(); return 'join'; })()" }, { sleep: 1500 },
         { expression: "JSON.stringify({ url: document.URL.split('/').pop() })" }] });
     const j2 = J(r)[0];
