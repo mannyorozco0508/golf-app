@@ -53,7 +53,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<!-- PORTRAIT-ONLY ON iPAD IS ONLY LEGAL ALONGSIDE THIS (2026-10-08).
 	     App Store Connect rejected build 12 with error 90474: an iPad app that

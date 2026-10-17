@@ -34,8 +34,10 @@ const CONSUMER_PAGES = [
 const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 
 const NATIVE_ICONS = {
-    'ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png':
-        '3330ab520f7d0da6fb37e8774fe736c51d6d681bb7b409b9d0808b5e6fc02dc1',
+    // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): com.rattlegolf.app takes the GPS
+    // app's HP ball + green location pin, the whole slot set (gps-beta's AppIcon.appiconset).
+    'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png':
+        '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png':
         '300cf9f2ff551ccd3aa45dc64d933ca9a53a0830d312cd2906cbb1f6ec801ddd',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png':
@@ -185,7 +187,7 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
             assert.notEqual(digest, STROKE_R_MASTER, file + ' is still the Stroke R master');
         });
         const master = sha('icon-1024.png');
-        assert.equal(master, NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png']);
+        assert.equal(master, NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png']);
         assert.notEqual(master, STROKE_R_MASTER, 'icon-1024.png is still the Stroke R');
         const img = readPng(path.join(__dirname, 'icon-1024.png'));
         assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
