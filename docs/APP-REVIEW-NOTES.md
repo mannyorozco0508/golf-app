@@ -18,10 +18,11 @@ device only, while the app is open; a position leaves the phone only when the go
 green here" while standing on a green.
 
 To try it without being on a golf course:
-1. Open the app. On Home, tap Games & Bets, then Join, and enter the code ZNBLP8. This opens a
-   sample round (Caledonia Golf & Fish Club, 4 golfers) as a spectator: the card, the leaderboard
-   and the games are view-only.
-2. To start your own round: Games & Bets > Start a round, pick any course from the search, add a
+1. Open the app. On Home, tap Games, then Join, and enter the code 5RZ8GE. This opens a sample
+   round (Caledonia Golf & Fish Club, 4 test golfers, 3 holes played) as a spectator: the card,
+   the leaderboard and its games - a $5 Nassau, skins, and a KP pool on the par 3s - are
+   view-only. Settle shows the friendly "who owes who" summary (no money moves in the app).
+2. To start your own round: Games > Start a round, pick any course from the search, add a
    couple of golfer names, Save. Scores entered there are yours.
 3. GPS: tap GPS on Home and pick a course. Off the course, the map still opens on that course and
    shows the holes and greens; yardages are measured from your position, so away from a course they
@@ -30,8 +31,6 @@ To try it without being on a golf course:
 Sign-in is optional (Apple, Google or an email link) and only needed to keep rounds across devices.
 Account deletion: Account > Delete account (in the app).
 
-(Manny: if you'd rather give review a round with games already set up, create one on a test account,
-put a Nassau and skins on it, and replace ZNBLP8 above.)
 
 ## Age rating questionnaire (proposed answers)
 - Cartoon or fantasy violence; realistic violence; prolonged graphic violence: None

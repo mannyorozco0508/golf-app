@@ -44,3 +44,14 @@ test('the screen shows it in place of the generic "Cannot find you" line', () =>
     const v = fs.readFileSync(path.join(__dirname, 'gps-view.js'), 'utf8');
     assert.match(v, /var ipadMsg = ipadNoGps\(S\.geoError, fix\);\n\s*if \(ipadMsg\) msg = ipadMsg;\n\s*txt\('\.gps-msg', msg\);/);
 });
+
+// THE LOCATION POLICY (mailbox 005, Manny 2026-10-17: keep "set the green by GPS"; save no uid or
+// name with the pin, and say so in the privacy policy).
+test('a saved green carries no uid and no name - the spot, the time, how it was set', () => {
+    const G = require('./gps-geo.js');
+    const pin = G.makePin([33.45, -79.15], [33.4499, -79.15], [33.4501, -79.15], { mid: { lat: 33.44, lng: -79.14 }, at: 1 }, 1000, 'gps');
+    const keys = JSON.stringify(pin);
+    assert.deepEqual(Object.keys(pin).sort(), ['at', 'back', 'by', 'front', 'mid', 'prev']);
+    assert.ok(!/uid|name|email|owner/i.test(keys), keys);
+    assert.match(fs.readFileSync(path.join(__dirname, 'privacy.html'), 'utf8'), /A saved green carries no name and no account id/);
+});
