@@ -23,6 +23,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- EMAIL SIGN-IN LINKS OPEN THE APP (job 006, from the 005 plan). Firebase sends
+                 email-link sign-in on its Hosting domain at /__/auth/links. autoVerify needs
+                 /.well-known/assetlinks.json on that host naming this package and the Play
+                 signing SHA-256; until it is served, Android keeps opening Chrome, as before.
+                 front-door.js hands the link to admin.html's existing email-link finish. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="golfapp-9fb21.firebaseapp.com" android:pathPrefix="/__/auth/links" />
+            </intent-filter>
+
         </activity>
 
         <provider

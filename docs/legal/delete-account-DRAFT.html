@@ -2,9 +2,9 @@
 <!-- DRAFT FOR MANNY (job 003, 2026-10-17). NOT DEPLOYED. Play's account-deletion page.
      "What is deleted / what stays" matches the CLIENT delete path in account-exit.js as it
      runs today: the accountDelete Cloud Function is NOT deployed (live answers 404), so the
-     app falls back to the client delete. Two lines depend on whether the stage-2 delete rule
-     (database.rules.stage2delete.json) is live - see the NEEDS-MANNY note. The email-request
-     timeframe is a promise Manny must make: placeholder until he answers. -->
+     app falls back to the client delete. The stage-2 delete rule is NOT live (Manny's console check, mailbox 007,
+     2026-10-17): organizers/$uid has no .write, so firstSeenAt and pass stay - the page says so. The email-request
+     timeframe ("reply within 7 days, delete within 30") is from job 006: MANNY TO CONFIRM BEFORE DEPLOY. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -40,7 +40,7 @@
 <p>You need a signal: if a step can't reach our servers, nothing is deleted and the app asks you to try again.</p>
 
 <h2>By email</h2>
-<p>If you can't open the app, email <a href="mailto:support@rattlegolf.com?subject=Delete%20my%20HardPan%20account">support@rattlegolf.com</a> from the address you signed in with, with the subject <strong>"Delete my HardPan account"</strong>. We reply to confirm and delete the account within <strong>[TIMEFRAME — Manny to set]</strong>.</p>
+<p>If you can't open the app, email <a href="mailto:support@rattlegolf.com?subject=Delete%20my%20HardPan%20account">support@rattlegolf.com</a> from the address you signed in with, with the subject <strong>"Delete my HardPan account"</strong>. We reply within 7 days and delete the account within 30 days.</p>
 
 <h2>What is deleted</h2>
 <ul>
@@ -52,7 +52,7 @@
 <h2>What stays</h2>
 <ul>
 <li><strong>Rounds.</strong> A round belongs to everyone who played it, so it is not deleted with your account: the scores stay under its game code, for the golfers who have it. An organizer can erase a round with End &amp; Wipe Round, or email us its code.</li>
-<li><strong>Two small records with your old account id</strong>: the date you were first seen and, if you had one, a founder pass. They hold no name or email, and nobody can read them once the account is gone. <em>[Only if the stage-2 delete rule is not live — see note.]</em></li>
+<li><strong>Two small records with your old account id</strong>: the date you were first seen and, if you had one, a founder pass. They hold no name or email, and nobody can read them once the account is gone.</li>
 <li><strong>A daily count of course lookups</strong> made by your old account id (used to limit lookups). It holds no name or email.</li>
 <li><strong>Green positions</strong> you set while playing. They never carried your name or account.</li>
 </ul>

@@ -1,6 +1,6 @@
 # HardPan Golf for Google Play: submission prep (job 001)
 
-Prepared 2026-10-17 on `android-gps` for the build **0.2 (versionCode 5)**, package `com.rattlegolf.app`,
+Prepared 2026-10-17 on `android-gps` for the build **0.2 (versionCode 6)**, package `com.rattlegolf.app`,
 under the Rattle Golf LLC organization account (still in Google's verification).
 Nothing here has been entered in Play Console. Paste from this file once the account is verified.
 
@@ -204,14 +204,14 @@ Check G4 before publishing the "we delete" list. Without the server function, so
 | iPhone set (`final-10`) | — | **Not usable**: 1320×2868 = 2.17:1, and iOS chrome |
 
 Screenshots (clean install, 0.2 (5), demo round 5RZ8GE): 01 Home, 02 Near you (Caledonia), 03 GPS hole 4 (151 to centre), 04 GPS near the green (41), 05 scorecard (Alex / Blake / Casey / Drew), 06 full leaderboard, 07 Results (settle summary), 08 Share with QR.
-Left for Manny: 06 and 07 show the demo data's names ("Casey Test" etc.) and its title "App Review demo (TEST round)". For polished store images, a round made for screenshots needs a database write, which is your call.
+06 and 07 were reshot (job 006) from a separate screenshot round, **LX83Z6** ("GPS round" at Caledonia: Mike, Jordan, Chris, Taylor; a $5 Nassau; 3 holes scored). The App Review round 5RZ8GE is untouched.
 
 ---
 
-## 7. Release checklist: 0.2 (versionCode 5)
+## 7. Release checklist: 0.2 (versionCode 6)
 
-- [x] `app-release.aab` builds: `android/app/build/outputs/bundle/release/app-release.aab`, 5,767,389 bytes, sha256 `26cc9636…2e8a` (job 003 commit).
-- [x] versionName **0.2**, versionCode **5**, package **com.rattlegolf.app**.
+- [x] `app-release.aab` builds: `android/app/build/outputs/bundle/release/app-release.aab`, 5,768,350 bytes, sha256 `4db361f6…67a6` (job 006 commit).
+- [x] versionName **0.2**, versionCode **6**, package **com.rattlegolf.app**.
 - [x] Signed with the upload key, SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Enroll in Play App Signing at first upload.
 - [x] **targetSdk 36**, minSdk 24. Play rule (developer.android.com, updated 2026-10-16): since **31 Aug 2026**, new apps and updates must target **Android 16 (API 36)** or higher. An extension to 1 Nov 2026 can be requested. **Met.**
 - [x] Portrait only. No background location. No ads. No billing.

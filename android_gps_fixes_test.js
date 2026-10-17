@@ -59,7 +59,8 @@ function windowFor(platform, page, extra) {
     const geo = (extra && extra.geo) || {};
     const App = {
         addListener(name, fn) { calls.push('App.addListener:' + name); (listeners[name] = listeners[name] || []).push(fn); return { remove() {} }; },
-        minimizeApp() { calls.push('App.minimizeApp'); }
+        minimizeApp() { calls.push('App.minimizeApp'); },
+        getLaunchUrl() { calls.push('App.getLaunchUrl'); return Promise.resolve((extra && extra.launchUrl) ? { url: extra.launchUrl } : undefined); }
     };
     const W = {
         Capacitor: {
@@ -71,7 +72,7 @@ function windowFor(platform, page, extra) {
         history: { back() { calls.push('history.back'); } },
         navigator: { onLine: true },
         localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-        sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        sessionStorage: (() => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; })(),
         document: {
             readyState: 'complete',
             getElementById: id => els.get(id) || null,
@@ -82,7 +83,7 @@ function windowFor(platform, page, extra) {
         setTimeout(fn, ms) { const t = { fn, at: now + (ms || 0), id: timers.length + 1 }; timers.push(t); return t.id; },
         clearTimeout(id) { const t = timers.find(x => x.id === id); if (t) t.fn = null; },
         addEventListener() {}, scrollTo() {}, console,
-        URLSearchParams, Promise, JSON, Math, Date, String, Number, Array, Object, RegExp, Error
+        URL, URLSearchParams, Promise, JSON, Math, Date, String, Number, Array, Object, RegExp, Error
     };
     W.window = W;
     if (extra && extra.GolfBack) W.GolfBack = extra.GolfBack;
@@ -405,5 +406,78 @@ describe('5. THE STATUS BAR: Android only, native, no page CSS changed', () => {
         });
         walk(ios);
         assert.deepEqual(hit, [], 'an iOS source reads insetsHandling, so the config key reaches iOS');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// JOB 006 (from the 005 plan): an email sign-in link opens the app on Android.
+describe('B. APP LINKS: the email sign-in link opens the app on Android only', () => {
+    const KEY = 'K', CODE = 'TESTCODE123';
+    const inner = 'https://golfapp-9fb21.firebaseapp.com/__/auth/action?apiKey=' + KEY + '&mode=signIn&oobCode=' + CODE
+        + '&continueUrl=https://golf-app-5a5.pages.dev/admin.html&lang=en';
+    const wrapper = 'https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=' + encodeURIComponent(inner);
+    const want = 'admin.html?apiKey=' + KEY + '&mode=signIn&oobCode=' + CODE
+        + '&continueUrl=https%3A%2F%2Fgolf-app-5a5.pages.dev%2Fadmin.html&lang=en&account=1';
+
+    test('Android, warm start: appUrlOpen with the link reopens admin.html with its own sign-in query, once', { skip }, () => {
+        const sb = windowFor('android', 'home.html');
+        sb.__els.set('v-main', sb.__el('v-main')); sb.__els.get('v-main').classList.add('on');
+        load(sb, 'front-door.js');
+        const open = sb.__listeners.appUrlOpen || [];
+        assert.equal(open.length, 1, 'no appUrlOpen listener on Android');
+        open[0]({ url: wrapper });
+        assert.equal(sb.location.href, want, 'the link did not go to the existing email-link finish');
+        sb.location.href = 'home.html';
+        open[0]({ url: wrapper });
+        assert.equal(sb.location.href, 'home.html', 'the same code was handled twice');
+    });
+
+    test('Android, cold start: getLaunchUrl carries the link the same way', { skip }, async () => {
+        const sb = windowFor('android', 'home.html', { launchUrl: wrapper });
+        sb.__els.set('v-main', sb.__el('v-main')); sb.__els.get('v-main').classList.add('on');
+        load(sb, 'front-door.js');
+        await settle();
+        assert.ok(sb.__calls.includes('App.getLaunchUrl'));
+        assert.equal(sb.location.href, want);
+    });
+
+    test('Android: anything that is not a sign-in link on our host is ignored', { skip }, () => {
+        const sb = windowFor('android', 'home.html');
+        load(sb, 'front-door.js');
+        const t = sb.HardPanLinks.target;
+        assert.equal(t('https://golfapp-9fb21.firebaseapp.com/__/auth/handler?x=1'), null);
+        assert.equal(t('https://evil.example.com/__/auth/links?link=' + encodeURIComponent(inner)), null);
+        assert.equal(t('https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=' + encodeURIComponent(inner.replace('golfapp-9fb21.firebaseapp.com', 'evil.example.com'))), null, 'our host wrapping a foreign inner link');
+        assert.equal(t('https://golfapp-9fb21.firebaseapp.com/__/auth/links?link=' + encodeURIComponent(inner.replace('mode=signIn', 'mode=resetPassword'))), null);
+        assert.equal(t('http://golfapp-9fb21.firebaseapp.com/__/auth/links?link=' + encodeURIComponent(inner)), null);
+        assert.equal(t(inner), want, 'the inner action link alone is accepted too');
+    });
+
+    test('iOS UNCHANGED: no appUrlOpen listener, no getLaunchUrl', { skip }, () => {
+        const sb = windowFor('ios', 'home.html', { launchUrl: wrapper });
+        load(sb, 'front-door.js');
+        assert.equal((sb.__listeners.appUrlOpen || []).length, 0);
+        assert.ok(!sb.__calls.includes('App.getLaunchUrl'));
+    });
+
+    test('ActionCodeSettings are byte-for-byte the same on the website, iOS and Android (unchanged)', () => {
+        const { loadJsFile } = require('./helpers/load-script.js');
+        const sb = loadJsFile('email-link-auth.js', []);
+        const url = 'https://golf-app-5a5.pages.dev/admin.html';
+        const as = (cap) => { sb.Capacitor = sb.window.Capacitor = cap; return JSON.stringify(sb.emailLinkAuth.actionCodeSettings(url)); };
+        const web = as(undefined);
+        const ios = as({ getPlatform: () => 'ios', isNativePlatform: () => true, Plugins: {} });
+        const android = as({ getPlatform: () => 'android', isNativePlatform: () => true, Plugins: {} });
+        const before = JSON.stringify({ url, handleCodeInApp: true, iOS: { bundleId: 'com.rattlegolf.app' }, android: { packageName: 'com.rattlegolf.app', installApp: false } });
+        assert.equal(web, before, 'the website ActionCodeSettings changed');
+        assert.equal(ios, before, 'the iOS ActionCodeSettings changed');
+        assert.equal(android, before);
+    });
+
+    test('the manifest hands /__/auth/links on the Firebase Hosting domain to MainActivity, autoVerify', () => {
+        const m = read('android/app/src/main/AndroidManifest.xml');
+        assert.match(m, /<intent-filter android:autoVerify="true">\s*<action android:name="android\.intent\.action\.VIEW" \/>\s*<category android:name="android\.intent\.category\.DEFAULT" \/>\s*<category android:name="android\.intent\.category\.BROWSABLE" \/>\s*<data android:scheme="https" android:host="golfapp-9fb21\.firebaseapp\.com" android:pathPrefix="\/__\/auth\/links" \/>\s*<\/intent-filter>/);
+        const act = m.slice(m.indexOf('android:name=".MainActivity"'), m.indexOf('</activity>'));
+        assert.ok(act.includes('android:pathPrefix="/__/auth/links"'), 'the filter is not on MainActivity');
     });
 });

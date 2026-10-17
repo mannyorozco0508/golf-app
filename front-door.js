@@ -2892,6 +2892,49 @@
     }
     armBack();
 
+    // ---- ANDROID: AN EMAIL SIGN-IN LINK OPENS THE APP (job 006, the 005 plan) ------------
+    // AndroidManifest.xml's intent filter hands https://golfapp-9fb21.firebaseapp.com/__/auth/
+    // links to the app; the App plugin carries it here - appUrlOpen on a warm start,
+    // getLaunchUrl on a cold one. It reopens admin.html with the link's own query (mode=signIn
+    // &oobCode=...), which is exactly the arrival email-link-auth.js's install() already
+    // finishes for the website - no second sign-in path. account=1 keeps the launch hop from
+    // sending a bare admin.html to Home. A code is handled once: getLaunchUrl keeps answering
+    // the same launch URL on every page load of that launch. ANDROID ONLY: iOS and the web
+    // never arm it.
+    var LINK_HOST = 'golfapp-9fb21.firebaseapp.com', LINK_DONE = 'hardpan_email_link_done';
+    function signInTarget(url) {
+        try {
+            var u = new URL(String(url || ''));
+            if (u.protocol !== 'https:' || u.hostname !== LINK_HOST || u.pathname.indexOf('/__/auth/') !== 0) return null;
+            var inner = u.searchParams.get('link');
+            if (inner) u = new URL(inner);
+            if (u.hostname !== LINK_HOST || u.searchParams.get('mode') !== 'signIn' || !u.searchParams.get('oobCode')) return null;
+            var q = new URLSearchParams(u.search);
+            q.set('account', '1');
+            return 'admin.html?' + q.toString();
+        } catch (e) { return null; }
+    }
+    function openSignInLink(url) {
+        var to = signInTarget(url);
+        if (!to) return false;
+        var code = new URLSearchParams(to.split('?')[1]).get('oobCode');
+        if (ss(LINK_DONE) === code) return false;
+        ss(LINK_DONE, code);
+        W.location.href = to;
+        return true;
+    }
+    function armLinks() {
+        if (!native() || !android()) return false;
+        var App = W.Capacitor.Plugins && W.Capacitor.Plugins.App;
+        if (!App || typeof App.addListener !== 'function') return false;
+        App.addListener('appUrlOpen', function (ev) { openSignInLink(ev && ev.url); });
+        if (typeof App.getLaunchUrl === 'function') {
+            Promise.resolve(App.getLaunchUrl()).then(function (r) { openSignInLink(r && r.url); }, function () {});
+        }
+        return true;
+    }
+    armLinks();
+
     W.HardPanDoors = { dayLabel: dayLabel, historyList: historyList, recapHref: recapHref, joinGroups: joinGroups, seenRound: seenRound, roundResult: roundResult, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
@@ -2904,6 +2947,7 @@
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
     W.HardPanBack = { layer: backLayer, back: back, position: position };
+    W.HardPanLinks = { target: signInTarget };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
     // round; it used to hop index -> admin -> home, drawing each. Now, as this file is read

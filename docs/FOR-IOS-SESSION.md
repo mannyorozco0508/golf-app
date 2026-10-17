@@ -55,11 +55,20 @@ were reproduced on an iPhone.
    - Android now tries once more after `load` (job 003). iOS is unchanged.
    - If an iPhone ever shows "This round's setup belongs to its organizer" on a round it just made, this is why.
 
-8. **The players-first hand-off doesn't continue (seen on Android; iOS not checked).**
-   - Repro: Vegas from Add a game with one golfer → Players step → add 3 golfers → "Save golfers · set up Vegas ›".
-   - The players save to the round (4 in RTDB), but the hand-off doesn't happen: `hardpan_ag_next` stays at `stage: 'players'`, so `showRoundReadyScreen` → `afterSave` never ran. `saveSettings()` stopped early with no visible message.
-   - Not root-caused: the round created from the GPS door has no `courseKey`, only `courseName`, which may matter.
-   - My tap automation was slow on this run, so treat it as unproven until reproduced by hand.
+8. **The players-first hand-off loops back to Players. ROOT-CAUSED (job 006); shared, not fixed.**
+   - **Repro** (Android emulator, 0.2 (6), round LX83Z6 from the GPS door): Add a game → Vegas with 1 golfer → Players → add 3 golfers → "Save golfers · set up Vegas ›". You land on Players again, every time.
+   - **What actually happens.** Recorded in a debugging probe, kept in sessionStorage across the reload:
+     `save:start → save:returned → showRoundReadyScreen(LX83Z6) → afterSave(LX83Z6) → unload → afterSave returned true`.
+     So the save **works** (all 4 golfers are in RTDB), and `afterSave` sets `stage: 'game'` and goes to `index.html?game=LX83Z6&agq=vegas`.
+   - **The bounce.** On the scorecard, `front-door.js` ~L1049-1058 waits only for `agPlayers().length` (**any** golfer), then calls `agQuick(agq)`.
+     `agQuick` → `agPlayersFirst(tpl)` counts `currentData.players` again, and at that moment `currentData` is the phone's **stored copy** of the round, `golfapp_snap_v1_LX83Z6`, saved before the golfers were added.
+     Measured: stored copy **1** golfer, live round **4**. So 1 < 4 sends the golfer back to Players, and `agNext` is reset to `stage: 'players'`. It loops.
+   - **Shared:** the same `front-door.js` and the same offline snapshot ship in the iOS GPS build. Whether iOS hits it depends only on whether the stored copy draws before the live data, which is likely there too.
+   - **Fix options for the iOS session** (not done here):
+     - wait for `agPlayers().length >= agNeed(agq)` (still capped at 80 ticks) instead of `length`; or
+     - skip the players-first check once `nx.stage === 'game'` (the golfers were just saved); or
+     - refresh `golfapp_snap_v1_<code>` when admin saves the roster.
+     The first is the smallest.
 
 ## Shared files android-gps changed (all Android-gated)
 
@@ -72,6 +81,7 @@ the old path unchanged, and `android_gps_fixes_test.js` asserts the iOS half of 
 | `gps-view.js` | `backLayer()` / `back()` added to the API (called only by Android Back) |
 | `pwa-boot.js` | `androidTopLevel()`: on Android, an empty press at a page's top level goes to Home |
 | `auth-boot.js` | `retryAfterLoad()`: on Android only, "no Firebase App" waits for `load` and signs in once more (job 003) |
+| `front-door.js` (again) | `armLinks()`: on Android only, an email sign-in link (App Links, `/__/auth/links`) reopens admin.html with its sign-in query; `email-link-auth.js` is unchanged (job 006) |
 | `admin.html` | `isAndroidShell()`; no Apple/Google/Link buttons, email card shown; Notifications card hidden; Setup Coach back probe |
 | `index.html` | Round Menu sheet back probe (Android only) |
 | `capacitor.config.ts` | `plugins.SystemBars.insetsHandling = 'disable'` (Android reads it; Capacitor iOS has no such key) |
