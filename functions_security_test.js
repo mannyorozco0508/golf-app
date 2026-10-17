@@ -25,6 +25,9 @@ const Module = require('module');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const ON = fs.existsSync(path.join(__dirname, 'firebase-functions', 'gps-live-core.js'));
 const skip = ON ? false : 'Consumer tree: no GPS live functions';
+// The (app) tests load gps-geo.js / gps-live.js, which a Consumer tree removes (functions stay).
+const APP_ON = ['gps-geo.js', 'gps-match.js', 'gps-live.js'].every((f) => fs.existsSync(path.join(__dirname, f)));
+const appSkip = APP_ON ? skip : 'Consumer tree: no GPS app files';
 
 // ---- fakes ------------------------------------------------------------------
 function fakeDb(seed) {
@@ -161,7 +164,7 @@ function sandbox(opts) {
     return { sb, L: sb.HardPanGpsLive, requests, reads };
 }
 
-test('H2 (app): the App Check token goes along when the app has App Check; the new answers read as plain words', { skip }, async () => {
+test('H2 (app): the App Check token goes along when the app has App Check; the new answers read as plain words', { skip: appSkip }, async () => {
     const t = sandbox({ appCheck: 'AC-TOKEN' });
     await t.L.search('Prestwick');
     assert.equal(t.requests[0].init.headers['X-Firebase-AppCheck'], 'AC-TOKEN');
@@ -233,7 +236,7 @@ test('H3: gpsUnlink - owners only; it removes gps_links/<key> and nothing else',
     assert.ok(loadIndex().declared.gpsUnlink, 'deployed as its own callable');
 });
 
-test('H3 (app): the round code goes with the course key; after the save linkRound offers the link again for 0 GolfAPI calls, only when needed', { skip }, async () => {
+test('H3 (app): the round code goes with the course key; after the save linkRound offers the link again for 0 GolfAPI calls, only when needed', { skip: appSkip }, async () => {
     const COURSE = { id: PW, h: { 1: { g: { c: [33.64, -78.96] } } } };
     const t = sandbox({ reply: (u, b) => ({ result: { status: 'ready', course: COURSE, cardKey: null } }) });
     await t.L.course(PW, 'gca_1', 'abc123');
@@ -316,7 +319,7 @@ test('M5: the cache holds at most 500 points, the oldest dropped first; no datab
     assert.deepEqual(await bare.wind({ uid: 'u' }, { lat: 1, lon: 1 }), { status: 'off' }, 'the guards need the database');
 });
 
-test('M5 (app): the wind ask names the round\'s course (key and GolfAPI id), still never the golfer\'s position', { skip }, async () => {
+test('M5 (app): the wind ask names the round\'s course (key and GolfAPI id), still never the golfer\'s position', { skip: appSkip }, async () => {
     const t = sandbox({ db: {}, ls: { hardpan_gpslive_link_v1_gca_1: JSON.stringify(PW) } });
     await t.L.wind(33.64123, -78.96011, 'gca_1');
     assert.deepEqual(t.requests[0].body, { data: { lat: 33.641, lon: -78.96, courseKey: 'gca_1', courseId: PW } });
