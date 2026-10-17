@@ -181,3 +181,13 @@ test('wiring: trip.html loads the builder and the scoreboard in GPS blocks; noth
     assert.ok(!/\.set\(|\.push\(\)\.key|\.remove\(/.test(ui), 'one update, nothing else');
     assert.ok(!/db\.ref|\.set\(|\.update\(/.test(read('cup-scoreboard.js').replace(/db\.ref\('events\/' \+ c\)/, '')), 'the scoreboard only reads');
 });
+
+// THE TRIP IS ITS CREATOR'S (Manny 2026-10-17, the phase-1 rules refuse a trip with no ownerUid): the
+// builder stamps the uid on the trip as on its rounds, and the blank-trip path stamps it too.
+test('the trip carries ownerUid = the builder\'s uid; the blank trip too', { skip }, () => {
+    const out = build(plan(), TB.questions(plan()).map((q) => q.answer));
+    assert.strictEqual(out.updates['trips/TRIP01/ownerUid'], 'uid-1');
+    const src = require('fs').readFileSync(require('path').join(__dirname, 'trip.html'), 'utf8');
+    assert.match(src, /organizerGate\.ensureOrganizer\(db\)\.then\(\(uid\) => \{ ownerUid = uid; return issueUniqueCode\(\{ db, root: 'trips' \}\); \}\)/);
+    assert.match(src, /\.set\(\{ name: name, createdAt: Date\.now\(\), rounds: \{\}, organizerToken: tripToken, ownerUid: ownerUid \}\)/);
+});

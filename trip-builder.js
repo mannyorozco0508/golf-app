@@ -390,6 +390,8 @@
         updates['trips/' + c.tripCode + '/name'] = plan.name || 'Trip';
         updates['trips/' + c.tripCode + '/createdAt'] = c.now;
         updates['trips/' + c.tripCode + '/organizerToken'] = c.tokens.trip;
+        // The trip is its builder's, like its rounds (the rules refuse a trip with no ownerUid).
+        updates['trips/' + c.tripCode + '/ownerUid'] = c.uid;
         // WHAT THE ENGINE CAN'T HOLD, kept on the trip: the Cup's own rules, captains,
         // and every line the builder did not turn into setup.
         updates['trips/' + c.tripCode + '/builder'] = {
