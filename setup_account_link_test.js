@@ -139,7 +139,16 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         //                         the SAME uid different words
         // email_link_auth_test.js is 19/19 green against it.
         // was 0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a
-        assert.equal(sha('email-link-auth.js'), '7c421eb50161dc5f43cd40cf7fcaffc007d6b44a2ec8a67a2c9c1d3b4e46325b',
+        //
+        // RE-PINNED AGAIN (android-gps, job 009, Manny's explicit approval for this file,
+        // 2026-10-17): actionCodeSettings() sends the `android` block only from the Android
+        // app (App Links); the website and iOS send the old settings minus `android`. The
+        // three paths were re-measured, not assumed: setStatus('flush-check') leaves lastNote
+        // === 'flush-check'; planCompletion({isAnonymous:true}) still answers 'link';
+        // migrationNote still gives the adopted uid different words ("not moved") from the
+        // same uid. email_link_auth_test.js 19/19; android_gps_fixes_test.js holds the split.
+        // was 7c421eb50161dc5f43cd40cf7fcaffc007d6b44a2ec8a67a2c9c1d3b4e46325b
+        assert.equal(sha('email-link-auth.js'), '1607185766ee551f9142615728a7e0075c30d6c1236badc28f75dfe514ef1931',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

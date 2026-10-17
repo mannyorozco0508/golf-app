@@ -460,7 +460,7 @@ describe('B. APP LINKS: the email sign-in link opens the app on Android only', (
         assert.ok(!sb.__calls.includes('App.getLaunchUrl'));
     });
 
-    test('ActionCodeSettings are byte-for-byte the same on the website, iOS and Android (unchanged)', () => {
+    test('ActionCodeSettings: Android = the old settings; website and iOS = the old settings minus `android` (job 009)', () => {
         const { loadJsFile } = require('./helpers/load-script.js');
         const sb = loadJsFile('email-link-auth.js', []);
         const url = 'https://golf-app-5a5.pages.dev/admin.html';
@@ -468,10 +468,11 @@ describe('B. APP LINKS: the email sign-in link opens the app on Android only', (
         const web = as(undefined);
         const ios = as({ getPlatform: () => 'ios', isNativePlatform: () => true, Plugins: {} });
         const android = as({ getPlatform: () => 'android', isNativePlatform: () => true, Plugins: {} });
-        const before = JSON.stringify({ url, handleCodeInApp: true, iOS: { bundleId: 'com.rattlegolf.app' }, android: { packageName: 'com.rattlegolf.app', installApp: false } });
-        assert.equal(web, before, 'the website ActionCodeSettings changed');
-        assert.equal(ios, before, 'the iOS ActionCodeSettings changed');
-        assert.equal(android, before);
+        const old = { url, handleCodeInApp: true, iOS: { bundleId: 'com.rattlegolf.app' }, android: { packageName: 'com.rattlegolf.app', installApp: false } };
+        const withoutAndroid = Object.assign({}, old); delete withoutAndroid.android;
+        assert.equal(android, JSON.stringify(old), 'the Android app must send exactly the old settings');
+        assert.equal(web, JSON.stringify(withoutAndroid), 'the website: the old settings minus android, nothing else');
+        assert.equal(ios, JSON.stringify(withoutAndroid), 'iOS: the old settings minus android, nothing else');
     });
 
     test('the manifest hands /__/auth/links on the Firebase Hosting domain to MainActivity, autoVerify', () => {

@@ -212,8 +212,9 @@ describe('SENDING THE LINK', () => {
         assert.equal(sb.__calls.sent.settings.url, 'https://golf-app-5a5.pages.dev/admin.html');
         assert.equal(sb.__calls.sent.settings.handleCodeInApp, true);
         assert.equal(sb.__calls.sent.settings.iOS.bundleId, 'com.rattlegolf.app');
-        assert.equal(sb.__calls.sent.settings.android.packageName, 'com.rattlegolf.app');
-        assert.equal(sb.__calls.sent.settings.android.installApp, false);
+        // job 009 (android-gps): the website sends no android block - only the Android app
+        // asks for an App Links (/__/auth/links) email. android_gps_fixes_test.js holds all three.
+        assert.equal(sb.__calls.sent.settings.android, undefined, 'the website must not ask for an Android link');
         assert.equal(sb.localStorage.getItem('golfapp_email_for_sign_in'), 'marty@example.com');
         assert.equal(sb.localStorage.getItem('golfapp_email_link_uid'), 'anon-stub');
         assert.match(sent.note, /another browser/);

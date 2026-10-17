@@ -148,13 +148,24 @@
         return String(base).replace(/\/+$/, '') + '/admin.html';
     }
 
+    // THE ANDROID BLOCK ONLY FROM THE ANDROID APP (android-gps, job 009, 2026-10-17). With
+    // android.packageName in the settings, Firebase mails a /__/auth/links link - the one the
+    // Android app's App Links intent filter catches. Sent from the website or iOS, that would
+    // pull a web sign-in on an Android phone with HardPan installed into the app, away from the
+    // browser session that asked for it. So only the Android app sends it; the website and iOS
+    // send the same url, handleCodeInApp and iOS block as before, without `android`.
+    function androidShell() {
+        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
+        catch (e) { return false; }
+    }
     function actionCodeSettings(url) {
-        return {
+        var settings = {
             url: url || continueUrl(),
             handleCodeInApp: true,
-            iOS: { bundleId: IOS_BUNDLE },
-            android: { packageName: IOS_BUNDLE, installApp: false }
+            iOS: { bundleId: IOS_BUNDLE }
         };
+        if (androidShell()) settings.android = { packageName: IOS_BUNDLE, installApp: false };
+        return settings;
     }
 
     // user: { uid, isAnonymous } or null. pending: { email, uid } from THIS
