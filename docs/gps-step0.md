@@ -372,23 +372,33 @@ Manny approved the scope on 2026-10-08. Branch `gps-wave2` is stacked on
     (`periods[0].temperature`). There is no other weather request.
   - **When it is hidden** (quietly): under 30 yds, on the green, outside the
     US, or with no data at all.
-- **Free / Pro (no purchases yet):**
+- **Free / Pro (gps-store-iap, 2026-10-17):**
   - **`hasGpsPro()`** is the one check, exported on `window.HardPanGps`. It
     reads, in order:
-    1. `?gpstier=free|pro|clear` (stored as `hardpan_gps_tier`)
-    2. `HARDPAN_GPS_CONFIG.paywall`, which is `false` this wave, so everyone in
-       the GPS build is Pro
-    3. later, the App Store entitlement
+    1. `HARDPAN_GPS_CONFIG.iap` on: the App Store entitlement alone
+       (`gps-entitlement.js`, StoreKit through RevenueCat; no plugin or no key
+       = Free)
+    2. `iap` off (the default): `HARDPAN_GPS_CONFIG.paywall` - `false` means
+       everyone in the GPS build is Pro, `true` means Free
+  - **There is no tester override.** The old URL tier switch and the phone's
+    `hardpan_gps_tier` are gone (the value is cleared once if a phone still has
+    it). The checks make a phone Free with `paywall: true` in their stand-in
+    config, and stub `window.Capacitor.Plugins.Purchases` for the paywall.
   - **Free basic mode:**
     - It shows the title, ◀ ▶, units, FRONT / CENTER / BACK, accuracy, Enter
       Score and "Get HardPan GPS".
     - There is no map: MapLibre is never loaded, and there are no tile, Esri,
       USGS pre-cache, EPQS or NWS requests.
-  - **The upgrade sheet** reads "HardPan GPS — coming soon", with the feature
-    list and "Not now". It shows **no price** until Manny sets one: setting
-    `HARDPAN_GPS_CONFIG.priceLine` brings back a price line and a disabled buy
-    button.
-    - It is never shown to a Pro user.
+  - **The upgrade sheet (the paywall):**
+    - `iap` off: the feature list, one sentence ("HardPan GPS Pro isn't
+      available in this build.") and "Not now". No price, no buy button.
+    - `iap` on: the product title, the price per year from StoreKit (the
+      config `iapPriceFallback` only when the store gives none, marked
+      `data-price-src="config"`), "1-year subscription", the 7-day free trial
+      and when the charge happens, the auto-renew / cancel wording, Subscribe,
+      Restore Purchases, and the Terms of Use / Privacy Policy links.
+    - It is never shown to a Pro user, and never before the store has answered
+      at launch.
     - It opens the first time GPS is shown in a session, and from "Get HardPan
       GPS".
     - Betting stays free.

@@ -193,9 +193,13 @@ describe('THE DELETE PLAN IS A LIST, AND IT NAMES WHAT IT CANNOT TAKE', () => {
         const paths = plain(p.removals).map(r => r.path);
         // g3's only coOrganizers entry is FALSE, so it is not a pointer and must not
         // be in the list - an invite that was withdrawn has nothing to remove.
+        // store-legal: pushTokens/<uid> and pushPrefs/<uid> now go too (5.1.1(v): no
+        // push records left behind), after the pointers and before the record.
         assert.deepEqual(paths, [
             'sharedGroups/a,b@c,com/u9/g1',
             'sharedGroups/d,e@f,com/u9/g1',
+            'pushTokens/u9',
+            'pushPrefs/u9',
             'organizers/u9',
             'organizers/u9/groups'
         ], 'a coOrganizers entry that is not true is not a pointer: ' + JSON.stringify(paths));
@@ -206,8 +210,8 @@ describe('THE DELETE PLAN IS A LIST, AND IT NAMES WHAT IT CANNOT TAKE', () => {
         // the approved delta allows - and the groups write as the fallback for the
         // world where the publish has not happened yet.
         const soft = plain(p.removals).filter(r => r.soft).map(r => r.path);
-        assert.deepEqual(soft, ['organizers/u9', 'organizers/u9/groups'],
-            'both organizers writes are SOFT: one of them is expected to be refused in either world');
+        assert.deepEqual(soft, ['pushTokens/u9', 'pushPrefs/u9', 'organizers/u9', 'organizers/u9/groups'],
+            'both organizers writes are SOFT: one of them is expected to be refused in either world; the push records are soft because accountDelete removes them again');
         assert.ok(plain(p.removals).slice(0, 2).every(r => !r.soft),
             'the pointer removals are HARD - if they fail, the account must not be deleted');
     });
@@ -215,7 +219,7 @@ describe('THE DELETE PLAN IS A LIST, AND IT NAMES WHAT IT CANNOT TAKE', () => {
     test('no groups means no group write at all', () => {
         [null, undefined, {}, 'nonsense', 7].forEach(v => {
             const p = need().deletePlan('u9', v);
-            assert.deepEqual(plain(p.removals).map(r => r.path), ['organizers/u9'],
+            assert.deepEqual(plain(p.removals).map(r => r.path), ['pushTokens/u9', 'pushPrefs/u9', 'organizers/u9'],
                 'the record attempt always stands; only the groups write is conditional: ' + JSON.stringify(v));
             assert.equal(p.groupCount, 0);
         });
@@ -408,9 +412,11 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         // record goes in one write and the groups write is skipped as moot.
         assert.deepEqual(p.writes(), [
             'remove sharedGroups/a,b@c,com/u9/g1',
+            'remove pushTokens/u9',
+            'remove pushPrefs/u9',
             'remove organizers/u9'
         ], 'the data goes first, while the token is still valid');
-        assert.deepEqual(p.deleted, ['delete@2'],
+        assert.deepEqual(p.deleted, ['delete@4'],
             'the Auth user must be deleted AFTER the writes - delete it first and every write after it is permission-denied forever');
         assert.equal(p.reloads(), 1, 'then the page reloads, so no stale uid is left in authReady');
     });
@@ -466,8 +472,10 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
             'the groups fallback must not run once the record is gone - it is one write, not two');
         assert.deepEqual(sb.__dbWrites.map(w => w.path), [
             'sharedGroups/a,b@c,com/u9/g1',
+            'pushTokens/u9',
+            'pushPrefs/u9',
             'organizers/u9'
-        ], 'exactly two writes: the pointer, and the record');
+        ], 'the pointer, the two push records, and the record - no groups write');
         // AND THE KEEPS ARE NOW MOOT, which the result says rather than the header:
         // firstSeenAt and pass went with the record.
         assert.equal(out.keeps.length, 2, 'the plan still NAMES them, for the rollback world');
@@ -488,10 +496,12 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         await tick();
         assert.deepEqual(p.writes(), [
             'remove sharedGroups/a,b@c,com/u9/g1',
+            'remove pushTokens/u9',
+            'remove pushPrefs/u9',
             'remove organizers/u9',
             'remove organizers/u9/groups'
         ], 'the refused record attempt is followed by the groups fallback');
-        assert.deepEqual(p.deleted, ['delete@3'], 'and the account is deleted anyway');
+        assert.deepEqual(p.deleted, ['delete@5'], 'and the account is deleted anyway');
         assert.equal(p.reloads(), 1);
         assert.match(p.text('account-exit-status'), /^$|Deleting/,
             'no failure message: a refused soft removal is not an error');
@@ -506,9 +516,9 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         p.tap('delete'); p.tap('delete');
         await p.go();
         await tick();
-        assert.deepEqual(p.writes(), ['remove organizers/u9'],
-            'no groups means no pointer and no groups write - only the record attempt');
-        assert.deepEqual(p.deleted, ['delete@1'], 'and an account with no groups still deletes');
+        assert.deepEqual(p.writes(), ['remove pushTokens/u9', 'remove pushPrefs/u9', 'remove organizers/u9'],
+            'no groups means no pointer and no groups write - only the push records and the record attempt');
+        assert.deepEqual(p.deleted, ['delete@3'], 'and an account with no groups still deletes');
     });
 
     test('requires-recent-login RE-RUNS THE SIGN-IN, then deletes', async () => {
@@ -518,7 +528,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         await p.go();
         await tick();
         assert.deepEqual(p.reauths, ['apple'], 'the provider on the account is the one it re-runs');
-        assert.deepEqual(p.deleted, ['delete@2', 'delete@2'], 'and it tries again after the re-auth');
+        assert.deepEqual(p.deleted, ['delete@4', 'delete@4'], 'and it tries again after the re-auth');
         assert.equal(p.reloads(), 1);
     });
 
@@ -544,7 +554,7 @@ describe('DELETING AN ACCOUNT: THE ORDER, AND THE STOP', () => {
         await p.go();
         await tick();
         assert.deepEqual(p.reauths, [], 'there is no popup to re-run for an email link');
-        assert.deepEqual(p.deleted, ['delete@2'], 'one attempt, which Firebase refused');
+        assert.deepEqual(p.deleted, ['delete@4'], 'one attempt, which Firebase refused');
         assert.match(p.text('account-exit-status'), /Sign in once more/,
             'and the screen says what to do rather than failing blank: ' + p.text('account-exit-status'));
         assert.equal(p.reloads(), 0);

@@ -8,7 +8,7 @@
 // show only in Capacitor). A reopen is a reload with the session cleared (the
 // harness keeps no storage between launches). Positions come from a stand-in
 // sensor at Caledonia's first tee.
-//   1  Home in the app is home.html: Main - GPS (green) and Games & Bets (navy)
+//   1  Home in the app is home.html: Main - GPS (green) and Games (navy; "Games & Bets" until store-legal)
 //      cards, "Have a game code?", "Sign in", "We'll remember your pick".
 //   2  Games -> Games-1 (Start a round, code, Trips & Cups, Build a trip); the
 //      reopen goes straight there. Join: a wrong code is said; a right one opens.
@@ -73,11 +73,11 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     report.main = { url: m1.url, view: m1.view, gps: m1.gps, games: m1.games }; report.games = { view: g1.view, door: g1.door }; report.reopen = reo.view; report.join = { bad: bad.msg, good: good.url };
     f(/home\.html$/.test(m1.url) && m1.view === 'v-main', '1: Home in the app did not open home.html Main: ' + m1.url + ' ' + m1.view);
     f(m1.gps && /GPS/.test(m1.gps[0]) && /Pick a course/.test(m1.gps[0]) && m1.gps[1] === 'rgb(15, 76, 58)', '1: the GPS card (green #0f4c3a): ' + JSON.stringify(m1.gps));
-    f(m1.games && /Games & Bets/.test(m1.games[0]) && /Start or join a game/.test(m1.games[0]) && m1.games[1] === 'rgb(29, 53, 87)', '1: the Games & Bets card (navy #1d3557): ' + JSON.stringify(m1.games));
+    f(m1.games && /Games/.test(m1.games[0]) && !/Bets/.test(m1.games[0]) && /Start or join a game/.test(m1.games[0]) && m1.games[1] === 'rgb(29, 53, 87)', '1: the Games card (navy #1d3557): ' + JSON.stringify(m1.games));
     f(/Have a game code\?/.test(m1.text) && /Sign in/.test(m1.text) && /We'll remember your pick/.test(m1.text), '1: Main text');
     f(g1.view === 'v-games' && g1.door === 'games', '2: Games did not open Games-1 / remember');
     ['+ Start a round', 'Have a game code?', 'TRIPS & CUPS', 'Build a trip from one paste', 'No location needed here.'].forEach((t) => f(g1.text.indexOf(t) !== -1, '2: Games-1 lacks "' + t + '"'));
-    f(reo.view === 'v-main' && reo.last.join() === 'games' && reo.tag !== 'none', '2: the reopen must open MAIN with Games & Bets highlighted: ' + JSON.stringify(reo));
+    f(reo.view === 'v-main' && reo.last.join() === 'games' && reo.tag !== 'none', '2: the reopen must open MAIN with Games highlighted: ' + JSON.stringify(reo));
     f(/No round with the code ZZZZZZ/.test(bad.msg), '2: a wrong code was not said: ' + bad.msg);
     f(/index\.html\?game=FDRND1&spectate=1$/.test(good.url), '2: Join did not open the round: ' + good.url);
     if (m1.e.length) fails.push('1: errors ' + m1.e.join(' | '));
@@ -248,7 +248,8 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, skins: skinsInstances.map(function (s) { return s.skinsBuyIn; }), e: window.__e })" }] });
     report.tplSkinsPlain = J(r)[0];
     f(report.tplSkinsPlain.step === report.tplSkinsPlain.money && (report.tplSkinsPlain.skins || []).join() === '2', '5c: a plain Skins template is no longer $2: ' + JSON.stringify(report.tplSkinsPlain));
-    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money$/, wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
+    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money&pool=1$/,   // &pool=1: the Weekly Game section open (URGENT-001)
+        wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
     report.allGames = {};
     for (const id of Object.keys(ALL)) {
         r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 3500, preScript: APP + ERR, steps: [

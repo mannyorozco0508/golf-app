@@ -262,7 +262,16 @@ const READ = `JSON.stringify((function () {
            view: ds.view || null, greenBtn: vis('.gps-green-view') ? t('.gps-green-view') : null, greenDims: vis('.gps-green-dims') ? t('.gps-green-dims') : null,
            greenLbls: o ? [].slice.call(o.querySelectorAll('.gps-green-lbl')).filter(function (e) { return e.style.display !== 'none' && e.offsetParent !== null; }).map(function (e) { return { k: e.className.replace(/.*gps-green-lbl-/, ''), text: e.innerText.trim(), box: box(e) }; }) : [],
            hasPro: window.HardPanGps && window.HardPanGps.hasGpsPro ? window.HardPanGps.hasGpsPro() : null,
-           tier: (function () { try { return localStorage.getItem('hardpan_gps_tier'); } catch (e) { return 'err'; } })() };
+           // gps-store-iap: the old tier switch's value is never kept (null on every phone).
+           tier: (function () { try { return localStorage.getItem('hardpan_gps_tier'); } catch (e) { return 'err'; } })(),
+           // The paywall (gps-store-iap): its two faces and its disclosures.
+           sheetOff: vis('.gps-sheet-off') ? t('.gps-sheet-off') : null, sheetIap: vis('.gps-sheet-iap'),
+           buyShown: vis('.gps-sheet-buy'), restoreShown: vis('.gps-sheet-restore'),
+           priceSrc: q('.gps-sheet-price') ? q('.gps-sheet-price').getAttribute('data-price-src') : null,
+           sheetMsg: vis('.gps-sheet-msg') ? t('.gps-sheet-msg') : null,
+           termsHref: q('.gps-sheet-terms') ? q('.gps-sheet-terms').getAttribute('href') : null,
+           privacyHref: q('.gps-sheet-privacy') ? q('.gps-sheet-privacy').getAttribute('href') : null,
+           iapCalls: window.__iap ? window.__iap.calls.slice() : null };
 })())`;
 const DUMP = `JSON.stringify({ writes: window.__coldWrites || [], storage: (function () { var o = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; })() })`;
 const COUNT_USGS = `(window.__usgsN = null, (typeof caches === 'undefined' ? (window.__usgsN = -1) : caches.open('hardpan-usgs-v1').then(function (c) { return c.keys(); }).then(function (k) { window.__usgsN = k.length; }, function () { window.__usgsN = -2; })), 'counting')`;
@@ -550,9 +559,31 @@ function CFG(o) {
     if (o.nws) c.nwsBase = SO;
     if (o.epqs) c.epqsUrl = SO + '/epqs?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
     if (o.paywall != null) c.paywall = o.paywall;
+    // gps-store-iap: the App Store paywall on, with a stand-in key (the plugin is IAP_STUB).
+    if (o.iap) { c.iap = true; c.revenueCatKey = 'CHECK'; c.iapEntitlement = 'gps_pro'; c.iapProduct = 'com.rattlegolf.app.gps.yearly'; c.iapTermsUrl = 'https://example.test/terms.html'; c.iapPrivacyUrl = 'https://example.test/privacy.html'; }
     if (o.overpass) c.overpassUrl = SO + '/overpass';
     if (o.google) { c.googleKey = o.google; c.googleBase = SO; c.imagery = 'esri'; c.imageryPro = 'google'; }
     return `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return ${JSON.stringify(c)}; }, set: function () {} });`;
+}
+// THE PURCHASE PLUGIN, STUBBED (gps-store-iap): window.Capacitor.Plugins.Purchases with
+// RevenueCat's documented calls. Not a native platform (isNativePlatform false), so
+// nothing else in the page changes. buy: 'ok' (the entitlement turns on), 'cancel'.
+function IAP_STUB(active, buy) {
+    return `window.__iap = { calls: [], active: ${!!active}, buy: ${JSON.stringify(buy || 'ok')} };
+(function () {
+  var I = window.__iap;
+  var info = function () { return { entitlements: { active: I.active ? { gps_pro: { identifier: 'gps_pro', isActive: true } } : {} } }; };
+  var pkg = { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'com.rattlegolf.app.gps.yearly', title: 'HardPan GPS Pro', priceString: '$1.23', price: 1.23, subscriptionPeriod: 'P1Y', introPrice: { price: 0, priceString: '$0.00', period: 'P1W', cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } } };
+  var P = {
+    configure: function () { I.calls.push('configure'); return Promise.resolve(); },
+    addCustomerInfoUpdateListener: function () { I.calls.push('listen'); return Promise.resolve('l'); },
+    getCustomerInfo: function () { I.calls.push('getCustomerInfo'); return Promise.resolve({ customerInfo: info() }); },
+    getOfferings: function () { I.calls.push('getOfferings'); return Promise.resolve({ current: { identifier: 'default', annual: pkg, availablePackages: [pkg] } }); },
+    purchasePackage: function () { I.calls.push('purchasePackage'); if (I.buy === 'cancel') return Promise.reject({ code: '1', userCancelled: true, message: 'cancelled' }); I.active = true; return Promise.resolve({ productIdentifier: pkg.product.identifier, customerInfo: info() }); },
+    restorePurchases: function () { I.calls.push('restorePurchases'); return Promise.resolve({ customerInfo: info() }); }
+  };
+  window.Capacitor = { isNativePlatform: function () { return false; }, Plugins: { Purchases: P } };
+})();`;
 }
 const ESRI_CREDIT = 'Powered by <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> | Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community';
 const ESRI_CREDIT_TEXT = 'Powered by Esri | Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community';
@@ -1546,6 +1577,8 @@ function usgsFallbackFails(tag, g, why) {
     // ---- FREE (no HardPan GPS): numbers only, the upgrade sheet, nothing fetched -------
     const freeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-free-profile-'));
     const ALL_ON = CFG({ esri: 'OK-FREE', nws: true, epqs: true });
+    // FREE = the build's own switch (paywall: true, iap off) - no tester override exists any more.
+    const FREE_CFG = CFG({ esri: 'OK-FREE', nws: true, epqs: true, paywall: true });
     const SVC = new RegExp('maplibre-gl|nationalmap\\.gov|arcgis|' + SO.replace(/[.:/]/g, (c) => '\\' + c));
     const fr = await arm('free', 'caledonia', null, 'ok', ME, 4.6, [
         { expression: READ },                                                                  // 0 arrival: Bets
@@ -1557,21 +1590,39 @@ function usgsFallbackFails(tag, g, why) {
         { tap: '.gps-side-gps' }, { sleep: 600 }, { expression: READ },                        // 5 GPS again: no sheet
         { sleep: 6000 },                                                                       //   past the pre-cache's 4 s
         { tap: '.gps-score' }, { sleep: 500 }, { expression: READ },                           // 6 Enter Score
-    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, query: '&gpstier=free', profileDir: freeProfile });
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + FREE_CFG, profileDir: freeProfile });
     out.free = fr; bail(out, fr);
     const cl = await arm('clear', 'caledonia', null, 'ok', ME, 4.6, [
         { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },
-    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, query: '&gpstier=clear', profileDir: freeProfile });
+    ], { preScript: sensor('ok', ME[0], ME[1], 4.6) + ALL_ON, profileDir: freeProfile });
     out.clear = cl; bail(out, cl);
+    // THE APP STORE PAYWALL (gps-store-iap): iap on, the plugin stubbed, no entitlement.
+    // The sheet with every disclosure; Not now; Restore (nothing found: a sentence, still
+    // Free); a cancelled Subscribe (a sentence, still Free); then Subscribe -> Pro, the map.
+    const iapRead = (extra) => Object.assign({ preScript: sensor('ok', ME[0], ME[1], 4.6) + CFG({ esri: 'OK-FREE', nws: true, epqs: true, iap: true }) }, extra);
+    const ip = await arm('iap', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, { sleep: 1500 }, { expression: READ },                       // 0 the paywall
+        { tap: '.gps-sheet-restore' }, { sleep: 600 }, { expression: READ },                   // 1 Restore: none found
+        { expression: 'window.__iap.buy = "cancel", "cancel next"' },
+        { tap: '.gps-sheet-buy' }, { sleep: 600 }, { expression: READ },                       // 2 Subscribe, cancelled
+        { expression: 'window.__iap.buy = "ok", "buy next"' },
+        { tap: '.gps-sheet-buy' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },            // 3 Subscribe -> Pro
+    ], iapRead({ preScript: iapRead().preScript + IAP_STUB(false, 'ok') }));
+    out.iap = ip; bail(out, ip);
+    // A phone whose entitlement is already active: Pro from launch, no paywall.
+    const ia = await arm('iapon', 'caledonia', null, 'ok', ME, 4.6, [
+        { tap: '.gps-side-gps' }, WAIT_MAP, { sleep: 2500 }, { expression: READ },
+    ], iapRead({ preScript: iapRead().preScript + IAP_STUB(true, 'ok') }));
+    out.iapon = ia; bail(out, ia);
     {
         const [f0, f1, f2, f3, f4, f5, f6] = fr.reads;
-        if (f1.hasPro !== false || f1.tier !== 'free') fails.push('free: ?gpstier=free did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
+        if (f1.hasPro !== false || f1.tier !== null) fails.push('free: paywall on (iap off) did not make this phone free: ' + JSON.stringify([f1.hasPro, f1.tier]));
         if (!f0.toggle || !/📍 GPS/.test(f0.toggle)) fails.push('free: the GPS button is not there');
-        // NO PRICE until Manny sets one: "HardPan GPS — coming soon", the list, Not now.
-        const sheetWant = ['HardPan GPS — coming soon', 'Satellite hole map', 'Drag-the-target yardages', 'Wind', 'Plays-like yardage', 'Not now'];
+        // iap OFF: the list, ONE sentence (Pro is not available in this build), Not now - nothing to buy.
+        const sheetWant = ['HardPan GPS', 'Satellite hole map', 'Drag-the-target yardages', 'Wind', 'Plays-like yardage', 'HardPan GPS Pro isn\u2019t available in this build.', 'Not now'];
         if (/Edit Pin/.test(f1.sheet || '')) fails.push('free: the sheet still offers Edit Pin');
         if (!f1.sheet || sheetWant.some((w) => f1.sheet.indexOf(w) === -1) || /Season Pass/i.test(f1.sheet)) fails.push('free: the upgrade sheet: ' + JSON.stringify(f1.sheet));
-        if (/\$|\/year|trial|Coming soon$/.test((f1.sheet || '').replace('HardPan GPS — coming soon', ''))) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify(f1.sheet));
+        if (/\$|\/year|per year|trial|soon|Subscribe|Restore/i.test(f1.sheet || '') || f1.buyShown || f1.restoreShown || f1.sheetIap) fails.push('free: the sheet shows a price or a buy button: ' + JSON.stringify([f1.sheet, f1.buyShown, f1.restoreShown]));
         if (f2.sheet) fails.push('free: "Not now" did not close the sheet');
         if (!f2.basicMode || f2.mapWrapShown || f2.map) fails.push('free: a map on the free screen: ' + JSON.stringify([f2.basicMode, f2.mapWrapShown, f2.map]));
         if (f2.f !== EXPECT.front || f2.m !== EXPECT.center || f2.b !== EXPECT.back) fails.push(`free: F/C/B ${f2.f}/${f2.m}/${f2.b}, expected ${EXPECT.front}/${EXPECT.center}/${EXPECT.back}`);
@@ -1585,19 +1636,38 @@ function usgsFallbackFails(tag, g, why) {
         const outside = fr.requests.filter((u) => SVC.test(urlOf(u)));
         if (outside.length) fails.push('free: ' + outside.length + ' map / imagery / elevation / weather requests: ' + outside.slice(0, 3).map(urlOf).join(' | '));
         if (fr.dump.storage['hardpan_usgs_done_v1_caledonia']) fails.push('free: the USGS imagery was pre-cached');
-        // ?gpstier=clear: Pro again, the map back - and the same services DO get asked (the control).
+        // The same phone, paywall off (the shipped default): Pro, the map back - and the same services DO get asked (the control).
         const c0 = cl.reads[0];
-        if (c0.hasPro !== true || c0.tier !== null || !c0.map || c0.basicMode) fails.push('clear: ?gpstier=clear did not restore Pro: ' + JSON.stringify([c0.hasPro, c0.tier, c0.map, c0.basicMode]));
+        if (c0.hasPro !== true || c0.tier !== null || !c0.map || c0.basicMode) fails.push('clear: paywall off did not give Pro: ' + JSON.stringify([c0.hasPro, c0.tier, c0.map, c0.basicMode]));
         const ctl = cl.requests.filter((u) => SVC.test(urlOf(u)));
         if (!ctl.some((u) => /maplibre-gl/.test(u)) || !ctl.some((u) => /\/esri\//.test(u))) fails.push('clear: the control asked for no map / Esri - the free arm proves nothing');
         out.freeSummary = { freeServiceRequests: outside.length, proControlRequests: ctl.length, sheet: f1.sheet };
+    }
+    {
+        // THE APP STORE PAYWALL (gps-store-iap).
+        const [p0, p1, p2, p3] = ip.reads;
+        const want = ['HardPan GPS Pro', '$1.23 per year', '1-year subscription', '7-day free trial', 'charged $1.23 when the trial ends',
+            'Renews automatically each year unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings > Apple ID > Subscriptions.',
+            'Subscribe', 'Restore Purchases', 'Terms of Use', 'Privacy Policy', 'Not now'];
+        if (p0.hasPro !== false || !p0.basicMode) fails.push('iap: no entitlement, yet Pro: ' + JSON.stringify([p0.hasPro, p0.basicMode]));
+        if (!p0.sheet || want.some((w) => p0.sheet.indexOf(w) === -1)) fails.push('iap: the paywall is missing a disclosure: ' + JSON.stringify([want.filter((w) => (p0.sheet || '').indexOf(w) === -1), p0.sheet]));
+        if (/soon/i.test(p0.sheet || '') || p0.sheetOff) fails.push('iap: the paywall says soon / not available: ' + JSON.stringify(p0.sheet));
+        if (!p0.buyShown || !p0.restoreShown || p0.priceSrc !== 'store') fails.push('iap: Subscribe / Restore / the store price: ' + JSON.stringify([p0.buyShown, p0.restoreShown, p0.priceSrc]));
+        if (p0.termsHref !== 'https://example.test/terms.html' || p0.privacyHref !== 'https://example.test/privacy.html') fails.push('iap: the Terms / Privacy links: ' + JSON.stringify([p0.termsHref, p0.privacyHref]));
+        if (!p0.iapCalls || p0.iapCalls[0] !== 'configure' || p0.iapCalls.indexOf('getCustomerInfo') === -1) fails.push('iap: the plugin was not configured and asked: ' + JSON.stringify(p0.iapCalls));
+        if (p1.hasPro !== false || p1.sheetMsg !== 'No GPS Pro subscription was found for this Apple ID.' || p1.iapCalls.indexOf('restorePurchases') === -1) fails.push('iap: Restore with nothing to restore: ' + JSON.stringify([p1.hasPro, p1.sheetMsg]));
+        if (p2.hasPro !== false || p2.sheetMsg !== 'Purchase cancelled. Nothing was charged.' || !p2.basicMode) fails.push('iap: a cancelled Subscribe: ' + JSON.stringify([p2.hasPro, p2.sheetMsg, p2.basicMode]));
+        if (p3.hasPro !== true || p3.basicMode || !p3.map || p3.sheet) fails.push('iap: Subscribe did not turn Pro on with the map: ' + JSON.stringify([p3.hasPro, p3.basicMode, p3.map, p3.sheet]));
+        const a0 = ia.reads[0];
+        if (a0.hasPro !== true || a0.basicMode || !a0.map || a0.sheet || a0.getPro) fails.push('iapon: an active entitlement is not Pro from launch: ' + JSON.stringify([a0.hasPro, a0.basicMode, a0.map, a0.sheet]));
+        out.iapSummary = { sheet: p0.sheet, calls: p3.iapCalls };
     }
     try { fs.rmSync(freeProfile, { recursive: true, force: true }); } catch (e) {}
     SRV.close();
 
     // ---- privacy, every arm ------------------------------------------------------
     [[a, ME], [i, ME], [b, pl], [c, ME], [d, ME], [p1, ME], [p2, ME], [e, pl], [vf, TME], [fh, FAR], [ft, ME], [po, ME], [et, ME], [sc, ME], [wd, ME], [wo, ME], [wf, ME], [wu, ME], [gg, ME],
-     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME], [fl, ME], [fu, pl], [fd, ME]].forEach(([r, me]) => {
+     [ex, ME], [eb, ME], [eo, ME], [bu, ME], [pa, ME], [pa2, ME], [fr, ME], [cl, ME], [ip, ME], [ia, ME], [gv, ME], [ly, ME], [go, ME], [gb, ME], [fl, ME], [fu, pl], [fd, ME]].forEach(([r, me]) => {
         const l = leaks(r, me);
         if (l.length) fails.push(r.name + ': the golfer\'s position left the page: ' + l.slice(0, 3).join(' | '));
     });

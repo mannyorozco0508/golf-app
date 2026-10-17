@@ -58,6 +58,25 @@
 // the round codes - because a golfer who expects "delete everything" and gets
 // "delete my organizer powers" deserves to know which one this is.
 //
+// THE SERVER FINISHES IT (store-legal, 2026-10-17). App Review 5.1.1(v) also wants
+// Sign in with Apple tokens REVOKED and nothing left behind. Revoking needs a
+// secret that never ships in an app, and the rules never let a client remove the
+// whole organizers/<uid> record, so the callable Cloud Function accountDelete
+// (firebase-functions/account-delete-core.js) does both with the Admin SDK:
+//   1. an Apple account first asks the native Apple sheet for a FRESH authorization
+//      code (deps.appleCode) - before anything is touched, so cancelling it deletes
+//      nothing;
+//   2. the client removes what the rules let it (the pointers, pushTokens/<uid>,
+//      pushPrefs/<uid>, the record or its groups), exactly as before;
+//   3. deps.serverDelete hands the code to accountDelete, which revokes the Apple
+//      token, removes organizers/<uid>, pushTokens/<uid>, pushPrefs/<uid> and the
+//      pointers for good, and deletes the Auth user. A refusal (Apple said no) STOPS
+//      here and the account is NOT deleted.
+// WHILE THE FUNCTION IS NOT DEPLOYED (a 404, or no answer at all) the old client
+// delete runs instead, so Google, email-link and Apple accounts can all still delete
+// themselves from this build today. Only a structured answer from the function is
+// trusted as a refusal.
+//
 // SIGN OUT IS NOT A LIGHTER DELETE. It ends the session and the device falls back
 // to a fresh anonymous organizer, which is a DIFFERENT organizer: the rounds set up
 // on the old account are still in their round codes and still owned by that
@@ -78,7 +97,7 @@
     var WORDS = {
         signOutWarn: 'Sign out? The rounds you set up here stay where they are - they are still in their round codes, and they still belong to this account. This device goes back to being a new organizer, so to get the organizer screens back you sign in again with the same Apple ID, Google account or email.',
         signOutGo: 'Sign out',
-        deleteWarn1: 'Delete this account? This removes the account itself, your saved groups, and any co-organizer invites you sent. It does NOT delete rounds: a round you set up stays in its round code, so anybody still scoring it keeps scoring it.',
+        deleteWarn1: 'Delete this account? This removes the account itself, your saved groups, any co-organizer invites you sent, and your notification settings. It does NOT delete rounds: a round you set up stays in its round code, so anybody still scoring it keeps scoring it.',
         deleteWarn2: 'Last check. This cannot be undone: the account is gone, the saved groups are gone, and signing in again with the same Apple ID, Google account or email makes a NEW organizer that has none of it.',
         deleteGo: 'Delete my account',
         deleting: 'Deleting…',
@@ -211,6 +230,12 @@
                 });
             });
         });
+        // THE PUSH RECORDS (store-legal): this account's device tokens and its
+        // notification switches. Both are owner-writable in the rules, and SOFT,
+        // because accountDelete removes them again with the Admin SDK - a refusal
+        // here (an older ruleset) must not keep an account alive.
+        removals.push({ path: 'pushTokens/' + id, what: 'the notification tokens for your devices', soft: true });
+        removals.push({ path: 'pushPrefs/' + id, what: 'your notification settings', soft: true });
         // THE WHOLE RECORD FIRST, AND THE GROUPS AS A FALLBACK. Stage 1 refuses a
         // write at organizers/<uid>, so until the delete rule is published this
         // attempt is permission-denied and the groups write is what actually runs.
@@ -332,6 +357,10 @@
         if (code === 'PERMISSION_DENIED' || code === 'permission-denied') return 'The database refused the change, so the account was NOT deleted. Nothing is half gone.';
         if (code === 'auth/requires-recent-login') return 'Sign in once more to prove it is you, then delete.';
         if (code === 'reauth-cancelled') return 'Sign-in was cancelled, so nothing was deleted.';
+        if (code === 'apple-revoke-failed') return 'Apple did not confirm that this app was removed from your Apple ID, so the account was NOT deleted. Try again in a moment - it picks up where it stopped.';
+        if (code === 'apple-account-mismatch') return 'That Apple ID is not the one on this account, so the account was NOT deleted. Use the Apple ID this account signs in with.';
+        if (code === 'internal' || code === 'server-refused' || code === 'unavailable') return 'The server could not finish, so the account was NOT deleted. Try again when you have signal.';
+        if (code === 'apple-not-configured') return 'Deleting an Apple account is not switched on yet, so nothing was deleted. Email support@rattlegolf.com and it will be done for you.';
         // Wave 33's lesson, one wave later: an unmapped code is SHOWN. The shell
         // has no visible console, and a sentence that hides which failure it was
         // costs a trip to a physical device to find out.
@@ -407,6 +436,50 @@
         });
     }
 
+    function hasProvider(user, id) {
+        var list = (user && user.providerData) || [];
+        for (var i = 0; i < list.length; i += 1) if (list[i] && list[i].providerId === id) return true;
+        return false;
+    }
+
+    // THE APPLE CODE, ASKED FOR BEFORE ANYTHING IS TOUCHED. Only when there is a
+    // server to hand it to and the account has Apple on it. Null means "none to
+    // give" (the web, or no plugin) and the server deletes without revoking; a
+    // rejection means the golfer backed out of the Apple sheet, and nothing goes.
+    function appleCodeFor(user, deps) {
+        if (!hasProvider(user, 'apple.com')) return Promise.resolve(null);
+        if (typeof deps.serverDelete !== 'function' || typeof deps.appleCode !== 'function') return Promise.resolve(null);
+        var asked;
+        try { asked = Promise.resolve(deps.appleCode()); } catch (e) { asked = Promise.reject(e); }
+        return asked.then(function (r) {
+            if (!r) return null;
+            return typeof r === 'string' ? { code: r } : (r.code ? r : null);
+        }, function (err) {
+            var m = String((err && (err.code || err.message)) || '').toLowerCase();
+            if (/cancel|1001/.test(m)) throw coded('reauth-cancelled');
+            throw err;
+        });
+    }
+
+    // THE SERVER'S ANSWER. Resolves { server: true, result } when accountDelete did
+    // the job, { server: false } when there is no function to ask (not deployed,
+    // or no answer at all), and rejects with the function's own reason otherwise.
+    function askServer(deps, apple) {
+        if (typeof deps.serverDelete !== 'function') return Promise.resolve({ server: false });
+        var payload = {};
+        if (apple && apple.code) payload.appleAuthorizationCode = String(apple.code);
+        if (apple && apple.bundleId) payload.appleClientId = String(apple.bundleId);
+        var call;
+        try { call = Promise.resolve(deps.serverDelete(payload)); } catch (e) { call = Promise.reject(e); }
+        return call.then(function (result) {
+            if (result && result.status === 'deleted') return { server: true, result: result };
+            throw coded('server-refused', 'accountDelete answered ' + String(result && result.status));
+        }, function (err) {
+            if (err && err.code === 'server-absent') return { server: false };
+            throw err;
+        });
+    }
+
     function deleteAccount(deps) {
         var auth = deps && deps.auth;
         var db = deps && deps.db;
@@ -414,27 +487,89 @@
         var plan = planExit(user);
         if (!plan.show) return Promise.reject(coded(plan.reason));
         var uid = plan.uid;
-        return readGroups(db, uid).then(function (groupsVal) {
-            var p = deletePlan(uid, groupsVal);
-            return removeAll(db, p.removals).then(function (out) {
-                // THE STOP. Data first, and if a HARD removal did not go, the
-                // account stays - see the header. A soft one is allowed to fail.
-                if (out.failed.length) throw coded('removal-failed',
-                    'could not remove ' + out.failed.length + ' of ' + p.removals.length);
-                return dropUser(auth, deps).then(function (reauthed) {
-                    if (deps && typeof deps.reload === 'function') deps.reload();
-                    return {
-                        uid: uid, deleted: true, reauthed: !!reauthed,
-                        removed: p.removals.map(function (r) { return r.path; }),
-                        done: out.done,
-                        // TRUE only when the whole record actually went, which is the
-                        // one fact that says whether the rules publish has landed.
-                        recordRemoved: out.done['organizers/' + uid] === 'removed',
-                        keeps: p.keeps
-                    };
+        return appleCodeFor(user, deps).then(function (apple) {
+            return readGroups(db, uid).then(function (groupsVal) {
+                var p = deletePlan(uid, groupsVal);
+                return removeAll(db, p.removals).then(function (out) {
+                    // THE STOP. Data first, and if a HARD removal did not go, the
+                    // account stays - see the header. A soft one is allowed to fail.
+                    if (out.failed.length) throw coded('removal-failed',
+                        'could not remove ' + out.failed.length + ' of ' + p.removals.length);
+                    return askServer(deps, apple).then(function (srv) {
+                        var finish = function (reauthed) {
+                            if (deps && typeof deps.reload === 'function') deps.reload();
+                            return {
+                                uid: uid, deleted: true, reauthed: !!reauthed,
+                                removed: p.removals.map(function (r) { return r.path; }),
+                                done: out.done,
+                                // TRUE when the whole record went: the client's own
+                                // write did it, or the server did.
+                                recordRemoved: srv.server || out.done['organizers/' + uid] === 'removed',
+                                server: !!srv.server,
+                                appleRevoked: !!(srv.server && srv.result.appleRevoked),
+                                keeps: srv.server ? [] : p.keeps
+                            };
+                        };
+                        if (srv.server) {
+                            // The Auth user is gone on the server; this device's
+                            // session goes with a sign-out, then the reload.
+                            var so;
+                            try { so = Promise.resolve(auth.signOut && auth.signOut()); } catch (e) { so = Promise.resolve(); }
+                            return so.then(function () { return finish(false); }, function () { return finish(false); });
+                        }
+                        return dropUser(auth, deps).then(finish, function (err) {
+                            // A server that DID delete the user but whose answer was
+                            // lost: the account is already gone, which is the goal.
+                            var c = err && err.code;
+                            if (typeof deps.serverDelete === 'function'
+                                && (c === 'auth/user-not-found' || c === 'auth/user-token-expired')) return finish(false);
+                            throw err;
+                        });
+                    });
                 });
             });
         });
+    }
+
+    // THE DEFAULT serverDelete: a callable function by plain fetch, the same way
+    // gps-live.js calls gpsSearch (no extra Firebase SDK in the app). POST { data }
+    // with the user's ID token; the answer is { result } or { error }.
+    //   no answer at all, a 404, or not JSON  -> 'server-absent' (not deployed yet)
+    //   { error: { details: { reason } } }    -> that reason (apple-revoke-failed ...)
+    //   { error: { status } }                  -> the status, lower-cased
+    var FN_BASE = 'https://us-central1-golfapp-9fb21.cloudfunctions.net';
+    var FN_MS = 25000;
+    function serverDeleter(opts) {
+        var o = opts || {};
+        var doFetch = o.fetch;
+        var base = String(o.base || FN_BASE).replace(/\/+$/, '');
+        return function (payload) {
+            var user = o.auth && o.auth.currentUser;
+            if (typeof doFetch !== 'function' || !user || typeof user.getIdToken !== 'function') {
+                return Promise.reject(coded('server-absent'));
+            }
+            return Promise.resolve(user.getIdToken()).then(function (tok) {
+                var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+                var t = ctl ? setTimeout(function () { ctl.abort(); }, FN_MS) : null;
+                return Promise.resolve(doFetch(base + '/accountDelete', {
+                    method: 'POST', credentials: 'omit', signal: ctl ? ctl.signal : undefined,
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+                    body: JSON.stringify({ data: payload || {} })
+                })).then(function (r) {
+                    if (t) clearTimeout(t);
+                    if (!r || r.status === 404) throw coded('server-absent');
+                    return Promise.resolve(r.json()).then(null, function () { throw coded('server-absent'); });
+                }, function () {
+                    if (t) clearTimeout(t);
+                    throw coded('server-absent');
+                });
+            }).then(function (j) {
+                if (j && j.result) return j.result;
+                var e = (j && j.error) || {};
+                var reason = (e.details && e.details.reason) || String(e.status || 'server-refused').toLowerCase().replace(/_/g, '-');
+                throw coded(reason, e.message || reason);
+            });
+        };
     }
 
     window.accountExit = {
@@ -453,6 +588,7 @@
         needsReauth: needsReauth,
         messageFor: messageFor,
         signOut: signOut,
-        deleteAccount: deleteAccount
+        deleteAccount: deleteAccount,
+        serverDeleter: serverDeleter
     };
 })();

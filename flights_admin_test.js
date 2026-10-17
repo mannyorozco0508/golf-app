@@ -459,7 +459,8 @@ describe('6b THE FLIGHT CONTROL SITS ON THE SECOND LINE (compact list, 2026-10-0
 // ---------------------------------------------------------------------------
 describe('6c THE MAIN POOL SKINS NOTE', () => {
     // v143: the pool is the Weekly Game on every surface; the name is the only word that moved in these approved (v126) sentences.
-    const NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+    // store-legal: "Skins wager" -> "Skins game" (no wager wording in the app's copy).
+    const NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins game (Step 4 or Also Playing) instead of this bucket.';
     // The per-flight sentence, approved 2026-09-14 (COMMIT 2 paste), verbatim.
     const SPLIT = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
     // v187 (2026-09-20): the bucket can split EVENLY, and that is a fresh round's

@@ -4729,6 +4729,8 @@ const SHELL_FILES = [
     './league-ui.js',
     './points.html',
     './score-marks-hp.js',
+    // GPS Pro: the App Store entitlement (gps-store-iap).
+    './gps-entitlement.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the

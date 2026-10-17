@@ -258,7 +258,7 @@
     // What the golfer reads for each answer.
     var MESSAGES = {
         ready: 'GPS ✓ ready',
-        soon: 'GPS coming soon for this course',
+        soon: 'New GPS courses are paused for now - pick a course that is already set up',
         nogps: 'No GPS for this course yet - Tools › Set the green during the round',
         limit: 'You\u2019ve hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.',
         account: 'Sign in (Apple, Google or email) to set up a new GPS course',

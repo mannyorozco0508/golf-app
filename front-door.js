@@ -690,30 +690,64 @@
         if (u) {
             var c = u[1].toUpperCase(), g = /[?&]group=(\d{1,2})/.exec(t), k = /[?&]sk=([A-Za-z0-9]{4,12})/.exec(t);
             if (/leaderboard\.html/i.test(t) || /[?&]spectate=1/.test(t) || !g) return { code: c, href: 'index.html?game=' + c + '&spectate=1' };
-            return { code: c, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
+            return { code: c, group: g[1], sk: k ? k[1].toUpperCase() : null, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
         }
         var sk = /^([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})$/i.exec(t);
-        if (sk) return { code: sk[1].toUpperCase(), href: 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase(), direct: true };
+        if (sk) return { code: sk[1].toUpperCase(), group: sk[2], sk: sk[3].toUpperCase(), href: 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase() };
         var grp = /^([A-Z0-9]{4,10})\s+(\d{1,2})$/i.exec(t);
-        if (grp) return { code: grp[1].toUpperCase(), href: 'index.html?game=' + grp[1].toUpperCase() + '&group=' + grp[2] };
+        if (grp) return { code: grp[1].toUpperCase(), group: grp[2], href: 'index.html?game=' + grp[1].toUpperCase() + '&group=' + grp[2] };
         var code = t.toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (code.length < 4 || code.length > 10) return null;
         // A GAME CODE OPENS THE ROUND AS A SPECTATOR (view-only, with GPS); the round's own
         // organizer and golfers keep their access (the scorecard decides).
         return { code: code, href: 'index.html?game=' + code + '&spectate=1' };
     }
+    // JOIN NEVER OPENS A ROUND IT HAS NOT CHECKED (URGENT-002, 2026-10-17). Manny pasted
+    // "ABCDEF-2-K7Q9X" (no such round): the scorekeeper form (CODE-G-KEY) skipped the check and
+    // went straight to the card, which said "Connecting to game..." for ever. Every form is
+    // checked now - the round, its group and the scorekeeper key - and a problem is a sentence
+    // here on Home, with nothing saved as the last round.
+    function sha256(text) {
+        try {
+            if (!(W.crypto && W.crypto.subtle && W.TextEncoder)) return Promise.resolve(null);
+            return W.crypto.subtle.digest('SHA-256', new W.TextEncoder().encode(String(text))).then(function (b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }, function () { return null; });
+        } catch (e) { return Promise.resolve(null); }
+    }
+    function groupCount(d) {
+        var n = ((d && d.players) || []).length;
+        try { if (typeof W.computeGroupBoundaries === 'function') return W.computeGroupBoundaries(n, d.groupSizeOverrides || {}).length; } catch (e) {}   /* grouping.js */
+        return Math.max(1, Math.ceil(n / 4));
+    }
+    // null when the round can be opened this way, or what is wrong with it (a promise).
+    function joinProblem(j, d) {
+        if (!d || !d.players || !d.players.length) return Promise.resolve('No round with the code ' + j.code + '. Check it with whoever set it up.');
+        if (j.group) {
+            var g = Number(j.group), n = groupCount(d);
+            if (!(g >= 1 && g <= n)) return Promise.resolve('Round ' + j.code + ' has no Group ' + j.group + (n > 1 ? ' (it has Groups 1\u2013' + n + ').' : ' (it is one group). Join with just ' + j.code + '.'));
+            var want = d.scoreKeys && d.scoreKeys[String(g)];
+            if (j.sk && want) return sha256(j.sk).then(function (h) { return h == null || h === want ? null : 'That scorekeeper key isn\u2019t right for Group ' + g + ' of ' + j.code + '. Ask whoever set it up for the Group ' + g + ' link.'; });
+        }
+        return Promise.resolve(null);
+    }
     function join() {
         var i = $('hp-code'), msg = $('hp-code-msg');
         var j = joinTarget(i && i.value);
-        if (!j) { if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'Type the game code (letters and numbers), or paste the round link.'; } return; }
-        if (j.direct || !H.db) { W.location.href = j.href; return; }
-        if (msg) { msg.className = 'hp-status'; msg.textContent = 'Checking ' + j.code + '\u2026'; }
-        // TIME-BOUND (audit): offline, once() never answers - after 6 s the round opens anyway
-        // (its own page says what it can).
-        timeout(H.db.ref('events/' + j.code + '/players').once('value'), 6000, 'join').then(function (s) {
-            if (s && s.exists && s.exists()) W.location.href = j.href;
-            else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + j.code + '. Check it with whoever set it up.'; }
-        }, function () { W.location.href = j.href; });
+        var say = function (t, err) { if (msg) { msg.className = err ? 'hp-status hp-err' : 'hp-status'; msg.textContent = t; } };
+        if (!j) { say('Type the game code (letters and numbers), or paste the round link.', true); return; }
+        if (!H.db) { W.location.href = j.href; return; }
+        say('Checking ' + j.code + '\u2026');
+        timeout(H.db.ref('events/' + j.code).once('value'), LOAD_MS, 'join').then(function (s) {
+            var d = s && typeof s.val === 'function' ? s.val() : null;
+            return joinProblem(j, d).then(function (why) {
+                if (why) { forgetRound(j.code, false); say(why, true); return; }
+                W.location.href = j.href;
+            });
+        }, function () {
+            // No answer (no signal): a round this phone already has a copy of still opens (the
+            // offline round is a feature); one it has never seen cannot - it would never load.
+            if (ls('golfapp_snap_v1_' + j.code)) { W.location.href = j.href; return; }
+            say('Couldn\u2019t reach round ' + j.code + ' \u2014 check your signal and try again.', true);
+        });
     }
     // THE GPS ROUND IN PROGRESS (Manny, 2026-10-13: GPS from Games went to "Where are you playing?").
     // The last round, from the last 12 hours and not finished (mainDecor checks the scores), opens
@@ -834,8 +868,13 @@
             if (tpl || paste || step || fmt) whenLoaded(function () {
                 try {
                     if (paste && typeof W.spRoundOpen === 'function') { W.goToWizardStep(5); W.spRoundOpen(); return; }
-                    if (step === 'players') { W.goToWizardStep(5); return; }
-                    if (step === 'money') { W.goToWizardStep(SO.action); return; }
+                    if (step === 'players') {
+                        W.goToWizardStep(5);
+                        var nx = agNext();
+                        if (nx && nx.stage === 'players' && nx.code === String(p.get('game')).toUpperCase()) agNeedBanner(nx);
+                        return;
+                    }
+                    if (step === 'money') { W.goToWizardStep(SO.action); if (p.get('pool') === '1') agOpenPool(); return; }
                     // ALL GAMES > a round format: its card picked on the Format step.
                     if (fmt) { if (typeof W.selectFormatCard === 'function') W.selectFormatCard(fmt); W.goToWizardStep(SO.format); return; }
                     if (tpl && typeof W.gpsApplyTemplate === 'function') {
@@ -921,6 +960,21 @@
     }
     // Round Setup's Round Ready screen calls this first: a quick GPS start skips it.
     function afterSave(code) {
+        var nx = agNext();
+        if (nx && nx.code === String(code).toUpperCase() && Date.now() - (nx.at || 0) < 2 * 3600 * 1000) {
+            if (nx.stage === 'players') {
+                // Players saved: on into the game's setup, the same round.
+                nx.stage = 'game'; nx.at = Date.now(); agNext(nx);
+                W.location.href = nx.next && nx.next.url ? nx.next.url : 'index.html?game=' + encodeURIComponent(code) + '&agq=' + encodeURIComponent((nx.next && nx.next.q) || nx.id);
+                return true;
+            }
+            if (nx.stage === 'game') {
+                // The game saved: back to the round, the side and hole it was on.
+                agNext(null);
+                W.location.href = 'index.html?game=' + encodeURIComponent(code);
+                return true;
+            }
+        }
         if (!ss(GO)) return false;
         ss(GO, null); ss(QUICK, null);
         ls('hardpan_round_side', 'gps|' + code);
@@ -937,8 +991,22 @@
         // scorekeeper stays that group's, when Resume / the GPS door / a return from the background
         // opens the round again.
         var pr = params();
-        ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
-            spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
+        // REMEMBERED ONLY ONCE IT LOADS (URGENT-002): a round that never arrived (no such code,
+        // gone, unreadable) is never the one Resume / the GPS door / a relaunch goes back to.
+        // Not here within LOAD_MS: "Round X isn't available" + Go Home, never "Connecting..." for ever.
+        var remember = function () {
+            ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
+                spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
+        };
+        var loaded = function () { var d = cd(); return !!(d && d.players && d.players.length); };
+        if (loaded()) remember();
+        else {
+            var t0 = Date.now(), iv = setInterval(function () {
+                if (loaded()) { clearInterval(iv); remember(); hideMissing(code); return; }
+                if (Date.now() - t0 >= LOAD_MS && !(STUCK.code === String(code).toUpperCase() && STUCK.why === 'missing')) stuckRound(code, 'missing');
+                if (Date.now() - t0 > 10 * 60 * 1000) clearInterval(iv);
+            }, 250);
+        }
         backFromBackground(function () { W.location.href = 'home.html'; });
         // Games-3: the green GPS button lives IN the hole's heading (placeGpsPill, on
         // every render) - never floating over the game cards or the keypad (Manny,
@@ -956,6 +1024,20 @@
         placeGpsPill();
         placeMenuItems();
         placeShareButton();
+        // Back from Players for a QUICK START (URGENT-001): its $ / golfers sheet, once the
+        // round (with its new golfers) is on the card. Back at the round otherwise: done.
+        var agq = pr.get('agq'), nx = agNext();
+        if (agq && nx && nx.code === String(code).toUpperCase()) {
+            try { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'index.html?game=' + encodeURIComponent(code)); } catch (e) {}
+            var tries = 0, t = setInterval(function () {
+                if (++tries > 80 || agPlayers().length) {
+                    clearInterval(t);
+                    if (!agPlayers().length) return;
+                    openAddGame();
+                    if (QUICK_STARTS.some(function (q) { return q.tpl === agq; })) agQuick(agq);
+                }
+            }, 150);
+        } else if (nx && nx.stage === 'game' && nx.code === String(code).toUpperCase()) agNext(null);
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
@@ -1042,6 +1124,55 @@
     function agPlayers() { try { return ((typeof currentData !== 'undefined' && currentData && currentData.players) || []).filter(function (p) { return p && p.name; }); } catch (e) { return []; } }   /* global currentData */
     function agRound() { try { return (typeof currentData !== 'undefined' && currentData) || {}; } catch (e) { return {}; } }
     function first(n) { return String(n || '').split(' ')[0]; }
+    // ENOUGH GOLFERS FIRST (URGENT-001, Manny 2026-10-17). A GPS quick start has one golfer
+    // ("Me"): a game picked here that needs more opened its setup with nobody to put in it (KP pool
+    // went straight to Money). Now a game with too few golfers opens Round Setup's Players step
+    // first, with one line saying why; Players' Save carries on into that game's setup (the same
+    // round code), and the game's own Save comes back to the round - the side (GPS or card) and the
+    // hole are the ones the phone was on (gps-view keeps the side, the card keeps the hole).
+    var AG_NEED = { kp: 2, nassau: 2, match: 2, strokebet: 2, skins: 2, vegas: 4, bbb: 2, wolf: 2, dots: 2, nines: 3, side: 2, bestball: 2, scramble: 2, ryder: 2, hilo: 4 };
+    var AG_NEXT = 'hardpan_ag_next';
+    function agNeed(id) { return AG_NEED[id] || 0; }
+    function agGameName(id) {
+        var g = ALL_GAMES.filter(function (x) { return x.id === id; })[0] || QUICK_STARTS.filter(function (x) { return x.tpl === id; })[0];
+        return g ? g.name : 'the game';
+    }
+    function agNext(v) {
+        if (v === undefined) { try { return JSON.parse(ss(AG_NEXT) || 'null'); } catch (e) { return null; } }
+        ss(AG_NEXT, v ? JSON.stringify(v) : null);
+        return v;
+    }
+    // Too few golfers for `id`? Then Players first, and `next` ({ url } or { q: tpl }) after it.
+    function agPlayersFirst(id, next) {
+        if (agPlayers().length >= agNeed(id)) return false;
+        var code = agCode();
+        agNext({ code: String(code).toUpperCase(), id: id, name: agGameName(id), need: agNeed(id), next: next, stage: 'players', at: Date.now() });
+        W.location.href = 'admin.html?game=' + encodeURIComponent(code) + '&step=players';
+        return true;
+    }
+    // Round Setup on the Players step for a game: the line on top, and a Save that goes on.
+    function agNeedBanner(nx) {
+        var host = $('admin-screen');
+        if (!host || $('fd-need')) return;
+        var box = W.document.createElement('div');
+        box.id = 'fd-need';
+        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card);';
+        box.innerHTML = '<div style="font-weight:800;font-size:1.02rem;color:#0f4c3a;">Add your golfers first, then we\u2019ll set up ' + esc(nx.name) + '.</div>'
+            + '<div style="font-size:.8rem;opacity:.8;margin:4px 0 8px;">' + esc(nx.name) + ' needs ' + nx.need + ' golfers or more.</div>'
+            + '<button type="button" class="btn-primary fd-need-go" style="width:100%;min-height:50px;font-weight:800;background:#0f4c3a;border-color:#0f4c3a;">Save golfers \u00b7 set up ' + esc(nx.name) + ' \u203a</button>';
+        var prog = $('wizard-progress');
+        if (prog && prog.parentNode) prog.parentNode.insertBefore(box, prog); else host.insertBefore(box, host.firstChild);
+        box.addEventListener('click', function (ev) {
+            if (!ev.target.closest('.fd-need-go')) return;
+            try { if (typeof W.saveSettings === 'function') W.saveSettings(); } catch (e) { try { console.error('[front door] players first', e); } catch (x) {} }
+        });
+    }
+    // The KP pool / weekly game: its section open on the Money step.
+    function agOpenPool() {
+        var cb = $('mp-enabled');
+        if (cb && !cb.checked) cb.click();
+        try { if (cb && cb.scrollIntoView) cb.scrollIntoView({ block: 'start' }); } catch (e) {}
+    }
     function agMoney(v) { v = Number(v); return '$' + (v % 1 ? v.toFixed(2).replace(/0$/, '') : v); }
     function agSheet() {
         var el = $('fd-addgame');
@@ -1098,6 +1229,7 @@
     }
     // A QUICK START: the $ and the golfers / teams, then its normal setup.
     function agQuick(tpl) {
+        if (agPlayersFirst(tpl, { q: tpl })) return;
         var ps = agPlayers(), ids = ps.map(function (p) { return String(p.id); });
         AG.q = { tpl: tpl, amt: AG_DEF[tpl], order: ids.slice(0, 4), ids: ids.slice(), carry: true, mode: ps.length === 2 || ps.length === 3 ? '1v1' : '2v2' };
         if (AG.q.mode === '1v1') AG.q.order = ids.slice(0, 2);
@@ -1182,7 +1314,7 @@
         if (g.go === 'smlist') return 'sidematches.html' + base;
         if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
         if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;
-        if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step;
+        if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step + (g.id === 'kp' ? '&pool=1' : '');
         if (g.go === 'points') return 'points.html' + base + '&setup=1';
         return null;
     }
@@ -1215,7 +1347,9 @@
             var g = ALL_GAMES.filter(function (x) { return x.id === b.getAttribute('data-ag-all'); })[0];
             if (!g) return;
             if (g.go === 'trip') { agTrip(); return; }
-            var url = agRoute(g); if (url) W.location.href = url;
+            var url = agRoute(g);
+            if (url && agPlayersFirst(g.id, { url: url })) return;
+            if (url) W.location.href = url;
             return;
         }
         if (!AG.q) return;
@@ -1316,6 +1450,16 @@
         code = String(code || '').toUpperCase();
         if (!code || (STUCK.code === code && (STUCK.why === why || STUCK.why === 'gone'))) return;
         STUCK.code = code; STUCK.why = why;
+        if (why === 'missing') {
+            // Never the round the doors go back to - but nothing queued is dropped: a slow first
+            // load that arrives after all keeps every score typed meanwhile.
+            forgetRound(code, false);
+            var sd0 = String(ls('hardpan_round_side') || '');
+            if (sd0 === 'gps|' + code || sd0 === 'bets|' + code) ls('hardpan_round_side', null);
+            if (String(ls('lastRoomCode') || '').toUpperCase() === code) ls('lastRoomCode', null);
+            missingSheet(code);
+            return;
+        }
         if (why === 'gone') forgetRound(code, true); else forgetRound(code, false);
         var d = W.document, el = $('hp-stuck-round');
         if (!el) {
@@ -1337,6 +1481,32 @@
         el.querySelector('[data-hp-exit]').onclick = function () { exitRound(code, gone); };
         var v = el.querySelector('[data-hp-view]');
         if (v) v.onclick = function () { W.__hpReadOnly = true; spectatorMode(true, false); el.style.display = 'none'; try { if (typeof renderScorecard === 'function') renderScorecard(); } catch (e) {} };   /* global renderScorecard */
+    }
+    // 'missing' (URGENT-002): the round never arrived - no such code, gone, or unreadable from here.
+    function missingSheet(code) {
+        var d = W.document, el = $('hp-stuck-round');
+        if (!el) {
+            el = d.createElement('div'); el.id = 'hp-stuck-round'; el.setAttribute('role', 'alertdialog');
+            el.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;color-scheme:light;';
+            (d.body || d.documentElement).appendChild(el);
+        }
+        var btn = 'display:block;width:100%;min-height:52px;border-radius:14px;font-weight:800;font-size:1.05rem;margin-top:10px;';
+        var off = typeof navigator !== 'undefined' && navigator.onLine === false;
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div style="font-weight:800;font-size:1.15rem;color:#9b1c1c;">\u26A0\uFE0F Round ' + esc(code) + ' isn\u2019t available</div>'
+            + '<div style="font-size:.95rem;margin-top:8px;line-height:1.4;">' + (off ? 'This phone has no signal and has never opened this round, so there is nothing to show yet.' : 'There is no round with that code, or it could not be read. Check the code with whoever set it up.') + '</div>'
+            + '<button type="button" data-hp-home style="' + btn + 'border:0;background:#0f4c3a;color:#fff;">Go Home</button>'
+            + '<button type="button" data-hp-retry style="' + btn + 'border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;">Try again</button>'
+            + '</div>';
+        el.style.display = 'flex';
+        el.querySelector('[data-hp-home]').onclick = function () { var to = on() ? 'home.html' : 'admin.html'; try { W.location.replace(to); } catch (e) { W.location.href = to; } };
+        el.querySelector('[data-hp-retry]').onclick = function () { try { W.location.reload(); } catch (e) {} };
+    }
+    // The round arrived after all (a slow first load): the sheet goes, and it is remembered.
+    function hideMissing(code) {
+        if (!(STUCK.code === String(code).toUpperCase() && STUCK.why === 'missing')) return;
+        STUCK.code = null; STUCK.why = null;
+        var el = $('hp-stuck-round'); if (el) el.style.display = 'none';
     }
     // Exit: the round is forgotten here (and its unsendable changes), then the course picker.
     function exitRound(code, gone) {
@@ -1516,7 +1686,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
