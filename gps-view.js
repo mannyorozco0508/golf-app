@@ -1120,8 +1120,15 @@
         // One line per credit, from MapLibre's own (it lists the sources on the map).
         if (a && pop) pop.innerHTML = a.innerHTML.split(' | ').map(function (l) { return '<div>' + l + '</div>'; }).join('')
             // BUILD 3: the accuracy and where the green came from, small, here only.
-            + '<div class="gps-pop-info">' + escapeText([(S.el.querySelector('.gps-acc') || {}).textContent, (S.el.querySelector('.gps-src') || {}).textContent].filter(Boolean).join(' · ')) + '</div>';
+            + '<div class="gps-pop-info">' + escapeText([(S.el.querySelector('.gps-acc') || {}).textContent, (S.el.querySelector('.gps-src') || {}).textContent].filter(Boolean).join(' · ')) + '</div>'
+            // store-legal: Apple Weather's attribution wherever its wind is on screen
+            // (the wind sheet carries it too), and every licence in one page.
+            + (wkShown() ? '<div>\uF8FF Weather · <a href="https://weatherkit.apple.com/legal-attribution.html" target="_blank" rel="noopener">Other data sources</a></div>' : '')
+            + '<div><a class="gps-ack" href="' + ackHref() + '" target="_blank" rel="noopener">Acknowledgements</a></div>';
     }
+    // A web page, not in the bundle: from product-links.js's one origin (Safari in the app).
+    function ackHref() { try { if (typeof shareBaseUrl === 'function') return shareBaseUrl() + 'acknowledgements.html'; } catch (e) {} return 'acknowledgements.html'; }
+    function wkShown() { try { var w = effectiveWind(); return !!(w && !w.manual && w.src === 'weatherkit'); } catch (e) { return false; } }
     function toggleCredits(e) {
         if (e) e.stopPropagation();
         var pop = S && S.el.querySelector('.gps-credit-pop');

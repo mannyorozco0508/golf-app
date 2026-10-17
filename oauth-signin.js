@@ -69,7 +69,7 @@
     // the popup hands Firebase a credential Firebase itself minted. On iOS the
     // credential is built here out of what the Apple or Google SDK returned, so it
     // can be wrong in ways a popup cannot, and each one needs a different answer.
-    var NOTE_BAD_CREDENTIAL = 'Apple or Google signed you in, but this app could not finish it - the sign-in token was rejected. Nothing changed. Use email instead for now and tell Manny it said the token was rejected.';
+    var NOTE_BAD_CREDENTIAL = 'Apple or Google signed you in, but this app could not finish it - the sign-in token was rejected. Nothing changed. Use email instead for now, and if it keeps happening email support@rattlegolf.com and say the token was rejected.';
     var NOTE_NO_CONNECTION = 'No connection while signing in. Nothing changed - try again when you have signal.';
 
     var PROVIDERS = { apple: 'apple.com', google: 'google.com' };
@@ -307,6 +307,27 @@
         } catch (e) { return null; }
     }
 
+    // A FRESH APPLE AUTHORIZATION CODE, FOR DELETING THE ACCOUNT (store-legal).
+    // Apple's account-deletion rule: the app's Sign in with Apple grant is revoked
+    // when the account goes, and revoking needs a code from a fresh Apple sheet -
+    // the server (accountDelete) trades it for a token and revokes that. Nothing
+    // is signed in here: skipNativeAuth, and the credential is never sent to
+    // Firebase. Resolves { code, bundleId } or null when there is no native Apple
+    // sheet (the web); rejects when the golfer cancels it.
+    function appleAuthorizationCode() {
+        var plugins = window.Capacitor && window.Capacitor.Plugins;
+        var plugin = plugins && plugins.FirebaseAuthentication;
+        if (!plugin || typeof plugin.signInWithApple !== 'function') return Promise.resolve(null);
+        var appInfo = (plugins.App && typeof plugins.App.getInfo === 'function')
+            ? Promise.resolve(plugins.App.getInfo()).then(function (i) { return (i && i.id) || ''; }, function () { return ''; })
+            : Promise.resolve('');
+        return Promise.resolve(plugin.signInWithApple({ skipNativeAuth: true })).then(function (r) {
+            var code = r && r.credential && r.credential.authorizationCode;
+            if (!code) return null;
+            return appInfo.then(function (id) { return { code: String(code), bundleId: id }; });
+        });
+    }
+
     // EVERY FAILURE IS ALSO LOGGED, because in the iOS shell console.error is the
     // only thing that reaches a place Manny can read it: Capacitor forwards web-view
     // console output to the native log, so an Xcode Cmd+R run shows the code even
@@ -415,6 +436,7 @@
         messageFor: messageFor,
         providerFor: providerFor,
         nativeCredential: nativeCredential,
+        appleAuthorizationCode: appleAuthorizationCode,
         adoptCredential: adoptCredential,
         appleAdoptCredential: appleAdoptCredential,
         signIn: signIn,
