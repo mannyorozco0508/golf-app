@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js', 'gps-entitlement.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -150,7 +150,8 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
     assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    // gps-store-iap (2026-10-17): the in-app purchase settings joined - iap OFF, an EMPTY RevenueCat key.
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPriceFallback', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
@@ -203,10 +204,11 @@ test('HardPan GPS (Pro): ONE check, exported; free never loads MapLibre', { skip
     assert.ok(/hasGpsPro: hasGpsPro/.test(v), 'exported on window.HardPanGps');
     const em = v.slice(v.indexOf('function ensureMap('), v.indexOf('function showSide('));
     assert.ok(em.indexOf('if (!S.pro) return;') !== -1 && em.indexOf('if (!S.pro) return;') < em.indexOf('loadMapLibre('), 'free returns before MapLibre loads');
-    // No price anywhere in the code until Manny sets one (2026-10-08): the sheet
-    // says "HardPan GPS — coming soon"; a price comes only from config.priceLine.
+    // No price written into the code: the paywall's price comes from StoreKit, or
+    // (marked) from config.iapPriceFallback. The old placeholder button is gone
+    // (gps-store-iap, 2026-10-17) - gps_entitlement_test.js holds the paywall.
     assert.ok(!/\$\d/.test(v), 'a price is written into gps-view.js');
-    assert.ok(/HardPan GPS — coming soon/.test(v) && /Not now/.test(v));
+    assert.ok(!/coming soon/i.test(v.slice(v.indexOf('THE UPGRADE SHEET'), v.indexOf('NO PULL-DOWN ON GPS'))) && /Not now/.test(v));
     assert.ok(/function openSheet\(\) \{\s*(\/\/.*\s*)?if \(!S \|\| S\.pro\) return;/.test(v), 'the sheet is never opened for a Pro user');
     assert.ok(!/Season Pass/i.test(v), 'HardPan GPS, never "Season Pass" (that is the organizer product)');
 });
