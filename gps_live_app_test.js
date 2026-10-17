@@ -205,7 +205,7 @@ test('setup: an old saved course with no GPS looks itself up ONCE on pick, links
     const a = read('admin.html');
     assert.ok(/if \(!gpsFindTried\[key\] && navigator\.onLine !== false && !\/\^gapi_\/\.test\(key\)\) \{ gpsLiveFind\(key, name, \{ auto: true \}\); return; \}/.test(a), 'auto, once');
     const f = a.slice(a.indexOf('async function gpsLiveFind'), a.indexOf('// GPS:END', a.indexOf('async function gpsLiveFind')));
-    assert.ok(/L\.find\(name, where\)/.test(f) && /L\.course\(x\.id, key\)/.test(f), 'the saved course key goes along: the function writes gps_links/<key>');
+    assert.ok(/L\.find\(name, where\)/.test(f) && /L\.course\(x\.id, key, currentMode\)/.test(f), 'the saved course key and the round code go along: the function writes gps_links/<key> for the round\'s organizer');
     assert.ok(/No GPS match for/.test(f) && /label: 'Search online'/.test(f) && /None of these (\u2014|\\u2014) Search online/.test(f), 'every outcome says something and offers Search online');
     assert.ok(/gpsCourseRowSub\(optionDiv, id\)/.test(a) && /gps-row-where/.test(a), 'city, state under each saved course');
 });

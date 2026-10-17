@@ -2,7 +2,8 @@
 // HARDPAN GPS LIVE - THE TWO CLOUD FUNCTIONS (Firebase golfapp-9fb21, 2nd gen)
 //
 //   gpsSearch({ name })              -> { status, results[] }
-//   gpsCourse({ courseId, ourKey? }) -> { status, course, cardKey }
+//   gpsCourse({ courseId, ourKey?, roundCode? }) -> { status, course, cardKey }
+//   gpsUnlink({ ourKey })            -> { status: 'ok' | 'denied', was }   (owners only)
 //
 // The GolfAPI key is the Secret Manager secret GOLFAPI_KEY: set it once with
 //   firebase functions:secrets:set GOLFAPI_KEY
@@ -10,15 +11,22 @@
 // Callable functions refuse a call with no Firebase ID token before this code
 // runs; gps-live-core.js checks request.auth again and does everything else.
 //
-//   gpsWind({ lat, lon })            -> { status, mph, gustMph, fromDeg, toDeg, tempF, asOf }
+//   gpsWind({ lat, lon, courseKey, courseId? }) -> { status, mph, gustMph, fromDeg, toDeg, tempF, asOf }
 //     Apple WeatherKit (weather-core.js). NOT DEPLOYED until Manny's OK. Needs, once:
 //       firebase functions:secrets:set WEATHERKIT_KEY      (the .p8 file's text)
 //       WEATHERKIT_KEY_ID, WEATHERKIT_TEAM_ID, WEATHERKIT_SERVICE_ID  (params, in .env.<project>)
 //     and the app's gps-config.js weatherkit: true. Without them the app uses NWS.
 //
-// DEPLOY ONLY THESE:  firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse
+// DEPLOY ONLY THESE:  firebase deploy --only functions:gps-live:gpsSearch,functions:gps-live:gpsCourse,functions:gps-live:gpsUnlink
 //   (gpsWind, when approved: firebase deploy --only functions:gps-live:gpsWind)
 // (a bare `firebase deploy` would also publish database.rules.json)
+//
+// APP CHECK IS ENFORCED (audit H2, 2026-10-16): every one of these refuses a call
+// that carries no valid App Check token (header X-Firebase-AppCheck), before any
+// code here runs. gps-live.js sends one when the app has the App Check SDK
+// (firebase.appCheck()); until the app is built with App Check registered for its
+// iOS app (App Attest / DeviceCheck) these functions refuse EVERY call, so deploy
+// them only together with - or after - that app build.
 // ============================================================================
 'use strict';
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
@@ -52,6 +60,7 @@ async function notify(kind, detail) {
     const uids = ALERT_UIDS.value().split(',').map((s) => s.trim()).filter(Boolean);
     const body = kind === 'floor' ? `GolfAPI calls left: ${detail.left}. New courses are paused (floor ${detail.floor}).`
         : /^userlimit_/.test(kind) ? `A golfer hit the daily limit for new GPS courses (${detail.max}).`
+        : kind === 'searchcap' ? `GPS course searches hit today's cap (${detail.max}).`
         : `New GPS courses hit today's cap (${detail.max}).`;
     for (const uid of uids) {
         const devices = (await db.get('pushTokens/' + uid)) || {};
@@ -77,12 +86,15 @@ function wrap(fn) {
         }
     };
 }
-const opts = { region: 'us-central1', secrets: [GOLFAPI_KEY], maxInstances: 5, timeoutSeconds: 30, memory: '256MiB' };
+const opts = { region: 'us-central1', secrets: [GOLFAPI_KEY], maxInstances: 5, timeoutSeconds: 30, memory: '256MiB', enforceAppCheck: true };
 exports.gpsSearch = onCall(opts, wrap((auth, data) => getCore().search(auth, data)));
 exports.gpsCourse = onCall(opts, wrap((auth, data) => getCore().course(auth, data)));
+// Owners only (the check is in gps-live-core.js unlink): removes a wrong gps_links/<key>.
+exports.gpsUnlink = onCall(opts, wrap((auth, data) => getCore().unlink(auth, data)));
 let weather = null;
 function getWeather() {
-    if (!weather) weather = createWeather({ fetch: (u, o) => fetch(u, o),
+    const owners = () => ALERT_UIDS.value().split(',').map((x) => x.trim()).filter(Boolean);
+    if (!weather) weather = createWeather({ fetch: (u, o) => fetch(u, o), db, owners,
         creds: () => ({ privateKey: WEATHERKIT_KEY.value(), keyId: WEATHERKIT_KEY_ID.value(), teamId: WEATHERKIT_TEAM_ID.value(), serviceId: WEATHERKIT_SERVICE_ID.value() }) });
     return weather;
 }

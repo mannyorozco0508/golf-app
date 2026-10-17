@@ -96,7 +96,11 @@ test('search: one GolfAPI call (0.1), then the same name from anyone is free for
     await core.search(GUEST, { name: '  prestwick ' });
     tick(29 * 86400000); await core.search(GUEST, { name: 'PRESTWICK' });
     assert.equal(api.calls.length, 1, 'cached: same name, any golfer, any spacing or case');
-    tick(2 * 86400000); await core.search(GUEST, { name: 'Prestwick' });
+    // A GUEST GETS CACHED ANSWERS ONLY (audit H2, 2026-10-16): past 30 days a guest's search
+    // would call GolfAPI, so it is 'signin' - and a real account's asks again.
+    tick(2 * 86400000); assert.equal((await core.search(GUEST, { name: 'Prestwick' })).status, 'signin');
+    assert.equal(api.calls.length, 1, 'a guest never spends a call');
+    await core.search(MANNY, { name: 'Prestwick' });
     assert.equal(api.calls.length, 2, 'after 30 days it is asked again');
     assert.equal(db.root.gps_meta.left, 399.8, 'calls left, read as a NUMBER');
     assert.equal(db.root.gps_meta.known[PW].gps, true, 'what a search returned is what may be pulled');
@@ -133,11 +137,11 @@ test('only a course a search returned, with GPS: no blind pulls, no pulls of a c
 
 test('a NEW pull needs a real account (anonymous uids are free to mint); a guest still gets cached courses', { skip }, async () => {
     const { core, api } = setup();
-    await core.search(GUEST, { name: 'Prestwick' });
+    await core.search(MANNY, { name: 'Prestwick' });   // a guest may not make the uncached search (audit H2)
     assert.equal((await core.course(GUEST, { courseId: PW })).status, 'account');
     assert.equal(api.calls.length, 1);
     const open = setup({}, { cfg: { pullNeedsAccount: false } });
-    await open.core.search(GUEST, { name: 'Prestwick' });
+    await open.core.search(MANNY, { name: 'Prestwick' });
     assert.equal((await open.core.course(GUEST, { courseId: PW })).status, 'ready', 'one setting');
 });
 
@@ -244,9 +248,11 @@ test('every call is logged (who, what, cost, calls left) - and the key never is'
 });
 
 test('links: our course key -> its GolfAPI course, first link wins, only for a course of ours', { skip }, async () => {
-    const { core, db } = setup({ global_courses: { gca_123: { name: 'Prestwick CC', data: [] } } });
+    // Since audit H3 (2026-10-16) a link needs the organizer's round on that course
+    // (functions_security_test.js has the refusals).
+    const { core, db } = setup({ global_courses: { gca_123: { name: 'Prestwick CC', data: [] } }, events: { ABC123: { ownerUid: 'uMANNY', activeCourseKey: 'gca_123' } } });
     await core.search(MANNY, { name: 'Prestwick' });
-    await core.course(MANNY, { courseId: PW, ourKey: 'gca_123' });
+    await core.course(MANNY, { courseId: PW, ourKey: 'gca_123', roundCode: 'ABC123' });
     assert.equal(db.root.gps_links.gca_123, PW);
     await core.course(MANNY, { courseId: '012141520639939791440', ourKey: 'nope_key' });
     assert.equal(db.root.gps_links.nope_key, undefined, 'not one of our courses');
