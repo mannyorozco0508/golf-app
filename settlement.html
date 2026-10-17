@@ -815,8 +815,8 @@ html {
     function formatMatchPill(score, t1Name, t2Name, isClosed, finalResult) {
         if (isClosed && finalResult) return finalResult;
         if (score === 0) return "AS";
-        if (score > 0) return `${t1Name} ${score}UP`;
-        return `${t2Name} ${Math.abs(score)}UP`;
+        if (score > 0) return `${escapeHtml(t1Name)} ${score}UP`;
+        return `${escapeHtml(t2Name)} ${Math.abs(score)}UP`;
     }
 
     // --- HOLE BET + OVERALL BET ENGINE (mirrors index.html for final settlement) ---
@@ -1102,7 +1102,7 @@ html {
         // PDF (native-export.js) reads innerText, so it gets nothing from this line;
         // that is stated in receipt_logo_test.js rather than hidden.
         return `<div class="receipt-head" id="receipt-export-head"><img class="receipt-mark" src="logo-mark.png" alt="HardPan" width="64" height="64">
-            <div class="receipt-head-course">${course}</div>
+            <div class="receipt-head-course">${escapeHtml(course)}</div>
             <div class="receipt-head-date">${date}</div>
             <div class="receipt-head-format">${sub}${who ? ' \u00B7 ' + who + ' golfer' + (who === 1 ? '' : 's') : ''}</div>
             ${label ? `<div class="receipt-head-group">${escapeHtml(label)}</div>` : ''}
@@ -1390,7 +1390,7 @@ html {
                 const roster = data.players || [];
                 ids.forEach(pid => {
                     const pl = roster.find(p => String(p.id) === String(pid));
-                    html += `<div class="ledger-row"><span>${pl ? pl.name : pid}</span>${fmtSignedHtml(net[pid] || 0)}</div>`;
+                    html += `<div class="ledger-row"><span>${escapeHtml(pl ? pl.name : pid)}</span>${fmtSignedHtml(net[pid] || 0)}</div>`;
                 });
                 html += `</div>`;
             });
@@ -1595,7 +1595,7 @@ html {
                 // Only reachable on a Receipt previewed mid-round. A finished round
                 // has every card in, so none of these rows appear.
                 const who = row.missing.length > 0
-                    ? row.missing.map(m => m.name).join(', ')
+                    ? row.missing.map(m => escapeHtml(m.name)).join(', ')
                     : `${row.requiredCount - row.postedCount} golfer(s)`;
                 html += `<div class="ledger-row"><span>${row.label} — Waiting on ${who}</span><span></span></div>`;
                 return;
@@ -1768,7 +1768,7 @@ html {
                 const who = tied
                     ? `T${l.place}: ${l.names.join(' / ')}`
                     : `${l.place}${['st','nd','rd'][l.place-1]||'th'}: ${l.names[0]}`;
-                netRows += `<div class="ledger-row"><span>${who} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
+                netRows += `<div class="ledger-row"><span>${escapeHtml(who)} \u00B7 net ${l.net}</span><span class="val-pos">${$(l.cents)}</span></div>`;
 
                 if (!tied) return;
 
@@ -2317,7 +2317,7 @@ html {
             html += `<div class="settle-card">
                 <div class="settle-header">🤝 Who Pays Who</div>`;
             transactions.forEach(t => {
-                html += `<div class="ledger-row"><span>${t.from} → ${t.to}</span><span class="val-neg">$${fmtWhole(t.amount)}</span></div>`;
+                html += `<div class="ledger-row"><span>${escapeHtml(t.from)} → ${escapeHtml(t.to)}</span><span class="val-neg">$${fmtWhole(t.amount)}</span></div>`;
             });
             html += `</div>`;
         }
@@ -2399,7 +2399,7 @@ html {
                 const money = hiloNet[p.id] || 0;
                 ledgerHtml += `<div class="ledger-row"><span>${escapeHtml(p.name)}:</span>${fmtSignedHtml(money)}</div>`;
             });
-            const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${calc.t1Name}: ${calc.t1Points} pts &nbsp;|&nbsp; ${calc.t2Name}: ${calc.t2Points} pts</p>` : '';
+            const pointsLine = calc ? `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:0;">${escapeHtml(calc.t1Name)}: ${calc.t1Points} pts &nbsp;|&nbsp; ${escapeHtml(calc.t2Name)}: ${calc.t2Points} pts</p>` : '';
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">↕️ ${settleHeading('Hi-Lo Settlement', '', isFinal)}</div>
@@ -2598,11 +2598,11 @@ html {
             container.innerHTML = `
                 <div class="settle-card">
                     <div class="settle-header">${settleHeading('Ledger', ' — 1v1 (Stroke Play)', isFinal)}</div>
-                    <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${calc.p1.name} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${calc.p2.name} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
+                    <div class="breakdown-item"><span>Original — $${matchStake} Flat:</span> <span>${escapeHtml(calc.p1.name)} ${calc.holesCompleted > 0 ? calc.p1Total : '-'} | ${escapeHtml(calc.p2.name)} ${calc.holesCompleted > 0 ? calc.p2Total : '-'}</span></div>
                     ${!calc.roundComplete ? `<div class="breakdown-item"><span style="color:#888;">Not yet final — thru ${calc.holesCompleted} of ${calc.totalHoles}.</span></div>` : ''}
                     ${pressBreakdownHtml}
-                    <div class="ledger-row" style="margin-top:10px;"><span>${pressSet.p1.name}</span>${fmtStrokeSettle(pressSet.combinedT1Money)}</div>
-                    <div class="ledger-row"><span>${pressSet.p2.name}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
+                    <div class="ledger-row" style="margin-top:10px;"><span>${escapeHtml(pressSet.p1.name)}</span>${fmtStrokeSettle(pressSet.combinedT1Money)}</div>
+                    <div class="ledger-row"><span>${escapeHtml(pressSet.p2.name)}</span>${fmtStrokeSettle(-pressSet.combinedT1Money)}</div>
                 </div>
                 ${sideHtml}
             `;
@@ -2666,8 +2666,8 @@ html {
                     
                     groupMatches.forEach(m => {
                         let statusDesc = "All Square ($0)";
-                        if (m.status > 0) statusDesc = `${matchData.t1Name} +$${stakeToUse}`;
-                        else if (m.status < 0) statusDesc = `${matchData.t2Name} +$${stakeToUse}`;
+                        if (m.status > 0) statusDesc = `${escapeHtml(matchData.t1Name)} +$${stakeToUse}`;
+                        else if (m.status < 0) statusDesc = `${escapeHtml(matchData.t2Name)} +$${stakeToUse}`;
                         
                         let lockIcon = m.closed ? "🔒 " : "";
                         let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid #2a9d8f; padding-left: 8px;" : "padding-left: 4px;";
@@ -2680,12 +2680,12 @@ html {
             let statusDesc = "All Square ($0)";
             if (holeBet > 0) {
                 let amt = Math.abs(t18.status * holeBet);
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+                if (t18.status > 0) statusDesc = `${escapeHtml(matchData.t1Name)} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${escapeHtml(matchData.t2Name)} Won (-${amt})`;
             } else {
                 let amt = matchStake;
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+                if (t18.status > 0) statusDesc = `${escapeHtml(matchData.t1Name)} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${escapeHtml(matchData.t2Name)} Won (-${amt})`;
             }
             breakdownHtml += `
                 <div class="breakdown-item">

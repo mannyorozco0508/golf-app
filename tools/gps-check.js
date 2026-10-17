@@ -137,6 +137,9 @@ function sensor(mode, lat, lng, acc) {
       var report = function (id) { if (calls.active[id]) oks[id]({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: cur.acc }, timestamp: Date.now() }); };
       // Wave 2: the golfer walks - every live watch hears the new spot.
       window.__moveTo = function (la, ln, acc) { cur.lat = la; cur.lng = ln; if (acc != null) cur.acc = acc; Object.keys(calls.active).forEach(report); return 'moved'; };
+      // A PHONE KEEPS REPORTING (about once a second, standing still too): a fix older than
+      // 10 s is not used any more (audit C3, 2026-10-16), so the stand-in repeats like one.
+      setInterval(function () { if (${JSON.stringify(mode)} !== 'denied') Object.keys(calls.active).forEach(report); }, 1000);
       var fake = {
         watchPosition: function (ok, err, opts) {
           var id = nextId++; calls.watch++; calls.active[id] = true; calls.opts = opts || null; oks[id] = ok;

@@ -159,7 +159,7 @@ describe('2. INITIALS: Randy T. / Randy C. / Matt M. / Matt B. / Matt H. on ever
         // The Wolf modal's own lines and two match-status lines (:7756-7797, :8417, :8542, :8573 in v193) were not on the list and remain - counted so a regression at a swept site is seen.
         assert.ok(cuts <= 12, 'first-token cuts left: ' + cuts);
         assert.match(src, /function getInitials\(name\)/);
-        assert.match(src, /\$\{initials\}/, 'the column initials are drawn as before');
+        assert.match(src, /\$\{escapeHtml\(initials\)\}/, 'the column initials are drawn as before (escaped, audit H1)');
         ["return p ? getSmartDisplayName(p, d.players || []) : null;", "escapeHtml(golferLabel(p))).join(', ')", "golferLabelFor(log.wolfName)"].forEach(s => assert.ok(src.includes(s), 'missing: ' + s.slice(0, 40)));
         assert.doesNotMatch(src, /function shortName\(/, 'bet-strip.js (protected) owns the global shortName; the page must not shadow it');
     });

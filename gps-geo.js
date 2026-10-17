@@ -544,6 +544,11 @@
             return { source: 'osm', mid: pinPt(osm.mid) || polygonCentroid(osm.green), front: null, back: null,
                      green: osm.green, tee: pinPt(osm.tee), useGreenForEdges: true };
         }
+        // A CENTRE AND NO OUTLINE (a GolfAPI hole with only its centre, audit C5): the centre is
+        // still the number a golfer most needs - shown, with no front / back.
+        if (osm && pinPt(osm.mid)) {
+            return { source: 'osm', mid: pinPt(osm.mid), front: null, back: null, green: null, tee: pinPt(osm.tee), useGreenForEdges: false };
+        }
         return { source: 'none', mid: null, front: null, back: null, green: null, tee: osm ? pinPt(osm.tee) : null, useGreenForEdges: false };
     }
 
@@ -623,11 +628,28 @@
         return String(name || '').toLowerCase().replace(/['\u2019`]/g, '').split(/[^a-z0-9]+/)
             .filter(function (w) { return w && !NAME_STOP[w] && !/^\d+$/.test(w); }).join(' ');
     }
-    function bundleKeyFor(table, key, name) {
+    // KNOWN ALIASES (audit C1, 2026-10-16): round keys from imports / trips that name a bundled
+    // course another way. A name alone never makes an alias any more - "Pine Lakes Golf Club" in
+    // Jacksonville got the Myrtle Pine Lakes greens - so these are listed, and anything else needs
+    // the course's own location within 5 km of the bundled one.
+    var KNOWN_ALIASES = { thistle_cameron_stewart: 'thistle_27_cameron_stewart', thistle_mackay_cameron: 'thistle_27_mackay_cameron' };
+    var NEAR_M = 5000;
+    // "(Front 9)" / "(Back 9)" are Round Setup's 9-hole suffixes: the course is the same (audit C6).
+    function stripNineSuffix(name) { return String(name || '').replace(/\s*\((?:front|back)\s*9\)\s*$/i, ''); }
+    function bundlePoint(rec) {
+        var hs = rec && rec.holes, k = hs && Object.keys(hs)[0], h = k && (hs[k].osm || hs[k]);
+        return h ? (h.tee || h.mid || null) : null;
+    }
+    function bundleKeyFor(table, key, name, loc) {
         if (table && key && table[key] && key !== '_names') return key;
-        var names = table && table._names, want = courseNameKey(name);
-        if (!names || !want) return null;
-        var hit = Object.keys(names).filter(function (k) { return courseNameKey(names[k]) === want; });
+        if (table && key && KNOWN_ALIASES[key] && table[KNOWN_ALIASES[key]]) return KNOWN_ALIASES[key];
+        var names = table && table._names, want = courseNameKey(stripNineSuffix(name));
+        if (!names || !want || !loc) return null;
+        var hit = Object.keys(names).filter(function (k) {
+            if (courseNameKey(names[k]) !== want) return false;
+            var r = table[k]; var pt = r && (r.compose ? bundlePoint(table[r.compose[0]]) : bundlePoint(r));
+            return !!pt && haversineMeters(loc, pt) <= NEAR_M;
+        });
         return hit.length === 1 ? hit[0] : null;
     }
 
@@ -919,6 +941,9 @@
         if (isNum(o.tempF)) { terms.temp = D * 0.001 * (70 - o.tempF); n++; }
         if (!n) return null;
         var exact = D + (terms.elev || 0) + (terms.wind || 0) + (terms.temp || 0);
+        // NEVER SILLY (audit): extreme wind / slope inputs could show a negative "plays ~". The
+        // estimate stays between half and 1.6 times the real distance.
+        exact = Math.max(D * 0.5, Math.min(D * 1.6, exact));
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
 
@@ -1297,15 +1322,30 @@
     // counts. Returns { record, how } or null.
     function golfapiMatch(data, key, name, loc, holesWanted, table) {
         if (!data || !data.courses) return null;
+        name = stripNineSuffix(name);
         var all = Object.keys(data.courses).map(function (id) { return data.courses[id]; });
+        // A SIBLING OF A LINKED 27-HOLE CLUB (thistle_27_stewart_mackay beside the linked
+        // thistle_27_cameron_stewart) knows where it is: the linked record's own point.
+        if (!loc && data.links && key) {
+            Object.keys(data.links).some(function (lk) {
+                var base = lk.split('_').slice(0, -2).join('_');
+                if (base.split('_').length < 2 || key.indexOf(base + '_') !== 0) return false;
+                var c = data.courses[data.links[lk]];
+                if (c && isFinite(c.lat) && isFinite(c.lng)) { loc = [c.lat, c.lng]; return true; }
+                return false;
+            });
+        }
         // A link under the round's key, else under the bundle key its name resolves to
         // (the Myrtle trip's Thistle rounds carry "thistle_cameron_stewart"; the link
         // is "thistle_27_cameron_stewart").
-        var alias = table ? bundleKeyFor(table, key, name) : null;
+        var alias = table ? bundleKeyFor(table, key, name, loc) : null;
         var linkId = data.links && (data.links[key] || (alias && data.links[alias]));
         var link = linkId && data.courses[linkId];
         if (link) return { record: golfapiRecord([link]), how: 'linked' + (data.links[key] ? '' : ' (as ' + alias + ')') };
-        var near = function (c) { return !loc || !isFinite(c.lat) || haversineMeters(loc, [c.lat, c.lng]) <= 5000; };
+        // BY NAME ONLY WITH A PLACE (audit C2): no location, no name match - "The Pinehills" in
+        // Massachusetts is not Myrtlewood's Pine Hills.
+        if (!loc) return null;
+        var near = function (c) { return isFinite(c.lat) && haversineMeters(loc, [c.lat, c.lng]) <= NEAR_M; };
         var words = function (c) { return hsWords(c.club + ' ' + c.course); };
         var covers = function (want, have) {
             var hj = have.join('');
@@ -1325,7 +1365,8 @@
             };
             if (m) {
                 var a = nine(m[1]), b = nine(m[2]);
-                if (a && b && a !== b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
+                // The same nine twice is a real round (audit C9): its holes, then the same holes again.
+                if (a && b) return { record: golfapiRecord([a, b]), how: 'the nines "' + a.course + '" + "' + b.course + '"' };
             } else {
                 var one = nine(m1[1]);
                 if (one) return { record: golfapiRecord([one]), how: 'the nine "' + one.course + '"' };
@@ -1343,7 +1384,15 @@
             hsWords(m[2]).forEach(function (w) { cw.forEach(function (x, k) { if (hsSame(x, w) && j < 0) j = k; }); });
             return i < 0 || j < 0 || i < j;
         };
-        var hit = all.filter(function (c) { return near(c) && (!holesWanted || c.holes >= holesWanted) && covers(want, words(c)) && ordered(c); });
+        // A BARE CLUB NAME IS NOT ONE OF ITS COURSES (audit C2): "Talking Stick Golf Club" never
+        // becomes Piipaash - the course's own words must be in the name, unless the course IS
+        // the club.
+        var namesCourse = function (c) {
+            var cw = hsWords(c.course), clw = hsWords(c.club);
+            var own = cw.filter(function (w) { return !hsHas(clw, w); });
+            return !own.length || own.some(function (w) { return covers([w], want); });
+        };
+        var hit = all.filter(function (c) { return near(c) && (!holesWanted || c.holes >= holesWanted) && covers(want, words(c)) && ordered(c) && namesCourse(c); });
         // Several: ambiguous (the club name alone, "Talking Stick Golf Club") - no
         // match, unless exactly one of them IS the name with nothing more.
         if (hit.length > 1) hit = hit.filter(function (c) { return words(c).length === want.length; });
@@ -1361,7 +1410,7 @@
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
-        courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, courseNameKey: courseNameKey,
+        courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,
         accuracyLabel: accuracyLabel, polygonCentroid: polygonCentroid, pointInRing: pointInRing,

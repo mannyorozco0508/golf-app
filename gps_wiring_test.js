@@ -111,7 +111,7 @@ test('battery: 60 s after Bets, stop; background stops at once; foreground resta
     assert.ok(/startWatch\(\);/.test(side));
     const vis = v.slice(v.indexOf('function onVisibility('), v.indexOf('function onPageHide('));
     assert.ok(/=== 'hidden'\) stopWatch\(\)/.test(vis));
-    assert.ok(/else if \(S\.side === 'gps'\) startWatch\(\)/.test(vis));
+    assert.ok(/if \(S\.side === 'gps'\) startWatch\(\)/.test(vis));
 });
 
 test('the scorecard owns the hole: every render hands it to GPS, GPS Prev/Next use the card\'s own', { skip }, () => {
@@ -260,7 +260,7 @@ test('build 3 look: no arcs, no center line, no green fill or outline, nothing y
     assert.ok(!/\.gps-ring::before|\.gps-ring::after/.test(css), 'no crosshair');
     // Build 5 (Manny, 2026-10-09) brought "20 yd" back to the hole view, at the end of the width line.
     assert.ok(/lbl\.setAttribute\('data-end'/.test(v), '"20 yd" at one end of the width line');
-    assert.ok(/#gps-overlay:not\(\.gps-basic-mode\) \.gps-sub,#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar, no "Tee -> target" pill');
+    assert.ok(/#gps-overlay:not\(\.gps-basic-mode\) \.gps-sub:not\(\.gps-sub-show\),#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar (unless GPS is weak - audit C4), no "Tee -> target" pill');
     assert.ok(/class="gps-pop-info"/.test(v), 'the accuracy / source line is in the credits');
 });
 
@@ -418,7 +418,7 @@ test('build 7: F / B follow the golfer\'s live angle - 100 yds right of the gree
     // The screen asks with the LIVE origin on every fix (render on each position).
     const v = read('gps-view.js');
     assert.ok(/var nums = r \? G\.holeNumbers\(o \? o\.pt : null, r\) : null;\s*marker\('front', nums && nums\.front/.test(v), 'the F / B markers come from the live origin');
-    assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy \};\s*S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
+    assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy, at: Date\.now\(\) \};\s*S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
 });
 
 test('GPS badge on online course search results: bundled greens and course_gps first, never Overpass per result', { skip }, async () => {
@@ -722,7 +722,9 @@ test('GolfAPI matching: same-club courses kept apart, the club name alone is amb
     assert.equal(ids(G.golfapiMatch(data, 'az_talking_oodham', "Talking Stick Golf Club (O'odham)", near, 18)), 'O');
     assert.equal(G.golfapiMatch(data, 'x', 'Talking Stick Golf Club', near, 18), null, 'the club alone: no guess');
     assert.equal(G.golfapiMatch(data, 'az_talking_piipaash', 'Talking Stick Golf Club (Piipaash)', [45.5, -122.6], 18), null, 'not 5 km from the course: no match');
-    const th = G.golfapiMatch(data, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)', null, 18);
+    // By name, a place is needed (audit C2, 2026-10-16): no location, no match; at the club, the nines.
+    assert.equal(G.golfapiMatch(data, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)', null, 18), null, 'no place: no name match');
+    const th = G.golfapiMatch(data, 'thistle_mackay_cameron', 'Thistle Golf Club (MacKay / Cameron)', [data.courses.C9.lat, data.courses.C9.lng], 18);
     assert.equal(ids(th), 'M9+C9', 'MacKay (ours) = McKay (theirs), front + back');
     assert.equal(Object.keys(th.record.holes).length, 18);
     assert.deepEqual(th.record.holes['10'].osm.mid, data.courses.C9.h['1'].g.c, 'the back nine\'s hole 1 is hole 10');
@@ -731,7 +733,7 @@ test('GolfAPI matching: same-club courses kept apart, the club name alone is amb
     // name GolfAPI's "Prestwick Golf Course / Prestwick".
     data.courses.PW = Object.assign(fakeGolfApi('caledonia', 'PW', 'Prestwick Golf Course', 'Prestwick'), { lat: 33.6431, lng: -78.9615 });
     ['Prestwick Country Club', 'Prestwick CC', 'Prestwick Golf Club', 'Prestwick Country Club - Prestwick'].forEach((n) => {
-        assert.equal(ids(G.golfapiMatch(data, 'gca_987654', n, null, 18)), 'PW', n);
+        assert.equal(G.golfapiMatch(data, 'gca_987654', n, null, 18), null, n + ' with no place: no match (audit C2)');
         assert.equal(ids(G.golfapiMatch(data, 'gca_987654', n, [33.644, -78.962], 18)), 'PW', n + ' (at the course)');
     });
     assert.equal(G.golfapiMatch(data, 'gca_987654', 'Prestwick Golf Club', [55.506, -4.62], 18), null, 'Prestwick, Scotland is not Prestwick, Myrtle Beach');
@@ -776,12 +778,13 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
         return sb.HardPanGpsMatch;
     };
     const on = mk({});
-    const k = on.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)');
+    const k = on.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)', [33.546, -111.864]);
+    assert.notEqual((on.known('gca_unlinked', 18, 'Talking Stick Golf Club (Piipaash)') || {}).source, 'golfapi', 'no place: the name alone picks no GolfAPI course (audit C2)');
     assert.deepEqual([k.source, k.status, k.n], ['golfapi', 'ready', 18]);
     const r = await on.match({ key: 'az_talking_piipaash', name: 'Talking Stick Golf Club (Piipaash)', loc: [33.546, -111.864], holes: 18, recheck: 'pick' });
     assert.equal(r.source, 'golfapi'); assert.equal(fetches, 0, 'a GolfAPI course is never pulled from OpenStreetMap');
     // "Search online" -> Prestwick (build 10): the import's gca_ key, the provider's name.
-    assert.deepEqual((({ source, status, n }) => [source, status, n])(on.known('gca_987654', 18, 'Prestwick CC')), ['golfapi', 'ready', 18], 'GPS \u2713 ready at pick time');
+    assert.deepEqual((({ source, status, n }) => [source, status, n])(on.known('gca_987654', 18, 'Prestwick CC', [33.644, -78.962])), ['golfapi', 'ready', 18], 'GPS \u2713 ready at pick time');
     const pw = await on.match({ key: 'gca_987654', name: 'Prestwick Country Club', loc: [33.644, -78.962], holes: 18, recheck: 'pick' });
     assert.equal(pw.source, 'golfapi'); assert.equal(fetches, 0, 'and never pulled from OpenStreetMap');
     // Kill switch: exactly build 8 - the bundle (OSM) answers.
@@ -826,11 +829,13 @@ test('GolfAPI links reach the trip rounds\' own keys (Thistle "thistle_cameron_s
     const data = { courses: { CS: cs }, links: { thistle_27_cameron_stewart: 'CS' } };
     const m = G.golfapiMatch(data, 'thistle_cameron_stewart', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T);
     assert.ok(m && m.record.golfapiIds[0] === 'CS' && /as thistle_27_cameron_stewart/.test(m.how), m && m.how);
-    // Without links: the name matches - but only in the same order.
+    // Without links: the name matches - at the club (a place, audit C2) - but only in the same order.
     data.links = {};
+    const at = [cs.lat, cs.lng];
     // ANY PAIRING FROM THE NINES (gps-oct15): the record is split into its nines, and the round's
     // order is kept - Stewart front, Cameron back is Stewart's holes then Cameron's, never the
     // 18 as stored.
-    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Cameron / Stewart)', null, 18, T).record.golfapiIds, ['CS#1', 'CS#2']);
-    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', null, 18, T).record.golfapiIds, ['CS#2', 'CS#1'], 'Stewart front, Cameron back: in that order');
+    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Cameron / Stewart)', at, 18, T).record.golfapiIds, ['CS#1', 'CS#2']);
+    assert.deepEqual(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', at, 18, T).record.golfapiIds, ['CS#2', 'CS#1'], 'Stewart front, Cameron back: in that order');
+    assert.equal(G.golfapiMatch(data, 'x', 'Thistle Golf Club (Stewart / Cameron)', null, 18, T), null, 'no place: no name match');
 });

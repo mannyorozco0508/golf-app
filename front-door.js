@@ -60,16 +60,23 @@
     // and the plugin's own timeout doesn't run while the prompt is up. After LOC_MS the
     // list says so with "Tap to retry"; an answer arriving later is still used.
     var LOC_MS = 15000;
+    // DENIED IS ONLY DENIED (audit, 2026-10-16): a timeout or "no position yet" (the native
+    // plugin's own timeout) is "Couldn't get your location - Tap to retry", never "turn on location".
+    function whyNot(e) {
+        var code = e && e.code, m = String((e && (e.message || e.errorMessage)) || e || '').toLowerCase();
+        if (code === 1 || code === 'PERMISSION_DENIED' || /denied|permission|not authori[sz]ed|disabled/.test(m)) return 'denied';
+        return 'timeout';
+    }
     function position(done) {
         var Cap = W.Capacitor, G = Cap && Cap.Plugins && Cap.Plugins.Geolocation, settled = false;
         var once = function (p, why) { if (settled) { if (p) done(p, 'late'); return; } settled = true; clearTimeout(timer); done(p, why); };
         var timer = setTimeout(function () { once(null, 'timeout'); }, LOC_MS);
         try {
             if (native() && G && typeof G.getCurrentPosition === 'function') {
-                G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function () { once(null, 'denied'); });
+                G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function (e) { once(null, whyNot(e)); });
                 return;
             }
-            if (W.navigator.geolocation) { W.navigator.geolocation.getCurrentPosition(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function () { once(null, 'denied'); }, { timeout: 10000, maximumAge: 300000 }); return; }
+            if (W.navigator.geolocation) { W.navigator.geolocation.getCurrentPosition(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function (e) { once(null, whyNot(e)); }, { timeout: 10000, maximumAge: 300000 }); return; }
         } catch (e) {}
         once(null, 'none');
     }
@@ -376,7 +383,7 @@
             matchScoring: 'net', matchScoringStyle: 'match', matchStake: 0, matchPressRule: 'none',
             nassauType: 'team', nassauScoring: 'net', nassauStake: 0, nassauPressRule: 'none',
             wolfPointVal: 0, wolfLoneMult: 2, wolfBlindMult: 3, wolfTieRule: 'carry', wolfLastPlaceRule: 'off',
-            stablefordPointVal: 0, groupSizeOverrides: { 0: 1 }, stablefordScoring: 'net',
+            stablefordPointVal: 0, groupSizeOverrides: {}, stablefordScoring: 'net',
             stablefordPoints: { other: 0, bogey: 1, par: 2, birdie: 3, eagle: 4, albatross: 5 },
             dotPointVal: 0, greenieCarryover: true, skinsBuyIn: 0, skinsCarryOver: false,
             courseData: card, startingHole: start,
@@ -389,13 +396,19 @@
         var G = W.organizerGate;
         if (!H.db || !G || typeof W.issueUniqueCode !== 'function') return Promise.reject(new Error('This screen cannot start a round right now - reload the app.'));
         var code;
+        // ONE ROUND PER START (audit, 2026-10-16): a save that timed out may still land, so a second
+        // tap for the same course writes the SAME code again (the same round) - never a second one.
+        var held = null; try { held = JSON.parse(ss('hardpan_qs_pending') || 'null'); } catch (e) { held = null; }
+        var reuse = held && held.key === key && held.name === name && Date.now() - (held.at || 0) < 10 * 60 * 1000 ? held.code : null;
         return timeout(G.ensureOrganizer(H.db), 12000, 'sign-in').then(function (uid) {
-            return timeout(W.issueUniqueCode({ db: H.db, root: 'events' }), 12000, 'code').then(function (c) {
+            return (reuse ? Promise.resolve(reuse) : timeout(W.issueUniqueCode({ db: H.db, root: 'events' }), 12000, 'code')).then(function (c) {
                 code = c;
+                ss('hardpan_qs_pending', JSON.stringify({ key: key, name: name, code: code, at: Date.now() }));
                 var payload = G.stamp(roundPayload(key, name, card, opts), uid);
                 return timeout(H.db.ref('events/' + code).set(payload), 15000, 'save');
             });
         }).then(function () {
+            ss('hardpan_qs_pending', null);
             if (side === 'gps') { addRecent(key, name); ls('hardpan_round_side', 'gps|' + code); }
             else ls('hardpan_round_side', 'bets|' + code);
             ls('lastRoomCode', code);
@@ -530,6 +543,11 @@
         if (L) { $('hp-o-front').value = ks[0]; $('hp-o-back').value = ks[1] || 'none'; }
         var paint = function () {
             var nineOnly = L && $('hp-o-back').value === 'none';
+            // THE SAME NINE TWICE IS SAID, NOT QUIETLY CHANGED (audit): 18 holes, that nine twice.
+            var twice = L && !nineOnly && $('hp-o-front').value === $('hp-o-back').value;
+            var tn = $('hp-o-twice');
+            if (L && !tn) { tn = W.document.createElement('div'); tn.id = 'hp-o-twice'; tn.style.cssText = 'font-size:13px;color:#0f4c3a;font-weight:700;margin-top:6px;'; $('hp-o-back').parentNode.insertBefore(tn, $('hp-o-back').nextSibling); }
+            if (tn) { tn.textContent = twice ? L[$('hp-o-front').value].name.split(' ')[0] + ' twice: 18 holes, the same nine played two times.' : ''; tn.style.display = twice ? '' : 'none'; }
             if (nineOnly) o.start = 1;
             $('hp-o-startbox').style.display = nineOnly ? 'none' : '';
             Array.prototype.forEach.call(el.querySelectorAll('[data-o-start]'), function (b) {
@@ -553,7 +571,7 @@
             if (t.closest('[data-o="go"]')) {
                 var ti = $('hp-o-tee') ? $('hp-o-tee').value : '';
                 var opts = { start: o.start, tee: ti !== '' && o.tees[Number(ti)] ? o.tees[Number(ti)] : null, tournament: !!($('hp-o-tourney') && $('hp-o-tourney').checked) };
-                if (L) { opts.front = $('hp-o-front').value; opts.back = $('hp-o-back').value; if (opts.back === opts.front) opts.back = 'none'; }
+                if (L) { opts.front = $('hp-o-front').value; opts.back = $('hp-o-back').value; }
                 el.style.display = 'none';
                 startRound(Object.assign({}, c, { opts: opts }));
             }
@@ -571,11 +589,11 @@
         if (last && H.db) {
             today.style.display = '';
             card.innerHTML = '<div class="hp-status">Loading your last round…</div>';
-            H.db.ref('events/' + last).once('value').then(function (s) {
+            timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) {
                 var d = s && s.val ? s.val() : null;
                 if (!d) { today.style.display = 'none'; return; }
                 var ps = d.players || [], sc = d.scores || {}, thru = 0;
-                (d.courseData || []).forEach(function (h) { if (ps.some(function (p) { return sc['p' + p.id + '_h' + h.hole]; })) thru = Math.max(thru, Number(h.hole)); });
+                thru = thruOf(d);
                 var games = [];
                 if (d.gameFormat && d.gameFormat !== 'stroke') games.push(d.gameFormat.replace(/^\w/, function (x) { return x.toUpperCase(); }));
                 var sm = d.sideMatches || {}; if (Object.keys(sm).some(function (k) { return sm[k] && sm[k].format === 'nassau'; })) games.push('Nassau');
@@ -651,7 +669,7 @@
             else { setupClose(); var q = $('hp-q'); if (q) { q.value = ''; q.focus(); } search(); }
             return;
         }
-        if ((b = t.closest('[data-hp-open]'))) { W.location.href = 'index.html?game=' + encodeURIComponent(b.getAttribute('data-hp-open')); return; }
+        if ((b = t.closest('[data-hp-open]'))) { W.location.href = roundHref(b.getAttribute('data-hp-open')); return; }
         if ((b = t.closest('[data-hp-trip]'))) { W.location.href = 'trip.html?trip=' + encodeURIComponent(b.getAttribute('data-hp-trip')); return; }
         if ((b = t.closest('[data-hp-act]'))) {
             var a = b.getAttribute('data-hp-act');
@@ -663,25 +681,66 @@
             else if (a === 'tripcode') { var tci = $('hp-trip-code'), tcv = String((tci && tci.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (tcv.length >= 4) W.location.href = 'trip.html?trip=' + encodeURIComponent(tcv); }
         }
     }
-    function join() {
-        var i = $('hp-code'), msg = $('hp-code-msg');
-        // A SCOREKEEPER CODE (gps-share): "TADPJH-2-K7Q9X" = round, group, key -> that group's card.
-        var sk = /^\s*([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})\s*$/i.exec(String((i && i.value) || ''));
-        if (sk) { W.location.href = 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase(); return; }
-        var code = String((i && i.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (code.length < 4) { if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'Type the game code (letters and numbers).'; } return; }
+    // WHAT WAS TYPED OR PASTED INTO "Have a game code?" (audit B8): a game code (a spectator), a
+    // scorekeeper code "CODE-G-KEY", the regular app's "CODE 2" (that group's card), or a pasted
+    // round link (index.html / leaderboard.html ?game=...). Returns { code, href } or null.
+    function joinTarget(raw) {
+        var t = String(raw || '').trim();
+        var u = /[?&]game=([A-Za-z0-9]{4,10})/.exec(t);
+        if (u) {
+            var c = u[1].toUpperCase(), g = /[?&]group=(\d{1,2})/.exec(t), k = /[?&]sk=([A-Za-z0-9]{4,12})/.exec(t);
+            if (/leaderboard\.html/i.test(t) || /[?&]spectate=1/.test(t) || !g) return { code: c, href: 'index.html?game=' + c + '&spectate=1' };
+            return { code: c, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
+        }
+        var sk = /^([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})$/i.exec(t);
+        if (sk) return { code: sk[1].toUpperCase(), href: 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase(), direct: true };
+        var grp = /^([A-Z0-9]{4,10})\s+(\d{1,2})$/i.exec(t);
+        if (grp) return { code: grp[1].toUpperCase(), href: 'index.html?game=' + grp[1].toUpperCase() + '&group=' + grp[2] };
+        var code = t.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (code.length < 4 || code.length > 10) return null;
         // A GAME CODE OPENS THE ROUND AS A SPECTATOR (view-only, with GPS); the round's own
         // organizer and golfers keep their access (the scorecard decides).
-        if (!H.db) { W.location.href = 'index.html?game=' + code + '&spectate=1'; return; }
-        if (msg) { msg.className = 'hp-status'; msg.textContent = 'Checking ' + code + '…'; }
-        H.db.ref('events/' + code + '/players').once('value').then(function (s) {
-            if (s && s.exists && s.exists()) W.location.href = 'index.html?game=' + code + '&spectate=1';
-            else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + code + '. Check it with whoever set it up.'; }
-        }, function () { W.location.href = 'index.html?game=' + code + '&spectate=1'; });
+        return { code: code, href: 'index.html?game=' + code + '&spectate=1' };
+    }
+    function join() {
+        var i = $('hp-code'), msg = $('hp-code-msg');
+        var j = joinTarget(i && i.value);
+        if (!j) { if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'Type the game code (letters and numbers), or paste the round link.'; } return; }
+        if (j.direct || !H.db) { W.location.href = j.href; return; }
+        if (msg) { msg.className = 'hp-status'; msg.textContent = 'Checking ' + j.code + '\u2026'; }
+        // TIME-BOUND (audit): offline, once() never answers - after 6 s the round opens anyway
+        // (its own page says what it can).
+        timeout(H.db.ref('events/' + j.code + '/players').once('value'), 6000, 'join').then(function (s) {
+            if (s && s.exists && s.exists()) W.location.href = j.href;
+            else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + j.code + '. Check it with whoever set it up.'; }
+        }, function () { W.location.href = j.href; });
     }
     // THE GPS ROUND IN PROGRESS (Manny, 2026-10-13: GPS from Games went to "Where are you playing?").
     // The last round, from the last 12 hours and not finished (mainDecor checks the scores), opens
     // again on GPS at its hole. The course picker only without one, or from "Pick another course".
+    // THRU N IN PLAY ORDER (audit, 2026-10-16): the last hole with a score along the order the round
+    // is played (its start hole first), not the highest hole number - off the 10th, after 10..18
+    // and 1, 2 it is "thru 2", not "thru 18".
+    function thruOf(d) {
+        var cd = ((d && d.courseData) || []).slice().sort(function (a, b) { return Number(a.hole) - Number(b.hole); });
+        var ps = (d && d.players) || [], sc = (d && d.scores) || {}, start = Number(d && d.startingHole) || 0;
+        var i = cd.map(function (h) { return Number(h.hole); }).indexOf(start);
+        if (i > 0) cd = cd.slice(i).concat(cd.slice(0, i));
+        var last = 0;
+        cd.forEach(function (h) { if (ps.some(function (p) { return sc['p' + p.id + '_h' + h.hole]; })) last = Number(h.hole); });
+        return last;
+    }
+    // The link that opens a round the way this phone last had it open (its role included).
+    function roundHref(code) {
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        var h = 'index.html?game=' + encodeURIComponent(code);
+        if (lr && String(lr.code) === String(code)) {
+            if (lr.group) h += '&group=' + encodeURIComponent(lr.group);
+            if (lr.sk) h += '&sk=' + encodeURIComponent(lr.sk);
+            if (lr.spectate) h += '&spectate=1';
+        }
+        return h;
+    }
     function activeRound() {
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return null;
@@ -691,7 +750,7 @@
     function backToGpsRound() {
         var code = activeRound();
         if (!code) return false;
-        var open = function () { ls('hardpan_round_side', 'gps|' + code); W.location.href = 'index.html?game=' + encodeURIComponent(code); };
+        var open = function () { ls('hardpan_round_side', 'gps|' + code); W.location.href = roundHref(code); };
         if (!H.db || H.activeChecked) { open(); return true; }
         // ASKED FIRST (gps-trapfix): a round the server no longer has is never reopened - the
         // picker instead. No answer (no signal) still reopens it: the offline round is a feature.
@@ -739,7 +798,8 @@
             if (!d) { forgetRound(lr.code, true); return; }
             if (!d.players || !d.courseData) return;
             var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
-            holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (any) thru = Math.max(thru, h); if (!every) all = false; });
+            holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (!every) all = false; });
+            thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
             H.activeChecked = true; H.active = (all && thru) ? null : lr.code;
             if (all && thru) return;   // finished
             box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(d.courseName || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
@@ -873,7 +933,12 @@
         var code = params().get('game');
         if (!code || !on()) return;
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
-        ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '' }));
+        // THE ROUND'S ROLE GOES WITH IT (audit B6/B7): a spectator stays a spectator, a group's
+        // scorekeeper stays that group's, when Resume / the GPS door / a return from the background
+        // opens the round again.
+        var pr = params();
+        ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
+            spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
         backFromBackground(function () { W.location.href = 'home.html'; });
         // Games-3: the green GPS button lives IN the hole's heading (placeGpsPill, on
         // every render) - never floating over the game cards or the keypad (Manny,
@@ -1445,7 +1510,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

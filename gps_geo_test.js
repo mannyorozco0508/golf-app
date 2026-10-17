@@ -668,7 +668,13 @@ test('the bundle by name when a round\'s key differs: the Myrtle trip\'s Thistle
     assert.notEqual(geo.bundleKeyFor(table, 'x', 'Thistle (Stewart / Cameron)'), 'thistle_27_cameron_stewart');
     // The key wins when the bundle has it; an import of a bundled course finds it by name.
     assert.equal(geo.bundleKeyFor(table, 'trueblue', 'Anything'), 'trueblue');
-    assert.equal(geo.bundleKeyFor(table, 'gca_new', 'True Blue Golf Club'), 'trueblue');
+    // ... by name only WITH its place (audit C1, 2026-10-16): at True Blue, yes; with no place, or
+    // somewhere else ("True Blue" / "Pine Lakes" in Jacksonville), never.
+    const tb = table.trueblue, tbPt = tb.holes[Object.keys(tb.holes)[0]].osm.tee || tb.holes[Object.keys(tb.holes)[0]].osm.mid;
+    assert.equal(geo.bundleKeyFor(table, 'gca_new', 'True Blue Golf Club', tbPt), 'trueblue');
+    assert.equal(geo.bundleKeyFor(table, 'gca_new', 'True Blue Golf Club'), null, 'no place: no alias');
+    assert.equal(geo.bundleKeyFor(table, 'gca_new', 'True Blue Golf Club', [30.33, -81.66]), null, 'Jacksonville is not Pawleys Island');
+    assert.equal(geo.bundleKeyFor(table, 'gca_pl', 'Pine Lakes Golf Club', [30.33, -81.66]), null, 'nor Pine Lakes');
     // Ambiguous or unknown: nothing, never a guess.
     assert.equal(geo.bundleKeyFor(table, 'gca_x', 'Talking Stick Golf Club'), null);
     assert.equal(geo.bundleKeyFor(table, 'gca_y', 'Nowhere Links'), null);
