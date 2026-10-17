@@ -33,6 +33,10 @@ const path = require('path');
 const HERE = path.join(__dirname, '..');
 const { arriveCold, fileUrl } = require(path.join(HERE, 'tools/lib/cold-arrival.js'));
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
+// PAID LAUNCH (2026-10-17): v2.0's GPS is the GPS Map subscription. This check tests GPS features
+// (and the app around them) as a SUBSCRIBER: the App Store stubbed, entitlement active
+// (tools/lib/iap-stub.js). The paywall itself: tools/gps-paywall-check.js.
+const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
 const CAL = [33.450384, -79.153438];
 const GEO = "window.__geo = 0; try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: function () { window.__geo++; return 1; }, getCurrentPosition: function (ok) { window.__geo++; setTimeout(function () { ok({ coords: { latitude: " + CAL[0] + ", longitude: " + CAL[1] + ", accuracy: 5 } }); }, 10); }, clearWatch: function () {} } }); } catch (e) {} try { var q0 = navigator.permissions.query.bind(navigator.permissions); navigator.permissions.query = function (d) { return d && d.name === 'geolocation' ? Promise.resolve({ state: 'prompt' }) : q0(d); }; } catch (e) {}";
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});";
@@ -49,7 +53,7 @@ function round(code) {
     return r;
 }
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
-const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3500, viewport: { width: 390, height: 844 } }, o)); if (!r.ok) throw new Error(r.reason); return r; };
+const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3500, viewport: { width: 390, height: 844 } }, o, { preScript: (o.preScript || '') + iapStub({ active: true }) })); if (!r.ok) throw new Error(r.reason); return r; };
 const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector('.hp-view.on')||{}).id || null, e: window.__e })";
 
 (async () => {

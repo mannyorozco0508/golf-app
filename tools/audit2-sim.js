@@ -17,11 +17,15 @@ const path = require('path');
 const HERE = path.join(__dirname, '..');
 const { arriveCold, fileUrl } = require(path.join(HERE, 'tools/lib/cold-arrival.js'));
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
+// PAID LAUNCH (2026-10-17): v2.0's GPS is the GPS Map subscription. This check tests GPS features
+// (and the app around them) as a SUBSCRIBER: the App Store stubbed, entitlement active
+// (tools/lib/iap-stub.js). The paywall itself: tools/gps-paywall-check.js.
+const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});";
 const APP = 'window.__hardpanDoors = true; window.__freshPhone = true;';
 const DB = (ev) => ({ events: ev || {}, global_courses: {}, trips: {}, organizers: {}, tournaments: {} });
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
-const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3000, viewport: { width: 390, height: 844 } }, o)); if (!r.ok) throw new Error(r.reason); return r; };
+const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3000, viewport: { width: 390, height: 844 } }, o, { preScript: (o.preScript || '') + iapStub({ active: true }) })); if (!r.ok) throw new Error(r.reason); return r; };
 function round(code, n, owner, extra) {
     const NAMES = ['Ann Able', 'Ben Bravo', 'Cal Cole', 'Dee Dunn', 'Eli Echo', 'Fay Fox'];
     const r = wizardSavedRound({ code, golfers: n, names: NAMES.slice(0, n), hcps: NAMES.slice(0, n).map((_, i) => i + 1), ownerUid: owner || 'someone-else', thru: 0, flights: false,
