@@ -37,11 +37,11 @@
 
     var TRIAL_MS = 21 * 24 * 60 * 60 * 1000;   // the rule's 1814400000
 
-    // THE COPY - one sentence per line, shown in the page's alert.
-    var WALL = '⛳ Your free trial has ended.\n\n'
-        + 'Joining a round is free, always. Setting one up needs a pass — one person per group: '
-        + 'a Season Pass ($29.99 a year) or a Trip Pass ($19.99).\n\n'
-        + 'Passes aren’t on sale in the app yet. The rounds you already set up still work. This one was not saved.';
+    // NO WALL (mailbox 003, 2026-10-17: Manny - games are free). The 21-day trial is gone from the
+    // rules (database.rules.proposed.json) and its copy is gone from here: a refused round write
+    // keeps the page's own error, and nothing on any screen counts days down. WALL stays exported
+    // as '' so an older caller's `WALL || its own message` falls through to its own message.
+    var WALL = '';
 
     function isPermissionDenied(err) {
         var s = String((err && (err.code || err.message)) || '');
@@ -198,7 +198,8 @@
             var now = Date.now();
             var passLive = !!(o.pass && typeof o.pass.expiresAt === 'number' && o.pass.expiresAt > now);
             if (passLive) return 'unknown';
-            return now >= o.firstSeenAt + TRIAL_MS ? 'trial-ended' : 'inside-window';
+            // No trial any more: a refusal is never 'trial-ended' (no wall to show).
+            return 'inside-window';
         }, function () { return 'unknown'; });
     }
 
@@ -258,9 +259,7 @@
             var label = st.passKind ? st.passKind.charAt(0).toUpperCase() + st.passKind.slice(1) + ' pass' : 'Pass';
             return label + ' \u00B7 rounds free to set up until ' + fmtDate(st.expiresAt);
         }
-        if (st.kind === 'trial' && st.daysLeft <= NOTICE_DAYS) {
-            return 'Free trial \u00B7 ' + st.daysLeft + (st.daysLeft === 1 ? ' day' : ' days') + ' left to set up new rounds';
-        }
+        // No trial line (games are free, 2026-10-17): nothing counts days down.
         return '';
     }
 

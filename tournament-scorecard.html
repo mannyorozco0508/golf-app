@@ -24,6 +24,10 @@
          and that guard is worth more absolute than a comment is worth precise. -->
     <link rel="manifest" href="tournament-manifest.json">
     <script src="./firebase-app-compat.js"></script>
+    <!-- SIGNED IN TO SCORE (mailbox 003, 2026-10-17): the proposed rules take a tournament score
+         only from a signed-in phone. The same fire-and-forget anonymous sign-in the round pages
+         load; a write waits for it (scorerReady below), the page never does. -->
+    <script src="auth-boot.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <!-- Place and tie payout allocation, shared with Trip Mode. -->
     <!-- Handicap. Individual Net stroke play allocates strokes by the hole's stroke
@@ -322,6 +326,27 @@
     // "Check your signal and re-enter" would be a lie there: the signal is fine
     // and re-entering cannot help. That code gets its own sentence, and stays
     // on screen; every other failure keeps the signal sentence.
+    // THE SCORER'S CLAIM (mailbox 003). A link the organizer sent after scoring keys came in
+    // carries &k=<key>: before the first score this phone writes tournamentScorers/<code>/<uid>
+    // = { slot, key } once, and the proposed rules let only a uid holding a valid claim for
+    // this team (or group) write its scores. A link with no k (sent before keys) claims
+    // nothing - the rules keep those working until the organizer has keys.
+    const scorerKey = urlParams.get('k') || null;
+    let scorerReadyP = null;
+    function scorerReady() {
+        if (scorerReadyP) return scorerReadyP;
+        const auth = (window.authReady && typeof window.authReady.then === 'function') ? window.authReady : Promise.resolve(null);
+        scorerReadyP = auth.then((uid) => {
+            if (!uid || !scorerKey || !currentCode) return uid;
+            const slot = myGroupId ? 'group' + myGroupId : 'team' + myTeamNum;
+            return db.ref(`tournamentScorers/${currentCode}/${uid}`).set({ slot: slot, key: scorerKey }).then(() => uid);
+        }).catch(() => { scorerReadyP = null; return null; });   // tried again on the next score
+        return scorerReadyP;
+    }
+    function writeScore(ref, val) {
+        return scorerReady().then(() => ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))));
+    }
+
     function trackWrite(promise) {
         setSaveState('saving', 'Saving…');
         return promise
@@ -344,14 +369,14 @@
     function saveHoleScore(holeNum, val) {
         if (roundLocked) return;
         const ref = db.ref(scorePath(`team${myTeamNum}_h${holeNum}`));
-        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
+        trackWrite(writeScore(ref, val));
     }
 
     function savePlayerHoleScore(holeNum, playerIdx, val) {
         if (roundLocked) return;
         const path = scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`);
         const ref = db.ref(path);
-        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
+        trackWrite(writeScore(ref, val));
     }
 
     // A GOLFER'S SCORE IS WRITTEN UNDER THEIR ID. Not their position in the group,
@@ -377,7 +402,7 @@
         const group = (scope.scoringGroups || {})[myGroupId] || {};
         if ((group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer
         const ref = db.ref(scorePath(`${playerId}_h${holeNum}`));
-        trackWrite((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10)));
+        trackWrite(writeScore(ref, val));
     }
 
     // THE HOLE YOU ARE TYPING IS NEVER TOUCHED.
