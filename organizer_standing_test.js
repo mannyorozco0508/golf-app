@@ -59,37 +59,43 @@ const line = (record, now) => { const g = gate(); return g.standingLine(g.standi
 const trialRecord = daysLeft => ({ firstSeenAt: NOW + daysLeft * DAY - TRIAL });   // ends exactly daysLeft days from NOW
 
 describe('THE PURE PART: a record and a clock in, one line out', () => {
-    test('a founder pass', () => {
-        assert.equal(line({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } }), 'Founder pass · setting up rounds is free');
+    // (mailbox 005: games are free) standingLine says nothing for any standing; standingOf still counts.
+    const st = (record, now) => gate().standingOf(record, now === undefined ? NOW : now);
+    test('a founder pass: no line', () => {
+        const rec = { firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } };
+        assert.equal(st(rec).kind, 'pass');
+        assert.equal(line(rec), '');
     });
-    test('another kind of pass names itself and its date', () => {
-        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4), kind: 'season' } }), 'Season pass · rounds free to set up until Mar 4, 2027');
-        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4) } }), 'Pass · rounds free to set up until Mar 4, 2027');
+    test('another kind of pass: no line either', () => {
+        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4), kind: 'season' } }), '');
+        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4) } }), '');
     });
-    test('a pass that has EXPIRED is not a pass: the trial (or the wall) decides', () => {
-        assert.equal(line({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: NOW - 1, kind: 'season' } }), 'Free trial · 18 days left to set up new rounds');
-        assert.equal(line({ firstSeenAt: NOW - 16 * DAY, pass: { expiresAt: NOW - 1 } }), 'Free trial · 5 days left to set up new rounds');
+    test('a pass that has EXPIRED is not a pass (standingOf), and still no line', () => {
+        assert.equal(st({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: NOW - 1, kind: 'season' } }).kind, 'trial');
+        assert.equal(line({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: NOW - 1, kind: 'season' } }), '');
+        assert.equal(line({ firstSeenAt: NOW - 16 * DAY, pass: { expiresAt: NOW - 1 } }), '');
     });
-    test('inside the window at several distances: counted every day of it, 21 down to 1', () => {
-        assert.equal(line(trialRecord(21)), 'Free trial · 21 days left to set up new rounds');
-        assert.equal(line(trialRecord(14)), 'Free trial · 14 days left to set up new rounds');
-        assert.equal(line(trialRecord(8)), 'Free trial · 8 days left to set up new rounds');
-        assert.equal(line(trialRecord(7)), 'Free trial · 7 days left to set up new rounds');
-        assert.equal(line(trialRecord(6)), 'Free trial · 6 days left to set up new rounds');
-        assert.equal(line(trialRecord(2)), 'Free trial · 2 days left to set up new rounds');
-        assert.equal(line(trialRecord(1)), 'Free trial · 1 day left to set up new rounds');
+    test('inside the window at several distances: standingOf still counts 21 down to 1, and no line counts days down', () => {
+        [21, 14, 8, 7, 6, 2, 1].forEach(d => {
+            assert.equal(st(trialRecord(d)).daysLeft, d);
+            assert.equal(line(trialRecord(d)), '', d + ' days: no countdown');
+        });
     });
-    test('a partial day counts as a day - it ends TODAY, so "1 day left", never "0 days"', () => {
-        assert.equal(line({ firstSeenAt: NOW + 6 * 3600000 - TRIAL }), 'Free trial · 1 day left to set up new rounds');   // six hours left
-        assert.equal(line({ firstSeenAt: NOW + 7 * DAY + 1 - TRIAL }), 'Free trial · 8 days left to set up new rounds', 'a hair over seven days is the eighth day');
-        assert.equal(line({ firstSeenAt: NOW + 7 * DAY - TRIAL }), 'Free trial · 7 days left to set up new rounds');
-        assert.equal(line({ firstSeenAt: NOW }), 'Free trial · 21 days left to set up new rounds', 'stamped this second: the whole window ahead, said');
+    test('a partial day counts as a day in standingOf ("1", never "0"); the line is still empty', () => {
+        assert.equal(st({ firstSeenAt: NOW + 6 * 3600000 - TRIAL }).daysLeft, 1);   // six hours left
+        assert.equal(st({ firstSeenAt: NOW + 7 * DAY + 1 - TRIAL }).daysLeft, 8, 'a hair over seven days is the eighth day');
+        assert.equal(st({ firstSeenAt: NOW + 7 * DAY - TRIAL }).daysLeft, 7);
+        assert.equal(st({ firstSeenAt: NOW }).daysLeft, 21);
+        assert.equal(line({ firstSeenAt: NOW + 6 * 3600000 - TRIAL }), '');
+        assert.equal(line({ firstSeenAt: NOW }), '');
     });
-    test('the counting agrees with the rule, to the millisecond: the day the rule closes is the day the line stops', () => {
+    test('standingOf agrees with the rule, to the millisecond; the line is empty on both sides of it', () => {
         // the rule: now < firstSeenAt + 1814400000
         const rec = { firstSeenAt: NOW - TRIAL + 1 };   // 1 ms left
-        assert.equal(line(rec, NOW), 'Free trial · 1 day left to set up new rounds');
-        assert.equal(line(rec, NOW + 1), '', 'closed: the wall speaks now, not this line');
+        assert.equal(st(rec, NOW).kind, 'trial');
+        assert.equal(st(rec, NOW + 1).kind, 'ended');
+        assert.equal(line(rec, NOW), '');
+        assert.equal(line(rec, NOW + 1), '');
     });
     test('outside the window: nothing (the wall is the sentence for that)', () => {
         assert.equal(line({ firstSeenAt: NOW - 30 * DAY }), '');
@@ -155,30 +161,24 @@ function page(record, opts) {
 const nowRecord = daysLeft => ({ firstSeenAt: Date.now() + daysLeft * DAY - TRIAL });
 
 describe('THE PAGE: Round Ready and the Review step say the same line, from one read', () => {
-    test('a founder pass, on all three screens - the lobby the moment the read answers, with no render call', async () => {
+    // (mailbox 005: games are free) no pass line and no trial line on any screen.
+    const allThree = p => { p.run('renderWizardReview(); renderRoundReady({ players: [] });'); return [p.lobby(), p.rr(), p.wz()]; };
+    test('a founder pass: nothing, on all three screens', async () => {
         const p = page({ firstSeenAt: Date.now() - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } });
         await p.boot();
-        assert.equal(p.lobby(), 'Founder pass · setting up rounds is free', 'the home screen, from the load alone');
-        p.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(p.rr(), 'Founder pass · setting up rounds is free');
-        assert.equal(p.wz(), 'Founder pass · setting up rounds is free');
+        assert.equal(p.lobby(), '', 'the home screen, from the load alone');
+        assert.deepEqual(allThree(p), ['', '', '']);
     });
-    test('five days left, and twenty days left, on all three screens', async () => {
-        const a = page(nowRecord(5)); await a.boot(); a.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(a.lobby(), 'Free trial · 5 days left to set up new rounds');
-        assert.equal(a.rr(), 'Free trial · 5 days left to set up new rounds');
-        assert.equal(a.wz(), 'Free trial · 5 days left to set up new rounds');
-        const b = page(nowRecord(20)); await b.boot(); b.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(b.lobby(), 'Free trial · 20 days left to set up new rounds');
-        assert.equal(b.rr(), 'Free trial · 20 days left to set up new rounds'); assert.equal(b.wz(), 'Free trial · 20 days left to set up new rounds');
+    test('five days left, and twenty days left: nothing counts down on any screen', async () => {
+        const a = page(nowRecord(5)); await a.boot();
+        assert.deepEqual(allThree(a), ['', '', '']);
+        const b = page(nowRecord(20)); await b.boot();
+        assert.deepEqual(allThree(b), ['', '', '']);
     });
-    test('THE TELL: the same home screen, a fresh record with no pass - a sentence appears', async () => {
-        const before = page({ firstSeenAt: Date.now() - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } });
-        await before.boot();
-        assert.equal(before.lobby(), 'Founder pass · setting up rounds is free');
-        const after = page({ firstSeenAt: Date.now() });   // a reinstall: a new uid, a fresh stamp, no pass
+    test('a fresh record with no pass: still nothing (no trial to tell about)', async () => {
+        const after = page({ firstSeenAt: Date.now() });
         await after.boot();
-        assert.equal(after.lobby(), 'Free trial · 21 days left to set up new rounds', 'day one of a trial this phone should not be on - the tell');
+        assert.equal(after.lobby(), '');
     });
     test('not an organizer (no record): nothing, on any screen', async () => {
         const p = page(null); await p.boot(); p.run('renderWizardReview(); renderRoundReady({ players: [] });');
@@ -207,8 +207,9 @@ describe('THE PAGE: Round Ready and the Review step say the same line, from one 
         await p.boot();
         p.run('renderWizardReview(); renderRoundReady({ players: [] }); renderWizardReview();');
         assert.equal((p.sb.__onceReads || []).length, 1);
-        assert.equal(p.wz(), 'Free trial · 4 days left to set up new rounds');
-        assert.equal(p.rr(), 'Free trial · 4 days left to set up new rounds');
+        // (mailbox 005: games are free) rendered from memory - and it renders nothing.
+        assert.equal(p.wz(), '');
+        assert.equal(p.rr(), '');
     });
     test('the mounts exist where the organizer stands: the lobby, Round Ready and the Review step, and nowhere the golfer does', () => {
         const a = read('admin.html');

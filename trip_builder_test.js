@@ -163,9 +163,12 @@ const UNCHANGED = {
     'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
     'challenges.js': '7fc9ed67d513a1b18fa807d92a2634e57a9734e44b488f61035ecbbdcb6fdc1b',
     'code-issuer.js': 'c8e246c246d194a539f346f7e9e5dcfe2ae4ac21c611809b938bf12fa7865c9d',
-    'organizer-gate.js': '8bff990e9bdc00ceaca42392cf9dbea42ec61b87aa92bd2fc41f0736a155773d'
+    // RE-PINNED 2026-10-17 (mailbox 005: games are free; main is 8bff990e...). The diff from
+    // main is WALL = '', explainRefusal never 'trial-ended', standingLine ''; ensureOrganizer
+    // and stamp (what the builder calls) are main's.
+    'organizer-gate.js': '901709387199778300c18aef5ff54cdeb4a6b0ad470afd3a58b4915791950dbc'
 };
-test('the Ryder engine and the code / organizer helpers are byte-identical to main', () => {
+test('the Ryder engine and the code / organizer helpers are byte-pinned (main\'s; organizer-gate re-pinned for no wall)', () => {
     Object.keys(UNCHANGED).forEach((f) => assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, f))).digest('hex'), UNCHANGED[f], f + ' changed'));
 });
 

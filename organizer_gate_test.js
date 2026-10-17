@@ -105,24 +105,22 @@ describe('THE ORDER: token, firstSeenAt, then the round with ownerUid', () => {
 // ---------------------------------------------------------------------------
 describe('THE WALL', () => {
     const NOW = Date.now();
-    test('the round write refused and the uid\'s window closed 22 days on, no pass: the golfer reads the sentence, not the SDK error; nothing was written', async () => {
+    // (mailbox 005: games are free) 22 days on is no longer a closed window: no wall, the page's own error.
+    test('the round write refused 22 days on, no pass: NO wall - the golfer reads the page\'s own error, once; the button given back', async () => {
         const sb = wizard({ refuse: (p, op) => (p === 'events/GATE01' ? DENIED() : null), reads: { 'organizers/anon-stub': { firstSeenAt: NOW - 22 * DAY } } });
         await save(sb);
         assert.equal(sb.window.__alerts.length, 1, JSON.stringify(sb.window.__alerts));
-        assert.equal(sb.window.__alerts[0], sb.window.organizerGate.WALL);
+        assert.match(sb.window.__alerts[0], /^Save error: PERMISSION_DENIED/);
         assert.equal(sb.window.__btn.disabled, false);
     });
-    test('THE COPY: says the trial ended, joining is free, one person per group pays, both prices, and that passes are not on sale in the app yet - and never a buy button', () => {
+    // (mailbox 005: games are free)
+    test('THE COPY IS GONE: WALL is empty, and the gate names no trial, no pass, no price - and never a buy button', () => {
         const sb = wizard();
         const w = sb.window.organizerGate.WALL;
-        assert.match(w, /free trial has ended/);
-        assert.match(w, /Joining a round is free, always/);
-        assert.match(w, /one person per group/);
-        assert.match(w, /Season Pass \(\$29\.99 a year\)/); assert.match(w, /Trip Pass \(\$19\.99\)/);
-        assert.match(w, /aren.t on sale in the app yet/);
-        assert.match(w, /rounds you already set up still work/);
-        assert.match(w, /This one was not saved/);
-        assert.ok(!/buy|purchase|tap here|subscribe now|upgrade/i.test(w), 'no purchase flow is implied');
+        assert.equal(w, '', 'no wall sentence');
+        const code = stripComments(read('organizer-gate.js'));
+        assert.ok(!/free trial|founder pass|Season Pass|Trip Pass|\$\d/i.test(code), 'no trial, pass or price in the gate\'s code');
+        assert.ok(!/buy|purchase|tap here|subscribe now|upgrade/i.test(code), 'no purchase flow is implied');
         assert.ok(!/StoreKit|App Store|receipt/i.test(read('organizer-gate.js').replace(/^\s*\/\/.*$/gm, '')), 'no purchase machinery in the gate');
     });
     test('refused INSIDE the window (some other rule): the honest SDK message, not the wall', async () => {
@@ -135,10 +133,12 @@ describe('THE WALL', () => {
         await save(sb);
         assert.match(sb.window.__alerts[0], /^Save error/);
     });
-    test('a lapsed pass with the window closed: the wall', async () => {
+    // (mailbox 005: games are free)
+    test('a lapsed pass 60 days on: no wall either - the page\'s own error', async () => {
         const sb = wizard({ refuse: (p) => (p === 'events/GATE01' ? DENIED() : null), reads: { 'organizers/anon-stub': { firstSeenAt: NOW - 60 * DAY, pass: { type: 'trip', expiresAt: NOW - DAY } } } });
         await save(sb);
-        assert.equal(sb.window.__alerts[0], sb.window.organizerGate.WALL);
+        assert.equal(sb.window.__alerts.length, 1);
+        assert.match(sb.window.__alerts[0], /^Save error: PERMISSION_DENIED/);
     });
     test('a refusal that is not PERMISSION_DENIED keeps the SDK message', async () => {
         const sb = wizard({ refuse: (p) => (p === 'events/GATE01' ? new Error('disconnected') : null) });
@@ -186,10 +186,12 @@ describe('THE TRIP PLANNER BATCH stamps every round', () => {
         assert.ok(w.indexOf('set organizers/anon-stub/firstSeenAt') < sb.__dbWrites.indexOf(b), 'firstSeenAt first: ' + w.join(' | '));
         assert.equal(JSON.stringify(sb.window.__alerts), JSON.stringify([]));
     });
-    test('the batch refused with the window closed: the wall, once; the button given back', async () => {
+    // (mailbox 005: games are free)
+    test('the batch refused 30 days on: no wall - the planner\'s own error, once; the button given back', async () => {
         const sb = planner({ refuse: (p, op, v) => (op === 'update' && Object.keys(v || {}).some(k => /^events\//.test(k)) ? DENIED() : null), reads: { 'organizers/anon-stub': { firstSeenAt: Date.now() - 30 * DAY } } });
         await build(sb);
-        assert.equal(JSON.stringify(sb.window.__alerts), JSON.stringify([sb.window.organizerGate.WALL]));
+        assert.equal(sb.window.__alerts.length, 1, JSON.stringify(sb.window.__alerts));
+        assert.match(sb.window.__alerts[0], /^Error building trip: PERMISSION_DENIED/);
         assert.equal(sb.window.__btn.disabled, false);
         assert.equal(sb.window.location.href, '', 'no navigation to a trip that was not made');
     });
@@ -248,7 +250,9 @@ describe('THE SEAM (source, comments stripped)', () => {
         assert.match(g, /return ready\.then\(function \(uid\) \{[\s\S]*db\.ref\('organizers\/' \+ uid \+ '\/firstSeenAt'\)\.set\(sv\)/);
         assert.match(g, /if \(isPermissionDenied\(err\)\) return uid;/);
         assert.match(g, /TRIAL_MS = 21 \* 24 \* 60 \* 60 \* 1000/);
-        assert.match(g, /now >= o\.firstSeenAt \+ TRIAL_MS \? 'trial-ended' : 'inside-window'/);
+        // (mailbox 005: games are free) the read-back never says 'trial-ended'.
+        assert.ok(!/'trial-ended'/.test(g), 'explainRefusal never returns trial-ended');
+        assert.match(g, /return 'inside-window';/);
         assert.match(g, /if \(passLive\) return 'unknown';/);
     });
     test('the tournaments legacy-claim gap is recorded, not fixed (MONETIZATION.md)', () => {

@@ -53,6 +53,7 @@
 // Wave 33 merged, no account-exit.js, no card, no sign-out anywhere in the app:
 //
 //     3 PASS / 44 FAIL
+// BASELINE COUNT DELTA: +1  "no delete sentence names a free trial or a founder pass" (mailbox 005, after the measurement)
 //
 // The nine tests in the INCIDENT block at the bottom were also measured on their own
 // against bb3cd18 - the code as it stood when Manny's real account was deleted:
@@ -275,23 +276,32 @@ describe('THE WARNINGS SAY DIFFERENT THINGS, BECAUSE THEY ARE DIFFERENT THINGS',
         assert.match(w.deleteWarn1, /co-organizer/i);
     });
 
-    test('a FOUNDER PASS gets its own unmissable sentence', () => {
+    // (mailbox 005: games are free) the loud sentence names an organizer account, not a pass.
+    test('a pass-holding account gets its own unmissable sentence, and it names no pass', () => {
         const x = need();
         const loud = x.deleteWarning({ kind: 'pass', passKind: 'founder' });
-        assert.match(loud, /FOUNDER PASS/);
-        assert.match(loud, /does not release it|nothing brings it back/i,
-            'the rules cannot remove a pass, so the honest word is that it is stranded: ' + loud);
+        assert.match(loud, /THIS IS AN ORGANIZER ACCOUNT/);
+        assert.match(loud, /nothing brings it back/i, 'it is gone for good: ' + loud);
         assert.ok(loud.indexOf(x.WORDS.deleteWarn2) === 0, 'the last check still leads');
+        assert.ok(!/free trial|founder pass/i.test(loud), 'no trial or pass wording: ' + loud);
     });
 
     test('an UNKNOWN standing is hedged, never silent', () => {
         const x = need();
         [null, undefined, { kind: 'trial' }, {}].forEach(s => {
             const m = x.deleteWarning(s);
-            assert.match(m, /founder pass/i, 'silence would let somebody delete a pass unwarned: ' + JSON.stringify(s));
-            assert.ok(!/THIS ACCOUNT HAS A FOUNDER PASS/.test(m),
-                'and it must not CLAIM one when the read did not say so');
+            assert.match(m, /cannot be undone/i, 'silence would let somebody delete unwarned: ' + JSON.stringify(s));
+            assert.ok(!/THIS IS AN ORGANIZER ACCOUNT/.test(m),
+                'and it must not CLAIM the loud case when the read did not say so');
+            assert.ok(!/free trial|founder pass/i.test(m), 'no trial or pass wording');
         });
+        assert.match(x.WORDS.founderUnknown, /could not check/i, 'the could-not-check sentence still says so');
+    });
+
+    // (mailbox 005: games are free)
+    test('no delete sentence names a free trial or a founder pass', () => {
+        const w = need().WORDS;
+        Object.keys(w).forEach(k => assert.ok(!/free trial|founder pass/i.test(w[k]), k + ': ' + w[k]));
     });
 
     test('an unmapped error code is shown, not swallowed', () => {
@@ -811,8 +821,10 @@ describe('THE INCIDENT: A SIGNED-IN PANEL MUST NOT OFFER TO SIGN IN AGAIN', () =
         assert.equal(p.asked.prompt.length, 1, 'it must ask for the word to be typed');
         assert.match(p.asked.prompt[0].title, /Type DELETE/);
         assert.match(p.asked.prompt[0].title, /manny@example\.com/, 'and name the account in the prompt');
-        assert.match(p.asked.prompt[0].body, /FOUNDER PASS/);
-        assert.match(p.asked.prompt[0].body, /gives that pass up for good/);
+        // (mailbox 005: games are free) the gate is the same; the words name the account, not a pass.
+        assert.match(p.asked.prompt[0].body, /organizer account/);
+        assert.match(p.asked.prompt[0].body, /for good/);
+        assert.ok(!/free trial|founder pass/i.test(p.asked.prompt[0].body), p.asked.prompt[0].body);
         // The pass was read HERE, off auth.currentUser - not from the record
         // organizer-gate.js fetched at boot for whatever uid the page started with.
         assert.ok(p.sb.__dbWrites.length > 0, 'and with DELETE typed it goes through');

@@ -115,9 +115,11 @@ function stripComments(s) {
 // The target is checked across the whole body rather than inside db.ref(...)
 // because savePlayerHoleScore builds its path into a `const path` first and
 // passes the variable.
+// RE-PINNED 2026-10-17 (mailbox 003, scoring keys): the writers hand their ref to
+// writeScore(), which claims first and then sets / removes - that call is the mutation.
 function writesAScore(body) {
     const b = stripComments(body);
-    if (!/\.(set|remove|update)\s*\(/.test(b)) return false;
+    if (!/\.(set|remove|update)\s*\(|\bwriteScore\s*\(/.test(b)) return false;
     return /scores\//.test(b) || new RegExp(RESOLVER + '\\(').test(b);
 }
 
@@ -210,6 +212,13 @@ describe('THE DISCOVERY CAN SEE THE FILE', () => {
                 `${n} no longer looks like a score writer - no db.ref() with a scores path in `
                 + 'its body. This test can no longer tell whether it asks the two questions.');
         });
+    });
+
+    test('writeScore claims first, then sets or removes the ref it was handed - nothing else', () => {
+        const ws = stripComments(bodyOf('writeScore') || '');
+        assert.match(ws, /return scorerReady\(\)\.then\(\(\) => \(\(val === '' \|\| val === null\) \? ref\.remove\(\) : ref\.set\(parseInt\(val, 10\)\)\)\)/,
+            'writeScore is the mutation the writers rely on');
+        assert.ok(!/db\.ref\(/.test(ws), 'writeScore opens no path of its own');
     });
 
     test('the resolver exists and is the only place a raw scores path belongs', () => {

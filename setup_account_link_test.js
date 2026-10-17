@@ -139,7 +139,11 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         //                         the SAME uid different words
         // email_link_auth_test.js is 19/19 green against it.
         // was 0879073c142b1b87bcf3ba722a132737a637a76febd0f231d1fd74cc4ee66b1a
-        assert.equal(sha('email-link-auth.js'), '7c421eb50161dc5f43cd40cf7fcaffc007d6b44a2ec8a67a2c9c1d3b4e46325b',
+        // RE-PINNED 2026-10-17 (mailbox 005: games are free; was 7c421eb50161dc5f...).
+        // The diff is the four NOTE_* strings only (no trial / pass wording); no
+        // code moved. The three paths re-measured in email_link_auth_test.js:
+        // migrationNote still tells SAME from ADOPTED, planCompletion still links.
+        assert.equal(sha('email-link-auth.js'), 'e017a194b13f1952b2e26f8a69823301bc85b06c894b3b690fcb2acc84237f44',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

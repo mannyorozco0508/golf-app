@@ -259,7 +259,7 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
                 'tournament.html must still own ' + fn));
     });
 
-    test('8. the scorecard writes only scores, scoped to the link it was opened with', () => {
+    test('8. the scorecard writes its scorer claim, then scores - scoped to the link it was opened with, and nothing else', () => {
         // WIDENED FOR INDIVIDUAL EVENTS. This used to require every write to be
         // team{myTeamNum}_… which was the only scope that existed. An individual link
         // writes {playerId}_h{n} instead - still scoped, just to a player rather than
@@ -301,8 +301,18 @@ describe('TOURNAMENT — the only writer of tournament data', () => {
         // literal paths remain, this page may only write inside its own
         // tournament. Kept as a scan over call sites so a NEW write that skips
         // scorePath is still caught.
-        w.forEach(p => assert.match(p, /^tournaments\/\$\{currentCode\}\//,
-            'the scoring link may only write inside its own tournament, got: ' + p));
+        // RE-PINNED 2026-10-17 (mailbox 003/005, scoring keys): the one other write is
+        // this phone's own claim, tournamentScorers/<code>/<uid> = { slot, key },
+        // made before the first score. Nothing else leaves the tournament.
+        const CLAIM = 'tournamentScorers/${currentCode}/${uid}';
+        w.forEach(p => assert.ok(p === CLAIM || /^tournaments\/\$\{currentCode\}\//.test(p),
+            'the scoring link may only write inside its own tournament (or its own claim), got: ' + p));
+        assert.ok(w.includes(CLAIM), 'the claim is the scorer\'s own uid under this event');
+        assert.equal((card.match(/tournamentScorers\//g) || []).length, 1, 'one claim write, no other scorer path');
+        assert.match(card, /db\.ref\(`tournamentScorers\/\$\{currentCode\}\/\$\{uid\}`\)\.set\(\{ slot: slot, key: scorerKey \}\)/,
+            'the claim carries the slot and the key, nothing else');
+        assert.match(card, /function writeScore\(ref, val\) \{\s*return scorerReady\(\)\.then\(/,
+            'every score waits for the claim');
 
         // THE CROSS-GROUP GUARD. A player id arriving from anywhere must be checked
         // against this group before a stroke is written, or one group's link could

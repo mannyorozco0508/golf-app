@@ -106,22 +106,22 @@ describe('THE PLAN: link the anonymous user, sign in otherwise', () => {
         assert.equal(plan({ uid: 'anon-1', isAnonymous: true }, { email: 'a@b.co', uid: 'anon-1' }).action, 'link');
     });
 
-    test('the migration sentences name the trial and the founder pass, and sell nothing', () => {
+    // (mailbox 005: games are free) the sentences say what stays with the account; no trial, no pass.
+    test('the migration sentences say the rounds stay, name no trial or pass, and sell nothing', () => {
         const sb = authModule();
         const note = sb.emailLinkAuth.migrationNote;
         const same = note({ uid: 'anon-1', isAnonymous: true }, { uid: 'anon-1', isAnonymous: false });
         const adopted = note({ uid: 'anon-2', isAnonymous: true }, { uid: 'anon-1', isAnonymous: false });
         const fresh = note(null, { uid: 'anon-1', isAnonymous: false });
         [same, adopted, fresh, sb.emailLinkAuth.NOTE_SENT].forEach((line) => {
-            assert.match(line, /free trial/);
-            assert.match(line, /founder pass/);
+            assert.doesNotMatch(line, /free trial|founder pass/i);
             assert.doesNotMatch(line, MONEY);
         });
         assert.doesNotMatch(sb.emailLinkAuth.NOTE_CONSOLE, MONEY);
         assert.match(sb.emailLinkAuth.NOTE_CONSOLE, /Firebase console/);
         assert.match(same, /same organizer account/);
-        assert.match(same, /Rounds you already set up stay yours/);
-        assert.match(adopted, /not copied/);
+        assert.match(same, /rounds and groups you already set up stay yours/);
+        assert.match(adopted, /Nothing is copied/);
         assert.match(adopted, /not moved/);
         assert.equal(sb.emailLinkAuth.sameOrganizer('anon-1', 'anon-1'), true);
         assert.equal(sb.emailLinkAuth.sameOrganizer('anon-1', 'anon-2'), false);
@@ -357,7 +357,9 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         assert.match(lobby, /id="email-link-send"/);
         assert.match(lobby, /id="email-link-finish"/);
         assert.match(lobby, /This browser's organizer account exists only here/);
-        assert.match(lobby, /free trial and a founder pass stay with the rounds already set up on it/);
+        // (mailbox 005: games are free)
+        assert.match(lobby, /the rounds and groups already set up on it stay yours/);
+        assert.doesNotMatch(lobby.replace(/<!--[\s\S]*?-->/g, ''), /free trial|founder pass/i, 'nothing a golfer reads');
         assert.doesNotMatch(lobby, MONEY);
         assert.match(html, /<script src="email-link-auth\.js"><\/script>/);
         assert.ok(!/email-link-auth/.test(read('tournament.html')), 'tournament.html keeps its own sign-in');
@@ -510,7 +512,9 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
         // 2. THE LINK OPENS IT, and the words are the same words.
         assert.equal(opened.onScreen, true, '"Use email instead" did not reveal the email form');
         assert.match(opened.text, /Keep this organizer/);
-        assert.match(opened.text, /free trial and a founder pass/);
+        // (mailbox 005: games are free)
+        assert.match(opened.text, /rounds and groups already set up on it stay yours/);
+        assert.doesNotMatch(opened.text, /free trial|founder pass/i);
         assert.doesNotMatch(opened.text, MONEY);
         // 3. AND SENDING STILL WORKS, unchanged, from inside the panel.
         assert.equal(sent.value, 'a@b.co', 'the address was typed into the box');
@@ -524,7 +528,9 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
         // objs[1] is the OPENED panel now, not the send result - a third step was
         // inserted ahead of it when the card moved behind the Account link, and this
         // line was reading a status off an object that has none.
-        assert.match(sent.status, /free trial/);
+        // (mailbox 005: games are free) it still warns about the other browser, without a trial.
+        assert.match(sent.status, /would start a different account/);
+        assert.doesNotMatch(sent.status, /free trial|founder pass/i);
     });
 
     test('opening the email link on Home links this anonymous user and does not sign in a new one', { timeout: 90000 }, async () => {
@@ -560,8 +566,9 @@ describe('COLD CHROME: Account opens the card, the button sends, the link preser
         assert.equal(got.probe.uid, 'anon-cold');
         assert.equal(got.uid, 'anon-cold');
         assert.match(got.status, /same organizer account/);
-        assert.match(got.status, /free trial/);
-        assert.match(got.status, /founder pass/);
+        // (mailbox 005: games are free)
+        assert.match(got.status, /rounds and groups you already set up stay yours/);
+        assert.doesNotMatch(got.status, /free trial|founder pass/i);
         assert.ok(!got.writes.some((w) => /organizers\/|events\//.test(w)), 'finishing the link wrote ' + got.writes.join(' | '));
     });
 

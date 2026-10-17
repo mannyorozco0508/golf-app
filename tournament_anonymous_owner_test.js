@@ -161,7 +161,10 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
 describe('THE SEAM (tournament.html, comments stripped)', () => {
     const code = stripComments(read('tournament.html'));
     test('onAuthStateChanged stores a non-anonymous user or null - the one seam', () => {
-        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*applyManageGate\(\);\s*renderSignedInAs\(\);\s*\}\);/);
+        // RE-PINNED 2026-10-17 (mailbox 003, scoring keys): the seam also starts the
+        // organizer's key watch, which is itself gated on canManage() (authUser).
+        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*applyManageGate\(\);\s*renderSignedInAs\(\);\s*watchScoringKeys\(\);\s*\}\);/);
+        assert.match(code, /function watchScoringKeys\(\) \{\s*if \(!currentData \|\| !currentData\.lockedLinks \|\| !canManage\(\)\) return;/);
         assert.equal((code.match(/isAnonymous/g) || []).length, 1);
     });
     test('every organizer check reads authUser; nothing reads the SDK\'s user directly; the anonymous user is never signed out', () => {

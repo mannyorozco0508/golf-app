@@ -155,7 +155,7 @@ describe('one-tap sign-in keeps the organizer', () => {
         assert.equal(r.note, o.notes.preserved);
     });
 
-    test('THE SECOND DEVICE: a credential already in use signs in, and SAYS the trial moved', async () => {
+    test('THE SECOND DEVICE: a credential already in use signs in, and SAYS nothing was copied', async () => {
         const stub = fakeFirebase({
             fail: { linkWithPopup: 'auth/credential-already-in-use' },
             after: { uid: 'other-account', isAnonymous: false, email: 'a@b.com' }
@@ -166,7 +166,9 @@ describe('one-tap sign-in keeps the organizer', () => {
         assert.equal(r.preserved, false);
         assert.equal(r.uid, 'other-account');
         assert.equal(r.note, o.notes.adopted);
-        assert.match(r.note, /not copied/, 'the note must not imply the trial came along');
+        // (mailbox 005: games are free) still says nothing came along; names no trial or pass.
+        assert.match(r.note, /Nothing is copied/, 'the note must not imply the anonymous account came along');
+        assert.doesNotMatch(r.note, /free trial|founder pass/i);
     });
 
     test('all four "already belongs to somebody" codes are the adopt path', () => {
