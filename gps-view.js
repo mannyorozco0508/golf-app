@@ -3475,6 +3475,9 @@
             if (!b || !S) return;
             var base = 'admin.html?game=' + encodeURIComponent(S.eventCode);
             var tpl = b.getAttribute('data-ag-tpl'), go = b.getAttribute('data-ag-go');
+            // Too few golfers for the game: Players first (URGENT-001), then the game.
+            var D = window.HardPanDoors;
+            if (tpl && D && typeof D.playersFirst === 'function' && D.playersFirst(tpl, { url: base + '&tpl=' + tpl })) return;
             window.location.href = tpl ? base + '&tpl=' + tpl : go === 'paste' ? base + '&paste=1' : base;
         });
         on(el, '.gps-replay', function () {
