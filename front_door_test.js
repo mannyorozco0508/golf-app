@@ -62,7 +62,9 @@ test('HardPan only: home.html and front-door.js are GPS files; every page loads 
 test('gps-doors-fix: a launch goes straight to the doors; Main every launch; light only; GPS READY = what GPS draws; a course tap never opens Round Setup', { skip }, () => {
     const s = read('front-door.js'), h = read('home.html');
     assert.match(s, /\(function launch\(\) \{/); assert.match(s, /W\.document\.documentElement\.style\.visibility = 'hidden';\n\s*W\.location\.replace\('home\.html'\);/);
-    assert.match(s, /show\(h === 'gps' \|\| h === 'games' \? h : 'main'\);/, 'every launch opens Main');
+    // Every launch opens Main - #gps / #pick too, under the GPS Map gate (paid launch, 2026-10-17).
+    assert.match(s, /else show\(h === 'games' \? h : 'main'\);/, 'every launch opens Main');
+    assert.match(s, /else if \(h === 'gps'\) \{ show\('main'\); gpsGate\(homeCourse\(\)/, '#gps: Main, then the gate');
     assert.ok(!/prefers-color-scheme/.test(h) && /<meta name="color-scheme" content="light only">/.test(h), 'home.html never follows dark mode');
     assert.match(s, /if \(live\(\)\) return !!golfapiLink\(key\)/, 'in the app, GPS READY = GolfAPI has it');
     const pick = s.slice(s.indexOf('function startRound('), s.indexOf('function pickCourse('));

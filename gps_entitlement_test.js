@@ -1,16 +1,20 @@
 // ============================================================================
-// HARDPAN GPS PRO - THE APP STORE ENTITLEMENT AND THE PAYWALL (gps-store-iap, 2026-10-17)
+// HARDPAN GPS MAP - THE APP STORE ENTITLEMENT (gps-store-iap, 2026-10-17; paid launch,
+// Manny mailbox 007, 2026-10-17)
 //
-// App Store Guideline 3.1.1: GPS Pro is sold through StoreKit only (RevenueCat's
-// Capacitor plugin), behind HARDPAN_GPS_CONFIG.iap. This file holds:
+// App Store Guideline 3.1.1: GPS Map (ALL of GPS) is sold through StoreKit only
+// (RevenueCat's Capacitor plugin), behind HARDPAN_GPS_CONFIG.iap - ON for v2.0. This
+// file holds:
 //   - the old URL tier switch is gone from every shipped file, tool and doc;
-//   - flag off: not one purchase call, and Pro is the build's paywall switch;
-//   - flag on, the plugin stubbed: active -> Pro, inactive -> Free; Restore calls
-//     restorePurchases and reads again; a cancel or an error leaves Free with one
-//     sentence; no plugin / no key never throws;
-//   - the paywall: every disclosure Apple asks for, Subscribe, Restore Purchases,
-//     the Terms and Privacy links - and never "soon".
-// The browser check is tools/gps-check.js (the free, clear, iap and iapon arms).
+//   - the shipped config: iap ON, an empty key -> no entitlement (the paywall), not
+//     one plugin call, never a throw; flag off: not one purchase call;
+//   - flag on, the plugin stubbed: gps_map active -> GPS, inactive -> none; Restore
+//     calls restorePurchases and reads again; a cancel or an error leaves none with one
+//     sentence; no plugin / no key never throws; whenKnown waits for the first answer;
+//   - the paywall sheet's two faces (store / no store) and that it never opens for a
+//     subscriber. Its words are gps_paywall_test.js.
+// The browser checks: tools/gps-check.js (free, clear, iap, iapon) and
+// tools/gps-paywall-check.js (every entry point).
 // ============================================================================
 'use strict';
 const test = require('node:test');
@@ -37,13 +41,13 @@ function load(config, stub) {
     vm.runInContext(read('gps-entitlement.js'), sb);
     return { E: sb.HardPanEntitlement, sb, store };
 }
-const ON_CFG = { iap: true, revenueCatKey: 'appl_TEST', iapEntitlement: 'gps_pro', iapProduct: 'com.rattlegolf.app.gps.yearly' };
-// RevenueCat's documented calls, recorded. active: is gps_pro in entitlements.active.
+const ON_CFG = { iap: true, revenueCatKey: 'appl_TEST', iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly' };
+// RevenueCat's documented calls, recorded. active: is gps_map in entitlements.active.
 function stub(o) {
     o = Object.assign({ active: false, buy: 'ok', restoreActive: null }, o);
     const calls = [];
-    const info = () => ({ entitlements: { active: o.active ? { gps_pro: { identifier: 'gps_pro', isActive: true } } : {}, all: {} } });
-    const pkg = { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'com.rattlegolf.app.gps.yearly', title: 'HardPan GPS Pro', priceString: '$1.23', price: 1.23, subscriptionPeriod: 'P1Y', introPrice: { price: 0, priceString: '$0.00', period: 'P1W', cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } } };
+    const info = () => ({ entitlements: { active: o.active ? { gps_map: { identifier: 'gps_map', isActive: true } } : {}, all: {} } });
+    const pkg = { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'com.rattlegolf.app.gpsmap.yearly', title: 'GPS Map', priceString: '$1.23', price: 1.23, subscriptionPeriod: 'P1Y', introPrice: { price: 0, priceString: '$0.00', period: 'P1W', cycles: 1, periodUnit: 'WEEK', periodNumberOfUnits: 1 } } };
     const P = {
         calls, state: o,
         configure: (a) => { calls.push(['configure', a]); return Promise.resolve(); },
@@ -85,18 +89,29 @@ test('no URL tier switch anywhere: shipped files, tools, docs, tests', () => {
     assert.ok(!/__hpTest|location\.search[^\n]*(pro|tier)/i.test(v + read('gps-entitlement.js')), 'no test hook / URL path to Pro in shipped code');
 });
 
-// ---- 2. FLAG OFF ------------------------------------------------------------------
-test('flag off (the shipped config): no purchase call at all, and Pro is the paywall switch', { skip }, async () => {
+// ---- 2. THE SHIPPED CONFIG (iap ON, no key) AND FLAG OFF ----------------------------
+test('the shipped config: iap ON, the GPS Map ids, an EMPTY key -> no entitlement, no plugin call, no throw', { skip }, async () => {
     const c = {}; vm.runInNewContext(read('gps-config.js'), { window: c });
     const cfg = c.HARDPAN_GPS_CONFIG;
-    assert.strictEqual(cfg.iap, false, 'iap is OFF in the repo');
+    assert.strictEqual(cfg.iap, true, 'iap is ON for v2.0');
     assert.strictEqual(cfg.revenueCatKey, '', 'no RevenueCat key in the repo');
     assert.ok(!/sk_[A-Za-z0-9]/.test(read('gps-config.js')), 'never a RevenueCat secret key');
-    assert.strictEqual(cfg.iapEntitlement, 'gps_pro');
-    assert.strictEqual(cfg.iapProduct, 'com.rattlegolf.app.gps.yearly');
-    assert.ok(/PLAN ONLY/.test(read('gps-config.js')), 'the ids are marked plan only');
+    assert.strictEqual(cfg.iapEntitlement, 'gps_map');
+    assert.strictEqual(cfg.iapProduct, 'com.rattlegolf.app.gpsmap.yearly');
     const P = stub({ active: true });
-    const { E } = load(Object.assign({}, cfg, { revenueCatKey: 'appl_TEST' }), P);
+    const { E } = load(cfg, P);
+    const p = await cb(E.refresh);
+    assert.strictEqual(E.enabled(), true);
+    assert.strictEqual(p, false); assert.strictEqual(E.isPro(), false, 'no key: no entitlement, even with one on the account');
+    assert.strictEqual(E.known(), true, 'answered (no) at once - the paywall, never a wait');
+    assert.deepStrictEqual(P.calls, [], 'no key: the plugin is never configured or asked');
+    const r = await cb(E.purchase);
+    assert.strictEqual(r.pro, false); assert.strictEqual(r.outcome, 'unavailable');
+});
+
+test('flag off: no purchase call at all, and GPS follows the build\'s paywall switch', { skip }, async () => {
+    const P = stub({ active: true });
+    const { E } = load(Object.assign({}, ON_CFG, { iap: false }), P);
     await new Promise((r) => setTimeout(r, 20));
     assert.strictEqual(E.enabled(), false);
     assert.strictEqual(E.isPro(), false, 'flag off: the entitlement is never asked, even with one');
@@ -104,10 +119,31 @@ test('flag off (the shipped config): no purchase call at all, and Pro is the pay
     const r1 = await cb(E.purchase), r2 = await cb(E.restore), o = await cb(E.offer), p = await cb(E.refresh);
     assert.strictEqual(r1.pro, false); assert.strictEqual(r2.pro, false); assert.strictEqual(o.fromStore, false); assert.strictEqual(p, false);
     assert.deepStrictEqual(P.calls, [], 'flag off: the plugin was called');
-    // hasGpsPro with the flag off: exactly the paywall switch, as before.
+    // hasGpsPro: the entitlement when the flag is on; the flag on with no entitlement
+    // module = no GPS; the flag off = the build's paywall switch.
     const v = read('gps-view.js');
     const fn = v.slice(v.indexOf('function hasGpsPro('), v.indexOf('}', v.indexOf('if (cfg().paywall !== true) return true;')) + 1);
-    assert.ok(/if \(iapOn\(\)\) return entitlement\(\)\.isPro\(\) === true;\s*if \(cfg\(\)\.paywall !== true\) return true;\s*return false;/.test(fn), fn);
+    assert.ok(/if \(iapOn\(\)\) return entitlement\(\)\.isPro\(\) === true;\s*if \(cfg\(\)\.iap === true\) return false;\s*if \(cfg\(\)\.paywall !== true\) return true;\s*return false;/.test(fn), fn);
+});
+
+test('whenKnown: answers once the store has, or after its timeout - never twice', { skip }, async () => {
+    const A = stub({ active: true });
+    const a = load(ON_CFG, A);
+    const got = [];
+    a.E.whenKnown((v) => got.push(v), 5000);
+    assert.deepStrictEqual(got, [], 'not before the store answers');
+    await cb(a.E.refresh);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(got, [true]);
+    a.E.whenKnown((v) => got.push('again ' + v));
+    assert.deepStrictEqual(got, [true, 'again true'], 'known: at once');
+    // A store that never answers: the timeout answers "no entitlement", once.
+    const H = stub({}); H.configure = () => new Promise(() => {});
+    const h = load(ON_CFG, H);
+    const g2 = [];
+    h.E.whenKnown((v) => g2.push(v), 30);
+    await new Promise((r) => setTimeout(r, 80));
+    assert.deepStrictEqual(g2, [false]);
 });
 
 test('flag on with no plugin (the web, a check) or no key: Free, a sentence, never a throw', { skip }, async () => {
@@ -125,7 +161,7 @@ test('flag on with no plugin (the web, a check) or no key: Free, a sentence, nev
 });
 
 // ---- 3. FLAG ON, THE PLUGIN STUBBED -------------------------------------------------
-test('flag on: an active gps_pro entitlement -> Pro; inactive -> Free (configure once, the public key only)', { skip }, async () => {
+test('flag on: an active gps_map entitlement -> GPS; inactive -> none (configure once, the public key only)', { skip }, async () => {
     const A = stub({ active: true });
     const a = load(ON_CFG, A);
     assert.strictEqual(a.E.known(), false, 'not known before the store answers');
@@ -136,7 +172,7 @@ test('flag on: an active gps_pro entitlement -> Pro; inactive -> Free (configure
     const i = load(ON_CFG, I);
     await cb(i.E.refresh);
     assert.strictEqual(i.E.isPro(), false); assert.strictEqual(i.E.known(), true);
-    // Another entitlement id active is not GPS Pro.
+    // Another entitlement id active is not GPS Map.
     const O = stub({ active: true });
     const o = load(Object.assign({}, ON_CFG, { iapEntitlement: 'something_else' }), O);
     await cb(o.E.refresh);
@@ -160,7 +196,7 @@ test('Restore calls restorePurchases and reads the entitlement again', { skip },
     const q = load(ON_CFG, Q);
     const s = await cb(q.E.restore);
     assert.strictEqual(s.pro, false); assert.strictEqual(s.outcome, 'none');
-    assert.strictEqual(s.message, 'No GPS Pro subscription was found for this Apple ID.');
+    assert.strictEqual(s.message, 'No GPS Map subscription was found for this Apple ID.');
 });
 
 test('Subscribe: the yearly package is bought -> Pro; cancel / error / pending leave Free with one sentence', { skip }, async () => {
@@ -168,7 +204,7 @@ test('Subscribe: the yearly package is bought -> Pro; cancel / error / pending l
     const { E } = load(ON_CFG, P);
     const r = await cb(E.purchase);
     assert.strictEqual(r.pro, true); assert.strictEqual(E.isPro(), true);
-    assert.deepStrictEqual(P.calls.filter((c) => c[0] === 'purchasePackage'), [['purchasePackage', 'com.rattlegolf.app.gps.yearly']]);
+    assert.deepStrictEqual(P.calls.filter((c) => c[0] === 'purchasePackage'), [['purchasePackage', 'com.rattlegolf.app.gpsmap.yearly']]);
     const want = { cancel: ['cancelled', 'Purchase cancelled. Nothing was charged.'], error: ['error', 'The purchase did not go through. Please try again.'], pending: ['pending', /waiting for approval/] };
     for (const k of Object.keys(want)) {
         const Q = stub({ active: false, buy: k });
@@ -189,62 +225,29 @@ test('Subscribe: the yearly package is bought -> Pro; cancel / error / pending l
 test('the offer: title, price, 1-year period and the 7-day free trial come from StoreKit', { skip }, async () => {
     const { E } = load(ON_CFG, stub({}));
     const o = await cb(E.offer);
-    assert.deepStrictEqual(JSON.parse(JSON.stringify(o)), { fromStore: true, title: 'HardPan GPS Pro', price: '$1.23', period: '1-year', trial: '7-day' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(o)), { fromStore: true, title: 'GPS Map', price: '$1.23', period: '1-year', trial: '7-day' });
 });
 
-// ---- 4. THE PAYWALL ---------------------------------------------------------------
-function viewApi() {
-    const sb = { localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, JSON, Object, Math, Number, String, Date, Promise, RegExp, isFinite, setTimeout, clearTimeout, navigator: {} };
-    sb.window = sb;
-    sb.HARDPAN_GPS_CONFIG = { iapPriceFallback: '' };
-    vm.createContext(sb);
-    vm.runInContext(read('gps-view.js'), sb);
-    return sb;
-}
-const RENEW = 'Renews automatically each year unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings > Apple ID > Subscriptions.';
-test('the paywall text: every required disclosure, with the store price - or the marked fallback', { skip }, () => {
-    const sb = viewApi();
-    const V = sb.HardPanGps;
-    const all = (t) => [t.title, t.price, t.length, t.trial, t.renew].join(' ');
-    const s = V.paywallText({ fromStore: true, title: 'HardPan GPS Pro', price: '$1.23', period: '1-year', trial: '7-day' });
-    assert.strictEqual(s.priceSrc, 'store');
-    ['HardPan GPS Pro', '$1.23 per year', '1-year subscription', '7-day free trial', 'charged $1.23 when the trial ends', RENEW].forEach((w) => assert.ok(all(s).includes(w), w + ' | ' + all(s)));
-    // No store price, no fallback: no made-up price.
-    const n = V.paywallText({ fromStore: false });
-    assert.strictEqual(n.priceSrc, 'none');
-    assert.ok(!/\$/.test(all(n)) && /shown by the App Store/.test(n.price) && n.renew === RENEW && /7-day free trial/.test(n.trial) && /1-year/.test(n.length));
-    // The config fallback, ONLY when the store gave none, and marked.
-    sb.HARDPAN_GPS_CONFIG = { iapPriceFallback: '$4.56 per year' };
-    const f = V.paywallText({ fromStore: false });
-    assert.strictEqual(f.priceSrc, 'config'); assert.strictEqual(f.price, '$4.56 per year');
-    assert.strictEqual(V.paywallText({ fromStore: true, price: '$1.23' }).priceSrc, 'store', 'the store price wins');
-    [s, n, f].forEach((t) => assert.ok(!/soon/i.test(all(t))));
-});
-
-test('the paywall sheet: Subscribe, Restore Purchases, Terms + Privacy links; flag off = one sentence, no buy button; never "soon"', { skip }, () => {
+// ---- 4. THE PAYWALL SHEET ------------------------------------------------------------
+// Its words: gps_paywall_test.js. Here: its two faces, and it never opens for a subscriber.
+test('the paywall sheet: the store face (trial, Restore, Terms + Privacy) or, with no store, one sentence; never for a subscriber; never "soon"', { skip }, () => {
     const v = read('gps-view.js');
-    const sheet = v.slice(v.indexOf("'<div class=\"gps-sheet\""), v.indexOf("var TOGGLE_H"));
-    assert.ok(sheet.length > 200, 'positive: the sheet markup was found');
-    assert.ok(/<button type="button" class="gps-sheet-buy">Subscribe<\/button>/.test(sheet));
-    assert.ok(/<button type="button" class="gps-sheet-restore">Restore Purchases<\/button>/.test(sheet));
-    assert.ok(/class="gps-sheet-terms"[^>]*>Terms of Use</.test(sheet) && /class="gps-sheet-privacy"[^>]*>Privacy Policy</.test(sheet));
+    const sheet = v.slice(v.indexOf('var PW_MARKUP'), v.indexOf('var PW_CSS'));
+    assert.ok(sheet.length > 300, 'positive: the sheet markup was found');
     assert.ok(!/disabled/.test(sheet), 'no disabled placeholder button');
-    assert.ok(!/soon/i.test(sheet) && !/soon/i.test(v.slice(v.indexOf('THE UPGRADE SHEET'), v.indexOf('NO PULL-DOWN ON GPS'))), 'the paywall never says soon');
-    // Both purchase buttons and the links sit inside the iap-only block.
+    assert.ok(!/soon/i.test(sheet) && !/soon/i.test(v.slice(v.indexOf('THE PAYWALL AND THE GATE'), v.indexOf('NO PULL-DOWN ON GPS'))), 'the paywall never says soon');
+    // The purchase buttons and the links sit inside the store-only block.
     const iap = sheet.slice(sheet.indexOf('gps-sheet-iap'), sheet.indexOf('gps-sheet-close'));
     ['gps-sheet-buy', 'gps-sheet-restore', 'gps-sheet-terms', 'gps-sheet-privacy', 'gps-sheet-price', 'gps-sheet-trial', 'gps-sheet-renew'].forEach((c) => assert.ok(iap.includes(c), c));
-    // Flag off: the iap block hidden, the one sentence shown.
-    const sync = v.slice(v.indexOf('function syncSheet('), v.indexOf('function sheetBusy('));
-    assert.ok(/show\('\.gps-sheet-off', !on\)/.test(sync) && /show\('\.gps-sheet-iap', on\)/.test(sync) && /if \(!on\) return;/.test(sync));
-    assert.ok(/var SHEET_OFF = "HardPan GPS Pro isn\\u2019t available in this build\.";/.test(v));
-    // The links: the config's Terms (terms.html) and Privacy (privacy.html) pages.
-    const c = {}; vm.runInNewContext(read('gps-config.js'), { window: c });
-    assert.match(c.HARDPAN_GPS_CONFIG.iapTermsUrl, /^https:\/\/[^/]+\/terms\.html$/);
-    assert.match(c.HARDPAN_GPS_CONFIG.iapPrivacyUrl, /^https:\/\/[^/]+\/privacy\.html$/);
-    assert.ok(/'\.gps-sheet-terms'[\s\S]{0,200}iapTermsUrl/.test(v) && /iapPrivacyUrl/.test(v));
-    // The sheet never opens for Pro, nor before the store has answered.
-    assert.ok(/if \(!S\.pro && !sheetSeen\(\) && !proPending\(\)\) openSheet\(\);/.test(v));
-    // A purchase / restore that says Pro turns the full screen on at once.
+    // Flag off: the store block hidden, the one sentence shown.
+    const paint = v.slice(v.indexOf('function paintSheet('), v.indexOf('function openPaywall('));
+    assert.ok(/pshow\('\.gps-sheet-off', !on\)/.test(paint) && /pshow\('\.gps-sheet-iap', on\)/.test(paint) && /if \(!on\) return;/.test(paint));
+    assert.ok(/var SHEET_OFF = "GPS Map isn\\u2019t available in this build\.";/.test(v));
+    // Never for a subscriber: the gate goes straight on when entitled, and waits while the
+    // store's first answer is pending.
+    const gate = v.slice(v.indexOf('function requireGps('), v.indexOf('function roundCourseName('));
+    assert.ok(/if \(hasGpsPro\(\)\) \{ yes\(\); return true; \}/.test(gate) && /if \(proPending\(\)\) \{ entitlement\(\)\.whenKnown\(decide, PENDING_MS\); return false; \}/.test(gate), gate);
+    // A trial / restore that says yes unlocks GPS at once.
     assert.ok(/E\.onChange\(function \(p\) \{ if \(p\) becomePro\(\); \}\)/.test(v));
 });
 
