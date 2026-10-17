@@ -3961,7 +3961,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // yesterday and says nothing today has a new uid and a fresh trial.
     let organizerRecord;   // undefined until the read answers; null = no record
     function renderOrganizerStanding() {
-        const text = window.organizerGate
+        // ANDROID SAYS NOTHING HERE (job 012). The Play listing promises no trial and
+        // sells no pass, so neither line is shown in the Android app. iOS and the
+        // website keep it.
+        const text = !isAndroidShell() && window.organizerGate
             ? window.organizerGate.standingLine(window.organizerGate.standingOf(organizerRecord, Date.now()))
             : '';
         ['lobby-standing', 'rr-standing', 'wz-standing'].forEach(id => {
@@ -11297,8 +11300,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (linked) {
             setTextOnce(document.getElementById('email-link-lead'),
                 'Signed in. Use this again only to move this organizer onto another browser or phone.');
-            setTextOnce(document.getElementById('oauth-lead'),
-                'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email.');
+            // Android signs in by email only (job 012): no Apple ID or Google account to name.
+            setTextOnce(document.getElementById('oauth-lead'), isAndroidShell()
+                ? 'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same email.'
+                : 'Signed in. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email.');
+        } else if (isAndroidShell()) {
+            // The static lead promises a free trial and a founder pass; Android sells neither.
+            setTextOnce(document.getElementById('email-link-lead'),
+                'This organizer account exists only on this phone. Email yourself a link — the rounds already set up on it stay with it.');
         }
         // THE LINK ROW IS DECIDED HERE, on the same beat as everything else
         // about the account. A render function nothing calls is this project's

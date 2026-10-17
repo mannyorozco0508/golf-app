@@ -43,6 +43,13 @@ were reproduced on an iPhone.
    - `admin.html` `oauthTap()` success line: "… your rounds and trial stay on this account."
    - Mailbox 005 removed trial / founder-pass wording "anywhere a golfer reads it". These
      three survived, and paywall and iap are both off.
+   - **G6 (job 012): Android no longer shows it; iOS STILL DOES.** On Android only: the
+     "Free trial · N days left" / "Founder pass" line is empty (lobby, Review, Round Ready),
+     the signed-out email lead promises nothing, and the sign-out / delete words in
+     `account-exit.js` raise no trial. iOS and the website are byte-for-byte unchanged and
+     still show all of it, plus the four `email-link-auth.js` notes ("the free trial and a
+     founder pass stay with you") on every platform, Android included (that file is
+     frozen by `setup_account_link_test.js`; waiting on Manny).
 
 6. **The Vegas row uses a dice icon.**
    - `front-door.js:1128` (`ALL_GAMES`): `{ id: 'vegas', ico: '🎲', … }`.
@@ -94,6 +101,8 @@ the old path unchanged, and `android_gps_fixes_test.js` asserts the iOS half of 
 | `email-link-auth.js` | **Changes the website and iOS too (job 009, Manny chose this):** `actionCodeSettings()` sends the `android: { packageName, installApp:false }` block **only** when `Capacitor.getPlatform() === 'android'`. Website and iOS links now go out as `{ url, handleCodeInApp: true, iOS: { bundleId } }`, the old settings minus `android`; everything else is byte-for-byte the same. Why: the Android app catches `/__/auth/links` email links (App Links); a website sign-in on an Android phone with HardPan installed must stay in the browser. Still to confirm with a real website-sent email: whether Firebase then mails a plain `/__/auth/action` link, or still the `/__/auth/links` wrapper because the iOS block is present. iOS behaviour is unchanged either way: the iOS bundle id is still sent. |
 | `front-door.js` (again) | `armLinks()`: on Android only, an email sign-in link (App Links, `/__/auth/links`) reopens admin.html with its sign-in query; `email-link-auth.js` is unchanged (job 006) |
 | `admin.html` | `isAndroidShell()`; no Apple/Google/Link buttons, email card shown; Notifications card hidden; Setup Coach back probe |
+| `admin.html` (job 012) | `renderOrganizerStanding()` writes nothing on Android; signed-out `#email-link-lead` gets trial-free words on Android; signed-in `#oauth-lead` says "the same email" on Android |
+| `account-exit.js` (job 012) | On Android only: "Apple ID, Google account or email" → "email" in the sign-out / delete warnings; `founderMaybe` / `founderUnknown` drop the trial; `describeAccount()` names no providers |
 | `index.html` | Round Menu sheet back probe (Android only) |
 | `capacitor.config.ts` | `plugins.SystemBars.insetsHandling = 'disable'` (Android reads it; Capacitor iOS has no such key) |
 | `native_bundle_freshness_test.js` | GPS mode for the Android bundle, declared by `@capacitor/geolocation` in the Android allowlist; the iOS bundle is still held to Consumer |

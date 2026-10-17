@@ -19,7 +19,7 @@ Ground rules for this first release (Manny, 2026-10-17):
 | G3 | ~~Organizer locked out of their own round's setup on Android~~. **Fixed in 0.2 (5)** (job 003): `auth-boot.js` tries again after `load` on Android. On the emulator, Vegas with one golfer now opens the Players step for the round's creator. | — | Done |
 | G4 | **Server account deletion (`accountDelete`) is not deployed.** Live, it answers 404. | In-app Delete account still works: the client-side delete runs when the function is missing. Data left behind that way: anything the client may not remove (see §5). The Data safety "deletion" answer must match what really happens. | Manny: deploy or accept |
 | G5 | **Screenshots.** The 10 in `~/Desktop/HardPan-screenshots-v2/final-10` are iPhone (1320×2868, 2.17:1). Play's limit is 2:1, and they show iOS. | They are rejected at upload. | Done: 8 Android shots on a clean 0.2 (5) install with the 5RZ8GE demo round, in `docs/play-assets/screenshots/` (1080×2160). No test data in any of the 8 (job 011). |
-| G6 | **"Trial" and "founder pass" words inside the app.** The Account sheet on Android says "the free trial and a founder pass stay with the rounds already set up on it". | The listing says GPS is included, and nothing can be bought on Android. In-app copy that promises a trial is misleading. | Listed for the iOS session (`docs/FOR-IOS-SESSION.md` #5) |
+| G6 | **"Trial" and "founder pass" words inside the app.** | | **Mostly fixed in 0.2 (8)** (job 012): Android shows no trial / pass line, and the Account sheet names email only. Still on every platform: the four sign-in notes in `email-link-auth.js` (frozen file, waiting on Manny). iOS unchanged. |
 | G7 | **Money-game wording and the gambling policy.** The app records friendly side games (Nassau, skins, Vegas, BBB) and shows who owes whom. It never takes, holds or moves money (confirmed in code, §3). The Vegas row uses a 🎲 icon. | Reviewers can read "bets / who pays who" as gambling. Keep the listing on "side games" and "settle up between yourselves", target 18+, and answer IARC as in §3. Swap the 🎲 icon (`docs/FOR-IOS-SESSION.md` #6). | Manny (icon via the iOS session) |
 | G8 | **Shared bugs a reviewer could meet**: a GPS READY course that "cannot start" (Talking Stick South), "No rated tees" when tees exist, "&" dropped in the trip builder. | They look broken in review. The review path in §4 avoids them. | iOS session (`docs/FOR-IOS-SESSION.md`) |
 | G9 | **Play App Signing SHA-1 is not known yet.** | Play re-signs with its own app-signing key. When native Google sign-in comes, Firebase needs that SHA-1 too, not only the upload key's. Nothing to do for this release. | Later |
@@ -230,6 +230,20 @@ Screenshots (0.2 (7) on the emulator): 01 Home, 02 Near you (Caledonia), 03 GPS 
 | *(none)* `ACCESS_BACKGROUND_LOCATION` | Not requested. No location declaration form is needed. |
 
 ---
+
+## 7b. 0.2 (versionCode 8) (job 012)
+- [x] Android Account words: no trial / founder-pass line, email-only wording (Android-gated; iOS and web unchanged, tested).
+- [x] AAB 5,769,356 bytes, sha256 `78fc57d4bc22…`, signer SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Debug APK on rattle36 (versionCode 8).
+- [x] Full suite: 11072 tests, 11066 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
+
+## 9. Post-launch: App Links (order approved by Manny, job 012; nothing deployed yet)
+Tested on the emulator (URGENT-010): the link opens the app warm and cold, and a cold start signs in with no paste. Real phones send these links to the browser until step 2.
+Steps 1 and 2 both wait for the app to exist in Play Console (the Play App Signing SHA-256).
+1. **The job-009 split goes live on the website** (`email-link-auth.js`: `android` block only from the Android app). Merge to `main`, which Cloudflare Pages deploys. Needs Manny's OK.
+2. **Deploy `/.well-known/assetlinks.json`** on golfapp-9fb21.firebaseapp.com (Firebase Hosting, option B), with the Play App Signing SHA-256 and the upload-key SHA-256. Needs Manny's OK.
+3. **GATE: step 5 re-test.** Request a sign-in link **from the website** in Chrome on an Android phone with HardPan installed. It must open and finish in Chrome, not the app. If it opens the app (the `/__/auth/links` wrapper still comes back with only the iOS block), stop: the next fix is to send the `iOS` block from the iOS app only (web-visible, Manny's call).
+4. **In the same release that turns verification on:** change the Android Account sheet sentence "In the app, don't tap the link in the email — it opens the website… Copy the link…". After step 2 it is false: tapping the link is the right thing to do. Until then it is true; leave it.
+5. Check on a real phone: `adb shell pm get-app-links com.rattlegolf.app` shows `verified` for golfapp-9fb21.firebaseapp.com.
 
 ## 8. Checks run for this file
 - Listing lengths, by script: see the job report (`outbox/001-play-listing-prep-REPORT.md`).

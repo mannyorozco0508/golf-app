@@ -482,3 +482,105 @@ describe('B. APP LINKS: the email sign-in link opens the app on Android only', (
         assert.ok(act.includes('android:pathPrefix="/__/auth/links"'), 'the filter is not on MainActivity');
     });
 });
+
+// ---------------------------------------------------------------------------
+// 012. NO TRIAL, NO PASS, NO APPLE OR GOOGLE IN THE ANDROID ACCOUNT WORDS (job 012).
+// The Play listing promises no trial and sells nothing; the Android app signs in by
+// email alone. admin.html is reached the way a golfer reaches it: the page's own load
+// renders the standing line (its own loadOrganizerStanding, with the real
+// organizer-gate.js and only the record read stubbed), and the Account link's own
+// onclick opens the sheet. account-exit.js is read as Android or iOS before it parses.
+// CANNOT PROVE: mini-dom does not parse static text, so the iOS lead is checked as
+// "untouched" plus the markup itself; email-link-auth.js's notes are NOT changed
+// (a frozen-hash file, held for Manny's per-file OK) and nothing here covers them.
+// BASELINE (whole file, 31 tests): against pre-012 admin.html b5850e00020f and account-exit.js
+// 5d1c7fc39dfe, 27 pass / 4 fail - the 4 are this block's Android tests; its 3 iOS/web tests pass
+// before and after, as they must (24 older + 3 = 27). After the change: 31 / 0.
+// ---------------------------------------------------------------------------
+describe('012. THE ANDROID ACCOUNT WORDS: no trial, no pass, email only', () => {
+    const run = (sb, expr) => vm.runInContext(expr, sb);
+    const NO_PROMISE = /trial|founder|\bpass\b/i;
+    function arrive(platform) {
+        const sb = loadHtmlInlineScript('admin.html', [], {
+            beforeRun: s => {
+                s.Capacitor = s.window.Capacitor = { getPlatform: () => platform, isNativePlatform: () => true, Plugins: {} };
+                vm.runInContext(read('organizer-gate.js'), s, { filename: 'organizer-gate.js' });
+                // A live trial, one day in: the record a new organizer has.
+                s.window.organizerGate.readStanding = () => Promise.resolve({ firstSeenAt: Date.now() - 86400000 });
+            }
+        });
+        return sb;
+    }
+    const openAccount = sb => {
+        run(sb, "window.firebase = { auth: function () { return { currentUser: null }; } };");
+        const m = /id="account-link"[^>]*onclick="([^"]+)"/.exec(read('admin.html'));
+        assert.ok(m, 'the Account link is not in the markup');
+        run(sb, m[1]);
+    };
+    const txt = (sb, id) => run(sb, "document.getElementById('" + id + "').textContent");
+
+    test('Android: the trial / pass line is empty on the lobby, Review and Round Ready', { skip }, async () => {
+        const sb = arrive('android');
+        await flush(); await flush();
+        ['lobby-standing', 'wz-standing', 'rr-standing'].forEach(id => assert.equal(txt(sb, id), '', id + ' speaks on Android'));
+    });
+
+    test('iOS UNCHANGED: the same arrival says "Free trial · N days left" on all three', { skip }, async () => {
+        const sb = arrive('ios');
+        await flush(); await flush();
+        ['lobby-standing', 'wz-standing', 'rr-standing'].forEach(id =>
+            assert.match(txt(sb, id), /^Free trial · \d+ days? left to set up new rounds$/, id + ' lost its line on iOS'));
+    });
+
+    test('Android: the signed-out email lead promises no trial or pass', { skip }, async () => {
+        const sb = arrive('android');
+        await flush();
+        openAccount(sb);
+        const lead = txt(sb, 'email-link-lead');
+        assert.match(lead, /exists only on this phone\. Email yourself a link/, 'the Android lead was not written');
+        assert.ok(!NO_PROMISE.test(lead), 'the Android lead promises: ' + lead);
+    });
+
+    test('iOS UNCHANGED: the lead is left to its markup, which still names the trial and the pass', { skip }, async () => {
+        const sb = arrive('ios');
+        await flush();
+        openAccount(sb);
+        assert.equal(txt(sb, 'email-link-lead'), '', 'iOS had its lead rewritten');
+        assert.match(read('admin.html'), /<p id="email-link-lead">This browser's organizer account exists only here\. Email yourself a link &mdash; the free trial and a founder pass stay with the rounds already set up on it\.<\/p>/);
+    });
+
+    test('the signed-in lead: Android says "the same email"; the iOS sentence is the old one, byte for byte', () => {
+        const src = read('admin.html');
+        assert.match(src, /isAndroidShell\(\)\s*\? 'Signed in\. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same email\.'/);
+        assert.match(src, /: 'Signed in\. To put this same organizer on another phone or browser, sign out here first and then sign in over there with the same Apple ID, Google account or email\.'\);/);
+    });
+
+    function exitWords(platform) {
+        const sb = windowFor(platform, 'admin.html');
+        if (platform === 'web') delete sb.Capacitor;
+        load(sb, 'account-exit.js');
+        return sb.accountExit;
+    }
+    const linked = { uid: 'u1', isAnonymous: false, email: 'golfer@example.com',
+        providerData: [{ providerId: 'apple.com' }, { providerId: 'google.com' }, { providerId: 'password' }] };
+
+    test('Android: sign-out and delete warnings say "the same email", trial-free, and no providers are named', { skip }, () => {
+        const a = exitWords('android');
+        ['signOutWarn', 'deleteWarn2', 'founderWarn'].forEach(k => {
+            assert.match(a.WORDS[k], /the same email/, k + ' was not rewritten');
+            assert.ok(!/Apple|Google/.test(a.WORDS[k]), k + ' still names Apple or Google');
+        });
+        ['signOutWarn', 'deleteWarn2', 'founderMaybe', 'founderUnknown'].forEach(k =>
+            assert.ok(!/trial/i.test(a.WORDS[k]), k + ' raises a trial on Android'));
+        assert.equal(a.describeAccount(linked), 'Signed in as golfer@example.com');
+    });
+
+    test('iOS and the website UNCHANGED: every word identical to each other and to the old text', { skip }, () => {
+        const i = exitWords('ios'), w = exitWords('web');
+        assert.deepEqual(Object.assign({}, i.WORDS), Object.assign({}, w.WORDS));
+        assert.match(i.WORDS.signOutWarn, /the same Apple ID, Google account or email\.$/);
+        assert.match(i.WORDS.founderMaybe, /^If this account has a founder pass or a running free trial/);
+        assert.equal(i.describeAccount(linked), 'Signed in as golfer@example.com (Apple and Google and email)');
+        assert.equal(w.describeAccount(linked), 'Signed in as golfer@example.com (Apple and Google and email)');
+    });
+});

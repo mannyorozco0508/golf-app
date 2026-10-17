@@ -118,6 +118,25 @@
         founderUnknown: 'This device could not check whether this account holds a founder pass or a running free trial. If it does, deleting the account gives it up for good. Check on a connection first if that matters to you.'
     };
 
+    // ---- ANDROID: EMAIL ONLY, AND NO TRIAL (job 012) ----------------------
+    // The Android app signs in by email alone, and its Play listing promises no trial
+    // and sells no pass. So the Apple ID / Google phrase becomes "email", and the two
+    // sentences that raise a trial for everybody become neutral. founderWarn keeps
+    // its pass: it only reaches an account that HOLDS one, and losing it is the fact.
+    // iOS and the website keep every word above.
+    function androidShell() {
+        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
+        catch (e) { return false; }
+    }
+    var ANDROID = androidShell();
+    if (ANDROID) {
+        ['signOutWarn', 'deleteWarn2', 'founderWarn'].forEach(function (k) {
+            WORDS[k] = WORDS[k].replace('the same Apple ID, Google account or email', 'the same email');
+        });
+        WORDS.founderMaybe = 'Anything attached to this account stays with it, and a new account does not get it.';
+        WORDS.founderUnknown = 'This device could not check what is attached to this account. If something is, deleting the account gives it up for good. Check on a connection first if that matters to you.';
+    }
+
     // WHAT THE LIVE RULES REFUSE TO LET GO OF, with the rule that refuses it. Held
     // here rather than in a comment so the plan can HAND it to the screen and the
     // guard can assert the pair.
@@ -192,7 +211,9 @@
         if (!user || !user.uid || user.isAnonymous) return '';
         var who = user.email || 'this account';
         var p = accountProviders(user);
-        return 'Signed in as ' + who + (p.length ? ' (' + p.join(' and ') + ')' : '');
+        // Android names no providers: an account linked to Apple and Google on an
+        // iPhone would read "(Apple and Google and email)" in an app with neither.
+        return 'Signed in as ' + who + (p.length && !ANDROID ? ' (' + p.join(' and ') + ')' : '');
     }
 
     // ---- WHO SEES THE CARD AT ALL ----------------------------------------
