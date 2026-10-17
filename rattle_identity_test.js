@@ -342,10 +342,11 @@ describe('APP ICON ASSET SEAM', () => {
         const crypto = require('crypto');
         const sha = f => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
-        const MASTER_SHA = '3330ab520f7d0da6fb37e8774fe736c51d6d681bb7b409b9d0808b5e6fc02dc1';
+        // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): the HP ball + green location pin.
+        const MASTER_SHA = '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947';
         const STROKE_R_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
         assert.equal(sha(MASTER), MASTER_SHA, 'icon-1024.png moved');
-        assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png'), MASTER_SHA,
+        assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'), MASTER_SHA,
             'the iOS AppIcon moved');
         assert.notEqual(sha(MASTER), STROKE_R_SHA, 'icon-1024.png is still the Stroke R');
         assert.notEqual(sha('icon-512.png'), MASTER_SHA, 'the web icon is still the App Store master');
