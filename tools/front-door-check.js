@@ -248,7 +248,8 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, skins: skinsInstances.map(function (s) { return s.skinsBuyIn; }), e: window.__e })" }] });
     report.tplSkinsPlain = J(r)[0];
     f(report.tplSkinsPlain.step === report.tplSkinsPlain.money && (report.tplSkinsPlain.skins || []).join() === '2', '5c: a plain Skins template is no longer $2: ' + JSON.stringify(report.tplSkinsPlain));
-    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money$/, wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
+    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money&pool=1$/,   // &pool=1: the Weekly Game section open (URGENT-001)
+        wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
     report.allGames = {};
     for (const id of Object.keys(ALL)) {
         r = await go({ url: fileUrl('index.html', 'game=FDRND4&group=1'), db: DB({ FDRND4: R4() }), settleMs: 3500, preScript: APP + ERR, steps: [

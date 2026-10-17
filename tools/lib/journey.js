@@ -270,7 +270,9 @@ async function openJourney(opts) {
     const o = opts || {};
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'journey-'));
     if (!fs.existsSync(CHROME)) throw new Error('Chrome not found at ' + CHROME);
-    const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
+    // webgl: true (URGENT-001) - a WebGL context, as arriveCold's, for the GPS map.
+    const gpuArgs = o.webgl ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--disable-gpu'];
+    const chrome = spawn(CHROME, ['--headless=new', ...gpuArgs, '--no-first-run',
         '--remote-debugging-port=0', '--user-data-dir=' + profile,
         '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
     // TRACKED BEFORE ANYTHING THAT CAN THROW OR BAIL - openJourney throws in
@@ -364,7 +366,7 @@ async function openJourney(opts) {
             // would be silently ignored by the page.
             try { await evaluate("sessionStorage.removeItem('__journey_db')"); } catch (e) {}
             const r = await rpc(ws, id++, 'Page.addScriptToEvaluateOnNewDocument',
-                { source: statefulStub(JSON.stringify(db), o.auth) });
+                { source: statefulStub(JSON.stringify(db), o.auth) + (o.preScript ? '\n;' + o.preScript : '') });   // preScript (URGENT-001): e.g. the app's front door on
             injected = r.result && r.result.identifier;
             await rpc(ws, id++, 'Page.navigate', { url: url });
             await sleep(settleMs || 2200);

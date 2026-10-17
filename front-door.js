@@ -834,8 +834,13 @@
             if (tpl || paste || step || fmt) whenLoaded(function () {
                 try {
                     if (paste && typeof W.spRoundOpen === 'function') { W.goToWizardStep(5); W.spRoundOpen(); return; }
-                    if (step === 'players') { W.goToWizardStep(5); return; }
-                    if (step === 'money') { W.goToWizardStep(SO.action); return; }
+                    if (step === 'players') {
+                        W.goToWizardStep(5);
+                        var nx = agNext();
+                        if (nx && nx.stage === 'players' && nx.code === String(p.get('game')).toUpperCase()) agNeedBanner(nx);
+                        return;
+                    }
+                    if (step === 'money') { W.goToWizardStep(SO.action); if (p.get('pool') === '1') agOpenPool(); return; }
                     // ALL GAMES > a round format: its card picked on the Format step.
                     if (fmt) { if (typeof W.selectFormatCard === 'function') W.selectFormatCard(fmt); W.goToWizardStep(SO.format); return; }
                     if (tpl && typeof W.gpsApplyTemplate === 'function') {
@@ -921,6 +926,21 @@
     }
     // Round Setup's Round Ready screen calls this first: a quick GPS start skips it.
     function afterSave(code) {
+        var nx = agNext();
+        if (nx && nx.code === String(code).toUpperCase() && Date.now() - (nx.at || 0) < 2 * 3600 * 1000) {
+            if (nx.stage === 'players') {
+                // Players saved: on into the game's setup, the same round.
+                nx.stage = 'game'; nx.at = Date.now(); agNext(nx);
+                W.location.href = nx.next && nx.next.url ? nx.next.url : 'index.html?game=' + encodeURIComponent(code) + '&agq=' + encodeURIComponent((nx.next && nx.next.q) || nx.id);
+                return true;
+            }
+            if (nx.stage === 'game') {
+                // The game saved: back to the round, the side and hole it was on.
+                agNext(null);
+                W.location.href = 'index.html?game=' + encodeURIComponent(code);
+                return true;
+            }
+        }
         if (!ss(GO)) return false;
         ss(GO, null); ss(QUICK, null);
         ls('hardpan_round_side', 'gps|' + code);
@@ -956,6 +976,20 @@
         placeGpsPill();
         placeMenuItems();
         placeShareButton();
+        // Back from Players for a QUICK START (URGENT-001): its $ / golfers sheet, once the
+        // round (with its new golfers) is on the card. Back at the round otherwise: done.
+        var agq = pr.get('agq'), nx = agNext();
+        if (agq && nx && nx.code === String(code).toUpperCase()) {
+            try { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'index.html?game=' + encodeURIComponent(code)); } catch (e) {}
+            var tries = 0, t = setInterval(function () {
+                if (++tries > 80 || agPlayers().length) {
+                    clearInterval(t);
+                    if (!agPlayers().length) return;
+                    openAddGame();
+                    if (QUICK_STARTS.some(function (q) { return q.tpl === agq; })) agQuick(agq);
+                }
+            }, 150);
+        } else if (nx && nx.stage === 'game' && nx.code === String(code).toUpperCase()) agNext(null);
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
@@ -1042,6 +1076,55 @@
     function agPlayers() { try { return ((typeof currentData !== 'undefined' && currentData && currentData.players) || []).filter(function (p) { return p && p.name; }); } catch (e) { return []; } }   /* global currentData */
     function agRound() { try { return (typeof currentData !== 'undefined' && currentData) || {}; } catch (e) { return {}; } }
     function first(n) { return String(n || '').split(' ')[0]; }
+    // ENOUGH GOLFERS FIRST (URGENT-001, Manny 2026-10-17). A GPS quick start has one golfer
+    // ("Me"): a game picked here that needs more opened its setup with nobody to put in it (KP pool
+    // went straight to Money). Now a game with too few golfers opens Round Setup's Players step
+    // first, with one line saying why; Players' Save carries on into that game's setup (the same
+    // round code), and the game's own Save comes back to the round - the side (GPS or card) and the
+    // hole are the ones the phone was on (gps-view keeps the side, the card keeps the hole).
+    var AG_NEED = { kp: 2, nassau: 2, match: 2, strokebet: 2, skins: 2, vegas: 4, bbb: 2, wolf: 2, dots: 2, nines: 3, side: 2, bestball: 2, scramble: 2, ryder: 2, hilo: 4 };
+    var AG_NEXT = 'hardpan_ag_next';
+    function agNeed(id) { return AG_NEED[id] || 0; }
+    function agGameName(id) {
+        var g = ALL_GAMES.filter(function (x) { return x.id === id; })[0] || QUICK_STARTS.filter(function (x) { return x.tpl === id; })[0];
+        return g ? g.name : 'the game';
+    }
+    function agNext(v) {
+        if (v === undefined) { try { return JSON.parse(ss(AG_NEXT) || 'null'); } catch (e) { return null; } }
+        ss(AG_NEXT, v ? JSON.stringify(v) : null);
+        return v;
+    }
+    // Too few golfers for `id`? Then Players first, and `next` ({ url } or { q: tpl }) after it.
+    function agPlayersFirst(id, next) {
+        if (agPlayers().length >= agNeed(id)) return false;
+        var code = agCode();
+        agNext({ code: String(code).toUpperCase(), id: id, name: agGameName(id), need: agNeed(id), next: next, stage: 'players', at: Date.now() });
+        W.location.href = 'admin.html?game=' + encodeURIComponent(code) + '&step=players';
+        return true;
+    }
+    // Round Setup on the Players step for a game: the line on top, and a Save that goes on.
+    function agNeedBanner(nx) {
+        var host = $('admin-screen');
+        if (!host || $('fd-need')) return;
+        var box = W.document.createElement('div');
+        box.id = 'fd-need';
+        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card);';
+        box.innerHTML = '<div style="font-weight:800;font-size:1.02rem;color:#0f4c3a;">Add your golfers first, then we\u2019ll set up ' + esc(nx.name) + '.</div>'
+            + '<div style="font-size:.8rem;opacity:.8;margin:4px 0 8px;">' + esc(nx.name) + ' needs ' + nx.need + ' golfers or more.</div>'
+            + '<button type="button" class="btn-primary fd-need-go" style="width:100%;min-height:50px;font-weight:800;background:#0f4c3a;border-color:#0f4c3a;">Save golfers \u00b7 set up ' + esc(nx.name) + ' \u203a</button>';
+        var prog = $('wizard-progress');
+        if (prog && prog.parentNode) prog.parentNode.insertBefore(box, prog); else host.insertBefore(box, host.firstChild);
+        box.addEventListener('click', function (ev) {
+            if (!ev.target.closest('.fd-need-go')) return;
+            try { if (typeof W.saveSettings === 'function') W.saveSettings(); } catch (e) { try { console.error('[front door] players first', e); } catch (x) {} }
+        });
+    }
+    // The KP pool / weekly game: its section open on the Money step.
+    function agOpenPool() {
+        var cb = $('mp-enabled');
+        if (cb && !cb.checked) cb.click();
+        try { if (cb && cb.scrollIntoView) cb.scrollIntoView({ block: 'start' }); } catch (e) {}
+    }
     function agMoney(v) { v = Number(v); return '$' + (v % 1 ? v.toFixed(2).replace(/0$/, '') : v); }
     function agSheet() {
         var el = $('fd-addgame');
@@ -1098,6 +1181,7 @@
     }
     // A QUICK START: the $ and the golfers / teams, then its normal setup.
     function agQuick(tpl) {
+        if (agPlayersFirst(tpl, { q: tpl })) return;
         var ps = agPlayers(), ids = ps.map(function (p) { return String(p.id); });
         AG.q = { tpl: tpl, amt: AG_DEF[tpl], order: ids.slice(0, 4), ids: ids.slice(), carry: true, mode: ps.length === 2 || ps.length === 3 ? '1v1' : '2v2' };
         if (AG.q.mode === '1v1') AG.q.order = ids.slice(0, 2);
@@ -1182,7 +1266,7 @@
         if (g.go === 'smlist') return 'sidematches.html' + base;
         if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
         if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;
-        if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step;
+        if (g.go === 'step') return 'admin.html' + base + '&step=' + g.step + (g.id === 'kp' ? '&pool=1' : '');
         if (g.go === 'points') return 'points.html' + base + '&setup=1';
         return null;
     }
@@ -1215,7 +1299,9 @@
             var g = ALL_GAMES.filter(function (x) { return x.id === b.getAttribute('data-ag-all'); })[0];
             if (!g) return;
             if (g.go === 'trip') { agTrip(); return; }
-            var url = agRoute(g); if (url) W.location.href = url;
+            var url = agRoute(g);
+            if (url && agPlayersFirst(g.id, { url: url })) return;
+            if (url) W.location.href = url;
             return;
         }
         if (!AG.q) return;
@@ -1516,7 +1602,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
