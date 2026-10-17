@@ -174,7 +174,7 @@
           }
         },
         "organizerToken": {
-          ".validate": "newData.isString() && newData.val().length >= 16 && newData.val().length <= 64"
+          ".validate": "newData.val() === data.val() || (newData.isString() && newData.val().length >= 16 && newData.val().length <= 64)"
         },
         "pointsGame": {
           ".write": "auth != null && root.child('events/' + $eventCode).exists()"

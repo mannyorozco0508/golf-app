@@ -36,7 +36,9 @@ E.players = { '.validate': 'newData.hasChildren()', $i: {
     '.validate': "newData.hasChildren(['id', 'name']) && newData.child('id').isNumber() && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 60" } };
 E.courseData = { '.validate': 'newData.hasChildren()', $i: {
     '.validate': "newData.hasChildren(['hole', 'par']) && newData.child('hole').isNumber() && newData.child('hole').val() >= 1 && newData.child('hole').val() <= 18 && newData.child('par').isNumber() && newData.child('par').val() >= 3 && newData.child('par').val() <= 6" } };
-E.organizerToken = { '.validate': 'newData.isString() && newData.val().length >= 16 && newData.val().length <= 64' };
+// A NEW token is a real one (the app mints 32 hex); a save that carries the round's existing
+// token unchanged is never refused for it (older rounds may hold shorter ones).
+E.organizerToken = { '.validate': 'newData.val() === data.val() || (newData.isString() && newData.val().length >= 16 && newData.val().length <= 64)' };
 // The game play children: any SIGNED-IN golfer on the round (scorekeepers, players). Each was
 // "while the round exists" with no auth; now auth is required too (C1).
 const PLAY = ['scores', 'scoresVerified', 'kpLeaders', 'kpWinners', 'kpConfirmed', 'kpGroupAnswers', 'challenges', 'sideMatches',
