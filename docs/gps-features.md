@@ -415,3 +415,9 @@ accuracy in Pro when weak, centre-only holes, Mark shot per hole, plays-like cla
 location timeout != denied, Join / Games card time-bound, group-locked name tag, no duplicate
 quick-start round, thru N and the hole picker in play order. Checks: audit2_queue_test.js,
 audit2_geo_test.js, tools/audit2-sim.js, tools/xss-check.js.
+
+## gps-games-btn (2026-10-17, mailbox 002b): "Games" on the GPS screen stays in the round
+In a round, Games shows the card side with this round's games in view (no reload: hole, golfer pick
+and GPS kept; the GPS button returns to the map on the same hole); a round with no games opens this
+round's own Add a game. home.html#games only with no round open. The rule "has games" is the GPS-3
+card's (front-door hasGames). Check: tools/games-button-check.js.

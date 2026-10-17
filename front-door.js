@@ -974,11 +974,17 @@
         if (num && num.nextSibling) head.insertBefore(b, num.nextSibling); else head.appendChild(b);
     }
     // GPS-3: on the card of a GPS round with no money, the next steps.
+    // Does this round have any game to show? (The GPS-3 card's rule, shared with the GPS screen's
+    // "Games" button, mailbox 002b.) Plain stroke play with no stakes is "no games yet".
+    function hasGames(data) {
+        if (!data) return false;
+        return !!((data.gameFormat && data.gameFormat !== 'stroke') || Object.keys(data.sideMatches || {}).length || Object.keys(data.additionalGameInstances || {}).length
+            || (data.moneyPool && data.moneyPool.enabled) || (data.additionalGames && Object.keys(data.additionalGames).length) || data.ryderCup || data.ryderCupRef
+            || Number(data.skinsBuyIn) > 0 || data.birdieGameEnabled === true || Number(data.holeBetStake) > 0);
+    }
     function gpsRoundStrip(data) {
         if (!on() || !data) return '';
-        var money = (data.gameFormat && data.gameFormat !== 'stroke') || Object.keys(data.sideMatches || {}).length || Object.keys(data.additionalGameInstances || {}).length
-            || (data.moneyPool && data.moneyPool.enabled) || (data.additionalGames && Object.keys(data.additionalGames).length) || data.ryderCup || data.ryderCupRef;
-        if (money) return '';
+        if (hasGames(data)) return '';
         var code = params().get('game');
         return '<div id="fd-gps3" style="margin:12px 0;padding:14px;border-radius:16px;background:#ffffff;color:#1a1a1a;border:1px solid #d0e1db;color-scheme:light;">'
             + '<div style="font-size:.8rem;opacity:.75;margin-bottom:6px;">Just scores, no money.</div>'
@@ -1510,7 +1516,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
