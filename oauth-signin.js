@@ -57,9 +57,9 @@
 (function () {
     'use strict';
 
-    var NOTE_PRESERVED = 'Signed in. This is the same organizer account, so the free trial and a founder pass stay with you. Rounds you already set up stay yours.';
-    var NOTE_ADOPTED = 'Signed in as that account. The free trial and a founder pass are the ones on it - they are not copied from the anonymous account this browser had before, and rounds set up on that anonymous account are not moved.';
-    var NOTE_FRESH = 'Signed in. The free trial and a founder pass, if this account has them, are the ones on this account.';
+    var NOTE_PRESERVED = 'Signed in. This is the same organizer account, so rounds and groups you already set up stay yours.';
+    var NOTE_ADOPTED = 'Signed in as that account. Nothing is copied from the anonymous account this browser had before, and rounds set up on that anonymous account are not moved.';
+    var NOTE_FRESH = 'Signed in. Rounds and groups you set up from now on stay with this account.';
     var NOTE_CANCELLED = 'Sign-in cancelled. Nothing changed.';
     var NOTE_NOT_ENABLED = 'That sign-in is not switched on for this app yet. It has to be enabled in the Firebase console first.';
     var NOTE_POPUP_BLOCKED = 'The browser blocked the sign-in window. Allow pop-ups for this site, or use email instead.';

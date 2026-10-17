@@ -59,10 +59,10 @@
         'auth/provider-already-linked': true
     };
 
-    var NOTE_PRESERVED = 'Signed in. This is the same organizer account, so the free trial and a founder pass stay with you. Rounds you already set up stay yours.';
-    var NOTE_ADOPTED = 'Signed in on this device as your email account. The free trial and a founder pass stay on that account. They are not copied from the anonymous account this browser had before, and rounds set up on that anonymous account are not moved.';
-    var NOTE_FRESH = 'Signed in. The free trial and a founder pass, if this account has them, are the ones on this account.';
-    var NOTE_SENT = 'Link sent. Open it in this app, or paste it below. Finish here before you open it in another browser — that would start a different account and leave the free trial and a founder pass behind.';
+    var NOTE_PRESERVED = 'Signed in. This is the same organizer account, so rounds and groups you already set up stay yours.';
+    var NOTE_ADOPTED = 'Signed in on this device as your email account. Nothing is copied from the anonymous account this browser had before, and rounds set up on that anonymous account are not moved.';
+    var NOTE_FRESH = 'Signed in. Rounds and groups you set up from now on stay with this account.';
+    var NOTE_SENT = 'Link sent. Open it in this app, or paste it below. Finish here before you open it in another browser — that would start a different account.';
     var NOTE_NEED_EMAIL = 'Enter the same email address the link was sent to, then tap Finish sign-in.';
     var NOTE_PASTE = 'Paste the whole link from the email, or just the code from the end of it.';
     var NOTE_CONSOLE = 'Email sign-in is not turned on for this app yet. It has to be enabled in the Firebase console before a link can be sent.';

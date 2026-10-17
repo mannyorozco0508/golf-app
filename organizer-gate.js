@@ -254,12 +254,7 @@
     // with more than NOTICE_DAYS left (none, at 21: every live trial says its days).
     function standingLine(st) {
         if (!st) return '';
-        if (st.kind === 'pass') {
-            if (st.passKind === 'founder') return 'Founder pass \u00B7 setting up rounds is free';
-            var label = st.passKind ? st.passKind.charAt(0).toUpperCase() + st.passKind.slice(1) + ' pass' : 'Pass';
-            return label + ' \u00B7 rounds free to set up until ' + fmtDate(st.expiresAt);
-        }
-        // No trial line (games are free, 2026-10-17): nothing counts days down.
+        // No trial line and no pass line (games are free, 2026-10-17): nothing counts days down.
         return '';
     }
 

@@ -110,12 +110,13 @@
         // an account that no longer exists; once the delete rule is published it goes
         // with the record. Either way it is gone for the person reading this, and a
         // sentence that named the mechanism would be wrong within the week.
-        founderWarn: 'THIS ACCOUNT HAS A FOUNDER PASS. Deleting the account gives up that pass for good: nothing brings it back, and signing in again with the same Apple ID, Google account or email makes a NEW organizer that does not have it. If you want the pass, do not delete this account.',
-        founderMaybe: 'If this account has a founder pass or a running free trial, it stays attached to this account and a new one does not get it.',
+        // NO PASS WORDING (mailbox 005, 2026-10-17: games are free; nothing here mentions a trial or a pass).
+        founderWarn: 'THIS IS AN ORGANIZER ACCOUNT. Deleting it is for good: nothing brings it back, and signing in again with the same Apple ID, Google account or email makes a NEW account. If you want to keep it, do not delete it.',
+        founderMaybe: 'Deleting the account cannot be undone.',
         // SEPARATE FROM founderMaybe ON PURPOSE. "We could not check" and "there is
         // probably nothing" read the same to a golfer and are not the same fact, and
         // the incident happened in exactly the state this sentence describes.
-        founderUnknown: 'This device could not check whether this account holds a founder pass or a running free trial. If it does, deleting the account gives it up for good. Check on a connection first if that matters to you.'
+        founderUnknown: 'This device could not check this account just now. Deleting it cannot be undone. Check on a connection first if that matters to you.'
     };
 
     // WHAT THE LIVE RULES REFUSE TO LET GO OF, with the rule that refuses it. Held

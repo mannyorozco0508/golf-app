@@ -1264,7 +1264,7 @@ html {
     </section>
     <section id="email-link-card" class="email-link-card" aria-labelledby="email-link-title" style="display:none;">
         <h2 id="email-link-title">Keep this organizer</h2>
-        <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a link &mdash; the free trial and a founder pass stay with the rounds already set up on it.</p>
+        <p id="email-link-lead">This browser's organizer account exists only here. Email yourself a link &mdash; the rounds and groups already set up on it stay yours.</p>
         <form id="email-link-form" onsubmit="return emailLinkAuth.submitSend(event)">
             <label for="email-link-input">Email</label>
             <input id="email-link-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email for the sign-in link">
@@ -10187,7 +10187,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (X.deleteNeedsTyping(standing)) {
                 const typed = await uiPrompt({
                     title: 'Type ' + X.TYPE_WORD + ' to delete ' + ((user && user.email) || 'this account'),
-                    body: 'This account holds a FOUNDER PASS. Deleting it gives that pass up for good - nothing brings it back, and a new account does not get one.',
+                    body: 'This is an organizer account. Deleting it is for good - nothing brings it back, and signing in again makes a new account.',
                     code: true, maxLength: 12, placeholder: X.TYPE_WORD,
                     confirmText: 'Delete for good', cancelText: 'Keep my account'
                 });
