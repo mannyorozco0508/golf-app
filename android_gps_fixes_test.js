@@ -584,3 +584,96 @@ describe('012. THE ANDROID ACCOUNT WORDS: no trial, no pass, email only', () => 
         assert.equal(w.describeAccount(linked), 'Signed in as golfer@example.com (Apple and Google and email)');
     });
 });
+
+// ---------------------------------------------------------------------------
+// 015. THE DAY-22 WALL AND THE SIGN-IN NOTES, ANDROID WORDS (job 015).
+// The wall is reached the way a golfer reaches it: the wizard's own Save, the round
+// write refused, the uid's own record read back 22 days on. The sign-in note is
+// reached by ARRIVING on the email-link URL; the page finishes it by itself.
+// window.Capacitor exists before any script parses (helpers/load-script.js
+// beforeScripts), as it does in the native shell.
+// CANNOT PROVE: the refusal itself (that is the live rules; wave2_rules_test.js holds
+// the rules file, including EXPIRED1 - an expired owner still edits an existing round).
+// BASELINE (whole file, 35 tests): against pre-015 email-link-auth.js e5ae7c217885 and
+// organizer-gate.js 4042160ee3dd, 33 pass / 2 fail - the 2 are this block's Android tests;
+// its 2 iOS/web tests pass before and after (31 older + 2 = 33). After the change: 35 / 0.
+// ---------------------------------------------------------------------------
+describe('015. Android: the wall names no price, trial or pass; the sign-in notes neither', () => {
+    const DAY = 86400000;
+    const settle = () => new Promise(r => setTimeout(r, 30));
+    const DENIED = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
+    const cap = platform => s => {
+        if (platform !== 'web') s.Capacitor = s.window.Capacitor = { getPlatform: () => platform, isNativePlatform: () => true, Plugins: {} };
+    };
+    const SELLS = /\$|\d+\.\d\d|trial|\bpass(es)?\b|purchase|\bbuy\b|price|subscri|on sale/i;
+
+    async function wallFor(platform) {
+        const sb = loadHtmlInlineScript('admin.html', ['pwa-boot.js'], { search: '?game=GATE01', beforeScripts: cap(platform) });
+        vm.runInContext(`
+            window.__alerts = []; window.alert = function (m) { window.__alerts.push(String(m)); }; uiRefuse = alert; uiFail = alert; uiToast = alert;
+            window.crypto = { getRandomValues: function (a) { for (var i = 0; i < a.length; i++) a[i] = (i * 37) & 255; return a; } };
+            var key = Object.keys(coursePresets)[0];
+            courseHiddenSelect.value = key; courseSearchInput.value = coursePresets[key].name;
+            window.__btn = document.getElementById('main-save-btn'); window.__btn.innerText = '💾 Save & Start Round';
+        `, sb);
+        sb.__dbRefuse = (p) => (p === 'events/GATE01' ? DENIED() : null);
+        sb.__dbReads = { 'organizers/anon-stub': { firstSeenAt: Date.now() - 22 * DAY } };
+        // The golfer presses Save & Start Round: the button's own handler.
+        vm.runInContext('saveSettings();', sb);
+        for (let i = 0; i < 20; i++) await settle();
+        return sb.window.__alerts;
+    }
+
+    test('Android, day 22, Save refused: the golfer reads the Android wall - paused, what still works, support email - and nothing priced', { skip }, async () => {
+        const alerts = await wallFor('android');
+        assert.equal(alerts.length, 1, JSON.stringify(alerts));
+        const w = alerts[0];
+        assert.match(w, /^⛳ New rounds are paused for this organizer account\./);
+        assert.match(w, /Joining, scoring and watching rounds still work/);
+        assert.match(w, /support@rattlegolf\.com/);
+        assert.match(w, /This one was not saved/);
+        assert.ok(!SELLS.test(w), 'the Android wall sells or prices something: ' + w);
+    });
+
+    test('iOS and the website UNCHANGED: the same refusal shows the old wall, prices and all, identical on both', { skip }, async () => {
+        const ios = await wallFor('ios'), web = await wallFor('web');
+        assert.equal(ios.length, 1); assert.equal(JSON.stringify(ios), JSON.stringify(web));
+        assert.match(ios[0], /^⛳ Your free trial has ended\./);
+        assert.match(ios[0], /Season Pass \(\$29\.99 a year\)/);
+    });
+
+    const LINK = '?apiKey=test-key&oobCode=oob-wave1&mode=signIn&lang=en';
+    async function arriveOnLink(platform) {
+        const sb = loadHtmlInlineScript('admin.html', [], {
+            search: LINK, localStorage: true,
+            seedStorage: { golfapp_email_for_sign_in: 'marty@example.com', golfapp_email_link_uid: 'anon-stub' },
+            beforeScripts: cap(platform),
+            beforeRun(s) {
+                s.firebase.auth.EmailAuthProvider = { credentialWithLink(email, url) { return { email, url, providerId: 'password' }; } };
+                const user = s.firebase.auth().currentUser;
+                user.linkWithCredential = (cred) => { user.isAnonymous = false; user.email = cred.email; return Promise.resolve({ user: { uid: user.uid, isAnonymous: false, email: cred.email } }); };
+            }
+        });
+        for (let i = 0; i < 40; i++) await settle();
+        return sb;
+    }
+
+    test('Android: arriving on the link signs in and the note on screen names no trial or pass', { skip }, async () => {
+        const sb = await arriveOnLink('android');
+        const shown = sb.document.getElementById('email-link-status').textContent;
+        assert.equal(shown, 'Signed in. This is the same organizer account. Rounds you already set up stay yours.');
+        const e = sb.emailLinkAuth;
+        [e.NOTE_PRESERVED, e.NOTE_ADOPTED, e.NOTE_FRESH, e.NOTE_SENT].forEach(n => {
+            assert.ok(n && n.length > 5, 'a note is empty');
+            assert.ok(!/trial|founder|\bpass\b/i.test(n), 'Android note: ' + n);
+        });
+    });
+
+    test('iOS and the website UNCHANGED: the same arrival shows the old note; all four notes identical on both', { skip }, async () => {
+        const ios = await arriveOnLink('ios'), web = await arriveOnLink('web');
+        assert.equal(ios.document.getElementById('email-link-status').textContent,
+            'Signed in. This is the same organizer account, so the free trial and a founder pass stay with you. Rounds you already set up stay yours.');
+        ['NOTE_PRESERVED', 'NOTE_ADOPTED', 'NOTE_FRESH', 'NOTE_SENT'].forEach(k => assert.equal(ios.emailLinkAuth[k], web.emailLinkAuth[k], k));
+        assert.match(ios.emailLinkAuth.NOTE_SENT, /leave the free trial and a founder pass behind\.$/);
+    });
+});

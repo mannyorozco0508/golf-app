@@ -42,6 +42,19 @@
         + 'Joining a round is free, always. Setting one up needs a pass — one person per group: '
         + 'a Season Pass ($29.99 a year) or a Trip Pass ($19.99).\n\n'
         + 'Passes aren’t on sale in the app yet. The rounds you already set up still work. This one was not saved.';
+    // ANDROID (job 015): the same refusal in plain words - no prices, no trial, no pass,
+    // nothing to buy, because the Android app sells nothing. The rule is unchanged: only a
+    // NEW round is refused; joining, scoring and watching are not gated at all. iOS and
+    // the website keep the sentence above.
+    var androidShell = (function () {
+        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
+        catch (e) { return false; }
+    })();
+    if (androidShell) {
+        WALL = '⛳ New rounds are paused for this organizer account.\n\n'
+            + 'Joining, scoring and watching rounds still work, and the rounds you already set up still work. This one was not saved.\n\n'
+            + 'Email support@rattlegolf.com and we’ll sort it out.';
+    }
 
     function isPermissionDenied(err) {
         var s = String((err && (err.code || err.message)) || '');

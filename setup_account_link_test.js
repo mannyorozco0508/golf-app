@@ -148,7 +148,17 @@ describe('Option A: the setup home does not open on the organizer card', () => {
         // migrationNote still gives the adopted uid different words ("not moved") from the
         // same uid. email_link_auth_test.js 19/19; android_gps_fixes_test.js holds the split.
         // was 7c421eb50161dc5f43cd40cf7fcaffc007d6b44a2ec8a67a2c9c1d3b4e46325b
-        assert.equal(sha('email-link-auth.js'), '1607185766ee551f9142615728a7e0075c30d6c1236badc28f75dfe514ef1931',
+        //
+        // RE-PINNED (android-gps, job 015, Manny's explicit approval for this file,
+        // 2026-10-17): on Android only, NOTE_PRESERVED / NOTE_ADOPTED / NOTE_FRESH /
+        // NOTE_SENT drop "the free trial and a founder pass" (the Android app sells nothing);
+        // iOS and the website keep every word. No auth logic moved. Re-measured on android,
+        // ios and web alike: setStatus('flush-check') leaves lastNote === 'flush-check';
+        // planCompletion({isAnonymous:true}) answers 'link'; migrationNote gives the adopted
+        // uid NOTE_ADOPTED ("not moved") and the same uid NOTE_PRESERVED, different words.
+        // email_link_auth_test.js 19/19; android_gps_fixes_test.js 015 holds both halves.
+        // was 1607185766ee551f9142615728a7e0075c30d6c1236badc28f75dfe514ef1931
+        assert.equal(sha('email-link-auth.js'), 'aed105929f282340a2ff369e65d6af5fde6eca25ed7a91eade2c6d733f640e1d',
             'email-link-auth.js changed. Option A is a PRESENTATION change - moving the '
             + 'card behind Account must not touch the auth. If this was deliberate, the '
             + 'held-note flush (v214), the uid-preserving link path and the second-device '

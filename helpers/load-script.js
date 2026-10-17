@@ -408,6 +408,12 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
         sandbox.document.__mount(el);
     }
 
+    // BEFORE ANY SCRIPT PARSES. The native shell injects window.Capacitor before the
+    // page's first <script>, and some shared files decide Android-or-not as they are
+    // read (job 015). beforeRun is too late for those: the declared scripts below have
+    // already run by then.
+    if (options && typeof options.beforeScripts === 'function') options.beforeScripts(sandbox);
+
     dependencies.forEach(depPath => {
         const depCode = fs.readFileSync(path.join(REPO_ROOT, depPath), 'utf8');
         vm.runInContext(depCode, sandbox, { filename: depPath });

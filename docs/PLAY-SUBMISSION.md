@@ -19,7 +19,7 @@ Ground rules for this first release (Manny, 2026-10-17):
 | G3 | ~~Organizer locked out of their own round's setup on Android~~. **Fixed in 0.2 (5)** (job 003): `auth-boot.js` tries again after `load` on Android. On the emulator, Vegas with one golfer now opens the Players step for the round's creator. | — | Done |
 | G4 | **Server account deletion (`accountDelete`) is not deployed.** Live, it answers 404. | In-app Delete account still works: the client-side delete runs when the function is missing. Data left behind that way: anything the client may not remove (see §5). The Data safety "deletion" answer must match what really happens. | Manny: deploy or accept |
 | G5 | **Screenshots.** The 10 in `~/Desktop/HardPan-screenshots-v2/final-10` are iPhone (1320×2868, 2.17:1). Play's limit is 2:1, and they show iOS. | They are rejected at upload. | Done: 8 Android shots on a clean 0.2 (5) install with the 5RZ8GE demo round, in `docs/play-assets/screenshots/` (1080×2160). No test data in any of the 8 (job 011). |
-| G6 | **"Trial" and "founder pass" words inside the app.** | | **Mostly fixed in 0.2 (8)** (job 012): Android shows no trial / pass line, and the Account sheet names email only. Still on every platform: the four sign-in notes in `email-link-auth.js` (frozen file, waiting on Manny). iOS unchanged. |
+| G6 | **"Trial" and "founder pass" words inside the app.** | | **Fixed on Android in 0.2 (9)** (jobs 012, 015): no trial / pass line, email-only Account words, trial-free sign-in notes, and a day-22 wall with no prices ("New rounds are paused… Email support@rattlegolf.com"). iOS unchanged (G7 in `FOR-IOS-SESSION.md`). |
 | G7 | **Money-game wording and the gambling policy.** The app records friendly side games (Nassau, skins, Vegas, BBB) and shows who owes whom. It never takes, holds or moves money (confirmed in code, §3). The Vegas row uses a 🎲 icon. | Reviewers can read "bets / who pays who" as gambling. Keep the listing on "side games" and "settle up between yourselves", target 18+, and answer IARC as in §3. Swap the 🎲 icon (`docs/FOR-IOS-SESSION.md` #6). | Manny (icon via the iOS session) |
 | G8 | **Shared bugs a reviewer could meet**: a GPS READY course that "cannot start" (Talking Stick South), "No rated tees" when tees exist, "&" dropped in the trip builder. | They look broken in review. The review path in §4 avoids them. | iOS session (`docs/FOR-IOS-SESSION.md`) |
 | G9 | **Play App Signing SHA-1 is not known yet.** | Play re-signs with its own app-signing key. When native Google sign-in comes, Firebase needs that SHA-1 too, not only the upload key's. Nothing to do for this release. | Later |
@@ -235,6 +235,11 @@ Screenshots (0.2 (7) on the emulator): 01 Home, 02 Near you (Caledonia), 03 GPS 
 - [x] Android Account words: no trial / founder-pass line, email-only wording (Android-gated; iOS and web unchanged, tested).
 - [x] AAB 5,769,356 bytes, sha256 `78fc57d4bc22…`, signer SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Debug APK on rattle36 (versionCode 8).
 - [x] Full suite: 11072 tests, 11066 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
+
+## 7c. 0.2 (versionCode 9) (job 015)
+- [x] Android sign-in notes without trial / pass words; Android day-22 wall without prices. iOS and web unchanged (tested both halves).
+- [x] AAB (clean build) 5,769,768 bytes, sha256 `7bd9c72b1790…`, signer SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Debug APK on rattle36 (versionCode 9). **Build with `clean`:** an incremental `bundleRelease` after `cap sync` shipped the previous assets once; check the AAB's `base/assets/public/` for the change before uploading.
+- [x] Full suite: 11076 tests, 11070 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
 
 ## 9. Post-launch: App Links (order approved by Manny, job 012; nothing deployed yet)
 Tested on the emulator (URGENT-010): the link opens the app warm and cold, and a cold start signs in with no paste. Real phones send these links to the browser until step 2.

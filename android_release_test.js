@@ -62,7 +62,7 @@ describe('VERSION', () => {
     });
 
     test('versionCode is its own sequence and is pinned here', () => {
-        assert.match(GRADLE, /versionCode 8\b/, 'versionCode is not 8; the iOS build number is not this sequence');
+        assert.match(GRADLE, /versionCode 9\b/, 'versionCode is not 9; the iOS build number is not this sequence');
     });
 });
 

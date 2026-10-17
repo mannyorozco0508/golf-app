@@ -163,7 +163,11 @@ const UNCHANGED = {
     'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
     'challenges.js': '7fc9ed67d513a1b18fa807d92a2634e57a9734e44b488f61035ecbbdcb6fdc1b',
     'code-issuer.js': 'c8e246c246d194a539f346f7e9e5dcfe2ae4ac21c611809b938bf12fa7865c9d',
-    'organizer-gate.js': '8bff990e9bdc00ceaca42392cf9dbea42ec61b87aa92bd2fc41f0736a155773d'
+    // RE-PINNED (android-gps, job 015, Manny approved the Android wall copy, which lives only
+    // in this file, 2026-10-17): +13 lines after WALL, 0 removed - on Android only, WALL is
+    // reassigned to plain words with no prices. ensureOrganizer and stamp, the two paths the
+    // builder calls, are byte-identical. was 8bff990e9bdc00ceaca42392cf9dbea42ec61b87aa92bd2fc41f0736a155773d
+    'organizer-gate.js': '55c83cb5f34ea9948e6affb5f8a8abaf15d589a5982306b92f6205dc0f8fa16d'
 };
 test('the Ryder engine and the code / organizer helpers are byte-identical to main', () => {
     Object.keys(UNCHANGED).forEach((f) => assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, f))).digest('hex'), UNCHANGED[f], f + ' changed'));

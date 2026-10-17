@@ -48,8 +48,16 @@ were reproduced on an iPhone.
      the signed-out email lead promises nothing, and the sign-out / delete words in
      `account-exit.js` raise no trial. iOS and the website are byte-for-byte unchanged and
      still show all of it, plus the four `email-link-auth.js` notes ("the free trial and a
-     founder pass stay with you") on every platform, Android included (that file is
-     frozen by `setup_account_link_test.js`; waiting on Manny).
+     founder pass stay with you"). **Job 015:** those four notes are now Android-gated
+     too; iOS and the website still show them.
+   - **G7 (job 015): THE DAY-22 WALL ON iOS NAMES PRICES WITH NO WAY TO PAY.** The live
+     rule refuses a NEW round once `firstSeenAt + 21 days` has passed and no pass is live,
+     on every platform. iOS and the website then show "Your free trial has ended… a Season
+     Pass ($29.99 a year) or a Trip Pass ($19.99)… Passes aren't on sale in the app yet."
+     There is no IAP for passes; passes are only ever written by hand (console/CLI,
+     `pass/.write: false`). Android now says "New rounds are paused for this organizer
+     account… Email support@rattlegolf.com". A rules change that lifts the wall for
+     everyone, and what it breaks, is in `docs/rules/LIFT-TRIAL-WALL.md` (not deployed).
 
 6. **The Vegas row uses a dice icon.**
    - `front-door.js:1128` (`ALL_GAMES`): `{ id: 'vegas', ico: '🎲', … }`.
@@ -103,6 +111,9 @@ the old path unchanged, and `android_gps_fixes_test.js` asserts the iOS half of 
 | `admin.html` | `isAndroidShell()`; no Apple/Google/Link buttons, email card shown; Notifications card hidden; Setup Coach back probe |
 | `admin.html` (job 012) | `renderOrganizerStanding()` writes nothing on Android; signed-out `#email-link-lead` gets trial-free words on Android; signed-in `#oauth-lead` says "the same email" on Android |
 | `account-exit.js` (job 012) | On Android only: "Apple ID, Google account or email" → "email" in the sign-out / delete warnings; `founderMaybe` / `founderUnknown` drop the trial; `describeAccount()` names no providers |
+| `email-link-auth.js` (job 015) | On Android only: NOTE_PRESERVED / NOTE_ADOPTED / NOTE_FRESH / NOTE_SENT drop the trial and founder pass. Frozen hash re-pinned with Manny's approval, three sign-in paths re-measured on android, ios and web |
+| `organizer-gate.js` (job 015) | On Android only: `WALL` is "New rounds are paused for this organizer account…", with no prices. +13 lines, 0 removed; `trip_builder_test.js` pin moved with the reason |
+| `helpers/load-script.js` (job 015, tests only) | `beforeScripts` option: runs before the page's declared scripts, as the native shell's Capacitor does |
 | `index.html` | Round Menu sheet back probe (Android only) |
 | `capacitor.config.ts` | `plugins.SystemBars.insetsHandling = 'disable'` (Android reads it; Capacitor iOS has no such key) |
 | `native_bundle_freshness_test.js` | GPS mode for the Android bundle, declared by `@capacitor/geolocation` in the Android allowlist; the iOS bundle is still held to Consumer |

@@ -63,6 +63,15 @@
     var NOTE_ADOPTED = 'Signed in on this device as your email account. The free trial and a founder pass stay on that account. They are not copied from the anonymous account this browser had before, and rounds set up on that anonymous account are not moved.';
     var NOTE_FRESH = 'Signed in. The free trial and a founder pass, if this account has them, are the ones on this account.';
     var NOTE_SENT = 'Link sent. Open it in this app, or paste it below. Finish here before you open it in another browser — that would start a different account and leave the free trial and a founder pass behind.';
+    // ANDROID: NO TRIAL, NO PASS (job 015). The Play listing promises no trial and sells
+    // nothing, so these four say only what happens to the account and its rounds. iOS
+    // and the website keep the sentences above, unchanged.
+    if (androidShell()) {
+        NOTE_PRESERVED = 'Signed in. This is the same organizer account. Rounds you already set up stay yours.';
+        NOTE_ADOPTED = 'Signed in on this device as your email account. Rounds set up on the anonymous account this phone had before are not moved.';
+        NOTE_FRESH = 'Signed in.';
+        NOTE_SENT = 'Link sent. Open it in this app, or paste it below. Finish here before you open it in another browser — that would start a different account.';
+    }
     var NOTE_NEED_EMAIL = 'Enter the same email address the link was sent to, then tap Finish sign-in.';
     var NOTE_PASTE = 'Paste the whole link from the email, or just the code from the end of it.';
     var NOTE_CONSOLE = 'Email sign-in is not turned on for this app yet. It has to be enabled in the Firebase console before a link can be sent.';
