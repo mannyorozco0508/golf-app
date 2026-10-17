@@ -3452,7 +3452,22 @@
         on(el, '.gps-add-game', function () { if (!S) return; closeMenus(); if (doorsOn()) openAddGame(); else window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); });
         on(el, '.gps-door-add', function () { openAddGame(); });
         on(el, '.gps-pick-course', function () { closeMenus(); window.location.href = 'home.html#pick'; });
-        on(el, '.gps-door-games', function () { window.location.href = 'home.html#games'; });
+        // "Games" IN A ROUND STAYS IN THE ROUND (Manny, 2026-10-16): the card side with this round's
+        // games in view, or - no games yet - this round's own Add a game. Never the course picker;
+        // Home's Games only when no round is open. The hole, the golfer pick and GPS stay (no reload).
+        on(el, '.gps-door-games', function () {
+            if (!S || !S.eventCode) { window.location.href = 'home.html#games'; return; }
+            closeMenus();
+            S.userChoseSide = true;
+            showSide('bets');
+            setTimeout(function () {
+                var m = document.getElementById('todays-games-mount'), D = window.HardPanDoors;
+                var rd = (typeof currentData !== 'undefined' ? currentData : null) || S.round;   /* global currentData */
+                var has = D && typeof D.hasGames === 'function' ? D.hasGames(rd) : !!(m && m.textContent.replace(/\s+/g, ''));
+                if (has) { try { m.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { m.scrollIntoView(); } }
+                else if (window.HardPanDoors && typeof window.HardPanDoors.openAddGame === 'function') window.HardPanDoors.openAddGame();
+            }, 60);
+        });
         on(el, '.gps-ag-back', function () { closeAddGame(); });
         on(el, '.gps-ag-not', function () { closeAddGame(); });
         el.addEventListener('click', function (ev) {
