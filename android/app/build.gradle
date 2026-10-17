@@ -27,8 +27,8 @@ android {
         // number). versionName may match iOS when shipping together —
         // android_release_test.js pins this literal and holds it to semver;
         // move both together.
-        versionCode 2
-        versionName "1.0.6"
+        versionCode 3
+        versionName "0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

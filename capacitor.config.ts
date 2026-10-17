@@ -85,8 +85,12 @@ const config: CapacitorConfig = {
   // so naming them would break the Android build for a feature Android does not
   // ship. When Android gets push, it gets the json, the gradle plugin and the
   // entries here together, on purpose.
+  // @capacitor/geolocation JOINS ANDROID FOR THE GPS APP (android-gps, 2026-10-17):
+  // Android ships the HardPan GPS build on com.rattlegolf.app, matching the iOS GPS
+  // beta (gps-beta/capacitor.config.json). Foreground location only - fine + coarse
+  // in AndroidManifest.xml, no background location, as iOS asks When In Use only.
   android: {
-    includePlugins: ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share']
+    includePlugins: ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share', '@capacitor/geolocation']
   },
   // SPM TRAITS: GOOGLE YES, FACEBOOK NO (Wave 33).
   //

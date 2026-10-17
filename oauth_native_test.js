@@ -163,8 +163,10 @@ describe('THE PLUGIN REACHES iOS AND DELIBERATELY NOT ANDROID', () => {
         const android = list('android');
         assert.ok(ios && ios.includes(PLUGIN_ID), 'ios.includePlugins must name ' + PLUGIN_ID);
         assert.ok(android, 'android.includePlugins is missing - Android is back on the default, and the next cap sync android links a plugin whose Android half needs google-services.json');
-        assert.deepEqual(android.slice().sort(), ['@capacitor/app', '@capacitor/filesystem', '@capacitor/share'],
-            'the Android list must stay the three that were already linked');
+        // android-gps (2026-10-17): @capacitor/geolocation joins for the GPS app; the
+        // auth plugin still does not (no google-services.json on Android).
+        assert.deepEqual(android.slice().sort(), ['@capacitor/app', '@capacitor/filesystem', '@capacitor/geolocation', '@capacitor/share'],
+            'the Android list must stay the three that were already linked plus geolocation');
         assert.ok(!android.includes(PLUGIN_ID), 'Android must not link the auth plugin until it has google-services.json and the gradle plugin');
     });
 

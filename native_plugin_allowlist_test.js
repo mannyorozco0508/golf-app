@@ -154,7 +154,7 @@ const IOS_TRAITS = {
 };
 // Android links these three, now by its own allowlist rather than the default
 // (see the header). The gradle project name is what capacitor.build.gradle writes.
-const ANDROID_PLUGINS = ['capacitor-app', 'capacitor-filesystem', 'capacitor-share'];
+const ANDROID_PLUGINS = ['capacitor-app', 'capacitor-filesystem', 'capacitor-share', 'capacitor-geolocation'];
 // Products every CapApp-SPM target carries regardless of plugins, and the
 // Android twin: capacitor.settings.gradle includes ':capacitor-android' - the
 // platform runtime - beside the plugins, and it is not one.

@@ -55,12 +55,14 @@ describe('VERSION', () => {
         // line, and the shape is held to semver so a stray string cannot ship.
         const m = /versionName "([^"]+)"/.exec(GRADLE);
         assert.ok(m, 'build.gradle declares no versionName');
-        assert.match(m[1], /^[0-9]+\.[0-9]+\.[0-9]+$/, 'versionName must be MAJOR.MINOR.PATCH: ' + m[1]);
-        assert.equal(m[1], '1.0.6', 'Android ships 1.0.6; move this pin when Android moves');
+        // android-gps (2026-10-17): Android ships the GPS app as 0.2, the iOS GPS
+        // beta's MARKETING_VERSION, so MAJOR.MINOR is accepted alongside the full form.
+        assert.match(m[1], /^[0-9]+\.[0-9]+(\.[0-9]+)?$/, 'versionName must be MAJOR.MINOR[.PATCH]: ' + m[1]);
+        assert.equal(m[1], '0.2', 'Android ships the GPS app 0.2; move this pin when Android moves');
     });
 
     test('versionCode is its own sequence and is pinned here', () => {
-        assert.match(GRADLE, /versionCode 2\b/, 'versionCode is not 2; the iOS build number is not this sequence');
+        assert.match(GRADLE, /versionCode 3\b/, 'versionCode is not 3; the iOS build number is not this sequence');
     });
 });
 
