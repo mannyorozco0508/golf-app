@@ -28,7 +28,7 @@ test('routes to existing screens; the ONE write is a new GPS round, through the 
     const s = read('front-door.js').replace(/^\s*\/\/.*$/gm, '');
     const writes = s.match(/ref\([^)]*\)\.(set|update|push|remove|transaction)\(/g) || [];
     assert.deepEqual(writes, ["ref('events/' + code).set(", "ref('events/' + code + '/scoreKeys/' + g).set("], 'two writes: the new round, and (Share, organizer) a group\u2019s scorekeeper code - its SHA-256 only');
-    assert.match(s, /sha256\(key\)\.then\(function \(hash\) \{ return d0\.ref\('events\/' \+ code \+ '\/scoreKeys\/' \+ g\)\.set\(hash\); \}\)/, 'the hash, never the code');
+    assert.match(s, /sha256\(key\)\.then\(function \(hash\) \{ made = hash; return d0\.ref\('events\/' \+ code \+ '\/scoreKeys\/' \+ g\)\.set\(hash\); \}\)/, 'the hash, never the code');
     assert.match(s, /else if \(a === 'newkey' && SH\.group != null && isOrganizer\(\)\) makeKey\(SH\.group\);/, 'the organizer only');
     assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card, opts\), uid\)/);
     assert.match(s, /W\.issueUniqueCode\(\{ db: H\.db, root: 'events' \}\)/);

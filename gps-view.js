@@ -296,7 +296,11 @@
                     // Stopped before the id arrived: clear it now rather than leak a watch.
                     if (gen !== watchGen) { try { cap.clearWatch({ id: id }); } catch (e) {} return; }
                     watchId = id;
-                }, onErr);
+                }, function (e) {
+                    // The plugin refused outright: not 'pending' for ever - the next GPS open tries again.
+                    if (gen === watchGen) watchId = null;
+                    onErr(e);
+                });
             return;
         }
         if (typeof navigator === 'undefined' || !navigator.geolocation || typeof navigator.geolocation.watchPosition !== 'function') {
@@ -634,7 +638,7 @@
     // (a pin set with no signal survives the app closing); the course copy is
     // best effort until course_gps has a rule. Only TAPPED points are ever here.
     function savePin(pin) {
-        if (!S || !pin) return;
+        if (!S || !pin || readOnlyHere()) return;   // view-only (a spectator): never a shared green
         var k = holeKey(S.hole);
         S.localPins = S.localPins || {};
         S.localPins[k] = pin;
@@ -2596,7 +2600,8 @@
 
         // Tools: set a green on an unmapped hole (anyone), fix one (the organizer).
         // Free: no map, so nothing to set - the numbers only.
-        show('.gps-set-green', S.pro && !setting && noGreen && !S.loadingCourses);
+        // A spectator writes nothing (audit 2026-10-16): no Set the green for a view-only phone.
+        show('.gps-set-green', S.pro && !setting && noGreen && !S.loadingCourses && !readOnlyHere());
         show('.gps-fix-green', S.pro && !setting && !noGreen && !!S.canFix);
         // The organizer can change which course's holes a club's outline gave.
         var lk = lookedUp(S.courseKey);
@@ -3677,6 +3682,8 @@
             closeSheet();
             closeWindSheet();
             stopWindTick();
+            // A shot replay does not keep turning the CARD's hole under a golfer typing a score.
+            stopReplayTimer();
             clearIdle();
             if (isWatching()) idleTimer = setTimeout(function () { idleTimer = null; stopWatch(); }, IDLE_STOP_MS);
         }
@@ -3702,9 +3709,11 @@
     }
 
     // The round changed under us (another phone set a pin).
-    function roundUpdated(round) {
+    function roundUpdated(round, opts) {
         if (!S) return;
         S.round = round || null;
+        // The organizer's own tools follow the sign-in, which can land after the GPS mounted.
+        if (opts && typeof opts.canFix === 'boolean') S.canFix = opts.canFix;
         render();
         // A score saved: the stats' snapshot follows, and an open sheet redraws.
         var St = window.HardPanGpsStats;
@@ -3747,6 +3756,7 @@
         // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
         hasGpsPro: hasGpsPro,
         isMounted: function () { return !!S; },
+        courseKey: function () { return S ? S.courseKey : null; },
         tournament: function () { return tournament(); },
         hole: function () { return S ? Number(S.hole) : null; },
         side: function () { return S ? S.side : null; },

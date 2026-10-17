@@ -711,3 +711,20 @@ test('a hole drawn as one line from EACH tee (Palmbrook 18: four lines to one gr
     const r2 = geo.pickHoleSet([one, a, b], { name: 'X', holes: 18 });
     assert.equal(r2.step, 1); assert.equal(r2.set['2'].geometry.length, 3, 'joined end to start');
 });
+
+// AUDIT 2026-10-16 (Caledonia 9): GolfAPI's centre can sit at the back edge, off the front-back
+// line. The ellipse must hold it, or a ray from the tee leaves the green before the centre and
+// the screen reads "back 112, centre 113". Front < centre < back from the tee, always.
+test('a GolfAPI green whose centre is off the front-back midpoint: F < C < B from the tee', { skip: !fs.existsSync(path.join(__dirname, 'gps-geo.js')) }, () => {
+    const G = require('./gps-geo.js');
+    const f = [33.4500, -79.1500], b = G.destination(f, 0, 18);           // an 18 m deep green, due north
+    const mid = G.destination(G.destination(f, 0, 17), 90, 6);              // the centre: near the back, 6 m to the side
+    const tee = G.destination(f, 180, 90);                                  // a short par 3, 90 m south
+    const ring = G.ellipseRing(f, b, mid);
+    assert.ok(G.pointInRing(mid, ring), 'the ring holds the centre');
+    const n = G.greenNumbers(tee, ring, mid);
+    assert.ok(n.frontM < n.middleM && n.middleM < n.backM, JSON.stringify([n.frontM, n.middleM, n.backM]));
+    // A centred one is the same ellipse as before (no growth).
+    const c0 = G.midpoint(f, b);
+    assert.deepEqual(G.ellipseRing(f, b, c0), G.ellipseRing(f, b, null));
+});

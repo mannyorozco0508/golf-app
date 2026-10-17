@@ -561,6 +561,12 @@
             r.middleM = haversineMeters(me, resolved.mid);
             if (resolved.front) r.frontM = haversineMeters(me, resolved.front);
             if (resolved.back) r.backM = haversineMeters(me, resolved.back);
+            // A set front / back is two fixed points: from beside or behind the green the "front"
+            // can be the farther one. What the golfer needs is the near edge and the far edge.
+            if (r.frontM != null && r.backM != null && r.frontM > r.backM) {
+                var t = r.front; r.front = r.back; r.back = t;
+                var tm = r.frontM; r.frontM = r.backM; r.backM = tm;
+            }
         }
         return r;
     }
@@ -1207,6 +1213,19 @@
         if (bearing == null) return null;
         depth = Math.max(12, depth);
         var a = depth / 2, w = Math.max(9, Math.min(15, depth * 0.4));
+        // THE CENTRE GOLFAPI GIVES IS INSIDE THE GREEN (audit, 2026-10-16). It is not always the
+        // front-back midpoint: Caledonia 9's sits at the back edge and slightly to one side, so a
+        // ray from the tee left this ellipse before it - "back 112, centre 113". The ellipse grows
+        // just enough (3 m margin) to hold it; a centred one is unchanged.
+        if (mid && f && b) {
+            var dm = haversineMeters(c, mid);
+            if (dm > 0.5) {
+                var rel = (bearingDeg(c, mid) - bearing) * Math.PI / 180;
+                var al = Math.abs(dm * Math.cos(rel)), ac = Math.abs(dm * Math.sin(rel));
+                if (al + 3 > a) a = al + 3;
+                if (ac + 3 > w) w = ac + 3;
+            }
+        }
         var ring = [];
         for (var i = 0; i < 24; i++) {
             var t = i / 24 * 2 * Math.PI;

@@ -392,3 +392,13 @@ with a gap; the card's older shape-box-1/2 give way), the Receipt / PDF (screen 
 names all four) and shared.html. Gross only, display only. Consumer tree unchanged. Check:
 tools/marks-check.js; score_marks_test.js. The regular app gets the boxes when gps-features goes to
 main after Oct 17 (Manny, 2026-10-16).
+
+## gps-audit (2026-10-16): the deep audit (mailbox 001)
+tools/audit-courses.js (every bundled course / Thistle pairing, hole by hole: F < C < B, a tee,
+sane yards, card par / hcp), tools/audit-sim.js (c edit/clear from GPS, f deleted mid-round, h wind
+across a reload + offline, i location denied, l 72 fast writes, m small things, r the review's
+fixes). Fixed (GPS-only): a GolfAPI green ellipse holds its own centre (Caledonia 9 read B < C); a
+set front/back swaps when seen from behind; spectators cannot set a green; GPS remounts when Round
+Setup changes the course; the organizer's tools follow the sign-in; the shot replay stops on the
+card; a refused Capacitor watch can retry; Exit after a refused change keeps the other queued
+scores; one Share observer; the scorekeeper key's local copy is the hash; no SubtleCrypto = 'none'.
