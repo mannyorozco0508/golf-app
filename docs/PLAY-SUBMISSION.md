@@ -240,6 +240,7 @@ Screenshots (0.2 (7) on the emulator): 01 Home, 02 Near you (Caledonia), 03 GPS 
 - [x] Android sign-in notes without trial / pass words; Android day-22 wall without prices. iOS and web unchanged (tested both halves).
 - [x] AAB (clean build) 5,769,768 bytes, sha256 `7bd9c72b1790…`, signer SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. Debug APK on rattle36 (versionCode 9). **Build with `clean`:** an incremental `bundleRelease` after `cap sync` shipped the previous assets once; check the AAB's `base/assets/public/` for the change before uploading.
 - [x] Full suite: 11076 tests, 11070 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
+- [x] **Approved by Manny (job 018, 2026-10-17 4:27 PM AZ):** the `organizer-gate.js` edit (the Android wall text) and the `trip_builder_test.js` re-pin of `organizer-gate.js` from job 015.
 
 ## 9. Post-launch: App Links (order approved by Manny, job 012; nothing deployed yet)
 Tested on the emulator (URGENT-010): the link opens the app warm and cold, and a cold start signs in with no paste. Real phones send these links to the browser until step 2.
