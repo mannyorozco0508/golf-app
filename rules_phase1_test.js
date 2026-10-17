@@ -125,3 +125,14 @@ test('SEASONS: a golfer\'s anonymous phone opens the season link (live: email si
     assert.strictEqual(targaryen.database(P1, d).as(OUT).read('/seasons/S1', NOW).allowed, false, 'signed out: no');
     assert.strictEqual(JSON.stringify(P1.rules.seasons.$seasonCode['.write']), JSON.stringify(LIVE.rules.seasons.$seasonCode['.write']), 'season writes are live\'s, unchanged');
 });
+test('TRIPS: an anonymous organizer creates a trip stamped with its own uid, and edits it (Manny 2026-10-17)', () => {
+    const d = data(true); const ORG = anon('triporg');
+    assert.strictEqual(W(P1, d, ORG, '/trips/NEWT', { name: 'Weekend', createdAt: NOW, rounds: {}, organizerToken: 'x'.repeat(32), ownerUid: 'triporg' }), true, 'createTripBlank with ownerUid');
+    assert.strictEqual(U(P1, d, ORG, '/', { 'trips/NEWB/name': 'Built', 'trips/NEWB/createdAt': NOW, 'trips/NEWB/organizerToken': 'x'.repeat(32), 'trips/NEWB/ownerUid': 'triporg',
+        'trips/NEWB/rounds/RB1': { label: 'Day 1', addedAt: NOW }, 'events/RB1': round({ ownerUid: 'triporg', tripCode: 'NEWB' }) }), true, 'the builder\'s one multi-path update');
+    const d2 = data(true); d2.trips.MINE = { name: 'Mine', createdAt: 1, ownerUid: 'triporg', rounds: {} };
+    assert.strictEqual(W(P1, d2, ORG, '/trips/MINE/name', 'Renamed'), true, 'the anonymous owner renames');
+    assert.strictEqual(W(P1, d, ORG, '/trips/NEWX', { name: 'X', createdAt: NOW, rounds: {}, ownerUid: 'someone-else' }), false, 'naming another uid');
+    assert.strictEqual(W(P1, d, ORG, '/trips/NEWY', { name: 'Y', createdAt: NOW, rounds: {} }), false, 'no ownerUid: refused (the app before this fix)');
+    assert.strictEqual(W(P1, d2, anon('other'), '/trips/MINE/name', 'pwned'), false, 'not the owner');
+});

@@ -30,6 +30,25 @@
 // sanity check.
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK)
+// (rules/database.rules.phase1.json). The scenario file was rewritten to assert
+// what phase 1 does:
+//   - every events / global_courses / trips scenario that ran signed out now
+//     runs as a signed-in phone ('anonymous'), and each path a phone may write
+//     carries one signed-out row that must be REFUSED (every write needs auth);
+//     a trip reads for a signed-in phone, not signed out;
+//   - 'organizer' and 'stranger' carry an email token: tournament structure is
+//     email sign-in + owner (as live), so a stranger is refused by OWNERSHIP;
+//   - REFUSED now: overwriting an existing course card (create-only; the
+//     Admin/server path corrects one), deleting a legacy round, writing into an
+//     owner-less trip (frozen until the migration stamps an owner) or an
+//     owner-less tournament (frozen by the ownerUid validate, as live);
+//   - ACCEPTED now: the owner deleting their own tournament (as live), and ANY
+//     value at events/<code>/sideMatches/<id>/stake from a signed-in phone - the
+//     old repo file validated that child, live and phase 1 do not. A known gap,
+//     recorded here rather than hidden; the engines' input guards are the check.
+// ----------------------------------------------------------------------------
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');

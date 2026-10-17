@@ -261,14 +261,29 @@ describe('ONE FUNCTION, SIX CALLERS, AND THE RULE', () => {
         });
         assert.equal((src.match(/function tripGolferKey\(/g) || []).length, 1);
     });
-    test('the rule: one node, accepted shape, refused values, refused player id, refused unknown round (targaryen)', () => {
+    test('the rule: one node a signed-in phone writes on an owned trip; SHAPE ONLY in phase 1 - any string id, any value 1..64, a well-formed round code (targaryen)', () => {
+        // Was: "accepted shape, refused values, refused player id, refused unknown
+        // round" - the old repo file validated $playerId ^[0-9]+$, the value ^g[0-9]+$
+        // and that the round is in the trip. That file was never production.
+        // Phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK) (identity as
+        // live, plus a .write): any signed-in phone writes identity on an EXISTING
+        // trip that has an owner; the round code must match ^[A-Z0-9]{2,12}$ and
+        // the value be a 1..64 string. So 'mike', 'G1', an unknown round ZZZZ and a
+        // non-numeric player id are ACCEPTED now - tripGolferKey must keep treating
+        // the node as untrusted input. Signed out, a non-string, an empty string
+        // and a malformed round code are refused. The scenario trip carries an
+        // ownerUid (an owner-less trip is frozen by the trip validate), and adding
+        // a round pointer is the owner's (by ownerUid; anonymous counts), not any phone's.
         const bin = path.join(REPO_ROOT, 'node_modules', '.bin', 'targaryen');
         const out = execFileSync(bin, [path.join(REPO_ROOT, 'database.rules.json'), path.join(REPO_ROOT, 'trip_identity.tests-data.json')], { encoding: 'utf8' });
-        assert.match(out, /0 failures in 11 tests/, out);
+        assert.match(out, /0 failures in 14 tests/, out);
         const rules = JSON.parse(read('database.rules.json')).rules;
         const node = rules.trips.$tripCode.identity;
-        assert.equal(node.$roundCode['.validate'], "root.child('trips/' + $tripCode + '/rounds/' + $roundCode).exists()");
-        assert.equal(node.$roundCode.$playerId['.validate'], "$playerId.matches(/^[0-9]+$/) && newData.isString() && newData.val().matches(/^g[0-9]+$/)");
-        assert.deepEqual(Object.keys(rules.trips.$tripCode).sort(), ['.read', '.validate', '.write', 'identity'], 'the trip rule gained exactly one child');
+        assert.equal(node['.write'], "auth != null && root.child('trips/' + $tripCode).exists()");
+        assert.equal(node.$roundCode['.validate'], "$roundCode.matches(/^[A-Z0-9]{2,12}$/)");
+        assert.equal(node.$roundCode.$playerId['.validate'], "newData.isString() && newData.val().length > 0 && newData.val().length <= 64");
+        assert.deepEqual(Object.keys(rules.trips.$tripCode).sort(),
+            ['.read', '.validate', '.write', 'eventCode', 'identity', 'league', 'ownerEmail', 'ownerUid', 'tripName'],
+            'the trip rule\'s children are the phase-1 set');
     });
 });

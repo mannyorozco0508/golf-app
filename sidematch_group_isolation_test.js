@@ -650,23 +650,25 @@ describe('SECURITY — what this does and does not claim', () => {
         // what a legacy round cannot satisfy. The CLAIM is unchanged and is
         // asserted as behaviour rather than as a suffix: a round with no ownerUid
         // and scores on it cannot be deleted in one write by anyone.
-        assert.match(w, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
-        assert.match(w, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
-        assert.ok(!/!data\.hasChild\('ownerUid'\)/.test(w),
-            'the repo file grew a legacy clause production does not have: ' + w.slice(-110));
-        // A side match written into an existing round meets no identity check.
-        // The parent names auth for the owner's delete; the child grant must not.
-        assert.equal(rules.events.$eventCode.sideMatches['.write'], "root.child('events/' + $eventCode).exists()");
-        assert.ok(!/auth/.test(rules.events.$eventCode.sideMatches['.write']), 'a side match is not an identity check');
-        // AND THE auth IN THE PARENT IS REACHABLE ONLY BY AN OWNER. It sits inside
-        // the owner term, behind data.hasChild('ownerUid'), so a round that records
-        // no owner meets no identity check at all - which is the claim this test
-        // was making when production still had a separate legacy branch to point at.
-        const term = w.slice(w.indexOf("|| (auth != null && data.hasChild('ownerUid')"));
-        assert.ok(term.length > 40, 'the owner term is gone: ' + w.slice(-140));
-        assert.equal((w.match(/auth/g) || []).length, (w.slice(0, w.indexOf(term)).match(/auth/g) || []).length
-            + (term.match(/auth/g) || []).length,
-            'auth appears somewhere other than creation and the owner term');
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). Production now has a legacy clause: a round with no ownerUid
+        // is editable by a signed-in phone and cannot be deleted in one write by
+        // anyone; an owned round's setup is the owner (or the trip owner).
+        assert.match(w, /data\.exists\(\) && !data\.hasChild\('ownerUid'\) && newData\.exists\(\)/, 'a legacy round cannot be deleted');
+        assert.match(w, /data\.exists\(\) && \(data\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'owned setup is the owner');
+        // A side match written into an existing round meets no identity check -
+        // only "signed in" (phase 1: every write needs a sign-in). The child grant
+        // names no uid.
+        const sm = rules.events.$eventCode.sideMatches['.write'];
+        assert.equal(sm, "auth != null && root.child('events/' + $eventCode).exists()");
+        assert.ok(!/auth\.uid|ownerUid|auth\.token/.test(sm), 'a side match is not an identity check');
+        // AND THE uid CHECK IN THE PARENT IS REACHABLE ONLY BY AN OWNER (or the
+        // trip owner): every `auth.uid` in the parent sits in an ownerUid comparison,
+        // so a round that records no owner meets no identity check at all.
+        const uidUses = (w.match(/auth\.uid/g) || []).length;
+        const ownerUses = (w.match(/ownerUid'\)\.val\(\) === auth\.uid/g) || []).length;
+        assert.ok(uidUses >= 2, 'the owner term is gone: ' + w.slice(-140));
+        assert.equal(uidUses, ownerUses, 'auth.uid appears somewhere other than an owner comparison: ' + w);
     });
 
     test('this is client-side isolation, and the code says so', () => {

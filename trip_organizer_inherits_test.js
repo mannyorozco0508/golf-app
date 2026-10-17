@@ -112,7 +112,12 @@ describe('3. IT GRANTS SCREENS, NOT WRITES', () => {
         // truth. A sha says "this file did not move", which is the actual claim.
         const sha = require('crypto').createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, 'database.rules.json'))).digest('hex').slice(0, 16);
-        assert.equal(sha, '31496c1b5ea03cf8',
+        // RE-PINNED 2026-10-17 (was 31496c1b5ea03cf8): phase-1 rules published
+        // 2026-10-17 (trips without email sign-in; redeploy pending) - its own wave, approved by Manny. A
+        // setup write on an owned round is still the owner's - or, in phase 1,
+        // the owner of the trip the round names (tripCode); this wave still grants
+        // screens only.
+        assert.equal(sha, '9f7a7fadc5c13faa',
             'database.rules.json moved. This wave grants SCREENS only - a setup write still '
             + 'needs auth.uid === the round owner. If the rules genuinely changed, that is its '
             + 'own wave with Manny approving the diff, and this pin is re-pinned with the reason.');

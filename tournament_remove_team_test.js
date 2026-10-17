@@ -153,7 +153,10 @@ describe('the live rules allow the owner and nobody else (read, never published)
     const targaryen = require('targaryen');
     const rules = require('./database.rules.json');
     const data = { tournaments: { RT1: { name: 'x', ownerUid: OWNER.uid, teams: { team1: { num: 1, name: 'E', players: ['a'], handicap: 0 }, team2: { num: 2, name: 'T', players: ['b'], handicap: 0 } } } } };
-    const as = (uid) => targaryen.database(rules, data).as(uid ? { uid, provider: 'password', token: { firebase: { sign_in_provider: 'password' } } } : null);
+    // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK). Tournament
+    // structure needs an EMAIL sign-in (as live), and a real password token always
+    // carries the email - the fixture now does too (it carried none before).
+    const as = (uid) => targaryen.database(rules, data).as(uid ? { uid, provider: 'password', token: { email: uid + '@example.com', firebase: { sign_in_provider: 'password' } } } : null);
     test('owner may remove teams/team2', () => { assert.equal(as(OWNER.uid).write('/tournaments/RT1/teams/team2', null).allowed, true); });
     test('a stranger and an anonymous visitor may not', () => {
         assert.equal(as('u-who').write('/tournaments/RT1/teams/team2', null).allowed, false);

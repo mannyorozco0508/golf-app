@@ -386,16 +386,18 @@ describe('WHERE IT LIVES, AND WHAT IT DOES NOT CHANGE', () => {
         const rules = JSON.parse(read('database.rules.json'));
         const write = rules.rules.events.$eventCode['.write'];
         // RE-PINNED 2026-10-05: database.rules.json is a mirror of production now.
-        // Production has one clause for every existing round rather than the repo
-        // file's owned/legacy pair, and the owner term inside it is what an
-        // email-link sign-in makes reachable on a second device - which is this
-        // file's subject and is unchanged.
-        assert.match(write, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
-        assert.match(write, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
-        assert.equal(rules.rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()");
-        assert.equal(rules.rules.events.$eventCode.players, undefined, 'players has no child grant');
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). Every write needs a sign-in; the owner term on an existing
+        // round is what an email-link sign-in makes reachable on a second device -
+        // which is this file's subject and is unchanged. A round without an owner
+        // (legacy) stays editable by a signed-in phone but cannot be deleted.
+        assert.ok(write.startsWith('auth != null && '), 'every events write needs a sign-in');
+        assert.match(write, /data\.exists\(\) && \(data\.child\('ownerUid'\)\.val\(\) === auth\.uid/);
+        assert.match(write, /data\.exists\(\) && !data\.hasChild\('ownerUid'\) && newData\.exists\(\)/);
+        assert.equal(rules.rules.events.$eventCode.scores['.write'], "auth != null && root.child('events/' + $eventCode).exists()");
+        assert.equal((rules.rules.events.$eventCode.players || {})['.write'], undefined, 'players has no child grant (shape validation only)');
         assert.equal(rules.rules.organizers.$uid.pass['.write'], false);
-        assert.equal(rules.rules.tournaments.$tourneyCode['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
+        assert.equal(rules.rules.tournaments.$tourneyCode['.write'], "auth != null && auth.token.email != null && (!data.exists() || (data.hasChild('ownerUid') && data.child('ownerUid').val() === auth.uid))");
     });
 });
 

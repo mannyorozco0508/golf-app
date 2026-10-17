@@ -34,6 +34,21 @@
 // that existed.
 // registrations_rules_isolation_test.js is the pattern; the rows themselves
 // live in security-rules.tests-data.json (118 under tournaments/ at writing).
+//
+// RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+// trips with no email sign-in; redeploy pending Manny's OK). The tournaments STRUCTURE rule is live's:
+//   auth != null && auth.token.email != null
+//     && (!data.exists() || (data.hasChild('ownerUid') && data.child('ownerUid').val() === auth.uid))
+// What that moves in this file's classification, measured:
+//   - the boundary is email sign-in + owner. An anonymous create (NEWCODE2) is
+//     refused by the BOUNDARY now, not by a validate;
+//   - a create without ownerUid (NEWCODE) is refused by the parent .validate;
+//   - a legacy record (QRST, no ownerUid) is FROZEN by the parent .validate -
+//     scores included, so "a legacy record still takes scores" is gone - and
+//     the claim (writing ownerUid onto it) is closed TWICE: by the boundary
+//     and by the ownerUid validate (set only at creation);
+//   - the owner may delete their own tournament (live has no newData.exists()
+//     in the owner arm), so that row is a positive now.
 // ============================================================================
 
 const { test, describe, before, after } = require('node:test');
@@ -68,8 +83,10 @@ const label = (r) => `${r.path} ${r.op} ${r.auth} expect ${r.expect}`;
 const VALIDATE_ROWS = [
     { path: 'tournaments/NEWCODE2', auth: 'null', why: 'ownerUid validate: a create carrying ownerUid needs auth' },
     { path: 'tournaments/NEWCODE2', auth: 'stranger', why: 'ownerUid validate: the uid must be the writer\'s own' },
-    { path: 'tournaments/NEWCODE2', auth: 'anonymous', why: 'ownerUid validate: an anonymous provider may not own' },
-    { path: 'tournaments/OWNED', auth: 'organizer', why: 'parent validate: even the owner may not drop ownerUid (the {name:"X"} row); the delete row on this path is the boundary\'s and is asserted apart' },
+    // (phase 1: NEWCODE2 by 'anonymous' is the BOUNDARY's now - auth.token.email != null.)
+    { path: 'tournaments/NEWCODE', auth: /./, why: 'parent validate (phase 1): a create without ownerUid - the boundary only asks for an email sign-in' },
+    { path: /^tournaments\/QRST(\/|$)/, auth: /./, why: 'parent validate (phase 1, as live): a record with no ownerUid is FROZEN - every write under it fails hasChildren([\'ownerUid\'])' },
+    { path: 'tournaments/OWNED', auth: 'organizer', why: 'parent validate: even the owner may not drop ownerUid (the {name:"X"} row); the owner\'s delete is a positive in phase 1' },
     { path: 'tournaments/OWNED/ownerUid', auth: 'stranger', why: 'ownerUid validate: never changed once set' },
     { path: 'tournaments/OWNED/ownerUid', auth: 'null', why: 'ownerUid validate: never removed' },
     { path: 'tournaments/OWNED/ownerUid', auth: 'organizer', why: 'ownerUid validate: never changed, even by the owner (the u-stranger row)' },
@@ -126,9 +143,26 @@ function buildGrantStubCopy() {
     return p;
 }
 
-let CLEAN = null, STUBBED = null, STUB_PATH = null, GRANTSTUB = null, GRANT_PATH = null;
-before(() => { CLEAN = runTargaryen(REAL_RULES); STUB_PATH = buildPermissiveCopy(); STUBBED = runTargaryen(STUB_PATH); GRANT_PATH = buildGrantStubCopy(); GRANTSTUB = runTargaryen(GRANT_PATH); });
-after(() => { [STUB_PATH, GRANT_PATH].forEach((p) => { try { fs.unlinkSync(p); } catch (e) { /* gone */ } }); });
+// THE THIRD STUB (phase 1): the grants set to true AND the parent .validate set
+// to true. A squat under a code with NOTHING behind it (NOPE) is now closed
+// twice - by the existence condition and by the parent validate (a record
+// created by a score write has no ownerUid) - so only with both opened does it
+// go green. A squat under an EXISTING record (OWNED/rounds/r9) is the grant's
+// alone and goes green under the plain grant stub.
+function buildGrantAndValidateStubCopy() {
+    const rules = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8'));
+    const t = rules.rules.tournaments.$tourneyCode;
+    t.scores.$scoreKey['.write'] = true;
+    t.rounds.$roundId.scores.$scoreKey['.write'] = true;
+    t['.validate'] = 'true';
+    const p = path.join(os.tmpdir(), 'tournaments-grant-validate-stub-' + process.pid + '.json');
+    fs.writeFileSync(p, JSON.stringify(rules, null, 2));
+    return p;
+}
+
+let CLEAN = null, STUBBED = null, STUB_PATH = null, GRANTSTUB = null, GRANT_PATH = null, GRANTVAL = null, GRANTVAL_PATH = null;
+before(() => { CLEAN = runTargaryen(REAL_RULES); STUB_PATH = buildPermissiveCopy(); STUBBED = runTargaryen(STUB_PATH); GRANT_PATH = buildGrantStubCopy(); GRANTSTUB = runTargaryen(GRANT_PATH); GRANTVAL_PATH = buildGrantAndValidateStubCopy(); GRANTVAL = runTargaryen(GRANTVAL_PATH); });
+after(() => { [STUB_PATH, GRANT_PATH, GRANTVAL_PATH].forEach((p) => { try { fs.unlinkSync(p); } catch (e) { /* gone */ } }); });
 
 describe('THE HARNESS IS REALLY RUNNING', () => {
     test('both runs produced a verdict table with every declared row in it', () => {
@@ -139,7 +173,8 @@ describe('THE HARNESS IS REALLY RUNNING', () => {
     });
     test('the real file is the narrowed block, and the stub differs from it in the parent .write ONLY', () => {
         const real = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8')).rules.tournaments.$tourneyCode;
-        assert.equal(real['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
+        // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK) (live's structure rule).
+        assert.equal(real['.write'], "auth != null && auth.token.email != null && (!data.exists() || (data.hasChild('ownerUid') && data.child('ownerUid').val() === auth.uid))");
         // The grant is on the KEY (a board cannot be replaced in one write) and it
         // requires the record - and at the multi-round depth the round - to EXIST.
         // Candidate 1 said `true` here; the live probe wrote a score under a code
@@ -173,7 +208,10 @@ describe('THE ISOLATION CONTROL - structure refused BY ownership, not by a valid
         assert.ok(pos.some((r) => /^tournaments\/OWNED\/scores\/team1_h2$/.test(r.path) && r.auth === 'null'), 'no positive: nobody writes a single-round score');
         assert.ok(pos.some((r) => /^tournaments\/OWNED\/rounds\/r1\/scores\/p1_h2$/.test(r.path) && r.auth === 'null'), 'no positive: nobody writes a multi-round score');
         assert.ok(pos.some((r) => /^tournaments\/OWNED\/name$/.test(r.path) && r.auth === 'organizer'), 'no positive: the owner renames');
-        assert.ok(pos.some((r) => /^tournaments\/QRST\/scores\/team1_h2$/.test(r.path)), 'no positive: a legacy record still takes scores');
+        // Was: a positive - "a legacy record still takes scores". Phase 1 (as live)
+        // freezes a record with no ownerUid entirely, so the row is a negative now.
+        assert.ok(rows.some((r) => /^tournaments\/QRST\/scores\/team1_h2$/.test(r.path) && r.expect === CROSS && r.got === CROSS), 'a legacy record (no ownerUid) is frozen - scores included');
+        assert.ok(pos.some((r) => r.path === 'tournaments/OWNED' && r.auth === 'organizer'), 'no positive: the owner deletes their own tournament');
     });
 
     test('EVERY ownership negative goes GREEN with the parent .write stubbed true', () => {
@@ -187,30 +225,48 @@ describe('THE ISOLATION CONTROL - structure refused BY ownership, not by a valid
     test('EVERY validate negative stays RED under the stub - those are the validates\' own work', () => {
         // The verdict table shows path, op and auth - not the data - so the rows
         // are laid out in the data file so that no path+auth pair mixes a validate
-        // refusal with a boundary refusal. One exception is asserted apart below:
-        // tournaments/OWNED by the organizer carries {name:'X'} (validate: drops
-        // ownerUid) AND null (boundary: no delete, as today).
+        // refusal with a boundary refusal. tournaments/OWNED by the organizer is
+        // asserted apart below: {name:'X'} (validate: drops ownerUid) is its only
+        // negative in phase 1 - the owner's delete is a positive now.
         const rows = verdictRows(STUBBED.output).filter((r) => isT(r) && isWrite(r) && r.expect === CROSS && isValidateRow(r)
-            && !(r.path === 'tournaments/OWNED' && r.auth === 'organizer'));
+            && !(r.path === 'tournaments/OWNED' && r.auth === 'organizer')
+            && !(r.path === 'tournaments/QRST' && r.auth === 'null'));
         assert.ok(rows.length >= 10, 'only ' + rows.length + ' validate negatives');
         const flipped = rows.filter((r) => r.got === TICK).map(label);
         assert.equal(flipped.length, 0, 'a validate row went green under the stub - it was the boundary refusing it, misclassified:\n  ' + flipped.join('\n  '));
         const ownerRows = verdictRows(STUBBED.output).filter((r) => r.path === 'tournaments/OWNED' && r.auth === 'organizer' && r.expect === CROSS);
-        assert.equal(ownerRows.length, 2, 'the owner has two negatives on the record root: drop-ownerUid and delete');
-        assert.equal(ownerRows.filter((r) => r.got === CROSS).length, 1, 'exactly one stays red under the stub (the drop-ownerUid validate)');
-        assert.equal(ownerRows.filter((r) => r.got === TICK).length, 1, 'exactly one flips (the delete, refused by the boundary\'s newData.exists())');
+        assert.equal(ownerRows.length, 1, 'the owner has one negative on the record root: drop-ownerUid (the delete is allowed in phase 1)');
+        assert.equal(ownerRows.filter((r) => r.got === CROSS).length, 1, 'it stays red under the stub (the drop-ownerUid validate)');
+        // Phase 1: tournaments/QRST signed out carries a rename (parent validate:
+        // frozen, no ownerUid) AND a delete (the boundary's - a validate never
+        // runs on a delete). Asserted apart, the same way.
+        const qrst = verdictRows(STUBBED.output).filter((r) => r.path === 'tournaments/QRST' && r.auth === 'null' && r.expect === CROSS);
+        assert.equal(qrst.length, 2, 'QRST signed out: a rename and a delete');
+        assert.equal(qrst.filter((r) => r.got === CROSS).length, 1, 'the rename stays red under the stub (frozen by the parent validate)');
+        assert.equal(qrst.filter((r) => r.got === TICK).length, 1, 'the delete flips (refused by the boundary)');
     });
 
-    test('THE CLAIM CLOSES BY THE BOUNDARY: the legacy ownerUid write by a signed-in user is refused by ownership, and the stub lets it through', () => {
-        // Today's rule would let a signed-in user write ownerUid onto a record that
-        // has none (the child validate allows it). The parent .write no longer
-        // reaches that child. Deliberate: the land-grab goes away; FN68 is
-        // console-only. So this row must be RED on the clean file and GREEN under
-        // the stub - refused by the boundary, not by the ownerUid validate.
+    test('THE CLAIM CLOSES BY THE BOUNDARY: the legacy ownerUid write by a signed-in user is refused by ownership - and, in phase 1, by the ownerUid validate too', () => {
+        // Was: refused on the clean file and GREEN under the parent stub (the child
+        // validate allowed it). Phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK): ownerUid is settable only at creation (!data.parent().exists()),
+        // and the record is frozen by the parent validate - so the stub alone does
+        // not let it through. The boundary's own refusal is proved with the
+        // VALIDATES stubbed instead: still refused, by ownership.
         const clean = verdictRows(CLEAN.output).find((r) => r.path === 'tournaments/QRST/ownerUid' && r.auth === 'organizer' && r.expect === CROSS);
         const stubbed = verdictRows(STUBBED.output).filter((r) => r.path === 'tournaments/QRST/ownerUid' && r.auth === 'organizer' && r.expect === CROSS);
         assert.ok(clean && clean.got === CROSS, 'the claim is not refused on the clean file');
-        assert.ok(stubbed.some((r) => r.got === TICK), 'the claim stayed refused with the boundary open - it is the validate refusing it, not ownership');
+        assert.ok(stubbed.length > 0 && stubbed.every((r) => r.got === CROSS), 'the claim went through with the boundary open - the ownerUid validate no longer holds it');
+        const targaryen = require('targaryen');
+        const data = JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
+        const org = data.users.organizer;
+        const noValidates = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8'));
+        const t = noValidates.rules.tournaments.$tourneyCode;
+        t['.validate'] = 'true'; t.ownerUid['.validate'] = 'true';
+        assert.equal(targaryen.database(noValidates, data.root).as(org).write('/tournaments/QRST/ownerUid', org.uid).allowed, false,
+            'with the validates stubbed, the boundary let a signed-in user claim a record with no owner');
+        assert.equal(targaryen.database(noValidates, data.root).as(org).write('/tournaments/OWNED/name', 'Renamed').allowed, true,
+            'positive control: with the validates stubbed, the owner still writes their own record');
     });
 
     test('the positive tournaments rows stay green under the stub', () => {
@@ -228,15 +284,26 @@ describe('THE ISOLATION CONTROL - structure refused BY ownership, not by a valid
         assert.equal(moved.length, 0, 'rows outside tournaments changed verdict under the stub:\n  ' + moved.join('\n  '));
     });
 
-    test('THE SQUAT: refused by the grant\'s own existence condition - red on the clean file, GREEN under the grant stub, and the grant stub moves nothing else', () => {
+    test('THE SQUAT: refused by the grant\'s own existence condition - red on the clean file, GREEN under the grant stub (under a code with nothing behind it: only with the parent validate opened too), and the grant stub moves nothing else', () => {
         const clean = verdictRows(CLEAN.output), grant = verdictRows(GRANTSTUB.output);
         assert.equal(grant.length, clean.length);
         const squatClean = clean.filter((r) => isSquatRow(r) && r.expect === CROSS);
         assert.ok(squatClean.length >= 5, 'only ' + squatClean.length + ' squat rows - the rows are missing');
         squatClean.forEach((r) => assert.equal(r.got, CROSS, 'the squat is open on the clean file: ' + label(r)));
+        // Phase 1: the squat under an EXISTING record goes green under the grant
+        // stub alone; the squat under NOPE (nothing behind the code) stays red
+        // there - the parent validate refuses a record with no ownerUid - and goes
+        // green only with the grants AND the parent validate opened.
         const squatGrant = grant.filter((r) => isSquatRow(r) && r.expect === CROSS);
-        const stillRed = squatGrant.filter((r) => r.got === CROSS).map(label);
-        assert.equal(stillRed.length, 0, 'a squat row stayed refused with the grants set to true - something other than the existence condition refuses it:\n  ' + stillRed.join('\n  '));
+        const existing = squatGrant.filter((r) => !/^tournaments\/NOPE\//.test(r.path));
+        const nope = squatGrant.filter((r) => /^tournaments\/NOPE\//.test(r.path));
+        assert.ok(existing.length >= 1 && nope.length >= 4, 'squat rows missing: ' + existing.length + ' / ' + nope.length);
+        const stillRed = existing.filter((r) => r.got === CROSS).map(label);
+        assert.equal(stillRed.length, 0, 'a squat row under an existing record stayed refused with the grants set to true - something other than the existence condition refuses it:\n  ' + stillRed.join('\n  '));
+        nope.forEach((r) => assert.equal(r.got, CROSS, 'a NOPE squat went through with only the grants open - the parent validate no longer holds it: ' + label(r)));
+        const both = verdictRows(GRANTVAL.output).filter((r) => isSquatRow(r) && r.expect === CROSS);
+        const bothRed = both.filter((r) => r.got === CROSS).map(label);
+        assert.equal(bothRed.length, 0, 'a squat row stayed refused with the grants AND the parent validate open:\n  ' + bothRed.join('\n  '));
         // NOTHING ELSE MOVES under the grant stub: the ownership rows and the validate
         // rows are the parent's and the validates' - the grant condition is not what
         // holds them.

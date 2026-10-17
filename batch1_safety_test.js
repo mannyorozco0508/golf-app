@@ -396,7 +396,10 @@ describe('FIREBASE RULES — writes narrowed, reads deliberately left open', () 
 
     test('rounds, trips and tournaments stay publicly readable — links depend on it', () => {
         assert.equal(rules.events.$eventCode['.read'], true);
-        assert.equal(rules.trips.$tripCode['.read'], true);
+        // Phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): a trip reads for
+        // any signed-in phone (every app signs in before it opens a trip link);
+        // signed-out is no longer a reader. Still not owner-only.
+        assert.equal(rules.trips.$tripCode['.read'], 'auth != null');
         assert.equal(rules.tournaments.$tourneyCode['.read'], true);
         assert.equal(rules.global_courses['.read'], true);
     });
@@ -410,7 +413,12 @@ describe('FIREBASE RULES — writes narrowed, reads deliberately left open', () 
     });
 
     test('a course can be created or corrected but never deleted', () => {
-        assert.equal(rules.global_courses.$courseId['.write'], 'newData.exists()');
+        // Phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): CREATE-only from a
+        // signed-in phone (correcting a shared card is now the Admin/server path,
+        // accepted by Manny), and still never deleted; gapi_/gca_ keys refused.
+        const w = rules.global_courses.$courseId['.write'];
+        assert.equal(w, "auth != null && !data.exists() && newData.exists() && !$courseId.beginsWith('gapi_') && !$courseId.beginsWith('gca_')");
+        assert.ok(/newData\.exists\(\)/.test(w), 'a delete is still refused');
     });
 
     test('a course must actually look like a course', () => {

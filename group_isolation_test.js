@@ -333,17 +333,22 @@ describe('FIREBASE RULES — what the server can and cannot enforce', () => {
         // what a legacy round cannot satisfy. The CLAIM is unchanged and is
         // asserted as behaviour rather than as a suffix: a round with no ownerUid
         // and scores on it cannot be deleted in one write by anyone.
-        assert.match(w, /data\.exists\(\) && \(newData\.exists\(\) \|\| !data\.hasChild\('scores'\)/);
-        assert.match(w, /auth != null && data\.hasChild\('ownerUid'\) && auth\.uid === data\.child\('ownerUid'\)\.val\(\)/);
-        assert.ok(!/!data\.hasChild\('ownerUid'\)/.test(w),
-            'the repo file grew a legacy clause production does not have: ' + w.slice(-110));
-        assert.match(w, /auth\.uid === data\.child\('ownerUid'\)\.val\(\)/, 'an owned round is the owner');
-        assert.equal(rules.events.$eventCode.scores['.write'], "root.child('events/' + $eventCode).exists()", 'a score is still not an identity check');
-        assert.match(w, /^\(!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'creation stays gated');
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). Every write needs a sign-in; an owned round's setup is the
+        // owner (or the trip owner); production now HAS a legacy clause - a round
+        // with no ownerUid is editable by a signed-in phone but cannot be deleted
+        // in one write by anyone. A score is still a child grant with no identity
+        // check beyond "signed in" - shape only, which is what this test is about.
+        assert.match(w, /data\.exists\(\) && !data\.hasChild\('ownerUid'\) && newData\.exists\(\)/, 'a legacy round cannot be deleted');
+        assert.match(w, /data\.exists\(\) && \(data\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'an owned round is the owner');
+        assert.equal(rules.events.$eventCode.scores['.write'], "auth != null && root.child('events/' + $eventCode).exists()", 'a score is a sign-in check, still not an identity check');
+        assert.match(w, /^auth != null && \(\(!data\.exists\(\) && newData\.exists\(\) && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid\)/, 'creation stays gated');
     });
 
     test('the shared course library is still protected', () => {
         assert.equal(rules.global_courses['.write'], undefined);
-        assert.equal(rules.global_courses.$courseId['.write'], 'newData.exists()');
+        // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK) -
+        // create-only from a signed-in phone, never a delete, no gapi_/gca_.
+        assert.equal(rules.global_courses.$courseId['.write'], "auth != null && !data.exists() && newData.exists() && !$courseId.beginsWith('gapi_') && !$courseId.beginsWith('gca_')");
     });
 });

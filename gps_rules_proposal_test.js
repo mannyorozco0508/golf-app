@@ -26,6 +26,22 @@
 // lower down, so the round copy is protected by .validate - which does not run
 // on a delete. A code holder could DELETE a round pin (never change it). The app
 // never deletes one: an undo writes a new pin.
+//
+// PHASE 1 (of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK)). The green-pin rules are
+// now IN database.rules.json, in their phase-1 form, so every case below runs
+// against THE PUBLISHED FILE rather than the draft merged into a copy:
+//   - events/<code>/gpsPins/$hole carries its own .write (first green by a
+//     signed-in golfer on a live round; a change by the owner only), and the
+//     round-level .write is no longer open to code holders - so the KNOWN LIMIT
+//     is closed for an owned round. A legacy round (no ownerUid) is still
+//     editable by any signed-in phone through the round-level legacy arm, so
+//     there a code holder can still change or delete a round pin.
+//   - course_gps/<key>/pins: as drafted, with an exact non-empty course key
+//     (or a 27-hole pairing under a key ending _27).
+//   - course_gps/<key>/osm and holeChoice are REFUSED from phones (the draft
+//     let a phone fill an empty osm lookup). The app already treats a refused
+//     osm write as fine.
+// docs/gps-rules-proposal.json stays as the record of the draft.
 // ============================================================================
 'use strict';
 const { test } = require('node:test');
@@ -37,6 +53,8 @@ const targaryen = require('targaryen');
 const REPO_RULES = JSON.parse(fs.readFileSync(path.join(__dirname, 'database.rules.json'), 'utf8'));
 const PROPOSAL = JSON.parse(fs.readFileSync(path.join(__dirname, 'docs', 'gps-rules-proposal.json'), 'utf8'));
 
+// The draft merged into a copy - kept only to show the published file is NOT
+// the draft (osm differs). Every verdict below reads REPO_RULES.
 function proposedRules() {
     const r = JSON.parse(JSON.stringify(REPO_RULES));
     r.rules.course_gps = PROPOSAL.course_gps;
@@ -55,18 +73,24 @@ const DATA = {
     },
     course_gps: { caledonia: { pins: { h2: pin(33.45, -79.15, 'ROUND1') } } },
 };
-const db = (uid) => targaryen.database(proposedRules(), DATA).as(uid ? { uid, provider: 'anonymous' } : null);
+const db = (uid) => targaryen.database(REPO_RULES, DATA).as(uid ? { uid, provider: 'anonymous' } : null);
 const can = (uid, p, v) => db(uid).write(p, v, NOW).allowed;
 
-test('the proposal is NOT in database.rules.json - recorded, not applied', () => {
+test('phase 1 (2026-10-17) carries course_gps and events gpsPins - the draft is history, not the rule', () => {
     assert.ok(REPO_RULES.rules.events && REPO_RULES.rules.global_courses, 'positive: the real ruleset loaded');
-    assert.strictEqual(REPO_RULES.rules.course_gps, undefined);
-    assert.strictEqual(REPO_RULES.rules.events.$eventCode.gpsPins, undefined);
-    // TODAY, with the real rules: round pins are accepted (they ride the round's
-    // own open write, like scores), and the shared course copy is refused outright.
-    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'golfer' }).write('/events/ROUND1/gpsPins/h1', pin(33.451, -79.151), NOW).allowed, true);
-    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'golfer' }).write('/events/ROUND1/gpsPins/h2', pin(33.451, -79.151), NOW).allowed, true, 'and today anyone can change one - which the proposal closes');
-    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'org' }).write('/course_gps/caledonia/pins/h1', pin(33.45, -79.15, 'ROUND1'), NOW).allowed, false);
+    // Was: course_gps / gpsPins undefined in the repo file. Phase-1 rules
+    // of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): both are live.
+    assert.ok(REPO_RULES.rules.course_gps && REPO_RULES.rules.course_gps.$courseKey.pins.$hole['.write'], 'course_gps pins rule is live');
+    assert.ok(REPO_RULES.rules.events.$eventCode.gpsPins.$hole['.write'], 'round pins carry their own .write');
+    assert.strictEqual(REPO_RULES.rules.course_gps.$courseKey.osm['.write'], false, 'osm is refused from phones (the draft allowed an empty fill)');
+    assert.strictEqual(REPO_RULES.rules.course_gps.$courseKey.holeChoice['.write'], false);
+    assert.notDeepStrictEqual(proposedRules().rules.course_gps, REPO_RULES.rules.course_gps, 'the published block is not the draft');
+    // TODAY, with the real rules: a golfer sets an empty round pin, may NOT change
+    // one on an owned round (the draft's whole point, now enforced), and the
+    // organizer sets the shared course copy.
+    assert.strictEqual(can('golfer', '/events/ROUND1/gpsPins/h1', pin(33.451, -79.151)), true);
+    assert.strictEqual(can('golfer', '/events/ROUND1/gpsPins/h2', pin(33.451, -79.151)), false, 'a golfer cannot change an owned round\'s green');
+    assert.strictEqual(can('org', '/course_gps/caledonia/pins/h1', pin(33.45, -79.15, 'ROUND1')), true);
 });
 
 test('course_gps: any signed-in round member sets an EMPTY green; nobody but the organizer changes it', () => {
@@ -102,10 +126,15 @@ test('round pins: anyone on the round sets an EMPTY green; only the organizer ch
     assert.strictEqual(can('golfer', '/events/LEGACY/gpsPins/h1', pin(33.701, -78.901)), true, 'a round with no organizer stays open, as its scores are');
 });
 
-test('KNOWN LIMIT: a code holder can DELETE a round pin (validate does not run on delete)', () => {
-    // If this ever starts failing, the limit is gone - delete this test and the
-    // paragraph about it in the header and in docs/gps-builds.md.
-    assert.strictEqual(can('golfer', '/events/ROUND1/gpsPins/h2', null), true);
+test('KNOWN LIMIT, narrowed by phase 1: no golfer deletes an OWNED round\'s pin; on a legacy round a signed-in code holder still can', () => {
+    // Was: a code holder can delete any round pin (the round-level grant was
+    // open). Phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): an owned
+    // round's grant is the owner's, and gpsPins/$hole refuses a non-owner change
+    // or delete. A legacy round (no ownerUid) is still editable by any signed-in
+    // phone through the round-level legacy arm, so the limit survives there.
+    assert.strictEqual(can('golfer', '/events/ROUND1/gpsPins/h2', null), false, 'owned round: a golfer cannot delete a pin');
+    assert.strictEqual(can(null, '/events/ROUND1/gpsPins/h2', null), false, 'signed out: no');
+    assert.strictEqual(can('golfer', '/events/LEGACY/gpsPins/h1', null), true, 'legacy round: still deletable by a signed-in code holder');
 });
 
 test('the app writes what the proposal accepts: the course copy carries `ev`', () => {
@@ -114,14 +143,18 @@ test('the app writes what the proposal accepts: the course copy carries `ev`', (
     assert.ok(/Object\.assign\(\{\}, pin, \{ ev: S\.eventCode \}\)/.test(v), 'savePin stamps the round code on the course copy');
 });
 
-test('course_gps/<key>/osm (build 5): a signed-in phone fills an EMPTY lookup; nobody changes it', () => {
+test('course_gps/<key>/osm (build 5): REFUSED from every phone in phase 1 - the app treats that as fine', () => {
+    // Was: a signed-in phone fills an EMPTY lookup (the draft). Phase-1 rules
+    // of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): osm is .write false - no phone
+    // fills, changes or deletes it.
     const rec = { v: 1, src: 'osm-lookup', at: NOW - 1000, holes: { 1: { osm: { mid: [47.2, -122.57] } } } };
-    assert.strictEqual(can('golfer', '/course_gps/gca_50bc8qqa/osm', rec), true, 'empty: any signed-in phone');
+    assert.strictEqual(can('golfer', '/course_gps/gca_50bc8qqa/osm', rec), false, 'empty: refused even to a signed-in phone');
     assert.strictEqual(can(null, '/course_gps/gca_50bc8qqa/osm', rec), false, 'signed out: no');
-    assert.strictEqual(can('golfer', '/course_gps/gca_50bc8qqa/osm', Object.assign({}, rec, { src: 'typed' })), false, 'only a lookup');
+    assert.strictEqual(can('org', '/course_gps/gca_50bc8qqa/osm', Object.assign({}, rec, { src: 'typed' })), false, 'not a typed record either');
     const withOsm = JSON.parse(JSON.stringify(DATA));
     withOsm.course_gps.gca_50bc8qqa = { osm: rec };
-    assert.strictEqual(targaryen.database(proposedRules(), withOsm).as({ uid: 'org', provider: 'anonymous' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, false, 'once there, nobody overwrites it');
-    // And the LIVE rules (unchanged) refuse it - the app treats that as fine.
-    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'golfer' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, false);
+    assert.strictEqual(targaryen.database(REPO_RULES, withOsm).as({ uid: 'org', provider: 'anonymous' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, false, 'once there, nobody overwrites it');
+    assert.strictEqual(targaryen.database(REPO_RULES, withOsm).as({ uid: 'org', provider: 'anonymous' }).write('/course_gps/gca_50bc8qqa/osm', null, NOW).allowed, false, 'or deletes it');
+    // The draft, for the record, would have accepted the empty fill.
+    assert.strictEqual(targaryen.database(proposedRules(), DATA).as({ uid: 'golfer', provider: 'anonymous' }).write('/course_gps/gca_50bc8qqa/osm', rec, NOW).allowed, true, 'positive control: the draft differs here');
 });

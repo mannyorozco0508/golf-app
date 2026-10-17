@@ -190,7 +190,7 @@
     "trips": {
       "$tripCode": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.token.email != null && ((!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email))))",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email))))",
         ".validate": "newData.hasChildren(['ownerUid']) || newData.hasChildren(['ownerEmail'])",
         "ownerEmail": {
           ".validate": "newData.isString() && newData.val().length >= 5 && newData.val().length <= 160 && newData.val().matches(/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/)"

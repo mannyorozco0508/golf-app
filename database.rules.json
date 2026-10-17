@@ -3,31 +3,31 @@
     "events": {
       "$eventCode": {
         ".read": true,
-        ".write": "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid && ((root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000) || (root.child('organizers/' + auth.uid + '/pass/expiresAt').exists() && root.child('organizers/' + auth.uid + '/pass/expiresAt').val() > now))) || (data.exists() && (newData.exists() || !data.hasChild('scores') || (auth != null && data.hasChild('ownerUid') && auth.uid === data.child('ownerUid').val())))",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('ownerUid').val() === auth.uid || (data.child('tripCode').isString() && root.child('trips/' + data.child('tripCode').val() + '/ownerUid').val() === auth.uid))) || (data.exists() && !data.hasChild('ownerUid') && newData.exists()))",
         ".validate": "newData.val() === null || (newData.hasChildren() && (!data.hasChild('ownerUid') || newData.hasChild('ownerUid')))",
         "ownerUid": {
           ".validate": "(!data.parent().exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
         },
         "scores": {
-          ".write": "root.child('events/' + $eventCode).exists()",
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()",
           "$scoreKey": {
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 30 && $scoreKey.matches(/^p[0-9]+_h[0-9]+$/)"
           }
         },
         "kpLeaders": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "kpWinners": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "kpConfirmed": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "kpGroupAnswers": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "challenges": {
-          ".write": "root.child('events/' + $eventCode).exists()",
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()",
           "$challengeId": {
             ".validate": "newData.val() === null || (newData.hasChildren(['from', 'to', 'status', 'terms']) && newData.child('from').isString() && newData.child('from').val().length <= 16 && newData.child('to').isString() && newData.child('to').val().length <= 16 && newData.child('from').val() !== newData.child('to').val())",
             "from": {
@@ -50,20 +50,48 @@
             },
             "terms": {
               ".validate": "newData.hasChildren(['format']) && (newData.child('format').val() === 'match' || newData.child('format').val() === 'nassau' || newData.child('format').val() === 'stroke')",
-              "format": { ".validate": "newData.isString()" },
-              "scoring": { ".validate": "newData.isString() && (newData.val() === 'net' || newData.val() === 'gross')" },
-              "startHole": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 18" },
-              "stake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "holeStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "overallStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "frontStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "backStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "autoPressStake": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
-              "pressRule": { ".validate": "newData.isString() && (newData.val() === 'auto' || newData.val() === 'manual' || newData.val() === 'off')" },
-              "tieRule": { ".validate": "newData.isString() && (newData.val() === 'carry' || newData.val() === 'split')" },
-              "overallMode": { ".validate": "newData.isString() && (newData.val() === 'total' || newData.val() === 'per-hole')" },
-              "segment": { ".validate": "newData.isString() && (newData.val() === 'full18' || newData.val() === 'front9' || newData.val() === 'back9')" },
-              "$other": { ".validate": false }
+              "format": {
+                ".validate": "newData.isString()"
+              },
+              "scoring": {
+                ".validate": "newData.isString() && (newData.val() === 'net' || newData.val() === 'gross')"
+              },
+              "startHole": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 18"
+              },
+              "stake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "holeStake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "overallStake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "frontStake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "backStake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "autoPressStake": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              },
+              "pressRule": {
+                ".validate": "newData.isString() && (newData.val() === 'auto' || newData.val() === 'manual' || newData.val() === 'off')"
+              },
+              "tieRule": {
+                ".validate": "newData.isString() && (newData.val() === 'carry' || newData.val() === 'split')"
+              },
+              "overallMode": {
+                ".validate": "newData.isString() && (newData.val() === 'total' || newData.val() === 'per-hole')"
+              },
+              "segment": {
+                ".validate": "newData.isString() && (newData.val() === 'full18' || newData.val() === 'front9' || newData.val() === 'back9')"
+              },
+              "$other": {
+                ".validate": false
+              }
             },
             "$other": {
               ".validate": false
@@ -71,37 +99,37 @@
           }
         },
         "sideMatches": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "matchPresses": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "strokePresses": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "dots": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "auditLog": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "scoresVerified": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "wolfCalls": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "ryderCup": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "ryderCupRef": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "ryderFoursomes": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "additionalGameInstances": {
-          ".write": "root.child('events/' + $eventCode).exists()"
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
         },
         "holeBetStake": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
@@ -132,14 +160,38 @@
         },
         "wolfBlindMult": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+        },
+        "players": {
+          ".validate": "newData.hasChildren()",
+          "$i": {
+            ".validate": "newData.hasChildren(['id', 'name']) && newData.child('id').isNumber() && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 60"
+          }
+        },
+        "courseData": {
+          ".validate": "newData.hasChildren()",
+          "$i": {
+            ".validate": "newData.hasChildren(['hole', 'par']) && newData.child('hole').isNumber() && newData.child('hole').val() >= 1 && newData.child('hole').val() <= 18 && newData.child('par').isNumber() && newData.child('par').val() >= 3 && newData.child('par').val() <= 6"
+          }
+        },
+        "organizerToken": {
+          ".validate": "newData.val() === data.val() || (newData.isString() && newData.val().length >= 16 && newData.val().length <= 64)"
+        },
+        "pointsGame": {
+          ".write": "auth != null && root.child('events/' + $eventCode).exists()"
+        },
+        "gpsPins": {
+          "$hole": {
+            ".write": "auth != null && root.child('events/' + $eventCode).exists() && (!data.exists() || root.child('events/' + $eventCode + '/ownerUid').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['mid', 'at']) && $hole.matches(/^h([1-9]|1[0-9]|2[0-7])$/) && newData.child('mid/lat').isNumber() && newData.child('mid/lat').val() >= -90 && newData.child('mid/lat').val() <= 90 && newData.child('mid/lng').isNumber() && newData.child('mid/lng').val() >= -180 && newData.child('mid/lng').val() <= 180 && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000"
+          }
         }
       }
     },
     "trips": {
       "$tripCode": {
-        ".read": "auth != null && auth.token.email != null",
-        ".write": "auth != null && auth.token.email != null && (!data.exists() || newData.exists())",
-        ".validate": "newData.hasChildren(['ownerEmail'])",
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email))))",
+        ".validate": "newData.hasChildren(['ownerUid']) || newData.hasChildren(['ownerEmail'])",
         "ownerEmail": {
           ".validate": "newData.isString() && newData.val().length >= 5 && newData.val().length <= 160 && newData.val().matches(/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/)"
         },
@@ -155,13 +207,20 @@
             "$playerId": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
             }
-          }
+          },
+          ".write": "auth != null && root.child('trips/' + $tripCode).exists()"
+        },
+        "ownerUid": {
+          ".validate": "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())"
+        },
+        "league": {
+          ".write": "auth != null && auth.token.email != null && root.child('trips/' + $tripCode).exists()"
         }
       }
     },
     "seasons": {
       "$seasonCode": {
-        ".read": "auth != null && auth.token.email != null",
+        ".read": "auth != null",
         ".write": "auth != null && auth.token.email != null && (!data.exists() || newData.exists())",
         ".validate": "newData.hasChildren(['ownerEmail'])",
         "ownerEmail": {
@@ -214,19 +273,13 @@
         },
         "rounds": {
           "$roundId": {
-            ".write": "root.child('tournaments/' + $tourneyCode).exists()",
-            ".validate": "newData.hasChildren(['eventCode'])",
-            "eventCode": {
-              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24"
-            },
-            "label": {
-              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
-            },
-            "status": {
-              ".validate": "newData.isString() && (newData.val() === 'open' || newData.val() === 'closed')"
-            },
-            "$other": {
-              ".validate": false
+            ".write": "auth != null && root.child('tournaments/' + $tourneyCode + '/ownerUid').val() === auth.uid",
+            ".validate": "newData.hasChildren()",
+            "scores": {
+              "$scoreKey": {
+                ".write": "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()",
+                ".validate": "$scoreKey.matches(/^(team[0-9]+(_p[0-9]+)?|p[a-z0-9]+)_h([1-9]|1[0-8])$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 30 && newData.val() % 1 === 0"
+              }
             }
           }
         }
@@ -292,7 +345,6 @@
     "organizers": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "newData.val() === null && auth != null && auth.uid === $uid",
         "firstSeenAt": {
           ".write": "!data.exists() && auth != null && auth.uid === $uid",
           ".validate": "newData.isNumber() && newData.val() <= now"
@@ -367,7 +419,7 @@
     "global_courses": {
       ".read": true,
       "$courseId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && !data.exists() && newData.exists() && !$courseId.beginsWith('gapi_') && !$courseId.beginsWith('gca_')",
         ".validate": "(newData.hasChildren(['name','data']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 120) && (!$courseId.beginsWith('gca_') || $courseId === 'gca_' + newData.child('source/providerCourseId').val())",
         "data": {
           ".validate": "newData.hasChildren([\"0\", \"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"10\", \"11\", \"12\", \"13\", \"14\", \"15\", \"16\", \"17\"])",
@@ -383,6 +435,46 @@
               ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 18"
             }
           }
+        },
+        "tees": {
+          ".validate": "newData.hasChildren()",
+          "$gender": {
+            ".validate": "$gender === 'male' || $gender === 'female'"
+          }
+        },
+        "location": {
+          ".validate": "newData.hasChildren()",
+          "latitude": {
+            ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+          },
+          "longitude": {
+            ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+          },
+          "city": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "state": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "country": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "address": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+        },
+        "source": {},
+        "createdAt": {},
+        "updatedAt": {},
+        "createdBy": {},
+        "$other": {
+          ".validate": false
         }
       }
     },
@@ -432,13 +524,47 @@
         }
       }
     },
-    "gps_courses": { "$courseId": { ".read": "auth != null", ".write": false } },
-    "gps_links": { "$courseKey": { ".read": "auth != null", ".write": false } },
-    "gps_usage": { "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": false } },
+    "gps_courses": {
+      "$courseId": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+    "gps_links": {
+      "$courseKey": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+    "gps_usage": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
     "$other": {
       ".read": false,
       ".write": false
+    },
+    "course_gps": {
+      "$courseKey": {
+        ".read": "auth != null",
+        "pins": {
+          "$hole": {
+            ".write": "auth != null && newData.exists() && newData.child('ev').isString() && root.child('events/' + newData.child('ev').val()).child('players').exists() && root.child('events/' + newData.child('ev').val()).child('activeCourseKey').isString() && root.child('events/' + newData.child('ev').val()).child('activeCourseKey').val().length > 0 && ($courseKey === root.child('events/' + newData.child('ev').val()).child('activeCourseKey').val() || (root.child('events/' + newData.child('ev').val()).child('activeCourseKey').val().matches(/_27$/) && $courseKey.beginsWith(root.child('events/' + newData.child('ev').val()).child('activeCourseKey').val() + '_'))) && (!data.exists() || root.child('events/' + newData.child('ev').val()).child('ownerUid').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['mid', 'at', 'ev']) && $hole.matches(/^h([1-9]|1[0-9]|2[0-7])$/) && newData.child('mid/lat').isNumber() && newData.child('mid/lat').val() >= -90 && newData.child('mid/lat').val() <= 90 && newData.child('mid/lng').isNumber() && newData.child('mid/lng').val() >= -180 && newData.child('mid/lng').val() <= 180 && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000"
+          }
+        },
+        "osm": {
+          ".write": false
+        },
+        "holeChoice": {
+          ".write": false
+        },
+        "$other": {
+          ".write": false
+        }
+      }
     }
   }
 }
-

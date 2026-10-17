@@ -109,11 +109,18 @@ describe('THE PURE PART: a record and a clock in, one line out', () => {
         assert.equal(g.standingLine(g.standingOf(undefined, NOW)), '');
         assert.equal(g.standingOf(undefined, NOW), null, 'unknown stays unknown');
     });
-    test('the two constants are the gate\'s: 21 days from the rule, and notice for all of them', () => {
+    test('the two constants are the gate\'s: 21 days, and notice for all of them - and the rule no longer carries the wall', () => {
         const g = gate();
         assert.equal(g.TRIAL_MS, 1814400000);
         assert.equal(g.NOTICE_DAYS, 21, 'the tell needs the trial line present from day one');
-        assert.match(read('database.rules.json'), /firstSeenAt'\)\.val\(\) \+ 1814400000/);
+        // Was: the rule carried `firstSeenAt').val() + 1814400000`. Phase-1 rules
+        // of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): the 21-day organizer wall
+        // clause is GONE from the rules (games are free), so the server never
+        // refuses a save on the clock. firstSeenAt itself is still write-once.
+        const rules = read('database.rules.json');
+        assert.doesNotMatch(rules, /1814400000/, 'the wall constant is back in the rules');
+        assert.doesNotMatch(rules, /firstSeenAt'\)\.val\(\) \+/, 'a firstSeenAt clock clause is back in the rules');
+        assert.match(rules, /"firstSeenAt": \{\s*"\.write": "!data\.exists\(\) && auth != null && auth\.uid === \$uid"/, 'firstSeenAt is still write-once');
     });
 });
 

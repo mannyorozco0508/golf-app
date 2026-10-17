@@ -42,6 +42,31 @@
 // validate should see the merge. "Should" is why this is a test. The scenario
 // below writes to `global_courses/<key>/name` on an existing record, which is
 // exactly that shape.
+//
+// ---------------------------------------------------------------------------
+// PHASE 1 (of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK) to
+// rules/database.rules.phase1.json). WHAT CHANGED, AND HOW THIS FILE HOLDS IT.
+// ---------------------------------------------------------------------------
+//
+// global_courses/$courseId .write is now
+//     auth != null && !data.exists() && newData.exists()
+//       && !$courseId.beginsWith('gapi_') && !$courseId.beginsWith('gca_')
+// so a phone may CREATE a plain course card and nothing else: it cannot write
+// a card back, cannot edit a shared card, and cannot import a gca_ card. Manny
+// accepted that - corrections and imports are the Admin/server path now (the
+// Admin SDK does not evaluate these rules at all). Signed-out writes are
+// refused outright.
+//
+// So this file runs TWO tables:
+//   REAL - the published file, exactly. Write-backs, merges and gca_ imports
+//          from a phone are asserted REFUSED; a fresh plain card is asserted
+//          ACCEPTED (and every one of the 36 live cards, created under a fresh
+//          key, still passes phase 1's tees/location/$other validation).
+//   STUB - the same file with ONLY $courseId/.write opened to true, so the
+//          .validate does all the work. That keeps the provenance clause and
+//          the merge question measured: matching ids accepted, mismatched /
+//          missing / empty ids refused, a {name, data} child write onto an
+//          existing gca_ record accepted by the validate.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -73,13 +98,17 @@ const GCA_CLAUSE =
 // had it. Now it does, and appending a second copy would make the temp rules
 // differ from what deploys - which the agreement assertion above would catch,
 // but as a confusing failure rather than the real one.
-function buildTempRules() {
+//
+// stubWrite: phase 1 - the STUB table opens $courseId/.write to true and
+// changes nothing else, so the validate is measured on its own.
+function buildTempRules(stubWrite) {
     const rules = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8'));
     const node = rules.rules.global_courses.$courseId;
     if (node['.validate'].indexOf("beginsWith('gca_')") === -1) {
         node['.validate'] = '(' + node['.validate'] + ') && ' + GCA_CLAUSE;
     }
-    const p = path.join(os.tmpdir(), 'gca-rules-' + process.pid + '.json');
+    if (stubWrite) node['.write'] = 'true';
+    const p = path.join(os.tmpdir(), 'gca-rules-' + (stubWrite ? 'stub-' : '') + process.pid + '.json');
     fs.writeFileSync(p, JSON.stringify(rules, null, 2));
     return p;
 }
@@ -109,58 +138,91 @@ const imported = (providerId, over) => Object.assign({
               siFrom: 'male/Copper' }
 }, over || {});
 
-function buildTests() {
-    const tests = {};
-    const root = { events: {}, trips: {}, tournaments: {}, app_settings: {},
-                   global_courses: Object.assign({}, LIVE, {
-                       // pre-existing imported record, for the merge scenarios
-                       gca_bwcdmzcy: imported('bwcdmzcy')
-                   }) };
+// A fresh key for a live card: never gca_/gapi_, never an existing key.
+const copyKey = (id) => 'copy_' + id;
 
+const USERS = { nobody: null, phone: { uid: 'u-phone', provider: 'anonymous' } };
+
+function buildRoot() {
+    return { events: {}, trips: {}, tournaments: {}, app_settings: {},
+             global_courses: Object.assign({}, LIVE, {
+                 // pre-existing imported record, for the merge scenarios
+                 gca_bwcdmzcy: imported('bwcdmzcy')
+             }) };
+}
+
+// REAL: the published file. What a phone may and may not do today.
+function buildRealTests() {
+    const tests = {};
+    // ---- WRITE-BACK of every live card: REFUSED for a phone and signed out
+    // (create-only; a correction is the Admin/server path). ----
+    Object.entries(LIVE).forEach(([id, rec]) => {
+        tests['global_courses/' + id] = { cannotWrite: [{ auth: 'phone', data: rec }, { auth: 'nobody', data: rec }] };
+        // ---- and the same card, CREATED under a fresh key by a phone, is
+        // ACCEPTED: phase 1's shape validation still fits every real card. ----
+        tests['global_courses/' + copyKey(id)] = { canWrite: [{ auth: 'phone', data: rec }],
+                                                    cannotWrite: [{ auth: 'nobody', data: rec }] };
+    });
+    // ---- gca_ imports from a phone: REFUSED, matching id or not. ----
+    tests['global_courses/gca_s21hccyk'] = { cannotWrite: [{ auth: 'phone', data: imported('s21hccyk') }] };
+    tests['global_courses/gca_5ngjj512'] = { cannotWrite: [{ auth: 'phone', data: imported('5ngjj512') }] };
+    // ---- THE MERGE CASE from a phone: REFUSED (existing record, gca_ key). ----
+    tests['global_courses/gca_bwcdmzcy/name'] = { cannotWrite: [{ auth: 'phone', data: 'Legacy Golf Resort (edited)' }] };
+    tests['global_courses/gca_bwcdmzcy/data'] = { cannotWrite: [{ auth: 'phone', data: CARD }] };
+    // ---- REFUSED ----
+    tests['global_courses/gca_mismatch1'] = { cannotWrite: [{ auth: 'phone', data: imported('s21hccyk') }] };
+    tests['global_courses/gca_nosource1'] = { cannotWrite: [{ auth: 'phone', data: { name: 'No Source', data: CARD } }] };
+    tests['global_courses/gca_emptyid1'] = { cannotWrite: [{ auth: 'phone',
+        data: imported('', { source: { provider: 'golfcourseapi', importedAt: 1 } }) }] };
+    return tests;
+}
+
+// STUB: $courseId/.write = true. The validate, measured on its own - the
+// original scenario table of this file.
+function buildStubTests() {
+    const tests = {};
     // ---- UNAFFECTED: all 36 live keys, written back exactly as they are ----
     Object.entries(LIVE).forEach(([id, rec]) => {
         tests['global_courses/' + id] = { canWrite: [{ auth: 'nobody', data: rec }] };
     });
-
     // ---- ACCEPTED ----
     tests['global_courses/gca_s21hccyk'] = { canWrite: [{ auth: 'nobody', data: imported('s21hccyk') }] };
     tests['global_courses/gca_5ngjj512'] = { canWrite: [{ auth: 'nobody', data: imported('5ngjj512') }] };
-
     // ---- THE MERGE CASE. Writes to CHILDREN of an existing gca_ record, which
     // is how Firebase applies .update({name, data}). ----
     tests['global_courses/gca_bwcdmzcy/name'] = { canWrite: [{ auth: 'nobody', data: 'Legacy Golf Resort (edited)' }] };
     tests['global_courses/gca_bwcdmzcy/data'] = { canWrite: [{ auth: 'nobody', data: CARD }] };
-
     // ---- REFUSED ----
     tests['global_courses/gca_mismatch1'] = { cannotWrite: [{ auth: 'nobody', data: imported('s21hccyk') }] };
     tests['global_courses/gca_nosource1'] = { cannotWrite: [{ auth: 'nobody', data: { name: 'No Source', data: CARD } }] };
     tests['global_courses/gca_emptyid1'] = { cannotWrite: [{ auth: 'nobody',
         data: imported('', { source: { provider: 'golfcourseapi', importedAt: 1 } }) }] };
-
-    return { root, tests };
+    return tests;
 }
 
+// Through helpers/targaryen-run.js (phase 1 doubled this table): a pipe
+// truncates targaryen's output at ~33 KB on macOS; a file does not. A non-zero
+// exit means scenarios failed - a real result, not a crash.
 function runTargaryen(rulesPath, dataPath) {
-    try {
-        return { exitCode: 0,
-                 output: execFileSync(TARGARYEN, [rulesPath, dataPath, '--verbose'], { encoding: 'utf8' }) };
-    } catch (e) {
-        return { exitCode: e.status, output: (e.stdout || '') + (e.stderr || '') };
-    }
+    return require('./helpers/targaryen-run.js').runTargaryen(rulesPath, dataPath);
 }
 
-let RESULT = null;
+let RESULT = null;        // REAL table
+let STUB_RESULT = null;   // STUB table
 let RULES_PATH = null;
+let STUB_RULES_PATH = null;
 let DATA_PATH = null;
+let STUB_DATA_PATH = null;
 
 before(() => {
-    RULES_PATH = buildTempRules();
-    const built = buildTests();
+    RULES_PATH = buildTempRules(false);
+    STUB_RULES_PATH = buildTempRules(true);
     DATA_PATH = path.join(os.tmpdir(), 'gca-tests-' + process.pid + '.json');
-    fs.writeFileSync(DATA_PATH, JSON.stringify({
-        root: built.root, users: { nobody: null }, tests: built.tests
-    }, null, 1));
+    STUB_DATA_PATH = path.join(os.tmpdir(), 'gca-tests-stub-' + process.pid + '.json');
+    fs.writeFileSync(DATA_PATH, JSON.stringify({ root: buildRoot(), users: USERS, tests: buildRealTests() }, null, 1));
+    fs.writeFileSync(STUB_DATA_PATH, JSON.stringify({ root: buildRoot(), users: USERS, tests: buildStubTests() }, null, 1));
     RESULT = runTargaryen(RULES_PATH, DATA_PATH);
+    STUB_RESULT = runTargaryen(STUB_RULES_PATH, STUB_DATA_PATH);
 });
 
 // ---------------------------------------------------------------------------
@@ -192,44 +254,52 @@ const stripAnsi = (s) => String(s).replace(/\u001b\[[0-9;]*m/g, '');
 // deliberately-refused cases as failures. targaryen itself said "0 failures in
 // 43 tests" while this function reported three. The table's own verdict is the
 // comparison of the last two columns.
-const TICK = '\u2713';
-const CROSS = '\u2716';
+const TICK = '✓';
+const CROSS = '✖';
 
-function parseFailedPaths(output) {
+function tableRows(output) {
     return stripAnsi(output).split('\n')
-        .filter((l) => l.indexOf('\u2502') > -1)
-        .map((l) => l.split('\u2502').map((c) => c.trim()).filter((c) => c !== ''))
+        .filter((l) => l.indexOf('│') > -1)
+        .map((l) => l.split('│').map((c) => c.trim()).filter((c) => c !== ''))
         // Drops the header row, whose last two cells are "Expect" and "Got".
         .filter((cells) => cells.length >= 5
             && [TICK, CROSS].indexOf(cells[cells.length - 2]) > -1
-            && [TICK, CROSS].indexOf(cells[cells.length - 1]) > -1)
+            && [TICK, CROSS].indexOf(cells[cells.length - 1]) > -1);
+}
+function parseFailedPaths(output) {
+    return tableRows(output)
         .filter((cells) => cells[cells.length - 2] !== cells[cells.length - 1])
         .map((cells) => cells[0]);
 }
 const failedPaths = () => parseFailedPaths((RESULT && RESULT.output) || '');
+const stubFailedPaths = () => parseFailedPaths((STUB_RESULT && STUB_RESULT.output) || '');
 
 // The full table, so an assertion can say "this row says DENIED" rather than
 // only "this row is not among the failures" - an absence is what an empty
 // parser returns, and that is how the first version of this file went green.
-function verdictRows() {
+// Keyed `path|auth` (phase 1: a path can carry a phone row and a signed-out row).
+function verdictRows(result) {
     const out = {};
-    stripAnsi((RESULT && RESULT.output) || '').split('\n')
-        .filter((l) => l.indexOf('\u2502') > -1)
-        .map((l) => l.split('\u2502').map((c) => c.trim()).filter((c) => c !== ''))
-        .filter((c) => c.length >= 5
-            && [TICK, CROSS].indexOf(c[c.length - 2]) > -1
-            && [TICK, CROSS].indexOf(c[c.length - 1]) > -1)
-        .forEach((c) => { out[c[0]] = { expect: c[c.length - 2], got: c[c.length - 1] }; });
+    tableRows(((result === undefined ? RESULT : result) || {}).output || '')
+        .forEach((c) => { out[c[0] + '|' + c[2]] = { expect: c[c.length - 2], got: c[c.length - 1] }; });
     return out;
+}
+function assertRow(rows, key, got, why) {
+    const row = rows[key];
+    assert.ok(row, `${key} produced no verdict row - the scenario did not run`);
+    assert.equal(row.got, got, why);
+    assert.equal(row.expect, row.got, `${key}: expected ${row.expect}, got ${row.got}`);
 }
 
 describe('THE HARNESS IS REALLY RUNNING', () => {
 
     test('targaryen ran and produced output', () => {
-        assert.ok(RESULT, 'the before hook did not run');
-        assert.ok((RESULT.output || '').length > 40,
-            'targaryen produced almost nothing, so every assertion below would be reading an '
-            + 'empty string: ' + JSON.stringify((RESULT.output || '').slice(0, 200)));
+        [['REAL', RESULT], ['STUB', STUB_RESULT]].forEach(([name, r]) => {
+            assert.ok(r, 'the before hook did not run (' + name + ')');
+            assert.ok((r.output || '').length > 40,
+                name + ': targaryen produced almost nothing, so every assertion below would be reading an '
+                + 'empty string: ' + JSON.stringify((r.output || '').slice(0, 200)));
+        });
     });
 
     // THIS ASSERTION TURNED AROUND WHEN THE CLAUSE SHIPPED, AND THAT IS WHY IT
@@ -247,6 +317,9 @@ describe('THE HARNESS IS REALLY RUNNING', () => {
     // measure and the file that actually deploys must agree. A temp copy that
     // drifted from the deployed rules would mean these 46 tests were measuring
     // something nobody runs.
+    //
+    // Phase 1: the REAL temp copy is the published file byte for byte as JSON,
+    // and the STUB differs from it in $courseId/.write ONLY.
     test('the temp copy and the REAL file both carry the clause, and agree', () => {
         const temp = JSON.parse(fs.readFileSync(RULES_PATH, 'utf8'));
         const real = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8'));
@@ -260,17 +333,22 @@ describe('THE HARNESS IS REALLY RUNNING', () => {
         assert.equal(t, r,
             'the temp copy and the deployed rules have DRIFTED. These tests would be measuring '
             + 'an expression nobody runs.\n  temp: ' + t + '\n  real: ' + r);
+        assert.deepEqual(temp, real, 'the REAL table must run the published file unchanged');
+        const stub = JSON.parse(fs.readFileSync(STUB_RULES_PATH, 'utf8'));
+        assert.equal(stub.rules.global_courses.$courseId['.write'], 'true');
+        stub.rules.global_courses.$courseId['.write'] = real.rules.global_courses.$courseId['.write'];
+        assert.deepEqual(stub, real, 'the STUB moved something other than $courseId/.write');
     });
 
     test('THE VERDICT PARSER ACTUALLY FIRES - proved against an impossible rule', () => {
         // Without this, every "path X is not in the failed list" assertion in
         // this file is true of an empty list. An earlier parser returned []
         // unconditionally and the whole file passed on it.
-        const rules = JSON.parse(fs.readFileSync(REAL_RULES, 'utf8'));
+        const rules = JSON.parse(fs.readFileSync(STUB_RULES_PATH, 'utf8'));
         rules.rules.global_courses.$courseId['.validate'] = 'false';
         const rp = path.join(os.tmpdir(), 'gca-impossible-' + process.pid + '.json');
         fs.writeFileSync(rp, JSON.stringify(rules, null, 2));
-        const res = runTargaryen(rp, DATA_PATH);
+        const res = runTargaryen(rp, STUB_DATA_PATH);
         const failed = parseFailedPaths(res.output);
         assert.notEqual(res.exitCode, 0,
             'a rule of `false` did not fail any scenario, so targaryen is not evaluating '
@@ -295,87 +373,117 @@ describe('THE HARNESS IS REALLY RUNNING', () => {
 
 describe('THE MERGE CASE - MEASURED, NOT REASONED', () => {
 
-    // If this fails, the clause as written would refuse every edit to every
-    // imported course and MUST be redesigned before it goes near the real file.
-    test('a {name, data} update onto an EXISTING gca_ record is ACCEPTED', () => {
-        const failed = failedPaths();
-        const broke = failed.filter(p => p.includes('gca_bwcdmzcy'));
+    // If the STUB half fails, the clause as written would refuse every edit to
+    // every imported course and MUST be redesigned. Phase 1: a PHONE's merge
+    // onto an existing gca_ record is refused by .write (create-only, no gca_
+    // from phones - accepted by Manny; the Admin/server path edits imports).
+    test('a {name, data} update onto an EXISTING gca_ record: REFUSED from a phone (phase 1), and the validate alone still accepts the merge', () => {
+        const rows = verdictRows(RESULT);
+        ['global_courses/gca_bwcdmzcy/name', 'global_courses/gca_bwcdmzcy/data'].forEach((p) =>
+            assertRow(rows, p + '|phone', CROSS,
+                p + ' from a phone was ACCEPTED - phase 1 refuses edits to an existing card'));
+        const broke = stubFailedPaths().filter(p => p.includes('gca_bwcdmzcy'));
         assert.deepEqual(broke, [],
-            'WRITING A CHILD OF AN EXISTING gca_ RECORD WAS REFUSED. That means Firebase '
+            'WRITING A CHILD OF AN EXISTING gca_ RECORD WAS REFUSED BY THE VALIDATE. That means Firebase '
             + 'evaluates .validate against only the written subtree, not the merged record - '
-            + 'so the round publish, which writes {name, data} to the gca_ key after an '
-            + 'import (admin.html:3814 sets it, :5607 reads it), would be refused for every '
-            + 'imported course. THE CLAUSE NEEDS REDESIGNING BEFORE IT GOES NEAR THE REAL '
-            + 'FILE.\n  refused: ' + JSON.stringify(broke));
+            + 'so the clause would refuse every edit to every imported course. THE CLAUSE NEEDS '
+            + 'REDESIGNING.\n  refused: ' + JSON.stringify(broke));
+        const stubRows = verdictRows(STUB_RESULT);
+        ['global_courses/gca_bwcdmzcy/name', 'global_courses/gca_bwcdmzcy/data'].forEach((p) =>
+            assertRow(stubRows, p + '|null', TICK, p + ' was refused by the validate'));
     });
 });
 
 describe('EVERY LIVE KEY IS UNAFFECTED - ALL 36', () => {
 
+    // Phase 1: "unaffected" now means the CARD is unaffected - it still reads,
+    // it still validates (created under a fresh key by a phone, and written back
+    // under the validate alone) - while a phone WRITE-BACK of it is refused:
+    // shared cards are corrected by the Admin/server path (accepted by Manny).
     Object.keys(LIVE).forEach((id) => {
-        test(`${id} still writes back cleanly`, () => {
-            const failed = failedPaths();
-            assert.ok(!failed.includes('global_courses/' + id),
-                `${id} is a course that works today and the clause refused it. A rule that `
-                + 'breaks a working course is worse than the gap it closes.');
+        test(`${id}: a phone write-back is REFUSED (create-only, phase 1); the card still validates`, () => {
+            const rows = verdictRows(RESULT);
+            assertRow(rows, 'global_courses/' + id + '|phone', CROSS,
+                `${id}: a phone overwrote an existing shared card - phase 1 is create-only`);
+            assertRow(rows, 'global_courses/' + id + '|null', CROSS,
+                `${id}: a signed-out write was accepted`);
+            assertRow(rows, 'global_courses/' + copyKey(id) + '|phone', TICK,
+                `${id} is a course that works today and phase 1's validation refused its card `
+                + 'as a new course. A rule that breaks a working course is worse than the gap it closes.');
+            assert.ok(!stubFailedPaths().includes('global_courses/' + id),
+                `${id}: the validate alone refused the card it holds today`);
         });
     });
 
     test('zz_scratch_probe specifically - it has NO source and is already undeletable', () => {
         // Called out separately because it is the record with the least to lose
         // and the most already wrong with it. The clause must not be the reason
-        // it becomes harder to deal with than it already is.
+        // it becomes harder to deal with than it already is - its fate is the
+        // Admin/server path now, which these rules do not gate.
         assert.ok(!('source' in PROBE), 'the probe fixture has gained a source node');
-        assert.ok(!failedPaths().includes('global_courses/zz_scratch_probe'),
-            'the clause refused zz_scratch_probe. It carries no source, it cannot be deleted '
-            + 'by any client, and making it unwritable as well would leave it in a worse state '
-            + 'than the gap this rule closes.');
+        assert.ok(!stubFailedPaths().includes('global_courses/zz_scratch_probe'),
+            'the validate refused zz_scratch_probe. It carries no source, and making it '
+            + 'invalid as well would leave it in a worse state than the gap this rule closes.');
+        assertRow(verdictRows(RESULT), 'global_courses/zz_scratch_probe|phone', CROSS,
+            'a phone rewrote zz_scratch_probe - phase 1 is create-only');
     });
 });
 
 describe('gca_ KEYS ARE HELD TO THEIR OWN PROVENANCE', () => {
 
-    test('a matching providerCourseId is ACCEPTED', () => {
-        const failed = failedPaths();
+    test('a matching providerCourseId: REFUSED from a phone (gca_ imports are the server path, phase 1), ACCEPTED by the validate alone', () => {
+        const real = verdictRows(RESULT);
+        const failed = stubFailedPaths();
         ['gca_s21hccyk', 'gca_5ngjj512'].forEach((k) => {
+            assertRow(real, 'global_courses/' + k + '|phone', CROSS,
+                `${k}: a phone imported a gca_ card - phase 1 refuses that`);
             assert.ok(!failed.includes('global_courses/' + k),
-                `${k} matches its own providerCourseId and was refused - the clause is too `
+                `${k} matches its own providerCourseId and was refused by the validate - the clause is too `
                 + 'strict and would block real imports');
+            assertRow(verdictRows(STUB_RESULT), 'global_courses/' + k + '|null', TICK, `${k} refused by the validate`);
         });
     });
 
     test('a MISMATCHED providerCourseId is refused', () => {
         // Read off the table directly rather than inferred from the absence of a
         // failure: the row must say the write was DENIED, and the scenario must
-        // agree that denial was expected.
-        const rows = verdictRows();
+        // agree that denial was expected. Both tables: the phone (by .write) and
+        // the validate alone (by the clause).
+        const rows = verdictRows(RESULT);
+        const stub = verdictRows(STUB_RESULT);
         [['gca_mismatch1', 'a gca_ key whose providerCourseId names a different course'],
          ['gca_nosource1', 'a gca_ key with no source node at all'],
          ['gca_emptyid1', 'a gca_ key whose providerCourseId is empty']].forEach(([k, what]) => {
-            const row = rows['global_courses/' + k];
-            assert.ok(row, `${k} produced no verdict row - the scenario did not run`);
-            assert.equal(row.got, CROSS, `${what} was ACCEPTED. The clause does not bind.`);
-            assert.equal(row.expect, row.got, `${k}: expected ${row.expect}, got ${row.got}`);
+            assertRow(rows, 'global_courses/' + k + '|phone', CROSS, `${what} was ACCEPTED from a phone.`);
+            assertRow(stub, 'global_courses/' + k + '|null', CROSS, `${what} was ACCEPTED. The clause does not bind.`);
         });
     });
 
     test('the whole scenario table agreed with targaryen', () => {
         // The cannotWrite rows are verdicts in the data file; targaryen fails the
         // run if any disagrees. Exit code 0 means every accepted case was
-        // accepted AND every refused case was refused.
+        // accepted AND every refused case was refused - in BOTH tables.
         assert.equal(RESULT.exitCode, 0,
-            'at least one scenario disagreed. This is the whole result - a refused case that '
-            + 'was accepted means the clause does not bind; an accepted case that was refused '
-            + 'means it breaks something real.\n' + (RESULT.output || '').slice(-2000));
+            'REAL: at least one scenario disagreed. A refused case that was accepted means '
+            + 'phase 1 does not bind; an accepted case that was refused means it breaks something real.\n'
+            + (RESULT.output || '').slice(-2000));
+        assert.equal(STUB_RESULT.exitCode, 0,
+            'STUB: at least one scenario disagreed. A refused case that was accepted means the '
+            + 'clause does not bind; an accepted case that was refused means it breaks something real.\n'
+            + (STUB_RESULT.output || '').slice(-2000));
     });
 
     test('AND A CLEAN CASE STILL PASSES, so this cannot be satisfied by refusing everything', () => {
         // CLAUDE.md's standing requirement for any guard: prove it is not a rule
-        // that simply says no. The 36 live keys above are that proof at scale;
-        // this names it so the reason survives.
+        // that simply says no. The 36 fresh-key creates above are that proof at
+        // scale; this names it so the reason survives.
         assert.ok(Object.keys(LIVE).length >= 36);
-        assert.ok(!failedPaths().includes('global_courses/caledonia'),
-            'a plain directory-keyed course was refused, so the clause is refusing everything '
+        const rows = verdictRows(RESULT);
+        assertRow(rows, 'global_courses/' + copyKey('caledonia') + '|phone', TICK,
+            'a plain directory-keyed course CREATED by a signed-in phone was refused, so phase 1 is '
+            + 'refusing everything rather than only write-backs and gca_ keys');
+        assert.ok(!stubFailedPaths().includes('global_courses/caledonia'),
+            'a plain directory-keyed course was refused by the validate, so the clause is refusing everything '
             + 'rather than only malformed gca_ keys');
     });
 });

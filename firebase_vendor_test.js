@@ -356,12 +356,46 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
         // So the claim this test makes is unchanged and is finally true of the
         // database: VENDORING THE SDK INTRODUCED NO auth RULE. What changed is
         // that the file it reads is no longer a parallel fiction.
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK) (rules/database.rules.phase1.json). The list is what the
+        // database now contains, grouped by the decision that put each one there.
+        // None of it is this batch's. The account-exit node delete
+        // (/organizers/$uid/.write) is GONE in phase 1 - accepted by Manny.
         assert.deepEqual(authSites.sort(), [
+            // GPS layer (course_gps pins: a member sets the first green, that
+            // round's organizer changes it; reads need a signed-in phone).
+            '/course_gps/$courseKey/.read',
+            '/course_gps/$courseKey/pins/$hole/.write',
+            // PHASE 1, events: setup is the owner's (or the trip owner's); every
+            // game-play child needs a signed-in phone on an existing round.
             '/events/$eventCode/.write',
+            '/events/$eventCode/additionalGameInstances/.write',
+            '/events/$eventCode/auditLog/.write',
+            '/events/$eventCode/challenges/.write',
+            '/events/$eventCode/dots/.write',
+            '/events/$eventCode/gpsPins/$hole/.write',
+            '/events/$eventCode/kpConfirmed/.write',
+            '/events/$eventCode/kpGroupAnswers/.write',
+            '/events/$eventCode/kpLeaders/.write',
+            '/events/$eventCode/kpWinners/.write',
+            '/events/$eventCode/matchPresses/.write',
             '/events/$eventCode/ownerUid/.validate',
+            '/events/$eventCode/pointsGame/.write',
+            '/events/$eventCode/ryderCup/.write',
+            '/events/$eventCode/ryderCupRef/.write',
+            '/events/$eventCode/ryderFoursomes/.write',
+            '/events/$eventCode/scores/.write',
+            '/events/$eventCode/scoresVerified/.write',
+            '/events/$eventCode/sideMatches/.write',
+            '/events/$eventCode/strokePresses/.write',
+            '/events/$eventCode/wolfCalls/.write',
+            // PHASE 1, course library: create-only, from a signed-in phone.
+            '/global_courses/$courseId/.write',
+            // GPS server-written nodes, read by a signed-in phone (live).
+            '/gps_courses/$courseId/.read',
+            '/gps_links/$courseKey/.read',
+            '/gps_usage/$uid/.read',
             '/organizers/$uid/.read',
-            // ACCOUNT EXIT, live: a golfer may delete their own organizer record.
-            '/organizers/$uid/.write',
             '/organizers/$uid/firstSeenAt/.write',
             // MY GROUPS, live: a roster a golfer keeps, readable and writable by
             // its owner and by the co-organizers they share it with.
@@ -383,8 +417,9 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
             '/registrations/$code/$entryId/.validate',
             '/registrations/$code/$entryId/.write',
             '/registrations/$code/.read',
-            // v218 season ledger. Owner writes the season; the code is the read,
-            // same as events.
+            // v218 season ledger. Owner writes the season; phase 1 reads need a
+            // signed-in phone.
+            '/seasons/$seasonCode/.read',
             '/seasons/$seasonCode/.write',
             '/seasons/$seasonCode/ownerUid/.validate',
             // MY GROUPS sharing, live: the index a co-organizer reads to find the
@@ -393,8 +428,17 @@ describe('BATCH 7A CHANGED NO PAGE', () => {
             '/sharedGroups/$emailKey/.read',
             // The narrowing (2026-09-18, published by hand): the parent .write
             // names the owner - a code-holder writes scores and nothing else.
+            // Phase 1 adds the owner's rounds/$roundId record.
             '/tournaments/$tourneyCode/.write',
-            '/tournaments/$tourneyCode/ownerUid/.validate'
+            '/tournaments/$tourneyCode/ownerUid/.validate',
+            '/tournaments/$tourneyCode/rounds/$roundId/.write',
+            // PHASE 1, trips: owner by ownerUid; reads, identity and league need
+            // a signed-in phone.
+            '/trips/$tripCode/.read',
+            '/trips/$tripCode/.write',
+            '/trips/$tripCode/identity/.write',
+            '/trips/$tripCode/league/.write',
+            '/trips/$tripCode/ownerUid/.validate'
         ], 'auth reached a rule outside the approved rules wave: ' + JSON.stringify(authSites));
         assert.match(read('admin.html'), /function makeOrganizerToken/,
             'organizerToken is untouched');

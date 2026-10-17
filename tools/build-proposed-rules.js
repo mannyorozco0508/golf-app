@@ -58,7 +58,9 @@ E.gpsPins = { $hole: {
 const T = R.trips.$tripCode;
 // The owner only (like seasons). A trip made before ownerUid (legacy) is the ownerEmail's until it
 // is migrated (rules/migrations: its ownerUid is written from its organizer). No delete.
-T['.write'] = "auth != null && auth.token.email != null && ("
+// OWNER BY UID, ANY SIGN-IN (Manny 2026-10-17): the app stamps the creator's uid (anonymous too) on a
+// new trip, and the owner is whoever holds that uid - an email is not needed to prove it.
+T['.write'] = "auth != null && ("
     + "(!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid)"
     + " || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email)))"
     + ")";

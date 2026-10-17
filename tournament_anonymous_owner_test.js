@@ -142,18 +142,23 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
         assert.equal(d.users.anonymous.token.firebase.sign_in_provider, 'anonymous');
         ['organizer', 'newcomer', 'google'].forEach(u => assert.notEqual(d.users[u].token.firebase.sign_in_provider, 'anonymous'));
     });
-    test('the rule: one clause added to ownerUid, and NOTHING else in the file moved', () => {
+    test('the rule: an anonymous auth is refused by the email sign-in the boundary requires (the ownerUid clause moved there in phase 1)', () => {
+        // Was: "one clause added to ownerUid" - the ownerUid .validate carried
+        // auth.token.firebase.sign_in_provider !== 'anonymous'. Phase-1 rules
+        // of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK): tournaments structure is
+        // live's - the parent .write requires auth.token.email != null, which an
+        // anonymous token never carries, so the anonymous owner is refused at the
+        // BOUNDARY and the ownerUid validate no longer names the provider. The
+        // scenario users now carry the email a password / Google token carries.
+        // The 18 rows above are the behaviour; this pins where it lives.
         const rules = read('database.rules.json');
-        const clause = "auth.token.firebase.sign_in_provider !== 'anonymous' && ";
-        assert.equal(rules.split(clause).length, 2, 'the clause appears exactly once');
-        assert.match(rules, /"ownerUid": \{\s*"\.validate": "\(!data\.exists\(\) && auth != null && auth\.token\.firebase\.sign_in_provider !== 'anonymous' && newData\.val\(\) === auth\.uid\) \|\| \(data\.exists\(\) && newData\.val\(\) === data\.val\(\)\)"/);
-        // The tournaments block is the NARROWED one (2026-09-18) - owner-only
-        // structure, scores open one key at a time. The ownerUid clause this test
-        // is about is unchanged inside it; tournaments_rules_isolation_test.js and
-        // wave2_rules_test.js hold the block itself.
         const t = JSON.parse(rules).rules.tournaments.$tourneyCode;
-        assert.equal(t['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
-        assert.equal(t.ownerUid['.validate'], "(!data.exists() && auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())");
+        assert.equal(t['.write'], "auth != null && auth.token.email != null && (!data.exists() || (data.hasChild('ownerUid') && data.child('ownerUid').val() === auth.uid))");
+        assert.equal(t.ownerUid['.validate'], "(!data.parent().exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())");
+        assert.equal(rules.split("auth.token.firebase.sign_in_provider !== 'anonymous' && ").length, 1, 'the old provider clause is gone from the file');
+        const d = JSON.parse(read('tournament_anonymous_owner.tests-data.json'));
+        assert.ok(!d.users.anonymous.token.email, 'the anonymous scenario user carries no email, as the real token does not');
+        ['organizer', 'newcomer', 'google'].forEach(u => assert.ok(d.users[u].token.email, u + ' carries the email its provider gives'));
     });
 });
 

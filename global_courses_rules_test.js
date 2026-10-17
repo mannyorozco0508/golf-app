@@ -36,6 +36,15 @@
 // the deployed database.rules.json, and 13 of its scenarios FAIL today. That is
 // the point: a scenario that passes against today's rules proves nothing about
 // the rules being written next.
+//
+// PHASE 1 (of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK)): the write rule is now
+// CREATE-ONLY from a signed-in phone, and gapi_/gca_ keys are refused from
+// phones. So the scenarios run as a signed-in phone ('phone') CREATING a card
+// at a fresh key - the validation table is unchanged in meaning - while a
+// write-back of an existing card is asserted REFUSED (correcting a shared card
+// is the Admin/server path now; accepted by Manny) and a signed-out write is
+// refused. Phase 1 also added `$other: false`, so A17 (a junk top-level field)
+// flipped from allowed to refused.
 // ============================================================================
 
 const { test, describe } = require('node:test');
@@ -86,8 +95,10 @@ const TABLE = [
     { id: 'A02', what: 'name replaced, data intact',             verdict: 'allow',
       why: 'a non-empty string name is a valid name; rules cannot know it is the wrong one',
       data: { name: 'HACKED', data: clean() } },
-    { id: 'A17', what: 'junk extra top-level field',             verdict: 'allow',
-      why: 'no $other deny, on purpose - "forbid what is not declared" rejects the next field we add',
+    // PHASE 1: refused. global_courses/$courseId now carries $other: false
+    // (with name/data/tees/location/source/createdAt/updatedAt/createdBy
+    // declared), so an undeclared top-level field is refused. Was 'allow'.
+    { id: 'A17', what: 'junk extra top-level field',             verdict: 'refuse',
       data: { name: 'X', data: clean(), evil: true } },
     { id: 'A19', what: 'duplicate hcpIndex (the hollywood_beach shape)', verdict: 'allow',
       why: 'uniqueness is not expressible in RTDB rules, and a live record already has this shape',
@@ -136,46 +147,55 @@ function buildTestsData() {
     const presets = presetPayloads();
     const tests = {};
 
-    // REGRESSION GUARD. Every record the database already holds, re-saved
-    // exactly as it is. A rule that rejects one of these breaks the "push to
-    // global database" admin flow, and it must fail here rather than on a
-    // golfer's phone at a course.
+    // REGRESSION GUARD. Every record the database already holds, CREATED
+    // exactly as it is under a fresh key by a signed-in phone. A rule that
+    // rejects one of these would refuse a real card's shape, and it must fail
+    // here rather than on a golfer's phone at a course.
+    //
+    // PHASE 1: re-saving the record AT ITS OWN KEY is now REFUSED for a phone
+    // and signed out - create-only (the "push to global database" correction of
+    // an existing card is the Admin/server path; accepted by Manny).
     Object.entries(SNAPSHOT).forEach(([id, rec]) => {
-        tests[`global_courses/${id}`] = { canWrite: [{ auth: 'nobody', data: rec }] };
+        tests[`global_courses/${id}`] = { cannotWrite: [{ auth: 'phone', data: rec }, { auth: 'nobody', data: rec }] };
+        tests[`global_courses/copy_${id}`] = { canWrite: [{ auth: 'phone', data: rec }] };
     });
-    // The same guard for every preset syncPresetsToFirebase would write. That
-    // write is a ROOT multi-path update and RTDB applies it atomically, so ONE
-    // rejected preset fails all of them together.
+    // The same guard for every preset syncPresetsToFirebase would write, as a
+    // CREATE. That write is a ROOT multi-path update and RTDB applies it
+    // atomically, so ONE rejected preset fails all of them together (and in
+    // phase 1 any preset key that already exists refuses the whole update).
     Object.entries(presets).forEach(([id, rec]) => {
-        tests[`global_courses/preset_${id}`] = { canWrite: [{ auth: 'nobody', data: rec }] };
+        tests[`global_courses/preset_${id}`] = { canWrite: [{ auth: 'phone', data: rec }] };
     });
 
     TABLE.forEach((row) => {
         const key = `global_courses/atk_${row.id}`;
         tests[key] = row.verdict === 'refuse'
-            ? { cannotWrite: [{ auth: 'nobody', data: row.data }] }
-            : { canWrite: [{ auth: 'nobody', data: row.data }] };
+            ? { cannotWrite: [{ auth: 'phone', data: row.data }] }
+            : { canWrite: [{ auth: 'phone', data: row.data }] };
     });
+
+    // PHASE 1 extras: signed out creates nothing; gapi_/gca_ keys are the
+    // server's, never a phone's.
+    tests['global_courses/atk_signed_out'] = { cannotWrite: [{ auth: 'nobody', data: { name: 'X', data: clean() } }] };
+    tests['global_courses/gapi_phone_probe'] = { cannotWrite: [{ auth: 'phone', data: { name: 'X', data: clean() } }] };
 
     return {
         counts: { live: Object.keys(SNAPSHOT).length, presets: Object.keys(presets).length,
-                  attacks: TABLE.length, total: Object.keys(tests).length },
+                  attacks: TABLE.length, extras: 2, total: Object.keys(tests).length },
         json: {
             root: { events: {}, trips: {}, tournaments: {},
                     global_courses: SNAPSHOT, app_settings: {} },
-            users: { nobody: null },
+            users: { nobody: null, phone: { uid: 'u-phone', provider: 'anonymous' } },
             tests: tests
         }
     };
 }
 
+// Through helpers/targaryen-run.js (phase 1 doubled this table): a pipe
+// truncates targaryen's output at ~33 KB on macOS; a file does not. A non-zero
+// exit means scenarios failed - a real result, not a crash.
 function runTargaryen(rulesPath, dataPath) {
-    try {
-        return { exitCode: 0, output: execFileSync(TARGARYEN, [rulesPath, dataPath, '--verbose'], { encoding: 'utf8' }) };
-    } catch (e) {
-        // A non-zero exit means scenarios failed. That is a real result, not a crash.
-        return { exitCode: e.status, output: (e.stdout || '') + (e.stderr || '') };
-    }
+    return require('./helpers/targaryen-run.js').runTargaryen(rulesPath, dataPath);
 }
 
 describe('global_courses — Tier-B validation', () => {
@@ -190,7 +210,9 @@ describe('global_courses — Tier-B validation', () => {
         assert.equal(built.counts.live, 35, 'the live snapshot should hold 35 courses');
         assert.ok(built.counts.presets >= 26, `only ${built.counts.presets} presets were read from course-data.js`);
         assert.equal(built.counts.attacks, 20, 'the Tier-B attack table has 20 rows');
-        assert.equal(built.counts.total, built.counts.live + built.counts.presets + built.counts.attacks);
+        // Phase 1: each live record is two paths (write-back refused, fresh-key
+        // create accepted), plus the two signed-out / gapi_ extras.
+        assert.equal(built.counts.total, 2 * built.counts.live + built.counts.presets + built.counts.attacks + built.counts.extras);
     });
 
     test('the table asserts both verdicts, not only refusals', () => {
@@ -198,8 +220,9 @@ describe('global_courses — Tier-B validation', () => {
         // everything, including every real course.
         const allow = TABLE.filter((r) => r.verdict === 'allow');
         const refuse = TABLE.filter((r) => r.verdict === 'refuse');
-        assert.equal(allow.length, 4, 'four scenarios are deliberately allowed');
-        assert.equal(refuse.length, 16, 'sixteen scenarios must be refused');
+        // Phase 1: A17 moved from allow to refuse ($other: false), so 3 / 17.
+        assert.equal(allow.length, 3, 'three scenarios are deliberately allowed');
+        assert.equal(refuse.length, 17, 'seventeen scenarios must be refused');
         allow.forEach((r) => assert.ok(r.why && r.why.length > 20,
             `${r.id} is allowed on purpose and must say why, or a later reader will "fix" it`));
     });
@@ -210,6 +233,7 @@ describe('global_courses — Tier-B validation', () => {
         assert.ok(m, `could not parse targaryen output:\n${output}`);
         const failures = parseInt(m[1], 10);
         const total = parseInt(m[2], 10);
+        // targaryen counts every canWrite/cannotWrite entry, so >= the path count.
         assert.ok(total >= built.counts.total,
             `targaryen ran ${total} scenarios, expected at least ${built.counts.total}`);
         assert.equal(failures, 0,

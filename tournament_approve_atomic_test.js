@@ -149,7 +149,10 @@ describe('A5. the live rules accept the single write (read, never published)', (
         registrations: { APP1: { e1: { fullName: 'Bo Bravo', email: 'bo@example.com', phone: '555-0001', createdAt: 10 } } } };
     const change = { 'tournaments/APP1/teams/team2': { num: 2, name: 'Team 2', players: ['Bo Bravo'], handicap: 0 },
         'registrations/APP1/e1/approvedAt': 5, 'registrations/APP1/e1/teamNum': 2 };
-    const as = (uid) => targaryen.database(rules, data).as(uid ? { uid, provider: 'password', token: { firebase: { sign_in_provider: 'password' } } } : null);
+    // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK). Tournament
+    // structure needs an EMAIL sign-in (as live), and a real password token always
+    // carries the email - the fixture now does too (it carried none before).
+    const as = (uid) => targaryen.database(rules, data).as(uid ? { uid, provider: 'password', token: { email: uid + '@example.com', firebase: { sign_in_provider: 'password' } } } : null);
     test('the owner may', () => { assert.equal(as(OWNER.uid).update('/', change).allowed, true); });
     test('a stranger and an anonymous visitor may not', () => {
         assert.equal(as('u-stranger').update('/', change).allowed, false);

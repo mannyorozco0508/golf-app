@@ -203,7 +203,11 @@ function targaryen(scenarioObj, rulesPath) {
 }
 
 describe('THE RULES: the payload the page just built, against database.rules.json', () => {
-    test('a LEGACY round accepts the page\'s payload, from any code-holder', async () => {
+    test('a LEGACY round accepts the page\'s payload, from any signed-in code-holder; signed out is refused', async () => {
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). Every write needs a sign-in, so the signed-out row moved
+        // from canWrite to cannotWrite. Any signed-in phone still saves a legacy
+        // round (no ownerUid) - the app signs in anonymously at boot.
         const rec = record(null, false);
         const { payload } = await saveThrough('LEGACY1', rec, { 104: 20 });
         const r = targaryen({
@@ -212,8 +216,9 @@ describe('THE RULES: the payload the page just built, against database.rules.jso
             tests: {
                 'events/LEGACY1': { canWrite: [
                     { auth: 'stub', data: mergedSet(rec, payload) },
-                    { auth: 'nobody', data: mergedSet(rec, payload) },
                     { auth: 'stranger', data: mergedSet(rec, payload) }
+                ], cannotWrite: [
+                    { auth: 'nobody', data: mergedSet(rec, payload) }
                 ] }
             }
         });
@@ -236,7 +241,12 @@ describe('THE RULES: the payload the page just built, against database.rules.jso
         assert.deepEqual(r.wrong, [], 'ownerUid can be added to an existing round after all:\n' + r.out.slice(-1400));
     });
 
-    test('an OWNED round: the owner saves it - and so, TODAY, does a code-holder', async () => {
+    test('an OWNED round: the owner saves it - and since phase 1, a code-holder and signed out cannot', async () => {
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). The gap documented below is CLOSED in production: an owned
+        // round's setup is the owner's (or the trip owner's). The owner's save -
+        // the claim this test is for - still holds. History follows.
+        //
         // RE-POINTED 2026-10-05, AND THE CHANGE IS THE FINDING. This test asserted
         // that a code-holder cannot overwrite an owned round's setup. That is true
         // of database.rules.json as the repo kept it and has NEVER been true of the
@@ -258,8 +268,8 @@ describe('THE RULES: the payload the page just built, against database.rules.jso
             root: { events: { OWNED1: rec }, organizers: { 'anon-stub': { firstSeenAt: NOW - 2 * DAY } } },
             users: { nobody: null, stub: anon('anon-stub'), stranger: anon('anon-stranger') },
             tests: { 'events/OWNED1': {
-                canWrite: [{ auth: 'stub', data: merged },
-                           { auth: 'nobody', data: merged }, { auth: 'stranger', data: merged }]
+                canWrite: [{ auth: 'stub', data: merged }],
+                cannotWrite: [{ auth: 'nobody', data: merged }, { auth: 'stranger', data: merged }]
             } }
         });
         assert.equal(r.rows.length, 3, r.out.slice(-800));

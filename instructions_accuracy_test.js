@@ -519,10 +519,19 @@ describe('D. THE COURSE CARD STATES WHAT THE CODE DOES WITH A SAVED COURSE', () 
 
     test('the guide says nothing can delete a course, and the rule still says exactly that', () => {
         const rule = globalCoursesWriteRule();
-        assert.equal(rule.write, 'newData.exists()',
-            'global_courses/$courseId .write is no longer "newData.exists()". If a delete path was '
+        // RE-PINNED 2026-10-17: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json,
+        // trips with no email sign-in; redeploy pending Manny's OK). The rule is now create-only from a signed-in phone (no gapi_/
+        // gca_ keys) - and STILL refuses every delete (newData.exists()), so the
+        // guide's "nothing can delete a course" sentence stays true.
+        // NOTE (not asserted here, app-copy follow-up): the guide's "A second
+        // import replaces the card already stored" is no longer what a phone can
+        // do - phase 1 refuses phone overwrites and gca_ imports (accepted by
+        // Manny; the Admin/server path does them).
+        assert.equal(rule.write, "auth != null && !data.exists() && newData.exists() && !$courseId.beginsWith('gapi_') && !$courseId.beginsWith('gca_')",
+            'global_courses/$courseId .write is no longer the phase-1 create-only rule. If a delete path was '
             + 'opened on purpose, the guide\'s "nothing can delete it" sentence is now false - rewrite '
             + 'it before re-pinning this');
+        assert.match(rule.write, /&& newData\.exists\(\)/, 'a delete must stay refused');
         assert.match(guideCourseCard(), /nothing can delete/i,
             'the rule refuses every delete and the guide must say so');
     });

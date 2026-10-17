@@ -1,5 +1,6 @@
 // ============================================================================
-// GPS LIVE RULES, AS PROPOSED - NOT PUBLISHED (gps-live, 2026-10-10)
+// GPS LIVE RULES, AS PROPOSED (gps-live, 2026-10-10) - LIVE: in the phase-1
+// rules of 2026-10-17 exactly as proposed.
 //
 // docs/gps-live-rules-proposal.json: three NEW top-level nodes, nothing existing
 // changes. This file adds them to an IN-MEMORY copy of database.rules.json (the
@@ -41,14 +42,19 @@ const as = (uid, provider) => targaryen.database(proposedRules(), DATA).as(uid ?
 const read = (uid, p) => as(uid).read(p).allowed;
 const write = (uid, p, v) => as(uid).write(p, v).allowed;
 
-test('the proposal is NOT in database.rules.json, and it only ADDS: every existing rule is the same', () => {
+test('the proposal is LIVE in database.rules.json exactly as proposed, and it only ADDED: every other rule is the published file', () => {
+    // Was: "the proposal is NOT in database.rules.json". Phase-1 rules published
+    // 2026-10-17 (rules/database.rules.phase1.json): gps_courses / gps_links / gps_usage are
+    // in the published file, byte-for-byte the proposal - so merging the
+    // proposal into a copy changes nothing.
     assert.ok(REPO_RULES.rules.events && REPO_RULES.rules.global_courses && REPO_RULES.rules.$other, 'positive: the real ruleset loaded');
-    NEW.forEach((k) => assert.strictEqual(REPO_RULES.rules[k], undefined, k + ' is not live'));
+    NEW.forEach((k) => assert.deepStrictEqual(REPO_RULES.rules[k], PROPOSAL[k], k + ' is live, exactly as proposed'));
     const p = proposedRules().rules;
     Object.keys(REPO_RULES.rules).forEach((k) => assert.deepStrictEqual(p[k], REPO_RULES.rules[k], k + ' unchanged'));
-    assert.deepStrictEqual(Object.keys(p).filter((k) => !(k in REPO_RULES.rules)).sort(), NEW.slice().sort());
-    // Today, with the live rules, a phone cannot read any of it.
-    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'uA' }).read('/gps_courses/' + PW).allowed, false);
+    assert.deepStrictEqual(Object.keys(p).filter((k) => !(k in REPO_RULES.rules)).sort(), [], 'nothing left to add');
+    // With the published rules alone, a signed-in phone reads one course; signed out does not.
+    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as({ uid: 'uA' }).read('/gps_courses/' + PW).allowed, true);
+    assert.strictEqual(targaryen.database(REPO_RULES, DATA).as(null).read('/gps_courses/' + PW).allowed, false);
 });
 
 test('the diff on file is exactly the proposal, and only + lines', () => {

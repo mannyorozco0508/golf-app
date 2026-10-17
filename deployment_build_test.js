@@ -513,7 +513,9 @@ describe('FIREBASE — one project, unchanged', () => {
         // An exact string, not a looser match: the rule that stops an anonymous
         // whole-tournament delete must survive a deployment batch byte for byte.
         // Narrowed 2026-09-18 (published by hand, not by a deployment batch): owner-only structure.
-        assert.equal(rules.tournaments.$tourneyCode['.write'], "(!data.exists() && auth != null && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && auth != null && auth.uid === data.child('ownerUid').val())");
+        // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK) (the live
+        // email-sign-in owner rule; a whole-tournament delete is still the owner's only).
+        assert.equal(rules.tournaments.$tourneyCode['.write'], "auth != null && auth.token.email != null && (!data.exists() || (data.hasChild('ownerUid') && data.child('ownerUid').val() === auth.uid))");
         assert.equal(rules.app_settings['.write'], false);
     });
 });

@@ -260,7 +260,12 @@ describe('rules Stage 1 — additive, and proved so before it is published', () 
         const cand = JSON.parse(fs.readFileSync(CANDIDATE, 'utf8')).rules.events.$eventCode['.write'];
         const repo = JSON.parse(fs.readFileSync(REPO_RULES, 'utf8')).rules.events.$eventCode['.write'];
         assert.notEqual(cand, repo, 'the repo file tightens the parent; Stage 1 does not');
-        assert.match(repo, /auth\.uid === data\.child\('ownerUid'\)\.val\(\)/, 'that is the Stage 2 shape');
+        // Re-pinned: phase-1 rules of 2026-10-17 (rules/database.rules.phase1.json, trips with no email sign-in; redeploy pending Manny's OK). The
+        // repo file IS production now and its parent is owner-only setup on an
+        // owned round, spelled `data.child('ownerUid').val() === auth.uid`.
+        assert.match(repo, /data\.exists\(\) && \(data\.child\('ownerUid'\)\.val\(\) === auth\.uid/, 'that is the owner-only (phase 1) shape');
+        assert.ok(!/data\.child\('ownerUid'\)\.val\(\) === auth\.uid/.test(cand),
+            'Stage 1 must carry no owner-only arm on the parent (phase-1 spelling)');
         assert.ok(!/auth\.uid === data\.child\('ownerUid'\)\.val\(\)/.test(cand),
             'Stage 1 must carry no owner-only arm on the parent');
     });

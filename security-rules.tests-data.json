@@ -129,10 +129,16 @@
   "users": {
     "nobody": null,
     "organizer": {
-      "uid": "u-org"
+      "uid": "u-org",
+      "token": {
+        "email": "org@example.com"
+      }
     },
     "stranger": {
-      "uid": "u-stranger"
+      "uid": "u-stranger",
+      "token": {
+        "email": "stranger@example.com"
+      }
     },
     "organizer-pass": {
       "uid": "u-org",
@@ -191,11 +197,11 @@
     "events/GARBAGE": {
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "not-a-real-round"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "gameFormat": "stroke",
             "players": [],
@@ -221,7 +227,7 @@
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": null
         }
       ]
@@ -240,7 +246,7 @@
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "gameFormat": "stroke",
             "players": [],
@@ -252,50 +258,63 @@
     "events/ABCD/scores/p101_h1": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 5
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": null
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "seven"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 0
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -3
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 99
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "strokes": 5
           }
+        },
+        {
+          "auth": "nobody",
+          "data": 5
         }
       ]
     },
     "trips/WXYZ": {
       "canRead": [
-        "nobody"
+        "anonymous"
       ],
-      "canWrite": [
+      "cannotWrite": [
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "Renamed Trip"
+          }
+        },
         {
           "auth": "nobody",
           "data": {
             "name": "Renamed Trip"
           }
         }
+      ],
+      "cannotRead": [
+        "nobody"
       ]
     },
     "tournaments/QRST": {
@@ -327,7 +346,7 @@
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "course_a": {
               "name": "A",
@@ -340,147 +359,149 @@
           }
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": null
         }
       ]
     },
     "global_courses/pebble_beach": {
-      "canWrite": [
-        {
-          "auth": "nobody",
-          "data": {
-            "name": "Pebble Beach Updated",
-            "data": [
-              {
-                "hole": 1,
-                "par": 4,
-                "hcpIndex": 1
-              },
-              {
-                "hole": 2,
-                "par": 4,
-                "hcpIndex": 2
-              },
-              {
-                "hole": 3,
-                "par": 4,
-                "hcpIndex": 3
-              },
-              {
-                "hole": 4,
-                "par": 4,
-                "hcpIndex": 4
-              },
-              {
-                "hole": 5,
-                "par": 4,
-                "hcpIndex": 5
-              },
-              {
-                "hole": 6,
-                "par": 4,
-                "hcpIndex": 6
-              },
-              {
-                "hole": 7,
-                "par": 4,
-                "hcpIndex": 7
-              },
-              {
-                "hole": 8,
-                "par": 4,
-                "hcpIndex": 8
-              },
-              {
-                "hole": 9,
-                "par": 4,
-                "hcpIndex": 9
-              },
-              {
-                "hole": 10,
-                "par": 4,
-                "hcpIndex": 10
-              },
-              {
-                "hole": 11,
-                "par": 4,
-                "hcpIndex": 11
-              },
-              {
-                "hole": 12,
-                "par": 4,
-                "hcpIndex": 12
-              },
-              {
-                "hole": 13,
-                "par": 4,
-                "hcpIndex": 13
-              },
-              {
-                "hole": 14,
-                "par": 4,
-                "hcpIndex": 14
-              },
-              {
-                "hole": 15,
-                "par": 4,
-                "hcpIndex": 15
-              },
-              {
-                "hole": 16,
-                "par": 4,
-                "hcpIndex": 16
-              },
-              {
-                "hole": 17,
-                "par": 4,
-                "hcpIndex": 17
-              },
-              {
-                "hole": 18,
-                "par": 4,
-                "hcpIndex": 18
-              }
-            ]
-          }
-        }
-      ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": null
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "data": []
           }
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "name": "",
             "data": []
           }
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "not-a-course"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "name": "Pebble Beach Updated",
             "data": []
           }
+        },
+        {
+          "auth": "anonymous",
+          "data": {
+            "name": "Pebble Beach Updated",
+            "data": [
+              {
+                "hole": 1,
+                "par": 4,
+                "hcpIndex": 1
+              },
+              {
+                "hole": 2,
+                "par": 4,
+                "hcpIndex": 2
+              },
+              {
+                "hole": 3,
+                "par": 4,
+                "hcpIndex": 3
+              },
+              {
+                "hole": 4,
+                "par": 4,
+                "hcpIndex": 4
+              },
+              {
+                "hole": 5,
+                "par": 4,
+                "hcpIndex": 5
+              },
+              {
+                "hole": 6,
+                "par": 4,
+                "hcpIndex": 6
+              },
+              {
+                "hole": 7,
+                "par": 4,
+                "hcpIndex": 7
+              },
+              {
+                "hole": 8,
+                "par": 4,
+                "hcpIndex": 8
+              },
+              {
+                "hole": 9,
+                "par": 4,
+                "hcpIndex": 9
+              },
+              {
+                "hole": 10,
+                "par": 4,
+                "hcpIndex": 10
+              },
+              {
+                "hole": 11,
+                "par": 4,
+                "hcpIndex": 11
+              },
+              {
+                "hole": 12,
+                "par": 4,
+                "hcpIndex": 12
+              },
+              {
+                "hole": 13,
+                "par": 4,
+                "hcpIndex": 13
+              },
+              {
+                "hole": 14,
+                "par": 4,
+                "hcpIndex": 14
+              },
+              {
+                "hole": 15,
+                "par": 4,
+                "hcpIndex": 15
+              },
+              {
+                "hole": 16,
+                "par": 4,
+                "hcpIndex": 16
+              },
+              {
+                "hole": 17,
+                "par": 4,
+                "hcpIndex": 17
+              },
+              {
+                "hole": 18,
+                "par": 4,
+                "hcpIndex": 18
+              }
+            ]
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": null
         }
       ]
     },
     "global_courses/brand_new_course": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "name": "Brand New Course",
             "data": [
@@ -580,10 +601,108 @@
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "name": "Brand New Course",
             "data": []
+          }
+        },
+        {
+          "auth": "nobody",
+          "data": {
+            "name": "Brand New Course",
+            "data": [
+              {
+                "hole": 1,
+                "par": 4,
+                "hcpIndex": 1
+              },
+              {
+                "hole": 2,
+                "par": 4,
+                "hcpIndex": 2
+              },
+              {
+                "hole": 3,
+                "par": 4,
+                "hcpIndex": 3
+              },
+              {
+                "hole": 4,
+                "par": 4,
+                "hcpIndex": 4
+              },
+              {
+                "hole": 5,
+                "par": 4,
+                "hcpIndex": 5
+              },
+              {
+                "hole": 6,
+                "par": 4,
+                "hcpIndex": 6
+              },
+              {
+                "hole": 7,
+                "par": 4,
+                "hcpIndex": 7
+              },
+              {
+                "hole": 8,
+                "par": 4,
+                "hcpIndex": 8
+              },
+              {
+                "hole": 9,
+                "par": 4,
+                "hcpIndex": 9
+              },
+              {
+                "hole": 10,
+                "par": 4,
+                "hcpIndex": 10
+              },
+              {
+                "hole": 11,
+                "par": 4,
+                "hcpIndex": 11
+              },
+              {
+                "hole": 12,
+                "par": 4,
+                "hcpIndex": 12
+              },
+              {
+                "hole": 13,
+                "par": 4,
+                "hcpIndex": 13
+              },
+              {
+                "hole": 14,
+                "par": 4,
+                "hcpIndex": 14
+              },
+              {
+                "hole": 15,
+                "par": 4,
+                "hcpIndex": 15
+              },
+              {
+                "hole": 16,
+                "par": 4,
+                "hcpIndex": 16
+              },
+              {
+                "hole": 17,
+                "par": 4,
+                "hcpIndex": 17
+              },
+              {
+                "hole": 18,
+                "par": 4,
+                "hcpIndex": 18
+              }
+            ]
           }
         }
       ]
@@ -591,7 +710,7 @@
     "events/ABCD/scores/garbage_key": {
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 4
         }
       ]
@@ -599,248 +718,292 @@
     "events/ABCD/dotPointVal": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 5
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 0
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 2.5
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 100000
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "5"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "abc"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -5
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 100001
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": true
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "v": 5
           }
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": [
             5
           ]
+        },
+        {
+          "auth": "nobody",
+          "data": 5
         }
       ]
     },
     "events/ABCD/nassauStake": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 10
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "10"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -1
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": {
             "amt": 10
           }
+        },
+        {
+          "auth": "nobody",
+          "data": 10
         }
       ]
     },
     "events/ABCD/matchStake": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 20
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "twenty"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -20
+        },
+        {
+          "auth": "nobody",
+          "data": 20
         }
       ]
     },
     "events/ABCD/skinsBuyIn": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 5
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "5"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -5
+        },
+        {
+          "auth": "nobody",
+          "data": 5
         }
       ]
     },
     "events/ABCD/birdieUnitVal": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 1
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "1"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -1
+        },
+        {
+          "auth": "nobody",
+          "data": 1
         }
       ]
     },
     "events/ABCD/wolfPointVal": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 2
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "2"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -2
+        },
+        {
+          "auth": "nobody",
+          "data": 2
         }
       ]
     },
     "events/ABCD/stablefordPointVal": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 1
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "1"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -1
+        },
+        {
+          "auth": "nobody",
+          "data": 1
         }
       ]
     },
     "events/ABCD/holeBetStake": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 5
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "5"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -5
+        },
+        {
+          "auth": "nobody",
+          "data": 5
         }
       ]
     },
     "events/ABCD/wolfLoneMult": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 2
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 3
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "2"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": -1
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 1000
+        },
+        {
+          "auth": "nobody",
+          "data": 2
         }
       ]
     },
     "events/ABCD/wolfBlindMult": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 4
         }
       ],
       "cannotWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": "4"
         },
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 500
+        },
+        {
+          "auth": "nobody",
+          "data": 4
         }
       ]
     },
     "events/ABCD/sideMatches/m1/stake": {
       "canWrite": [
         {
-          "auth": "nobody",
+          "auth": "anonymous",
           "data": 10
+        },
+        {
+          "auth": "anonymous",
+          "data": "10"
+        },
+        {
+          "auth": "anonymous",
+          "data": -10
         }
       ],
       "cannotWrite": [
         {
           "auth": "nobody",
-          "data": "10"
-        },
-        {
-          "auth": "nobody",
-          "data": -10
+          "data": 10
         }
       ]
     },
@@ -860,7 +1023,11 @@
       ]
     },
     "events/NOSCORES": {
-      "canWrite": [
+      "cannotWrite": [
+        {
+          "auth": "anonymous",
+          "data": null
+        },
         {
           "auth": "nobody",
           "data": null
@@ -958,6 +1125,10 @@
             "name": "X",
             "ownerUid": "u-org"
           }
+        },
+        {
+          "auth": "organizer",
+          "data": null
         }
       ],
       "cannotWrite": [
@@ -980,10 +1151,6 @@
           "data": {
             "name": "X"
           }
-        },
-        {
-          "auth": "organizer",
-          "data": null
         }
       ]
     },
@@ -2081,7 +2248,7 @@
       ]
     },
     "tournaments/QRST/scores/team1_h2": {
-      "canWrite": [
+      "cannotWrite": [
         {
           "auth": "nobody",
           "data": 5
