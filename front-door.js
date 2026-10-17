@@ -581,7 +581,58 @@
     function pickCourse(key, name, row) {
         var all = allCourses();
         var c = all.filter(function (x) { return key ? x.key === key : (x.name === name && !x.key); })[0] || { key: key || null, name: name };
-        startRound({ key: c.key, name: c.name || name, city: c.city || '', state: c.state || '' });
+        // A GPS round starts only with GPS Map (the gate - Near You, search and Recent alike).
+        gpsGate({ key: c.key, name: c.name || name }, function () {
+            startRound({ key: c.key, name: c.name || name, city: c.city || '', state: c.state || '' });
+        });
+    }
+    // ---- THE GPS GATE ON HOME (paid launch: Manny, mailbox 007, 2026-10-17) ------------
+    // ALL of GPS is the "GPS Map" subscription (a 7-day free trial, then yearly). The GPS
+    // door, the GPS | Games switch's GPS, #gps / #pick and a course pick ask gps-view.js's
+    // requireGps first: GPS Map -> on; none -> the paywall; "Not now" -> the golfer stays
+    // where they are (Main, or Games). Games, joining and Resume of a card never ask.
+    // No gate on this page (gps-view.js not loaded): on - the round's own gate (index.html)
+    // still holds, so nothing GPS ever shows without GPS Map.
+    function gpsGate(c, go, no) {
+        var V = W.HardPanGps;
+        if (!V || typeof V.requireGps !== 'function') { go(); return; }
+        c = c || {};
+        V.requireGps({ course: c.name || '', coverage: function (cb) { coverageOf(c.key, c.name, cb); } }, go, function () { if (typeof no === 'function') no(); });
+    }
+    // The course the paywall names: the round in progress, else the last course used.
+    function homeCourse() {
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        var rec = recents();
+        if (activeRound() && lr && lr.course) {
+            var hit = rec.filter(function (r) { return r.name === lr.course; })[0];
+            return { key: hit ? hit.key : null, name: lr.course };
+        }
+        return rec[0] ? { key: rec[0].key, name: rec[0].name } : {};
+    }
+    // HOW MANY OF ITS HOLES HAVE GPS, for "Caledonia: 18/18 ✓": the GolfAPI course this
+    // app draws (GPS LIVE), else the bundled holes with a green - out of its card's holes.
+    // cb(null) when nothing says (the line is left off).
+    function coverageOf(key, name, cb) {
+        if (!key) { cb(null); return; }
+        var count = function () {
+            var card = typeof coursePresets !== 'undefined' && coursePresets[key] && coursePresets[key].data ? coursePresets[key].data.length : 0;   /* global coursePresets */
+            var ga = golfapiCourse(key);
+            if (live()) {
+                if (ga && Number(ga.holes) > 0) { var of = card || Number(ga.holes); cb({ name: name, n: Math.min(Number(ga.holes), of), of: of }); return; }
+                cb(null); return;
+            }
+            var b = bundled(), r = b && b[key];
+            if (!r || !r.holes) { cb(null); return; }
+            var n = 0, top = 0;
+            Object.keys(r.holes).forEach(function (h) {
+                var o = r.holes[h] && (r.holes[h].osm || r.holes[h]);
+                if (Number(h) > top) top = Number(h);
+                if (o && ((Array.isArray(o.green) && o.green.length >= 3) || Array.isArray(o.mid))) n++;
+            });
+            cb({ name: name, n: n, of: card || (top > 9 ? 18 : 9) });
+        };
+        if (bundled()) { count(); return; }
+        loadScriptTimed('gps-courses.js', function () { count(); });
     }
     function gamesView() {
         var last = ls('lastRoomCode'), trip = ls('lastTripCode');
@@ -659,7 +710,11 @@
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
         var b;
-        if ((b = t.closest('[data-hp-door]'))) { var d = b.getAttribute('data-hp-door'); setDoor(d); if (d === 'gps' && backToGpsRound()) return; show(d); return; }
+        if ((b = t.closest('[data-hp-door]'))) {
+            var d = b.getAttribute('data-hp-door');
+            if (d === 'gps') { gpsGate(homeCourse(), function () { setDoor('gps'); if (backToGpsRound()) return; show('gps'); }); return; }
+            setDoor(d); show(d); return;
+        }
         if (t.closest('[data-hp-retry]')) { C.asked = false; C.why = null; var nb = $('hp-near-list'); if (nb) nb.innerHTML = '<div class="hp-status">Finding courses near you\u2026</div>'; gpsView(); return; }
         if ((b = t.closest('[data-hp-course]'))) { pickCourse(b.getAttribute('data-hp-course'), b.getAttribute('data-hp-name'), b); return; }
         if ((b = t.closest('[data-hp-pull]'))) { pull({ id: b.getAttribute('data-hp-pull'), name: b.getAttribute('data-hp-pull-name') }, pending || {}); return; }
@@ -806,9 +861,14 @@
         var h = (W.location.hash || '').replace('#', '');
         // "Pick another course" (gps-trapfix): the picker, ALWAYS, and the round it came from is
         // no longer the one Resume / the GPS door goes back to (Games › your round still has it).
-        if (h === 'pick') { var lrp = null; try { lrp = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lrp = null; } if (lrp && lrp.code) forgetRound(lrp.code, false); setDoor('gps'); show('gps'); }
-        else if (h === 'gps' && backToGpsRound()) return;
-        else show(h === 'gps' || h === 'games' ? h : 'main');
+        if (h === 'pick') {
+            var lrp = null; try { lrp = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lrp = null; }
+            if (lrp && lrp.code) forgetRound(lrp.code, false);
+            show('main');
+            gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); });
+        }
+        else if (h === 'gps') { show('main'); gpsGate(homeCourse(), function () { if (backToGpsRound()) return; show('gps'); }); }
+        else show(h === 'games' ? h : 'main');
         mainDecor();
         backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show('main'); mainDecor(); });
     }
