@@ -157,20 +157,20 @@
     // ---- HARDPAN GPS PRO: THE ONE CHECK (Wave 2, 2026-10-08) -----------------
     // Free: the numbers (FRONT / CENTER / BACK, accuracy, Enter Score) and no map.
     // Pro: everything else - the satellite hole, arcs, target, Edit Pin, wind,
-    // plays like. This is the ONLY place that decides; in-app purchase plugs in
-    // here later (step 3) and nowhere else. In order:
-    //   1. a tester's override: ?gpstier=free | pro | clear, kept on the phone;
-    //   2. HARDPAN_GPS_CONFIG.paywall - false (this wave) means everyone is Pro;
-    //   3. (later) the App Store entitlement. Until it exists, paywall on = free.
-    var TIER_KEY = 'hardpan_gps_tier';
-    function readTierParam() {
-        try {
-            var m = /[?&]gpstier=(free|pro|clear)\b/.exec(String(window.location.search || ''));
-            if (!m) return;
-            if (m[1] === 'clear') localStorage.removeItem(TIER_KEY);
-            else localStorage.setItem(TIER_KEY, m[1]);
-        } catch (e) {}
-    }
+    // plays like. This is the ONLY place that decides. In order:
+    //   1. HARDPAN_GPS_CONFIG.iap on: the App Store entitlement alone
+    //      (gps-entitlement.js - StoreKit through RevenueCat; no plugin = Free);
+    //   2. iap off: HARDPAN_GPS_CONFIG.paywall - false means everyone is Pro,
+    //      true means Free.
+    // There is NO tester override (gps-store-iap, 2026-10-17): the old URL tier switch and the
+    // phone's hardpan_gps_tier are gone, so nothing in a URL can make a phone Pro.
+    function entitlement() { return (typeof window !== 'undefined' && window.HardPanEntitlement) || null; }
+    function iapOn() { var E = entitlement(); return !!(E && E.enabled()); }
+    // Flag on and the store has not answered yet this launch: the upgrade sheet
+    // waits, so a paying golfer is not shown it while the answer is on its way.
+    function proPending() { var E = entitlement(); return iapOn() && !E.known(); }
+    // A phone that once used the old switch still holds its value: never read, cleared once.
+    try { if (typeof localStorage !== 'undefined') localStorage.removeItem('hardpan_gps_tier'); } catch (e) {}
     // TOURNAMENT MODE (Rules of Golf 4.3: distance only in competition; Manny, 2026-10-15).
     // On for this round when the organizer set it (the round's tournamentMode - every phone in the
     // round, and no golfer can turn it off); else this phone's own switch (GPS Tools). On: no wind
@@ -181,14 +181,10 @@
     function tourneyPhone() { try { return localStorage.getItem(TOURNEY_KEY) === '1'; } catch (e) { return false; } }
     function tournament() { return tourneyRound() || tourneyPhone(); }
     function hasGpsPro() {
-        var t = null;
-        try { t = localStorage.getItem(TIER_KEY); } catch (e) {}
-        if (t === 'free') return false;
-        if (t === 'pro') return true;
+        if (iapOn()) return entitlement().isPro() === true;
         if (cfg().paywall !== true) return true;
         return false;
     }
-    if (typeof window !== 'undefined' && window.location) readTierParam();
 
     // ---- STATE --------------------------------------------------------------
     var S = null;          // the mounted GPS side for this round, or null
@@ -2352,12 +2348,21 @@
         el.setAttribute('data-terms', pl ? Object.keys(pl.terms).join(' ') : '');
     }
 
-    // ---- THE UPGRADE SHEET (Wave 2: shown, nothing sold yet) -------------------------
+    // ---- THE UPGRADE SHEET = THE PAYWALL (gps-store-iap, 2026-10-17) ---------------
     // The first time GPS is shown in a session without HardPan GPS, and from "Get
-    // HardPan GPS" on the panel. The buy button is "Coming soon" until the App
-    // Store purchase exists.
+    // HardPan GPS" on the panel. Two faces, decided by HARDPAN_GPS_CONFIG.iap:
+    //   off: the feature list and ONE sentence - Pro is not available in this
+    //        build. No price, no Subscribe, no Restore: nothing to buy.
+    //   on:  the App Store paywall, with every disclosure Apple asks for (3.1.2):
+    //        the product title, the price per period from StoreKit, the length
+    //        (1 year), the 7-day free trial and when the charge happens, the
+    //        auto-renew / cancel wording, Subscribe, Restore Purchases, and the
+    //        Terms of Use and Privacy Policy links.
+    // The old disabled placeholder button is gone.
     var SHEET_SEEN = 'hardpan_gps_sheet_seen';
     var sheetSeenHere = false;
+    var SHEET_OFF = "HardPan GPS Pro isn\u2019t available in this build.";
+    var RENEW = 'Renews automatically each year unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings > Apple ID > Subscriptions.';
     function sheetSeen() {
         try { if (sessionStorage.getItem(SHEET_SEEN) === '1') return true; } catch (e) {}
         return sheetSeenHere;
@@ -2365,22 +2370,80 @@
     // NEVER shown to a HardPan GPS (Pro) user, whatever calls it.
     function openSheet() {
         if (!S || S.pro) return;
-        syncSheetPrice();
+        syncSheet();
         sheetSeenHere = true;
         try { sessionStorage.setItem(SHEET_SEEN, '1'); } catch (e) {}
         show('.gps-sheet', true);
     }
     function closeSheet() { show('.gps-sheet', false); }
-    // NO PRICE until Manny sets one (2026-10-08): the sheet says "HardPan GPS —
-    // coming soon". HARDPAN_GPS_CONFIG.priceLine (one line: the price and the trial)
-    // brings back the price line and the (still disabled) buy button.
-    function syncSheetPrice() {
-        var line = String(cfg().priceLine || '').trim();
-        txt('.gps-sheet-title', line ? 'HardPan GPS' : 'HardPan GPS — coming soon');
-        txt('.gps-sheet-price', line);
-        show('.gps-sheet-price', !!line);
-        show('.gps-sheet-buy', !!line);
+    function sheetMsg(text) { txt('.gps-sheet-msg', text || ''); show('.gps-sheet-msg', !!text); }
+    // The disclosures, from the store's offer (o) - or, only when the store gave
+    // no price, the config fallback, marked data-price-src="config".
+    function sheetText(o) {
+        o = o || {};
+        var c = cfg(), trial = o.trial || '7-day', fallback = String(c.iapPriceFallback || '').trim();
+        var priceSrc = o.fromStore && o.price ? 'store' : (fallback ? 'config' : 'none');
+        var per = o.fromStore && o.price ? o.price + ' per year' : (fallback || '');
+        return {
+            title: (o.fromStore && o.title) || 'HardPan GPS Pro (yearly)',
+            price: per ? per : 'The price is shown by the App Store before you confirm.',
+            priceSrc: priceSrc,
+            length: '1-year subscription, renews automatically.',
+            trial: trial + ' free trial. Your Apple ID is charged ' + (per ? per.replace(/ per year$/, '') + ' ' : '') + 'when the trial ends, unless you cancel at least 24 hours before it ends.',
+            renew: RENEW
+        };
     }
+    function paintSheet(t) {
+        txt('.gps-sheet-title', 'HardPan GPS');
+        txt('.gps-sheet-product', t.title);
+        txt('.gps-sheet-price', t.price);
+        var pe = S && S.el.querySelector('.gps-sheet-price');
+        if (pe) pe.setAttribute('data-price-src', t.priceSrc);
+        txt('.gps-sheet-length', t.length);
+        txt('.gps-sheet-trial', t.trial);
+        txt('.gps-sheet-renew', t.renew);
+    }
+    function syncSheet() {
+        var on = iapOn();
+        show('.gps-sheet-off', !on);
+        txt('.gps-sheet-off', on ? '' : SHEET_OFF);
+        show('.gps-sheet-iap', on);
+        sheetMsg('');
+        if (!on) return;
+        var E = entitlement(), mine = S;
+        paintSheet(sheetText(null));
+        E.offer(function (o) { if (S === mine) paintSheet(sheetText(o)); });
+    }
+    // Subscribe / Restore: one at a time; the answer is one sentence, or Pro.
+    function sheetBusy(on) {
+        ['.gps-sheet-buy', '.gps-sheet-restore'].forEach(function (sel) { var b = S && S.el.querySelector(sel); if (b) b.disabled = !!on; });
+    }
+    function sheetAct(kind) {
+        var E = entitlement();
+        if (!S || !E || !iapOn()) return;
+        var mine = S;
+        sheetBusy(true);
+        sheetMsg(kind === 'restore' ? 'Restoring\u2026' : '');
+        E[kind === 'restore' ? 'restore' : 'purchase'](function (r) {
+            if (S !== mine) return;
+            sheetBusy(false);
+            if (r && r.pro) { sheetMsg(''); becomePro(); return; }
+            sheetMsg((r && r.message) || E.MSG.error);
+        });
+    }
+    // THE STORE SAID PRO (a purchase, a restore, or the launch read arriving
+    // after this round was mounted Free): the full screen, at once.
+    function becomePro() {
+        if (!S || S.pro || !hasGpsPro()) return;
+        S.pro = true;
+        S.el.classList.toggle('gps-basic-mode', false);
+        closeSheet();
+        // Free asked for the course data only (no MapLibre): ask again, map and all.
+        if (!S.map) S.mapRequested = false;
+        if (S.side === 'gps') ensureMap();
+        render();
+    }
+    (function () { var E = entitlement(); if (E && E.onChange) E.onChange(function (p) { if (p) becomePro(); }); })();
 
     // ---- NO PULL-DOWN ON GPS ----------------------------------------------------
     // A drag on the GPS side moves the map and nothing else: no page scroll, no
@@ -3054,9 +3117,21 @@
         + '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="HardPan GPS" style="display:none">'
         +   '<div class="gps-sheet-card">'
         +     '<div class="gps-sheet-title">HardPan GPS</div>'
-        +     '<div class="gps-sheet-price" style="display:none"></div>'
         +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Drag-the-target yardages</li><li>Wind</li><li>Plays-like yardage</li></ul>'
-        +     '<button type="button" class="gps-sheet-buy" disabled style="display:none">Coming soon</button>'
+        // iap off: one sentence, nothing to buy.
+        +     '<div class="gps-sheet-off" style="display:none"></div>'
+        // iap on: the App Store paywall and its disclosures (syncSheet fills them).
+        +     '<div class="gps-sheet-iap" style="display:none">'
+        +       '<div class="gps-sheet-product"></div>'
+        +       '<div class="gps-sheet-price" data-price-src="none"></div>'
+        +       '<div class="gps-sheet-length gps-sheet-fine"></div>'
+        +       '<div class="gps-sheet-trial gps-sheet-fine"></div>'
+        +       '<div class="gps-sheet-renew gps-sheet-fine"></div>'
+        +       '<button type="button" class="gps-sheet-buy">Subscribe</button>'
+        +       '<button type="button" class="gps-sheet-restore">Restore Purchases</button>'
+        +       '<div class="gps-sheet-msg" role="status" aria-live="polite" style="display:none"></div>'
+        +       '<div class="gps-sheet-links"><a class="gps-sheet-terms" target="_blank" rel="noopener">Terms of Use</a> \u00b7 <a class="gps-sheet-privacy" target="_blank" rel="noopener">Privacy Policy</a></div>'
+        +     '</div>'
         +     '<button type="button" class="gps-sheet-close">Not now</button>'
         +   '</div>'
         + '</div>';
@@ -3315,7 +3390,15 @@
         + '#gps-overlay .gps-sheet-title{font-size:24px;font-weight:800;color:#d9f99d;}'
         + '#gps-overlay .gps-sheet-price{margin-top:4px;font-size:16px;font-weight:700;color:#f4f4ef;}'
         + '#gps-overlay .gps-sheet-list{margin:14px 0 18px;padding-left:20px;font-size:15px;line-height:1.6;color:#d1d5db;}'
-        + '#gps-overlay .gps-sheet-buy{display:block;width:100%;min-height:48px;background:#d9f99d;color:#0b0f0c;border-radius:12px;font-weight:800;font-size:16px;opacity:.55;cursor:not-allowed;}'
+        + '#gps-overlay .gps-sheet-product{font-size:16px;font-weight:800;color:#f4f4ef;}'
+        + '#gps-overlay .gps-sheet-off{margin:0 0 14px;font-size:15px;line-height:1.4;color:#f4f4ef;}'
+        + '#gps-overlay .gps-sheet-fine{margin-top:6px;font-size:12px;line-height:1.4;color:#c8d1ca;}'
+        + '#gps-overlay .gps-sheet-buy{display:block;width:100%;margin-top:14px;min-height:48px;background:#d9f99d;color:#0b0f0c;border-radius:12px;font-weight:800;font-size:16px;}'
+        + '#gps-overlay .gps-sheet-buy:disabled,#gps-overlay .gps-sheet-restore:disabled{opacity:.55;}'
+        + '#gps-overlay .gps-sheet-restore{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;color:#d9f99d;font-weight:700;}'
+        + '#gps-overlay .gps-sheet-msg{margin-top:10px;font-size:14px;font-weight:700;line-height:1.4;color:#f4f4ef;}'
+        + '#gps-overlay .gps-sheet-links{margin-top:12px;text-align:center;font-size:13px;color:#c8d1ca;}'
+        + '#gps-overlay .gps-sheet-links a{color:#c8d1ca;text-decoration:underline;}'
         + '#gps-overlay .gps-sheet-close{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;}';
     function ensureCss() {
         if (document.getElementById('gps-view-css')) return;
@@ -3564,6 +3647,11 @@
         })();
         on(el, '.gps-get-pro', openSheet);
         on(el, '.gps-sheet-close', closeSheet);
+        on(el, '.gps-sheet-buy', function () { sheetAct('buy'); });
+        on(el, '.gps-sheet-restore', function () { sheetAct('restore'); });
+        var tl = el.querySelector('.gps-sheet-terms'), pl = el.querySelector('.gps-sheet-privacy');
+        if (tl) tl.setAttribute('href', String(cfg().iapTermsUrl || 'terms.html'));
+        if (pl) pl.setAttribute('href', String(cfg().iapPrivacyUrl || 'privacy.html'));
         window.addEventListener('offline', onOffline);
         window.addEventListener('online', onOnline);
         document.addEventListener('touchmove', blockPull, { passive: false });
@@ -3705,7 +3793,7 @@
         if (a) a.setAttribute('aria-pressed', side === 'gps' ? 'true' : 'false');
         closeMenus();
         if (side === 'gps') {
-            if (!S.pro && !sheetSeen()) openSheet();
+            if (!S.pro && !sheetSeen() && !proPending()) openSheet();
             S.windKick = true;
             startWindTick();
             ensureMap();
@@ -3793,6 +3881,8 @@
         openAddGame: function () { if (S && S.side !== 'gps') showSide('gps'); openAddGame(); },
         // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
         hasGpsPro: hasGpsPro,
+        // The paywall's disclosure text for a store offer (pure; gps_entitlement_test.js).
+        paywallText: function (o) { return sheetText(o); },
         isMounted: function () { return !!S; },
         courseKey: function () { return S ? S.courseKey : null; },
         tournament: function () { return tournament(); },
