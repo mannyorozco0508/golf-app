@@ -16,8 +16,10 @@
 // Consumer, iOS and Android builds.
 //
 // paywall: false = everyone in the GPS build has HardPan GPS (Pro). true = the
-// free numbers-only screen unless the phone is entitled (gps-view.js
-// hasGpsPro() - the one check). Testers: ?gpstier=free | pro | clear.
+// free numbers-only screen. It is read ONLY while iap is off (below); with iap
+// on, the App Store entitlement alone decides (gps-view.js hasGpsPro() - the
+// one check, and gps-entitlement.js). There is no tester override any more:
+// the old URL tier switch is gone, and nothing in a URL can make a phone Pro.
 // ============================================================================
 window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626sm39ujgfU89O2WgTbHOzScHuYC-jqnuh5PVjH4bTxis1jT2WYkunGwob17JGYuZzmp1nsVMZ4tqOzl3AfGe-nTOrsadF8AW1UJcfeMJe1ERbpXz0O0wX8mKr_4URw8uNLdWdsySPhs8J-yoZbizzwiCU-7J5HLnEPamSYe2Xt9IcoBw_OUDiQwKSZBEh1R-OQGiGncsJvl57ehuv0mfk_aLMUZ6fHKlCeqfgk4V2wE-uNv-Pk.AT1_49lmfRNb', paywall: false,
     // GOOGLE SATELLITE: KEEP IT OFF (Manny, 2026-10-08) - googleKey stays ''.
@@ -42,4 +44,27 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     osm: false, live: true, liveBase: 'https://us-central1-golfapp-9fb21.cloudfunctions.net',
     // PLAYS-LIKE HEIGHTS UP FRONT (gps-features): never asked for hole by hole on the
     // tee - fetched once for the whole course at setup, download or round open.
-    elevOnTee: false };
+    elevOnTee: false,
+    // GPS PRO IN-APP PURCHASE (gps-store-iap, 2026-10-17; App Store Guideline 3.1.1).
+    // iap: false = OFF, the default: no purchase plugin is ever called and Pro is
+    // decided by paywall (above) exactly as before. true = the App Store
+    // entitlement alone decides, through RevenueCat (@revenuecat/purchases-
+    // capacitor, window.Capacitor.Plugins.Purchases); no plugin or no key = Free.
+    // The product: a yearly auto-renewing subscription, a 7-day free trial as its
+    // introductory offer, founding price = base price.
+    // PLAN ONLY - NOT CREATED YET: Manny creates these in App Store Connect and
+    // RevenueCat; the ids here must then match them exactly.
+    iap: false, iapEntitlement: 'gps_pro', iapProduct: 'com.rattlegolf.app.gps.yearly',
+    // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
+    // API keys. Public by design (it ships in every app binary), but it stays
+    // EMPTY in the repo until Manny sets it for a build; empty = no purchases.
+    // NEVER a RevenueCat secret key (sk_...) - those belong on a server only.
+    revenueCatKey: '',
+    // FALLBACK PRICE TEXT, shown ONLY when StoreKit gave no price (offline, the
+    // store not answering), and the paywall marks it as such. The store's own
+    // price string always wins. PLAN ONLY: Manny sets it to the App Store
+    // Connect price, e.g. '$X.XX per year'; empty = "shown by the App Store".
+    iapPriceFallback: '',
+    // The paywall's Terms of Use (EULA) and Privacy Policy links. Absolute: the
+    // two pages are web pages, not in the app bundle (app_store_pages_test.js).
+    iapTermsUrl: 'https://golf-app-5a5.pages.dev/terms.html', iapPrivacyUrl: 'https://golf-app-5a5.pages.dev/privacy.html' };

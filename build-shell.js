@@ -164,7 +164,7 @@ const PRODUCTS = {
         cacheName: 'consumer-v165-gotoround',
         appName: 'HardPan',
         shortName: 'HardPan',
-        description: 'Live-syncing golf scorecard and betting tracker',
+        description: 'Live-syncing golf scorecard and game tracker',
         startUrl: './admin.html',
         themeColor: '#0E2B1F',
         backgroundColor: '#F6F4EC',

@@ -1368,6 +1368,20 @@ html {
         <button type="button" id="account-exit-cancel" class="btn-outline" style="display:none;" onclick="exitTap('cancel')">Keep my account</button>
         <p id="account-exit-status" role="status"></p>
     </section>
+    <!-- PRIVACY, TERMS, SUPPORT, ACKNOWLEDGEMENTS (store-legal, App Review 5.1.1).
+         The policy has to be reachable from inside the app, not only from the
+         listing. These pages are web pages, not part of either bundle
+         (app_store_pages_test.js), so inside the iOS shell a relative link would
+         point at capacitor://localhost and find nothing: syncLegalLinks() points
+         each one at shareBaseUrl() (product-links.js owns the origin), and
+         Capacitor hands that off-origin link to Safari. On the web the relative
+         href is already right. Shown to everybody, signed in or not. -->
+    <nav id="account-legal" class="account-legal" aria-label="About this app" style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-light); font-size:0.85rem; text-align:center; line-height:2;">
+        <a id="legal-privacy" href="privacy.html" data-legal="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot;
+        <a id="legal-terms" href="terms.html" data-legal="terms.html" target="_blank" rel="noopener">Terms</a> &middot;
+        <a id="legal-support" href="support.html" data-legal="support.html" target="_blank" rel="noopener">Support</a> &middot;
+        <a id="legal-acknowledgements" href="acknowledgements.html" data-legal="acknowledgements.html" target="_blank" rel="noopener">Acknowledgements</a>
+    </nav>
       </div>
     </div>
 
@@ -2380,7 +2394,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-section-head" id="also-playing-head">ALSO PLAYING</div>
         <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Side games that run right alongside your scoring format.</p>
             <div id="stacked-games-list"></div>
             <div id="skins-instances-list"></div>
             <!-- GPS:BEGIN -->
@@ -2671,7 +2685,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div id="rr-noaction-box" style="display:none; margin-bottom:18px;">
         <div class="wr-label" style="margin-bottom:4px;">Action</div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-            <span style="font-size:0.9rem; color:var(--text-muted);">Just keeping score — no money games</span>
+            <span style="font-size:0.9rem; color:var(--text-muted);">Just keeping score — no side games</span>
             <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Add</span>
         </div>
     </div>
@@ -4802,8 +4816,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         if (sub) {
             sub.textContent = mainFormat && MAIN_GAME_LABELS[mainFormat]
-                ? `Money games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
-                : 'Money games that run right alongside your scoring format.';
+                ? `Side games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
+                : 'Side games that run right alongside your scoring format.';
         }
 
         const instList = document.getElementById('skins-instances-list');
@@ -9686,7 +9700,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // describes behaviour is behaviour.
         const mpMode = document.getElementById('mp-skins-mode');
         const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
-        const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+        const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins game (Step 4 or Also Playing) instead of this bucket.';
         // Two split sentences since 2026-09-20, chosen by the Skins pot switch in
         // Players (flightsSkinsSplitNow, the value pool-engine's skinsSplitMode reads).
         const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
@@ -10008,10 +10022,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // The Account panel's Privacy / Terms / Support / Acknowledgements links, made
+    // absolute from the one origin product-links.js declares (see #account-legal).
+    function syncLegalLinks() {
+        if (typeof shareBaseUrl !== 'function') return;
+        let base = '';
+        try { base = shareBaseUrl(); } catch (e) { return; }
+        ['privacy', 'terms', 'support', 'acknowledgements'].forEach(name => {
+            const a = document.getElementById('legal-' + name);
+            const want = base + name + '.html';
+            if (a && a.getAttribute('href') !== want) a.setAttribute('href', want);
+        });
+    }
     function openAccountPanel() {
         const el = document.getElementById('account-modal');
         if (!el) return;
         refreshAccountState();
+        try { syncLegalLinks(); } catch (e) { }
         el.classList.add('open');
         // NOTHING IS FOCUSED ON ARRIVAL ANY MORE. The email box is behind "Use email
         // instead", so focusing it would open the keyboard over the two buttons a
@@ -10190,6 +10217,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             reauth: accountReauthFn(),
             reload: () => { try { location.reload(); } catch (e) { } }
         };
+        // THE SERVER FINISHES A DELETE (accountDelete): it revokes Sign in with Apple
+        // and removes what the rules will not let this page remove. No fetch, no
+        // server - and account-exit.js falls back to the client delete, as it does
+        // while the function is not deployed.
+        if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.serverDeleter === 'function') {
+            deps.serverDelete = window.accountExit.serverDeleter({ auth: auth, fetch: (u, o) => fetch(u, o) });
+            if (window.oauthSignin && typeof window.oauthSignin.appleAuthorizationCode === 'function') {
+                deps.appleCode = () => window.oauthSignin.appleAuthorizationCode();
+            }
+        }
         const run = step === 'signout'
             ? window.accountExit.signOut(deps)
             : window.accountExit.deleteAccount(deps);
@@ -11099,7 +11136,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!el) return;
         el.innerHTML = '<strong>Legacy ' + (names[format] || '') + ' round.</strong> '
             + 'This round uses the older single-stake setup and still works exactly as it did. '
-            + 'New wagers are created from <strong>Action</strong>'
+            + 'New games are created from <strong>Action</strong>'
             + (format === 'nassau' ? ', with separate Front, Back and Overall amounts.' : '.');
         el.style.display = 'block';
     }

@@ -61,7 +61,8 @@ describe('EACH OF THE NINE, IN ITS OWN CONTEXT', () => {
 
     test('admin.html: the v126 skins-scope notes keep their approved wording apart from the name', () => {
         const s = rendered('admin.html');
-        assert.match(s, /const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \\u2014 A and B play each other here\. For A-only and B-only skins pots, use a Skins wager \(Step 4 or Also Playing\) instead of this bucket\.';/);
+        // store-legal: "Skins wager" -> "Skins game" (no wager wording in the app's copy).
+        assert.match(s, /const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \\u2014 A and B play each other here\. For A-only and B-only skins pots, use a Skins game \(Step 4 or Also Playing\) instead of this bucket\.';/);
         assert.match(s, /const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\\'s skins bucket splits into two pots by headcount \\u2014 Flight A and Flight B each play their own\. KP and Net Finish stay whole-field\.';/);
     });
 

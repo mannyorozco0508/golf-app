@@ -67,7 +67,8 @@ test('signed out, or no signal: no request, and a plain message', { skip }, asyn
     const off = sandbox({ online: false });
     assert.equal((await off.sb.HardPanGpsLive.course(PW)).status, 'offline'); assert.equal(off.requests.length, 0);
     const L = sandbox().sb.HardPanGpsLive;
-    assert.equal(L.message('soon'), 'GPS coming soon for this course');
+    // store-legal: no "coming soon" developer wording in the app; the floor says what is true.
+    assert.equal(L.message('soon'), 'New GPS courses are paused for now - pick a course that is already set up');
     assert.match(L.message('limit'), /5 new GPS courses today/);
     assert.match(L.message('nogps'), /Tools › Set the green/);
     assert.match(L.message('whatever'), /not available right now/);

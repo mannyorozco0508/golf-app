@@ -78,7 +78,7 @@ test('its own app: bundle id, name, team, 0.2 (7), entitlements, Firebase guard'
     assert.ok(/CapacitorGeolocation/.test(pkg) && /CapacitorFirebaseAuthentication", path: [^\n]*traits: \["Google"\]/.test(pkg) && !/acebook/.test(pkg));
 });
 
-test('its own icon (option B: HP + a green pin): every iOS slot, no alpha, not the HardPan icon', { skip }, () => {
+test('its own icon (option B: HP + a green pin): every iOS slot, no alpha, and the merged app\'s icon too', { skip }, () => {
     const dir = path.join(BETA, 'ios/App/App/Assets.xcassets/AppIcon.appiconset');
     const c = JSON.parse(fs.readFileSync(path.join(dir, 'Contents.json'), 'utf8'));
     const slots = c.images.map((i) => i.idiom + ' ' + i.size + ' ' + i.scale).sort();
@@ -93,6 +93,8 @@ test('its own icon (option B: HP + a green pin): every iOS slot, no alpha, not t
         assert.strictEqual(w, want, i.filename + ' is ' + w + ' px, the slot needs ' + want);
         assert.ok(colorType === 2 || colorType === 0, i.filename + ': has an alpha channel (PNG colour type ' + colorType + ')');
     });
-    const hardpan = path.join(ROOT, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/icon-1024.png');
-    assert.ok(!png('AppIcon-1024.png').equals(fs.readFileSync(hardpan)), 'not the HardPan icon');
+    // ONE APP, ONE ICON (mailbox 004, Manny 2026-10-17): the merged release ships on
+    // com.rattlegolf.app with THIS icon - the live target's set is this set, file for file.
+    const live = path.join(ROOT, 'ios/App/App/Assets.xcassets/AppIcon.appiconset');
+    c.images.forEach((i) => assert.ok(png(i.filename).equals(fs.readFileSync(path.join(live, i.filename))), 'ios/App\'s ' + i.filename + ' is not the GPS icon'));
 });

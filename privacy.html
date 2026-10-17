@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- DRAFT FOR MANNY'S REVIEW (store-legal, 2026-10-17). Rewritten to match what the app does today: accounts, email, set-green location, GolfAPI / Cloud Functions / NWS / WeatherKit, push, in-app deletion, subscriptions. Not legal advice; read it before it goes live. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -36,6 +37,7 @@
 </style>
 </head>
 <body>
+<body>
 <div class="wrap">
 
 <header>
@@ -44,13 +46,19 @@
 </header>
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 23 September 2026</p>
+<p class="updated">Last updated: 17 October 2026</p>
 
-<p>HardPan is a golf scoring app for private groups — the consumer app for skins, settlement, and side action. The App Store listing may still say Rattle Golf while version 1.0.3 is in review. Rattle Golf Tournaments is the events product. Rattle Golf LLC operates both. This policy explains what HardPan stores, why, and what it does not do. It is written to be read, not to be survived.</p>
+<p>HardPan is a golf app for private groups: a live scorecard, the side games your group plays, a running tally of who owes who, and HardPan GPS yardages. Rattle Golf LLC operates HardPan and also Rattle Golf Tournaments, the separate events product, which this policy does not cover. This policy explains what HardPan stores, why, who else is involved, and how to delete it. It is written to be read, not to be survived.</p>
 
 <div class="callout">
-    <strong>The short version.</strong> HardPan has no accounts and asks for no email address. It stores the golf information you type in — names, scores, and the games your group is playing — so everyone in the round sees the same card. If you search for a course online, the text you type is sent through our proxy to a course directory, only to find a published scorecard. It does not sell anything, does not show ads, contains no analytics or tracking SDK, and never touches your money.
+    <strong>The short version.</strong> You can use HardPan without telling us who you are. If you sign in with Apple, Google or an email link, we keep your email address so your rounds follow you. We store the golf information your group types in, so everyone sees the same card. Your phone's location is used on your phone for yardages; it is saved only when you choose to set a green where you are standing. HardPan has no ads, no advertising identifier and no analytics or tracking SDK, does not sell data, and never holds or moves money. You can delete your account inside the app.
 </div>
+
+<h2>Accounts and sign-in</h2>
+<ul>
+    <li><strong>Without signing in:</strong> the first time you open HardPan, Firebase Authentication (Google) gives the app an anonymous account so the rounds you set up stay yours. It has no name or email on it.</li>
+    <li><strong>Sign in with Apple, Google, or an email link:</strong> Firebase Authentication keeps your email address (with Sign in with Apple this may be Apple's private relay address), which sign-in method you used, and, if Apple or Google shares it, your name. We use this only to sign you in and keep your rounds, saved groups, free trial or pass with you across devices. To send an email sign-in link, Firebase sends one email to the address you type.</li>
+</ul>
 
 <h2>What is stored</h2>
 
@@ -58,60 +66,83 @@
     <tr><th>Data</th><th>Why</th></tr>
     <tr><td>Player names as you type them</td><td>So a scorecard and a settlement can name who owes who. A nickname works as well as a real name.</td></tr>
     <tr><td>Hole-by-hole scores, handicaps, and the games and stakes your group selected</td><td>This is the app's entire function.</td></tr>
-    <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our Cloudflare Worker to golfcourseapi.com, only to look up a published reference scorecard. This is text you type, not your phone's location. Used for that lookup. Not sold.</td></tr>
-    <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
-    <tr><td>Green locations for the GPS screen, in the HardPan app (a point a golfer tapped on the map as the center, front or back of a green)</td><td>So every golfer on that course sees the same green. This is a spot on the course somebody chose by tapping the map, never where that golfer was standing.</td></tr>
-    <tr><td>Round codes and group numbers</td><td>To keep one foursome's card separate from another's.</td></tr>
-    <tr><td>Preferences and recent codes saved on your device</td><td>So the app can remember your dark-mode choice, prefill your last roster, offer to resume your last round or trip, and remember which player is you. This stays on your device and is never sent anywhere.</td></tr>
+    <tr><td>Round codes and group numbers, and the account that set the round up</td><td>To keep one foursome's card separate from another's, and so only the organizer can change or wipe the setup.</td></tr>
+    <tr><td>Your organizer record: when you first set up a round, a free trial or pass if you have one, and your saved groups (the golfers' names and handicaps you saved)</td><td>So you can start next week's game without retyping it.</td></tr>
+    <tr><td>Co-organizer invites (the email address of someone you invite to help run a saved group)</td><td>So that person can see and use the group when they sign in with that email.</td></tr>
+    <tr><td>Course search text (the course name or town you type)</td><td>Sent to our server to find the course, as described under Who else is involved. This is text you type, not your location.</td></tr>
+    <tr><td>Imported course details (course name, city, par, stroke index, tees, and hole and green positions)</td><td>Saved into the round and kept in the shared course list so a later round can use it.</td></tr>
+    <tr><td>Green locations for the GPS screen (the center, front or back of a green)</td><td>So every golfer on that course sees the same green. Saved to the round and to the shared course record, with the round code. See Location below.</td></tr>
+    <tr><td>Course-lookup counts and a lookup log (your account ID, which course was looked up, and when)</td><td>To keep within the daily limits of the course data provider.</td></tr>
+    <tr><td>Notification tokens and settings, if you allow notifications</td><td>Your device's push token, the player you said you are in a round, the round code, and your Bets and Hype switches, so the right phone gets the right notification.</td></tr>
+    <tr><td>Preferences and recent codes saved on your device</td><td>Your dark-mode choice, your last roster, the last round or trip, which player is you, courses and map pictures saved for use without signal, scores waiting to sync, and any shots you mark on the GPS screen. This stays on your device.</td></tr>
 </table>
+
+<h2>Location</h2>
+<ul>
+    <li><strong>Yardages, on your phone.</strong> In HardPan GPS, the GPS screen uses your phone's location while that screen is showing, and for at most a minute after you switch back, to show your distance to the green and targets. That calculation happens on your phone. Your position is not sent to us or anyone else for this.</li>
+    <li><strong>Courses near you.</strong> When you pick a GPS course, your phone uses its location to sort the course list by distance. That stays on your phone.</li>
+    <li><strong>Setting a green - the one time a position is saved.</strong> If you set or fix a green with the Set button while standing on it, your phone's position at that moment is saved as that green's location. If you set it by tapping the map, the point you tapped is saved instead. Either way it is saved to the round and to the shared course record so other golfers on that course see the same green. It is saved only when you choose to do this, and it is stored as a spot on the course, not as a history of where you have been. A saved green carries no name and no account id - only the spot, the time it was set and how it was set (by GPS or by a tap).</li>
+    <li><strong>Wind.</strong> Live wind is looked up for the <em>course</em>, using a point from the course data rounded to about 100 meters - never your own position. A HardPan build without the GPS screen does not ask for your location at all.</li>
+</ul>
 
 <h2>What is never collected</h2>
 <ul>
-    <li>No account, password, email address or phone number</li>
-    <li>No device location or GPS is collected. In the HardPan app, the GPS screen uses your phone's location <strong>on your phone only</strong> - while that screen is showing, and for at most a minute after you switch back to Bets - to show your distance to the green. Your position is never stored or sent to us or anyone else. The bets-only app does not ask for your location at all.</li>
+    <li>No phone number, and no password: sign-in is through Apple, Google or an email link</li>
     <li>No contacts, photos, camera or microphone access</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
-    <li>No payment details of any kind — see below</li>
+    <li>No crash-reporting service: errors stay in your phone's own log</li>
+    <li>No payment details of any kind - see Money and Purchases below</li>
 </ul>
 
-<h2>Money</h2>
-<p>HardPan records the games a group agreed to play and calculates the resulting total for each player. That is arithmetic, not a transaction.</p>
-<p><strong>The app does not accept wagers, hold funds, process payments, or pay winnings.</strong> If money changes hands, it happens between the people involved, outside the app, using whatever they normally use. HardPan never sees it and takes no share of it.</p>
+<h2>Who else is involved</h2>
+<p>These services process data for HardPan as service providers. None of them receives your scores, player names or position except as stated here.</p>
+<ul>
+    <li><strong>Google Firebase</strong> (Authentication, Realtime Database, Cloud Functions, Cloud Messaging): stores accounts and round data, runs our course and wind lookups, and delivers notifications.</li>
+    <li><strong>Cloudflare</strong>: hosts the website and runs our course-search proxy and the service that sends notifications.</li>
+    <li><strong>Apple</strong>: Sign in with Apple, push notifications on iPhone, the App Store for any purchase, and Apple Weather (WeatherKit) for live wind when it is switched on. Our server sends Apple the course point only.</li>
+    <li><strong>Google Sign-In</strong>, if you choose Continue with Google.</li>
+    <li><strong>GolfAPI (golfapi.io)</strong>: for HardPan GPS course search, the text you type goes to our Cloud Function, which asks GolfAPI and saves the answer so the same search is not repeated.</li>
+    <li><strong>golfcourseapi.com</strong>: the scorecard search on the round setup screen sends the text you type through our Cloudflare Worker to golfcourseapi.com to find a published scorecard. We may keep that search text on our proxy for a short time. Round scores and player names are not sent to golfcourseapi.</li>
+    <li><strong>National Weather Service (api.weather.gov)</strong>: when Apple Weather is off or unavailable, your phone asks the NWS for the wind at the course point, so the NWS sees that request and your internet address.</li>
+    <li><strong>Esri (ArcGIS) and the U.S. Geological Survey (USGS)</strong>: the satellite picture on the GPS screen. Your phone asks them for the map squares of the course you are looking at, the same way any web map works, so they see that request and your internet address. USGS squares for a course may be saved on your phone so the picture works without signal. Hole and green outlines from OpenStreetMap ship inside the app.</li>
+</ul>
+<p>Data is not sold, rented, or shared for advertising. We also share data where the law requires it.</p>
 
-<h2>Where data is stored</h2>
-<p>Round data is stored in Google Firebase Realtime Database, operated by Google Cloud. Google processes it as a service provider under its own security and privacy terms. Looking up a course sends the search text through our Cloudflare Worker, as described under Third-party directories.</p>
-<p>Your dark-mode setting and saved roster stay in your browser's local storage on your own device and are never sent anywhere.</p>
+<h2>Notifications</h2>
+<p>HardPan asks before it sends notifications, and only once you open a round. If you allow them, the notification token for your device is stored under your account as described above, and notifications about your rounds (you're in a round, the final results, a side-game challenge or offer, and hype) are sent through Firebase Cloud Messaging and Apple's push service. You can turn the optional ones off in Account, or turn all of them off in your phone's settings.</p>
+
+<h2>Money</h2>
+<p>HardPan records the games a group agreed to play and works out who owes who. That is arithmetic, not a transaction.</p>
+<p><strong>The app does not hold funds, move money, process payments, or pay winnings.</strong> If money changes hands, it happens between the people involved, outside the app, using whatever they normally use. HardPan never sees it and takes no share of it.</p>
+
+<h2>Purchases</h2>
+<p>A free trial or a pass is recorded on your organizer record. If HardPan offers a subscription (such as HardPan GPS), it is bought through the App Store: Apple handles the payment, and we, and the purchase service we use to check subscriptions (RevenueCat, when it is added), receive only what was bought, whether it is active, and the account it belongs to - never your card or payment details.</p>
 
 <h2>Who can see a round</h2>
-<p>Rounds are shared by link or code with the group. Anyone holding a round link can view that round, which is the point — you send it to your group. Anyone who can guess a code could view it too, so the practical guidance is simple: <strong>treat a round link like a group chat, and don't put anything in a player name you wouldn't want a stranger to read.</strong></p>
-
-<h2>Sharing</h2>
-<p>Data is not sold, rented, or shared for advertising. Round data is stored with Google Firebase, the hosting provider. Course search text is sent only as described under Third-party directories. We also share data where the law requires it.</p>
-
-<h2>Third-party directories</h2>
-<p>Online course search reaches golfcourseapi.com only through our own Cloudflare Worker. That provider receives the search text needed to find a course. We may keep that search text on our proxy for a short time so the same lookup is not repeated. Round scores and player names are not sent to golfcourseapi.</p>
-<p>The GPS screen's satellite picture comes from Esri (ArcGIS) and from the U.S. Geological Survey (USGS, public-domain aerial imagery). Your phone asks them for the map squares of the course you are looking at, the same way any web map works, so they see that request and your internet address. When a round opens with signal, the USGS squares for that course are saved on your phone so the picture still works without signal. Your position, scores and names are not sent to Esri or USGS. Hole and green outlines come from OpenStreetMap and ship inside the app; your phone does not contact OpenStreetMap.</p>
+<p>Rounds are shared by link or code with the group. Anyone holding a round link can view that round, which is the point - you send it to your group. Anyone who can guess a code could view it too, so the practical guidance is simple: <strong>treat a round link like a group chat, and don't put anything in a player name you wouldn't want a stranger to read.</strong></p>
 
 <h2>Children</h2>
-<p>HardPan is not directed at children under 13 and does not knowingly collect information from them. It has no accounts, no messaging, and no profiles.</p>
+<p>HardPan is not directed at children under 13 and does not knowingly collect information from them.</p>
 
 <h2>Deleting your data</h2>
 <ul>
-    <li><strong>A whole round:</strong> the organizer can use "End &amp; Wipe Round," which deletes that round's data.</li>
+    <li><strong>Your account, inside the app:</strong> open Account and tap Delete account. This deletes the account itself, your organizer record (including any free trial or pass), your saved groups, the co-organizer invites you sent, your notification tokens and settings, and your course-lookup counts. If you signed in with Apple, HardPan also asks Apple to revoke the app's access to your Apple ID.</li>
+    <li><strong>Rounds stay in their round codes:</strong> deleting an account does not delete rounds, because other golfers may still be scoring them. The organizer can use "End &amp; Wipe Round," which deletes that round's data.</li>
     <li><strong>Device settings:</strong> clearing your browser's site data, or deleting the app, removes everything stored locally.</li>
-    <li><strong>Anything else:</strong> email the address below with the round code and it will be deleted.</li>
+    <li><strong>Anything else:</strong> email the address below - with the round code, if it is about a round - and it will be deleted. That includes removing your account ID from the course-lookup log.</li>
 </ul>
 
 <h2>Changes</h2>
 <p>If this policy changes materially, the date at the top changes and the updated version appears here.</p>
 
 <h2>Contact</h2>
-<p>Questions about privacy, or a deletion request: <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a></p>
+<p>Questions about privacy, or a deletion request: <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> (Rattle Golf LLC)</p>
 
 <footer>
     <a href="privacy.html">Privacy</a> ·
     <a href="terms.html">Terms</a> ·
-    <a href="support.html">Support</a>
+    <a href="support.html">Support</a> ·
+    <a href="acknowledgements.html">Acknowledgements</a>
     <div style="margin-top:10px;">HardPan</div>
 </footer>
 
