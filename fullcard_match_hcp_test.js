@@ -88,7 +88,7 @@ const dottedSIs = (calc, p) => cd18
 describe('CHANGE 1 — THE GOLFER\u2019S HANDICAP IN THE HEADER', () => {
 
     test('the header cell carries name AND handicap', () => {
-        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{label\}<\/span>/,
+        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{escapeHtml\(label\)\}<\/span>/,
             'the name must stay its own element');
         // RE-PINNED, NOT WEAKENED. `first` became `label` when the header stopped
         // being able to show two golfers the same word: p.name.split(" ")[0] deleted
@@ -205,7 +205,7 @@ describe('HOLE VIEW STILL READS CLEAN NAMES', () => {
         // THE ATTRIBUTE AND THE VISIBLE SPAN MUST BE THE SAME STRING. Hole View reads
         // .fc-name first and falls back to this attribute, so letting them drift gives
         // the two views two different answers depending only on which branch ran.
-        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{label\}<\/span>/);
+        assert.match(renderScorecardSrc, /<span class="fc-name">\$\{escapeHtml\(label\)\}<\/span>/);
         assert.match(renderHoleViewSrc, /dataset\.playerName/);
     });
 

@@ -44,7 +44,12 @@ const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPan
 // merged into gps-flow on 2026-10-09. Before: 92a63164 (82d98b4), d697ea55
 // (04f5fd1), 8ea54ad0 (7a6c3f5). After the next rebase or merge of main, re-pin
 // it to that main's index.html.
-const PRE_GPS_INDEX_SHA = '0bbcaf204245bbfff598410b55befc2df3f5cfc3562bddf219e2d451763a29fa';
+// 2026-10-16 (mailbox 002, Manny approved shared-code fixes on gps-features): the Consumer
+// index.html is main 387cf89's PLUS the independent audit's shared fixes - the offline queue
+// (versions, one drain, this round only, stale ask, scoresVerified), the KP tag with the round,
+// escaped names (XSS) and the play-order hole list - so it is pinned to that, not main's.
+// Before: 0bbcaf20 (main 387cf89).
+const PRE_GPS_INDEX_SHA = 'f2761cc44cfbe2a6df746517928d0f2d020e97a4025dd5c9565f818bf91281a5';
 const GPS_SHELL = (() => {
     const m = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8'));
     return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];

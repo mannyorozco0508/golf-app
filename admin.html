@@ -7349,7 +7349,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // every pick re-pulls the course from OpenStreetMap - unless it was pulled
         // in the last hour or there is no signal - and the pull replaces the copy
         // only when newer and with at least as many usable holes.
-        const known = M.known(key, holes, name);
+        // The course's own place, when its record has one: a name alone never picks GPS data (audit C2).
+        const recLoc = rec && rec.location && isFinite(Number(rec.location.latitude != null ? rec.location.latitude : rec.location.lat))
+            ? [Number(rec.location.latitude != null ? rec.location.latitude : rec.location.lat), Number(rec.location.longitude != null ? rec.location.longitude : (rec.location.lng != null ? rec.location.lng : rec.location.lon))] : null;
+        const known = M.known(key, holes, name, recLoc);
         if (known) gpsSetupRender(key, known, name);
         if (!gpsOsmOn()) {
             // GPS LIVE: GolfAPI only - on the phone, else Firebase (gps_links /

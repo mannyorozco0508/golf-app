@@ -1164,12 +1164,12 @@ html {
             let statusDesc = "All Square ($0)";
             if (holeBet > 0) {
                 let amt = Math.abs(t18.status * holeBet);
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+                if (t18.status > 0) statusDesc = `${escapeHtml(matchData.t1Name)} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${escapeHtml(matchData.t2Name)} Won (-${amt})`;
             } else {
                 let amt = matchStake;
-                if (t18.status > 0) statusDesc = `${matchData.t1Name} Won (+${amt})`;
-                else if (t18.status < 0) statusDesc = `${matchData.t2Name} Won (-${amt})`;
+                if (t18.status > 0) statusDesc = `${escapeHtml(matchData.t1Name)} Won (+${amt})`;
+                else if (t18.status < 0) statusDesc = `${escapeHtml(matchData.t2Name)} Won (-${amt})`;
             }
             breakdownHtml += `
                 <div class="breakdown-item">
@@ -1183,7 +1183,7 @@ html {
 
         return `
             <div class="settle-card">
-                <div class="settle-header">💵 Round Settlement (${matchData.t1Name} vs ${matchData.t2Name})</div>
+                <div class="settle-header">💵 Round Settlement (${escapeHtml(matchData.t1Name)} vs ${escapeHtml(matchData.t2Name)})</div>
 
                 <div class="match-breakdown-list" style="margin-bottom: 16px;">
                     <div style="font-weight: bold; margin-bottom: 4px; color: #0f4c3a;">Bet Breakdown:</div>
@@ -1191,12 +1191,12 @@ html {
                 </div>
 
                 <div class="ledger-row" style="background:var(--nav-bg);">
-                    <span>${matchData.t1Name}:</span>
+                    <span>${escapeHtml(matchData.t1Name)}:</span>
                     <span>${formatMoney(t1Total)}</span>
                 </div>
 
                 <div class="ledger-row" style="background:var(--nav-bg);">
-                    <span>${matchData.t2Name}:</span>
+                    <span>${escapeHtml(matchData.t2Name)}:</span>
                     <span>${formatMoney(-t1Total)}</span>
                 </div>
             </div>
@@ -1230,7 +1230,7 @@ html {
                             <tr>
                                 <th style="width: 40px;">Hole</th>
                                 <th style="width: 35px;">Par</th>
-                                ${players.map(p => `<th>${p.name.split(" ")[0]}</th>`).join('')}
+                                ${players.map(p => `<th>${escapeHtml(p.name.split(" ")[0])}</th>`).join('')}
                             </tr>
                         </thead>
                         <tbody>

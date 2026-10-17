@@ -301,7 +301,7 @@ describe('THE SEAMS', () => {
         // RE-POINTED 2026-10-06: still ONE update carrying both keys - which is
         // the claim this test exists for - but issued through durableWrite, so
         // the op is on the phone before it is sent and is coalesced by hole.
-        assert.match(fn, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:h' \+ hole\)/);
+        assert.match(fn, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:' \+ currentMode \+ ':h' \+ hole\)/);
         assert.doesNotMatch(fn, /kpAsked|sessionStorage|transaction/);
     });
     test('the question is answered in sessionStorage per round and hole; the mount is rendered on every snapshot (the last score lights it)', () => {

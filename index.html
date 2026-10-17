@@ -6362,7 +6362,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         return { par: meta.par, si: isFinite(si) && si > 0 ? si : null, yards: isFinite(y) && y > 0 ? y : null };
     }
     function gpsHoleList() {
-        return ((currentData && currentData.courseData) || []).map(h => parseInt(h.hole, 10)).filter(n => n > 0).sort((a, b) => a - b);
+        // IN PLAY ORDER (audit, 2026-10-16): off the 10th the picker reads 10..18, 1..9, like the card.
+        return playOrderCourse().map(h => parseInt(h.hole, 10)).filter(n => n > 0);
     }
     function gpsGotoHole(hole) {
         goToHole(Number(hole));
@@ -6586,7 +6587,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // has no other way to tell: every refusal above returns undefined.
         // ONE UPDATE, still: kpLeaders and kpWinners together, so a refusal can
         // never leave half a KP. The queue carries that shape as a single op.
-        return durableWrite('events/' + currentMode, 'update', updates, 'kp:h' + hole)
+        return durableWrite('events/' + currentMode, 'update', updates, 'kp:' + currentMode + ':h' + hole)
             .then(() => {
                 kpEntryOpenHole = null;
                 renderKpEntryMount();
@@ -7154,7 +7155,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         mount.innerHTML = '<div class="hole-recap">' +
             '<div class="hr-title">Hole ' + currentViewedHole + ' complete</div>' +
             shown.map(e => '<div class="hr-event' + (e.personal ? ' personal' : '') + '">' +
-                '<span class="hr-icon">' + e.icon + '</span><span>' + e.text + '</span></div>').join('') +
+                '<span class="hr-icon">' + e.icon + '</span><span>' + escapeHtml(e.text) + '</span></div>').join('') +
             (hidden > 0 ? '<button type="button" class="hr-more" onclick="toggleRecap()">+ ' + hidden + ' more</button>' : '') +
             (recapExpanded && events.length > RECAP_LIMIT ? '<button type="button" class="hr-more" onclick="toggleRecap()">Show less</button>' : '') +
             '</div>';
@@ -9233,7 +9234,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // refusal that can never land (drop), and it is the only thing that gets
         // to make that call.
         p.then(function () {
-            if (op && q && store) { try { q.confirm(store, op.id); } catch (e) {} }
+            // THIS edit's version only (audit B2): a correction typed while this write was in
+            // flight keeps the same id with a newer version, and must stay queued.
+            if (op && q && store) { try { q.confirm(store, op.id, op.v); } catch (e) {} }
             renderOfflineBadge();
         }, function () { renderOfflineBadge(); });
         // GPS:BEGIN
@@ -9241,7 +9244,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // and the golfer is told plainly, with "Exit this round".
         p.then(null, function (err) {
             if (!(op && q && store && typeof q.isPermanent === 'function' && q.isPermanent(err))) return;
-            try { q.confirm(store, op.id); } catch (e) {}
+            try { q.confirm(store, op.id, op.v); } catch (e) {}
             lastDrop += 1;
             renderOfflineBadge();
             if (window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'refused');
@@ -9258,11 +9261,41 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // issue the same op twice and could land an older value last.
     var draining = false;
     var lastDrop = 0;
+    // THIS ROUND'S WRITES ONLY (audit B4): a phone carries other rounds' leftovers; opening this
+    // round must never replay them here. Its own ops older than 6 hours wait for the golfer's OK.
+    function queuePrefix() { return 'events/' + currentMode + '/'; }
+    function ownOp(op) { return !!(op && typeof op.path === 'string' && currentMode && (op.path === 'events/' + currentMode || op.path.indexOf(queuePrefix()) === 0)); }
+    function queueWaiting(q, store) {
+        try { return (typeof q.countFor === 'function' ? q.countFor(store, queuePrefix()) : q.count(store)) || 0; } catch (e) { return 0; }
+    }
+    var drainAgain = false, staleAnswer = null, staleAsking = false;
+    async function askAboutStale(q, store) {
+        if (staleAnswer !== null || staleAsking || typeof q.staleFor !== 'function' || typeof uiConfirm !== 'function') return;
+        var old = q.staleFor(store, queuePrefix());
+        if (!old.length) return;
+        staleAsking = true;
+        var ok = false;
+        try {
+            ok = await uiConfirm({
+                title: old.length + ' old change' + (old.length === 1 ? '' : 's') + ' on this phone',
+                body: 'This phone has ' + old.length + ' change' + (old.length === 1 ? '' : 's') + ' to this round saved more than 6 hours ago and never sent. Send ' + (old.length === 1 ? 'it' : 'them') + ' now? They would replace what is on the card.',
+                confirmText: 'Send ' + (old.length === 1 ? 'it' : 'them'), cancelText: 'Discard ' + (old.length === 1 ? 'it' : 'them')
+            });
+        } catch (e) { staleAsking = false; return; }
+        staleAsking = false;
+        staleAnswer = !!ok;
+        if (!ok) old.forEach(function (o) { try { q.confirm(store, o.id, o.v); } catch (e) {} });
+        renderOfflineBadge();
+        drainQueue('stale-answer');
+    }
     function drainQueue(why) {
         var store = offlineStore();
         var q = window.OfflineQueue;
-        if (!q || !store || draining) return Promise.resolve(null);
-        if (!q.count(store)) { renderOfflineBadge(); return Promise.resolve(null); }
+        if (!q || !store) return Promise.resolve(null);
+        // ONE DRAIN AT A TIME (audit B1): a second request while one runs is remembered, not
+        // started alongside it - two drains sent the same box twice, the older value last.
+        if (draining) { drainAgain = true; return Promise.resolve(null); }
+        if (!queueWaiting(q, store)) { renderOfflineBadge(); return Promise.resolve(null); }
         // NOT WHILE THE DEVICE SAYS IT HAS NOTHING. Measured, and it was a real
         // defect of the first version: a drain started while offline issues a
         // write that NEVER SETTLES - that is what an offline write does - so the
@@ -9281,20 +9314,28 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // on "Sending...", and no later drain able to start. offline-queue.js
         // abandons a write that does not settle, leaves the op queued, and
         // returns, so the retry below can have another go.
+        askAboutStale(q, store);
+        var cutoff = Date.now() - ((q.STALE_MS) || 6 * 3600 * 1000);
+        var only = function (op) { return ownOp(op) && (staleAnswer === true || !(Number(op.ts) < cutoff)); };
+        var touchedScores = false;
         return q.drain(store, function (op) {
             var ref = db.ref(op.path);
+            if (/\/scores\//.test(op.path)) touchedScores = true;
             if (op.type === 'remove' || op.value === null) return ref.remove();
             if (op.type === 'update') return ref.update(op.value);
             return ref.set(op.value);
-        }, { timeoutMs: 12000 }).then(function (r) {
+        }, { timeoutMs: 12000, only: only }).then(function (r) {
             draining = false;
+            // A REPLAYED SCORE UNDOES "VERIFIED" EXACTLY AS A TYPED ONE DOES (audit B4).
+            if (touchedScores && r && r.sent && typeof clearScoresVerified === 'function') { try { clearScoresVerified(); } catch (e) {} }
+            if (drainAgain) { drainAgain = false; setTimeout(function () { drainQueue('again'); }, 0); }
             if (r && r.dropped) lastDrop += r.dropped;
             // GPS:BEGIN
             if (r && r.dropped && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'refused');
             // GPS:END
             renderOfflineBadge();
             return r;
-        }, function () { draining = false; renderOfflineBadge(); return null; });
+        }, function () { draining = false; if (drainAgain) { drainAgain = false; setTimeout(function () { drainQueue('again'); }, 0); } renderOfflineBadge(); return null; });
     }
 
     // WHEN TO REPLAY. The round's own .info/connected is the honest signal -
@@ -9304,22 +9345,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function armQueueDrain() {
         try {
             db.ref('.info/connected').on('value', function (snap) {
-                if (snap.val() === true) { draining = false; drainQueue('socket'); }
+                // NOT reset here (audit B1): every queued write is time-bound (12 s), so a drain always
+                // ends by itself; a reconnect during one asks for one more after it.
+                if (snap.val() === true) { drainQueue('socket'); }
                 else {
-                    // AND THE FLAG IS RELEASED ON THE WAY DOWN. A drain caught by
-                    // the socket dropping is stuck on a promise that will never
-                    // settle; leaving `draining` true would mean the reconnect
-                    // above could never start a new one. Re-issuing a write that
-                    // is still pending costs nothing here - every op carries its
-                    // full path and its own value, so a replay writes the same
-                    // number to the same place.
-                    draining = false;
+                    // On the way down nothing is reset: a drain caught by the socket dropping ends
+                    // on its own 12 s write timeout and leaves its op queued for the next one.
                     renderOfflineBadge();
                 }
             });
         } catch (e) {}
         try {
-            window.addEventListener('online', function () { draining = false; drainQueue('online-event'); });
+            window.addEventListener('online', function () { drainQueue('online-event'); });
             window.addEventListener('offline', function () { renderOfflineBadge(); });
         } catch (e) {}
         // AND ON ARRIVAL, because the app may have been closed with scores in the
@@ -9354,12 +9391,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         var q = window.OfflineQueue;
         if (!st || !q) return;
         var waiting = 0;
-        try { waiting = q.count(st) || 0; } catch (e) { waiting = 0; }
+        waiting = queueWaiting(q, st);
         if (!waiting) return;
         retryTimer = setInterval(function () {
             var s2 = offlineStore();
             var n = 0;
-            try { n = (window.OfflineQueue && s2) ? (window.OfflineQueue.count(s2) || 0) : 0; } catch (e) { n = 0; }
+            n = (window.OfflineQueue && s2) ? queueWaiting(window.OfflineQueue, s2) : 0;
             if (!n) { clearInterval(retryTimer); retryTimer = null; return; }
             drainQueue('retry');
         }, 20000);
@@ -9378,7 +9415,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         var store = offlineStore();
         if (!q || !store) { el.style.display = 'none'; return; }
         var waiting = 0;
-        try { waiting = q.count(store) || 0; } catch (e) { waiting = 0; }
+        waiting = queueWaiting(q, store);
         // "Sending" ONLY WHILE A DRAIN IS GENUINELY IN FLIGHT. It used to be
         // whatever the caller passed, and a drain stuck on a write that never
         // settled left the word on screen for the rest of the round while nothing
@@ -11173,8 +11210,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         let inner = '';
 
         if (o.gameFormat === 'hilo' && o.hiloLog) {
-            inner += pill('pill-main', 'Low: ' + (o.hiloLog.lowWinner || 'Halved'));
-            inner += pill('pill-press', 'High: ' + (o.hiloLog.highWinner || 'Halved'));
+            inner += pill('pill-main', 'Low: ' + escapeHtml(o.hiloLog.lowWinner || 'Halved'));
+            inner += pill('pill-press', 'High: ' + escapeHtml(o.hiloLog.highWinner || 'Halved'));
         } else if (o.dots) {
             const d = o.dots || { count: 0, allowed: false };
             const cls = d.count > 0 ? 'dots-btn has-dots' : 'dots-btn';
@@ -11193,17 +11230,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 const statusTxt = !log.resolved
                     ? (log.winner === 'tie' ? 'Tied' : 'Pending')
                     : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
-                inner += pill('pill-main', callTag + ' ' + golferLabelFor(log.wolfName));
+                inner += pill('pill-main', callTag + ' ' + escapeHtml(golferLabelFor(log.wolfName)));
                 inner += pill('pill-press', statusTxt);
             } else {
-                inner += pill('pill-main', '\uD83D\uDC3A ' + golferLabelFor(log.wolfName));
+                inner += pill('pill-main', '\uD83D\uDC3A ' + escapeHtml(golferLabelFor(log.wolfName)));
             }
         } else if (o.gameFormat === 'stableford' && o.stablefordParts && o.stablefordParts.length) {
             inner += '<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">' +
-                o.stablefordParts.join(' \u00B7 ') + '</span>';
+                o.stablefordParts.map(function (t) { return escapeHtml(t); }).join(' \u00B7 ') + '</span>';
         } else if (o.matchPillText) {
             inner += pill('pill-main', o.matchPillText);
-            if (o.holeWinnerText) inner += pill('pill-press', o.holeWinnerText);
+            if (o.holeWinnerText) inner += pill('pill-press', escapeHtml(o.holeWinnerText));   // a team's names: text (audit H1)
         }
 
         let html = '<div class="match-status-cell">' + inner + '</div>';
@@ -12082,7 +12119,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         filteredPlayers.forEach((p, i) => {
             const label = fcLabels[i];
             headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}"${p.out === true ? ' class="golfer-out"' : ''}>`
-                + `<span class="fc-name">${label}</span>`
+                + `<span class="fc-name">${escapeHtml(label)}</span>`
                 + `<span class="fc-hcp">${escapeHtml(golferHandicapLabel(p))}</span></th>`;
         });
 
@@ -12093,7 +12130,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // a Stroke Play round gains no vertical space and no new vocabulary.
         const matchNoteEl = document.getElementById("match-hcp-note");
         if (matchNoteEl) {
-            const firstName = p => p.name.split(" ")[0];
+            // TEXT, NEVER MARKUP (audit H1): a name is whatever the round record says.
+            const firstName = p => escapeHtml(String(p.name || '').split(" ")[0]);
             let noteHtml = "";
             if (dotNoteMode === 'auto' && dotNoteMatches.length > 1) {
                 // MERGED MODE HAS NO SINGLE "LOW". Two matches mean two baselines, so
@@ -12283,7 +12321,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                            <div class="fc-cell-initials" style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
+                            <div class="fc-cell-initials" style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${escapeHtml(initials)}</div>
                             <div class="score-input-wrapper${markClass}${gapBoxes.has(String(p.id) + '_' + h.hole) ? ' score-gap' : ''}">
                                 ${scoreInputHtml}
                                 ${shapeHtml}
@@ -12434,7 +12472,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             function strokeLeadText(p1Total, p2Total, holesCompleted, p1Name, p2Name) {
                 if (holesCompleted === 0) return "Waiting for scores...";
                 const diff = p1Total - p2Total;
-                return diff === 0 ? "All Square" : (diff < 0 ? `${golferLabelFor(p1Name)} leads by ${Math.abs(diff)}` : `${golferLabelFor(p2Name)} leads by ${Math.abs(diff)}`);
+                return diff === 0 ? "All Square" : (diff < 0 ? `${escapeHtml(golferLabelFor(p1Name))} leads by ${Math.abs(diff)}` : `${escapeHtml(golferLabelFor(p2Name))} leads by ${Math.abs(diff)}`);
             }
 
             if (s.holesCompleted === 0) {
@@ -12487,14 +12525,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     <span>$${currentData.matchStake || 0} Flat, Stroke Play</span>
                 </div>
                 <div class="payout-row">
-                    <span>${s.p1.name}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
-                    <span>${s.p2.name}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
+                    <span>${escapeHtml(s.p1.name)}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
+                    <span>${escapeHtml(s.p2.name)}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
                 </div>
                 <div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>
                 ${pressRowsHtml}
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Combined Ledger:</span>
-                    <span>${s.p1.name}: ${fmtStrokeM(strokeCombinedT1Money)} | ${s.p2.name}: ${fmtStrokeM(-strokeCombinedT1Money)}</span>
+                    <span>${escapeHtml(s.p1.name)}: ${fmtStrokeM(strokeCombinedT1Money)} | ${escapeHtml(s.p2.name)}: ${fmtStrokeM(-strokeCombinedT1Money)}</span>
                 </div>
                 ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Original bet settles once both players finish all ${s.totalHoles} holes.</div>` : ''}
             `;
@@ -12544,11 +12582,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 let statusDesc = "All Square ($0)";
                 if (holeBet > 0) {
                     let amt = Math.abs(m.status * holeBet);
-                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${amt}`;
-                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${amt}`;
+                    if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${amt}`;
+                    else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${amt}`;
                 } else {
-                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${flatStakeForList}`;
-                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${flatStakeForList}`;
+                    if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${flatStakeForList}`;
+                    else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${flatStakeForList}`;
                 }
                 let lockIcon = m.closed ? "🔒 " : "";
                 let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid var(--accent-teal); padding-left: 8px;" : "padding-left: 4px;";
@@ -12566,7 +12604,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 </div>
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Total Ledger:</span>
-                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(matchCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(matchCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
                 ${pressBtnHtml ? `<div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>` : ''}
             `;
@@ -12621,8 +12659,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     
                     groupMatches.forEach(m => {
                         let statusDesc = "All Square ($0)";
-                        if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
-                        else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
+                        if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${stake}`;
+                        else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${stake}`;
 
                         // A closed segment already reflects a mathematically decided result
                         // (m.finalResult, e.g. "3&2") — an open one is still live and could change.
@@ -12662,7 +12700,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 </div>
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Total Ledger:</span>
-                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(matchCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(matchCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
             `;
         } else if (gameFormat === 'hilo' && hiloCalc) {
@@ -12679,17 +12717,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
                     <span>Team Points:</span>
-                    <span>${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong> | ${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+                    <span>${escapeHtml(hiloCalc.t1Name)}: <strong>${hiloCalc.t1Points} Pts</strong> | ${escapeHtml(hiloCalc.t2Name)}: <strong>${hiloCalc.t2Points} Pts</strong></span>
                 </div>
                 <div class="payout-row">
                     <span>Financial Ledger:</span>
-                    <span>${hiloCalc.t1Name}: ${fmtM(t1Money)} | ${hiloCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(hiloCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(hiloCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
             `;
             titleEl.textContent = `↕️ HI-LO (LOW BALL / HIGH BALL)`;
             statusEl.innerHTML = `
-                <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
-                <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+                <span class="ticker-part">${escapeHtml(hiloCalc.t1Name)}: <strong>${hiloCalc.t1Points} Pts</strong></span>
+                <span class="ticker-part">${escapeHtml(hiloCalc.t2Name)}: <strong>${hiloCalc.t2Points} Pts</strong></span>
             `;
         } else if (gameFormat === 'wolf' && wolfCalc) {
             payoutBox.style.display = "none";

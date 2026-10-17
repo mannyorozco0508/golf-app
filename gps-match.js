@@ -77,7 +77,7 @@
         if (ga) return ga;
         if (!osmOn()) return null;
         var g = G(), all = W.HardPanGpsCourses || {};
-        var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name));
+        var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name, loc || null));
         var l = lsGet(OSM_LOOKUP + key);
         // The newer OpenStreetMap data wins - gps-view's osmRecord rule: a lookup
         // (a re-check after the bundle was built) only when strictly newer.
@@ -85,7 +85,7 @@
         if (b && l && l.holes && isFinite(ta) && isFinite(tb) && ta > tb) b = null;
         if (b && b.holes && Object.keys(b.holes).length) {
             // A 27-hole pairing's record has no date of its own: its nines' (the older).
-            var bb = b.osmBase || (all[g.bundleKeyFor(all, key, name)] && (all[g.bundleKeyFor(all, key, name)].compose || []).map(function (k) { return (all[k] || {}).osmBase; }).sort()[0]) || null;
+            var bb = b.osmBase || (all[g.bundleKeyFor(all, key, name, loc || null)] && (all[g.bundleKeyFor(all, key, name, loc || null)].compose || []).map(function (k) { return (all[k] || {}).osmBase; }).sort()[0]) || null;
             return verdict(b.holes, of, { source: 'bundle', osmBase: bb });
         }
         if (l && l.holes && Object.keys(l.holes).length) return verdict(l.holes, of, { source: 'lookup', step: l.pick && l.pick.step, how: l.pick && l.pick.how, osmBase: l.osmBase || null });

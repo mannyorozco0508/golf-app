@@ -147,7 +147,7 @@ describe('OFFLINE MONEY GUARD - no manual money write may reach Firebase while o
         // so a refusal can never leave half a KP, and it is coalesced by hole so
         // a group who changes their answer replaces the queued one.
         const idx = inlineJs('index.html');
-        assert.match(idx, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:h' \+ hole\)/,
+        assert.match(idx, /durableWrite\('events\/' \+ currentMode, 'update', updates, 'kp:' \+ currentMode \+ ':h' \+ hole\)/,
             'the KP write no longer goes through the durable queue');
         assert.equal(/'KP NOT SAVED', 'Reconnect before recording the KP\.'/.test(idx), false,
             'the KP offline refusal is back');

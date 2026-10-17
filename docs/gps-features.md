@@ -402,3 +402,16 @@ set front/back swaps when seen from behind; spectators cannot set a green; GPS r
 Setup changes the course; the organizer's tools follow the sign-in; the shot replay stops on the
 card; a refused Capacitor watch can retry; Exit after a refused change keeps the other queued
 scores; one Share observer; the scorekeeper key's local copy is the hash; no SubtleCrypto = 'none'.
+
+## gps-audit2 (2026-10-16): the independent audit's fixes (mailbox 002; shared code approved by Manny)
+Offline queue: a version per edit, confirm only that version, re-read before send, one drain at a
+time, this round's writes only, older than 6 h waits for "Send / Discard", a replayed score clears
+"verified" (B1 B2 B4); KP tag carries the round (B3); a refusal is this round's only (B5); Resume /
+GPS door keep spectate / group / sk (B6 B7); Join takes CODE-G-KEY, a pasted link, "CODE 2" (B8);
+quick-start groupSizeOverrides {} (B9); names escaped everywhere (H1, tools/xss-check.js); course
+matching needs a place within 5 km except known aliases / a linked club's sibling, a bare club is
+not a course, "(Front 9)" stripped, the same nine twice works (C1 C2 C6 C9); stale fix > 10 s,
+accuracy in Pro when weak, centre-only holes, Mark shot per hole, plays-like clamp (C3 C4 C5 C8);
+location timeout != denied, Join / Games card time-bound, group-locked name tag, no duplicate
+quick-start round, thru N and the hole picker in play order. Checks: audit2_queue_test.js,
+audit2_geo_test.js, tools/audit2-sim.js, tools/xss-check.js.

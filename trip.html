@@ -2589,7 +2589,7 @@ html {
             const t = tournaments[code];
             return `<div class="round-card">
                 <div class="rc-info">
-                    <div class="rc-label">${t.label}</div>
+                    <div class="rc-label">${escapeHtml(t.label)}</div>
                     <div class="rc-sub">Tournament code: ${code}</div>
                 </div>
                 <a class="rc-link" href="${tournamentUrl(`tournament.html?tourney=${code}`)}">Open ▶</a>
@@ -3901,7 +3901,7 @@ html {
 
         html += `<div class="settle-card"><div class="settle-header">Per-Round Breakdown</div>`;
         perRoundBreakdown.forEach(r => {
-            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${r.label}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
+            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${escapeHtml(r.label)}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
             if (r.rows.length === 0) {
                 html += `<div style="font-size:0.78rem; color:var(--text-muted); padding:4px 0;">${r.message || 'No money data yet.'}</div>`;
             } else {
@@ -4722,7 +4722,7 @@ html {
                 const excludedNote = r.countsTowardTrip === false ? ' <span style="color:#999;">(excluded from trip totals)</span>' : '';
 
                 html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
-                    <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
+                    <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${escapeHtml(r.label)}${excludedNote}</div>
                     <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
                     <div><strong>Format:</strong> ${formatLabel}</div>
                     <div><strong>Players (${players.length}):</strong> ${playerNames}</div>

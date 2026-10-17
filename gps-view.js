@@ -197,7 +197,9 @@
     var watchGen = 0;      // bumps on every stop, so a late Capacitor id is cleared, not kept
     var idleTimer = null;  // the 60 s stop after switching to Bets
     var windTimer = null;  // the wind's 1-minute tick (age on the box, 10-minute refresh)
-    var fix = null;        // { pt: [lat, lng], acc: metres } - NEVER persisted, NEVER sent
+    var fix = null;        // { pt: [lat, lng], acc: metres, at: ms } - NEVER persisted, NEVER sent
+    var FIX_STALE_MS = 10000, staleTimer = null;
+    function dropStaleFix() { if (fix && (!fix.at || Date.now() - fix.at > FIX_STALE_MS)) { fix = null; return true; } return false; }
 
     function units() {
         try { return localStorage.getItem(UNITS_KEY) === 'm' ? 'm' : 'yd'; } catch (e) { return 'yd'; }
@@ -274,10 +276,13 @@
         var gen = watchGen;
         var onPos = function (pos) {
             if (gen !== watchGen || !S || !pos || !pos.coords) return;
-            fix = { pt: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy };
+            fix = { pt: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy, at: Date.now() };
             S.geoError = null;
             render();
         };
+        // A FIX OLDER THAN 10 s IS NOT WHERE THE GOLFER IS (audit C3): the screen goes back to
+        // "Finding you…" (and measures from the tee) until a fresh one arrives.
+        if (!staleTimer) staleTimer = setInterval(function () { if (dropStaleFix() && S) render(); }, 3000);
         var onErr = function (err) {
             if (gen !== watchGen || !S) return;
             S.geoError = (err && (err.code === 1 || /denied|permission/i.test(String(err.message || '')))) ? 'denied'
@@ -314,6 +319,7 @@
 
     function stopWatch() {
         clearIdle();
+        if (staleTimer) { clearInterval(staleTimer); staleTimer = null; }
         watchGen++;
         if (watchId === null) return;
         try {
@@ -334,7 +340,11 @@
     function onVisibility() {
         if (!S) return;
         if (document.visibilityState === 'hidden') stopWatch();
-        else if (S.side === 'gps') startWatch();
+        else {
+            // Back from the lock screen: the last fix is where the golfer WAS (audit C3).
+            if (dropStaleFix()) render();
+            if (S.side === 'gps') startWatch();
+        }
     }
     function onPageHide() { stopWatch(); }
 
@@ -362,7 +372,7 @@
         // Ranch: 9 greens in a 10/9 lookup, 18 in the bundle). Both carry the
         // OpenStreetMap timestamp they were read at (osmBase); the lookup is used
         // only when it is strictly newer, so a tie or a missing date is the bundle.
-        var b = G.osmCourse(all, G.bundleKeyFor(all, key, S && S.courseKey === key && S.round ? S.round.courseName : null)), l = lookedUp(key);
+        var b = G.osmCourse(all, G.bundleKeyFor(all, key, S && S.courseKey === key && S.round ? S.round.courseName : null, S && S.courseLoc ? S.courseLoc : null)), l = lookedUp(key);
         if (b && l && osmNewer(l.osmBase, b.osmBase)) return l;
         return b || l;
     }
@@ -751,7 +761,9 @@
     function golfapiFor(key) {
         if (!S || S.courseKey !== key || !G.golfapiMatch || !golfapiOn() || !window.HardPanGolfApi) return null;
         var name = (S.round && S.round.courseName) || '';
-        var ck = key + '|' + name;
+        // THE PLACE IS PART OF THE ANSWER (audit C2): a name-only miss made before the course's
+        // location arrived must not stick once it has.
+        var ck = key + '|' + name + '|' + (S.courseLoc ? S.courseLoc.map(function (x) { return Number(x).toFixed(3); }).join(',') : '-');
         if (S.gaCache && S.gaCache.k === ck) return S.gaCache.v;
         var list = (typeof S.holeList === 'function' ? S.holeList() : null) || [];
         var m = G.golfapiMatch(window.HardPanGolfApi, key, name, S.courseLoc || null, list.length === 9 ? 9 : 18, window.HardPanGpsCourses || null);
@@ -819,7 +831,7 @@
     // the fallback ("Set by tapping (lower detail)"), and that alone uses USGS.
     var GREEN_GPS_YD = 5;
     function tapMode() { return !!S && ['setMid', 'confirmMid', 'setFront', 'setBack', 'confirmAll'].indexOf(S.mode) !== -1; }
-    function gpsGoodEnough() { return !!(fix && isFinite(fix.acc) && Math.round(fix.acc / G.M_PER_YD) <= GREEN_GPS_YD); }
+    function gpsGoodEnough() { dropStaleFix(); return !!(fix && isFinite(fix.acc) && Math.round(fix.acc / G.M_PER_YD) <= GREEN_GPS_YD); }
     // ... and ON (or near) the green being fixed: within 100 yds of the green the
     // hole has now - a golfer 150 yds down the fairway must not save the green
     // where they stand. A hole with no green yet has nothing to be near.
@@ -2395,7 +2407,9 @@
     function lockedG() { try { return typeof lockedGroup !== 'undefined' && lockedGroup ? Number(lockedGroup) : null; } catch (e) { return null; } }
     function picked(d) {
         var v = null; try { v = localStorage.getItem(pickKey()); } catch (e) { v = null; }
-        return v != null && (d.players || []).some(function (p) { return String(p.id) === String(v); }) ? v : null;
+        // A GROUP'S SCOREKEEPER sees their group (audit): a pick from another group is not used.
+        var lg = lockedG();
+        return v != null && (d.players || []).some(function (p) { return String(p.id) === String(v) && (!lg || groupOf(p.id) === lg); }) ? v : null;
     }
     function scoreFor() {
         try {
@@ -2537,6 +2551,7 @@
         txt('.gps-m', (nums && aim && o) ? d(G.haversineMeters(o.pt, aim)) : '—');
         txt('.gps-b', nums ? d(nums.backM) : '—');
 
+        dropStaleFix();
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
         // OFF THE HOLE (more than 1,000 yds from the green) or NO GPS: everything is
         // measured from the TEE, and says so.
@@ -2548,6 +2563,9 @@
         if (accEl) {
             accEl.classList.toggle('gps-weak', !!(acc && acc.weak));
             accEl.textContent = acc ? acc.text : '';
+            // In Pro the line shows when GPS is WEAK (audit C4) - the one time a golfer must know.
+            var subEl = S.el.querySelector('.gps-sub');
+            if (subEl) subEl.classList.toggle('gps-sub-show', !!(acc && acc.weak && fix && !fromTee));
         }
 
         // Permission and availability, in words a golfer can act on.
@@ -3093,7 +3111,7 @@
         // BUILD 3: no "You are off this hole / Green from OpenStreetMap" bar - that
         // line is in the ⓘ credits now - and no "Tee -> target" pill at the bottom.
         // (Free has no map and no ⓘ: its accuracy line stays.)
-        + '#gps-overlay:not(.gps-basic-mode) .gps-sub,#gps-overlay .gps-target-row{display:none !important;}'
+        + '#gps-overlay:not(.gps-basic-mode) .gps-sub:not(.gps-sub-show),#gps-overlay .gps-target-row{display:none !important;}'
         + '#gps-overlay .gps-acc.gps-weak{color:#fbbf24;font-weight:800;}'
         + '#gps-overlay .gps-green-dims{color:#d9f99d;font:800 13px/1 ' + FONT + ';padding:7px 10px;border-radius:12px;white-space:nowrap;}'
         + '#gps-overlay .gps-msg{font-size:14px;line-height:1.35;color:#f4f4ef;padding:9px 11px;}'
@@ -3703,6 +3721,8 @@
         // it. A new hole closes the dial and asks for the live reading again.
         closeWindSheet(); S.windKick = true;
         S.target = null; S.targetMoved = false;
+        // Mark shot starts over on a new hole (audit C8): it measured from the last hole's spot.
+        S.measureFrom = null; S.measureShot = null;
         S.framed = null;
         frameHole(false);
         render();
