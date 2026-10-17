@@ -51,6 +51,7 @@ const db = {
 async function notify(kind, detail) {
     const uids = ALERT_UIDS.value().split(',').map((s) => s.trim()).filter(Boolean);
     const body = kind === 'floor' ? `GolfAPI calls left: ${detail.left}. New courses are paused (floor ${detail.floor}).`
+        : /^userlimit_/.test(kind) ? `A golfer hit the daily limit for new GPS courses (${detail.max}).`
         : `New GPS courses hit today's cap (${detail.max}).`;
     for (const uid of uids) {
         const devices = (await db.get('pushTokens/' + uid)) || {};
@@ -60,7 +61,9 @@ async function notify(kind, detail) {
 }
 let core = null;
 function getCore() {
-    if (!core) core = createCore({ db, fetch: (u, o) => fetch(u, o), key: () => GOLFAPI_KEY.value().trim(), notify });
+    // OWNERS (no per-golfer daily cap): the ALERT_UIDS uids - plus gps_meta/config.ownerUids.
+    const owners = () => ALERT_UIDS.value().split(',').map((x) => x.trim()).filter(Boolean);
+    if (!core) core = createCore({ db, fetch: (u, o) => fetch(u, o), key: () => GOLFAPI_KEY.value().trim(), notify, owners });
     return core;
 }
 function wrap(fn) {

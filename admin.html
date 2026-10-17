@@ -7598,7 +7598,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const L = window.HardPanGpsLive;
         const r = await L.course(x.id);
         gpsLivePicking = false;
-        if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status); return; }
+        if (!r || r.status !== 'ready') { sub.textContent = L.message(r && r.status, r); return; }
         if (r.cardKey) {
             // The function wrote the scorecard (pars, handicaps, tees) to
             // global_courses/<cardKey>: picked like any saved course. READ FRESH
@@ -7645,7 +7645,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const r = await L.find(name, where);
         if (mine !== gpsSetupSeq) return;     // the golfer picked another course meanwhile
         const searchOnline = { label: 'Search online', onclick: () => { courseSearchInput.value = name; runOnlineCourseSearch(name, null); courseDropdown.style.display = 'block'; } };
-        if (!r || (r.status !== 'ok' && r.status !== 'none')) { gpsSetupShow('none', L.message(r && r.status), searchOnline); return; }
+        if (!r || (r.status !== 'ok' && r.status !== 'none')) { gpsSetupShow('none', L.message(r && r.status, r), searchOnline); return; }
         if (r.status === 'none') {
             gpsSetupShow('none', 'No GPS match for “' + name + '”' + (wt ? ' in ' + wt : '') + ' (tried: ' + r.tried.join(', ') + ').', searchOnline);
             return;
@@ -7654,7 +7654,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             gpsSetupShow('busy', 'Setting up GPS — ' + x.name + '…');
             const c = await L.course(x.id, key);
             if (mine !== gpsSetupSeq) return;
-            if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status), searchOnline); return; }
+            if (!c || c.status !== 'ready') { gpsSetupShow('none', L.message(c && c.status, c), searchOnline); return; }
             gpsSetupMatch(key);
         };
         if (r.clear) { await link(r.clear); return; }

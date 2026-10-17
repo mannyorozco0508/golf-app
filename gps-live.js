@@ -221,7 +221,7 @@
         ready: 'GPS ✓ ready',
         soon: 'GPS coming soon for this course',
         nogps: 'No GPS for this course yet - Tools › Set the green during the round',
-        limit: 'You have set up 5 new GPS courses today - try again tomorrow, or pick a course that is already set up',
+        limit: 'You\u2019ve hit your daily limit for new GPS courses. You can still play and score this round; GPS for new courses resets tomorrow.',
         account: 'Sign in (Apple, Google or email) to set up a new GPS course',
         busy: 'Someone is setting up this course right now - try again in a minute',
         unknown: 'Search for the course first',
@@ -230,7 +230,11 @@
         error: 'GPS is not available right now - try again',
         off: '',
     };
-    function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
+    // The function's own wording wins when it sends one (limits are settings there).
+    function message(status, r) {
+        if (r && typeof r.message === 'string' && r.message && r.message.length < 300) return r.message;
+        return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error;
+    }
 
     W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
 })();
