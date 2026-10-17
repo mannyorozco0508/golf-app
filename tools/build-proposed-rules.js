@@ -62,6 +62,10 @@ T['.write'] = "auth != null && auth.token.email != null && ("
     + "(!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid)"
     + " || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email)))"
     + ")";
+// LIVE requires ownerEmail on every trip, and no trip has one: live refuses EVERY trip write today
+// (create, rename, the builder, a golfer's who-am-I) - measured with targaryen (mailbox 005). A trip
+// is valid with its owner (ownerUid, stamped by the migration) or, legacy, an ownerEmail.
+T['.validate'] = "newData.hasChildren(['ownerUid']) || newData.hasChildren(['ownerEmail'])";
 T.ownerUid = { '.validate': "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" };
 // What the trip's GOLFERS write - who-am-I and the points league - stays theirs (signed in).
 T.identity = Object.assign({}, T.identity, { '.write': "auth != null && root.child('trips/' + $tripCode).exists()" });
@@ -149,6 +153,22 @@ R.course_gps = { $courseKey: {
     osm: { '.write': false }, holeChoice: { '.write': false }, $other: { '.write': false } } };
 // gps_courses / gps_links / gps_usage stay as live (read signed-in, written only by the server).
 
-const out = { rules: R };
-fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.proposed.json'), JSON.stringify(out, null, 2) + '\n');
-console.log('rules/database.rules.proposed.json written');
+fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.proposed.json'), JSON.stringify({ rules: R }, null, 2) + '\n');
+console.log('rules/database.rules.proposed.json written (phase 2: everything)');
+
+// ---- PHASE 1 (mailbox 005, Manny 2026-10-17): close the holes NOW, without breaking the apps and
+// pages people use today - live 1.0.8, TestFlight build 15 (gps-features 504f2aa) and the web.
+// Everything above, EXCEPT what today's clients cannot do yet:
+//   - tournament scores: today's web scorecard (tournament-scorecard.html on main) does not sign in,
+//     so a score keeps live's rule (the event exists, or the round exists) and the scoring keys /
+//     claims wait for phase 2 with the page that writes them;
+//   - so tournamentKeys / tournamentScorers are not in phase 1.
+// The tournament ROUND record is fixed in phase 1 (the app's shape; live refuses it today).
+const P1 = JSON.parse(JSON.stringify(R));
+const TO1 = P1.tournaments.$tourneyCode;
+TO1.scores = JSON.parse(JSON.stringify(live.rules.tournaments.$tourneyCode.scores));
+TO1.rounds.$roundId.scores.$scoreKey['.write'] = "root.child('tournaments/' + $tourneyCode + '/rounds/' + $roundId).exists()";
+delete P1.tournamentKeys;
+delete P1.tournamentScorers;
+fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.phase1.json'), JSON.stringify({ rules: P1 }, null, 2) + '\n');
+console.log('rules/database.rules.phase1.json written (phase 1: safe for today\'s clients)');
