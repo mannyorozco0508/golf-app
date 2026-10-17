@@ -117,7 +117,11 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
     });
 
     test('it is explicit about what is NOT collected', () => {
-        [/no account|No account/, /email address/, /location|GPS/,
+        // RE-PINNED (job 019, 2026-10-17): every device now gets an anonymous Firebase
+        // account, so "No account" is no longer true and the policy no longer says it.
+        // The regex had started matching "carries no account id" in the green row - a
+        // pass for the wrong reason. It now holds what IS still never collected.
+        [/No password or phone number/, /email address/, /location|GPS/,
          /analytics or tracking/].forEach(re =>
             assert.match(P, re, 'the policy must state this is not collected'));
     });
@@ -145,7 +149,9 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
         // through functions/api/course-search.js to api.golfcourseapi.com.
         // The imported card is written onto the round and into global_courses.
         // Scores and names never go on that request.
-        assert.match(P, /Last updated: 23 September 2026/);
+        // RE-PINNED (job 019): the 17 October 2026 policy (anonymous accounts, GPS,
+        // services list). was: Last updated: 23 September 2026
+        assert.match(P, /Last updated: 17 October 2026/);
         assert.match(P, /Course search queries/);
         assert.match(P, /golfcourseapi\.com/);
         assert.match(P, /Cloudflare Worker/);
