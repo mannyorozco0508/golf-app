@@ -1724,11 +1724,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         Object.keys((currentData && currentData.rounds) || {}).forEach((rid) => groups((currentData.rounds[rid] || {}).scoringGroups));
         return out;
     }
+    // Each slot is asked for ONCE (a write being made is never minted again), and the links are
+    // redrawn after the listener returns - the database answers a page's own write at once, inside
+    // the update() call, and a redraw from in there re-entered this (a stack overflow, measured by
+    // tools/tournament-net-reachable-check.js).
+    const scoringKeysAsked = {};
+    let scoringLinksRedraw = null;
     function ensureScoringKeys() {
         const want = {};
-        scoringSlots().forEach((slot) => { if (!scoringKeys[slot] && !want[slot]) want[slot] = mintScoringKey(); });
+        scoringSlots().forEach((slot) => { if (!scoringKeys[slot] && !scoringKeysAsked[slot]) { want[slot] = mintScoringKey(); scoringKeysAsked[slot] = true; } });
         if (!Object.keys(want).length) return false;
-        db.ref(`tournamentKeys/${currentCode}`).update(want).catch(() => {});
+        db.ref(`tournamentKeys/${currentCode}`).update(want).catch(() => { Object.keys(want).forEach((k) => { delete scoringKeysAsked[k]; }); });
         return true;
     }
     function watchScoringKeys() {
@@ -1737,7 +1743,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         scoringKeysCode = currentCode;
         db.ref(`tournamentKeys/${currentCode}`).on('value', (snap) => {
             scoringKeys = snap.val() || {};
-            if (!ensureScoringKeys()) { renderTeamLinks(); renderScoringGroups(); renderGroupLinks(); }
+            ensureScoringKeys();
+            if (scoringLinksRedraw) return;
+            scoringLinksRedraw = setTimeout(() => { scoringLinksRedraw = null; renderTeamLinks(); renderGroupLinks(); }, 0);
         }, () => { scoringKeysCode = null; });
     }
     // The rounds of a multi-round event in play order, one shape for every list
