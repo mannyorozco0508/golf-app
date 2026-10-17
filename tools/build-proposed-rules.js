@@ -66,6 +66,9 @@ T['.write'] = "auth != null && auth.token.email != null && ("
 // (create, rename, the builder, a golfer's who-am-I) - measured with targaryen (mailbox 005). A trip
 // is valid with its owner (ownerUid, stamped by the migration) or, legacy, an ownerEmail.
 T['.validate'] = "newData.hasChildren(['ownerUid']) || newData.hasChildren(['ownerEmail'])";
+// LIVE lets only an EMAIL sign-in READ a trip, so a trip link never opens for a golfer's anonymous
+// phone (batch1_safety_test, mailbox 005). Any signed-in phone reads it, as a round is read by code.
+T['.read'] = 'auth != null';
 T.ownerUid = { '.validate': "(!data.exists() && auth != null && newData.val() === auth.uid) || (data.exists() && newData.val() === data.val())" };
 // What the trip's GOLFERS write - who-am-I and the points league - stays theirs (signed in).
 T.identity = Object.assign({}, T.identity, { '.write': "auth != null && root.child('trips/' + $tripCode).exists()" });

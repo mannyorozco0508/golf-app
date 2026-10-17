@@ -1,5 +1,5 @@
 --- rules/live-2026-10-17.json	2026-10-16 23:57:43
-+++ rules/database.rules.proposed.json	2026-10-17 03:17:01
++++ rules/database.rules.proposed.json	2026-10-17 06:33:52
 @@ -3,31 +3,31 @@
      "events": {
        "$eventCode": {
@@ -151,7 +151,7 @@
          },
          "holeBetStake": {
            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
-@@ -132,13 +160,37 @@
+@@ -132,14 +160,38 @@
          },
          "wolfBlindMult": {
            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
@@ -184,12 +184,15 @@
      },
      "trips": {
        "$tripCode": {
-         ".read": "auth != null && auth.token.email != null",
+-        ".read": "auth != null && auth.token.email != null",
 -        ".write": "auth != null && auth.token.email != null && (!data.exists() || newData.exists())",
+-        ".validate": "newData.hasChildren(['ownerEmail'])",
++        ".read": "auth != null",
 +        ".write": "auth != null && auth.token.email != null && ((!data.exists() && newData.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && newData.exists() && (data.child('ownerUid').val() === auth.uid || (!data.hasChild('ownerUid') && data.child('ownerEmail').val() === auth.token.email))))",
-         ".validate": "newData.hasChildren(['ownerEmail'])",
++        ".validate": "newData.hasChildren(['ownerUid']) || newData.hasChildren(['ownerEmail'])",
          "ownerEmail": {
            ".validate": "newData.isString() && newData.val().length >= 5 && newData.val().length <= 160 && newData.val().matches(/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/)"
+         },
 @@ -155,7 +207,14 @@
              "$playerId": {
                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"

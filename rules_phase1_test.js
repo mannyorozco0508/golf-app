@@ -111,3 +111,8 @@ test('NO 21-DAY WALL in phase 1', () => {
     assert.ok(!/1814400000/.test(JSON.stringify(P1.rules.events)));
     assert.strictEqual(W(P1, data(true), OWN, '/events/NEW9', round({ ownerUid: 'own' })), true, '40 days on, no pass');
 });
+test('TRIPS: a golfer\'s anonymous phone opens the trip link (live: email sign-in only)', () => {
+    assert.strictEqual(targaryen.database(LIVE, data(false)).as(GOLFER).read('/trips/T9WL', NOW).allowed, false, 'control: live refuses an anonymous golfer');
+    assert.strictEqual(targaryen.database(P1, data(true)).as(GOLFER).read('/trips/T9WL', NOW).allowed, true, 'phase 1: any signed-in phone');
+    assert.strictEqual(targaryen.database(P1, data(true)).as(OUT).read('/trips/T9WL', NOW).allowed, false, 'signed out: no');
+});
