@@ -690,30 +690,64 @@
         if (u) {
             var c = u[1].toUpperCase(), g = /[?&]group=(\d{1,2})/.exec(t), k = /[?&]sk=([A-Za-z0-9]{4,12})/.exec(t);
             if (/leaderboard\.html/i.test(t) || /[?&]spectate=1/.test(t) || !g) return { code: c, href: 'index.html?game=' + c + '&spectate=1' };
-            return { code: c, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
+            return { code: c, group: g[1], sk: k ? k[1].toUpperCase() : null, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
         }
         var sk = /^([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})$/i.exec(t);
-        if (sk) return { code: sk[1].toUpperCase(), href: 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase(), direct: true };
+        if (sk) return { code: sk[1].toUpperCase(), group: sk[2], sk: sk[3].toUpperCase(), href: 'index.html?game=' + sk[1].toUpperCase() + '&group=' + sk[2] + '&sk=' + sk[3].toUpperCase() };
         var grp = /^([A-Z0-9]{4,10})\s+(\d{1,2})$/i.exec(t);
-        if (grp) return { code: grp[1].toUpperCase(), href: 'index.html?game=' + grp[1].toUpperCase() + '&group=' + grp[2] };
+        if (grp) return { code: grp[1].toUpperCase(), group: grp[2], href: 'index.html?game=' + grp[1].toUpperCase() + '&group=' + grp[2] };
         var code = t.toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (code.length < 4 || code.length > 10) return null;
         // A GAME CODE OPENS THE ROUND AS A SPECTATOR (view-only, with GPS); the round's own
         // organizer and golfers keep their access (the scorecard decides).
         return { code: code, href: 'index.html?game=' + code + '&spectate=1' };
     }
+    // JOIN NEVER OPENS A ROUND IT HAS NOT CHECKED (URGENT-002, 2026-10-17). Manny pasted
+    // "ABCDEF-2-K7Q9X" (no such round): the scorekeeper form (CODE-G-KEY) skipped the check and
+    // went straight to the card, which said "Connecting to game..." for ever. Every form is
+    // checked now - the round, its group and the scorekeeper key - and a problem is a sentence
+    // here on Home, with nothing saved as the last round.
+    function sha256(text) {
+        try {
+            if (!(W.crypto && W.crypto.subtle && W.TextEncoder)) return Promise.resolve(null);
+            return W.crypto.subtle.digest('SHA-256', new W.TextEncoder().encode(String(text))).then(function (b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }, function () { return null; });
+        } catch (e) { return Promise.resolve(null); }
+    }
+    function groupCount(d) {
+        var n = ((d && d.players) || []).length;
+        try { if (typeof W.computeGroupBoundaries === 'function') return W.computeGroupBoundaries(n, d.groupSizeOverrides || {}).length; } catch (e) {}   /* grouping.js */
+        return Math.max(1, Math.ceil(n / 4));
+    }
+    // null when the round can be opened this way, or what is wrong with it (a promise).
+    function joinProblem(j, d) {
+        if (!d || !d.players || !d.players.length) return Promise.resolve('No round with the code ' + j.code + '. Check it with whoever set it up.');
+        if (j.group) {
+            var g = Number(j.group), n = groupCount(d);
+            if (!(g >= 1 && g <= n)) return Promise.resolve('Round ' + j.code + ' has no Group ' + j.group + (n > 1 ? ' (it has Groups 1\u2013' + n + ').' : ' (it is one group). Join with just ' + j.code + '.'));
+            var want = d.scoreKeys && d.scoreKeys[String(g)];
+            if (j.sk && want) return sha256(j.sk).then(function (h) { return h == null || h === want ? null : 'That scorekeeper key isn\u2019t right for Group ' + g + ' of ' + j.code + '. Ask whoever set it up for the Group ' + g + ' link.'; });
+        }
+        return Promise.resolve(null);
+    }
     function join() {
         var i = $('hp-code'), msg = $('hp-code-msg');
         var j = joinTarget(i && i.value);
-        if (!j) { if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'Type the game code (letters and numbers), or paste the round link.'; } return; }
-        if (j.direct || !H.db) { W.location.href = j.href; return; }
-        if (msg) { msg.className = 'hp-status'; msg.textContent = 'Checking ' + j.code + '\u2026'; }
-        // TIME-BOUND (audit): offline, once() never answers - after 6 s the round opens anyway
-        // (its own page says what it can).
-        timeout(H.db.ref('events/' + j.code + '/players').once('value'), 6000, 'join').then(function (s) {
-            if (s && s.exists && s.exists()) W.location.href = j.href;
-            else if (msg) { msg.className = 'hp-status hp-err'; msg.textContent = 'No round with the code ' + j.code + '. Check it with whoever set it up.'; }
-        }, function () { W.location.href = j.href; });
+        var say = function (t, err) { if (msg) { msg.className = err ? 'hp-status hp-err' : 'hp-status'; msg.textContent = t; } };
+        if (!j) { say('Type the game code (letters and numbers), or paste the round link.', true); return; }
+        if (!H.db) { W.location.href = j.href; return; }
+        say('Checking ' + j.code + '\u2026');
+        timeout(H.db.ref('events/' + j.code).once('value'), LOAD_MS, 'join').then(function (s) {
+            var d = s && typeof s.val === 'function' ? s.val() : null;
+            return joinProblem(j, d).then(function (why) {
+                if (why) { forgetRound(j.code, false); say(why, true); return; }
+                W.location.href = j.href;
+            });
+        }, function () {
+            // No answer (no signal): a round this phone already has a copy of still opens (the
+            // offline round is a feature); one it has never seen cannot - it would never load.
+            if (ls('golfapp_snap_v1_' + j.code)) { W.location.href = j.href; return; }
+            say('Couldn\u2019t reach round ' + j.code + ' \u2014 check your signal and try again.', true);
+        });
     }
     // THE GPS ROUND IN PROGRESS (Manny, 2026-10-13: GPS from Games went to "Where are you playing?").
     // The last round, from the last 12 hours and not finished (mainDecor checks the scores), opens
@@ -957,8 +991,22 @@
         // scorekeeper stays that group's, when Resume / the GPS door / a return from the background
         // opens the round again.
         var pr = params();
-        ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
-            spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
+        // REMEMBERED ONLY ONCE IT LOADS (URGENT-002): a round that never arrived (no such code,
+        // gone, unreadable) is never the one Resume / the GPS door / a relaunch goes back to.
+        // Not here within LOAD_MS: "Round X isn't available" + Go Home, never "Connecting..." for ever.
+        var remember = function () {
+            ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
+                spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
+        };
+        var loaded = function () { var d = cd(); return !!(d && d.players && d.players.length); };
+        if (loaded()) remember();
+        else {
+            var t0 = Date.now(), iv = setInterval(function () {
+                if (loaded()) { clearInterval(iv); remember(); hideMissing(code); return; }
+                if (Date.now() - t0 >= LOAD_MS && !(STUCK.code === String(code).toUpperCase() && STUCK.why === 'missing')) stuckRound(code, 'missing');
+                if (Date.now() - t0 > 10 * 60 * 1000) clearInterval(iv);
+            }, 250);
+        }
         backFromBackground(function () { W.location.href = 'home.html'; });
         // Games-3: the green GPS button lives IN the hole's heading (placeGpsPill, on
         // every render) - never floating over the game cards or the keypad (Manny,
@@ -1402,6 +1450,16 @@
         code = String(code || '').toUpperCase();
         if (!code || (STUCK.code === code && (STUCK.why === why || STUCK.why === 'gone'))) return;
         STUCK.code = code; STUCK.why = why;
+        if (why === 'missing') {
+            // Never the round the doors go back to - but nothing queued is dropped: a slow first
+            // load that arrives after all keeps every score typed meanwhile.
+            forgetRound(code, false);
+            var sd0 = String(ls('hardpan_round_side') || '');
+            if (sd0 === 'gps|' + code || sd0 === 'bets|' + code) ls('hardpan_round_side', null);
+            if (String(ls('lastRoomCode') || '').toUpperCase() === code) ls('lastRoomCode', null);
+            missingSheet(code);
+            return;
+        }
         if (why === 'gone') forgetRound(code, true); else forgetRound(code, false);
         var d = W.document, el = $('hp-stuck-round');
         if (!el) {
@@ -1423,6 +1481,32 @@
         el.querySelector('[data-hp-exit]').onclick = function () { exitRound(code, gone); };
         var v = el.querySelector('[data-hp-view]');
         if (v) v.onclick = function () { W.__hpReadOnly = true; spectatorMode(true, false); el.style.display = 'none'; try { if (typeof renderScorecard === 'function') renderScorecard(); } catch (e) {} };   /* global renderScorecard */
+    }
+    // 'missing' (URGENT-002): the round never arrived - no such code, gone, or unreadable from here.
+    function missingSheet(code) {
+        var d = W.document, el = $('hp-stuck-round');
+        if (!el) {
+            el = d.createElement('div'); el.id = 'hp-stuck-round'; el.setAttribute('role', 'alertdialog');
+            el.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;color-scheme:light;';
+            (d.body || d.documentElement).appendChild(el);
+        }
+        var btn = 'display:block;width:100%;min-height:52px;border-radius:14px;font-weight:800;font-size:1.05rem;margin-top:10px;';
+        var off = typeof navigator !== 'undefined' && navigator.onLine === false;
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div style="font-weight:800;font-size:1.15rem;color:#9b1c1c;">\u26A0\uFE0F Round ' + esc(code) + ' isn\u2019t available</div>'
+            + '<div style="font-size:.95rem;margin-top:8px;line-height:1.4;">' + (off ? 'This phone has no signal and has never opened this round, so there is nothing to show yet.' : 'There is no round with that code, or it could not be read. Check the code with whoever set it up.') + '</div>'
+            + '<button type="button" data-hp-home style="' + btn + 'border:0;background:#0f4c3a;color:#fff;">Go Home</button>'
+            + '<button type="button" data-hp-retry style="' + btn + 'border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;">Try again</button>'
+            + '</div>';
+        el.style.display = 'flex';
+        el.querySelector('[data-hp-home]').onclick = function () { var to = on() ? 'home.html' : 'admin.html'; try { W.location.replace(to); } catch (e) { W.location.href = to; } };
+        el.querySelector('[data-hp-retry]').onclick = function () { try { W.location.reload(); } catch (e) {} };
+    }
+    // The round arrived after all (a slow first load): the sheet goes, and it is remembered.
+    function hideMissing(code) {
+        if (!(STUCK.code === String(code).toUpperCase() && STUCK.why === 'missing')) return;
+        STUCK.code = null; STUCK.why = null;
+        var el = $('hp-stuck-round'); if (el) el.style.display = 'none';
     }
     // Exit: the round is forgotten here (and its unsendable changes), then the course picker.
     function exitRound(code, gone) {
@@ -1602,7 +1686,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
