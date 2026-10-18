@@ -165,7 +165,8 @@ test('009 the dragged target bends the flight: tee -> target -> green', () => {
 test('009 gps-view flies holePath with the dragged target only once the golfer moved it, through flyoverPlan / flyoverCamera', () => {
     const v = read('gps-view.js');
     const fly = v.slice(v.indexOf('function flyPath('), v.indexOf('function endFlyover('));
-    assert.ok(/G\.holePath\(\{ tee: r\.tee, mid: r\.mid, line: rec\.line, fairway: rec\.fairway, hazards: rec\.hazards, target: dragged \|\| null \}\)/.test(fly));
+    // 010 (switch osmPath): a GolfAPI hole with no line of its own borrows the bundled OSM line (gps_osm_path_test.js).
+    assert.ok(/G\.holePath\(\{ tee: r\.tee, mid: r\.mid, line: osmPathFor\(S\.hole\) \|\| rec\.line, fairway: rec\.fairway, hazards: rec\.hazards, target: dragged \|\| null \}\)/.test(fly));
     assert.ok(/flyPath\(r, S\.targetMoved \? S\.target : null\)/.test(fly), 'the default target is not a bend');
     assert.ok(/G\.flyoverPlan\(/.test(fly) && /G\.flyoverCamera\(plan, t\)/.test(fly));
     assert.ok(/pins: \[nums\.front, r\.mid, nums\.back\]/.test(fly), 'ends on the F / C / B pins');

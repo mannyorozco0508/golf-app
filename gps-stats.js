@@ -358,7 +358,7 @@
                 + '#hp-my-stats .ms-back{min-width:44px;min-height:44px;border:0;background:#fff;border-radius:12px;font-size:1.5rem;color:#0f4c3a;cursor:pointer;}'
                 + '#hp-my-stats .ms-body{max-width:520px;margin:0 auto;}#hp-my-stats .ms-seg{display:flex;gap:6px;margin:14px 0 6px;background:#e2f1ea;border-radius:999px;padding:4px;}'
                 + '#hp-my-stats .ms-seg button{flex:1;min-height:40px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}#hp-my-stats .ms-seg button.on{background:#0f4c3a;color:#fff;}'
-                + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
+                + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-saved{font-size:12px;color:#6b7280;margin:4px 2px 0;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
                 + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}';
             page.appendChild(st);
             var top = el('div', 'ms-top');
@@ -375,6 +375,8 @@
         if (!page) return;
         var body = page.querySelector('.ms-body'), n = lastN(), a = aggregate(myRounds(), n);
         body.textContent = '';
+        // 010: where these numbers live, in one small line.
+        body.appendChild(el('div', 'ms-saved', 'Saved on this phone'));
         var seg = el('div', 'ms-seg');
         [5, 20].forEach(function (k) {
             var b = el('button', k === n ? 'on' : '', 'Last ' + k); b.type = 'button'; b.setAttribute('data-ms-last', String(k));
