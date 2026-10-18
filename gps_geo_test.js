@@ -734,3 +734,82 @@ test('a GolfAPI green whose centre is off the front-back midpoint: F < C < B fro
     const c0 = G.midpoint(f, b);
     assert.deepEqual(G.ellipseRing(f, b, c0), G.ellipseRing(f, b, null));
 });
+
+// ---- 009 PART B: THE PLAYS-LIKE LINE, THE WIND RULE PINNED, CROSSWIND = AIM OFF ----------
+test('the wind rule, PINNED: the same wind into the face vs straight behind - the downwind change is exactly half the into-wind change', () => {
+    for (const [yards, mph] of [[150, 10], [168, 12], [100, 5], [210, 20], [137, 7]]) {
+        const into = geo.playsLike({ yards, windMph: mph, windFromDeg: 90, shotBearingDeg: 90 });     // from where the shot goes: in the face
+        const down = geo.playsLike({ yards, windMph: mph, windFromDeg: 270, shotBearingDeg: 90 });    // from behind
+        close(into.terms.wind, yards * 0.01 * mph, 1e-9, 'headwind: 1% per mph');
+        close(down.terms.wind, -yards * 0.005 * mph, 1e-9, 'tailwind: 0.5% per mph');
+        close(Math.abs(down.terms.wind), Math.abs(into.terms.wind) / 2, 1e-9, 'downwind is half of into-wind at ' + yards + ' yds, ' + mph + ' mph');
+        assert.ok(into.exact > yards && down.exact < yards);
+    }
+    // A crosswind changes no distance (its aim-off is windAim's).
+    close(geo.playsLike({ yards: 150, windMph: 12, windFromDeg: 0, shotBearingDeg: 90 }).terms.wind, 0, 1e-9);
+});
+test('playsParts: one line, the terms rounded, signed and named; no data or 0 left out; meters', () => {
+    const pl = geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 118, windMph: 6, windFromDeg: 90, shotBearingDeg: 90, tempF: 80 });
+    assert.deepStrictEqual(geo.playsParts(pl, 6), ['+6 uphill', '+9 into wind (6 mph)', '-1 warm'], '-1.5 rounds to -1');
+    const dn = geo.playsLike({ yards: 150, elevFromFt: 118, elevToFt: 100, windMph: 6, windFromDeg: 270, shotBearingDeg: 90, tempF: 50 });
+    assert.deepStrictEqual(geo.playsParts(dn, 6), ['-6 downhill', '-4 downwind (6 mph)', '+3 cold'], '-4.5 rounds to -4');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, tempF: 50 }), null), ['+3 cold'], 'only the terms with data');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, tempF: 70, elevFromFt: 10, elevToFt: 10 }), null), [], 'a term worth 0 says nothing');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, windMph: 6, windFromDeg: 90, shotBearingDeg: 90 })), ['+9 into wind'], 'no speed given: none shown');
+    assert.deepStrictEqual(geo.playsParts(pl, 6, 'm'), ['+5 uphill', '+8 into wind (6 mph)', '-1 warm'], 'meters');
+    assert.deepStrictEqual(geo.playsParts(null), []);
+});
+test('windAim: crosswind = aim off INTO the wind, ~0.5% of the distance per mph across; nothing under 2 yds', () => {
+    assert.strictEqual(geo.AIM_PER_MPH, 0.005);
+    assert.deepStrictEqual(geo.windAim(150, 10), { yd: 8, side: 'left' }, 'blowing left to right: the ball goes right - aim left');
+    assert.deepStrictEqual(geo.windAim(150, -10), { yd: 8, side: 'right' });
+    assert.deepStrictEqual(geo.windAim(160, 5), { yd: 4, side: 'left' });
+    assert.strictEqual(geo.windAim(150, 1), null, '0.75 yd -> 1: under 2, nothing to say');
+    assert.deepStrictEqual(geo.windAim(150, 2), { yd: 2, side: 'left' }, '1.5 yd rounds to 2: said');
+    assert.strictEqual(geo.windAim(150, 0), null);
+    assert.strictEqual(geo.windAim(null, 10), null);
+    // From windRelative: wind FROM the north (0), shot to the east (90) - from the golfer's left,
+    // blowing left to right across the shot: aim left.
+    const rel = geo.windRelative(0, 90, 12);
+    assert.ok(rel.cross > 0);
+    assert.deepStrictEqual(geo.windAim(150, rel.cross), { yd: 9, side: 'left' });
+});
+
+// ---- 009 PART B: THE WHOLE COURSE'S HEIGHTS - which points, and the golfer's height on the phone ----
+test('courseElevPoints: per hole the tee, every 25 yds along the hole\'s own line (doglegs followed), green front / center / back, each hazard - course points only, each once', () => {
+    const tee = [33.6, -79.0], bend = north(east(tee, 0), 200), mid = east(bend, 150);
+    const green = [north(east(mid, -12), -10), north(east(mid, 12), -10), north(east(mid, 12), 10), north(east(mid, -12), 10)];
+    const hz = [{ type: 'bunker', side: 'R', pt: east(north(tee, 150), 20) }];
+    const pts = geo.holeElevPoints({ osm: { tee, mid, line: [tee, bend, mid], green, hazards: hz } });
+    const r5 = (p) => [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5];
+    assert.deepStrictEqual(pts[0], r5(tee), 'the tee first');
+    // Along the dogleg: 350 m = 382.7 yds -> 0, 25, ..., 375 = 16 points, then the green.
+    const along = pts.filter((p) => geo.alongLine(p, [tee, bend, mid]).d < 1);
+    assert.ok(along.length >= 17, 'on the bent line: ' + along.length);
+    for (let i = 1; i < 16; i++) if (i !== 9) close(geo.haversineMeters(pts[i - 1], pts[i]) / 0.9144, 25, 1.5, 'every 25 yds along (each point to 5 decimals = +-1.1 m; #9 is the chord round the bend) #' + i);
+    assert.ok(pts.some((p) => geo.haversineMeters(p, mid) < 0.5), 'the green\'s center');
+    const onEdge = pts.filter((p) => Math.abs(geo.haversineMeters(p, mid) - 12) < 1.5);
+    assert.equal(onEdge.length, 2, 'front and back, along the line into the green');
+    assert.ok(pts.some((p) => geo.haversineMeters(p, hz[0].pt) < 0.5), 'the hazard');
+    assert.equal(new Set(pts.map(String)).size, pts.length, 'each once');
+    // No line: the straight tee -> green line. No tee: the green alone.
+    const straight = geo.holeElevPoints({ tee, mid: north(tee, 200) });
+    assert.equal(straight.length, 10, '0..200 m every 22.86 m = 9, + the green');
+    assert.deepStrictEqual(geo.holeElevPoints({ mid }).map(String), [r5(mid)].map(String));
+    assert.deepStrictEqual(geo.holeElevPoints(null), []);
+    const all = geo.courseElevPoints({ holes: { 1: { osm: { tee, mid } }, 2: { osm: {} } } });
+    assert.deepStrictEqual(Object.keys(all), ['1']);
+});
+test('elevFromSamples: the golfer\'s / target\'s height from the nearest samples, ON THE PHONE (1/d^2 of the nearest 3); a sample within 2 m is itself; nothing within 150 m: null', () => {
+    const a = [33.6, -79.0], b = north(a, 22.86), c = north(a, 45.72), far = north(a, 2000);
+    const S = [[a[0], a[1], 100], [b[0], b[1], 106], [c[0], c[1], 112], [far[0], far[1], 999], [east(a, 5)[0], east(a, 5)[1], null]];
+    assert.strictEqual(geo.elevFromSamples(S, east(a, 1)), 100, 'within 2 m: that sample');
+    const half = geo.elevFromSamples(S, north(a, 11.43));
+    close(half, 103, 1.2, 'halfway between 100 and 106 (the third pulls a little)');
+    const off = geo.elevFromSamples(S, east(north(a, 22.86), 15));
+    assert.ok(off > 103 && off < 109, '15 m off the line beside the 106: ' + off);
+    assert.strictEqual(geo.elevFromSamples(S, north(a, 900)), null, 'nothing within 150 m: no guess');
+    assert.strictEqual(geo.elevFromSamples([[a[0], a[1], null]], a), null, 'a "none" is not a height of 0');
+    assert.strictEqual(geo.elevFromSamples([], a), null);
+    assert.strictEqual(geo.ELEV_STEP_YD, 25); assert.strictEqual(geo.ELEV_REACH_M, 150);
+});

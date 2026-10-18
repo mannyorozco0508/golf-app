@@ -1043,6 +1043,103 @@
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
 
+    // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) -------------------------
+    // ONE LINE the golfer can check: "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm".
+    // Each part is playsLike's own term, rounded to the yard; a term with no data is not
+    // in pl.terms and so is left out; a term that rounds to 0 says nothing and is left out.
+    // pl: playsLike's result; windMph: the reading's speed (shown as the golfer sees it on
+    // the wind box); unit: 'm' for meters (else yards). Pure.
+    function playsParts(pl, windMph, unit) {
+        var out = [], t = (pl && pl.terms) || {}, k = unit === 'm' ? M_PER_YD : 1;
+        var sg = function (x) { return (x > 0 ? '+' : '-') + Math.abs(x); };
+        var r = function (x) { return Math.round(x * k); };
+        if (isNum(t.elev) && r(t.elev)) out.push(sg(r(t.elev)) + (t.elev > 0 ? ' uphill' : ' downhill'));
+        if (isNum(t.wind) && r(t.wind)) out.push(sg(r(t.wind)) + (t.wind > 0 ? ' into wind' : ' downwind') + (isNum(windMph) ? ' (' + Math.round(windMph) + ' mph)' : ''));
+        if (isNum(t.temp) && r(t.temp)) out.push(sg(r(t.temp)) + (t.temp > 0 ? ' cold' : ' warm'));
+        return out;
+    }
+    // CROSSWIND = AIM OFF, NO DISTANCE CHANGE. The rule (a common rule of thumb, kept
+    // simple on purpose): the ball drifts about 0.5% of the shot's distance per mph of
+    // crosswind - 150 yds in a 10 mph crosswind drifts ~8 yds. Aim that far INTO the
+    // wind. cross: windRelative's (+ = blowing LEFT TO RIGHT, so the ball goes right:
+    // aim left). Under 2 yds (inside what GPS can tell): nothing to say (null). Pure.
+    var AIM_PER_MPH = 0.005;
+    function windAim(yards, crossMph) {
+        if (!isNum(yards) || !isNum(crossMph) || yards <= 0) return null;
+        var yd = Math.round(yards * AIM_PER_MPH * Math.abs(crossMph));
+        if (yd < 2) return null;
+        return { yd: yd, side: crossMph > 0 ? 'left' : 'right' };
+    }
+    // ---- THE WHOLE COURSE'S HEIGHTS (009, switch courseElev) --------------------------
+    // The points sampled once per course (USGS EPQS, COURSE POINTS ONLY - never the
+    // golfer): per hole the tee; every ELEV_STEP_YD along the hole's own line (its
+    // centerline, doglegs followed; the straight tee -> green line when there is none);
+    // the green's front, center and back (along the line of play into it); and each
+    // hazard point. To 5 decimals, each once. rec: a course GPS record ({ holes:
+    // { n: { osm } } }). Returns { "1": [[lat, lng], ...], ... }. Pure.
+    var ELEV_STEP_YD = 25;
+    function r5pt(p) { return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]; }
+    function walkLine(line, stepM) {
+        var out = [line[0]];
+        var carry = 0;
+        for (var i = 1; i < line.length; i++) {
+            var a = line[i - 1], b = line[i], len = haversineMeters(a, b);
+            var s = stepM - carry;
+            while (s <= len) { var t = s / len; out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); s += stepM; }
+            carry = len - (s - stepM);
+        }
+        return out;
+    }
+    function holeElevPoints(o) {
+        o = o && (o.osm || o);
+        var mid = o && pinPt(o.mid), tee = o && pinPt(o.tee);
+        if (!mid) return [];
+        var pts = [], seen = {};
+        var add = function (p) { p = pinPt(p); if (!p) return; p = r5pt(p); var k = p[0] + ',' + p[1]; if (!seen[k]) { seen[k] = 1; pts.push(p); } };
+        var line = (o.line && o.line.length >= 2) ? o.line.map(pinPt).filter(Boolean) : (tee ? [tee, mid] : null);
+        if (line && line.length >= 2) {
+            if (tee && haversineMeters(tee, line[0]) > 5) line = [tee].concat(line);
+            if (haversineMeters(line[line.length - 1], mid) > 5) line = line.concat([mid]);
+            if (tee) add(tee);
+            walkLine(line, ELEV_STEP_YD * M_PER_YD).forEach(add);
+        } else if (tee) add(tee);
+        add(mid);
+        if (o.green && o.green.length >= 3) {
+            var from = line && line.length >= 2 ? line[line.length - 2] : tee;
+            var g = from ? greenNumbers(from, o.green, mid) : null;
+            if (g) { add(g.front); add(g.back); }
+        }
+        (o.hazards || []).forEach(function (z) { if (z) add(z.pt); });
+        return pts;
+    }
+    function courseElevPoints(rec) {
+        var out = {};
+        Object.keys((rec && rec.holes) || {}).forEach(function (n) { var p = holeElevPoints(rec.holes[n]); if (p.length) out[n] = p; });
+        return out;
+    }
+    // A POINT'S HEIGHT FROM THE HOLE'S SAMPLES, worked out ON THE PHONE (the golfer's
+    // spot, a tapped target, the green): a sample within 2 m is that sample; else the
+    // inverse-distance-weighted mean (weight 1/d^2) of the nearest 3 sampled points with
+    // a height, within ELEV_REACH_M. Nothing that close: null (no guess, no slope term).
+    // samples: [[lat, lng, ft | null], ...]. Pure.
+    var ELEV_REACH_M = 150;
+    function elevFromSamples(samples, pt) {
+        if (!samples || !samples.length || !pt) return null;
+        var near = [];
+        samples.forEach(function (s) {
+            if (!s || !isNum(s[2])) return;
+            near.push({ d: haversineMeters(pt, s), ft: s[2] });
+        });
+        near.sort(function (a, b) { return a.d - b.d; });
+        if (!near.length || near[0].d > ELEV_REACH_M) return null;
+        if (near[0].d < 2) return near[0].ft;
+        var sw = 0, sv = 0;
+        near.slice(0, 3).filter(function (n) { return n.d <= ELEV_REACH_M; }).forEach(function (n) { var w = 1 / (n.d * n.d); sw += w; sv += w * n.ft; });
+        return sv / sw;
+    }
+    var PLAYS_API = { playsParts: playsParts, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
+        elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M };
+
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
     // Shared by the app (gps-view.js lookupCourse) and tools/gps-coverage.js, so
     // the phone and the coverage report pick the same course and keep the same holes.
@@ -1516,6 +1613,7 @@
         greenNumbers: greenNumbers, compactRing: compactRing, osmToCourseGps: osmToCourseGps, outerRings: outerRings,
         resolveHole: resolveHole, holeNumbers: holeNumbers, makePin: makePin, undoPin: undoPin, pinPt: pinPt
     };
+    Object.keys(PLAYS_API).forEach(function (k) { api[k] = PLAYS_API[k]; });   // 009: plays-like parts, aim-off, course heights
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window !== 'undefined') window.HardPanGeo = api;
 })();

@@ -11,6 +11,9 @@
 //     green's center (USGS EPQS - free, no key, US only), the very points and the
 //     very phone keys gps-view.js reads, so nothing is asked for on the tee.
 // prefetchElevations() does the heights alone when a course is picked in setup.
+// 009 (switch courseElev, default on): the heights are the WHOLE course's samples - tee,
+// every 25 yds along the hole, green front / center / back, hazards - in one compact
+// record per course (see "THE WHOLE COURSE'S HEIGHTS" below); off: the 5 points above.
 // Course points only - never the golfer's position. Delete removes the tiles and
 // heights only this pack uses, and the pack; the course's GPS data stays (small,
 // and it is what GPS reads online too).
@@ -27,6 +30,9 @@
     var EPQS_URL = 'https://epqs.nationalmap.gov/v1/json?x={lng}&y={lat}&wkid=4326&units=Feet&includeDate=false';
     var ELEV_PREFIX = 'hardpan_elev_v1_';
     var ELEV_T = [0, 0.25, 0.5, 0.75, 1];
+    // THE WHOLE COURSE'S HEIGHTS (009, switch courseElev): one compact record per course.
+    // Shared with gps-view.js - gps_offline_test.js holds them equal.
+    var CELEV_PREFIX = 'hardpan_celev_v1_';
 
     function G() { return W.HardPanGeo; }
     function cfg() { try { return W.HARDPAN_GPS_CONFIG || {}; } catch (e) { return {}; } }
@@ -124,6 +130,92 @@
         });
     }
 
+    // ---- THE WHOLE COURSE'S HEIGHTS (009, switch courseElev; off = the 5 points above) --
+    // When a course is first opened with signal (or picked in setup, or downloaded), its
+    // heights are sampled ONCE: per hole the tee, every 25 yds along the hole's own line,
+    // the green's front / center / back and each hazard point (gps-geo.courseElevPoints -
+    // COURSE POINTS ONLY, never the golfer: their height is worked out on the phone from
+    // the nearest samples, gps-geo.elevFromSamples). USGS EPQS, so US courses only.
+    // OUTSIDE THE US: NO HEIGHTS. Open-Meteo's free elevation API is for non-commercial
+    // use only and HardPan is a paid app, so it is NOT used. elevFallbackUrl is a hook left
+    // UNSET (not in gps-config.js): a URL template ({lat} {lng}) answering EPQS's own shape
+    // ({ value: feet }) from a source HardPan may use commercially - none today.
+    // Asked one at a time, a short gap between (elevGapMs, default 120 ms), the hole on
+    // screen first; kept on the phone in ONE compact record per course
+    //   hardpan_celev_v1_<course> = { v: 1, o: [lat, lng], at, done,
+    //     h: { "<hole>": [dLat, dLng, ft, dLat, dLng, ft, ...] } }
+    // (d = 1e-5 degree steps from o; ft whole feet, null = the service has no height there,
+    // never asked again) - a few KB for 18 holes, read with no signal, never fetched twice.
+    var GAP_MS = 120, SAVE_EVERY = 6, GIVE_UP_AFTER = 4;
+    function courseElevOn() { var f = cfg().features || {}; return f.courseElev !== false; }
+    function celevRead(key) { var r = lsGet(CELEV_PREFIX + key); return r && r.v === 1 && r.h && r.o ? r : null; }
+    function celevUrl(p) {
+        if (inUS(p)) return epqsUrl(p);
+        var fb = cfg().elevFallbackUrl;   // unset: no heights outside the US (see above)
+        return fb ? String(fb).replace('{lng}', String(p[1])).replace('{lat}', String(p[0])) : null;
+    }
+    function dKey(rec, p) { return Math.round((p[0] - rec.o[0]) * 1e5) + ',' + Math.round((p[1] - rec.o[1]) * 1e5); }
+    // { hole: [[lat, lng, ft | null], ...] } from the compact record. gps-view.js decodes the same way.
+    function celevSamples(key) {
+        var rec = celevRead(key), out = {};
+        if (!rec) return out;
+        Object.keys(rec.h).forEach(function (n) {
+            var a = rec.h[n] || [], list = [];
+            for (var i = 0; i + 2 < a.length; i += 3) list.push([Math.round((rec.o[0] + a[i] / 1e5) * 1e5) / 1e5, Math.round((rec.o[1] + a[i + 1] / 1e5) * 1e5) / 1e5, a[i + 2]]);
+            out[n] = list;
+        });
+        return out;
+    }
+    var busy = {};
+    function sampleCourse(key, gpsRec, opts) {
+        opts = opts || {};
+        if (busy[key]) return busy[key];
+        var g = G(), plan = g && g.courseElevPoints ? g.courseElevPoints(gpsRec) : {};
+        var holes = Object.keys(plan).sort(function (a, b) { return Number(a) - Number(b); });
+        if (opts.first != null && plan[String(opts.first)]) holes = [String(opts.first)].concat(holes.filter(function (n) { return n !== String(opts.first); }));
+        var first = holes.length ? plan[holes[0]][0] : null;
+        var rec = celevRead(key) || (first ? { v: 1, o: r5(first), h: {} } : null);
+        var res = { points: 0, had: 0, fetched: 0, failed: 0, none: 0 };
+        if (!rec) return Promise.resolve(res);
+        var have = {}, todo = [], byPt = {};
+        Object.keys(rec.h).forEach(function (n) { var a = rec.h[n]; for (var i = 0; i + 2 < a.length; i += 3) have[n + ':' + a[i] + ',' + a[i + 1]] = 1; });
+        holes.forEach(function (n) {
+            plan[n].forEach(function (p) {
+                res.points++;
+                var dk = dKey(rec, p);
+                if (have[n + ':' + dk]) { res.had++; return; }
+                // A point two holes share (a shared tee): asked once, kept for both.
+                if (byPt[dk]) { byPt[dk].ns.push(n); return; }
+                var u = celevUrl(p);
+                if (u) todo.push(byPt[dk] = { ns: [n], p: p, u: u });
+            });
+        });
+        var save = function () { rec.at = Date.now(); rec.done = res.had + res.fetched === res.points; lsSet(CELEV_PREFIX + key, rec); };
+        if (!todo.length || typeof fetch !== 'function' || offline()) { if (!todo.length && !rec.done && Object.keys(rec.h).length) save(); return Promise.resolve(res); }
+        var gap = isFinite(Number(cfg().elevGapMs)) ? Math.max(0, Number(cfg().elevGapMs)) : GAP_MS;
+        var i = 0, inRow = 0, since = 0;
+        var wait = function () { return new Promise(function (ok) { setTimeout(ok, gap); }); };
+        var one = function () {
+            if (i >= todo.length || inRow >= GIVE_UP_AFTER || offline()) return Promise.resolve();
+            var t = todo[i++];
+            return fetch(t.u, { mode: 'cors', credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error('epqs ' + r.status); return r.json(); })
+                .then(function (j) {
+                    var v = j && j.value != null ? Number(j.value) : NaN;
+                    // -1000000 (anything at or below -1000) is the service's "no data".
+                    var ft = isFinite(v) && v > -1000 ? Math.round(v) : null;
+                    if (ft == null) res.none++;
+                    var d = dKey(rec, t.p).split(',');
+                    t.ns.forEach(function (n) { (rec.h[n] = rec.h[n] || []).push(Number(d[0]), Number(d[1]), ft); res.fetched++; });
+                    inRow = 0;
+                    if (++since >= SAVE_EVERY) { since = 0; save(); if (opts.progress) opts.progress({ elev: res }); }
+                }, function () { res.failed += t.ns.length; inRow++; })
+                .then(wait).then(one);
+        };
+        busy[key] = one().then(function () { save(); delete busy[key]; if (opts.progress) opts.progress({ elev: res }); return res; },
+            function () { save(); delete busy[key]; return res; });
+        return busy[key];
+    }
+
     // ---- THE PACK ------------------------------------------------------------------
     function status(key) {
         var p = key ? lsGet(PACK + key) : null;
@@ -150,12 +242,15 @@
             if (!rec || !rec.holes || !Object.keys(rec.holes).length) return { ok: false, reason: 'nogps' };
             var holes = Object.keys(rec.holes).length;
             return fetchTiles(rec, opts.progress).then(function (t) {
-                var pts = elevPoints(rec);
-                return fetchElevations(pts, opts.progress).then(function (e) {
+                // 009: the whole course's samples (courseElev on), else the 5 points per hole.
+                var whole = courseElevOn();
+                var pts = whole ? [] : elevPoints(rec);
+                return (whole ? sampleCourse(key, rec, { progress: opts.progress }) : fetchElevations(pts, opts.progress)).then(function (e) {
                     var card = opts.card && opts.card.name && Array.isArray(opts.card.data) && opts.card.data.length ? opts.card : null;
                     var pack = { v: 1, key: key, name: opts.name || (card && card.name) || key, at: Date.now(), holes: holes,
                         tiles: t.urls || [], tilesOk: !!t.ok, tileWhy: t.ok ? '' : (t.reason || (t.failed + ' tiles failed')),
-                        elevPoints: pts.map(elevKey), elevOk: e.failed === 0, elevNone: pts.filter(function (p) { var v = lsGet(elevKey(p)); return v && v.none; }).length,
+                        elevPoints: pts.map(elevKey), elevOk: e.failed === 0, elevNone: whole ? e.none : pts.filter(function (p) { var v = lsGet(elevKey(p)); return v && v.none; }).length,
+                        elevCourse: whole,
                         card: card ? { name: card.name, data: card.data, tees: card.tees || null, location: card.location || null } : null,
                         gpsId: (rec.golfapiIds && rec.golfapiIds[0]) || null };
                     if (!lsSet(PACK + key, pack)) return { ok: false, reason: 'storage-full' };
@@ -166,6 +261,8 @@
         }).catch(function () { return { ok: false, reason: 'error' }; });
     }
     // DELETE: the pack, and the tiles / heights NO OTHER pack uses.
+    // (009: the whole course's height record - a few KB - stays, like the course's GPS data:
+    // it is what the GPS screen reads online too, and it is never fetched twice.)
     function remove(key) {
         var p = status(key);
         if (!p) return Promise.resolve(false);
@@ -185,16 +282,20 @@
     }
     // PLAYS-LIKE HEIGHTS AT SETUP (feature 2): when a course is picked with signal,
     // its heights are fetched once and kept - so nothing is asked for on the tee.
-    function prefetchElevations(key, name) {
+    // 009 (courseElev on): the whole course's samples, the hole on screen first (opts.first);
+    // opts.progress is told as they arrive. Off: the 5 points per hole, as before.
+    function prefetchElevations(key, name, opts) {
         if (!key || offline()) return Promise.resolve({ ok: false, reason: offline() ? 'offline' : 'no-course' });
         return ensureCourse(key).then(function () {
             var rec = record(key, name);
             if (!rec) return { ok: false, reason: 'nogps' };
+            if (courseElevOn()) return sampleCourse(key, rec, opts).then(function (e) { return { ok: e.failed === 0, elev: e, whole: true }; });
             return fetchElevations(elevPoints(rec)).then(function (e) { return { ok: e.failed === 0, elev: e }; });
         }).catch(function () { return { ok: false, reason: 'error' }; });
     }
     function card(key) { var p = status(key); return p && p.card ? p.card : null; }
 
     W.HardPanGpsOffline = { status: status, list: list, download: download, remove: remove, prefetchElevations: prefetchElevations,
-        card: card, elevPoints: elevPoints, _const: { USGS_CACHE: USGS_CACHE, USGS_URL: USGS_URL, PRECACHE_MARK: PRECACHE_MARK, EPQS_URL: EPQS_URL, ELEV_PREFIX: ELEV_PREFIX, ELEV_T: ELEV_T } };
+        card: card, elevPoints: elevPoints, celevSamples: celevSamples, courseElevOn: courseElevOn,
+        _const: { USGS_CACHE: USGS_CACHE, USGS_URL: USGS_URL, PRECACHE_MARK: PRECACHE_MARK, EPQS_URL: EPQS_URL, ELEV_PREFIX: ELEV_PREFIX, ELEV_T: ELEV_T, CELEV_PREFIX: CELEV_PREFIX } };
 })();
