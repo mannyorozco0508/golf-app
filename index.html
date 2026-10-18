@@ -3911,6 +3911,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             + (lines.length ? '<ul class="tg-list">' + lines.join('') + '</ul>' : '')
             + pot
             + '</div>';
+        /* GPS:BEGIN */
+        // 012 (HardPan app): "+ Add game" at the top of Today's Games - the GPS screen's Games
+        // pill lands here, and the app's one Add a game sheet (front-door.js) runs from it.
+        try { if (window.HardPanDoors && typeof window.HardPanDoors.todaysGamesAdd === 'function') window.HardPanDoors.todaysGamesAdd(mount); } catch (e) {}
+        /* GPS:END */
     }
 
     function renderHoleLive() {

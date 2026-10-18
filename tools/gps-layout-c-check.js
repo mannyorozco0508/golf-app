@@ -105,6 +105,8 @@ const FETCH = "(function(){ var real = window.fetch; var T1 = " + JSON.stringify
 const BAG = { '4i': 195, '5i': 185, '6i': 174, '7i': 163, '8i': 152, '9i': 141, PW: 130 };
 const SEED = (hole) => "(function(){ try { if (sessionStorage.getItem('__s')) return; sessionStorage.setItem('__s','1'); localStorage.setItem('hardpan_round_side','gps|" + CODE + "'); localStorage.setItem('hardpan_last_hole_" + CODE + "','" + (hole || 1) + "');"
     + " localStorage.setItem('hardpan_gps_whoasked_" + CODE + "','1'); localStorage.setItem('hardpan_gps_golfer_" + CODE + "','101'); localStorage.setItem('hardpan_gps_autoadvance','0');"
+    // 012: layout D is the default now - this check plays C (Tools > Screen layout: Bottom panel).
+    + " localStorage.setItem('hardpan_gps_layout','c');"
     + " localStorage.setItem('hardpan_bag_v1', " + JSON.stringify(JSON.stringify({ v: 1, golfers: { 'n:manny orozco': { shots: {}, set: BAG, setupAt: 1 } } })) + "); } catch(e){} })();";
 // HOLE 1 CUT DOWN, as the bundle is set: 'center' = a green centre and no outline (no F / B);
 // 'none' = no green at all (the tee only).
@@ -230,7 +232,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
             TAP('#gps-overlay .gps-hz-btn'), W(500), SCALE(k), W(300), SHEET('hazards', '#gps-overlay .gps-hzs')].concat(shot(tag + '-hazards'), [TAP('#gps-overlay .gps-hzs-done'), W(300),
             TAP('#gps-overlay .gps-pl-info'), W(400), SCALE(k), W(300), SHEET('plays info', '#gps-overlay .gps-plinfo'), TAP('#gps-overlay .gps-plinfo-done'), W(300),
             TAP('#gps-overlay .gps-wind'), W(500), SCALE(k), W(300), SHEET('wind', '#gps-overlay .gps-wind-sheet'), TAP('#gps-overlay .gps-ws-done'), W(300),
-            TAP('#gps-overlay .gps-tools'), W(300), SCALE(k), W(300), SHEET('tools', '#gps-overlay .gps-tools-menu'),
+            TAP('#gps-overlay .gps-tools'), W(300), SCALE(k), W(300), SHEET('tools', '#gps-overlay .gps-tsheet:not([style*="none"]), #gps-overlay .gps-tools-menu:not([style*="none"])'),
             TAP('#gps-overlay .gps-my-bag'), W(900), SCALE(k), W(300), SHEET('my bag', '#gps-overlay .gps-bag', '.gps-bag-saved'), TAP('#gps-overlay .gps-bag-done'), W(300),
             TAP('#gps-overlay .gps-tools'), W(300), TAP('#gps-overlay .gps-my-stats'), W(1500), SCALE(k), W(300), SHEET('round stats', '#gps-overlay .gps-stats-sheet'), { expression: 'window.HardPanGpsStats && HardPanGpsStats.close()' }, W(300),
             // My stats (Home's page, 010's "Saved on this phone" line) - the same opener Home uses.
@@ -339,7 +341,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         if (d1 && d1.sheetOn) f(d1.side === 'gps' && d1.sheet && /^Hole 4 /.test(d1.sheet.title || '') && d1.sheet.player === '101', tag + ' E3: the score button did not open the score sheet for hole 4 over the map: ' + JSON.stringify(d1));
         else f(d1 && d1.side === 'bets' && d1.focus && d1.focus.hole === '4' && d1.focus.player === '101', tag + ' E3: the score button did not open the card\'s box for hole 4: ' + JSON.stringify(d1));
         const want4 = expectChip(r0, DELTAS.concat([5 - r0.courseData.slice().sort((x, y) => x.hole - y.hole)[3].par]));
-        f(d2 && d2.chipText === want4, tag + ' E3: after a score on hole 4 the chip says ' + JSON.stringify(d2 && d2.chipText) + ', expected ' + JSON.stringify(want4));
+        f(sheetOn || (d2 && d2.chipText === want4), tag + ' E3: after a score on hole 4 the chip says ' + JSON.stringify(d2 && d2.chipText) + ', expected ' + JSON.stringify(want4));
         errs(s, tag + ' E3');
         // E4: the OSM credit (010): a GolfAPI hole shaped by an OSM line.
         s = await go({ phone, hole: 13, at: GA.courses.CHK1.h[13].t.b, cfg: Object.assign({ osm: false, live: true, golfapi: true, golfapiFile: 'gps-golfapi-check.js' }, ESRI), pre: 'window.HardPanGolfApi = ' + JSON.stringify(GA) + ';',

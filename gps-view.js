@@ -1064,18 +1064,27 @@
         map.on('click', function (e) { onMapTap([e.lngLat.lat, e.lngLat.lng]); });
         S.map = map;
         S.styleReady = false;
-        map.on('load', function () {
-            if (!S || S.map !== map) return;
+        // READY WHEN THE STYLE IS: MapLibre's 'load' also waits for every tile of the first
+        // (world) view, and one slow or stuck tile (a weak signal on the course; a busy
+        // phone - 012: the layout-D check under load, gps-check's "tee at x -255") left the
+        // map at its world view with the hole never framed. The style being in is all the
+        // framing needs: 'style.load', 'load', or 4 s on, whichever comes first.
+        var ready = function () {
+            if (!S || S.map !== map || S.styleReady) return;
+            if (!map.getStyle || !(function () { try { return !!map.getSource('usgs'); } catch (e) { return false; } })()) return;
             S.styleReady = true;
             if (S.googleOn) addGoogleLayer();
             limitToCourse();
             frameHole(true);
             render();
-            // READY: loaded, framed on the hole and drawn. data-zoom alone is not
-            // this - tile data sets it before the load event (a check that waited
-            // for it read a map still at its world view, tee at x -255).
+            // READY: framed on the hole and drawn. data-zoom alone is not this - tile
+            // data sets it first (a check that waited for it read a map still at its
+            // world view, tee at x -255).
             el.setAttribute('data-ready', '1');
-        });
+        };
+        map.on('style.load', ready);
+        map.on('load', ready);
+        setTimeout(ready, 4000);
     }
 
     // WHAT THE MAP IS DOING, on the map element - so a check (and anybody with the
@@ -1214,11 +1223,52 @@
         if (!S) return;
         // LAYOUT C: the panel's measured height - the credit sits on it (so first), and Recenter, the
         // zoom and the banner on the credit (--gps-attrib-h: the bottom of the screen to its top).
-        var pn = lcOn() && S.el.querySelector('.gps-panel');
+        // LAYOUT D: the bottom controls' measured height - the credit, the plays pill and Recenter sit on it.
+        var pn = (lcOn() && S.el.querySelector('.gps-panel')) || (ldOn() && S.el.querySelector('.gps-ld-bottom'));
         if (pn && pn.offsetParent !== null) S.el.style.setProperty('--gps-panel-h', Math.round(S.el.getBoundingClientRect().bottom - pn.getBoundingClientRect().top) + 'px');
         S.el.style.setProperty('--gps-attrib-h', attribH() + 'px');
-        var t = S.el.querySelector(lcOn() ? '.gps-lc-top' : '.gps-top');
-        if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-top-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
+        var t = S.el.querySelector(lcOn() ? '.gps-lc-top' : (ldOn() ? '.gps-ld-top' : '.gps-top'));
+        var tB = (t && t.offsetParent !== null) ? t.getBoundingClientRect().bottom : null;
+        // LAYOUT D: under the Games / round chip row too.
+        var r2 = ldOn() && S.el.querySelector('.gps-ld-row2');
+        if (r2 && r2.offsetParent !== null && tB != null) tB = Math.max(tB, r2.getBoundingClientRect().bottom);
+        // 012: the top bar's own bottom - the Tools sheet never reaches over it.
+        if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-bar-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
+        if (tB != null) S.el.style.setProperty('--gps-top-b', Math.round(tB - S.el.getBoundingClientRect().top + 8) + 'px');
+        if (ldOn()) ldPlace();
+    }
+    // LAYOUT D, MEASURED: the pill and Recenter ride above the credit line (however tall the
+    // text makes it); the pill steps left of the rail when a short phone brings them together;
+    // "Hole 4 · Manny ▾" drops "Hole 4 ·" when the two do not fit on the button's line.
+    function ldPlace() {
+        var cr = S.el.querySelector('.gps-credit');
+        var ch = cr && cr.offsetParent !== null ? Math.ceil(cr.getBoundingClientRect().height) : 18;
+        S.el.style.setProperty('--gps-credit-h', ch + 'px');
+        var pill = S.el.querySelector('.gps-ld-plays'), rail = S.el.querySelector('.gps-ld-rail');
+        if (pill && rail && pill.style.display !== 'none') {
+            pill.classList.remove('gps-ld-plays-in'); pill.style.right = '';
+            var pb = pill.getBoundingClientRect(), left = null, W = S.el.getBoundingClientRect();
+            // The rail squares level with the pill (6px apart): the pill sits left of the widest.
+            Array.prototype.forEach.call(rail.children, function (c) { if (c.offsetParent === null) return; var b = c.getBoundingClientRect(); if (b.height && b.bottom + 6 > pb.top && b.top < pb.bottom) left = left == null ? b.left : Math.min(left, b.left); });
+            if (left != null && pb.right > left) { pill.classList.add('gps-ld-plays-in'); pill.style.right = Math.round(W.right - left + 8) + 'px'; }
+        }
+        // MIDDLE never runs into B / F: a long number (or a big text size) steps its size
+        // down to fit its column (never under 28px), and back up when there is room.
+        var big = S.el.querySelector('.gps-ld-top .gps-m'), col = big && big.parentNode;
+        if (big && col && col.clientWidth) {
+            var fs0 = big.getAttribute('data-ld-fs');
+            if (fs0) big.style.setProperty('font-size', fs0, 'important');
+            else { fs0 = big.style.getPropertyValue('font-size') || ''; big.setAttribute('data-ld-fs', fs0 || 'auto'); }
+            if (fs0 === 'auto') big.style.removeProperty('font-size');
+            var px = parseFloat(getComputedStyle(big).fontSize);
+            while (big.scrollWidth > col.clientWidth + 1 && px > 28) { px -= 2; big.style.setProperty('font-size', px + 'px', 'important'); }
+        }
+        var l1 = S.el.querySelector('.gps-ld-l1');
+        if (l1) {
+            l1.classList.remove('gps-ld-short');
+            var who = l1.querySelector('.gps-who');
+            if (who && who.style.display !== 'none' && (l1.scrollWidth > l1.clientWidth + 1 || who.scrollWidth > who.clientWidth + 1)) l1.classList.add('gps-ld-short');
+        }
     }
     // The hole's own view follows the screen until the golfer moves the map: the
     // phone's toolbars settle, or the attribution bar gains the Esri credit.
@@ -1368,6 +1418,14 @@
         var tb = vis('.gps-top');
         // LAYOUT C: under the top row (the taller of its two sides), above the panel.
         if (lcOn()) { ['.gps-lc-left', '.gps-lc-right', '.gps-lc-score'].forEach(function (sel) { var b = vis(sel); if (b) tb = (!tb || b.bottom > tb.bottom) ? b : tb; }); }
+        // LAYOUT D: the clear map, measured (ldClearBox) - between the top bar (+ Games / round
+        // row) and the pill / credit / bottom controls, left of the rail.
+        var ldc = ldOn() ? ldClearBox() : null;
+        if (ldc) {
+            var dTop = ldc.top + 12, dBot = W.height - ldc.bottom + 14, dRoom = W.height - dTop - dBot;
+            if (dRoom < 160) { var dk = Math.max(0, (W.height - 160) / Math.max(1, dTop + dBot)); dTop *= dk; dBot *= dk; }
+            return { top: Math.round(Math.max(VIEW_PAD.top, dTop)), bottom: Math.round(dBot), left: 20, right: Math.round(Math.max(28, W.width - ldc.right + 10)) };
+        }
         // The line under the top panel is held at its full height (28px) even
         // before its text arrives - a frame taken while it was empty let the back
         // of Pine Lakes #10's green slip under it once "±6 yds" filled it.
@@ -2010,7 +2068,8 @@
         var lblRect = rectOf(lblEl, wrapR), lblObs = null;
         if (lblRect) { add(lblRect, M); lblObs = obstacles[obstacles.length - 1]; }
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
-        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
+            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
         // distances can stay clear of them.
         placeGreenLabels();
@@ -2020,6 +2079,9 @@
         var safeTop = Math.max(M, topR ? topR.b + M : 0);
         if (lcOn()) ['.gps-lc-left', '.gps-lc-right', '.gps-lc-score'].forEach(function (sel) { var rc = rectOf(S.el.querySelector(sel), wrapR); if (rc) safeTop = Math.max(safeTop, rc.b + M); });
         var safeBot = Math.min(H - M, botR ? botR.t - M : H);
+        // LAYOUT D: the bubbles stay in the clear map (under the bars, above the controls).
+        var ldc = ldOn() ? ldClearBox() : null;
+        if (ldc) { safeTop = Math.max(safeTop, ldc.top + M); safeBot = Math.min(safeBot, ldc.bottom - M); }
         // The wind sheet (build 7) is a floor too while it is open.
         var wsR = rectOf(S.el.querySelector('.gps-wind-sheet'), wrapR);
         if (wsR) safeBot = Math.min(safeBot, wsR.t - M);
@@ -2048,6 +2110,8 @@
             return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
         };
         var SIZES = [44, 38, 32], TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.22, 0.78, 0.12, 0.88];
+        // LAYOUT D: round dark bubbles, smaller type.
+        if (ldOn()) SIZES = [24, 21, 18];
         var put = function (pill, a, b, text) {
             if (text === '—' || !a || !b) return;
             var seg = clip(a, b);
@@ -3289,7 +3353,7 @@
         var z = S && S.el && S.el.querySelector('.gps-zoom');
         var stack = S && S.el && S.el.querySelector('.gps-right');
         if (!z || !stack || typeof z.getBoundingClientRect !== 'function') return;
-        if (lcOn()) return;   // layout C: CSS puts it at the right, just above the panel
+        if (lcOn() || ldOn()) return;   // layout C: CSS puts it at the right, just above the panel; D: in the rail
         var h = z.offsetHeight || 44, vh = window.innerHeight || 0, top = vh / 2 - h / 2, low = 0;
         Array.prototype.forEach.call(stack.children, function (c) { if (c.offsetParent !== null) { var b = c.getBoundingClientRect(); if (b.height) low = Math.max(low, b.bottom); } });
         if (low && top < low + 8) top = low + 8;
@@ -3480,6 +3544,9 @@
         if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
         drawShots();
         syncLayoutC(r, nums, acc);
+        syncLayoutD(r, o, nums);
+        txt('.gps-layout-pick', 'Screen layout: ' + (layoutNow() === 'd' ? 'HardPan' : 'Bottom panel'));
+        show('.gps-layout-pick', ldSwitch()); show('.gps-menu-h', ldSwitch());
         placeZoom();
         placePills();
         syncWind();
@@ -4054,6 +4121,7 @@
     // The tap-anywhere target (and its distances) never under the top row or the panel:
     // a point there is pulled back into the clear map, along the screen's up / down.
     function lcClear() {
+        if (ldOn() && S.map) { var d = ldClearBox(); return d ? { top: d.top + 30, bottom: d.bottom - 30, left: 24, right: d.right - 24 } : null; }
         if (!lcOn() || !S.map) return null;
         var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return null;
         var W = wrap.getBoundingClientRect();
@@ -4074,11 +4142,299 @@
         return true;
     }
 
+    // ---- LAYOUT D "HardPan" (mailbox 012, the new default; switch gpsLayoutD) ----------
+    // One dark top bar (‹ | HOLE 4 ▾ | MIDDLE | B / F | Par / HCP), Games + the round chip
+    // under it, a right rail of small squares (Wind, Green, Hazards, Preview, Zoom), the
+    // distance bubbles on the shot line, a cream "Plays like" pill, and at the bottom a wide
+    // Mark shot over Card | Hole N / Enter score | + Game | Tools. The SAME elements as the
+    // other layouts, moved (their handlers, selectors and render code stay the same) - one
+    // model, two views. Tools > Screen layout switches D <-> C (layout C, "Bottom panel")
+    // at once, per phone. gpsLayoutD off: no setting, and 011's behaviour exactly.
+    var LAYOUT_KEY = 'hardpan_gps_layout';
+    function ldSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsLayoutD') !== false; } catch (e) { return true; } }
+    function ldOn() { return !!(S && S.ld); }
+    function layoutPref() { try { return localStorage.getItem(LAYOUT_KEY) === 'c' ? 'c' : 'd'; } catch (e) { return 'd'; } }
+    // 'd' | 'c' | 'old'. "Bottom panel" is layout C - the old layout when C's own switch is off.
+    function pickLayout() {
+        if (!ldSwitch()) return lcSwitch() ? 'c' : 'old';
+        if (layoutPref() === 'c') return lcSwitch() ? 'c' : 'old';
+        return 'd';
+    }
+    function layoutNow() { return !S ? null : (S.ld ? 'd' : (S.lc ? 'c' : 'old')); }
+    // Every element a layout moves, and where it lives in MARKUP (a comment marks the spot),
+    // so a switch puts them all back before the other layout takes them.
+    var MOVED = ['.gps-back', '.gps-door-games', '.gps-wind', '.gps-hole-btn', '.gps-who', '.gps-num-f', '.gps-num-mid', '.gps-num-b', '.gps-pl-line', '.gps-suggest',
+        '.gps-green-view', '.gps-hz-btn', '.gps-mark-shot', '.gps-fly-btn', '.gps-zoom', '.gps-bottom', '.gps-actions'];
+    var LAYOUT_BOXES = ['.gps-lc-top', '.gps-panel', '.gps-ld-head', '.gps-ld-l1', '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-holelbl'];
+    function markHomes(el) {
+        el._gpsHomes = MOVED.map(function (sel) {
+            var n = el.querySelector(sel);
+            if (!n || !n.parentNode) return null;
+            var ph = document.createComment('home ' + sel);
+            n.parentNode.insertBefore(ph, n);
+            var lb = n.querySelector('.gps-lbl');
+            return { n: n, ph: ph, lbl: lb ? lb.textContent : null };
+        }).filter(Boolean);
+    }
+    function unbuildLayouts(el) {
+        (el._gpsHomes || []).forEach(function (h) {
+            // A switch that removed it (data-feature) left it out: it stays out.
+            if (!h.ph.parentNode || !h.n.parentNode) return;
+            h.ph.parentNode.insertBefore(h.n, h.ph.nextSibling);
+            var lb = h.n.querySelector('.gps-lbl'); if (lb && h.lbl != null) lb.textContent = h.lbl;
+            if (h.n.matches && h.n.matches('.gps-num-f, .gps-num-b')) h.n.style.display = '';
+            if (h.n.matches && h.n.matches('.gps-zoom')) { h.n.style.top = ''; h.n.style.transform = ''; }
+        });
+        LAYOUT_BOXES.forEach(function (sel) { Array.prototype.forEach.call(el.querySelectorAll(sel), function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); });
+        el.classList.remove('gps-lc'); el.classList.remove('gps-ld');
+        var cap = el.querySelector('.gps-side-bets .gps-cap'); if (cap) cap.textContent = doorsOn() ? 'Score' : 'Card';
+        Array.prototype.forEach.call(el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { p.removeAttribute('data-u'); });
+    }
+    function buildLayoutD(el) {
+        var q = function (sel) { return el.querySelector(sel); };
+        var mk = function (tag, cls, attrs) { var e = document.createElement(tag); e.className = cls; Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); }); return e; };
+        var put = function (box, sel) { var e = q(sel); if (e) box.appendChild(e); return e; };
+        el.classList.add('gps-ld');
+        // THE TOP BAR: ‹ | HOLE 4 ▾ | MIDDLE 314 | B / F | Par / HCP.
+        var top = mk('div', 'gps-ld-top', { role: 'group', 'aria-label': 'Hole and distances' });
+        put(top, '.gps-back');
+        put(top, '.gps-hole-btn');
+        top.appendChild(mk('span', 'gps-ld-div', { 'aria-hidden': 'true' }));
+        var mid = put(top, '.gps-num-mid'); var ml = mid && mid.querySelector('.gps-lbl'); if (ml) ml.textContent = 'MIDDLE';
+        var fb = mk('div', 'gps-ld-fb'); put(fb, '.gps-num-b'); put(fb, '.gps-num-f'); top.appendChild(fb);
+        var par = mk('div', 'gps-ld-par'); par.appendChild(mk('span', 'gps-ld-par1')); par.appendChild(mk('span', 'gps-ld-hcp')); top.appendChild(par);
+        // UNDER IT: Games (left), the round chip (right; tap = the scorecard).
+        var row2 = mk('div', 'gps-ld-row2');
+        put(row2, '.gps-door-games');
+        row2.appendChild(mk('span', 'gps-ld-gap'));
+        if (rsSwitch()) row2.appendChild(mk('button', 'gps-lc-score gps-ld-score gps-float', { type: 'button', 'data-feature': 'gpsRoundScore', style: 'display:none', 'aria-label': 'Round score - open the scorecard' }));
+        // THE RIGHT RAIL (each still follows its own switch and render rule).
+        var rail = mk('div', 'gps-ld-rail');
+        put(rail, '.gps-wind'); put(rail, '.gps-green-view'); put(rail, '.gps-hz-btn'); put(rail, '.gps-fly-btn'); put(rail, '.gps-zoom');
+        // THE PLAYS-LIKE PILL: the raw yards in the dark circle, "Plays like 249y · 3W". Tap = ⓘ.
+        var plays = mk('button', 'gps-ld-plays', { type: 'button', style: 'display:none', 'aria-label': 'Plays like - how it works' });
+        plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
+        // THE BOTTOM: Mark shot, wide; under it Card | ‹ Hole 4 / Enter score › | + Game | Tools.
+        var bot = mk('div', 'gps-ld-bottom', { role: 'group', 'aria-label': 'Actions' });
+        put(bot, '.gps-mark-shot'); put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        // TWO LINES, however many golfers: "Hole 1 · Manny ▾" (tap the hole = Enter score, the
+        // name = whose score), then "Enter score" / the score.
+        var col = bot.querySelector('.gps-score-col');
+        if (col) {
+            var l1 = mk('span', 'gps-ld-l1');
+            l1.appendChild(mk('span', 'gps-ld-holelbl'));
+            var who = col.querySelector('.gps-who'); if (who) l1.appendChild(who);
+            col.insertBefore(l1, col.firstChild);
+        }
+        var credit = q('.gps-credit');
+        var head = mk('div', 'gps-ld-head');
+        head.appendChild(top); head.appendChild(row2);
+        [head, rail, plays, bot].forEach(function (n) { el.insertBefore(n, credit); });
+    }
+    // Club keys (gps-shots.js BAG) to the short name on the pill: 3w -> 3W, 7i -> 7i, PW.
+    function clubShort(c) { return c === 'Dr' ? 'Dr' : String(c || '').replace(/w$/, 'W'); }
+    // The pill's numbers follow THE TARGET RING (Manny, 012 - as the mockup): you -> the ring,
+    // the default target included (not the green's middle), and that leg's plays-like from
+    // the existing model (playsTo). No ring: to the aim. The club only from a bag that is set
+    // up. Tournament mode: no pill (playsTo says nothing then, and this asks first).
+    function ldPlays(r, o, nums) {
+        if (tournament() || !S.pro || S.mode !== 'measure' || !o || (nums && nums.onGreen)) return null;
+        var aim = S.target || aimAt(r);
+        if (!aim) return null;
+        var pl = playsTo(S.target || null);
+        if (!pl) return null;
+        var u = units(), m = u === 'm';
+        var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '' };
+        var B = bagApi();
+        if (bagSwitch() && B && o.from === 'me' && !(B.needsSetup && B.needsSetup(bagGolfer()))) {
+            var sg = B.suggestClub(B.bag(bagGolfer()), pl.exact);
+            if (sg) out.club = clubShort(sg.club);
+        }
+        return out;
+    }
+    // What render fills in layout D only.
+    function syncLayoutD(r, o, nums) {
+        if (!ldOn()) return;
+        var m = (typeof S.holeMeta === 'function') ? (S.holeMeta(S.hole) || {}) : {};
+        var par = m.par != null ? m.par : S.par;
+        txt('.gps-ld-par1', par != null ? 'Par ' + par : '');
+        txt('.gps-ld-hcp', m.si != null && isFinite(m.si) ? 'HCP ' + m.si : '');
+        txt('.gps-ld-holelbl', 'Hole ' + S.hole);
+        txt('.gps-side-bets .gps-cap', 'Card');
+        // No front / back for this hole: MIDDLE alone.
+        var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
+        show('.gps-num-f', edges); show('.gps-num-b', edges);
+        var mb = S.el.querySelector('.gps-mark-shot');
+        if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
+        var u = units() === 'm' ? 'm' : 'y';
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { if (p.getAttribute('data-u') !== u) p.setAttribute('data-u', u); });
+        var pill = S.el.querySelector('.gps-ld-plays');
+        if (pill) {
+            var p = ldPlays(r, o, nums);
+            pill.style.display = p ? '' : 'none';
+            if (p) {
+                txt('.gps-ld-raw', p.raw);
+                txt('.gps-ld-pltext', p.plays + (p.club ? ' · ' + p.club : ''));
+                pill.setAttribute('aria-label', 'Plays like ' + p.plays + (p.club ? ', ' + p.club : '') + ' - how it works');
+            }
+        }
+        if (rsSwitch()) syncRoundChip();
+        try { syncLayoutVars(); } catch (e) {}
+    }
+    // Tools > Screen layout: HardPan <-> Bottom panel, on this phone, at once.
+    function setLayout(name) {
+        try { if (name === 'c') localStorage.setItem(LAYOUT_KEY, 'c'); else localStorage.removeItem(LAYOUT_KEY); } catch (e) {}
+        applyLayout();
+    }
+    function applyLayout() {
+        if (!S) return;
+        var want = pickLayout();
+        if (want === layoutNow()) { render(); return; }
+        closeMenus();
+        unbuildLayouts(S.el);
+        if (want === 'd') buildLayoutD(S.el);
+        else if (want === 'c') buildLayoutC(S.el);
+        S.ld = want === 'd'; S.lc = want === 'c';
+        S.pad = null;
+        render();
+        syncLayoutVars();
+        try { syncCredit(); } catch (e) {}
+        if (S.map) {
+            try { S.map.resize(); } catch (e) {}
+            if (S.framed === 'hole' && !S.userMoved && S.view !== 'green' && !S.zoomStep) frameHole(false);
+            else placePills();
+        }
+    }
+    // The clear map in layout D: under the top bar and the Games / round row, above the
+    // pill, the credit and the bottom controls, left of the rail.
+    function ldClearBox() {
+        if (!ldOn()) return null;
+        var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return null;
+        var W = wrap.getBoundingClientRect();
+        var rc = function (sel) { var e = S.el.querySelector(sel); if (!e || e.offsetParent === null || getComputedStyle(e).display === 'none') return null; var b = e.getBoundingClientRect(); return b.height ? b : null; };
+        var top = W.top, bot = W.bottom, right = W.right;
+        ['.gps-ld-top', '.gps-ld-row2'].forEach(function (s) { var b = rc(s); if (b) top = Math.max(top, b.bottom); });
+        ['.gps-ld-bottom', '.gps-ld-plays', '.gps-credit', '.gps-leftrow .gps-recenter'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
+        var rl = rc('.gps-ld-rail'); if (rl) right = Math.min(right, rl.left);
+        return { top: top - W.top, bottom: bot - W.top, left: 0, right: right - W.left, W: W };
+    }
+
+    // ---- THE TOOLS SHEET (mailbox 012, Manny's Option 1; switch toolsSheet) -----------------
+    // In layouts D and C, Tools is a bottom sheet: SCREEN LAYOUT [HardPan | Bottom panel], UNITS
+    // [Yards | Meters], ROUND switches (Tournament mode, Auto-advance holes, Track stats for
+    // others), and MORE - a grid of tiles. ONE MODEL: every control runs the old menu's own
+    // button (still in the DOM, hidden) or the same function, so nothing is forked; a tile shows
+    // exactly when its menu item would. Settings save the moment they are tapped. Swipe down or
+    // tap outside to close; it never reaches over the top bar, and scrolls when it is taller.
+    // The old layout (C and D both off), or toolsSheet off: the old drop-down, unchanged.
+    function tsSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('toolsSheet') !== false; } catch (e) { return true; } }
+    function tsOn() { return !!(S && (S.ld || S.lc) && tsSwitch()); }
+    function tsSheet() { return S && S.el.querySelector('.gps-tsheet'); }
+    function tsOpen() { var t = tsSheet(); return !!(t && t.style.display !== 'none'); }
+    // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
+    var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
+        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'],
+        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
+        ['.gps-rechoose', '①', 'Hole 1 again']];
+    var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
+        + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
+        + '<div class="gps-ts-h">UNITS</div><div class="gps-ts-seg" data-ts-seg="units" role="radiogroup" aria-label="Units"><button type="button" data-v="yd" role="radio">Yards</button><button type="button" data-v="m" role="radio">Meters</button></div>'
+        + '<div class="gps-ts-h">ROUND</div><div class="gps-ts-rows">'
+        +   '<div class="gps-ts-row" data-ts-row="tourney"><span>🏆 Tournament mode</span><button type="button" class="gps-ts-sw" data-ts-sw="tourney" role="switch" aria-label="Tournament mode"><i></i></button></div>'
+        +   '<div class="gps-ts-row" data-ts-row="aa"><span>Auto-advance holes</span><button type="button" class="gps-ts-sw" data-ts-sw="aa" role="switch" aria-label="Auto-advance holes"><i></i></button></div>'
+        // THE SLOT for "Track stats for others" (gps-012s, HardPanGpsStats.trackOthers / setTrackOthers):
+        // shown only when that API is in the page.
+        +   '<div class="gps-ts-row" data-ts-row="others"><span>Track stats for others</span><button type="button" class="gps-ts-sw" data-ts-sw="others" role="switch" aria-label="Track stats for others"><i></i></button></div>'
+        + '</div>'
+        + '<div class="gps-ts-h">MORE</div><div class="gps-ts-grid">'
+        + TS_TILES.map(function (t) { return '<button type="button" class="gps-ts-tile" data-ts-tile="' + t[0] + '"><span class="gps-ts-ico" aria-hidden="true">' + t[1] + '</span><span>' + t[2] + '</span></button>'; }).join('')
+        + '</div>';
+    function tsStats() { var H = window.HardPanGpsStats; return H && typeof H.trackOthers === 'function' && typeof H.setTrackOthers === 'function' ? H : null; }
+    function tsSync() {
+        var t = tsSheet(); if (!t || !S) return;
+        var lay = layoutNow(), u = units();
+        var seg = function (k, v, on) { Array.prototype.forEach.call(t.querySelectorAll('[data-ts-seg="' + k + '"] button'), function (b) { var lit = b.getAttribute('data-v') === v; b.classList.toggle('on', lit); b.setAttribute('aria-checked', lit ? 'true' : 'false'); }); var sg = t.querySelector('[data-ts-seg="' + k + '"]'); if (sg) sg.style.display = on ? '' : 'none'; };
+        seg('layout', lay === 'd' ? 'd' : 'c', ldSwitch());
+        var lh = t.querySelector('[data-ts-sec="layout"]'); if (lh) lh.style.display = ldSwitch() ? '' : 'none';
+        seg('units', u === 'm' ? 'm' : 'yd', true);
+        var sw = function (k, on, shown, locked) {
+            var b = t.querySelector('[data-ts-sw="' + k + '"]'), row = t.querySelector('[data-ts-row="' + k + '"]');
+            if (row) row.style.display = shown ? '' : 'none';
+            if (b) { b.classList.toggle('on', !!on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.setAttribute('aria-disabled', locked ? 'true' : 'false'); }
+        };
+        sw('tourney', tournament(), true, tourneyRound());
+        sw('aa', aaOn(), !!S.el.querySelector('.gps-aa-toggle'));
+        var H = tsStats();
+        sw('others', H ? H.trackOthers() : false, !!H);
+        Array.prototype.forEach.call(t.querySelectorAll('[data-ts-tile]'), function (b) {
+            var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
+            b.style.display = m && m.style.display !== 'none' ? '' : 'none';
+        });
+    }
+    function openToolsSheet() {
+        var t = tsSheet(); if (!t) return;
+        render(); aaToggleText();
+        tsSync();
+        t.style.transform = ''; t.scrollTop = 0;
+        t.style.display = ''; show('.gps-ts-back', true);
+    }
+    function closeToolsSheet() { var t = tsSheet(); if (t) { t.style.display = 'none'; t.style.transform = ''; } show('.gps-ts-back', false); }
+    // Run an old menu button's own handler, keeping the sheet open (a setting).
+    function tsRun(sel) {
+        var b = S && S.el.querySelector('.gps-tools-menu ' + sel);
+        if (!b) return;
+        S.tsKeep = true;
+        try { b.click(); } finally { S.tsKeep = false; }
+        tsSync();
+    }
+    function tsClick(e) {
+        var t = e.target && e.target.closest ? e.target : null;
+        if (!t || !S) return;
+        var b;
+        if ((b = t.closest('[data-ts-seg] button'))) {
+            var k = b.parentNode.getAttribute('data-ts-seg'), v = b.getAttribute('data-v');
+            if (k === 'layout' && v !== layoutNow()) { S.tsKeep = true; try { setLayout(v); } finally { S.tsKeep = false; } tsSync(); }
+            if (k === 'units' && v !== (units() === 'm' ? 'm' : 'yd')) tsRun('.gps-units');
+            return;
+        }
+        if ((b = t.closest('[data-ts-sw]'))) {
+            var w = b.getAttribute('data-ts-sw');
+            if (w === 'tourney') tsRun('.gps-tourney-toggle');
+            else if (w === 'aa') tsRun('.gps-aa-toggle');
+            else if (w === 'others') { var H = tsStats(); if (H) { H.setTrackOthers(!H.trackOthers()); tsSync(); } }
+            return;
+        }
+        if ((b = t.closest('[data-ts-tile]'))) {
+            var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
+            closeToolsSheet();
+            if (m) m.click();
+        }
+    }
+    // Swipe down on its head (or anywhere while it is scrolled to the top): it follows the
+    // finger and closes past 70px.
+    function tsDrag(t) {
+        var y0 = null, dy = 0, id = null;
+        t.addEventListener('pointerdown', function (e) {
+            if (!e.target.closest('.gps-ts-head') && t.scrollTop > 0) return;
+            if (e.target.closest('button') && !e.target.closest('.gps-ts-head')) return;
+            y0 = e.clientY; dy = 0; id = e.pointerId;
+        });
+        t.addEventListener('pointermove', function (e) {
+            if (y0 == null || e.pointerId !== id) return;
+            dy = Math.max(0, e.clientY - y0);
+            if (dy > 4) t.style.transform = 'translateY(' + dy + 'px)';
+        });
+        var end = function () { if (y0 == null) return; y0 = null; if (dy > 70) closeToolsSheet(); else t.style.transform = ''; dy = 0; };
+        t.addEventListener('pointerup', end); t.addEventListener('pointercancel', end);
+    }
+
     // ---- MENUS: Tools and the hole picker ------------------------------------------
-    function closeMenus() { show('.gps-tools-menu', false); show('.gps-picker', false); }
+    function closeMenus() { show('.gps-tools-menu', false); show('.gps-picker', false); if (!(S && S.tsKeep)) closeToolsSheet(); }
     function toggleTools() {
         var m = S && S.el.querySelector('.gps-tools-menu');
         if (!m) return;
+        // 012: the Tools SHEET in layouts D and C (switch toolsSheet).
+        if (tsOn()) { var was = tsOpen(); closeMenus(); if (!was) openToolsSheet(); return; }
         var open = m.style.display === 'none';
         closeMenus();
         if (open) { render(); aaToggleText(); m.style.display = ''; }
@@ -4367,7 +4723,11 @@
         +   '<button type="button" class="gps-menu-item gps-undo-green" style="display:none">Undo last fix</button>'
         +   '<button type="button" class="gps-menu-item gps-rechoose" style="display:none">Choose hole 1 again</button>'
         +   '<button type="button" class="gps-menu-item gps-refresh-gps" style="display:none">Refresh GPS data</button>'
+        // GPS SETTINGS (012): Units, Screen layout, Tournament mode, Auto-advance - together, under a small heading.
+        +   '<div class="gps-menu-h" data-feature="gpsLayoutD" role="presentation" style="display:none">GPS settings</div>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
+        // 012: HardPan (layout D, the default) or Bottom panel (layout C) - this phone, at once.
+        +   '<button type="button" class="gps-menu-item gps-layout-pick" data-feature="gpsLayoutD" style="display:none"></button>'
         +   '<button type="button" class="gps-menu-item gps-tourney-toggle"></button>'
         +   '<button type="button" class="gps-menu-item gps-aa-toggle" data-feature="autoAdvance"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
@@ -4377,6 +4737,9 @@
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
         +   '<button type="button" class="gps-menu-item gps-pick-course" style="display:none">\u26F3 Pick another course</button>'
         + '</div>'
+        // THE TOOLS SHEET (012; layouts D and C, switch toolsSheet): filled from TS_MARKUP at mount.
+        + '<div class="gps-ts-back" style="display:none"></div>'
+        + '<div class="gps-tsheet gps-scroll-ok" data-feature="toolsSheet" style="display:none" role="dialog" aria-label="Tools"></div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
         + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span class="gps-credit-osm" style="display:none">· © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
@@ -4623,6 +4986,10 @@
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
+        // 012: the GPS settings rows under a small heading, a firmer line after them.
+        + '#gps-overlay .gps-menu-h{font:800 11px/1 ' + FONT + ';letter-spacing:.1em;text-transform:uppercase;color:#a7b3aa;padding:12px 12px 6px;border-top:1px solid rgba(255,255,255,.18);}'
+        + '#gps-overlay .gps-menu-h:first-child{border-top:0;}'
+        + '#gps-overlay .gps-menu-h ~ .gps-aa-toggle + .gps-menu-item{border-top:1px solid rgba(255,255,255,.3);margin-top:4px;}'
         + '#gps-overlay .gps-picker{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:calc(env(safe-area-inset-top) + 70px);}'
         + '#gps-overlay .gps-picker-card{width:calc(100% - 24px);max-width:420px;padding:12px;}'
         + '#gps-overlay .gps-picker-title{font-weight:800;font-size:15px;color:#d9f99d;margin:2px 4px 10px;}'
@@ -4708,7 +5075,8 @@
         + '#gps-overlay .gps-lc-hole{display:flex;flex-direction:column;align-items:flex-end;padding:4px 12px;border-radius:14px;max-width:100%;box-sizing:border-box;}'
         + '#gps-overlay .gps-lc-l1{min-height:24px;padding:0;font:800 15px/1.2 ' + FONT + ';color:#f4f4ef;text-align:right;}'
         + '#gps-overlay .gps-lc-l2{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;min-height:22px;font:600 13px/1.2 ' + FONT + ';color:#c8d1ca;white-space:nowrap;max-width:100%;}'
-        + '#gps-overlay .gps-lc-meta{overflow:hidden;text-overflow:ellipsis;min-width:0;}'
+        // 012: the yards · HCP line wraps on a small phone at big text, never "…".
+        + '#gps-overlay .gps-lc-meta{min-width:0;white-space:normal;text-align:right;}'
         + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind{display:inline-flex;align-items:center;gap:2px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 0 0 2px !important;min-height:22px;font:700 13px/1.2 ' + FONT + ';color:#bfdbfe;border-radius:0;flex:0 0 auto;}'
         + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind::before{content:"\\00b7";color:#c8d1ca;margin:0 5px 0 3px;}'
         + '#gps-overlay.gps-lc .gps-lc-meta:empty + .gps-wind::before{content:none;}'
@@ -4762,6 +5130,112 @@
         + '#gps-overlay.gps-lc:has(> .gps-bagask:not([style*="none"])) .gps-banner{visibility:hidden;}'
         + '#gps-overlay.gps-lc .gps-under{right:8px;max-height:calc(100% - var(--gps-top-b) - var(--gps-attrib-h) - 60px);overflow-y:auto;touch-action:pan-y;}'
         + '#gps-overlay.gps-lc .gps-shotbar{top:var(--gps-top-b);}'
+        // LAYOUT D (012, switch gpsLayoutD): only under #gps-overlay.gps-ld - C and the old layout untouched.
+        + '#gps-overlay.gps-ld{--gps-panel-h:140px;--gps-ld-lime:#c8f07a;}'
+        + '#gps-overlay.gps-ld .gps-top,#gps-overlay.gps-ld .gps-right,#gps-overlay.gps-ld .gps-yardbox,#gps-overlay.gps-ld .gps-target-row,'
+        +   '#gps-overlay.gps-ld .gps-pl-line,#gps-overlay.gps-ld .gps-suggest,#gps-overlay.gps-ld .gps-num-mid .gps-plays{display:none !important;}'
+        + '#gps-overlay .gps-ld-head{position:absolute;z-index:8;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);display:flex;flex-direction:column;gap:10px;pointer-events:none;}'
+        + '#gps-overlay .gps-ld-head > *{pointer-events:auto;}'
+        + '#gps-overlay .gps-ld-top{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 2px;border-radius:20px;background:rgba(11,15,12,.95);box-shadow:0 6px 18px rgba(0,0,0,.35);color:#f4f4ef;min-width:0;}'
+        + '#gps-overlay.gps-ld .gps-back{position:static;flex:0 0 auto;width:34px;height:52px;padding:0 0 3px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font-size:30px;color:#f4f4ef;}'
+        + '#gps-overlay.gps-ld .gps-hole-btn{flex:0 0 auto;display:grid;grid-template-columns:auto auto;align-items:end;column-gap:2px;min-height:52px;padding:0 2px;text-align:left;}'
+        + '#gps-overlay.gps-ld .gps-hole-lbl{grid-column:1 / 3;font-size:11px;letter-spacing:.1em;}'
+        + '#gps-overlay.gps-ld .gps-hole-num{font-size:34px;line-height:1;}'
+        + '#gps-overlay.gps-ld .gps-hole-caret{font-size:20px;line-height:1;color:#f4f4ef;padding-bottom:3px;}'
+        + '#gps-overlay .gps-ld-div{flex:0 0 1px;align-self:stretch;margin:6px 0;background:rgba(244,244,239,.2);}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;margin-right:4px;}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-m{max-width:100%;}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid .gps-lbl{font-size:11px;letter-spacing:.1em;}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid .gps-big{font-size:46px;line-height:1;color:var(--gps-ld-lime);letter-spacing:-.01em;}'
+        + '#gps-overlay .gps-ld-fb{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;}'
+        + '#gps-overlay.gps-ld .gps-ld-fb .gps-num{display:flex;align-items:baseline;gap:5px;}'
+        + '#gps-overlay.gps-ld .gps-ld-fb .gps-lbl{font-size:14px;letter-spacing:0;font-weight:600;color:#a7b3aa;}'
+        + '#gps-overlay.gps-ld .gps-ld-fb .gps-big{font-size:17px;font-weight:700;color:#f4f4ef;}'
+        + '#gps-overlay .gps-ld-par{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:1px solid rgba(244,244,239,.2);font:600 15px/1.2 ' + FONT + ';color:#f4f4ef;white-space:nowrap;}'
+        + '#gps-overlay .gps-ld-par span:empty{display:none;}'
+        + '#gps-overlay .gps-ld-row2{display:flex;align-items:center;gap:8px;min-height:0;pointer-events:none;}'
+        + '#gps-overlay .gps-ld-row2 > *{pointer-events:auto;}'
+        + '#gps-overlay .gps-ld-gap{flex:1 1 auto;pointer-events:none !important;}'
+        + '#gps-overlay.gps-ld .gps-door-games{position:static;flex:0 0 auto;background:#ffd60a;color:#0b0f0c;min-height:44px;padding:0 18px;border-radius:999px;font:800 16px/1 ' + FONT + ';box-shadow:0 4px 12px rgba(0,0,0,.3);}'
+        + '#gps-overlay .gps-ld-score{min-height:44px;padding:5px 16px;border-radius:22px;background:rgba(11,15,12,.94);border:0;font:800 15px/1.2 ' + FONT + ';color:#f4f4ef;white-space:normal;text-align:right;min-width:0;font-variant-numeric:tabular-nums;}'
+        + '#gps-overlay .gps-ld-score .gps-tp-under{color:#4ade80;}'
+        // THE RIGHT RAIL: small squares.
+        + '#gps-overlay .gps-ld-rail{position:absolute;z-index:6;right:8px;top:calc(var(--gps-top-b) + 4px);display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail > *{pointer-events:auto;position:static;transform:none;width:52px;min-height:52px;box-sizing:border-box;padding:4px;border-radius:14px;background:rgba(11,15,12,.92);border:0;box-shadow:0 4px 12px rgba(0,0,0,.3);'
+        +   '-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:800 12px/1.1 ' + FONT + ';color:#f4f4ef;text-align:center;white-space:nowrap;}'
+        // A label longer than the square (big text): the square widens, never the text spilling out.
+        + '#gps-overlay.gps-ld .gps-ld-rail > *{width:auto;min-width:52px;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind{width:auto;min-width:52px;position:relative;padding-bottom:4px !important;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-tag{display:none !important;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-arrow{font-size:20px;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-mph{font-size:12px;white-space:nowrap;}'
+        + '#gps-overlay.gps-ld .gps-ld-rail .gps-zoom{top:auto !important;transform:none !important;}'
+        // THE PLAYS-LIKE PILL: right, just above Mark shot (above the credit line).
+        + '#gps-overlay .gps-ld-plays{position:absolute;z-index:7;right:8px;bottom:calc(var(--gps-panel-h) + var(--gps-credit-h,18px) + 6px);max-width:calc(100% - 16px);box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:4px 14px 4px 4px;'
+        +   'border-radius:999px;background:#f3f0e2 !important;color:#0b0f0c !important;box-shadow:0 6px 16px rgba(0,0,0,.35);text-align:left;}'
+        + '#gps-overlay .gps-ld-plays.gps-ld-plays-in{max-width:calc(100% - 76px);}'
+        + '#gps-overlay .gps-ld-raw{flex:0 0 auto;min-width:52px;height:52px;padding:0 6px;box-sizing:border-box;border-radius:26px;background:#0b0f0c;color:#fff;display:flex;align-items:center;justify-content:center;font:800 20px/1 ' + FONT + ';font-variant-numeric:tabular-nums;}'
+        + '#gps-overlay .gps-ld-pl{display:flex;flex-direction:column;min-width:0;}'
+        + '#gps-overlay .gps-ld-pl small{font:600 12px/1.2 ' + FONT + ';color:#4b5563;}'
+        + '#gps-overlay .gps-ld-pl b{font:800 22px/1.1 ' + FONT + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#gps-overlay .gps-ld-i{flex:0 0 auto;font-size:18px;color:#6b7280;}'
+        // THE BOTTOM: Mark shot, then Card | Hole N / Enter score | + Game | Tools.
+        + '#gps-overlay .gps-ld-bottom{position:absolute;z-index:7;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-direction:column;gap:8px;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-mark-shot{width:100%;min-height:52px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 18px/1 ' + FONT + ';display:flex;align-items:center;justify-content:center;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom{position:static;height:62px;gap:8px;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:56px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
+        // 012 (Manny): Games (top left) and + Game opened the same thing - D has the Games pill only;
+        // its room goes to the Enter score button.
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{display:none !important;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-ico{color:#f4f4ef;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-cap{font-size:12px;color:#f4f4ef;}'
+        + '#gps-overlay.gps-ld .gps-scorebox{background:var(--gps-ld-lime);border:0;border-radius:18px;}'
+        + '#gps-overlay.gps-ld .gps-score-prev,#gps-overlay.gps-ld .gps-score-next{width:30px;border:0;}'
+        + '#gps-overlay.gps-ld .gps-score-col{align-items:center;justify-content:center;gap:1px;}'
+        + '#gps-overlay .gps-ld-l1{display:flex;align-items:baseline;justify-content:center;max-width:100%;min-width:0;}'
+        + '#gps-overlay .gps-ld-holelbl{flex:0 0 auto;font:800 18px/1.15 ' + FONT + ';color:#0b0f0c;white-space:nowrap;cursor:pointer;}'
+        + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who{flex:0 1 auto;min-width:0;padding:0 0 0 2px;font:800 16px/1.15 ' + FONT + ';opacity:.8;}'
+        + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who::before{content:"\\00a0\\00b7\\00a0";}'
+        + '#gps-overlay .gps-ld-l1.gps-ld-short .gps-ld-holelbl{display:none;}#gps-overlay.gps-ld .gps-ld-short .gps-who::before{content:none;}'
+        + '#gps-overlay.gps-ld .gps-score-col .gps-score{flex:0 0 auto;font-size:14px;font-weight:600;line-height:1.2;padding:0 6px;max-width:100%;}'
+        + '#gps-overlay.gps-ld .gps-score-col .gps-score.gps-score-num{font-size:20px;}'
+        + '#gps-overlay.gps-ld .gps-score-col .gps-score-n{height:28px;min-width:28px;}'
+        + '#gps-overlay.gps-ld .gps-score.gps-score-num .gps-score-n[class*="mark-"]{font-size:18px;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-actions{position:static;}'
+        // Over the map, on the bottom controls: the credit just above them (left), the pill
+        // over it (right), Recenter above that; menus and notes above those. Sheets cover all.
+        + '#gps-overlay.gps-ld .gps-credit,#gps-overlay.gps-ld.gps-credit-google .gps-credit{bottom:calc(var(--gps-panel-h) + 4px);}'
+        + '#gps-overlay.gps-ld .gps-credit-pop{bottom:calc(var(--gps-panel-h) + 26px);}'
+        + '#gps-overlay.gps-ld .gps-leftrow{bottom:calc(var(--gps-panel-h) + var(--gps-credit-h,18px) + 8px);right:auto;}'
+        + '#gps-overlay.gps-ld .gps-banner,#gps-overlay.gps-ld.gps-pinning .gps-banner{bottom:calc(var(--gps-panel-h) + 88px);}'
+        + '#gps-overlay.gps-ld .gps-tiles-note{bottom:calc(var(--gps-panel-h) + 140px);}'
+        + '#gps-overlay.gps-ld .gps-tools-menu{bottom:calc(var(--gps-panel-h) + 8px);z-index:30;}'
+        + '#gps-overlay.gps-ld .gps-bagask{bottom:calc(var(--gps-panel-h) + 8px);}'
+        + '#gps-overlay.gps-ld .gps-under{right:68px;}'
+        + '#gps-overlay.gps-ld .gps-shotbar{top:var(--gps-top-b);}'
+        // THE DISTANCE BUBBLES on the shot line: round, dark, "254y".
+        + '#gps-overlay.gps-ld .gps-pill-to,#gps-overlay.gps-ld .gps-pill-on{display:flex;align-items:baseline;justify-content:center;box-sizing:border-box;min-width:2.5em;height:2.5em;line-height:2.5em;padding:0 .35em;border-radius:1.25em;'
+        +   'background:rgba(11,15,12,.92);color:#fff;font-weight:800;text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.4);}'
+        + '#gps-overlay.gps-ld .gps-pill-to::after,#gps-overlay.gps-ld .gps-pill-on::after{content:attr(data-u);font-size:.6em;margin-left:1px;}'
+        // THE TOOLS SHEET (012, switch toolsSheet): layouts D and C only.
+        + '#gps-overlay .gps-ts-back{position:absolute;z-index:47;left:0;right:0;bottom:0;top:var(--gps-bar-b,0px);background:rgba(0,0,0,.35);}'
+        + '#gps-overlay .gps-tsheet{position:absolute;z-index:49;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;max-height:calc(100% - var(--gps-bar-b,0px));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;'
+        +   'padding:0 16px calc(env(safe-area-inset-bottom) + 16px);background:#0f1511;border-radius:24px 24px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.45);color:#f4f4ef;font-family:' + FONT + ';transition:transform .15s ease-out;}'
+        + '#gps-overlay .gps-ts-head{position:sticky;top:0;z-index:1;background:#0f1511;padding:10px 0 4px;touch-action:none;cursor:grab;}'
+        + '#gps-overlay .gps-ts-grip{display:block;width:40px;height:5px;border-radius:3px;background:rgba(244,244,239,.4);margin:0 auto 10px;}'
+        + '#gps-overlay .gps-ts-title{font:800 22px/1.2 ' + FONT + ';}'
+        + '#gps-overlay .gps-ts-h{font:800 12px/1 ' + FONT + ';letter-spacing:.1em;color:#a7b3aa;margin:16px 0 8px;}'
+        + '#gps-overlay .gps-ts-seg{display:flex;gap:4px;padding:4px;border-radius:16px;background:rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-ts-seg button{flex:1 1 0;min-width:0;min-height:44px;border-radius:12px;font:700 16px/1.2 ' + FONT + ';color:#f4f4ef;white-space:normal;}'
+        + '#gps-overlay .gps-ts-seg button.on{background:#c8f07a;color:#0b0f0c;}'
+        + '#gps-overlay .gps-ts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.1);font:700 17px/1.25 ' + FONT + ';}'
+        + '#gps-overlay .gps-ts-sw{flex:0 0 auto;position:relative;width:52px;height:32px;border-radius:16px !important;background:rgba(255,255,255,.22) !important;transition:background .15s;}'
+        + '#gps-overlay .gps-ts-sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);}'
+        + '#gps-overlay .gps-ts-sw.on{background:#7cc242 !important;}#gps-overlay .gps-ts-sw.on i{left:23px;}'
+        + '#gps-overlay .gps-ts-sw[aria-disabled="true"]{opacity:.55;}'
+        + '#gps-overlay .gps-ts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}'
+        + '#gps-overlay .gps-ts-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;padding:8px 4px;border-radius:14px;background:rgba(255,255,255,.07) !important;font:700 14px/1.2 ' + FONT + ';color:#f4f4ef;text-align:center;}'
+        + '#gps-overlay .gps-ts-ico{font-size:20px;line-height:1;}'
         // NO GPS MAP (paid launch): a round mounted without the entitlement never shows
         // the GPS side at all - no map, no yardage (the gate keeps it on the card).
         + '#gps-overlay.gps-locked{display:none !important;}';
@@ -4794,8 +5268,12 @@
         el.setAttribute('aria-label', 'GPS');
         el.innerHTML = MARKUP;
         document.body.appendChild(el);
-        // LAYOUT C (011): the same elements, moved into the top row and the bottom panel.
-        var lc = lcSwitch();
+        // LAYOUT D (012, the default) or LAYOUT C (011): the same elements, moved - D into the
+        // top bar, the rail and the bottom; C into the top row and the bottom panel. Their
+        // homes are marked first, so Tools > Screen layout can switch at once.
+        markHomes(el);
+        var lay = pickLayout(), lc = lay === 'c';
+        if (lay === 'd') buildLayoutD(el);
         if (lc) buildLayoutC(el);
 
         var tg = document.createElement('div');
@@ -4822,7 +5300,7 @@
             geoError: null, framed: null, mapRequested: false, windKick: true, windPan: 0, loadingCourses: !window.HardPanGpsCourses,
             // Decided once per round, by the one check (hasGpsPro).
             pro: hasGpsPro(),
-            lc: lc
+            lc: lc, ld: lay === 'd'
         };
         // LAYOUT C: the top row and the panel change height without a render (a longer plays line,
         // the round chip wrapping, bigger text): the map's frame and what sits on the panel follow.
@@ -4867,9 +5345,30 @@
         el.addEventListener('pointerdown', function (e) { if (!e.target.closest || !e.target.closest('.gps-credit-i')) closeCredits(); }, true);
         on(el, '.gps-verify', function () { var v = S && S.el.querySelector('.gps-verify'); if (v) v.classList.toggle('gps-open'); });
         on(el, '.gps-hole-btn', openPicker);
-        on(el, '.gps-lc-l1', openPicker);
-        on(el, '.gps-panel-handle', togglePanel);
-        on(el, '.gps-lc-score', function () { if (!S) return; closeMenus(); S.userChoseSide = true; showSide('bets'); });
+        // The layouts' own buttons, by delegation: a layout switch builds them again.
+        el.addEventListener('click', function (e) {
+            var t = e.target && e.target.closest ? e.target : null;
+            if (!t || !S) return;
+            var hit = function (sel) { var n = t.closest(sel); return !!(n && el.contains(n)); };
+            if (hit('.gps-lc-l1')) { e.preventDefault(); openPicker(); }
+            else if (hit('.gps-panel-handle')) { e.preventDefault(); togglePanel(); }
+            else if (hit('.gps-lc-score')) { e.preventDefault(); closeMenus(); S.userChoseSide = true; showSide('bets'); }
+            else if (hit('.gps-ld-plays')) {
+                e.preventDefault();
+                var sh = S.el.querySelector('.gps-plinfo');
+                if (sh && plInfoSwitch()) { closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; }
+            } else if (hit('.gps-ld-holelbl')) { e.preventDefault(); var sb = S.el.querySelector('.gps-score'); if (sb) sb.click(); }
+        });
+        on(el, '.gps-layout-pick', function () { if (S) setLayout(layoutNow() === 'd' ? 'c' : 'd'); });
+        // THE TOOLS SHEET (012): its controls, the swipe, and a tap outside it closes it.
+        var tsh = el.querySelector('.gps-tsheet');
+        if (tsh) { tsh.innerHTML = TS_MARKUP; tsh.addEventListener('click', tsClick); tsDrag(tsh); }
+        on(el, '.gps-ts-back', closeToolsSheet);
+        el.addEventListener('pointerdown', function (e) {
+            if (!tsOpen() || !e.target.closest) return;
+            if (e.target.closest('.gps-tsheet') || e.target.closest('.gps-tools') || e.target.closest('.gps-ts-back')) return;
+            closeToolsSheet();
+        }, true);
         on(el, '.gps-tools', toggleTools);
         on(el, '.gps-score-next', function () { closeMenus(); if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-score-prev', function () { closeMenus(); if (S && S.stepHole) S.stepHole(-1); });
@@ -5480,6 +5979,12 @@
         watchScore: function (ev) { return watchScore(ev); },
         // LAYOUT C's round chip (011; gps_layout_c_test.js): pure.
         roundScore: roundScore, roundScoreText: roundScoreText,
+        // LAYOUT D (012): which layout shows ('d' | 'c' | 'old'), and Tools > Screen layout's switch.
+        layout: function () { return layoutNow(); },
+        setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
+        clubShort: clubShort,
+        // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
+        toolsSheetOn: function () { return tsOn(); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;

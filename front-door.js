@@ -1138,6 +1138,7 @@
     if (W.document) W.document.addEventListener('click', function (ev) {
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
+        if (t.closest('.tg-add')) { openAddGame(); return; }
         if (t.closest('.fd-gps3-map') || t.closest('.fd-gps3-add')) {
             if (t.closest('.fd-gps3-add')) { openAddGame(); return; }
             if (W.HardPanGps && typeof W.HardPanGps.showSide === 'function') W.HardPanGps.showSide('gps');
@@ -1210,6 +1211,12 @@
         W.location.href = 'admin.html?game=' + encodeURIComponent(code) + '&step=players';
         return true;
     }
+    // A GAME ADDED FROM INSIDE A ROUND (012, Manny): Round Setup's Save comes back to the round -
+    // the side and hole it was on (afterSave, stage 'game') - not to Round Ready.
+    function agBackAfter(id) {
+        var code = agCode();
+        if (code) agNext({ code: String(code).toUpperCase(), id: id, stage: 'game', at: Date.now() });
+    }
     // Round Setup on the Players step for a game: the line on top, and a Save that goes on.
     function agNeedBanner(nx) {
         var host = $('admin-screen');
@@ -1271,6 +1278,20 @@
         return true;
     }
     function closeAddGame() { var el = $('fd-addgame'); if (el) el.style.display = 'none'; AG.q = null; }
+    // TODAY'S GAMES, ON THE CARD (012, Manny): the GPS screen's Games pill lands on this card in
+    // a round that has games - and there was no way to add another from it. "+ Add game" at its
+    // top runs the one Add a game sheet above (Players first still applies in it). The app only
+    // (this file is GPS_SHELL); never for a spectator, never twice.
+    function todaysGamesAdd(mount) {
+        if (!on() || !agCode() || spectating() || !mount) return;
+        var card = mount.querySelector('.tg-card');
+        if (!card || card.querySelector('.tg-add')) return;
+        var b = W.document.createElement('button');
+        b.type = 'button'; b.className = 'tg-add';
+        b.textContent = '+ Add game';
+        b.style.cssText = 'display:block;width:100%;min-height:44px;margin:0 0 8px;border-radius:12px;border:0;background:#0f4c3a;color:#ffffff;font-weight:800;font-size:.95rem;cursor:pointer;';
+        card.insertBefore(b, card.firstChild);
+    }
     function agList() {
         var ps = agPlayers();
         var h = agHead('Add a game', 'To this round · your scores carry over', 'close')
@@ -1366,6 +1387,7 @@
             return;
         }
         var ids = q.tpl === 'vegas' ? s.a.concat(s.b) : q.ids;
+        agBackAfter(q.tpl);
         W.location.href = 'admin.html' + base + '&tpl=' + q.tpl + '&amt=' + encodeURIComponent(q.amt) + '&ids=' + encodeURIComponent(ids.join(',')) + (q.tpl === 'skins' ? '&carry=' + (q.carry ? 1 : 0) : '');
     }
     function agRoute(g) {
@@ -1409,6 +1431,7 @@
             if (g.go === 'trip') { agTrip(); return; }
             var url = agRoute(g);
             if (url && agPlayersFirst(g.id, { url: url })) return;
+            if (url && /^admin\.html/.test(url)) agBackAfter(g.id);
             if (url) W.location.href = url;
             return;
         }
@@ -1746,7 +1769,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

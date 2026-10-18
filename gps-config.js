@@ -86,7 +86,13 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
         // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
         // the old layout exactly. gpsRoundScore = the "Thru 3 · 14 (+2) · Net 13 (+1)" chip.
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true, scoreSheet: true },
+        // 012 (mailbox 012, mockup D): gpsLayoutD = the "HardPan" layout, the default (one dark top
+        // bar, a right rail, the plays-like pill, Mark shot + Enter score at the bottom), with
+        // Tools > Screen layout: HardPan | Bottom panel (= layout C), per phone - off: no setting,
+        // and the 011 behaviour exactly (C with gpsLayoutC, else the old layout).
+        // 012: toolsSheet = Tools as a bottom sheet in layouts D and C (layout / units choices,
+        // round switches, a grid of tiles) - off: the old drop-down there too.
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true, scoreSheet: true, gpsLayoutD: true, toolsSheet: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
