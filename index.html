@@ -117,6 +117,7 @@
     <script src="gps-entitlement.js"></script>   <!-- GPS Map: the App Store entitlement (HARDPAN_GPS_CONFIG.iap; on in v2.0) -->
     <script src="gps-view.js"></script>
     <script src="hp-index.js"></script>   <!-- HardPan Index (unofficial): keeps this phone's golfer's finished 18s, on the phone only -->
+    <script src="gps-stats.js"></script>   <!-- Quick stats on the card + My stats (008, HardPanFeature('quickStats'); GPS Map) -->
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
     <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
@@ -1098,6 +1099,17 @@
                         inset 0 0 0 6px var(--text-main, #1a1a1a);
         }
         .receipt-table td.mark-double, .receipt-table td.mark-eagle { padding-left: 7px; padding-right: 7px; }
+        /* QUICK STATS (008): one small line under the golfer's score box - putts, fairway, GIR.
+           It wraps under the row's name and box, so the box itself never moves sideways. */
+        .hv-player-row:has(> .hv-qs) { flex-wrap: wrap; row-gap: 4px; }
+        .hv-qs { flex-basis: 100%; display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 3px; min-width: 0; }
+        .hv-qs-l { font-size: 0.62rem; font-weight: 800; letter-spacing: .03em; color: var(--text-muted); text-transform: uppercase; margin: 0 1px 0 3px; }
+        .hv-qs-chip { flex: 0 1 27px; min-width: 23px; min-height: 30px; padding: 0 3px; border-radius: 8px; border: 1px solid var(--border-mid, #c9d3e0);
+            background: var(--bg-card, #fff); color: var(--text-main, #1a1a1a); font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+        .hv-qs-chip.on { background: #0f4c3a; border-color: #0f4c3a; color: #fff; }
+        .hv-qs-gir { font-size: 0.66rem; font-weight: 800; padding: 3px 5px; border-radius: 999px; background: var(--bg-page, #f4f6f8); color: var(--text-muted); white-space: nowrap; margin-right: auto; }
+        .hv-qs-gir.on { background: #e2f1ea; color: #0f4c3a; }
+        @media print { .hv-qs { display: none !important; } }
         /* GPS:END */
 
         /* SAVE STATE - ported verbatim in shape from tournament-scorecard.html:80-83.
@@ -3534,6 +3546,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         gpsFollowHoleView();
         // GPS:END
         // GPS:BEGIN
+        qsAfterRender();   // quick stats (008): this phone's copy of the round, and My stats in the Round Menu
         // HardPan Index (unofficial): a finished 18 for this phone's golfer is kept on the phone (hp-index.js).
         if (window.HardPanIndex) { try { window.HardPanIndex.noteRound(currentMode, currentData, resolvedMeId()); } catch (e) { } }
         // GPS:END
@@ -3706,6 +3719,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // says everywhere. The pip span carries its net value as a title for anyone
             // who taps it.
             html += `</div><div class="hv-player-cell">${holeViewCellHtml(cells[i])}</div></div>`;
+            // GPS:BEGIN
+            // QUICK STATS (008): putts / fairway / GIR, one tap each, as the row's last line - under
+            // the score box. A golfer this phone may score, not Out; GPS Map only (qsOn).
+            if (hvPlayer && hvPlayer.out !== true && qsOn() && canWritePlayer(hvPlayer.id)) html = html.slice(0, -'</div>'.length) + qsHtml(hvPlayer.id, Number(holeNum), Number(par)) + '</div>';
+            // GPS:END
         }
 
         // ALTERNATE SHOT GETS ITS OWN BOX, and only in a Foursomes session.
@@ -6482,6 +6500,114 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             setTimeout(() => { try { g.precacheCourse(key, pins); } catch (e) {} }, 4000);
         }
     }
+
+    // ---- QUICK STATS ON THE SCORECARD (008: HardPanFeature('quickStats'); part of GPS Map) ----
+    // Under each golfer's score box in Hole View, one tap each: putts (0, 1, 2, 3, 4+), the
+    // fairway (left / hit / right - par 4s and 5s only), and GIR worked out from the score and the
+    // putts (score - putts <= par - 2). KEPT ON THIS PHONE (gps-stats.js): the live rules let only
+    // the round's owner write a new child of the round, so nothing here touches Firebase, and no
+    // money engine reads any of it. Shown only with GPS Map - the one check, hasGpsPro, asked
+    // quietly (the card never puts up a paywall for stats; without GPS Map there are simply no
+    // stats controls) - for a golfer this phone may score, never for a golfer who is Out.
+    function qsOn() {
+        try {
+            return !!(window.HardPanGpsStats && window.HardPanGpsStats.quick && typeof window.HardPanFeature === 'function'
+                && window.HardPanFeature('quickStats') && window.HardPanGps && window.HardPanGps.hasGpsPro());
+        } catch (e) { return false; }
+    }
+    function qsCtx() { return { code: currentMode, course: (currentData && currentData.courseName) || '' }; }
+    // The golfer's score on the hole: the box on screen (typed, perhaps not saved yet), else the saved one.
+    function qsStrokes(pid, hole) {
+        const box = document.querySelector('#hole-view-card .score-input[data-player-id="' + pid + '"][data-hole="' + hole + '"]');
+        const v = box ? parseInt(box.value, 10) : NaN;
+        if (v > 0) return v;
+        const s = Number(((currentData && currentData.scores) || {})['p' + pid + '_h' + hole]);
+        return s > 0 ? s : 0;
+    }
+    function qsHtml(pid, hole, par) {
+        const Q = window.HardPanGpsStats.quick;
+        const c = Q.hole(currentMode, pid, hole, qsStrokes(pid, hole), par);
+        const chip = (kind, val, label, on, aria) => `<button type="button" class="hv-qs-chip${on ? ' on' : ''}" data-qs="${kind}" data-qs-v="${val}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${aria}">${label}</button>`;
+        let h = `<div class="hv-qs" data-qs-pid="${escapeHtml(String(pid))}" data-qs-hole="${hole}" data-qs-par="${par}">`;
+        // GIR first, in the line's empty left end (worked out, never tapped).
+        if (c.gir != null) h += `<span class="hv-qs-gir${c.gir ? ' on' : ''}" data-qs-gir="${c.gir ? '1' : '0'}">${c.gir ? 'GIR \u2713' : 'No GIR'}</span>`;
+        h += '<span class="hv-qs-l">Putts</span>';
+        [0, 1, 2, 3, 4].forEach(k => { h += chip('putts', k, k === 4 ? '4+' : String(k), c.putts === k, (k === 4 ? '4 or more' : k) + ' putts'); });
+        if (Q.fwAsked(par)) {
+            h += '<span class="hv-qs-l">FW</span>';
+            [['L', 'L', 'Fairway missed left'], ['hit', 'Hit', 'Fairway hit'], ['R', 'R', 'Fairway missed right']].forEach(x => { h += chip('fw', x[0], x[1], c.fw === x[0], x[2]); });
+        }
+        return h + '</div>';
+    }
+    // THE GOLFER THIS PHONE IS, for My stats: "This is me" (resolvedMeId); else the GPS screen's
+    // "Who are you?" name tag (hardpan_gps_golfer_<code>); else the round's only golfer; else, on
+    // the phone that owns the round, player 1 (Round Setup's first row - "Me" on a GPS-door round).
+    // Nobody else is guessed at: a round with no answer adds nothing to My stats.
+    function qsMeId() {
+        const d = currentData;
+        if (!d || !Array.isArray(d.players) || !d.players.length) return null;
+        const has = id => id != null && d.players.some(p => String(p.id) === String(id));
+        let id = null;
+        try { id = typeof resolvedMeId === 'function' ? resolvedMeId() : null; } catch (e) { id = null; }
+        if (has(id)) return String(id);
+        try { id = localStorage.getItem('hardpan_gps_golfer_' + currentMode); } catch (e) { id = null; }
+        if (has(id)) return String(id);
+        if (d.players.length === 1) return String(d.players[0].id);
+        try { if (roundOwnerHere()) return String(d.players[0].id); } catch (e) {}
+        return null;
+    }
+    function qsSync() {
+        if (!qsOn() || !currentMode || !currentData) return;
+        const holes = ((currentData && currentData.courseData) || []).filter(h => h && h.hole).map(h => ({ n: String(h.hole), par: Number(h.par) || 0 }));
+        window.HardPanGpsStats.quick.sync({ code: currentMode, course: currentData.courseName || '', round: currentData, holes: holes }, qsMeId());
+    }
+    // ≡ ROUND MENU: "My stats" - with GPS Map only; gone again if it lapses.
+    function qsPlaceMenu() {
+        const body = document.getElementById('round-sheet-body');
+        if (!body) return;
+        let b = document.getElementById('qs-menu-mystats');
+        if (!qsOn()) { if (b) b.remove(); return; }
+        if (b) return;
+        b = document.createElement('button');
+        b.type = 'button'; b.id = 'qs-menu-mystats'; b.className = 'btn-outline';
+        b.style.cssText = 'width:100%;margin:4px 0 10px;';
+        b.textContent = '📊 My stats';
+        b.addEventListener('click', () => {
+            try { if (typeof toggleRoundSheet === 'function') toggleRoundSheet(false); } catch (e) {}
+            try { qsSync(); } catch (e) {}
+            window.HardPanGpsStats.openMy();
+        });
+        const qr = document.getElementById('qr-share-mount');
+        if (qr && qr.parentNode === body) body.insertBefore(b, qr); else body.appendChild(b);
+    }
+    function qsAfterRender() {
+        try { qsSync(); } catch (e) {}
+        try { qsPlaceMenu(); } catch (e) {}
+    }
+    // A tap on a stat never takes the focus from a score box being typed in (as Prev / Next).
+    document.addEventListener('mousedown', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.hv-qs [data-qs]')) e.preventDefault();
+    });
+    document.addEventListener('click', (e) => {
+        const b = e.target && e.target.closest ? e.target.closest('.hv-qs [data-qs]') : null;
+        if (!b || !qsOn()) return;
+        const strip = b.closest('.hv-qs');
+        const p = ((currentData && currentData.players) || []).find(x => String(x.id) === strip.getAttribute('data-qs-pid'));
+        if (!p || !canWritePlayer(p.id)) return;
+        const hole = Number(strip.getAttribute('data-qs-hole')), par = Number(strip.getAttribute('data-qs-par'));
+        const kind = b.getAttribute('data-qs'), val = b.getAttribute('data-qs-v');
+        const patch = {};
+        patch[kind] = b.classList.contains('on') ? null : (kind === 'putts' ? Number(val) : val);   // a second tap clears it
+        window.HardPanGpsStats.quick.set(qsCtx(), p.id, hole, patch, qsStrokes(p.id, hole), par);
+        strip.outerHTML = qsHtml(p.id, hole, par);
+        try { qsSync(); } catch (err) {}
+    });
+    // The store's answer arriving (or a subscription lapsing) redraws the hole: controls on / off.
+    try {
+        if (window.HardPanEntitlement && typeof window.HardPanEntitlement.onChange === 'function') {
+            window.HardPanEntitlement.onChange(() => { try { if (currentData && currentViewMode === 'hole') renderHoleView(); } catch (e) {} });
+        }
+    } catch (e) {}
 
     // GPS:END
     // ONE PLACE THAT CHANGES THE HOLE, so Prev, Next and the 1-18 picker cannot
