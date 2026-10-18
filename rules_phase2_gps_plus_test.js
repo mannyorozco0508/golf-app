@@ -42,6 +42,8 @@ test('quick stats: a signed-in golfer writes the exact shape; anything else is r
 test('club distances: only that account reads and writes its own bag', () => {
     assert.ok(can(ME, 'player_clubs/me/me/set/7i', 158));
     assert.ok(can(ME, 'player_clubs/me/n:ann able/shots/Dr', { 0: 241, 1: 236, 9: 250 }));
+    assert.ok(can(ME, 'player_clubs/me/me', { shots: { '7i': { 0: 150, 1: 152 } }, set: { Dr: 240 }, base: { PW: 120, LW: 75 } }), 'the whole record, one set() (009)');
+    assert.strictEqual(can(ME, 'player_clubs/me/me/base/PW', 500), false, 'setup carry over 449');
     assert.ok(canRead(ME, 'player_clubs/me'));
     assert.strictEqual(canRead(OTHER, 'player_clubs/me'), false, 'someone else reads my bag');
     assert.strictEqual(can(OTHER, 'player_clubs/me/me/set/7i', 158), false, 'someone else writes my bag');

@@ -626,6 +626,11 @@
               ".validate": "$club.matches(/^(Dr|3w|5w|Hy|[4-9]i|PW|GW|SW|LW)$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 449"
             }
           },
+          "base": {
+            "$club": {
+              ".validate": "$club.matches(/^(Dr|3w|5w|Hy|[4-9]i|PW|GW|SW|LW)$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 449"
+            }
+          },
           "$other": {
             ".validate": false
           }
