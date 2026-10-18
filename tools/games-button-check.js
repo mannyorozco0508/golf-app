@@ -17,6 +17,10 @@ const path = require('path');
 const HERE = path.join(__dirname, '..');
 const { arriveCold, fileUrl } = require(path.join(HERE, 'tools/lib/cold-arrival.js'));
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
+// PAID LAUNCH (2026-10-17): v2.0's GPS is the GPS Map subscription. This check tests GPS features
+// (and the app around them) as a SUBSCRIBER: the App Store stubbed, entitlement active
+// (tools/lib/iap-stub.js). The paywall itself: tools/gps-paywall-check.js.
+const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});";
 const APP = 'window.__hardpanDoors = true; window.__freshPhone = true;';
 const DB = (ev) => ({ events: ev || {}, global_courses: {}, trips: {}, organizers: {}, tournaments: {} });
@@ -29,7 +33,7 @@ function round(code, extra) {
 }
 const SEED = (code) => "localStorage.setItem('hardpan_round_side', 'gps|" + code + "'); localStorage.setItem('hardpan_gps_whoasked_" + code + "', '1'); window.__loads = (Number(sessionStorage.getItem('__loads') || 0) + 1); sessionStorage.setItem('__loads', String(window.__loads));";
 const ST = "JSON.stringify({ url: document.URL.split('/').pop(), loads: sessionStorage.getItem('__loads'), side: HardPanGps.side(), hole: HardPanGps.hole(), games: (function(){ var m = document.getElementById('todays-games-mount'); if (!m || !m.textContent.trim()) return null; var r = m.getBoundingClientRect(); return { text: m.innerText.slice(0, 60), inView: r.top < window.innerHeight && r.bottom > 0 }; })(), addGame: (function(){ var a = document.getElementById('fd-addgame'); return !!(a && a.style.display !== 'none'); })(), picker: !!document.querySelector('#v-gps.on, #hp-near-list'), e: window.__e })";
-const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3000, viewport: { width: 390, height: 844 }, webgl: true }, o)); if (!r.ok) throw new Error(r.reason); return r; };
+const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 3000, viewport: { width: 390, height: 844 }, webgl: true }, o, { preScript: (o.preScript || '') + iapStub({ active: true }) })); if (!r.ok) throw new Error(r.reason); return r; };
 const CLICK = (sel) => ({ expression: "(function(){ var b = document.querySelector(" + JSON.stringify(sel) + "); if (!b) return 'missing ' + " + JSON.stringify(sel) + "; b.click(); return 'ok'; })()" });
 
 (async () => {

@@ -94,10 +94,15 @@ describe('THE POSITIONING IS STATED, NOT IMPLIED', () => {
         assert.match(read('support.html'), /never takes payment and never takes a cut/i);
     });
 
-    test('no page promises in-app purchases that do not exist', () => {
-        // The app ships with no IAP. Claiming otherwise in the terms would be a
-        // straightforward rejection.
-        assert.match(read('terms.html'), /currently offers no in-app purchases or subscriptions/i);
+    test('the terms say what is free and what the GPS Map subscription is - and never promise free GPS', () => {
+        // Mailbox 007 (Manny 2026-10-17): v2.0 sells GPS from day one - every GPS feature behind a
+        // 7-day free trial, then the yearly GPS Map subscription; games stay free. The terms must say
+        // exactly that (a page promising free GPS, or no subscription, would be a rejection now).
+        const t = read('terms.html');
+        assert.match(t, /Games, scoring, the scorecard, the leaderboard, joining a game and settling up are free/);
+        assert.match(t, /GPS Map subscription: an auto-renewing yearly subscription with a 7-day free trial/);
+        assert.ok(!/currently offers no in-app purchases/i.test(t), 'the subscription exists now');
+        ['terms.html', 'privacy.html', 'support.html'].forEach((f) => assert.ok(!/free (gps|yardage)|gps (is |stays )?free|basic yardages/i.test(read(f)), f + ' promises free GPS'));
     });
 
     test('the terms carry the auto-renewing subscription terms for when one goes on sale', () => {

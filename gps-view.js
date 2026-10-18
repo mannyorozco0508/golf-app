@@ -154,20 +154,22 @@
                  tileSize: 256, maxzoom: GOOGLE.maxNativeZoom, attribution: 'Google Maps' };
     }
 
-    // ---- HARDPAN GPS PRO: THE ONE CHECK (Wave 2, 2026-10-08) -----------------
-    // Free: the numbers (FRONT / CENTER / BACK, accuracy, Enter Score) and no map.
-    // Pro: everything else - the satellite hole, arcs, target, Edit Pin, wind,
-    // plays like. This is the ONLY place that decides. In order:
-    //   1. HARDPAN_GPS_CONFIG.iap on: the App Store entitlement alone
-    //      (gps-entitlement.js - StoreKit through RevenueCat; no plugin = Free);
-    //   2. iap off: HARDPAN_GPS_CONFIG.paywall - false means everyone is Pro,
-    //      true means Free.
+    // ---- GPS MAP: THE ONE CHECK (Wave 2, 2026-10-08; paid launch 2026-10-17) -----
+    // Does this phone have GPS Map - an active 7-day free trial or a paid yearly
+    // subscription? ALL of GPS needs it (Manny, mailbox 007): the satellite hole,
+    // front / center / back, the target, wind, plays like. No entitlement = no GPS
+    // side at all (the gate below, requireGps). This is the ONLY place that decides:
+    //   1. HARDPAN_GPS_CONFIG.iap on (v2.0): the App Store entitlement alone
+    //      (gps-entitlement.js - StoreKit through RevenueCat; no plugin or no key =
+    //      no entitlement). The flag on but the entitlement file missing: no GPS.
+    //   2. iap off (a build with no store at all): HARDPAN_GPS_CONFIG.paywall -
+    //      false means GPS on, true means GPS off.
     // There is NO tester override (gps-store-iap, 2026-10-17): the old URL tier switch and the
-    // phone's hardpan_gps_tier are gone, so nothing in a URL can make a phone Pro.
+    // phone's hardpan_gps_tier are gone, so nothing in a URL can turn GPS on.
     function entitlement() { return (typeof window !== 'undefined' && window.HardPanEntitlement) || null; }
     function iapOn() { var E = entitlement(); return !!(E && E.enabled()); }
-    // Flag on and the store has not answered yet this launch: the upgrade sheet
-    // waits, so a paying golfer is not shown it while the answer is on its way.
+    // Flag on and the store has not answered yet this launch: the gate waits, so a
+    // paying golfer is not shown the paywall while the answer is on its way.
     function proPending() { var E = entitlement(); return iapOn() && !E.known(); }
     // A phone that once used the old switch still holds its value: never read, cleared once.
     try { if (typeof localStorage !== 'undefined') localStorage.removeItem('hardpan_gps_tier'); } catch (e) {}
@@ -182,6 +184,7 @@
     function tournament() { return tourneyRound() || tourneyPhone(); }
     function hasGpsPro() {
         if (iapOn()) return entitlement().isPro() === true;
+        if (cfg().iap === true) return false;
         if (cfg().paywall !== true) return true;
         return false;
     }
@@ -709,7 +712,7 @@
     // THE WHOLE COURSE'S HEIGHTS, ONCE, when the round opens with signal - for the
     // phones that never picked the course in setup (gps-offline.js; course points only).
     function prefetchCourseElevs() {
-        if (!S || S.elevPrefetch || cfg().elevOnTee !== false || tournament()) return;
+        if (!S || !S.pro || S.elevPrefetch || cfg().elevOnTee !== false || tournament()) return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         var mine = S;
         S.elevPrefetch = true;
@@ -1220,8 +1223,8 @@
         var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
         G = G || window.HardPanGeo || null;
         if (!courseKey || !G) return why('no-course');
-        // Free: no map, so no imagery stored either.
-        if (!hasGpsPro()) return why('free');
+        // No GPS Map: no map, so no imagery stored either.
+        if (!hasGpsPro()) return why('no-gps-map');
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return why('offline');
         if (typeof caches === 'undefined' || typeof fetch !== 'function') return why('unsupported');
         try {
@@ -2195,7 +2198,7 @@
         if (!S) return;
         var box = S.el.querySelector('.gps-wind');
         if (!box) return;
-        // Free (no HardPan GPS): no wind, and no request for it. Tournament mode: the same.
+        // No GPS Map: no wind, and no request for it. Tournament mode: the same.
         if (!S.pro || tournament()) { box.style.display = 'none'; closeWindSheet(); syncPlays(); return; }
         syncPlays();
         var w = lsGet(windKey()), now = Date.now();
@@ -2355,97 +2358,287 @@
         el.setAttribute('data-terms', pl ? Object.keys(pl.terms).join(' ') : '');
     }
 
-    // ---- THE UPGRADE SHEET = THE PAYWALL (gps-store-iap, 2026-10-17) ---------------
-    // The first time GPS is shown in a session without HardPan GPS, and from "Get
-    // HardPan GPS" on the panel. Two faces, decided by HARDPAN_GPS_CONFIG.iap:
-    //   off: the feature list and ONE sentence - Pro is not available in this
-    //        build. No price, no Subscribe, no Restore: nothing to buy.
-    //   on:  the App Store paywall, with every disclosure Apple asks for (3.1.2):
-    //        the product title, the price per period from StoreKit, the length
-    //        (1 year), the 7-day free trial and when the charge happens, the
-    //        auto-renew / cancel wording, Subscribe, Restore Purchases, and the
-    //        Terms of Use and Privacy Policy links.
-    // The old disabled placeholder button is gone.
+    // ---- THE PAYWALL AND THE GATE (paid launch: Manny, mailbox 007, 2026-10-17) ------
+    // ALL of GPS is the "GPS Map" subscription: a 7-day free trial, then an
+    // auto-renewing yearly subscription. Every part of GPS is paid - no map and no
+    // yardage shows without an active trial or subscription. Games, scoring, bet
+    // tracking, joining, the scorecard, the leaderboard and settle up never ask.
+    //
+    // THE GATE is requireGps(ctx, go, no): every way into GPS passes it - showSide
+    // ('gps') (the 📍 GPS button, the card's GPS pill, "back to map", Resume onto
+    // GPS, the landing) here, and the Home doors (front-door.js) before a GPS round
+    // starts. Entitled: go() at once. The store's first answer still on its way
+    // this launch: it waits for it (no GPS flashed then taken away, no paywall
+    // flashed at a paying golfer). Not entitled: THE PAYWALL - its own sheet over
+    // whatever screen the golfer is on (the card, Home), never over a map. A trial
+    // started or a purchase restored: go(). "Not now": no() - the golfer stays on
+    // the card / Home. ctx.quiet: no paywall, just no() (a programmatic return to
+    // GPS, e.g. after Enter Score, is never a sales pitch).
+    //
+    // THE PAYWALL (App Store Guideline 3.1.2): the primary button "Start 7-day free
+    // trial"; the store's own localized price per year - with the founding wording
+    // while the founding window is open; the subscription's length; the trial and
+    // when the Apple ID is charged; the auto-renew / cancel sentence; Restore
+    // Purchases; the Terms of Use and Privacy Policy links; "Not now". Price text
+    // comes ONLY from StoreKit - with none, it says the App Store shows the price
+    // before the golfer confirms. And the course the golfer is opening, with how
+    // many of its holes have GPS ("Caledonia: 18/18 ✓").
     var SHEET_SEEN = 'hardpan_gps_sheet_seen';
     var sheetSeenHere = false;
-    var SHEET_OFF = "HardPan GPS Pro isn\u2019t available in this build.";
+    var SHEET_OFF = "GPS Map isn\u2019t available in this build.";
     var RENEW = 'Renews automatically each year unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings > Apple ID > Subscriptions.';
+    var NO_PRICE = 'The App Store shows the price before you confirm.';
+    var PENDING_MS = 8000;      // the longest the gate waits for the store's first answer
+    var FOUNDING_MS = 2500;     // the longest the paywall waits for gps_meta/config
+    var FOUNDING_CAP = 1000;    // gps-config.js foundingCap, else this
+    var PW = null;              // the open paywall: { el, ctx, go, no, offer, founding, cov }
     function sheetSeen() {
         try { if (sessionStorage.getItem(SHEET_SEEN) === '1') return true; } catch (e) {}
         return sheetSeenHere;
     }
-    // NEVER shown to a HardPan GPS (Pro) user, whatever calls it.
-    function openSheet() {
-        if (!S || S.pro) return;
-        syncSheet();
-        sheetSeenHere = true;
-        try { sessionStorage.setItem(SHEET_SEEN, '1'); } catch (e) {}
-        show('.gps-sheet', true);
+    // THE FOUNDING WINDOW: the server's gps_meta/config { foundingOpen, foundingCap }
+    // (pure: the value read, or null). Absent or unreadable = OPEN - launch IS the
+    // founding window, and the store shows the actual price either way.
+    function foundingFrom(v) {
+        var c = cfg(), cap = Number(c.foundingCap) > 0 ? Math.floor(Number(c.foundingCap)) : FOUNDING_CAP;
+        var out = { open: true, cap: cap, src: 'default' };
+        if (v && typeof v === 'object') {
+            if (Number(v.foundingCap) > 0) { out.cap = Math.floor(Number(v.foundingCap)); out.src = 'server'; }
+            if (typeof v.foundingOpen === 'boolean') { out.open = v.foundingOpen; out.src = 'server'; }
+        }
+        return out;
     }
-    function closeSheet() { show('.gps-sheet', false); }
-    function sheetMsg(text) { txt('.gps-sheet-msg', text || ''); show('.gps-sheet-msg', !!text); }
-    // The disclosures, from the store's offer (o) - or, only when the store gave
-    // no price, the config fallback, marked data-price-src="config".
-    function sheetText(o) {
+    // Read once a session, best effort, never longer than FOUNDING_MS.
+    var foundingRead = null;
+    function founding(cb) {
+        if (foundingRead) { cb(foundingRead); return; }
+        var fin = false, t = null;
+        var done = function (v) { if (fin) return; fin = true; clearTimeout(t); if (v && v.src === 'server') foundingRead = v; cb(v); };
+        t = setTimeout(function () { done(foundingFrom(null)); }, FOUNDING_MS);
+        try {
+            var fb = window.firebase;
+            // (before the page's initializeApp this throws - caught: the default)
+            var d = fb && typeof fb.database === 'function' ? fb.database() : null;
+            if (!d || typeof d.ref !== 'function') { done(foundingFrom(null)); return; }
+            d.ref('gps_meta/config').once('value').then(function (snap) {
+                done(foundingFrom(snap && typeof snap.val === 'function' ? snap.val() : null));
+            }, function () { done(foundingFrom(null)); });
+        } catch (e) { done(foundingFrom(null)); }
+    }
+    // "Caledonia: 18/18 ✓" - the course being opened and its holes with GPS (pure).
+    function courseLine(name, n, of) {
+        name = String(name || '').replace(/\s*\((?:[A-Z]{2})\b[^)]*\)\s*$/, '').trim();
+        n = Number(n); of = Number(of);
+        if (!name || !(of > 0) || !(n >= 0)) return '';
+        if (n >= of) return name + ': ' + of + '/' + of + ' \u2713';
+        if (n > 0) return name + ': ' + n + '/' + of + ' holes with GPS';
+        return name + ': no holes with GPS yet';
+    }
+    // The paywall's words, from the store's offer (o), the founding window (f) and
+    // the course (cov: { name, n, of }). Pure (gps_paywall_test.js).
+    function sheetText(o, f, cov) {
         o = o || {};
-        var c = cfg(), trial = o.trial || '7-day', fallback = String(c.iapPriceFallback || '').trim();
-        var priceSrc = o.fromStore && o.price ? 'store' : (fallback ? 'config' : 'none');
-        var per = o.fromStore && o.price ? o.price + ' per year' : (fallback || '');
+        f = f || foundingFrom(null);
+        var price = o.fromStore && o.price ? String(o.price) : '';
+        // The store's product has no free introductory offer: no trial words at all.
+        var hasTrial = !(o.fromStore && !o.trial);
+        var trialLen = o.trial || '7-day';
+        var cap = Number(f.cap) > 0 ? Number(f.cap) : FOUNDING_CAP;
         return {
-            title: (o.fromStore && o.title) || 'HardPan GPS Pro (yearly)',
-            price: per ? per : 'The price is shown by the App Store before you confirm.',
-            priceSrc: priceSrc,
+            title: 'GPS Map',
+            product: (o.fromStore && o.title) || 'HardPan GPS Map (yearly)',
+            buy: hasTrial ? 'Start ' + trialLen + ' free trial' : 'Subscribe',
+            founding: f.open ? 'Founding price \u00b7 locked while subscribed \u00b7 first ' + cap.toLocaleString('en-US') + ' subscribers' : '',
+            price: price ? price + '/year' + (f.open ? ' founding price (locked while subscribed)' : '') : NO_PRICE,
+            priceSrc: price ? 'store' : 'none',
             length: '1-year subscription, renews automatically.',
-            trial: trial + ' free trial. Your Apple ID is charged ' + (per ? per.replace(/ per year$/, '') + ' ' : '') + 'when the trial ends, unless you cancel at least 24 hours before it ends.',
-            renew: RENEW
+            trial: hasTrial ? trialLen + ' free trial, then ' + (price ? price + '/year' : 'the yearly price the App Store shows') + '. Your Apple ID is charged when the trial ends unless you cancel at least 24 hours before.' : '',
+            renew: RENEW,
+            course: cov ? courseLine(cov.name, cov.n, cov.of) : ''
         };
     }
-    function paintSheet(t) {
-        txt('.gps-sheet-title', 'HardPan GPS');
-        txt('.gps-sheet-product', t.title);
-        txt('.gps-sheet-price', t.price);
-        var pe = S && S.el.querySelector('.gps-sheet-price');
-        if (pe) pe.setAttribute('data-price-src', t.priceSrc);
-        txt('.gps-sheet-length', t.length);
-        txt('.gps-sheet-trial', t.trial);
-        txt('.gps-sheet-renew', t.renew);
+    var PW_MARKUP = '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="GPS Map">'
+        + '<div class="gps-sheet-card">'
+        +   '<div class="gps-sheet-title">GPS Map</div>'
+        +   '<div class="gps-sheet-course" style="display:none"></div>'
+        +   '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Front, center and back yardages</li><li>Drag-the-target yardages</li><li>Wind and plays-like yardage</li></ul>'
+        // iap off (a build with no store): one sentence, nothing to buy.
+        +   '<div class="gps-sheet-off" style="display:none"></div>'
+        // iap on: the App Store paywall and its disclosures (paintSheet fills them).
+        +   '<div class="gps-sheet-iap" style="display:none">'
+        +     '<button type="button" class="gps-sheet-buy">Start 7-day free trial</button>'
+        +     '<div class="gps-sheet-founding" style="display:none"></div>'
+        +     '<div class="gps-sheet-price" data-price-src="none"></div>'
+        +     '<div class="gps-sheet-product gps-sheet-fine"></div>'
+        +     '<div class="gps-sheet-length gps-sheet-fine"></div>'
+        +     '<div class="gps-sheet-trial gps-sheet-fine"></div>'
+        +     '<div class="gps-sheet-renew gps-sheet-fine"></div>'
+        +     '<button type="button" class="gps-sheet-restore">Restore Purchases</button>'
+        +     '<div class="gps-sheet-msg" role="status" aria-live="polite" style="display:none"></div>'
+        +     '<div class="gps-sheet-links"><a class="gps-sheet-terms" target="_blank" rel="noopener">Terms of Use</a> \u00b7 <a class="gps-sheet-privacy" target="_blank" rel="noopener">Privacy Policy</a></div>'
+        +   '</div>'
+        +   '<button type="button" class="gps-sheet-close">Not now</button>'
+        + '</div>'
+        + '</div>';
+    // Its own sheet over any page (the card, Home) - the GPS side's look.
+    var PW_CSS = ''
+        + '#gps-paywall{position:fixed;inset:0;z-index:2147483000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#f4f4ef;color-scheme:dark;}'
+        + '#gps-paywall button{font:inherit;color:#f4f4ef;background:none;border:0;cursor:pointer;-webkit-appearance:none;appearance:none;padding:0 12px;}'
+        + '#gps-paywall .gps-sheet{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;}'
+        + '#gps-paywall .gps-sheet-card{width:100%;max-width:480px;max-height:100%;overflow-y:auto;box-sizing:border-box;background:#121a14;border:1px solid #3a4a3e;border-radius:18px 18px 0 0;'
+        +   'padding:22px 20px calc(22px + env(safe-area-inset-bottom));}'
+        + '#gps-paywall .gps-sheet-title{font-size:24px;font-weight:800;color:#d9f99d;}'
+        + '#gps-paywall .gps-sheet-course{margin-top:6px;font-size:15px;font-weight:700;color:#f4f4ef;}'
+        + '#gps-paywall .gps-sheet-list{margin:14px 0 14px;padding-left:20px;font-size:15px;line-height:1.6;color:#d1d5db;}'
+        + '#gps-paywall .gps-sheet-founding{margin-top:12px;display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(217,249,157,.14);color:#d9f99d;font-size:12px;font-weight:800;}'
+        + '#gps-paywall .gps-sheet-price{margin-top:8px;font-size:16px;font-weight:700;color:#f4f4ef;}'
+        + '#gps-paywall .gps-sheet-off{margin:0 0 14px;font-size:15px;line-height:1.4;color:#f4f4ef;}'
+        + '#gps-paywall .gps-sheet-fine{margin-top:6px;font-size:12px;line-height:1.4;color:#c8d1ca;}'
+        + '#gps-paywall .gps-sheet-buy{display:block;width:100%;margin-top:4px;min-height:48px;background:#d9f99d;color:#0b0f0c;border-radius:12px;font-weight:800;font-size:16px;}'
+        + '#gps-paywall .gps-sheet-buy:disabled,#gps-paywall .gps-sheet-restore:disabled{opacity:.55;}'
+        + '#gps-paywall .gps-sheet-restore{display:block;width:100%;margin-top:12px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;color:#d9f99d;font-weight:700;}'
+        + '#gps-paywall .gps-sheet-msg{margin-top:10px;font-size:14px;font-weight:700;line-height:1.4;color:#f4f4ef;}'
+        + '#gps-paywall .gps-sheet-links{margin-top:12px;text-align:center;font-size:13px;color:#c8d1ca;}'
+        + '#gps-paywall .gps-sheet-links a{color:#c8d1ca;text-decoration:underline;}'
+        + '#gps-paywall .gps-sheet-close{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;}';
+    function pq(sel) { return PW && PW.el ? PW.el.querySelector(sel) : null; }
+    function ptxt(sel, v) { var e = pq(sel); if (e && e.textContent !== String(v)) e.textContent = String(v); }
+    function pshow(sel, on) { var e = pq(sel); if (e) e.style.display = on ? '' : 'none'; }
+    function sheetMsg(text) { ptxt('.gps-sheet-msg', text || ''); pshow('.gps-sheet-msg', !!text); }
+    function paywallEl() {
+        var el = document.getElementById('gps-paywall');
+        if (el) return el;
+        if (!document.getElementById('gps-paywall-css')) {
+            var st = document.createElement('style');
+            st.id = 'gps-paywall-css';
+            st.textContent = PW_CSS;
+            (document.head || document.documentElement).appendChild(st);
+        }
+        el = document.createElement('div');
+        el.id = 'gps-paywall';
+        el.style.display = 'none';
+        el.innerHTML = PW_MARKUP;
+        var tl = el.querySelector('.gps-sheet-terms'), pl = el.querySelector('.gps-sheet-privacy');
+        if (tl) tl.setAttribute('href', String(cfg().iapTermsUrl || 'terms.html'));
+        if (pl) pl.setAttribute('href', String(cfg().iapPrivacyUrl || 'privacy.html'));
+        var tap = function (sel, fn) { var b = el.querySelector(sel); if (b) b.addEventListener('click', function (e) { e.preventDefault(); fn(); }); };
+        tap('.gps-sheet-close', declinePaywall);
+        tap('.gps-sheet-buy', function () { sheetAct('buy'); });
+        tap('.gps-sheet-restore', function () { sheetAct('restore'); });
+        (document.body || document.documentElement).appendChild(el);
+        return el;
     }
-    function syncSheet() {
+    function paintSheet() {
+        if (!PW) return;
         var on = iapOn();
-        show('.gps-sheet-off', !on);
-        txt('.gps-sheet-off', on ? '' : SHEET_OFF);
-        show('.gps-sheet-iap', on);
-        sheetMsg('');
+        pshow('.gps-sheet-off', !on);
+        ptxt('.gps-sheet-off', on ? '' : SHEET_OFF);
+        pshow('.gps-sheet-iap', on);
+        var t = sheetText(PW.offer, PW.founding, PW.cov);
+        ptxt('.gps-sheet-title', t.title);
+        ptxt('.gps-sheet-course', t.course);
+        pshow('.gps-sheet-course', !!t.course);
         if (!on) return;
-        var E = entitlement(), mine = S;
-        paintSheet(sheetText(null));
-        E.offer(function (o) { if (S === mine) paintSheet(sheetText(o)); });
+        ptxt('.gps-sheet-buy', t.buy);
+        ptxt('.gps-sheet-founding', t.founding);
+        pshow('.gps-sheet-founding', !!t.founding);
+        ptxt('.gps-sheet-price', t.price);
+        var pe = pq('.gps-sheet-price');
+        if (pe) pe.setAttribute('data-price-src', t.priceSrc);
+        ptxt('.gps-sheet-product', t.product);
+        ptxt('.gps-sheet-length', t.length);
+        ptxt('.gps-sheet-trial', t.trial);
+        pshow('.gps-sheet-trial', !!t.trial);
+        ptxt('.gps-sheet-renew', t.renew);
     }
-    // Subscribe / Restore: one at a time; the answer is one sentence, or Pro.
+    function openPaywall(ctx, go, no) {
+        ctx = ctx || {};
+        var el = paywallEl();
+        var mine = PW = { el: el, ctx: ctx, go: go || null, no: no || null, offer: null, founding: foundingRead, cov: null };
+        sheetSeenHere = true;
+        try { sessionStorage.setItem(SHEET_SEEN, '1'); } catch (e) {}
+        sheetBusy(false);
+        sheetMsg('');
+        paintSheet();
+        el.style.display = '';
+        var E = entitlement();
+        if (iapOn() && E) E.offer(function (o) { if (PW === mine) { mine.offer = o; paintSheet(); } });
+        founding(function (f) { if (PW === mine) { mine.founding = f; paintSheet(); } });
+        if (typeof ctx.coverage === 'function') {
+            try { ctx.coverage(function (c) { if (PW === mine && c && c.of > 0) { mine.cov = { name: c.name || ctx.course || '', n: c.n, of: c.of }; paintSheet(); } }); } catch (e) {}
+        }
+    }
+    function paywallOpen() { var el = document.getElementById('gps-paywall'); return !!(PW && el && el.style.display !== 'none'); }
+    // Closed by the store's yes (a trial started, a purchase restored): go().
+    function closePaywall(said) {
+        var p = PW;
+        if (!p) return;
+        PW = null;
+        if (p.el) p.el.style.display = 'none';
+        var fn = said === 'yes' ? p.go : said === 'no' ? p.no : null;
+        if (typeof fn === 'function') { try { fn(); } catch (e) {} }
+    }
+    function declinePaywall() { closePaywall('no'); }
+    // Start the trial / Restore: one at a time; the answer is one sentence, or GPS.
     function sheetBusy(on) {
-        ['.gps-sheet-buy', '.gps-sheet-restore'].forEach(function (sel) { var b = S && S.el.querySelector(sel); if (b) b.disabled = !!on; });
+        ['.gps-sheet-buy', '.gps-sheet-restore'].forEach(function (sel) { var b = pq(sel); if (b) b.disabled = !!on; });
     }
     function sheetAct(kind) {
         var E = entitlement();
-        if (!S || !E || !iapOn()) return;
-        var mine = S;
+        if (!PW || !E || !iapOn()) return;
+        var mine = PW;
         sheetBusy(true);
         sheetMsg(kind === 'restore' ? 'Restoring\u2026' : '');
         E[kind === 'restore' ? 'restore' : 'purchase'](function (r) {
-            if (S !== mine) return;
+            if (PW !== mine) return;
             sheetBusy(false);
-            if (r && r.pro) { sheetMsg(''); becomePro(); return; }
+            if (r && r.pro && hasGpsPro()) { sheetMsg(''); closePaywall('yes'); becomePro(); return; }
             sheetMsg((r && r.message) || E.MSG.error);
         });
     }
-    // THE STORE SAID PRO (a purchase, a restore, or the launch read arriving
-    // after this round was mounted Free): the full screen, at once.
+    // THE GATE. go(): GPS may show. no(): it may not (declined, or ctx.quiet).
+    function requireGps(ctx, go, no) {
+        ctx = ctx || {};
+        var yes = function () { if (typeof go === 'function') go(); };
+        var nope = function () { if (typeof no === 'function') no(); };
+        if (hasGpsPro()) { yes(); return true; }
+        var decide = function () {
+            if (hasGpsPro()) yes();
+            else if (ctx.quiet) nope();
+            else openPaywall(ctx, yes, nope);
+        };
+        // The store has not answered yet this launch: wait for it (PENDING_MS at most).
+        if (proPending()) { entitlement().whenKnown(decide, PENDING_MS); return false; }
+        decide();
+        return false;
+    }
+    // THE ROUND'S COURSE on the paywall: its name, and its holes with GPS (the same
+    // test the landing uses - holeHasData - over the card's holes).
+    function roundCourseName() {
+        var r = (S && S.round) || {};
+        return String(r.courseName || '');
+    }
+    function roundCoverage(cb) {
+        var mine = S;
+        if (!S) { cb(null); return; }
+        loadCourses(function () {
+            if (S !== mine) { cb(null); return; }
+            S.loadingCourses = false;
+            var list = [];
+            try { list = typeof S.holeList === 'function' ? (S.holeList() || []) : []; } catch (e) { list = []; }
+            if (!list.length) list = ((S.round && S.round.courseData) || []).map(function (h) { return Number(h && h.hole); }).filter(function (n) { return n > 0; });
+            if (!list.length) { cb(null); return; }
+            var n = list.filter(function (h) { try { return holeHasData(h); } catch (e) { return false; } }).length;
+            cb({ name: roundCourseName(), n: n, of: list.length });
+        });
+    }
+    // THE STORE SAID YES (a trial started, a restore, or the launch read arriving
+    // after this round was mounted without it): GPS unlocked, at once.
     function becomePro() {
         if (!S || S.pro || !hasGpsPro()) return;
         S.pro = true;
-        S.el.classList.toggle('gps-basic-mode', false);
-        closeSheet();
-        // Free asked for the course data only (no MapLibre): ask again, map and all.
+        S.el.classList.toggle('gps-locked', false);
+        // Nothing was asked for while locked (no MapLibre): ask now, map and all.
         if (!S.map) S.mapRequested = false;
         if (S.side === 'gps') ensureMap();
         render();
@@ -2692,7 +2885,7 @@
         show('.gps-banner', !!banner);
 
         // Tools: set a green on an unmapped hole (anyone), fix one (the organizer).
-        // Free: no map, so nothing to set - the numbers only.
+        // No GPS Map: no map, so nothing to set.
         // A spectator writes nothing (audit 2026-10-16): no Set the green for a view-only phone.
         show('.gps-set-green', S.pro && !setting && noGreen && !S.loadingCourses && !readOnlyHere());
         show('.gps-fix-green', S.pro && !setting && !noGreen && !!S.canFix);
@@ -3123,29 +3316,6 @@
         +   '<div class="gps-ws-read" aria-live="polite"></div>'
         +   '<div class="gps-ws-row"><button type="button" class="gps-ws-minus" aria-label="1 mph less">\u2212</button><span class="gps-ws-mph"></span><span class="gps-ws-unit">mph</span><button type="button" class="gps-ws-plus" aria-label="1 mph more">+</button></div>'
         +   '<input type="range" class="gps-ws-slider" min="0" max="40" step="1" value="0" aria-label="Wind speed, mph">'
-        + '</div>'
-        // FREE (no HardPan GPS): the way to the upgrade.
-        + '<div class="gps-basic"><button type="button" class="gps-get-pro">Get HardPan GPS</button></div>'
-        + '<div class="gps-sheet" role="dialog" aria-modal="true" aria-label="HardPan GPS" style="display:none">'
-        +   '<div class="gps-sheet-card">'
-        +     '<div class="gps-sheet-title">HardPan GPS</div>'
-        +     '<ul class="gps-sheet-list"><li>Satellite hole map</li><li>Drag-the-target yardages</li><li>Wind</li><li>Plays-like yardage</li></ul>'
-        // iap off: one sentence, nothing to buy.
-        +     '<div class="gps-sheet-off" style="display:none"></div>'
-        // iap on: the App Store paywall and its disclosures (syncSheet fills them).
-        +     '<div class="gps-sheet-iap" style="display:none">'
-        +       '<div class="gps-sheet-product"></div>'
-        +       '<div class="gps-sheet-price" data-price-src="none"></div>'
-        +       '<div class="gps-sheet-length gps-sheet-fine"></div>'
-        +       '<div class="gps-sheet-trial gps-sheet-fine"></div>'
-        +       '<div class="gps-sheet-renew gps-sheet-fine"></div>'
-        +       '<button type="button" class="gps-sheet-buy">Subscribe</button>'
-        +       '<button type="button" class="gps-sheet-restore">Restore Purchases</button>'
-        +       '<div class="gps-sheet-msg" role="status" aria-live="polite" style="display:none"></div>'
-        +       '<div class="gps-sheet-links"><a class="gps-sheet-terms" target="_blank" rel="noopener">Terms of Use</a> \u00b7 <a class="gps-sheet-privacy" target="_blank" rel="noopener">Privacy Policy</a></div>'
-        +     '</div>'
-        +     '<button type="button" class="gps-sheet-close">Not now</button>'
-        +   '</div>'
         + '</div>';
 
     var TOGGLE_H = 52;   // px, plus the safe-area inset
@@ -3197,8 +3367,8 @@
         + '#gps-overlay .gps-sub .gps-src:empty{display:none;}'
         // BUILD 3: no "You are off this hole / Green from OpenStreetMap" bar - that
         // line is in the ⓘ credits now - and no "Tee -> target" pill at the bottom.
-        // (Free has no map and no ⓘ: its accuracy line stays.)
-        + '#gps-overlay:not(.gps-basic-mode) .gps-sub:not(.gps-sub-show),#gps-overlay .gps-target-row{display:none !important;}'
+        // (Without GPS Map the side is never shown.)
+        + '#gps-overlay .gps-sub:not(.gps-sub-show),#gps-overlay .gps-target-row{display:none !important;}'
         + '#gps-overlay .gps-acc.gps-weak{color:#fbbf24;font-weight:800;}'
         + '#gps-overlay .gps-green-dims{color:#d9f99d;font:800 13px/1 ' + FONT + ';padding:7px 10px;border-radius:12px;white-space:nowrap;}'
         + '#gps-overlay .gps-msg{font-size:14px;line-height:1.35;color:#f4f4ef;padding:9px 11px;}'
@@ -3386,32 +3556,9 @@
         +   'box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none;}'
         + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#ffffff;'
         +   'font:700 10px/1 ' + FONT + ';padding:2px 5px;border-radius:999px;white-space:nowrap;}'
-        // FREE: no map - the numbers, large, with Enter Score and the upgrade link.
-        + '#gps-overlay .gps-basic{display:none;}'
-        + '#gps-overlay.gps-basic-mode .gps-map-wrap,#gps-overlay.gps-basic-mode .gps-right,#gps-overlay.gps-basic-mode .gps-leftrow,#gps-overlay.gps-basic-mode .gps-credit{display:none !important;}'
-        + '#gps-overlay.gps-basic-mode .gps-top{flex-wrap:wrap;}'
-        + '#gps-overlay.gps-basic-mode .gps-yardbox{flex:1 1 100%;justify-content:center;gap:28px;padding:14px 10px;}'
-        + '#gps-overlay.gps-basic-mode .gps-num-mid .gps-big{font-size:clamp(44px,15vw,72px);}'
-        + '#gps-overlay.gps-basic-mode .gps-fb .gps-big{font-size:clamp(22px,7vw,32px);}'
-        + '#gps-overlay.gps-basic-mode .gps-basic{display:flex;justify-content:center;position:absolute;left:0;right:0;top:50%;}'
-        + '#gps-overlay .gps-get-pro{color:#d9f99d;text-decoration:underline;font-size:15px;font-weight:800;min-height:40px;}'
-        // THE UPGRADE SHEET
-        + '#gps-overlay .gps-sheet{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;}'
-        + '#gps-overlay .gps-sheet-card{width:100%;max-width:480px;box-sizing:border-box;background:#121a14;border:1px solid #3a4a3e;border-radius:18px 18px 0 0;'
-        +   'padding:22px 20px calc(22px + env(safe-area-inset-bottom));}'
-        + '#gps-overlay .gps-sheet-title{font-size:24px;font-weight:800;color:#d9f99d;}'
-        + '#gps-overlay .gps-sheet-price{margin-top:4px;font-size:16px;font-weight:700;color:#f4f4ef;}'
-        + '#gps-overlay .gps-sheet-list{margin:14px 0 18px;padding-left:20px;font-size:15px;line-height:1.6;color:#d1d5db;}'
-        + '#gps-overlay .gps-sheet-product{font-size:16px;font-weight:800;color:#f4f4ef;}'
-        + '#gps-overlay .gps-sheet-off{margin:0 0 14px;font-size:15px;line-height:1.4;color:#f4f4ef;}'
-        + '#gps-overlay .gps-sheet-fine{margin-top:6px;font-size:12px;line-height:1.4;color:#c8d1ca;}'
-        + '#gps-overlay .gps-sheet-buy{display:block;width:100%;margin-top:14px;min-height:48px;background:#d9f99d;color:#0b0f0c;border-radius:12px;font-weight:800;font-size:16px;}'
-        + '#gps-overlay .gps-sheet-buy:disabled,#gps-overlay .gps-sheet-restore:disabled{opacity:.55;}'
-        + '#gps-overlay .gps-sheet-restore{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;color:#d9f99d;font-weight:700;}'
-        + '#gps-overlay .gps-sheet-msg{margin-top:10px;font-size:14px;font-weight:700;line-height:1.4;color:#f4f4ef;}'
-        + '#gps-overlay .gps-sheet-links{margin-top:12px;text-align:center;font-size:13px;color:#c8d1ca;}'
-        + '#gps-overlay .gps-sheet-links a{color:#c8d1ca;text-decoration:underline;}'
-        + '#gps-overlay .gps-sheet-close{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid #3a4a3e;border-radius:12px;}';
+        // NO GPS MAP (paid launch): a round mounted without the entitlement never shows
+        // the GPS side at all - no map, no yardage (the gate keeps it on the card).
+        + '#gps-overlay.gps-locked{display:none !important;}';
     function ensureCss() {
         if (document.getElementById('gps-view-css')) return;
         var st = document.createElement('style');
@@ -3464,11 +3611,13 @@
             // Decided once per round, by the one check (hasGpsPro).
             pro: hasGpsPro()
         };
-        el.classList.toggle('gps-basic-mode', !S.pro);
+        el.classList.toggle('gps-locked', !S.pro);
 
         // The golfer's own choice of side: remembered, and the landing leaves it be.
         on(tg, '.gps-side-gps', function () {
             S.userChoseSide = true;
+            // No GPS Map: the gate (the paywall) at once - nothing to load first.
+            if (!S.pro && !hasGpsPro()) { showSide('gps'); return; }
             // BUILD 5: no data AND no course location -> no map of the golfer's
             // street: a short note on the Card side instead.
             var done = false;
@@ -3657,13 +3806,6 @@
             });
             col.addEventListener('pointercancel', function () { x0 = null; });
         })();
-        on(el, '.gps-get-pro', openSheet);
-        on(el, '.gps-sheet-close', closeSheet);
-        on(el, '.gps-sheet-buy', function () { sheetAct('buy'); });
-        on(el, '.gps-sheet-restore', function () { sheetAct('restore'); });
-        var tl = el.querySelector('.gps-sheet-terms'), pl = el.querySelector('.gps-sheet-privacy');
-        if (tl) tl.setAttribute('href', String(cfg().iapTermsUrl || 'terms.html'));
-        if (pl) pl.setAttribute('href', String(cfg().iapPrivacyUrl || 'privacy.html'));
         window.addEventListener('offline', onOffline);
         window.addEventListener('online', onOnline);
         document.addEventListener('touchmove', blockPull, { passive: false });
@@ -3737,8 +3879,8 @@
             frameHole(false);
             render();
         });
-        // FREE: no map at all - MapLibre is never loaded, so no tile, Esri or
-        // USGS request can happen. The bundled course data gives the numbers.
+        // NO GPS MAP: never shown (the gate), and MapLibre is never loaded, so no
+        // tile, Esri or USGS request can happen.
         if (!S.pro) return;
         loadMapLibre(function () { if (S === mine) { buildMap(); render(); } });
     }
@@ -3748,7 +3890,21 @@
     // ON THE CARD (remembered), location is denied, or the hole has no GPS data
     // (no green and no tee): then the scorecard, as before GPS.
     function land() {
-        if (!S || !S.pro) { if (storedSide() === 'gps') showSide('gps'); return; }
+        if (!S) return;
+        if (!S.pro) {
+            if (hasGpsPro()) becomePro();
+            // The store's first answer is on its way: land once it is here (once).
+            else if (proPending() && !S.landWaited) {
+                var m0 = S;
+                S.landWaited = true;
+                entitlement().whenKnown(function () { if (S === m0) land(); }, PENDING_MS);
+                return;
+            }
+        }
+        // NO GPS MAP: the round stays on the card. Only a round this phone LEFT ON GPS
+        // (Resume) shows the paywall - once a session; a round joined or opened fresh
+        // (a game link, a spectator) never does.
+        if (!S.pro) { if (storedSide() === 'gps' && !sheetSeen()) showSide('gps'); return; }
         if (storedSide() === 'bets') return;
         // THE GAMES FRONT DOOR (gps-doors): the round opens on the card, and location is
         // not asked for until the golfer taps 📍 GPS (or this round was left on GPS).
@@ -3811,6 +3967,26 @@
     function showSide(side, opts) {
         if (!S) return false;
         side = side === 'gps' ? 'gps' : 'bets';
+        // THE GATE (paid launch): no GPS without GPS Map. Not entitled: the card stays
+        // and the paywall asks (a programmatic return - remember: false - just stays).
+        if (side === 'gps' && !S.pro) {
+            if (hasGpsPro()) becomePro();
+            if (!S.pro) {
+                var mine = S, o = opts || {}, quiet = o.remember === false;
+                requireGps({ quiet: quiet, course: roundCourseName(), coverage: roundCoverage }, function () {
+                    if (S !== mine) return;
+                    becomePro();
+                    if (S.pro) showSide('gps', o);
+                }, function () {
+                    // Declined ("Not now"): the golfer is on the card, and this round
+                    // no longer reopens on GPS.
+                    if (S !== mine || quiet) return;
+                    if (S.side !== 'bets') showSide('bets');
+                    else rememberSide('bets');
+                });
+                return false;
+            }
+        }
         S.side = side;
         if (!opts || opts.remember !== false) rememberSide(side);
         document.body.classList.toggle('gps-side-gps', side === 'gps');
@@ -3819,7 +3995,6 @@
         if (a) a.setAttribute('aria-pressed', side === 'gps' ? 'true' : 'false');
         closeMenus();
         if (side === 'gps') {
-            if (!S.pro && !sheetSeen() && !proPending()) openSheet();
             S.windKick = true;
             startWindTick();
             ensureMap();
@@ -3829,7 +4004,6 @@
         } else {
             // Kept running for IDLE_STOP_MS, so a quick look at Bets and back
             // does not cost a fresh fix; then stopped.
-            closeSheet();
             closeWindSheet();
             stopWindTick();
             // A shot replay does not keep turning the CARD's hole under a golfer typing a score.
@@ -3904,11 +4078,16 @@
         mount: mount, unmount: unmount, showSide: showSide, setHole: setHole, roundUpdated: roundUpdated,
         precacheCourse: precacheCourse,
         // GPS-4 (the app's front door): the Add a game sheet over the map.
-        openAddGame: function () { if (S && S.side !== 'gps') showSide('gps'); openAddGame(); },
-        // THE ONE CHECK for HardPan GPS (Pro). In-app purchase plugs in here.
+        openAddGame: function () { if (S && S.pro && S.side !== 'gps') showSide('gps'); openAddGame(); },
+        // THE ONE CHECK for GPS Map (an active trial or subscription).
         hasGpsPro: hasGpsPro,
-        // The paywall's disclosure text for a store offer (pure; gps_entitlement_test.js).
-        paywallText: function (o) { return sheetText(o); },
+        // THE GATE (paid launch): requireGps(ctx, go, no) - the Home doors ask it too.
+        requireGps: requireGps,
+        paywallOpen: paywallOpen,
+        // The paywall's words for a store offer, a founding window and a course (pure;
+        // gps_paywall_test.js), the founding default, and the course line.
+        paywallText: function (o, f, cov) { return sheetText(o, f, cov); },
+        foundingFrom: foundingFrom, courseLine: courseLine,
         // The Wi-Fi iPad sentence (gps_ipad_test.js).
         ipadNoGps: ipadNoGps,
         isMounted: function () { return !!S; },

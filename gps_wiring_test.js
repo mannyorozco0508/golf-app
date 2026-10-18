@@ -149,9 +149,13 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     require('vm').runInNewContext(c, sbx);
     const cfg = sbx.window.HARDPAN_GPS_CONFIG;
     assert.ok(cfg && typeof cfg.esriKey === 'string' && /^[A-Za-z0-9_.-]{100,}$/.test(cfg.esriKey), 'an ArcGIS API key is configured (value not printed)');
-    assert.strictEqual(cfg.paywall, false, 'paywall is off this wave: everyone in the GPS build is Pro');
-    // gps-store-iap (2026-10-17): the in-app purchase settings joined - iap OFF, an EMPTY RevenueCat key.
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPriceFallback', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    // PAID LAUNCH (2026-10-17): iap ON - the GPS Map entitlement alone decides; paywall is read
+    // only in a build with no store (iap off), and stays false there.
+    assert.strictEqual(cfg.iap, true, 'v2.0: GPS is the GPS Map subscription');
+    assert.strictEqual(cfg.paywall, false, 'paywall (iap off only) stays false');
+    // gps-store-iap (2026-10-17): the in-app purchase settings - an EMPTY RevenueCat key; the
+    // founding cap; no price (the store's own price only).
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
@@ -198,18 +202,18 @@ test('plays like: elevation from USGS EPQS for COURSE points, cached forever, on
     assert.ok(/!S\.pro/.test(fe) && /S\.side !== 'gps'/.test(fe) && /onLine === false/.test(fe), 'only Pro, only on GPS, only online');
 });
 
-test('HardPan GPS (Pro): ONE check, exported; free never loads MapLibre', { skip }, () => {
+test('GPS Map: ONE check, exported; without it MapLibre never loads', { skip }, () => {
     const v = read('gps-view.js');
     assert.strictEqual((v.match(/function hasGpsPro\(/g) || []).length, 1);
     assert.ok(/hasGpsPro: hasGpsPro/.test(v), 'exported on window.HardPanGps');
     const em = v.slice(v.indexOf('function ensureMap('), v.indexOf('function showSide('));
-    assert.ok(em.indexOf('if (!S.pro) return;') !== -1 && em.indexOf('if (!S.pro) return;') < em.indexOf('loadMapLibre('), 'free returns before MapLibre loads');
-    // No price written into the code: the paywall's price comes from StoreKit, or
-    // (marked) from config.iapPriceFallback. The old placeholder button is gone
-    // (gps-store-iap, 2026-10-17) - gps_entitlement_test.js holds the paywall.
+    assert.ok(em.indexOf('if (!S.pro) return;') !== -1 && em.indexOf('if (!S.pro) return;') < em.indexOf('loadMapLibre('), 'no GPS Map: returns before MapLibre loads');
+    // No price written into the code: the paywall's price comes from StoreKit only
+    // (paid launch: no config fallback) - gps_paywall_test.js holds the paywall.
     assert.ok(!/\$\d/.test(v), 'a price is written into gps-view.js');
-    assert.ok(!/coming soon/i.test(v.slice(v.indexOf('THE UPGRADE SHEET'), v.indexOf('NO PULL-DOWN ON GPS'))) && /Not now/.test(v));
-    assert.ok(/function openSheet\(\) \{\s*(\/\/.*\s*)?if \(!S \|\| S\.pro\) return;/.test(v), 'the sheet is never opened for a Pro user');
+    const pw = v.slice(v.indexOf('THE PAYWALL AND THE GATE'), v.indexOf('NO PULL-DOWN ON GPS'));
+    assert.ok(pw.length > 2000 && !/coming soon/i.test(pw) && /Not now/.test(v), 'positive: the paywall section, never "coming soon"');
+    assert.ok(/function requireGps\(ctx, go, no\) \{[\s\S]{0,300}if \(hasGpsPro\(\)\) \{ yes\(\); return true; \}/.test(v), 'the paywall is never opened for a subscriber');
     assert.ok(!/Season Pass/i.test(v), 'HardPan GPS, never "Season Pass" (that is the organizer product)');
 });
 
@@ -262,7 +266,7 @@ test('build 3 look: no arcs, no center line, no green fill or outline, nothing y
     assert.ok(!/\.gps-ring::before|\.gps-ring::after/.test(css), 'no crosshair');
     // Build 5 (Manny, 2026-10-09) brought "20 yd" back to the hole view, at the end of the width line.
     assert.ok(/lbl\.setAttribute\('data-end'/.test(v), '"20 yd" at one end of the width line');
-    assert.ok(/#gps-overlay:not\(\.gps-basic-mode\) \.gps-sub:not\(\.gps-sub-show\),#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar (unless GPS is weak - audit C4), no "Tee -> target" pill');
+    assert.ok(/#gps-overlay \.gps-sub:not\(\.gps-sub-show\),#gps-overlay \.gps-target-row\{display:none !important;\}/.test(v), 'no source bar (unless GPS is weak - audit C4), no "Tee -> target" pill');
     assert.ok(/class="gps-pop-info"/.test(v), 'the accuracy / source line is in the credits');
 });
 
@@ -300,7 +304,7 @@ test('build 7 live wind: the station\'s latest observation first, the hourly for
     assert.ok(/if \(e && e\.notFound\) lsSet\(ptKey, \{ at: Date\.now\(\), outside: true \}\);/.test(sec) && /if \(ew && ew\.outside\) \{ box\.style\.display = 'none';/.test(sec), 'outside the US: no box');
     assert.ok(/windTimer = setInterval\(/.test(sec) && /stopWindTick\(\);/.test(v.slice(v.indexOf('function unmount('))), 'the tick stops with the view');
     assert.ok(/if \(windTimer && typeof windTimer\.unref === 'function'\) windTimer\.unref\(\);/.test(sec), 'never keeps a test process alive');
-    const show = v.slice(v.indexOf('function showSide('), v.indexOf('function showSide(') + 1500);
+    const show = v.slice(v.indexOf('function showSide('), v.indexOf('function showSide(') + 3200);
     assert.ok(/S\.windKick = true;\s*startWindTick\(\);/.test(show) && /closeWindSheet\(\);\s*stopWindTick\(\);/.test(show), 'only while GPS is showing');
     assert.ok(/w\.mph \+ \(w\.gustMph \? ' g ' \+ w\.gustMph : ''\) \+ ' mph'/.test(sec), '"12 g 20 mph"');
 });

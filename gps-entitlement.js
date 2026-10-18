@@ -1,21 +1,25 @@
 // ============================================================================
-// HARDPAN GPS PRO - THE APP STORE ENTITLEMENT (gps-store-iap, 2026-10-17)
+// HARDPAN GPS MAP - THE APP STORE ENTITLEMENT (gps-store-iap, 2026-10-17;
+// paid launch, Manny mailbox 007, 2026-10-17)
 //
-// Answers ONE question for gps-view.js hasGpsPro(): does this phone have GPS Pro?
-// Games and bets are free; GPS Pro is the paid part (App Store Guideline 3.1.1:
-// it is sold through StoreKit only - a yearly auto-renewing subscription with a
-// 7-day free trial as its introductory offer).
+// Answers ONE question for gps-view.js hasGpsPro(): does this phone have GPS Map
+// (an active 7-day free trial or a paid yearly subscription)? Games, scoring, bet
+// tracking, joining, the scorecard, the leaderboard and settle up are always
+// free; ALL of GPS is the paid part (App Store Guideline 3.1.1: sold through
+// StoreKit only - "GPS Map", com.rattlegolf.app.gpsmap.yearly, an auto-renewing
+// yearly subscription in the group "HardPan Plus", with a 7-day free trial as its
+// introductory offer). Every part of GPS is paid.
 //
-// BEHIND A FLAG: HARDPAN_GPS_CONFIG.iap. Off (the default) = this file does
-// nothing - no plugin call, no network, enabled() is false and gps-view.js
-// decides from HARDPAN_GPS_CONFIG.paywall exactly as before. On = the
-// RevenueCat Capacitor plugin (@revenuecat/purchases-capacitor), read as
-// window.Capacitor.Plugins.Purchases. No plugin (the web, the checks, a build
-// that has not linked it) = never a crash: Free, and the paywall says so in one
-// sentence when a purchase is tried.
+// THE FLAG: HARDPAN_GPS_CONFIG.iap - ON for v2.0. On = the RevenueCat Capacitor
+// plugin (@revenuecat/purchases-capacitor), read as
+// window.Capacitor.Plugins.Purchases. No plugin or no key (the web, the checks,
+// a build that has not linked it) = never a crash: NO entitlement, so the
+// paywall, and it says so in one sentence when a purchase is tried. Off = this
+// file does nothing (no plugin call, no network) and gps-view.js decides from
+// HARDPAN_GPS_CONFIG.paywall.
 //
 // THERE IS NO TESTER OVERRIDE. The old URL tier switch (free | pro | clear) is gone: nothing
-// in a URL, and nothing kept on the phone, can make a phone Pro. Pro is the
+// in a URL, and nothing kept on the phone, can turn GPS on. The entitlement is the
 // store's answer, held in memory only (the plugin keeps its own cache for
 // offline launches). The checks stub the plugin itself.
 //
@@ -31,9 +35,9 @@
     function cfg() { return (typeof window !== 'undefined' && window.HARDPAN_GPS_CONFIG) || {}; }
     // The flag. Only a literal true turns it on.
     function enabled() { return cfg().iap === true; }
-    // PLAN ONLY ids (gps-config.js): the entitlement RevenueCat grants, and the
-    // App Store product it is attached to.
-    function entitlementId() { return String(cfg().iapEntitlement || 'gps_pro'); }
+    // The ids (gps-config.js): the entitlement RevenueCat grants, and the App
+    // Store product it is attached to.
+    function entitlementId() { return String(cfg().iapEntitlement || 'gps_map'); }
     function productId() { return String(cfg().iapProduct || ''); }
     function plugin() {
         try {
@@ -47,15 +51,24 @@
     var known = false;        // has the store answered at all this launch?
     var started = null;       // the configure promise, once
     var listeners = [];
+    var knownWaiters = [];    // whenKnown callbacks, run once the store has answered
 
+    function answered() {
+        known = true;
+        var w = knownWaiters; knownWaiters = [];
+        w.forEach(function (fn) { try { fn(pro); } catch (e) {} });
+    }
     function set(next) {
         next = !!next;
+        var first = !known;
         known = true;
-        if (next === pro) return;
-        pro = next;
-        listeners.slice().forEach(function (fn) { try { fn(pro); } catch (e) {} });
+        if (next !== pro) {
+            pro = next;
+            listeners.slice().forEach(function (fn) { try { fn(pro); } catch (e) {} });
+        }
+        if (first || knownWaiters.length) answered();
     }
-    // RevenueCat CustomerInfo -> is the GPS Pro entitlement active?
+    // RevenueCat CustomerInfo -> is the GPS Map entitlement active?
     function activeIn(info) {
         var act = info && info.entitlements && info.entitlements.active;
         var e = act && act[entitlementId()];
@@ -89,13 +102,14 @@
         start().then(function (ok) {
             if (!ok) { set(false); return false; }
             return plugin().getCustomerInfo().then(function (r) { set(activeIn(infoOf(r))); return pro; });
-        }).then(function () { done(pro); }, function () { known = true; done(pro); });
+        }).then(function () { done(pro); }, function () { answered(); done(pro); });
     }
 
     // ---- THE OFFER: what the paywall shows ----------------------------------
     // From StoreKit (through RevenueCat): title, price string, period, trial.
-    // { fromStore: false } when the store gave nothing - the paywall then uses
-    // the config fallback, marked as such.
+    // { fromStore: false } when the store gave nothing - the paywall then says
+    // the App Store shows the price before the golfer confirms (never a price
+    // written into the app).
     // An ISO 8601 period ('P1Y', 'P1W', 'P7D') -> '1-year', '7-day'. A week is
     // said in days, the way the trial is sold ("7-day free trial").
     function periodText(iso) {
@@ -148,8 +162,8 @@
     // 'none' | 'error' | 'unavailable'. message: one plain sentence, or ''.
     var MSG = {
         cancelled: 'Purchase cancelled. Nothing was charged.',
-        pending: 'Your purchase is waiting for approval. GPS Pro turns on once it is approved.',
-        none: 'No GPS Pro subscription was found for this Apple ID.',
+        pending: 'Your purchase is waiting for approval. GPS Map turns on once it is approved.',
+        none: 'No GPS Map subscription was found for this Apple ID.',
         error: 'The purchase did not go through. Please try again.',
         restoreError: 'Restore did not go through. Please try again.',
         unavailable: 'The App Store is not available right now. Please try again later.'
@@ -201,6 +215,17 @@
         isPro: function () { return enabled() && pro; },
         // Has the store answered yet this launch? (the paywall waits for it)
         known: function () { return !enabled() || known; },
+        // cb(pro) once the store has answered this launch (at once when it has, or
+        // when the flag is off). ms: give up waiting after this long and answer with
+        // what is known (no entitlement) - a store that never answers never leaves a
+        // golfer on a blank screen.
+        whenKnown: function (cb, ms) {
+            if (typeof cb !== 'function') return;
+            if (!enabled() || known) { cb(enabled() && pro); return; }
+            var done = false, once = function () { if (done) return; done = true; cb(enabled() && pro); };
+            knownWaiters.push(once);
+            if (ms > 0) setTimeout(once, ms);
+        },
         refresh: refresh, offer: offer, purchase: purchase, restore: restore,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
         MSG: MSG

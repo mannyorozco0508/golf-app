@@ -20,7 +20,11 @@ const path = require('path');
 const HERE = path.join(__dirname, '..');
 const { openJourney, fileUrl } = require(path.join(HERE, 'tools/lib/journey.js'));
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
-const PRE = "window.__hardpanDoors = true; window.__freshPhone = true; window.__e = []; addEventListener('error', function (e) { window.__e.push(String(e.message) + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno); });";
+// PAID LAUNCH (2026-10-17): v2.0's GPS is the GPS Map subscription. This check tests GPS features
+// (and the app around them) as a SUBSCRIBER: the App Store stubbed, entitlement active
+// (tools/lib/iap-stub.js). The paywall itself: tools/gps-paywall-check.js.
+const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
+const PRE = "window.__hardpanDoors = true; window.__freshPhone = true; window.__e = []; addEventListener('error', function (e) { window.__e.push(String(e.message) + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno); });" + iapStub({ active: true });
 function round(code, names) {
     const r = wizardSavedRound({ code, golfers: names.length, names, hcps: names.map((_, i) => i + 2), ownerUid: 'anon-cold', thru: 0, flights: false,
         overrides: { additionalGames: {}, activeCourseKey: 'caledonia', courseName: 'Caledonia Golf & Fish Club', gameFormat: 'stroke', holeBetStake: 0, matchStake: 0, nassauStake: 0, skinsBuyIn: 0, birdieGameEnabled: false } });

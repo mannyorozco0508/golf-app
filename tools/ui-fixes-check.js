@@ -24,12 +24,16 @@ const path = require('path');
 const HERE = path.join(__dirname, '..');
 const { arriveCold, fileUrl } = require(path.join(HERE, 'tools/lib/cold-arrival.js'));
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
+// PAID LAUNCH (2026-10-17): v2.0's GPS is the GPS Map subscription. This check tests GPS features
+// (and the app around them) as a SUBSCRIBER: the App Store stubbed, entitlement active
+// (tools/lib/iap-stub.js). The paywall itself: tools/gps-paywall-check.js.
+const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});";
 const APP = 'window.__hardpanDoors = true; window.__freshPhone = true;';
 const TEE = [33.450384, -79.153438];
 // A location he can walk: window.__walk(lat, lon) moves him.
 const WALK = "window.__geoCbs = []; window.__pos = " + JSON.stringify(TEE) + "; window.__walk = function (a, b) { window.__pos = [a, b]; window.__geoCbs.forEach(function (cb) { try { cb({ coords: { latitude: a, longitude: b, accuracy: 4 } }); } catch (e) {} }); }; try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: function (ok) { window.__geoCbs.push(ok); setTimeout(function () { ok({ coords: { latitude: window.__pos[0], longitude: window.__pos[1], accuracy: 4 } }); }, 10); return window.__geoCbs.length; }, getCurrentPosition: function (ok) { setTimeout(function () { ok({ coords: { latitude: window.__pos[0], longitude: window.__pos[1], accuracy: 4 } }); }, 10); }, clearWatch: function () {} } }); } catch (e) {} try { var q0 = navigator.permissions.query.bind(navigator.permissions); navigator.permissions.query = function (d) { return d && d.name === 'geolocation' ? Promise.resolve({ state: 'granted' }) : q0(d); }; } catch (e) {}";
-const OSM = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false,paywall:false,iap:false});}});})();";   // Pro by the build's own switch (gps-store-iap: no URL tier override any more)
+const OSM = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false});}});})();";   // the bundled courses; GPS Map from the stubbed store (go below)
 const DB = (ev, extra) => Object.assign({ events: ev || {}, global_courses: {}, trips: {}, organizers: {}, tournaments: {} }, extra || {});
 function round(code, golfers, names, score) {
     const r = wizardSavedRound({ code, golfers, names, hcps: names.map(() => 9), ownerUid: 'anon-cold', thru: 0, flights: false,
@@ -39,7 +43,7 @@ function round(code, golfers, names, score) {
     return r;
 }
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
-const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 4000, viewport: { width: 390, height: 844 } }, o)); if (!r.ok) throw new Error(r.reason); return r; };
+const go = async (o) => { const r = await arriveCold(Object.assign({ settleMs: 4000, viewport: { width: 390, height: 844 } }, o, { preScript: (o.preScript || '') + iapStub({ active: true }) })); if (!r.ok) throw new Error(r.reason); return r; };
 const GPSREAD = "JSON.stringify({ mark: (document.querySelector('#gps-overlay .gps-mark-shot')||{}).textContent || null, markOn: !!document.querySelector('#gps-overlay .gps-mark-shot') && document.querySelector('#gps-overlay .gps-mark-shot').style.display !== 'none', score: (document.querySelector('#gps-overlay .gps-score')||{}).textContent || null, msg: (document.querySelector('#gps-overlay .gps-flash, #gps-overlay .gps-msg')||{}).textContent || '', shots: (function(){ try { return Object.keys(localStorage).filter(function(k){ return /shot/i.test(k); }).length; } catch(e) { return -1; } })(), e: window.__e })";
 
 (async () => {

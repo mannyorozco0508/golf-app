@@ -1,7 +1,8 @@
 # One app: HardPan 2.0 on com.rattlegolf.app (the GPS web build in the live target)
 
 Mailbox 004 (Manny, 2026-10-16): ship the merged GPS + games app as the NEXT VERSION of the live
-listing com.rattlegolf.app, not a second app (App Store 4.3). Games free; GPS is the paid part.
+listing com.rattlegolf.app, not a second app (App Store 4.3). Games free; GPS is the paid part - ALL of it,
+from v2.0 (mailbox 007, 2026-10-17): a 7-day free trial, then the GPS Map subscription; no free GPS tier.
 **This is a plan. The live app's current release (1.0.8, build 19) is not changed.** Nothing here is
 archived, uploaded or submitted; each step that touches App Store Connect or a release is Manny's.
 
@@ -49,7 +50,8 @@ The GPS project's only reason to exist was a separate TestFlight app. It stays a
    Resources, with Precise Location and Name. The purchase SDK ships its own manifest.
 7. **Icon.** Done (mailbox 004): the HP ball + green pin, every iPhone and iPad slot.
 8. **Version.** MARKETING_VERSION 2.0, CURRENT_PROJECT_VERSION 20 (build numbers only go up).
-9. **App Store Connect (Manny).** The subscription group + yearly product with a 7-day introductory
+9. **App Store Connect (Manny), after the Apple account migration to Rattle Golf LLC.** The subscription
+   group "HardPan Plus" + com.rattlegolf.app.gpsmap.yearly ("GPS Map", yearly, founding $24.99) with a 7-day introductory
    free trial; the Paid Apps agreement, tax and banking; the privacy label (answers in the 004
    report); the age rating answers; review notes (docs/APP-REVIEW-NOTES.md); new screenshots
    (USGS imagery - Esri is not used in the iOS app); What's New.
