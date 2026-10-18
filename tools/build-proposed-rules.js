@@ -195,5 +195,16 @@ R.events.$eventCode.stats = { '.write': PLAY_WRITE, $statKey: {
     putts: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 4' },
     fw: { '.validate': "newData.isString() && (newData.val() === 'hit' || newData.val() === 'L' || newData.val() === 'R')" },
     gir: { '.validate': 'newData.isBoolean()' }, $other: { '.validate': false } } };
+// CLUB DISTANCES (mailbox 008): player_clubs/<uid>/<golferKey>/{ shots/<club>: the last 10 yards,
+// set/<club>: a typed number }, the shape gps-shots.js keeps in hardpan_bag_v1. Only that account
+// reads or writes it. Until phase 2 ships, the app keeps the bag on the phone.
+const CLUB = '/^(Dr|3w|5w|Hy|[4-9]i|PW|GW|SW|LW)$/';
+const YARDS = 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 449';
+R.player_clubs = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+    $golferKey: { '.validate': '$golferKey.length <= 64',
+        shots: { $club: { '.validate': '$club.matches(' + CLUB + ')',
+            $i: { '.validate': '$i.matches(/^[0-9]$/) && ' + YARDS } } },
+        set: { $club: { '.validate': '$club.matches(' + CLUB + ') && ' + YARDS } },
+        $other: { '.validate': false } } } };
 fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.proposed.json'), JSON.stringify({ rules: R }, null, 2) + '\n');
-console.log('rules/database.rules.proposed.json rewritten with the phase-2-only additions (stats)');
+console.log('rules/database.rules.proposed.json rewritten with the phase-2-only additions (stats, player_clubs)');

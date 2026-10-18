@@ -606,6 +606,31 @@
       "config": {
         ".read": "auth != null"
       }
+    },
+    "player_clubs": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$golferKey": {
+          ".validate": "$golferKey.length <= 64",
+          "shots": {
+            "$club": {
+              ".validate": "$club.matches(/^(Dr|3w|5w|Hy|[4-9]i|PW|GW|SW|LW)$/)",
+              "$i": {
+                ".validate": "$i.matches(/^[0-9]$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 449"
+              }
+            }
+          },
+          "set": {
+            "$club": {
+              ".validate": "$club.matches(/^(Dr|3w|5w|Hy|[4-9]i|PW|GW|SW|LW)$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 449"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
     }
   }
 }
