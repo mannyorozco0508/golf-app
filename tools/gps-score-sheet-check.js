@@ -49,6 +49,11 @@ const VP = SIZES[process.env.SS_SIZE || '15'] || SIZES[15];
 
 const CODE = 'SSHEET';
 const H = (n) => table.caledonia.holes[String(n)].osm;
+// THE GOLFER ~150 yds out on the hole, on the line from its tee to its green - not on the green
+// (standing on the green centre the map truthfully reads CENTER 0 and FRONT "ON").
+const R_EARTH = 6371008.8;
+const metres = (a, b) => { const r = Math.PI / 180, x = (b[1] - a[1]) * r * Math.cos((a[0] + b[0]) / 2 * r), y = (b[0] - a[0]) * r; return Math.hypot(x, y) * R_EARTH; };
+const OUT = (n, m) => { const t = H(n).tee, g = H(n).mid, f = Math.max(0, 1 - m / metres(t, g)); return [t[0] + (g[0] - t[0]) * f, t[1] + (g[1] - t[1]) * f]; };
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});addEventListener('unhandledrejection',function(e){window.__e.push('rej '+String(e.reason&&e.reason.message||e.reason))});";
 const APP = 'window.__hardpanDoors = true;';
 const CFG = (features) => "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false,esriKey:''});"
@@ -68,7 +73,7 @@ const BLOCK = ['*nationalmap.gov*', '*arcgis*', '*weather.gov*', '*epqs*', '*ove
 const go = async (o) => {
     const vp = o.vp || VP;
     const r = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE), db: DB(o.round || round()), settleMs: 3500, viewport: { width: vp.width, height: vp.height }, webgl: true, blockUrls: BLOCK,
-        preScript: CFG(o.features) + APP + ERR + GEO(o.at || H(5).mid) + SEED(o.hole || 5, o.seed) + iapStub({ active: true }), steps: o.steps });
+        preScript: CFG(o.features) + APP + ERR + GEO(o.at || OUT(o.hole || 5, 137)) + SEED(o.hole || 5, o.seed) + iapStub({ active: true }), steps: o.steps });
     if (!r.ok) throw new Error(r.reason);
     return r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 };
@@ -216,7 +221,7 @@ const MY = { expression: `JSON.stringify((function () {
     errs(s, 'A');
 
     // ---- B: a par 3 ------------------------------------------------------------------------
-    s = await go({ hole: 3, at: H(3).mid, steps: START.concat([TAP('#gps-overlay .gps-score'), WAIT(600), ST]) });
+    s = await go({ hole: 3, steps: START.concat([TAP('#gps-overlay .gps-score'), WAIT(600), ST]) });
     report.B = s[0] && [s[0].title, s[0].grid, s[0].rows];
     f(ok(s[0]) && s[0].title === 'Hole 3 · Par 3' && s[0].rows.indexOf('fw') === -1 && s[0].rows.indexOf('gd') !== -1, 'B: par 3: tee shot shown: ' + JSON.stringify(report.B));
     f(ok(s[0]) && s[0].grid[0] === '1/eagle' && s[0].grid[2] === '3', 'B: par 3 grid not centred on par: ' + JSON.stringify(s[0] && s[0].grid));
