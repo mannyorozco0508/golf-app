@@ -155,12 +155,14 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.strictEqual(cfg.paywall, false, 'paywall (iap off only) stays false');
     // gps-store-iap (2026-10-17): the in-app purchase settings - an EMPTY RevenueCat key; the
     // founding cap; no price (the store's own price only).
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagSetup', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats', 'watch']);
     // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
     assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch').every(([, v]) => v === true));
+    // 009: the My bag account sync is built but ships OFF (its rule is phase 2, not live).
+    assert.strictEqual(cfg.clubsSync, false, 'clubsSync ships off until the player_clubs rule is live');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');

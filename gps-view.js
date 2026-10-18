@@ -3169,14 +3169,50 @@
     // plays-like distance to the center - or to the target once the golfer has moved it.
     // TOURNAMENT MODE (Rules of Golf 4.3): no suggestion and no question. My bag (Tools)
     // shows, edits and resets the numbers.
-    // NOT SYNCED: no path under the live rules lets a phone write per-golfer data of its
-    // own (pushPrefs/<uid> takes only bets / hype; organizers/<uid>/groups only groups), so
-    // the bag stays on the phone until a rule for it exists.
+    // NOT SYNCED (yet): no path under the live rules lets a phone write per-golfer data of
+    // its own (pushPrefs/<uid> takes only bets / hype; organizers/<uid>/groups only groups).
+    // 009: the sync is BUILT (gps-shots.js syncLoad / syncSave: player_clubs/<uid>/me, the
+    // signed-in golfer's OWN bag only) behind HARDPAN_GPS_CONFIG.clubsSync, which ships
+    // false until the phase-2 rule is live - so today the bag stays on the phone.
+    // FIRST-TIME SETUP (009, switch bagSetup): My bag opens on "Enter your carry for each
+    // club", filled from the golfer's handicap (the round's, else their HardPan Index, else
+    // a mid 15) - a starting point, every number editable; each club then says "entered"
+    // or "learned" (gps-shots.js: the shots take over once a club has 3 of its own).
     var BAG_ASK_MS = 20000;
     function bagSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('clubs') !== false; } catch (e) { return true; } }
     function bagApi() { return window.HardPanGpsBag || null; }
     function bagGolfer() { var w = scoreFor(); return (w && w.player && w.player.name) || ''; }
     function bagShown(yd) { return units() === 'm' ? Math.round(yd * G.M_PER_YD) : Math.round(yd); }
+    function setupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('bagSetup') !== false; } catch (e) { return true; } }
+    // THE GOLFER'S HANDICAP for the setup's starting carries: the round's (a "+2" is -2),
+    // else - the phone's own golfer - their HardPan Index; else null (the mid default).
+    function bagHcp() {
+        var w = scoreFor(), h = w && w.player ? String(w.player.hcp == null ? '' : w.player.hcp).trim() : '';
+        if (h && isFinite(Number(h.replace(/^\+/, '')))) return /^\+/.test(h) ? -Number(h.slice(1)) : Number(h);
+        try {
+            var I = window.HardPanIndex;
+            if (bagIsMe() && I && typeof I.current === 'function' && typeof window.HardPanFeature === 'function' && window.HardPanFeature('hpIndex')) {
+                var c = I.current();
+                if (c && typeof c.index === 'number' && isFinite(c.index)) return c.index;
+            }
+        } catch (e) {}
+        return null;
+    }
+    // THE SIGNED-IN GOLFER'S OWN BAG (the only one the account sync touches): the GPS
+    // screen's golfer is the one this phone said it is, and the account is a real sign-in.
+    function bagIsMe() { try { var w = scoreFor(), me = typeof resolvedMeId === 'function' ? resolvedMeId() : null; return !!(w && me != null && String(w.id) === String(me)); } catch (e) { return false; } }   /* global resolvedMeId */
+    function bagUid() { try { var u = window.firebase && window.firebase.auth && window.firebase.auth().currentUser; return u && !u.isAnonymous && u.uid ? String(u.uid) : null; } catch (e) { return null; } }
+    function bagSyncCan(B) { return !!(B && B.syncOn() && S && S.db && bagIsMe() && bagUid()); }
+    function bagSaved() { var B = bagApi(); if (bagSyncCan(B)) B.syncSave(S.db, bagUid(), bagGolfer()); }
+    // Once per golfer per sign-in: the account's numbers onto this phone.
+    function bagSyncLoad(B) {
+        if (!bagSyncCan(B)) return;
+        var k = bagUid() + '|' + bagGolfer();
+        if (S.bagSynced === k) return;
+        S.bagSynced = k;
+        var mine = S;
+        B.syncLoad(S.db, bagUid(), bagGolfer()).then(function (got) { if (got && S === mine) { render(); if (bagSheet() && bagSheet().style.display !== 'none') fillBag(); } });
+    }
     function bagAsk(yd) {
         if (!S || !bagSwitch() || tournament() || !(yd > 0)) return;
         var bar = S.el.querySelector('.gps-bagask');
@@ -3203,7 +3239,7 @@
         var B = bagApi(), p = S && S.bagPending;
         bagSkip();
         if (!B || !p) return;
-        if (B.add(p.golfer, club, p.yd)) flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag');
+        if (B.add(p.golfer, club, p.yd)) { bagSaved(); flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag'); }
         else render();
     }
     function syncSuggest(r, o, nums) {
@@ -3214,6 +3250,7 @@
             var B = bagApi();
             if (!B) { if (!S.bagLoad) { S.bagLoad = true; withShots(function () { render(); }); } }
             else {
+                bagSyncLoad(B);
                 var moved = !!(S.targetMoved && S.target), to = moved ? S.target : aimAt(r);
                 if (to) {
                     var pl = playsTo(moved ? S.target : null);
@@ -3227,14 +3264,59 @@
         el.style.display = text ? '' : 'none';
     }
     function bagSheet() { return S && S.el.querySelector('.gps-bag'); }
-    function openBag() { var sh = bagSheet(); if (!sh || !S) return; closeMenus(); withShots(function () { if (!S) return; sh.style.display = ''; fillBag(); }); }
+    function openBag() {
+        var sh = bagSheet(); if (!sh || !S) return; closeMenus();
+        withShots(function () {
+            var B = bagApi(); if (!S || !B) return;
+            bagSyncLoad(B);
+            sh.style.display = '';
+            if (setupSwitch() && B.needsSetup(bagGolfer())) fillSetup(); else fillBag();
+        });
+    }
+    // "Enter your carry for each club": the starting carries for the golfer's handicap, editable.
+    function fillSetup() {
+        var sh = bagSheet(), B = bagApi();
+        if (!sh || !B) return;
+        var who = bagGolfer(), hcp = bagHcp(), m = units() === 'm', def = B.defaultCarries(hcp);
+        sh.setAttribute('data-bag-view', 'setup');
+        sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
+        sh.querySelector('.gps-bag-sub').textContent = 'Enter your carry for each club. ' + (hcp == null ? 'Starting numbers for a mid handicap' : 'Starting numbers for a ' + (hcp < 0 ? '+' + Math.abs(Math.round(hcp)) : Math.round(hcp)) + ' handicap')
+            + ' \u2014 change any, clear the clubs you do not carry. Mark shot keeps them up to date.';
+        var list = sh.querySelector('.gps-bag-setup');
+        list.textContent = '';
+        B.BAG.forEach(function (c) {
+            var row = document.createElement('div');
+            row.className = 'gps-bag-srow'; row.setAttribute('data-bag-srow', c);
+            var nm = document.createElement('span'); nm.className = 'gps-bag-name'; nm.textContent = B.NAMES[c];
+            var inp = document.createElement('input');
+            inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '1'; inp.max = '449'; inp.className = 'gps-bag-yd'; inp.setAttribute('data-bag-setup', c);
+            inp.setAttribute('aria-label', B.NAMES[c] + ' carry' + (m ? ', meters' : ', yards'));
+            inp.value = String(bagShown(def[c])); inp.placeholder = '\u2014';
+            row.appendChild(nm); row.appendChild(inp);
+            list.appendChild(row);
+        });
+    }
+    function saveSetup() {
+        var sh = bagSheet(), B = bagApi();
+        if (!sh || !B || !S) return;
+        var carries = {};
+        Array.prototype.forEach.call(sh.querySelectorAll('[data-bag-setup]'), function (i) {
+            var v = Number(i.value);
+            if (v > 0) carries[i.getAttribute('data-bag-setup')] = units() === 'm' ? v / G.M_PER_YD : v;
+        });
+        B.setup(bagGolfer(), carries);
+        bagSaved();
+        fillBag(); render();
+    }
     function closeBag() { var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
     function fillBag() {
         var sh = bagSheet(), B = bagApi();
         if (!sh || !B) return;
         var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
+        sh.setAttribute('data-bag-view', 'list');
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
-        sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': the middle of your last 10 marked shots per club (odd ones left out), or your own number. On this phone only.';
+        sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is the middle of your last 10 marked shots per club (odd ones left out); "entered" is a number you typed'
+            + (setupSwitch() ? ' or set up (marked shots take over once a club has ' + B.LEARN_MIN + ')' : '') + '. On this phone only.';
         var list = sh.querySelector('.gps-bag-list');
         list.textContent = '';
         B.BAG.forEach(function (c) {
@@ -3246,7 +3328,10 @@
             inp.setAttribute('aria-label', B.NAMES[c] + (m ? ', meters' : ', yards'));
             inp.value = v ? String(bagShown(v.yd)) : ''; inp.placeholder = '\u2014';
             var meta = document.createElement('span'); meta.className = 'gps-bag-meta';
-            meta.textContent = !v ? 'no shots yet' : (v.set ? 'your number' : v.n + ' shot' + (v.n === 1 ? '' : 's'));
+            // "entered" (typed, or the setup's carry) / "learned" (the marked shots' median).
+            meta.textContent = !v ? 'no shots yet' : B.source(v) === 'entered' ? 'entered' + (v.base && v.n ? ' \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's') : '')
+                : 'learned \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's');
+            meta.setAttribute('data-bag-src', B.source(v));
             var rs = document.createElement('button'); rs.type = 'button'; rs.className = 'gps-bag-reset'; rs.setAttribute('data-bag-reset', c); rs.textContent = 'Reset';
             rs.style.visibility = v ? '' : 'hidden';
             row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
@@ -3572,6 +3657,10 @@
         + '<div class="gps-bag gps-float gps-scroll-ok" data-feature="clubs" style="display:none" role="dialog" aria-label="My bag">'
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
         +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
+        // FIRST-TIME SETUP (009): "Enter your carry for each club" - in place of the list.
+        +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
+        +   '<div class="gps-bag-setup-foot" data-feature="bagSetup"><button type="button" class="gps-bag-setup-save">Save my bag</button><button type="button" class="gps-bag-setup-skip">Not now</button></div>'
+        +   '<button type="button" class="gps-bag-setup-open" data-feature="bagSetup">Start over from my handicap</button>'
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
@@ -3839,6 +3928,11 @@
         + '#gps-overlay .gps-bag-reset{min-height:40px;padding:0 8px;color:#fca5a5 !important;font-weight:700;}'
         + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
+        + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
+        + '#gps-overlay .gps-bag-srow{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-bag-setup-foot{display:flex;gap:10px;justify-content:center;margin-top:10px;}'
+        + '#gps-overlay .gps-bag-setup-save{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
+        + '#gps-overlay .gps-bag-setup-skip,#gps-overlay .gps-bag-setup-open{min-height:44px;padding:0 14px;color:#c8d1ca !important;font-weight:700;}#gps-overlay .gps-bag-setup-open{display:block;margin:4px auto 0;}'
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
@@ -4136,6 +4230,11 @@
         });
         // MY BAG (008): the switch off = no question, no suggestion, no My bag (removed, not hidden).
         if (!bagSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="clubs"]'), function (n) { n.parentNode.removeChild(n); });
+        // BAG SETUP (009): its switch off = no setup in My bag (removed, not hidden).
+        if (!setupSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagSetup"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-bag-setup-save', saveSetup);
+        on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
+        on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
         on(el, '.gps-my-bag', openBag);
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
         on(el, '.gps-bagask-skip', bagSkip);
@@ -4148,14 +4247,15 @@
                 if (!c || !B || !S) return;
                 var v = Number(e.target.value);
                 B.set(bagGolfer(), c, v > 0 ? (units() === 'm' ? v / G.M_PER_YD : v) : null);
+                bagSaved();
                 fillBag(); render();
             });
             bagEl.addEventListener('click', function (e) {
                 var t = e.target, B = bagApi();
                 if (!B || !S || !t || !t.closest) return;
                 var r1 = t.closest('[data-bag-reset]');
-                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); fillBag(); render(); return; }
-                if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); fillBag(); render(); }
+                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); bagSaved(); fillBag(); render(); return; }
+                if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); bagSaved(); fillBag(); render(); }
             });
         }
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
