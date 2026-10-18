@@ -116,6 +116,7 @@
     <script src="gps-config.js"></script>
     <script src="gps-entitlement.js"></script>   <!-- GPS Map: the App Store entitlement (HARDPAN_GPS_CONFIG.iap; on in v2.0) -->
     <script src="gps-view.js"></script>
+    <script src="hp-index.js"></script>   <!-- HardPan Index (unofficial): keeps this phone's golfer's finished 18s, on the phone only -->
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
     <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
@@ -3531,6 +3532,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
         // GPS:BEGIN
         gpsFollowHoleView();
+        // GPS:END
+        // GPS:BEGIN
+        // HardPan Index (unofficial): a finished 18 for this phone's golfer is kept on the phone (hp-index.js).
+        if (window.HardPanIndex) { try { window.HardPanIndex.noteRound(currentMode, currentData, resolvedMeId()); } catch (e) { } }
         // GPS:END
 
         const row = document.getElementById(`hole-row-${currentViewedHole}`);
