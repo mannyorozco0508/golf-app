@@ -33,11 +33,13 @@
 //      "This shot" carries the breakdown: "You → green: D yds, plays like N", "Uphill: +E",
 //      "Into the wind (8 mph): +W", "Warm (80°F vs 70°F): −T"; a crosswind: "Crosswind: aim
 //      6 yds right" in the sheet, never on the line.
-//  10  012 PART 4c, elevPerLeg ON: the golfer 70 m off hole 1's line - EXACTLY ONE EPQS request
+//  10  012 PART 4c, the golfer 70 m off hole 1's line. AS SHIPPED (elevMyCell off - the location
+//      rule): NOT ONE EPQS request near / derived from their spot; their height from the course
+//      samples; the (i) sheet never mentions the square. elevMyCell FORCED ON: EXACTLY ONE request
 //      near them, at the CENTER of their ~10 m grid cell (worked out inline), never their own
-//      point; the (i) sheet's heights row uses it ("you N ft ... your ~10 m square"); a reload
-//      (same phone) asks for it no more; elevPerLeg off: nothing asked near them. Arm 7
-//      (tournament) walks there too: still not one EPQS request.
+//      point; the heights row uses it ("you N ft ... your ~10 m square") and the sheet's words say
+//      so; a reload (same phone) asks for it no more. elevPerLeg off (cell forced on): nothing
+//      asked near them. Arm 7 (tournament, elevMyCell forced on) walks there: not one request.
 //  11  012 PART 5, bagAltitude ON: My bag says "My distances are from" a 1,257 ft course
 //      (Scottsdale-like): at Caledonia (the hole's tee / green heights, worked out inline)
 //      the line plays LONGER by ~2% per 1,000 ft, applied BEFORE wind and temperature (the
@@ -282,8 +284,19 @@ const START = [W(2500), OPEN, W(3000)];
     const cellOf = (p) => { const dLat = 10 / (R * Math.PI / 180), i = Math.floor(p[0] / dLat), latC = (i + 0.5) * dLat, dLng = dLat / Math.cos(rad(latC)), j = Math.floor(p[1] / dLng); return [latC, (j + 0.5) * dLng]; };
     const CELL = cellOf(OFF);
     const OWN = { waitFor: "Array.prototype.some.call(document.querySelectorAll('#gps-overlay .gps-plinfo-now .gps-plinfo-row'), function (d) { return /10 m square/.test(d.textContent); })", timeout: 25000 };
-    s = await go({ simple: true, at: OFF, wind: INTO, steps: START.concat([READY, TAP('.gps-pl-info'), OWN, W(500), SHEET, ST, { expression: 'location.reload()' }, W(1000)].concat(START, [READY, W(2500), ST])) });
     const near = (list) => (list || []).filter((p) => hav(p, OFF) < 12);
+    const POS = { expression: "JSON.stringify({ pos: (document.querySelector('#gps-overlay .gps-plinfo') || {}).innerText || '' })" };
+    // As shipped: elevMyCell off.
+    s = await go({ simple: true, at: OFF, wind: INTO, steps: START.concat([READY, TAP('.gps-pl-info'), W(4000), SHEET, POS, ST]) });
+    report.ownSpotShipped = { asked: near(s[2].epqs), rows: s[0].rows };
+    f(near(s[2].epqs).length === 0, '10: as shipped (elevMyCell off) EPQS was asked near the golfer: ' + JSON.stringify(near(s[2].epqs)));
+    f(!(s[0].rows || []).some((x) => /10 m square/.test(x)) && !/10-meter|10 m/.test(s[1].pos), '10: as shipped the sheet mentions the square: ' + JSON.stringify(s[0].rows));
+    f((s[0].rows || []).some((x) => /^Heights: you \d+ ft/.test(x)), '10: as shipped the golfer\'s height (course samples) is missing: ' + JSON.stringify(s[0].rows));
+    errs(s, 'ownSpotShipped');
+    // elevMyCell forced on: the cell center, once.
+    s = await go({ simple: true, at: OFF, wind: INTO, features: { elevMyCell: true }, steps: START.concat([READY, TAP('.gps-pl-info'), OWN, W(500), SHEET, POS, ST, { expression: 'location.reload()' }, W(1000)].concat(START, [READY, W(2500), ST])) });
+    f(/roughly 10-meter square you are in/.test(s[1].pos), '10: elevMyCell on - the sheet does not say so');
+    s = [s[0], s[2], s[3]];
     const o1 = s[1], o2 = s[2];
     report.ownSpot = { cell: CELL, asked: near(o1.epqs), again: near(o2.epqs), rows: s[0].rows };
     f(near(o1.epqs).length === 1, '10: not exactly one EPQS request near the golfer: ' + JSON.stringify(near(o1.epqs)));
@@ -291,7 +304,7 @@ const START = [W(2500), OPEN, W(3000)];
     f((s[0].rows || []).some((x) => x.indexOf('you ' + Math.round(ftAt(CELL)) + ' ft') !== -1), '10: the heights row does not use the cell\'s height ' + Math.round(ftAt(CELL)) + ': ' + JSON.stringify(s[0].rows));
     f(near(o2.epqs).length === 0, '10: the second visit asked for the cell again');
     errs(s, 'ownSpot');
-    s = await go({ simple: true, at: OFF, wind: INTO, features: { elevPerLeg: false }, steps: START.concat([READY, W(3000), ST]) });
+    s = await go({ simple: true, at: OFF, wind: INTO, features: { elevPerLeg: false, elevMyCell: true }, steps: START.concat([READY, W(3000), ST]) });
     report.ownSpotOff = { asked: near(s[0].epqs) };
     f(near(s[0].epqs).length === 0, '10: elevPerLeg off asked for the golfer\'s cell: ' + JSON.stringify(near(s[0].epqs)));
     errs(s, 'ownSpotOff');
@@ -331,7 +344,7 @@ const START = [W(2500), OPEN, W(3000)];
     // 7: tournament mode.
     const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];
     const ASK = { expression: "JSON.stringify({ ask: " + vis('.gps-bagask') + " })" };
-    s = await go({ simple: true, wind: INTO, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
+    s = await go({ simple: true, wind: INTO, features: { elevMyCell: true }, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
         { expression: 'window.__moveTo(' + dest(ME, B1, 120) + ')' }, W(1500), ...MARK, W(500), ASK, { expression: 'window.__moveTo(' + OFF + ')' }, W(2500), ST]) });
     const [t0, tAsk, t1] = s;
     report.tournament = { line: t0.line, sug: t0.sug, plays: t0.plays, epqs: (t1.epqs || []).length, nws: t1.nws, ask: tAsk.ask, celev: t1.celev };

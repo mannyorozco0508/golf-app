@@ -149,6 +149,15 @@ test('012-4 gps-view: behind elevPerLeg - no projection, the own-spot cell gated
     assert.ok(/lsGet\(CELL_PREFIX \+ c\.key\) != null\) return;/.test(fo), 'once per cell, ever');
     assert.ok(/fetch\(epqsUrl\(c\.pt\)/.test(fo) && !/fix|o\.pt|\bpt\b(?!\))/.test(fo.replace(/c\.pt/g, '')), 'the cell center only - never the golfer\'s point');
     assert.ok(/off > G\.OWN_SPOT_OFF_YD \? G\.elevCell\(pt\) : null/.test(fnSrc(v, 'ownSpotCell')), 'only more than 30 yds off the line');
+    // Its own switch, OFF unless exactly true (the location rule); both the cell and the fetch ask it.
+    assert.ok(/return f\.elevMyCell === true;/.test(fnSrc(v, 'myCellSwitch')));
+    assert.ok(/!myCellSwitch\(\)/.test(fnSrc(v, 'ownSpotCell')) && /!myCellSwitch\(\)/.test(fo));
+    const cfgSrc = read('gps-config.js');
+    assert.ok(/elevMyCell: false/.test(cfgSrc) && /NEEDS MANNY'S OWN OK/.test(cfgSrc), 'ships off, and says why');
+    // The (i) sheet's fixed words never mention the square; only fillPlaysInfo does, with both switches on.
+    const a = v.indexOf('<div class="gps-plinfo'), sheet = v.slice(a, v.indexOf("+ '</div>'", a));
+    assert.ok(!/10-meter|10 m/.test(sheet) && /<span class="gps-plinfo-pos">never your position<\/span>/.test(sheet));
+    assert.ok(/perLegSwitch\(\) && myCellSwitch\(\) \? 'never your exact position; more than 30 yards/.test(fnSrc(v, 'fillPlaysInfo')));
     assert.ok(/PRIVACY - THE ONLY TIME A POINT DERIVED FROM THE GOLFER'S POSITION LEAVES THE PHONE/.test(v), 'documented in the code');
     assert.ok(/if \(isPar3\(\) \|\| !S\.target/.test(fnSrc(v, 'playsAim')), 'par 3: the green');
     assert.ok(/if \(tournament\(\) \|\| !S \|\| !S\.pro/.test(fnSrc(v, 'playsLegsNow')));

@@ -72,11 +72,16 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // green) with heights at the real points; > 30 yds off the hole's line the height of the
     // golfer's ~10 m grid cell (its center, never the exact spot; USGS, US only, cached per
     // cell) - off: 009 (golfer -> green / moved target; the tee -> green line as a fallback).
+    // elevMyCell = OFF - NEEDS MANNY'S OWN OK under the project rule "No location data leaves the
+    // phone unless group-locator opt-in": with it (and elevPerLeg) on, a golfer more than 30 yds
+    // off the hole's line has the height of their ~10 m grid cell's CENTER asked of USGS (US only,
+    // cached per cell). Off: the golfer's height comes only from the course samples; nothing
+    // derived from their position is requested.
     // bagAltitude (part 5) = My bag's "My distances are from: Sea level | A course I pick | Don't
     // adjust" (default Don't adjust) + typical temperature; plays-like adjusts ~2% per 1,000 ft
     // of altitude vs that baseline (on this phone only) - off: no section, no altitude.
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true },
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the

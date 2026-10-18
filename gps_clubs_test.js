@@ -261,6 +261,7 @@ test('009 TOURNAMENT MODE (Rules of Golf 4.3): no plays-like, no club suggestion
     assert.ok(/function fetchCourseFt\(p, done\) \{\s*if \(tournament\(\)\) \{ done\(null\); return; \}/.test(v), 'the course-height lookup: nothing in tournament mode');
     assert.ok(/function fetchOwnSpot\(c\) \{\s*if \(tournament\(\)\) return;/.test(v), 'the own-spot fetch: nothing in tournament mode');
     assert.ok(/fetch\(epqsUrl\(c\.pt\)/.test(fn('fetchOwnSpot')), 'the cell center only');
+    assert.ok(/!myCellSwitch\(\)/.test(fn('fetchOwnSpot')) && /f\.elevMyCell === true/.test(fn('myCellSwitch')), 'and only with elevMyCell exactly true (ships off)');
     // tools/gps-playslike-check.js arm 7 plays it: tournament on - no line, no suggestion, no EPQS request.
     assert.ok(/7: tournament/.test(read('tools/gps-playslike-check.js')));
 });
@@ -277,7 +278,7 @@ test('009: "How plays-like works" - the (i) on the plays-like line, plain words,
     assert.ok(/0\.5% shorter for every mph of tailwind/.test(sheet) && /D \* 0\.005 \* head/.test(g));
     assert.ok(/Crosswind:<\/b> no change in distance - aim off/.test(sheet) && /about 0\.5% of the distance for every mph across/.test(sheet) && /var AIM_PER_MPH = 0\.005;/.test(g));
     assert.ok(/1 yard for every 10\\u00b0F per 100 yards/.test(sheet) && /D \* 0\.001 \* \(70 - o\.tempF\)/.test(g));
-    assert.ok(/only on US courses/.test(sheet) && /estimate/.test(sheet) && /never your exact position; more than 30 yards off the hole\\u2019s line, the height of the roughly 10-meter square you are in/.test(sheet) && /Tournament mode turns all of it off/.test(sheet));
+    assert.ok(/only on US courses/.test(sheet) && /estimate/.test(sheet) && /never your position/.test(sheet) && !/10-meter|10 m/.test(sheet) && /Tournament mode turns all of it off/.test(sheet));
 });
 
 test('010: My bag says "Saved on this phone" - one small grey line under the heading, in the list and the setup', { skip }, () => {

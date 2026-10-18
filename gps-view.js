@@ -2560,6 +2560,11 @@
     // on the phone (hardpan_elev_cell_v1_<row,col>); one request at a time; never in
     // tournament mode, never without GPS Map, never with the switch off, never offline. Under
     // 30 yds off the line: nothing is sent - the course samples say it. elevPerLeg off: never.
+    // ITS OWN SWITCH, OFF BY DEFAULT: features.elevMyCell must be exactly true (the project rule
+    // "No location data leaves the phone unless group-locator opt-in" - it needs Manny's own OK).
+    // Off: per-leg plays-like still works; the golfer's height comes ONLY from the course samples
+    // and nothing derived from their position is ever requested.
+    function myCellSwitch() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.elevMyCell === true; } catch (e) { return false; } }
     var CELL_PREFIX = 'hardpan_elev_cell_v1_';
     function holeLineFor(r) {
         var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
@@ -2567,7 +2572,7 @@
         return [r.tee].concat(line).concat([r.mid]);
     }
     function ownSpotCell(r, pt) {
-        if (!S || !r || !r.tee || !r.mid || !pt || !perLegSwitch()) return null;
+        if (!S || !r || !r.tee || !r.mid || !pt || !perLegSwitch() || !myCellSwitch()) return null;
         var off = G.offLineYards(pt, holeLineFor(r));
         return off != null && off > G.OWN_SPOT_OFF_YD ? G.elevCell(pt) : null;
     }
@@ -2581,7 +2586,7 @@
     }
     function fetchOwnSpot(c) {
         if (tournament()) return;   // tournament mode: no elevation at all
-        if (!perLegSwitch() || !S || !S.pro || S.side !== 'gps' || S.cellInFlight || typeof fetch !== 'function') return;
+        if (!perLegSwitch() || !myCellSwitch() || !S || !S.pro || S.side !== 'gps' || S.cellInFlight || typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         if (S.cellFailedAt && Date.now() - S.cellFailedAt < 60000) return;
         if (!c || !inUS(c.pt) || lsGet(CELL_PREFIX + c.key) != null) return;
@@ -2825,7 +2830,9 @@
             toGreen: lg && !lg.single ? lg.toGreen : null, heights: lg ? lg.heights : null });
     }
     function fillPlaysInfo() {
-        var sh = plInfoSheet(), box = sh && sh.querySelector('.gps-plinfo-now');
+        var sh = plInfoSheet(), pos = sh && sh.querySelector('.gps-plinfo-pos');
+        if (pos) pos.textContent = perLegSwitch() && myCellSwitch() ? 'never your exact position; more than 30 yards off the hole\u2019s line, the height of the roughly 10-meter square you are in - its center, not your spot' : 'never your position';
+        var box = sh && sh.querySelector('.gps-plinfo-now');
         if (!box) return;
         var rows = simpleSwitch() ? playsInfoNow() : [];
         var key = rows.join('|');
@@ -4138,7 +4145,8 @@
         // 012 part 5: the altitude, vs My bag's "My distances are from" (gps-geo ALT_PCT_PER_1000FT = 2).
         +     '<li><b>Altitude:</b> with My bag\u2019s \u201cMy distances are from\u201d set, about 2% for every 1,000 feet above it (shorter) or below it (longer) - worked out first.</li>'
         +   '</ul>'
-        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your exact position; more than 30 yards off the hole\u2019s line, the height of the roughly 10-meter square you are in), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
+        // 012: the words about the golfer's own grid cell appear ONLY when that fetch is on (elevMyCell + elevPerLeg; fillPlaysInfo).
+        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (<span class="gps-plinfo-pos">never your position</span>), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
