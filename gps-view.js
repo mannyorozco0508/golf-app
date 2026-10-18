@@ -4696,6 +4696,9 @@
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-mark-shot{width:100%;min-height:52px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 18px/1 ' + FONT + ';display:flex;align-items:center;justify-content:center;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom{position:static;height:62px;gap:8px;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:56px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
+        // 012 (Manny): Games (top left) and + Game opened the same thing - D has the Games pill only;
+        // its room goes to the Enter score button.
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{display:none !important;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-ico{color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-cap{font-size:12px;color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-scorebox{background:var(--gps-ld-lime);border:0;border-radius:18px;}'

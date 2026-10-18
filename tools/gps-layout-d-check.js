@@ -208,6 +208,7 @@ function checkD(a, f, tag, o) {
     f(a.bottom && a.bottom.t >= a.mark.b && a.bottom.b <= a.vh, tag + ' 3: the Card row is not under Mark shot');
     f(a.card && a.score && a.tools && a.card.r <= a.score.l + 1 && a.score.r <= (a.add ? a.add.l : a.tools.l) + 1 && (!a.add || a.add.r <= a.tools.l + 1), tag + ' 3: Card | score | + Game | Tools not in order');
     f(a.cardCap === 'Card' && a.holeLbl === 'Hole 1' && /Enter score|\d/.test(a.scoreText || '') && /200, 240, 122/.test(a.scoreBg || ''), tag + ' 3: Card / "Hole 1 / Enter score" lime: ' + JSON.stringify([a.cardCap, a.holeLbl, a.scoreText, a.scoreBg]));
+    f(!a.add, tag + ' 3: "+ Game" is still in the bottom bar (Games, top left, does the same): ' + JSON.stringify(a.add));
     f(a.score && a.score.w >= a.vw * 0.4, tag + ' 3: the Enter score button is not the big one: ' + JSON.stringify(a.score));
     f(a.credit && a.credit.l <= 16 && a.credit.b <= a.mark.t && a.credit.b >= a.mark.t - 16, tag + ' 3: the credit is not bottom-left just above Mark shot: ' + JSON.stringify([a.credit, a.mark]));
     if (o.esri) f(/Powered by Esri/.test(a.creditText || ''), tag + ' 3: Esri live, but the credit says ' + JSON.stringify(a.creditText));

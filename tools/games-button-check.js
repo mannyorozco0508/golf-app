@@ -11,6 +11,8 @@
 //   2  A round with no games: Games -> this round's own Add a game (the same page).
 //   3  The back "‹" -> the card side, the same page and hole; no way off the GPS screen drops
 //      the round unless the golfer chose to leave (Pick another course is that choice).
+//   4  (012) A round with games: Games -> Today's games, "+ Add game" at its top -> the Add a game
+//      sheet -> Skins -> Round Setup (Money, filled in) -> Save -> back in the round on hole 5.
 // ============================================================================
 'use strict';
 const path = require('path');
@@ -57,6 +59,25 @@ const CLICK = (sel) => ({ expression: "(function(){ var b = document.querySelect
     const [b0, b1] = J(r);
     report.noGames = [b0, b1].map((x) => [x.url, x.side, x.games, x.addGame]);
     f(b1.url === b0.url && b1.loads === b0.loads && b1.addGame, '2: a round with no games: Games did not open this round\'s Add a game: ' + JSON.stringify(b1));
+    // 4 (012, Manny): a round WITH games - Games pill -> Today's games -> "+ Add game" at its top ->
+    // the app's Add a game sheet -> Skins -> Round Setup (Money, filled in) -> Save -> back in the
+    // round, on the same hole.
+    const ST4 = "JSON.stringify({ url: document.URL.split('/').pop(), side: window.HardPanGps && HardPanGps.side(), hole: window.HardPanGps && HardPanGps.hole(), add: (function(){ var b = document.querySelector('#todays-games-mount .tg-add'); if (!b) return null; var r = b.getBoundingClientRect(); return { inView: r.top >= 0 && r.bottom <= innerHeight, text: b.textContent, top: b === b.parentNode.firstElementChild }; })(), addGame: (function(){ var a = document.getElementById('fd-addgame'); return !!(a && a.style.display !== 'none'); })(), e: window.__e })";
+    r = await go({ url: fileUrl('index.html', 'game=GBTN04'), db: DB({ GBTN04: round('GBTN04', { nassauStake: 5, gameFormat: 'nassau' }) }), settleMs: 3000, preScript: APP + ERR + SEED('GBTN04'), steps: [{ sleep: 2500 },
+        { expression: "(function(){ goToHole(5); return 'h5'; })()" }, { sleep: 800 }, CLICK('#fd-gps-btn'), { sleep: 1200 },
+        CLICK('#gps-overlay .gps-door-games'), { sleep: 1200 }, { expression: ST4 },
+        CLICK('#todays-games-mount .tg-add'), { sleep: 600 }, { expression: ST4 },
+        CLICK('#fd-addgame [data-ag-q="skins"]'), { sleep: 400 }, CLICK('#fd-ag-cta'), { sleep: 6000 },
+        { expression: "JSON.stringify({ url: document.URL.split('/').pop(), step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null, skins: typeof skinsInstances !== 'undefined' ? skinsInstances.length : null })" },
+        { expression: "(function(){ var b = document.getElementById('main-save-btn'); if (!b) return 'no save'; if (typeof goToWizardStep === 'function' && typeof WIZARD_STEP_OF !== 'undefined' && WIZARD_STEP_OF.review != null) goToWizardStep(WIZARD_STEP_OF.review); b.click(); return 'saved'; })()" }, { sleep: 6000 },
+        { expression: ST4 }] });
+    const g4 = J(r);
+    report.addFromGames = g4.map((x) => [x.url, x.side, x.hole, x.add, x.addGame, x.step, x.skins]);
+    const [d0, d1, d2, d3] = g4;
+    f(d0 && d0.side === 'bets' && d0.add && d0.add.top && d0.add.inView && d0.add.text === '+ Add game', '4: Today\'s games has no "+ Add game" at its top: ' + JSON.stringify(d0));
+    f(d1 && d1.addGame, '4: "+ Add game" did not open the Add a game sheet: ' + JSON.stringify(d1));
+    f(d2 && /^admin\.html\?game=GBTN04&tpl=skins/.test(d2.url) && d2.skins >= 1, '4: Skins did not open Round Setup filled in: ' + JSON.stringify(d2));
+    f(d3 && /^index\.html\?game=GBTN04/.test(d3.url) && d3.hole === 5, '4: after Save, not back in the round on hole 5: ' + JSON.stringify(d3));
     [a0, a1, a2, a3, b0, b1].forEach((x) => (x.e || []).filter((m) => !/reading 'ts'/.test(m)).forEach((m) => fails.push('error: ' + m)));
     console.log(JSON.stringify({ report, fails }, null, 1));
     process.exit(fails.length ? 1 : 0);
