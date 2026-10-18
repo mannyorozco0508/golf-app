@@ -139,7 +139,7 @@ const MEASURE = { expression: "(function(){ var ov = document.getElementById('gp
     + "  topBg: (function(){ var e = ov.querySelector('.gps-ld-top'); return e ? getComputedStyle(e).backgroundColor : null; })(), scoreBg: (function(){ var e = ov.querySelector('.gps-scorebox'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
     + "  pillBg: (function(){ var e = ov.querySelector('.gps-ld-plays'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
     + "  map: mapEl ? { zoom: mapEl.getAttribute('data-zoom'), center: mapEl.getAttribute('data-center'), bearing: mapEl.getAttribute('data-bearing'), w: mapEl.clientWidth, h: mapEl.clientHeight, ready: mapEl.getAttribute('data-ready'), bounds: mapEl.getAttribute('data-bounds'), tiles: mapEl.getAttribute('data-tiles-loaded'), side: document.body.className } : null, creditOnTop: (function(){ var c = ov.querySelector('.gps-credit-txt'); if (!c || c.offsetParent === null) return null; var b = c.getBoundingClientRect(); var h = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(h && ov.querySelector('.gps-credit').contains(h)); })(),"
-    + "  esriLayer: mapEl && mapEl.getAttribute('data-esri'), sheet: (function(){ var w = document.getElementById('hp-score-sheet'); if (!w) return null; for (var x = w; x && x !== document.body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; } var b = w.getBoundingClientRect(); return b.height > 0; })(), side: window.HardPanGps && HardPanGps.side(), pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
+    + "  esriLayer: mapEl && mapEl.getAttribute('data-esri'), sheet: (function(){ var w = document.getElementById('hp-score-sheet'); if (!w) return null; for (var x = w; x && x !== document.body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; } var b = w.getBoundingClientRect(); return b.height > 0; })(), side: window.HardPanGps && HardPanGps.side(), pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), tsLayout: (function(){ var b = ov.querySelector('.gps-tsheet [data-ts-seg=\"layout\"] button.on'); return R('.gps-tsheet') && b ? b.getAttribute('data-v') : null; })(), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
 const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay " + sel + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
 const WAIT_MAP = { waitFor: "(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && Number(m.dataset.zoom) > 3); })()", timeout: 45000 };
 const READY = { waitFor: "(function(){ var p = document.querySelector('#gps-overlay .gps-ld-pltext'), q = document.querySelector('#gps-overlay .gps-pl-text'); var m = document.querySelector('#gps-overlay .gps-m'); return !!(((p && /\\d/.test(p.textContent)) || (q && /Plays/.test(q.textContent))) && m && /\\d/.test(m.textContent)); })()", timeout: 25000 };
@@ -180,7 +180,9 @@ const TS = { expression: "(function(){ var ov = document.getElementById('gps-ove
     + "  pill: vis2('#gps-overlay .gps-ld-plays'), mText: (ov.querySelector('.gps-m') || {}).textContent, bag: vis2('#gps-overlay .gps-bag'), shotbar: vis2('#gps-overlay .gps-shotbar'), stats: vis2('#hp-my-stats') || vis2('.gps-stats-sheet'), banner: vis2('#gps-overlay .gps-banner') ? ov.querySelector('.gps-banner').textContent : null,"
     + "  actions: vis2('#gps-overlay .gps-actions'), url: document.URL.split('/').pop(), e: window.__e }); })()" };
 const TSC = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-tsheet " + sel.replace(/'/g, "\\'") + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
-const SWITCH = [TAP('.gps-tools'), W(300), TAP('.gps-layout-pick'), W(1500)];
+// Tools > Screen layout: the sheet's other choice (the old drop-down's item when the sheet is off), then closed.
+const SWITCH = [TAP('.gps-tools'), W(300), { expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-tsheet [data-ts-seg=\\\"layout\\\"] button:not(.on)'); if (b && b.offsetParent !== null) { b.click(); return 'sheet'; } var m = document.querySelector('#gps-overlay .gps-layout-pick'); if (m) m.click(); return 'menu'; })()" }, W(1500),
+    { expression: "(function(){ var t = document.querySelector('#gps-overlay .gps-tsheet'); if (t && t.style.display !== 'none') document.querySelector('#gps-overlay .gps-tools').click(); return 'closed'; })()" }, W(300)];
 
 // THE CREDIT, SEEN: on screen, nothing over its words, above the bottom controls (D: Mark shot; C: the panel).
 const creditOk = (a) => !!(a.credit && a.creditOnTop === true && a.credit.l >= 0 && a.credit.t >= 0 && a.credit.r <= a.vw && a.credit.b <= a.vh
@@ -256,7 +258,7 @@ function checkD(a, f, tag, o) {
         const tag = ph.name + '-' + tx.name;
         const shotStep = SHOTS ? [{ shot: path.join(SHOTS, 'D-' + ph.w + 'x' + ph.h + '-' + tx.name + '.png'), viewportOnly: true }] : [];
         s = await go({ esri: 'OK-3X', seed: BAG, vw: ph.w, vh: ph.h, steps: START.concat([SCALE(tx.k), W(1500), MEASURE, CLIPS], shotStep,
-            [TAP('.gps-ld-plays'), W(400), ONTOP('.gps-plinfo'), TAP('.gps-plinfo-done'), W(200), TAP('.gps-tools'), W(300), ONTOP('.gps-tools-menu'), TAP('.gps-tools'), W(200),
+            [TAP('.gps-ld-plays'), W(400), ONTOP('.gps-plinfo'), TAP('.gps-plinfo-done'), W(200), TAP('.gps-tools'), W(300), ONTOP('.gps-tsheet'), TAP('.gps-tools'), W(200),
              TAP('.gps-hz-btn'), W(500), ONTOP('.gps-hzs'), TAP('.gps-hzs-done'), W(200), TAP('.gps-hole-btn'), W(300), ONTOP('.gps-picker-card')]) });
         const [m, cl, ...tops] = s;
         checkD(m, f, tag, { esri: true, club: true, want });
@@ -376,13 +378,13 @@ function checkD(a, f, tag, o) {
     // 5: Tools > Screen layout, live: D -> C (no reload), remembered (a reload), C -> D. No bag: no club.
     s = await go({ steps: START.concat([MEASURE, TAP('.gps-tools'), W(300), MEASURE], SWITCH, [MEASURE, { expression: 'location.reload()' }, W(1000)], START, [MEASURE, TAP('.gps-tools'), W(300), MEASURE], SWITCH, [MEASURE]) });
     const [d0, dMenu, cLive, cReload, cMenu, dBack] = s;
-    report.switch = { menu: dMenu.pickText, live: cLive.layout, reload: cReload.layout, menuC: cMenu.pickText, back: dBack.layout };
+    report.switch = { menu: dMenu.tsLayout, live: cLive.layout, reload: cReload.layout, menuC: cMenu.tsLayout, back: dBack.layout };
     checkD(d0, f, 'nobag', { noClub: true });
-    f(dMenu.pick && dMenu.pickText === 'Screen layout: HardPan', '5: Tools has no "Screen layout: HardPan": ' + JSON.stringify(dMenu.pickText));
+    f(dMenu.tsLayout === 'd', '5: Tools has no Screen layout with HardPan lit: ' + JSON.stringify([dMenu.tsLayout, dMenu.pickText]));
     f(cLive.layout === 'c' && cLive.lc && !cLive.ld && cLive.panel && !cLive.top && !cLive.pill, '5: Bottom panel did not switch to layout C at once: ' + JSON.stringify({ layout: cLive.layout, panel: cLive.panel, top: cLive.top }));
     f(cLive.tee && cLive.panel && cLive.tee.b <= cLive.panel.t, '5: after the switch the hole is not re-fitted above C\'s panel: ' + JSON.stringify([cLive.tee, cLive.panel]));
     f(cReload.layout === 'c' && cReload.panel, '5: Bottom panel was not remembered on the phone');
-    f(cMenu.pickText === 'Screen layout: Bottom panel', '5: in C the setting says ' + JSON.stringify(cMenu.pickText));
+    f(cMenu.tsLayout === 'c', '5: in C the setting says ' + JSON.stringify(cMenu.tsLayout));
     f(dBack.layout === 'd', '5: HardPan did not switch back to D');
     if (dBack.layout === 'd') checkD(dBack, f, 'back');
     errs(s, 'switch');
