@@ -726,6 +726,14 @@
         return b;
     }
 
+    function setTrackOthers(v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); }
+    function trackShown() {
+        try {
+            var F = W.HardPanFeature;
+            return typeof F === 'function' && F('scoreSheet') !== false && F('quickStats') !== false
+                && !!(W.HardPanGps && typeof W.HardPanGps.hasGpsPro === 'function' && W.HardPanGps.hasGpsPro());
+        } catch (e) { return false; }
+    }
     W.HardPanGpsStats = { open: open, close: close, refresh: refresh, isOpen: function () { return !!(sheet && sheet.style.display !== 'none' && cur); },
         girAuto: girAuto, holeView: holeView, summary: summary, season: season, load: load, setHole: setHole, ensure: ensure,
         // Quick stats on the scorecard (008) and My stats.
@@ -734,7 +742,11 @@
         // "Track stats for others" (this phone, off by default): the state and its setter, for any Tools
         // surface (the old drop-down via sheet.placeToggle, the Tools bottom sheet's ROUND switch). The
         // setter redraws an open score sheet.
-        trackOthers: othersOn, setTrackOthers: function (v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); },
+        // Present only while the switch is meaningful (the score sheet and quick stats switched on, GPS
+        // Map): a Tools surface that shows the switch when these exist hides it otherwise.
+        get trackOthers() { return trackShown() ? othersOn : undefined; },
+        get setTrackOthers() { return trackShown() ? setTrackOthers : undefined; },
+        trackOthersShown: function () { return trackShown(); },
         // The score sheet (012).
         sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();

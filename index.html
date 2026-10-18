@@ -6448,13 +6448,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     }
     // Tools > "Track stats for others" (this phone; off by default) - with the sheet and quick stats.
     function gpsSheetPlace() {
+        // The sheet belongs to its hole: the hole changed under it (the card, the picker) - closed.
+        try {
+            const S = gpsSheetOn() ? window.HardPanGpsStats.sheet : null;
+            if (S && S.isOpen() && Number(S.hole()) !== Number(currentViewedHole)) S.close();
+        } catch (e) {}
+        // The Tools sheet (012, layouts D / C) has its own "Track stats for others" switch.
+        if (window.HardPanGps && typeof HardPanGps.toolsSheetOn === 'function' && HardPanGps.toolsSheetOn()) return;
         try {
             const menu = document.querySelector('#gps-overlay .gps-tools-menu');
             const on = gpsSheetOn() && qsOn();
             if (on && menu) window.HardPanGpsStats.sheet.placeToggle(menu);
             else if (menu) { const b = menu.querySelector('.hp-ss-others'); if (b) b.remove(); }
-            const S = on || gpsSheetOn() ? window.HardPanGpsStats.sheet : null;
-            if (S && S.isOpen() && Number(S.hole()) !== Number(currentViewedHole)) S.close();
         } catch (e) {}
     }
     function gpsOpenScore(hole, playerId) {

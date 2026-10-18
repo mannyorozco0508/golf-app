@@ -28,6 +28,7 @@ function sandbox(ls) {
     sb.window = sb;
     vm.createContext(sb);
     vm.runInContext(read('gps-stats.js'), sb);
+    sb.HardPanGpsStats.__sb = sb;
     return { St: sb.HardPanGpsStats, store };
 }
 const J = (x) => JSON.parse(JSON.stringify(x));
@@ -125,7 +126,13 @@ test('Track stats for others: per phone, off by default', { skip }, () => {
     assert.strictEqual(store.hardpan_stats_others, '1'); assert.strictEqual(St.sheet.othersOn(), true);
     St.sheet.setOthers(false);
     assert.ok(!('hardpan_stats_others' in store));
-    // The API any Tools surface uses.
+    // The API any Tools surface uses: absent until the switch means something (no switch / no GPS Map).
+    assert.strictEqual(St.trackOthers, undefined); assert.strictEqual(St.trackOthersShown(), false);
+    const G = St.__sb;
+    G.HardPanFeature = (n) => n !== 'scoreSheet'; G.HardPanGps = { hasGpsPro: () => true };
+    assert.strictEqual(St.trackOthers, undefined, 'scoreSheet off: no switch');
+    G.HardPanFeature = () => true;
+    assert.strictEqual(typeof St.trackOthers, 'function');
     assert.strictEqual(St.setTrackOthers(true), true); assert.strictEqual(St.trackOthers(), true); assert.strictEqual(store.hardpan_stats_others, '1');
     assert.strictEqual(St.setTrackOthers(false), false); assert.strictEqual(St.trackOthers(), false);
 });

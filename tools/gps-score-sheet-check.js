@@ -90,7 +90,14 @@ const ST = { expression: `JSON.stringify((function () {
   var card = w && w.querySelector('.hp-ss'), cr = card ? card.getBoundingClientRect() : null;
   var ls = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^hardpan_qstats_v1_/.test(k)) ls[k] = JSON.parse(localStorage.getItem(k)); }
   var box = function (pid, h) { var b = document.querySelector('.score-input[data-player-id="' + pid + '"][data-hole="' + h + '"]'); return b ? b.value : null; };
-  var tools = document.querySelector('#gps-overlay .hp-ss-others');
+  // "Track stats for others" where this tree has it: the Tools bottom sheet's ROUND switch (layouts D / C,
+  // HardPanGps.toolsSheetOn()) or the old Tools drop-down's row. Shown as "Track stats for others: On|Off".
+  var tsOn = !!(window.HardPanGps && typeof HardPanGps.toolsSheetOn === 'function' && HardPanGps.toolsSheetOn());
+  var tools = (function () {
+    if (tsOn) { var sw = document.querySelector('#gps-overlay [data-ts-sw="others"]'); var row = sw && sw.closest('[data-ts-row]');
+      if (!sw || !shown(sw) || (row && !shown(row))) return null; return { textContent: 'Track stats for others: ' + (sw.getAttribute('aria-checked') === 'true' ? 'On' : 'Off') }; }
+    var b = document.querySelector('#gps-overlay .hp-ss-others'); return b && shown(b) ? b : (b ? { textContent: b.textContent } : null);
+  })();
   return { open: open, inOverlay: !!(w && w.parentNode && w.parentNode.id === 'gps-overlay'),
     heightPct: cr ? Math.round(cr.height / innerHeight * 100) : null,
     title: open ? w.querySelector('.hp-ss-title').textContent : null, meta: open ? w.querySelector('.hp-ss-meta').textContent : null,
@@ -109,6 +116,11 @@ const ST = { expression: `JSON.stringify((function () {
 // THE PREVIOUS-HOLE BUTTON THE LAYOUT SHOWS (the old top panel's ‹, layout D's ‹ beside Enter score):
 // the visible one is marked, then tapped for real.
 const PREV = { expression: "(function(){ var b = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay [aria-label=\\'Previous hole\\']'), function (x) { var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden'; })[0]; if (!b) return 'none'; b.setAttribute('data-ss-prev', '1'); return b.className; })()" };
+// THE "Track stats for others" CONTROL, wherever this tree puts it (the Tools sheet's switch, or the
+// drop-down's row): marked, then tapped for real. And Tools closed the way each closes.
+const TS_ON = "(window.HardPanGps && typeof HardPanGps.toolsSheetOn === 'function' && HardPanGps.toolsSheetOn())";
+const OTHERS = { expression: "(function(){ var b = " + TS_ON + " ? document.querySelector('#gps-overlay [data-ts-sw=\\'others\\']') : document.querySelector('#gps-overlay .hp-ss-others'); if (!b) return 'none'; b.setAttribute('data-ss-others-tap', '1'); return b.className; })()" };
+const CLOSE_TOOLS = { expression: "(function(){ if (" + TS_ON + ") { var k = document.querySelector('#gps-overlay .gps-ts-back'); if (k) k.click(); return 'sheet closed'; } var t = document.querySelector('#gps-overlay .gps-tools'); if (t) t.click(); return 'menu closed'; })()" };
 const SCROLL_BOTTOM = { expression: "(function(){ var b = document.querySelector('#hp-score-sheet .hp-ss-body'); if (!b) return 'none'; b.scrollTop = b.scrollHeight; return 'scrolled'; })()" };
 const shot = (name) => SHOTS ? [{ shot: path.join(SHOTS, name), viewportOnly: true }] : [];
 // THE LARGEST TEXT (as tools/gps-layout-c-check.js): every font size (and px line height) on the GPS
@@ -228,7 +240,7 @@ const MY = { expression: `JSON.stringify((function () {
     errs(s, 'B');
 
     // ---- C: Track stats for others --------------------------------------------------------
-    s = await go({ steps: START.concat([TAP('#gps-overlay .gps-tools'), WAIT(300), ST, TAP('#gps-overlay .hp-ss-others'), WAIT(300), ST, TAP('#gps-overlay .gps-tools'), WAIT(300),
+    s = await go({ steps: START.concat([TAP('#gps-overlay .gps-tools'), WAIT(400), ST, OTHERS, TAP('#gps-overlay [data-ss-others-tap]'), WAIT(300), ST, CLOSE_TOOLS, WAIT(400),
         TAP('#gps-overlay .gps-score'), WAIT(600), TAP('#hp-score-sheet [data-ss-golfer="102"]'), WAIT(250), ST]) });
     report.C = s.map((x) => x && [x.tools, x.others, x.rows]);
     f(ok(s[0]) && s[0].tools === 'Track stats for others: Off' && s[0].others === null, 'C: the Tools row is not Off by default: ' + JSON.stringify(report.C[0]));
@@ -237,7 +249,7 @@ const MY = { expression: `JSON.stringify((function () {
     errs(s, 'C');
 
     // ---- D: the switch off ----------------------------------------------------------------
-    s = await go({ features: { scoreSheet: false }, steps: START.concat([TAP('#gps-overlay .gps-tools'), WAIT(300), ST, TAP('#gps-overlay .gps-tools'), WAIT(300), TAP('#gps-overlay .gps-score'), WAIT(800), ST]) });
+    s = await go({ features: { scoreSheet: false }, steps: START.concat([TAP('#gps-overlay .gps-tools'), WAIT(400), ST, CLOSE_TOOLS, WAIT(400), TAP('#gps-overlay .gps-score'), WAIT(800), ST]) });
     report.D = s.map((x) => x && [x.open, x.side, x.active, x.tools]);
     f(ok(s[0]) && s[0].tools === null, 'D: switch off, the Tools row is there');
     f(ok(s[1]) && !s[1].open && s[1].side === 'bets' && /score-input/.test(s[1].active || ''), 'D: switch off, Enter score is not the card\'s box: ' + JSON.stringify(report.D[1]));
