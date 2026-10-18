@@ -1232,6 +1232,40 @@
         // LAYOUT D: the bottom controls' measured height - the credit, the plays pill and Recenter sit on it.
         var pn = (lcOn() && S.el.querySelector('.gps-panel')) || (ldOn() && S.el.querySelector('.gps-ld-bottom'));
         if (pn && pn.offsetParent !== null) S.el.style.setProperty('--gps-panel-h', Math.round(S.el.getBoundingClientRect().bottom - pn.getBoundingClientRect().top) + 'px');
+        if (ldOn()) ldPlace();
+    }
+    // LAYOUT D, MEASURED: the pill and Recenter ride above the credit line (however tall the
+    // text makes it); the pill steps left of the rail when a short phone brings them together;
+    // "Hole 4 · Manny ▾" drops "Hole 4 ·" when the two do not fit on the button's line.
+    function ldPlace() {
+        var cr = S.el.querySelector('.gps-credit');
+        var ch = cr && cr.offsetParent !== null ? Math.ceil(cr.getBoundingClientRect().height) : 18;
+        S.el.style.setProperty('--gps-credit-h', ch + 'px');
+        var pill = S.el.querySelector('.gps-ld-plays'), rail = S.el.querySelector('.gps-ld-rail');
+        if (pill && rail && pill.style.display !== 'none') {
+            pill.classList.remove('gps-ld-plays-in'); pill.style.right = '';
+            var pb = pill.getBoundingClientRect(), left = null, W = S.el.getBoundingClientRect();
+            // The rail squares level with the pill (6px apart): the pill sits left of the widest.
+            Array.prototype.forEach.call(rail.children, function (c) { if (c.offsetParent === null) return; var b = c.getBoundingClientRect(); if (b.height && b.bottom + 6 > pb.top && b.top < pb.bottom) left = left == null ? b.left : Math.min(left, b.left); });
+            if (left != null && pb.right > left) { pill.classList.add('gps-ld-plays-in'); pill.style.right = Math.round(W.right - left + 8) + 'px'; }
+        }
+        // MIDDLE never runs into B / F: a long number (or a big text size) steps its size
+        // down to fit its column (never under 28px), and back up when there is room.
+        var big = S.el.querySelector('.gps-ld-top .gps-m'), col = big && big.parentNode;
+        if (big && col && col.clientWidth) {
+            var fs0 = big.getAttribute('data-ld-fs');
+            if (fs0) big.style.setProperty('font-size', fs0, 'important');
+            else { fs0 = big.style.getPropertyValue('font-size') || ''; big.setAttribute('data-ld-fs', fs0 || 'auto'); }
+            if (fs0 === 'auto') big.style.removeProperty('font-size');
+            var px = parseFloat(getComputedStyle(big).fontSize);
+            while (big.scrollWidth > col.clientWidth + 1 && px > 28) { px -= 2; big.style.setProperty('font-size', px + 'px', 'important'); }
+        }
+        var l1 = S.el.querySelector('.gps-ld-l1');
+        if (l1) {
+            l1.classList.remove('gps-ld-short');
+            var who = l1.querySelector('.gps-who');
+            if (who && who.style.display !== 'none' && (l1.scrollWidth > l1.clientWidth + 1 || who.scrollWidth > who.clientWidth + 1)) l1.classList.add('gps-ld-short');
+        }
     }
     // The hole's own view follows the screen until the golfer moves the map: the
     // phone's toolbars settle, or the attribution bar gains the Esri credit.
@@ -3279,7 +3313,7 @@
         syncLayoutC(r, nums, acc);
         syncLayoutD(r, o, nums);
         txt('.gps-layout-pick', 'Screen layout: ' + (layoutNow() === 'd' ? 'HardPan' : 'Bottom panel'));
-        show('.gps-layout-pick', ldSwitch());
+        show('.gps-layout-pick', ldSwitch()); show('.gps-menu-h', ldSwitch());
         placeZoom();
         placePills();
         syncWind();
@@ -3802,9 +3836,9 @@
     function layoutNow() { return !S ? null : (S.ld ? 'd' : (S.lc ? 'c' : 'old')); }
     // Every element a layout moves, and where it lives in MARKUP (a comment marks the spot),
     // so a switch puts them all back before the other layout takes them.
-    var MOVED = ['.gps-back', '.gps-door-games', '.gps-wind', '.gps-hole-btn', '.gps-num-f', '.gps-num-mid', '.gps-num-b', '.gps-pl-line', '.gps-suggest',
+    var MOVED = ['.gps-back', '.gps-door-games', '.gps-wind', '.gps-hole-btn', '.gps-who', '.gps-num-f', '.gps-num-mid', '.gps-num-b', '.gps-pl-line', '.gps-suggest',
         '.gps-green-view', '.gps-hz-btn', '.gps-mark-shot', '.gps-fly-btn', '.gps-zoom', '.gps-bottom', '.gps-actions'];
-    var LAYOUT_BOXES = ['.gps-lc-top', '.gps-panel', '.gps-ld-head', '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-holelbl'];
+    var LAYOUT_BOXES = ['.gps-lc-top', '.gps-panel', '.gps-ld-head', '.gps-ld-l1', '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-holelbl'];
     function markHomes(el) {
         el._gpsHomes = MOVED.map(function (sel) {
             var n = el.querySelector(sel);
@@ -3856,8 +3890,15 @@
         // THE BOTTOM: Mark shot, wide; under it Card | ‹ Hole 4 / Enter score › | + Game | Tools.
         var bot = mk('div', 'gps-ld-bottom', { role: 'group', 'aria-label': 'Actions' });
         put(bot, '.gps-mark-shot'); put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        // TWO LINES, however many golfers: "Hole 1 · Manny ▾" (tap the hole = Enter score, the
+        // name = whose score), then "Enter score" / the score.
         var col = bot.querySelector('.gps-score-col');
-        if (col) col.insertBefore(mk('span', 'gps-ld-holelbl'), col.firstChild);
+        if (col) {
+            var l1 = mk('span', 'gps-ld-l1');
+            l1.appendChild(mk('span', 'gps-ld-holelbl'));
+            var who = col.querySelector('.gps-who'); if (who) l1.appendChild(who);
+            col.insertBefore(l1, col.firstChild);
+        }
         var credit = q('.gps-credit');
         var head = mk('div', 'gps-ld-head');
         head.appendChild(top); head.appendChild(row2);
@@ -3865,14 +3906,15 @@
     }
     // Club keys (gps-shots.js BAG) to the short name on the pill: 3w -> 3W, 7i -> 7i, PW.
     function clubShort(c) { return c === 'Dr' ? 'Dr' : String(c || '').replace(/w$/, 'W'); }
-    // The pill's numbers, from the same model as the plays line (syncBreakdown): to the
-    // target once the golfer has moved it, else to the aim. The club only from a bag that
-    // is set up. Tournament mode: no pill (playsTo says nothing then, and this asks first).
+    // The pill's numbers follow THE TARGET RING (Manny, 012 - as the mockup): you -> the ring,
+    // the default target included (not the green's middle), and that leg's plays-like from
+    // the existing model (playsTo). No ring: to the aim. The club only from a bag that is set
+    // up. Tournament mode: no pill (playsTo says nothing then, and this asks first).
     function ldPlays(r, o, nums) {
         if (tournament() || !S.pro || S.mode !== 'measure' || !o || (nums && nums.onGreen)) return null;
-        var moved = !!(S.targetMoved && S.target), aim = moved ? S.target : aimAt(r);
+        var aim = S.target || aimAt(r);
         if (!aim) return null;
-        var pl = playsTo(moved ? S.target : null);
+        var pl = playsTo(S.target || null);
         if (!pl) return null;
         var u = units(), m = u === 'm';
         var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '' };
@@ -3945,7 +3987,7 @@
         var rc = function (sel) { var e = S.el.querySelector(sel); if (!e || e.offsetParent === null || getComputedStyle(e).display === 'none') return null; var b = e.getBoundingClientRect(); return b.height ? b : null; };
         var top = W.top, bot = W.bottom, right = W.right;
         ['.gps-ld-top', '.gps-ld-row2'].forEach(function (s) { var b = rc(s); if (b) top = Math.max(top, b.bottom); });
-        ['.gps-ld-bottom', '.gps-ld-plays', '.gps-credit'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
+        ['.gps-ld-bottom', '.gps-ld-plays', '.gps-credit', '.gps-leftrow .gps-recenter'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
         var rl = rc('.gps-ld-rail'); if (rl) right = Math.min(right, rl.left);
         return { top: top - W.top, bottom: bot - W.top, left: 0, right: right - W.left, W: W };
     }
@@ -4217,6 +4259,8 @@
         +   '<button type="button" class="gps-menu-item gps-undo-green" style="display:none">Undo last fix</button>'
         +   '<button type="button" class="gps-menu-item gps-rechoose" style="display:none">Choose hole 1 again</button>'
         +   '<button type="button" class="gps-menu-item gps-refresh-gps" style="display:none">Refresh GPS data</button>'
+        // GPS SETTINGS (012): Units, Screen layout, Tournament mode, Auto-advance - together, under a small heading.
+        +   '<div class="gps-menu-h" data-feature="gpsLayoutD" role="presentation" style="display:none">GPS settings</div>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
         // 012: HardPan (layout D, the default) or Bottom panel (layout C) - this phone, at once.
         +   '<button type="button" class="gps-menu-item gps-layout-pick" data-feature="gpsLayoutD" style="display:none"></button>'
@@ -4467,6 +4511,10 @@
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
+        // 012: the GPS settings rows under a small heading, a firmer line after them.
+        + '#gps-overlay .gps-menu-h{font:800 11px/1 ' + FONT + ';letter-spacing:.1em;text-transform:uppercase;color:#a7b3aa;padding:12px 12px 6px;border-top:1px solid rgba(255,255,255,.18);}'
+        + '#gps-overlay .gps-menu-h:first-child{border-top:0;}'
+        + '#gps-overlay .gps-menu-h ~ .gps-aa-toggle + .gps-menu-item{border-top:1px solid rgba(255,255,255,.3);margin-top:4px;}'
         + '#gps-overlay .gps-picker{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:calc(env(safe-area-inset-top) + 70px);}'
         + '#gps-overlay .gps-picker-card{width:calc(100% - 24px);max-width:420px;padding:12px;}'
         + '#gps-overlay .gps-picker-title{font-weight:800;font-size:15px;color:#d9f99d;margin:2px 4px 10px;}'
@@ -4605,9 +4653,10 @@
         + '#gps-overlay.gps-ld .gps-hole-btn{flex:0 0 auto;display:grid;grid-template-columns:auto auto;align-items:end;column-gap:2px;min-height:52px;padding:0 2px;text-align:left;}'
         + '#gps-overlay.gps-ld .gps-hole-lbl{grid-column:1 / 3;font-size:11px;letter-spacing:.1em;}'
         + '#gps-overlay.gps-ld .gps-hole-num{font-size:34px;line-height:1;}'
-        + '#gps-overlay.gps-ld .gps-hole-caret{font-size:12px;color:#f4f4ef;padding-bottom:2px;}'
+        + '#gps-overlay.gps-ld .gps-hole-caret{font-size:20px;line-height:1;color:#f4f4ef;padding-bottom:3px;}'
         + '#gps-overlay .gps-ld-div{flex:0 0 1px;align-self:stretch;margin:6px 0;background:rgba(244,244,239,.2);}'
-        + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;margin-right:4px;}'
+        + '#gps-overlay.gps-ld .gps-ld-top .gps-m{max-width:100%;}'
         + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid .gps-lbl{font-size:11px;letter-spacing:.1em;}'
         + '#gps-overlay.gps-ld .gps-ld-top .gps-num-mid .gps-big{font-size:46px;line-height:1;color:var(--gps-ld-lime);letter-spacing:-.01em;}'
         + '#gps-overlay .gps-ld-fb{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;}'
@@ -4620,20 +4669,23 @@
         + '#gps-overlay .gps-ld-row2 > *{pointer-events:auto;}'
         + '#gps-overlay .gps-ld-gap{flex:1 1 auto;pointer-events:none !important;}'
         + '#gps-overlay.gps-ld .gps-door-games{position:static;flex:0 0 auto;background:#ffd60a;color:#0b0f0c;min-height:44px;padding:0 18px;border-radius:999px;font:800 16px/1 ' + FONT + ';box-shadow:0 4px 12px rgba(0,0,0,.3);}'
-        + '#gps-overlay .gps-ld-score{min-height:44px;padding:0 16px;border-radius:999px;background:rgba(11,15,12,.94);border:0;font:800 15px/1.2 ' + FONT + ';color:#f4f4ef;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}'
+        + '#gps-overlay .gps-ld-score{min-height:44px;padding:5px 16px;border-radius:22px;background:rgba(11,15,12,.94);border:0;font:800 15px/1.2 ' + FONT + ';color:#f4f4ef;white-space:normal;text-align:right;min-width:0;font-variant-numeric:tabular-nums;}'
         + '#gps-overlay .gps-ld-score .gps-tp-under{color:#4ade80;}'
         // THE RIGHT RAIL: small squares.
         + '#gps-overlay .gps-ld-rail{position:absolute;z-index:6;right:8px;top:calc(var(--gps-top-b) + 4px);display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none;}'
         + '#gps-overlay.gps-ld .gps-ld-rail > *{pointer-events:auto;position:static;transform:none;width:52px;min-height:52px;box-sizing:border-box;padding:4px;border-radius:14px;background:rgba(11,15,12,.92);border:0;box-shadow:0 4px 12px rgba(0,0,0,.3);'
-        +   '-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:800 12px/1.1 ' + FONT + ';color:#f4f4ef;text-align:center;white-space:normal;}'
+        +   '-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:800 12px/1.1 ' + FONT + ';color:#f4f4ef;text-align:center;white-space:nowrap;}'
+        // A label longer than the square (big text): the square widens, never the text spilling out.
+        + '#gps-overlay.gps-ld .gps-ld-rail > *{width:auto;min-width:52px;}'
         + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind{width:auto;min-width:52px;position:relative;padding-bottom:4px !important;}'
         + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-tag{display:none !important;}'
         + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-arrow{font-size:20px;}'
         + '#gps-overlay.gps-ld .gps-ld-rail .gps-wind-mph{font-size:12px;white-space:nowrap;}'
         + '#gps-overlay.gps-ld .gps-ld-rail .gps-zoom{top:auto !important;transform:none !important;}'
         // THE PLAYS-LIKE PILL: right, just above Mark shot (above the credit line).
-        + '#gps-overlay .gps-ld-plays{position:absolute;z-index:7;right:8px;bottom:calc(var(--gps-panel-h) + 24px);max-width:calc(100% - 16px);box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:4px 14px 4px 4px;'
+        + '#gps-overlay .gps-ld-plays{position:absolute;z-index:7;right:8px;bottom:calc(var(--gps-panel-h) + var(--gps-credit-h,18px) + 6px);max-width:calc(100% - 16px);box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:4px 14px 4px 4px;'
         +   'border-radius:999px;background:#f3f0e2 !important;color:#0b0f0c !important;box-shadow:0 6px 16px rgba(0,0,0,.35);text-align:left;}'
+        + '#gps-overlay .gps-ld-plays.gps-ld-plays-in{max-width:calc(100% - 76px);}'
         + '#gps-overlay .gps-ld-raw{flex:0 0 auto;min-width:52px;height:52px;padding:0 6px;box-sizing:border-box;border-radius:26px;background:#0b0f0c;color:#fff;display:flex;align-items:center;justify-content:center;font:800 20px/1 ' + FONT + ';font-variant-numeric:tabular-nums;}'
         + '#gps-overlay .gps-ld-pl{display:flex;flex-direction:column;min-width:0;}'
         + '#gps-overlay .gps-ld-pl small{font:600 12px/1.2 ' + FONT + ';color:#4b5563;}'
@@ -4643,24 +4695,27 @@
         + '#gps-overlay .gps-ld-bottom{position:absolute;z-index:7;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-direction:column;gap:8px;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-mark-shot{width:100%;min-height:52px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 18px/1 ' + FONT + ';display:flex;align-items:center;justify-content:center;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom{position:static;height:62px;gap:8px;}'
-        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:60px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:56px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-ico{color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-cap{font-size:12px;color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-scorebox{background:var(--gps-ld-lime);border:0;border-radius:18px;}'
-        + '#gps-overlay.gps-ld .gps-score-prev,#gps-overlay.gps-ld .gps-score-next{width:34px;border:0;}'
+        + '#gps-overlay.gps-ld .gps-score-prev,#gps-overlay.gps-ld .gps-score-next{width:30px;border:0;}'
         + '#gps-overlay.gps-ld .gps-score-col{align-items:center;justify-content:center;gap:1px;}'
-        + '#gps-overlay .gps-ld-holelbl{font:800 18px/1.15 ' + FONT + ';color:#0b0f0c;white-space:nowrap;cursor:pointer;}'
+        + '#gps-overlay .gps-ld-l1{display:flex;align-items:baseline;justify-content:center;max-width:100%;min-width:0;}'
+        + '#gps-overlay .gps-ld-holelbl{flex:0 0 auto;font:800 18px/1.15 ' + FONT + ';color:#0b0f0c;white-space:nowrap;cursor:pointer;}'
+        + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who{flex:0 1 auto;min-width:0;padding:0 0 0 2px;font:800 16px/1.15 ' + FONT + ';opacity:.8;}'
+        + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who::before{content:"\\00a0\\00b7\\00a0";}'
+        + '#gps-overlay .gps-ld-l1.gps-ld-short .gps-ld-holelbl{display:none;}#gps-overlay.gps-ld .gps-ld-short .gps-who::before{content:none;}'
         + '#gps-overlay.gps-ld .gps-score-col .gps-score{flex:0 0 auto;font-size:14px;font-weight:600;line-height:1.2;padding:0 6px;max-width:100%;}'
         + '#gps-overlay.gps-ld .gps-score-col .gps-score.gps-score-num{font-size:20px;}'
         + '#gps-overlay.gps-ld .gps-score-col .gps-score-n{height:28px;min-width:28px;}'
         + '#gps-overlay.gps-ld .gps-score.gps-score-num .gps-score-n[class*="mark-"]{font-size:18px;}'
-        + '#gps-overlay.gps-ld .gps-who{padding:0 6px;font-size:11px;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-actions{position:static;}'
         // Over the map, on the bottom controls: the credit just above them (left), the pill
         // over it (right), Recenter above that; menus and notes above those. Sheets cover all.
         + '#gps-overlay.gps-ld .gps-credit,#gps-overlay.gps-ld.gps-credit-google .gps-credit{bottom:calc(var(--gps-panel-h) + 4px);}'
         + '#gps-overlay.gps-ld .gps-credit-pop{bottom:calc(var(--gps-panel-h) + 26px);}'
-        + '#gps-overlay.gps-ld .gps-leftrow{bottom:calc(var(--gps-panel-h) + 88px);right:auto;}'
+        + '#gps-overlay.gps-ld .gps-leftrow{bottom:calc(var(--gps-panel-h) + var(--gps-credit-h,18px) + 8px);right:auto;}'
         + '#gps-overlay.gps-ld .gps-banner,#gps-overlay.gps-ld.gps-pinning .gps-banner{bottom:calc(var(--gps-panel-h) + 88px);}'
         + '#gps-overlay.gps-ld .gps-tiles-note{bottom:calc(var(--gps-panel-h) + 140px);}'
         + '#gps-overlay.gps-ld .gps-tools-menu{bottom:calc(var(--gps-panel-h) + 8px);z-index:30;}'

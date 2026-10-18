@@ -33,6 +33,14 @@ const table = require(path.join(HERE, 'gps-courses.js'));
 
 const argShot = process.argv.indexOf('--shot');
 const SHOT = argShot > 0 ? path.resolve(process.argv[argShot + 1]) : null;
+// --shots <dir>: the phase-2 screenshots, D-<phone>-<default|largest>.png, into that folder.
+const argShots = process.argv.indexOf('--shots');
+const SHOTS = argShots > 0 ? path.resolve(process.argv[argShots + 1]) : null;
+// THREE PHONES x TWO TEXT SIZES (as 011's layout-C check): "largest" = every font size (and
+// px line height) on the GPS screen x1.35, the way a system text zoom does it (iOS xxxLarge
+// 23pt over the 17pt default); the map's own labels are left alone.
+const PHONES = [{ name: 'se', w: 375, h: 667 }, { name: '15', w: 393, h: 852 }, { name: 'promax', w: 430, h: 932 }];
+const TEXTS = [{ name: 'default', k: 1 }, { name: 'largest', k: 1.35 }];
 const VW = Number(process.env.LD_W) || 393, VH = Number(process.env.LD_H) || 852;
 const CODE = 'LAYD';
 const R = 6371008.8, rad = (d) => d * Math.PI / 180, deg = (r) => r * 180 / Math.PI;
@@ -96,14 +104,16 @@ const BLOCK = ['*nationalmap.gov*', '*arcgis*', '*overpass*', '*cloudfunctions.n
 const BLOCK_REAL = ['*arcgis*', '*overpass*', '*cloudfunctions.net*'];
 // Esri's tiles, stood in: a blank 1x1 PNG for every esri.test request.
 const ESRI_TILES = "(function(){ var png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='; var f0 = window.fetch;"
-    + " window.fetch = function (u, o) { if (/esri\\.test/.test(String(u && u.url || u))) { var b = atob(png), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);"
+    + " window.fetch = function (u, o) { var su = String(u && u.url || u); if (/esri\\.test\\/esri\\/DENY/.test(su)) return Promise.resolve(new Response('{\"error\":{\"code\":403}}', { status: 403, headers: { 'Content-Type': 'application/json' } }));"
+    + " if (/esri\\.test/.test(su)) { var b = atob(png), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);"
     + " return Promise.resolve(new Response(a.buffer, { status: 200, headers: { 'Content-Type': 'image/png' } })); } return f0.apply(this, arguments); }; })();";
 // MY BAG, set up (Manny's carries) - the pill names the club. Without it: no club.
 const BAG = "(function(){ try { if (sessionStorage.getItem('__b')) return; sessionStorage.setItem('__b','1'); localStorage.setItem('hardpan_bag_v1', JSON.stringify({ v: 1, golfers: { 'n:manny orozco': { shots: {}, setupAt: 1,"
     + " set: { Dr: 250, '3w': 230, '5w': 215, Hy: 200, '4i': 190, '5i': 180, '6i': 170, '7i': 160, '8i': 150, '9i': 140, PW: 125, GW: 110, SW: 95, LW: 80 } } } })); } catch(e){} })();";
+const LAYOUT_C = "(function(){ try { localStorage.setItem('hardpan_gps_layout','c'); } catch(e){} })();";
 const go = async (o) => {
     const res = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE), db: { events: { [CODE]: o.round || round() }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} },
-        settleMs: 3500, viewport: { width: VW, height: VH }, webgl: true, blockUrls: o.real ? BLOCK_REAL : BLOCK, profileDir: o.profileDir,
+        settleMs: 3500, viewport: { width: o.vw || VW, height: o.vh || VH }, webgl: true, blockUrls: o.real ? BLOCK_REAL : BLOCK, profileDir: o.profileDir,
         preScript: CFG(o.features, o.esri) + 'window.__hardpanDoors = true;' + ERR + GEO(ME) + (o.real ? '' : TILE) + (o.esri ? ESRI_TILES : '') + FETCH + SEED + (o.seed || '') + iapStub({ active: true }), steps: o.steps });
     if (!res.ok) throw new Error(res.reason);
     if (process.env.LD_DEBUG) console.error(JSON.stringify(res.value.filter((v) => typeof v !== 'string' || v.charAt(0) !== '{')));
@@ -128,13 +138,38 @@ const MEASURE = { expression: "(function(){ var ov = document.getElementById('gp
     + "  mFont: (function(){ var e = ov.querySelector('.gps-num-mid .gps-big'); return e ? getComputedStyle(e).fontSize : null; })(), mColor: (function(){ var e = ov.querySelector('.gps-num-mid .gps-big'); return e ? getComputedStyle(e).color : null; })(),"
     + "  topBg: (function(){ var e = ov.querySelector('.gps-ld-top'); return e ? getComputedStyle(e).backgroundColor : null; })(), scoreBg: (function(){ var e = ov.querySelector('.gps-scorebox'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
     + "  pillBg: (function(){ var e = ov.querySelector('.gps-ld-plays'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
-    + "  map: mapEl ? { zoom: mapEl.getAttribute('data-zoom'), center: mapEl.getAttribute('data-center'), bearing: mapEl.getAttribute('data-bearing'), w: mapEl.clientWidth, h: mapEl.clientHeight, ready: mapEl.getAttribute('data-ready'), bounds: mapEl.getAttribute('data-bounds'), tiles: mapEl.getAttribute('data-tiles-loaded'), side: document.body.className } : null, pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
+    + "  map: mapEl ? { zoom: mapEl.getAttribute('data-zoom'), center: mapEl.getAttribute('data-center'), bearing: mapEl.getAttribute('data-bearing'), w: mapEl.clientWidth, h: mapEl.clientHeight, ready: mapEl.getAttribute('data-ready'), bounds: mapEl.getAttribute('data-bounds'), tiles: mapEl.getAttribute('data-tiles-loaded'), side: document.body.className } : null, creditOnTop: (function(){ var c = ov.querySelector('.gps-credit-txt'); if (!c || c.offsetParent === null) return null; var b = c.getBoundingClientRect(); var h = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(h && ov.querySelector('.gps-credit').contains(h)); })(),"
+    + "  esriLayer: mapEl && mapEl.getAttribute('data-esri'), sheet: (function(){ var w = document.getElementById('hp-score-sheet'); if (!w) return null; for (var x = w; x && x !== document.body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; } var b = w.getBoundingClientRect(); return b.height > 0; })(), side: window.HardPanGps && HardPanGps.side(), pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
 const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay " + sel + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
 const WAIT_MAP = { waitFor: "(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && Number(m.dataset.zoom) > 3); })()", timeout: 45000 };
 const READY = { waitFor: "(function(){ var p = document.querySelector('#gps-overlay .gps-ld-pltext'), q = document.querySelector('#gps-overlay .gps-pl-text'); var m = document.querySelector('#gps-overlay .gps-m'); return !!(((p && /\\d/.test(p.textContent)) || (q && /Plays/.test(q.textContent))) && m && /\\d/.test(m.textContent)); })()", timeout: 25000 };
 const START = [W(2500), OPEN, W(2500), WAIT_MAP, READY, W(2000)];
+// THE LARGEST TEXT (as gps-layout-c-check.js's SCALE): every font size x k, once per element.
+const SCALE = (k) => ({ expression: "(function(){ var k = " + k + "; if (k === 1) return 'k1'; var todo = [];"
+    + " [document.getElementById('gps-overlay')].forEach(function (root) { if (!root) return;"
+    + "  [root].concat([].slice.call(root.querySelectorAll('*'))).forEach(function (e) { if (e.closest('.gps-map-wrap') || e.hasAttribute('data-fs0') || e.tagName === 'STYLE' || e.closest('svg')) return;"
+    + "   var cs = getComputedStyle(e), p = e.parentElement; todo.push([e, parseFloat(cs.fontSize), cs.lineHeight, !!(p && p.hasAttribute('data-fs0') && parseFloat(getComputedStyle(p).fontSize) === parseFloat(cs.fontSize))]); }); });"
+    + " todo.forEach(function (t) { var e = t[0]; e.setAttribute('data-fs0', t[1]); if (t[3]) return;"
+    + "  e.style.setProperty('font-size', (t[1] * k).toFixed(2) + 'px', 'important'); if (/px$/.test(t[2])) e.style.setProperty('line-height', (parseFloat(t[2]) * k).toFixed(2) + 'px', 'important'); });"
+    + " window.dispatchEvent(new Event('resize')); return 'scaled ' + todo.length; })()" });
+// TEXT CUT OFF: wider than its box (an ellipsis), or off the screen.
+const CLIPS = { expression: "(function(){ var ov = document.getElementById('gps-overlay'), out = [];"
+    + " ['.gps-back', '.gps-hole-btn', '.gps-num-mid .gps-lbl', '.gps-m', '.gps-ld-top .gps-num-mid', '.gps-num-b', '.gps-num-f', '.gps-ld-par1', '.gps-ld-hcp', '.gps-door-games', '.gps-lc-score', '.gps-ld-raw', '.gps-ld-pl small', '.gps-ld-pltext', '.gps-mark-shot', '.gps-ld-holelbl', '.gps-who', '.gps-score', '.gps-side-bets .gps-cap', '.gps-tools .gps-cap', '.gps-door-add .gps-cap', '.gps-credit',"
+    + "  '.gps-ld-rail .gps-wind-mph', '.gps-ld-rail .gps-green-view', '.gps-ld-rail .gps-hz-btn', '.gps-ld-rail .gps-fly-btn'].forEach(function (sel) { var e = ov.querySelector(sel); if (!e) return;"
+    + "  for (var x = e; x && x !== document.body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return; }"
+    + "  var b = e.getBoundingClientRect(); if (!b.width) return;"
+    + "  if (e.scrollWidth > e.clientWidth + 1) out.push(sel + (getComputedStyle(e).overflowX !== 'visible' ? ' cut ' : ' spills out ') + e.scrollWidth + '>' + e.clientWidth + ' ' + JSON.stringify(e.textContent));"
+    + "  if (b.left < -1 || b.right > innerWidth + 1 || b.top < -1 || b.bottom > innerHeight + 1) out.push(sel + ' off screen ' + JSON.stringify([Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)])); });"
+    + " return JSON.stringify({ clips: out }); })()" };
+// A SHEET OR MENU ON TOP: what a finger touches at its middle is inside it.
+const ONTOP = (sel) => ({ expression: "(function(){ var e = document.querySelector('#gps-overlay " + sel + "'); if (!e || e.offsetParent === null) return JSON.stringify({ ontop: null, sel: " + JSON.stringify(sel) + " });"
+    + " var b = e.getBoundingClientRect(), x = b.left + b.width / 2, y = Math.min(b.top + b.height / 2, innerHeight - 4), h = document.elementFromPoint(x, y);"
+    + " return JSON.stringify({ ontop: !!(h && e.contains(h)), sel: " + JSON.stringify(sel) + ", hit: h && h.className }); })()" });
 const SWITCH = [TAP('.gps-tools'), W(300), TAP('.gps-layout-pick'), W(1500)];
 
+// THE CREDIT, SEEN: on screen, nothing over its words, above the bottom controls (D: Mark shot; C: the panel).
+const creditOk = (a) => !!(a.credit && a.creditOnTop === true && a.credit.l >= 0 && a.credit.t >= 0 && a.credit.r <= a.vw && a.credit.b <= a.vh
+    && a.credit.b <= (a.mark && a.ld ? a.mark.t : (a.panel ? a.panel.t : a.vh)));
 const hits = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t);
 const inside = (a, c) => !!(a && a.t >= c.top && a.b <= c.bottom && a.l >= 0 && a.r <= c.right);
 // The clear map in D: under the top bar and the Games / chip row, above the pill / credit /
@@ -161,14 +196,14 @@ function checkD(a, f, tag, o) {
     // 2 THE RAIL
     const want = ['gps-wind', 'gps-green-view', 'gps-hz-btn', 'gps-fly-btn', 'gps-zoom'];
     f(JSON.stringify(a.rail.map((x) => x.cls)) === JSON.stringify(want), tag + ' 2: the rail is not Wind, Green, Hazards, Preview, Zoom: ' + JSON.stringify(a.rail.map((x) => x.cls)));
-    a.rail.forEach((x) => f(x.w >= 52 && x.w <= 64 && x.h >= 52 && x.r <= a.vw - 4 && x.r >= a.vw - 12, tag + ' 2: a rail square: ' + JSON.stringify(x)));
+    a.rail.forEach((x) => f(x.w >= 52 && x.w <= 96 && x.h >= 52 && x.r <= a.vw - 4 && x.r >= a.vw - 12, tag + ' 2: a rail square: ' + JSON.stringify(x)));
     f(a.rail.length && a.rail[0].t >= Math.max(a.games ? a.games.b : 0, a.chip ? a.chip.b : 0), tag + ' 2: the rail starts under the Games / chip row');
     // 3 THE PILL, THE BOTTOM, THE CREDIT
     f(a.pill && /^\d+$/.test(a.raw || '') && /^\d+y( · \w+)?$/.test(a.plText || ''), tag + ' 3: the pill: ' + JSON.stringify([a.raw, a.plText]));
     if (o.club) f(/ · (Dr|[35]W|Hy|\di|PW|GW|SW|LW)$/.test(a.plText || ''), tag + ' 3: the pill names no club from the bag: ' + a.plText);
     if (o.noClub) f(!/·/.test(a.plText || ''), tag + ' 3: a club with no bag set up: ' + a.plText);
     f(/243, 240, 226/.test(a.pillBg || ''), tag + ' 3: the pill is not cream: ' + a.pillBg);
-    f(a.pill && a.mark && a.pill.b <= a.mark.t && a.pill.r >= a.vw - 12, tag + ' 3: the pill is not at the right just above Mark shot: ' + JSON.stringify([a.pill, a.mark]));
+    f(a.pill && a.mark && a.pill.b <= a.mark.t && (a.pill.r >= a.vw - 12 || a.rail.filter((x) => x.b + 6 > a.pill.t && x.t < a.pill.b).every((x) => a.pill.r <= x.l - 4)), tag + ' 3: the pill is not at the right (or just left of the rail on a short phone) above Mark shot: ' + JSON.stringify([a.pill, a.mark]));
     f(a.mark && a.mark.w >= a.vw - 24 && a.mark.h >= 44 && /Mark shot/.test(a.markText || ''), tag + ' 3: Mark shot is not wide: ' + JSON.stringify([a.mark, a.markText]));
     f(a.bottom && a.bottom.t >= a.mark.b && a.bottom.b <= a.vh, tag + ' 3: the Card row is not under Mark shot');
     f(a.card && a.score && a.tools && a.card.r <= a.score.l + 1 && a.score.r <= (a.add ? a.add.l : a.tools.l) + 1 && (!a.add || a.add.r <= a.tools.l + 1), tag + ' 3: Card | score | + Game | Tools not in order');
@@ -176,6 +211,7 @@ function checkD(a, f, tag, o) {
     f(a.score && a.score.w >= a.vw * 0.4, tag + ' 3: the Enter score button is not the big one: ' + JSON.stringify(a.score));
     f(a.credit && a.credit.l <= 16 && a.credit.b <= a.mark.t && a.credit.b >= a.mark.t - 16, tag + ' 3: the credit is not bottom-left just above Mark shot: ' + JSON.stringify([a.credit, a.mark]));
     if (o.esri) f(/Powered by Esri/.test(a.creditText || ''), tag + ' 3: Esri live, but the credit says ' + JSON.stringify(a.creditText));
+    f(creditOk(a), tag + ' 3: the credit is not visible (in the viewport, on top, above Mark shot): ' + JSON.stringify([a.credit, a.creditOnTop, a.mark]));
     // 4 NOTHING OVERLAPS; the hole in the clear map.
     const ctl = [['top', a.top], ['games', a.games], ['chip', a.chip], ['pill', a.pill], ['credit', a.credit], ['mark', a.mark], ['bottom', a.bottom], ['recenter', a.recenter]].concat(a.rail.map((x) => [x.cls, x])).filter((x) => x[1]);
     for (let i = 0; i < ctl.length; i++) for (let j = i + 1; j < ctl.length; j++) f(!hits(ctl[i][1], ctl[j][1]), tag + ' 4: ' + ctl[i][0] + ' overlaps ' + ctl[j][0] + ' ' + JSON.stringify([ctl[i][1], ctl[j][1]]));
@@ -194,11 +230,53 @@ function checkD(a, f, tag, o) {
 
     // LD_ARMS=esri,tap,switch,tourney,off (default: all); LD_SHOT_ONLY=1: just the screenshot arm.
     let s;
-    const ARMS = process.env.LD_SHOT_ONLY ? [] : (process.env.LD_ARMS || 'esri,tap,switch,tourney,off').split(',');
+    const ARMS = process.env.LD_SHOT_ONLY ? [] : (process.env.LD_ARMS || 'esri,usgs,tap,switch,tourney,off,sheet,sizes').split(',');
     const TX = Math.round(VW * 0.4);
     const tapAt = (y) => ({ expression: "(function(){ var c = document.querySelector('#gps-overlay .maplibregl-canvas'); if (!c) return 'no canvas';"
         + " ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: " + TX + ", clientY: " + y + ", button: 0 })); }); return 'tapped'; })()" });
     let topB = 80;
+    // P2: THREE PHONES x TWO TEXT SIZES - every D rule, nothing cut off, sheets on top; screenshots.
+    if (ARMS.includes('sizes')) for (const ph of PHONES) for (const tx of TEXTS) {
+        const tag = ph.name + '-' + tx.name;
+        const shotStep = SHOTS ? [{ shot: path.join(SHOTS, 'D-' + ph.w + 'x' + ph.h + '-' + tx.name + '.png'), viewportOnly: true }] : [];
+        s = await go({ esri: 'OK-3X', seed: BAG, vw: ph.w, vh: ph.h, steps: START.concat([SCALE(tx.k), W(1500), MEASURE, CLIPS], shotStep,
+            [TAP('.gps-ld-plays'), W(400), ONTOP('.gps-plinfo'), TAP('.gps-plinfo-done'), W(200), TAP('.gps-tools'), W(300), ONTOP('.gps-tools-menu'), TAP('.gps-tools'), W(200),
+             TAP('.gps-hz-btn'), W(500), ONTOP('.gps-hzs'), TAP('.gps-hzs-done'), W(200), TAP('.gps-hole-btn'), W(300), ONTOP('.gps-picker-card')]) });
+        const [m, cl, ...tops] = s;
+        checkD(m, f, tag, { esri: true, club: true, want });
+        (cl.clips || []).forEach((x) => f(false, tag + ' P2: text cut off / off screen: ' + x));
+        tops.forEach((t) => f(t.ontop === true, tag + ' P2: ' + t.sel + ' is not on top: ' + JSON.stringify(t)));
+        const c = clearOf(m);
+        f(c.bottom - c.top >= 160, tag + ' P2: under 160px of clear map: ' + JSON.stringify(c));
+        report[tag] = { clear: c, pill: [m.raw, m.plText], chip: m.chipText, credit: m.creditText, clips: cl.clips, ontop: tops.map((t) => t.sel + ':' + t.ontop) };
+        errs(s, tag);
+        // The same phone and text in LAYOUT C (Tools > Screen layout: Bottom panel), Esri live: its credit too.
+        const cShot = SHOTS ? [{ shot: path.join(SHOTS, 'C-' + ph.w + 'x' + ph.h + '-' + tx.name + '.png'), viewportOnly: true }] : [];
+        s = await go({ esri: 'OK-3X', seed: BAG + LAYOUT_C, vw: ph.w, vh: ph.h, steps: START.concat([SCALE(tx.k), W(1500), MEASURE], cShot) });
+        const mc = s[0];
+        f(mc.layout === 'c', tag + ' C: not layout C');
+        f(/Powered by Esri/.test(mc.creditText || ''), tag + ' C: Esri live, but the credit says ' + JSON.stringify(mc.creditText));
+        f(creditOk(mc), tag + ' C: the credit is not visible above the panel: ' + JSON.stringify([mc.credit, mc.creditOnTop, mc.panel]));
+        report[tag].c = { credit: mc.creditText };
+        errs(s, tag + '-C');
+    }
+    // ESRI FAILS -> USGS: the credit says USGS, never Esri (its tiles refused, 403).
+    if (ARMS.includes('usgs')) {
+        s = await go({ esri: 'DENY-1', seed: BAG, steps: START.concat([W(2500), MEASURE]) });
+        report.usgs = { credit: s[0].creditText, esri: s[0].esriLayer };
+        f(/USGS/.test(s[0].creditText || '') && !/Esri/.test(s[0].creditText || ''), 'usgs: Esri refused, but the credit says ' + JSON.stringify(s[0].creditText));
+        f(creditOk(s[0]), 'usgs: the credit is not visible');
+        errs(s, 'usgs');
+    }
+    // THE SCORE SHEET (gps-012s, in the combined tree) opens OVER LAYOUT D: behind it, D's top bar -
+    // not the old one. A tree without the sheet: noted, nothing asserted.
+    if (ARMS.includes('sheet')) {
+        s = await go({ seed: BAG, steps: START.concat([TAP('.gps-score'), W(1200), MEASURE]) });
+        const sh = s[0];
+        report.sheet = sh.sheet == null ? 'no score sheet in this tree' : { open: sh.sheet, side: sh.side, ld: sh.ld, top: !!sh.top, oldTop: !!sh.oldTop };
+        if (sh.sheet != null) f(sh.sheet === true && sh.side === 'gps' && sh.ld && sh.top && !sh.oldTop, 'sheet: the score sheet is not over layout D: ' + JSON.stringify(report.sheet));
+        errs(s, 'sheet');
+    }
     if (ARMS.includes('esri')) {
     // 1-4: ESRI LIVE, the bag set up.
     s = await go({ esri: 'OK-3X', seed: BAG, steps: START.concat([MEASURE]) });
@@ -252,8 +330,8 @@ function checkD(a, f, tag, o) {
 
     // THE SCREENSHOT (a person looks at it): the real USGS photo of the course when LD_REAL_TILES=1.
     if (SHOT) {
-        s = await go({ seed: BAG, real: REAL, steps: START.concat([W(REAL ? 4000 : 0), MEASURE, { shot: SHOT, viewportOnly: true }]) });
-        checkD(s[0], f, 'shot', { club: true });
+        s = await go({ seed: BAG, real: REAL, esri: REAL ? null : 'OK-3X', steps: START.concat([W(REAL ? 4000 : 0), MEASURE, { shot: SHOT, viewportOnly: true }]) });
+        checkD(s[0], f, 'shot', { club: true, esri: !REAL });
         report.shot = SHOT;
     }
 
