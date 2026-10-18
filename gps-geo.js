@@ -1223,6 +1223,37 @@
         if (isNum(t.temp) && r(t.temp)) out.push(sg(r(t.temp)) + (t.temp > 0 ? ' cold' : ' warm'));
         return out;
     }
+    // ---- PLAYS-LIKE, SIMPLE (012 part 3, switch playsSimple) -------------------------
+    // THE ONE LINE, everywhere (the old layout's line, layout C's panel, layout D's pill):
+    // "Plays like 249y" ("Plays like 228m" in meters) - nothing else. The club is the
+    // view's to add (layout D: "Plays like 249y · 3W"); the why (wind, slope, temperature,
+    // altitude, aim) lives in the (i) sheet only (playsInfoRows). pl: playsLike's result.
+    // No pl: ''. Pure.
+    function playsText(pl, unit) {
+        if (!pl || !isNum(pl.exact)) return '';
+        return 'Plays like ' + (unit === 'm' ? Math.round(pl.exact * M_PER_YD) + 'm' : Math.round(pl.exact) + 'y');
+    }
+    // THE (i) SHEET'S "THIS SHOT" ROWS - the breakdown the line no longer carries. Plain
+    // strings, in order: the shot and what it plays like, then each of playsLike's terms
+    // that has data and rounds to something (uphill / downhill, the wind with its speed,
+    // warm / cold with the temperatures), then the crosswind's aim-off. o: { pl, yards (the
+    // raw distance), windMph, tempF, tempBaseF, aim (windAim's), unit, label }. Pure.
+    var MINUS = '−';
+    function playsInfoRows(o) {
+        o = o || {};
+        var pl = o.pl, out = [];
+        if (!pl) return out;
+        var m = o.unit === 'm', k = m ? M_PER_YD : 1, u = m ? ' m' : ' yds';
+        var r = function (x) { return Math.round(x * k); };
+        var sg = function (x) { return (x > 0 ? '+' : MINUS) + Math.abs(x); };
+        var t = pl.terms || {};
+        out.push((o.label || 'This shot') + ': ' + (isNum(o.yards) ? r(o.yards) + u + ', ' : '') + 'plays like ' + r(pl.exact));
+        if (isNum(t.elev) && r(t.elev)) out.push((t.elev > 0 ? 'Uphill' : 'Downhill') + ': ' + sg(r(t.elev)));
+        if (isNum(t.wind) && r(t.wind)) out.push((t.wind > 0 ? 'Into the wind' : 'Downwind') + (isNum(o.windMph) ? ' (' + Math.round(o.windMph) + ' mph)' : '') + ': ' + sg(r(t.wind)));
+        if (isNum(t.temp) && r(t.temp)) out.push((t.temp > 0 ? 'Cold' : 'Warm') + (isNum(o.tempF) ? ' (' + Math.round(o.tempF) + '°F vs ' + (isNum(o.tempBaseF) ? Math.round(o.tempBaseF) : 70) + '°F)' : '') + ': ' + sg(r(t.temp)));
+        if (o.aim && o.aim.yd) out.push('Crosswind: aim ' + (m ? Math.max(1, Math.round(o.aim.yd * M_PER_YD)) + ' m ' : o.aim.yd + (o.aim.yd === 1 ? ' yd ' : ' yds ')) + o.aim.side);
+        return out;
+    }
     // CROSSWIND = AIM OFF, NO DISTANCE CHANGE. The rule (a common rule of thumb, kept
     // simple on purpose): the ball drifts about 0.5% of the shot's distance per mph of
     // crosswind - 150 yds in a 10 mph crosswind drifts ~8 yds. Aim that far INTO the
@@ -1302,7 +1333,7 @@
         near.slice(0, 3).filter(function (n) { return n.d <= ELEV_REACH_M; }).forEach(function (n) { var w = 1 / (n.d * n.d); sw += w; sv += w * n.ft; });
         return sv / sw;
     }
-    var PLAYS_API = { playsParts: playsParts, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
+    var PLAYS_API = { playsParts: playsParts, playsText: playsText, playsInfoRows: playsInfoRows, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
         elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------

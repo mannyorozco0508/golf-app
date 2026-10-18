@@ -2589,6 +2589,14 @@
     // line (the plain suggestion, if any). Tournament mode: none of it.
     function plInfoSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsInfo') !== false; } catch (e) { return true; } }
     function plSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsBreakdown') !== false; } catch (e) { return true; } }
+    // 012 PART 3 (switch playsSimple): the line says ONLY "Plays like 249y" (gps-geo.playsText) -
+    // no club (the plain "Suggested:" line has it; layout D's pill adds its own), no aim-off,
+    // no parts: the why moved into the (i) sheet ("This shot", fillPlaysInfo). Off: the 009 line.
+    function simpleSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsSimple') !== false; } catch (e) { return true; } }
+    // Where the plays-like line measures to: the moved target, else the green's center (null).
+    function playsAim(r) {
+        return S && S.targetMoved && S.target ? S.target : null;
+    }
     function syncBreakdown(r, o, nums) {
         S.plClub = false;
         var el = S.el.querySelector('.gps-pl-line');
@@ -2597,7 +2605,10 @@
         if (plSwitch() && !tournament() && S.pro && S.mode === 'measure' && o && !(nums && nums.onGreen)) {
             var moved = !!(S.targetMoved && S.target), aim = moved ? S.target : aimAt(r);
             var pl = aim ? playsTo(moved ? S.target : null) : null;
-            if (pl) {
+            if (pl && simpleSwitch()) {
+                pl = aim ? playsTo(playsAim(r)) : null;
+                text = pl ? G.playsText(pl, units()) : '';
+            } else if (pl) {
                 var w = effectiveWind(), has = !!(w && !w.none), m = units() === 'm';
                 var parts = G.playsParts(pl, has ? w.mph : null, units());
                 text = 'Plays ' + (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (parts.length ? ': ' + parts.join(', ') : '');
@@ -2615,7 +2626,63 @@
         var t = el.querySelector('.gps-pl-text');
         if (t.textContent !== text) t.textContent = text;
         el.style.display = text ? '' : 'none';
+        if (plInfoOpen()) fillPlaysInfo();
     }
+    // THE PLAYS-LIKE NUMBER FOR ANY LAYOUT (012): the old line, layout C's panel and layout D's
+    // pill all read this - { text: 'Plays like 249y', yards, exact, shown, unit: 'y' | 'm',
+    // to: 'target' | 'green', from: 'me' | 'tee' } or null (tournament mode, no GPS Map, not
+    // measuring, on the green, under 30 yds, no data). Nothing is fetched or sent from here.
+    function playsLineNow() {
+        if (tournament() || !S || !S.pro || S.mode !== 'measure') return null;
+        var r = resolved(), o = origin(r);
+        if (!r || !o) return null;
+        var nums = G.holeNumbers(o.pt, r);
+        if (nums && nums.onGreen) return null;
+        var tp = playsAim(r), pl = playsTo(tp);
+        if (!pl) return null;
+        var m = units() === 'm';
+        return { text: G.playsText(pl, units()), yards: pl.yards, exact: pl.exact, shown: m ? Math.round(pl.exact * G.M_PER_YD) : Math.round(pl.exact),
+            unit: m ? 'm' : 'y', to: tp ? 'target' : 'green', from: o.from };
+    }
+    // THE CLUB FOR IT (layout D's "· 3W"): the bag's club for the PLAYS-LIKE distance, from the
+    // golfer's own spot only - { club: '3w', short: '3W', name: '3-wood', yd (the bag's), shown }
+    // or null (clubs off, tournament mode, from the tee, no bag, no plays-like).
+    function playsClubNow() {
+        var B = bagApi(), p = playsLineNow();
+        if (!p || p.from !== 'me' || !B || !bagSwitch() || tournament()) return null;
+        var sg = B.suggestClub(B.bag(bagGolfer()), p.exact);
+        return sg ? { club: sg.club, short: (B.SHORT && B.SHORT[sg.club]) || sg.club, name: sg.name, yd: sg.yd, shown: bagShown(sg.yd) } : null;
+    }
+    // THE (i) SHEET, "THIS SHOT" (012): the breakdown the simple line leaves out - the shot,
+    // uphill / downhill, wind, temperature, the crosswind's aim-off (gps-geo.playsInfoRows).
+    function plInfoSheet() { return S && S.el.querySelector('.gps-plinfo'); }
+    function plInfoOpen() { var sh = plInfoSheet(); return !!(sh && sh.style.display !== 'none'); }
+    function playsInfoNow() {
+        if (tournament() || !S || !S.pro || S.mode !== 'measure') return [];
+        var r = resolved(), o = origin(r);
+        if (!r || !o) return [];
+        var nums = G.holeNumbers(o.pt, r);
+        if (nums && nums.onGreen) return [];
+        var tp = playsAim(r), aim = tp || aimAt(r), pl = aim ? playsTo(tp) : null;
+        if (!pl) return [];
+        var w = effectiveWind(), has = !!(w && !w.none);
+        var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
+        var am = has && w.mph > 0 ? G.windAim(D, G.windRelative(w.fromDeg, G.bearingDeg(o.pt, aim), w.mph).cross) : null;
+        return G.playsInfoRows({ pl: pl, yards: D, windMph: has ? w.mph : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null, aim: am, unit: units(),
+            label: (o.from === 'tee' ? 'Tee' : 'You') + ' \u2192 ' + (tp ? 'target' : 'green') });
+    }
+    function fillPlaysInfo() {
+        var sh = plInfoSheet(), box = sh && sh.querySelector('.gps-plinfo-now');
+        if (!box) return;
+        var rows = simpleSwitch() ? playsInfoNow() : [];
+        var key = rows.join('|');
+        if (box.getAttribute('data-rows') === key) return;
+        box.setAttribute('data-rows', key);
+        box.textContent = '';
+        rows.forEach(function (t, i) { var d = document.createElement('div'); d.className = i ? 'gps-plinfo-row' : 'gps-plinfo-row gps-plinfo-shot'; d.textContent = t; box.appendChild(d); });
+        box.style.display = rows.length ? '' : 'none';
+    }
+    function openPlaysInfo() { var sh = plInfoSheet(); if (!sh) return; closeMenus(); sh.style.display = ''; fillPlaysInfo(); }
 
     // ---- THE PAYWALL AND THE GATE (paid launch: Manny, mailbox 007, 2026-10-17) ------
     // ALL of GPS is the "GPS Map" subscription: a 7-day free trial, then an
@@ -3810,6 +3877,8 @@
         // HOW PLAYS-LIKE WORKS (009, switch playsInfo): the ⓘ on the plays-like line. Plain words.
         + '<div class="gps-plinfo gps-float gps-scroll-ok" data-feature="playsInfo" style="display:none" role="dialog" aria-label="How plays-like works">'
         +   '<div class="gps-bag-head"><div class="gps-bag-title">How plays-like works</div><button type="button" class="gps-plinfo-done">Done</button></div>'
+        // 012 (playsSimple): THIS SHOT - the breakdown the line no longer carries (fillPlaysInfo).
+        +   '<div class="gps-plinfo-now" style="display:none" role="status" aria-label="This shot"></div>'
         +   '<p>Plays-like is how long the shot will play - the yards, adjusted. It is an estimate.</p>'
         +   '<ul>'
         +     '<li><b>Uphill / downhill:</b> about 1 yard for every 3 feet the target is above or below you.</li>'
@@ -4077,6 +4146,7 @@
         + '#gps-overlay .gps-pl-info{flex:0 0 auto;min-width:36px;min-height:36px;border-radius:18px;border:0;background:transparent;color:#d9f99d;font:800 18px/1 ' + FONT + ';padding:0;}'
         + '#gps-overlay .gps-plinfo{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font:600 14px/1.4 ' + FONT + ';touch-action:pan-y;}'
         + '#gps-overlay .gps-plinfo ul{margin:6px 0;padding-left:18px;}#gps-overlay .gps-plinfo li{margin:4px 0;}#gps-overlay .gps-plinfo p{margin:6px 0;color:#c8d1ca;}'
+        + '#gps-overlay .gps-plinfo-now{margin:6px 0 10px;padding:8px 10px;border-radius:12px;background:rgba(217,249,157,.10);}#gps-overlay .gps-plinfo-row{margin:2px 0;}#gps-overlay .gps-plinfo-shot{font-weight:800;}'
         + '#gps-overlay .gps-plinfo-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bagask{position:absolute;z-index:45;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 72px);padding:8px 10px;border-radius:14px;font:700 14px/1.2 ' + FONT + ';}'
         + '#gps-overlay .gps-bagask-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
@@ -4402,7 +4472,7 @@
         if (!plSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsBreakdown"]'), function (n) { n.parentNode.removeChild(n); });
         // HOW PLAYS-LIKE WORKS (009): the ⓘ opens it; its switch off = no ⓘ, no sheet.
         if (!plInfoSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsInfo"]'), function (n) { n.parentNode.removeChild(n); });
-        on(el, '.gps-pl-info', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (!sh) return; closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; });
+        on(el, '.gps-pl-info', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (!sh) return; closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; if (sh.style.display === '') fillPlaysInfo(); });
         on(el, '.gps-plinfo-done', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (sh) sh.style.display = 'none'; });
         on(el, '.gps-bag-setup-save', saveSetup);
         on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
@@ -4847,6 +4917,10 @@
         isMounted: function () { return !!S; },
         courseKey: function () { return S ? S.courseKey : null; },
         tournament: function () { return tournament(); },
+        // 012: the plays-like number, its club and the (i) sheet - for every layout (old, C, D).
+        playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },
+        playsClub: function () { try { return playsClubNow(); } catch (e) { return null; } },
+        openPlaysInfo: function () { try { openPlaysInfo(); } catch (e) {} },
         hole: function () { return S ? Number(S.hole) : null; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,

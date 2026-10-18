@@ -75,6 +75,8 @@
     var BAG = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
+    // 012: the short name a pill shows ("Plays like 249y · 3W").
+    var BAG_SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
     function quantile(sorted, q) {
         var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
         return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
@@ -235,7 +237,7 @@
             }, function () { return false; });
         } catch (e) { return Promise.resolve(false); }
     }
-    W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
+    W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, SHORT: BAG_SHORT, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
         add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY,
         DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries,
         setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,

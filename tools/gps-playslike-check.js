@@ -26,6 +26,13 @@
 //   8  "How plays-like works": the (i) on the line opens it - uphill/downhill ~1 yd per 3 ft,
 //      into wind ~1% per mph, downwind ~0.5%, crosswind = aim off, temperature, US only,
 //      estimates; Done closes it. playsInfo off: no (i), no sheet (the line stays).
+//   Arms 1-6 and 8 play the 009 line, so they run with playsSimple OFF (012: off = the 009 line).
+//   9  012 PART 3, playsSimple ON (as shipped): the line is ONLY "Plays like Ny" (N the same
+//      inline formula, no club, no aim, no parts); the plain "Suggested:" line has the club for
+//      the plays-like N; HardPanGps.playsLine() / playsClub() say the same; the (i) sheet's
+//      "This shot" carries the breakdown: "You → green: D yds, plays like N", "Uphill: +E",
+//      "Into the wind (8 mph): +W", "Warm (80°F vs 70°F): −T"; a crosswind: "Crosswind: aim
+//      6 yds right" in the sheet, never on the line.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -101,6 +108,8 @@ function round() {
 }
 const BLOCK = ['*nationalmap.gov*', '*arcgis*', '*weather.gov*', '*epqs*', '*overpass*', '*cloudfunctions.net*'];
 const go = async (o) => {
+    // 012: arms that read the 009 line say so with playsSimple off; o.simple = the shipped switches.
+    o = Object.assign({}, o, { features: o.simple ? o.features : Object.assign({ playsSimple: false }, o.features || {}) });
     const r = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE), db: { events: { [CODE]: round() }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} },
         settleMs: 3500, viewport: { width: 390, height: 844 }, webgl: true, blockUrls: BLOCK, profileDir: o.profileDir,
         preScript: CFG(o.features, o.cfg) + APP + ERR + GEO(o.at || ME) + FETCH(o.wind == null ? INTO : o.wind) + SEED(o.seed) + iapStub({ active: true }), steps: o.steps });
@@ -229,10 +238,36 @@ const START = [W(2500), OPEN, W(3000)];
     f(s[0].i === false && s[0].sheet === null && /uphill/.test(s[0].line || ''), '8: playsInfo off: ' + JSON.stringify(s[0]));
     errs(s, 'infoOff');
 
+    // 9: 012 part 3 - playsSimple on (as shipped): "Plays like N" only; the why in the (i) sheet.
+    const READY = { waitFor: "(function(){ var t = (document.querySelector('#gps-overlay .gps-plays') || { getAttribute: function () { return ''; } }).getAttribute('data-terms') || ''; return /elev/.test(t) && /wind/.test(t) && /^Plays like \\d+y$/.test((document.querySelector('#gps-overlay .gps-pl-text') || {}).textContent || ''); })()", timeout: 25000 };
+    const API = { expression: "JSON.stringify({ api: HardPanGps.playsLine(), club: HardPanGps.playsClub() })" };
+    const SHEET = { expression: "JSON.stringify({ rows: Array.prototype.map.call(document.querySelectorAll('#gps-overlay .gps-plinfo-now .gps-plinfo-row'), function (d) { return d.textContent; }) })" };
+    s = await go({ simple: true, wind: INTO, steps: START.concat([READY, W(800), ST, API, TAP('.gps-pl-info'), W(400), SHEET]) });
+    const [sl, sapi, ssheet] = s, es = expect(INTO);
+    report.simple = { line: sl.line, sug: sl.sug, api: sapi.api, club: sapi.club, rows: ssheet.rows, expected: { plays: Math.round(es.plays), E: Math.round(es.E), W: Math.round(es.W), T: Math.round(es.T) } };
+    const ms = /^Plays like (\d+)y$/.exec(sl.line || '');
+    f(ms && Math.abs(+ms[1] - es.plays) <= 2, '9: the simple line: ' + JSON.stringify(sl.line) + ', expected "Plays like ~' + es.plays.toFixed(1) + 'y"');
+    if (ms) {
+        f(sl.sug === 'Suggested: ' + clubFor(+ms[1]), '9: the plain suggestion is the club for plays-like ' + ms[1] + ': ' + sl.sug);
+        f(sapi.api && sapi.api.text === sl.line && sapi.api.yards === +ms[1] && sapi.api.unit === 'y' && sapi.api.to === 'green' && sapi.api.from === 'me', '9: HardPanGps.playsLine(): ' + JSON.stringify(sapi.api));
+        f(sapi.club && NAMES[sapi.club.club] + ' (your ' + sapi.club.yd + ')' === clubFor(+ms[1]) && /^[0-9A-Za-z]{2}$/.test(sapi.club.short), '9: HardPanGps.playsClub(): ' + JSON.stringify(sapi.club));
+        const rows = ssheet.rows || [];
+        f(new RegExp('^You → green: ' + Math.round(es.D) + ' yds, plays like ' + ms[1] + '$').test(rows[0] || ''), '9: the sheet\'s shot row: ' + JSON.stringify(rows[0]));
+        f(rows.indexOf('Uphill: +' + Math.round(es.E)) !== -1 || rows.indexOf('Uphill: +' + (Math.round(es.E) + 1)) !== -1 || rows.indexOf('Uphill: +' + (Math.round(es.E) - 1)) !== -1, '9: no uphill row: ' + JSON.stringify(rows));
+        f(rows.some((x) => /^Into the wind \(8 mph\): \+\d+$/.test(x) && Math.abs(+/\d+$/.exec(x)[0] - es.W) <= 1), '9: no into-wind row: ' + JSON.stringify(rows));
+        f(rows.some((x) => /^Warm \(80°F vs 70°F\): −\d+$/.test(x)), '9: no warm row: ' + JSON.stringify(rows));
+    }
+    errs(s, 'simple');
+    s = await go({ simple: true, wind: CROSS, steps: START.concat([{ waitFor: "/^Plays like \\d+y$/.test((document.querySelector('#gps-overlay .gps-pl-text') || {}).textContent || '')", timeout: 25000 }, W(1500), ST, TAP('.gps-pl-info'), W(400), SHEET]) });
+    report.simpleCross = { line: s[0].line, rows: s[1].rows };
+    f(/^Plays like \d+y$/.test(s[0].line || ''), '9: crosswind: the line carries more than the number: ' + JSON.stringify(s[0].line));
+    f((s[1].rows || []).indexOf('Crosswind: aim ' + ec.aim + ' yds ' + ec.aimSide) !== -1, '9: crosswind: the sheet has no "Crosswind: aim ' + ec.aim + ' yds ' + ec.aimSide + '": ' + JSON.stringify(s[1].rows));
+    errs(s, 'simpleCross');
+
     // 7: tournament mode.
     const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];
     const ASK = { expression: "JSON.stringify({ ask: " + vis('.gps-bagask') + " })" };
-    s = await go({ wind: INTO, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
+    s = await go({ simple: true, wind: INTO, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
         { expression: 'window.__moveTo(' + dest(ME, B1, 120) + ')' }, W(1500), ...MARK, W(500), ASK, ST]) });
     const [t0, tAsk, t1] = s;
     report.tournament = { line: t0.line, sug: t0.sug, plays: t0.plays, epqs: (t1.epqs || []).length, nws: t1.nws, ask: tAsk.ask, celev: t1.celev };
