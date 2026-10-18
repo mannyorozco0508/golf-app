@@ -67,7 +67,11 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // courseElev = the whole course's heights sampled once (tee, every 25 yds, green, hazards;
     // USGS, US only) - off: the 5 points per hole (tee, 25 / 50 / 75 %, green) as before.
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true },
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true,
+        // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
+        // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
+        // the old layout exactly.
+        gpsLayoutC: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
