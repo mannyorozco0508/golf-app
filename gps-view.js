@@ -1820,6 +1820,86 @@
     // target, its ring label, the green, a pin, the dot or a control: it slides
     // along its line (and off to either side of it) to the first clear spot, and
     // hides when there is none. The same numbers stay under FRONT / CENTER / BACK.
+    // ---- HOLE FLYOVER / PREVIEW (008, switch flyover) ---------------------------------
+    // "Preview": the camera flies the hole from the tee to the green along the hole's own
+    // line (gps-geo.flyoverFrame) in about 4 s, tilted, with "Hole 5 · Par 4 · 385 yds"
+    // over it, then comes back to the normal hole view. Drawn by MapLibre - no video. Any
+    // touch stops it (back to the hole view). prefers-reduced-motion: no flight - the
+    // whole hole framed at once, the same words, then the normal view.
+    var FLY_MS = 4000, FLY_STILL_MS = 2500, FLY_PITCH = 50;
+    function flySwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('flyover') !== false; } catch (e) { return true; } }
+    function reducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
+    function flyLine(r) {
+        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
+        var line = rec && rec.line && rec.line.length >= 2 ? rec.line.slice() : [r.tee, r.mid];
+        line[0] = r.tee; line[line.length - 1] = r.mid;   // a set green is where the flight ends
+        return line;
+    }
+    function flyCaption(r) {
+        var m = (typeof S.holeMeta === 'function' ? S.holeMeta(S.hole) : null) || {}, u = units();
+        var par = m.par != null ? m.par : S.par;
+        var len = m.yards ? (u === 'm' ? Math.round(m.yards * G.M_PER_YD) : m.yards) : G.shownDistance(G.haversineMeters(r.tee, r.mid), u);
+        return 'Hole ' + S.hole + (par != null ? ' \u00b7 Par ' + par : '') + ' \u00b7 ' + len + (u === 'm' ? ' m' : ' yds');
+    }
+    function flyMark(state) { var el = S && S.el.querySelector('.gps-map'); if (el) el.setAttribute('data-fly', state); }
+    function startFlyover() {
+        if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverFrame) return;
+        var r = resolved();
+        if (!r || !r.tee || !r.mid) { flash('Preview needs this hole\u2019s tee and green'); return; }
+        closeMenus();
+        var cap = S.el.querySelector('.gps-fly-cap');
+        if (cap) { cap.textContent = flyCaption(r); cap.style.display = ''; }
+        var mine = S, map = S.map, el = S.el.querySelector('.gps-map');
+        if (reducedMotion()) {
+            // STILL: the whole hole, at once.
+            S.flying = { still: true };
+            frameHole(false);
+            flyMark('still');
+            S.flying.timer = setTimeout(function () { if (S === mine) endFlyover('done'); }, FLY_STILL_MS);
+            render();
+            return;
+        }
+        var cam = holeView();
+        if (!cam) return;
+        var line = flyLine(r), maxZ = maxZoomNow();
+        var z0 = Math.min(maxZ, cam.zoom + 1.4), z1 = Math.min(maxZ, cam.zoom + 2.1);
+        try { map.setMaxPitch(FLY_PITCH); } catch (e) {}
+        S.flying = { t0: Date.now(), frames: 0 };
+        flyMark('flying');
+        var step = function () {
+            if (S !== mine || !S.flying || S.flying.still) return;
+            var t = Math.min(1, (Date.now() - S.flying.t0) / FLY_MS);
+            var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in and out
+            var fr = G.flyoverFrame(line, e);
+            if (fr) {
+                try { map.jumpTo({ center: ll(fr.pt), bearing: fr.bearing, zoom: z0 + (z1 - z0) * e, pitch: FLY_PITCH * Math.min(1, t / 0.15), padding: { top: 0, bottom: 0, left: 0, right: 0 } }); } catch (x) {}
+                S.flying.frames++;
+                if (el) { el.setAttribute('data-fly-at', fr.pt[0].toFixed(6) + ',' + fr.pt[1].toFixed(6)); el.setAttribute('data-fly-frames', String(S.flying.frames)); el.setAttribute('data-fly-pitch', String(Math.round(map.getPitch()))); }
+            }
+            if (t >= 1) { endFlyover('done'); return; }
+            S.flying.raf = requestAnimationFrame(step);
+        };
+        S.flying.raf = requestAnimationFrame(step);
+        render();
+    }
+    // Back to the normal hole view, flat; why: 'done' | 'cancelled'.
+    function endFlyover(why) {
+        if (!S || !S.flying) return;
+        var f = S.flying;
+        S.flying = null;
+        if (f.raf) cancelAnimationFrame(f.raf);
+        clearTimeout(f.timer);
+        var cap = S.el.querySelector('.gps-fly-cap');
+        if (cap) cap.style.display = 'none';
+        if (S.map) {
+            try { S.map.jumpTo({ pitch: 0 }); S.map.setMaxPitch(0); } catch (e) {}
+            frameHole(false);
+            var el = S.el.querySelector('.gps-map');
+            if (el) el.setAttribute('data-fly-pitch', String(Math.round(S.map.getPitch())));
+        }
+        flyMark(why === 'cancelled' ? 'cancelled' : 'done');
+        render();
+    }
     function rectOf(el, wrapR) {
         if (!el || el.style.display === 'none') return null;
         var b = el.getBoundingClientRect();
@@ -2949,6 +3029,8 @@
         txt('.gps-tourney-toggle', tourneyRound() ? '\uD83C\uDFC6 Tournament mode: On (set by the organizer)' : (tq ? '\uD83C\uDFC6 Tournament mode: On' : '\uD83C\uDFC6 Tournament mode: Off'));
         var tt = S.el.querySelector('.gps-tourney-toggle'); if (tt) tt.setAttribute('aria-disabled', tourneyRound() ? 'true' : 'false');
         show('.gps-zoom', S.view !== 'green');
+        // PREVIEW (008): the hole needs a tee and a green to fly.
+        show('.gps-fly-btn', S.pro && !!S.map && S.mode === 'measure' && !S.replay && !S.flying && !!(r && r.tee && r.mid));
         // THE SCORE BUTTON (Manny, 2026-10-14): no score yet -> "Enter score"; scored -> just the
         // number, big. A spectator sees the number (or "No score yet") and cannot open the editor.
         var mine = myScore(S.hole), ro = readOnlyHere();
@@ -3417,6 +3499,7 @@
         +   '<div class="gps-pill gps-pill-to" style="display:none"></div>'
         +   '<div class="gps-pill gps-pill-on" style="display:none"></div>'
         +   '<div class="gps-tiles-note" style="display:none">No satellite view here without signal — yardages still work.</div>'
+        +   '<div class="gps-fly-cap" data-feature="flyover" style="display:none" role="status"></div>'
         + '</div>'
         // TOP PANEL: back, the hole (tap = pick a hole), CENTER big with F / B.
         + '<div class="gps-top">'
@@ -3456,6 +3539,7 @@
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
         +   '<button type="button" class="gps-hz-btn gps-float" data-feature="hazards" style="display:none" aria-label="Hazards and layups on this hole">Hazards</button>'
         +   '<button type="button" class="gps-mark-shot gps-float" style="display:none" aria-label="Mark shot here">\uD83D\uDCCD Mark shot</button>'
+        +   '<button type="button" class="gps-fly-btn gps-float" data-feature="flyover" style="display:none" aria-label="Preview the hole from the tee to the green">Preview</button>'
         + '</div>'
         + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
         +   '<div class="gps-clubs-foot"><button type="button" class="gps-club-move">Move it on the map</button><button type="button" class="gps-club-skip">Skip</button></div></div>'
@@ -3730,6 +3814,8 @@
         + '#gps-overlay .gps-shotbar .gps-sb-done{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;margin-left:auto;}'
         + '#gps-overlay .gps-shot{min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:#f97316;color:#fff;border:2px solid #fff;font:800 12px/22px ' + FONT + ';text-align:center;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.5);}'
         + '#gps-overlay .gps-mark-shot{font-size:13px;font-weight:800;white-space:nowrap;padding:0 12px;min-height:44px;}'
+        + '#gps-overlay .gps-fly-btn{font-size:13px;white-space:nowrap;}'
+        + '#gps-overlay .gps-fly-cap{position:absolute;z-index:9;left:50%;top:calc(var(--gps-top-b) + 8px);transform:translateX(-50%);background:rgba(11,15,12,.86);color:#fff;font:800 18px/1.2 ' + FONT + ';padding:10px 16px;border-radius:999px;white-space:nowrap;pointer-events:none;}'
         + '#gps-overlay .gps-clubs{position:absolute;z-index:47;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;border-radius:18px 18px 0 0;padding:10px 12px calc(14px + env(safe-area-inset-bottom));color:#f4f4ef;font:700 14px/1.3 ' + FONT + ';}'
         + '#gps-overlay .gps-clubs-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}'
         + '#gps-overlay .gps-clubs button{min-height:44px;min-width:52px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;cursor:pointer;}'
@@ -4070,6 +4156,10 @@
         // Recenter also puts the target back at its default (build 6).
         on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
         on(el, '.gps-zoom', cycleZoom);
+        // PREVIEW (008): the switch off = no button (removed, not hidden). Any touch stops a flight.
+        if (!flySwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="flyover"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-fly-btn', startFlyover);
+        ['pointerdown', 'touchstart', 'wheel'].forEach(function (ev) { el.addEventListener(ev, function () { if (S && S.flying) endFlyover('cancelled'); }, { capture: true, passive: true }); });
         on(el, '.gps-green-view', toggleGreenView);
         // HAZARDS (008): the switch off = no button, no sheet (removed, not hidden).
         if (!hzSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="hazards"]'), function (n) { n.parentNode.removeChild(n); });
@@ -4314,6 +4404,7 @@
             stopWindTick();
             // A shot replay does not keep turning the CARD's hole under a golfer typing a score.
             stopReplayTimer();
+            endFlyover('cancelled');
             clearIdle();
             if (isWatching()) idleTimer = setTimeout(function () { idleTimer = null; stopWatch(); }, IDLE_STOP_MS);
         }
@@ -4326,6 +4417,7 @@
         if (!S) return;
         hole = Number(hole);
         if (hole === S.hole) { if (par != null) S.par = par; return; }
+        if (S.flying) endFlyover('cancelled');   // PREVIEW (008): a new hole ends a flight
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;

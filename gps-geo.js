@@ -776,6 +776,34 @@
         return { center: center, zoom: zoom, bearing: bearing };
     }
 
+    // ---- HOLE FLYOVER (008, switch flyover) -------------------------------------------
+    // Where the camera is a fraction t (0 = the tee, 1 = the green) of the way along the
+    // hole's own line (tee -> dogleg -> green; just tee -> green without one), by
+    // distance, and which way it looks: toward a point a fifth of the hole further on
+    // (the last fifth looks at the green from where that fifth starts, so the view never
+    // spins over the flag). Pure: { pt, bearing } or null.
+    function flyoverFrame(line, t) {
+        var pts = (line || []).map(pinPt).filter(Boolean);
+        if (pts.length < 2) return null;
+        var segs = [], total = 0;
+        for (var i = 1; i < pts.length; i++) { var m = haversineMeters(pts[i - 1], pts[i]); segs.push(m); total += m; }
+        if (!(total > 0)) return null;
+        var at = function (f) {
+            var want = Math.max(0, Math.min(1, f)) * total;
+            for (var j = 0; j < segs.length; j++) {
+                if (want <= segs[j] || j === segs.length - 1) {
+                    var k = segs[j] ? Math.min(1, want / segs[j]) : 0;
+                    return [pts[j][0] + (pts[j + 1][0] - pts[j][0]) * k, pts[j][1] + (pts[j + 1][1] - pts[j][1]) * k];
+                }
+                want -= segs[j];
+            }
+            return pts[pts.length - 1];
+        };
+        var tt = Math.max(0, Math.min(1, Number(t) || 0));
+        var from = tt > 0.8 ? at(0.8) : at(tt), to = tt > 0.8 ? pts[pts.length - 1] : at(tt + 0.2);
+        return { pt: at(tt), bearing: bearingDeg(from, to) };
+    }
+
     // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
     // the hole; the TEE when they are more than offYards from the green, or have
     // no fix at all (planning a hole from the clubhouse, or a GPS that has not
@@ -1480,6 +1508,7 @@
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
+        flyoverFrame: flyoverFrame,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,
