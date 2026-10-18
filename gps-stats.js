@@ -512,6 +512,9 @@
         + '#hp-score-sheet .hp-ss-h{margin:16px 0 8px;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d7dcd3;}#hp-score-sheet .hp-ss-h small{font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#8f978c;}'
         + '#hp-score-sheet .hp-ss-opts{display:grid;gap:8px;}#hp-score-sheet .hp-ss-c4{grid-template-columns:repeat(4,minmax(0,1fr));}#hp-score-sheet .hp-ss-c5{grid-template-columns:repeat(5,minmax(0,1fr));}'
         + '#hp-score-sheet .hp-ss-b{--ss-bg:#262c26;min-height:52px;border-radius:14px;background:var(--ss-bg);color:#f4f4ef;font-size:17px;font-weight:700;padding:0 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;}'
+        // The stats rows: equal buttons in one line while their words fit; at a large text size on a
+        // small phone they wrap onto a second line rather than cut a word off.
+        + '#hp-score-sheet .hp-ss-opts:not(.hp-ss-grid){display:flex;flex-wrap:wrap;}#hp-score-sheet .hp-ss-opts:not(.hp-ss-grid) .hp-ss-b{flex:1 1 0;min-width:max-content;padding:0 6px;white-space:nowrap;}'
         + '#hp-score-sheet .hp-ss-b.on{--ss-bg:#c8f07a;color:#0b0f0c;}#hp-score-sheet .hp-ss-b small{font-size:12px;font-weight:600;opacity:.8;}'
         + '#hp-score-sheet .hp-ss-grid .hp-ss-b{min-height:60px;font-size:22px;font-weight:800;}'
         + '#hp-score-sheet .hp-ss-n{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;}'
@@ -525,9 +528,11 @@
         + '#hp-score-sheet .hp-ss-note{font-size:14px;color:#a7aea4;margin:14px 2px 0;}'
         + '#hp-score-sheet textarea.hp-ss-notes{width:100%;box-sizing:border-box;min-height:84px;margin-top:8px;border-radius:12px;border:1px solid #3a423a;background:#1b211b;color:#f4f4ef;font:500 16px/1.35 inherit;padding:10px;}'
         + '#hp-score-sheet .hp-ss-saved{font-size:12px;color:#8f978c;margin:14px 2px 0;}'
-        + '#hp-score-sheet .hp-ss-foot{flex:0 0 auto;display:flex;gap:12px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #262c26;}'
-        + '#hp-score-sheet .hp-ss-notes-btn{flex:0 0 32%;min-height:56px;border-radius:16px;background:#262c26;color:#f4f4ef;font-size:18px;font-weight:600;}#hp-score-sheet .hp-ss-notes-btn.on{box-shadow:inset 0 0 0 2px #c8f07a;}'
-        + '#hp-score-sheet .hp-ss-save{flex:1 1 auto;min-height:56px;border-radius:16px;background:#c8f07a;color:#0b0f0c;font-size:clamp(17px,5vw,21px);font-weight:800;}';
+        // Notes | Save on one line; when Save's words do not fit beside Notes (large text, small phone),
+        // Save moves up onto its own line above Notes - never wrapped or cut.
+        + '#hp-score-sheet .hp-ss-foot{flex:0 0 auto;display:flex;flex-wrap:wrap-reverse;gap:12px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #262c26;}'
+        + '#hp-score-sheet .hp-ss-notes-btn{flex:1 1 28%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#262c26;color:#f4f4ef;font-size:18px;font-weight:600;}#hp-score-sheet .hp-ss-notes-btn.on{box-shadow:inset 0 0 0 2px #c8f07a;}'
+        + '#hp-score-sheet .hp-ss-save{flex:2 1 60%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#c8f07a;color:#0b0f0c;font-size:clamp(17px,5vw,21px);font-weight:800;}';
     function ssEl(tag, cls, text, attrs) { var e = el(tag, cls, text); if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (tag === 'button') e.type = 'button'; return e; }
     function ssBuild(host) {
         var wrap = el('div', 'gps-scroll-ok');

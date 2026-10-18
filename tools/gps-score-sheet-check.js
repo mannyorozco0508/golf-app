@@ -22,6 +22,14 @@
 //   C  Tools > Track stats for others: On (this phone) -> Joe gets the stats rows.
 //   D  the switch off: Enter score = the card's box, focused, exactly as before; no Tools row.
 //   E  tournament mode (set by the organizer): the sheet still scores.
+//   L  THE LAYOUT on iPhone SE 375x667, iPhone 15 393x852 and 15 Pro Max 430x932, each at the
+//      default text and the LARGEST TEXT (every font size on the GPS screen and the sheet x1.35 -
+//      iOS xxxLarge over the default; the app has no Dynamic Type of its own, as
+//      tools/gps-layout-c-check.js simulates it): the sheet inside the screen at ~90%; no label
+//      cut off; no two buttons, rows or header parts overlapping; every button 44px+ tall; Save
+//      and Notes on top (hit-tested) and clear of the rows; scrolled to the bottom, "Saved on this
+//      phone" above the footer. Screenshots (--shots): sheet-top / sheet-bottom-<phone>-<text>.png.
+//   SS_ONLY=flow|layout runs one half (default both).
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -58,7 +66,8 @@ function round(extra) {
 const DB = (r) => ({ events: { [CODE]: r }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} });
 const BLOCK = ['*nationalmap.gov*', '*arcgis*', '*weather.gov*', '*epqs*', '*overpass*', '*cloudfunctions.net*'];
 const go = async (o) => {
-    const r = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE), db: DB(o.round || round()), settleMs: 3500, viewport: { width: VP.width, height: VP.height }, webgl: true, blockUrls: BLOCK,
+    const vp = o.vp || VP;
+    const r = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE), db: DB(o.round || round()), settleMs: 3500, viewport: { width: vp.width, height: vp.height }, webgl: true, blockUrls: BLOCK,
         preScript: CFG(o.features) + APP + ERR + GEO(o.at || H(5).mid) + SEED(o.hole || 5, o.seed) + iapStub({ active: true }), steps: o.steps });
     if (!r.ok) throw new Error(r.reason);
     return r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
@@ -97,6 +106,49 @@ const ST = { expression: `JSON.stringify((function () {
 const PREV = { expression: "(function(){ var b = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay [aria-label=\\'Previous hole\\']'), function (x) { var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden'; })[0]; if (!b) return 'none'; b.setAttribute('data-ss-prev', '1'); return b.className; })()" };
 const SCROLL_BOTTOM = { expression: "(function(){ var b = document.querySelector('#hp-score-sheet .hp-ss-body'); if (!b) return 'none'; b.scrollTop = b.scrollHeight; return 'scrolled'; })()" };
 const shot = (name) => SHOTS ? [{ shot: path.join(SHOTS, name), viewportOnly: true }] : [];
+// THE LARGEST TEXT (as tools/gps-layout-c-check.js): every font size (and px line height) on the GPS
+// screen and the sheet x k, once per element - read every size first, then write.
+const SCALE = (k) => ({ expression: "(function(){ var k = " + k + "; if (k === 1) return 'k1'; var todo = [];"
+    + " [document.getElementById('gps-overlay')].forEach(function (root) { if (!root) return;"
+    + "  [root].concat([].slice.call(root.querySelectorAll('*'))).forEach(function (e) { if (e.closest('.gps-map-wrap') || e.hasAttribute('data-fs0') || e.tagName === 'STYLE' || e.closest('svg')) return;"
+    + "   var cs = getComputedStyle(e), p = e.parentElement; todo.push([e, parseFloat(cs.fontSize), cs.lineHeight, !!(p && p.hasAttribute('data-fs0') && parseFloat(getComputedStyle(p).fontSize) === parseFloat(cs.fontSize))]); }); });"
+    + " todo.forEach(function (t) { var e = t[0]; e.setAttribute('data-fs0', t[1]); if (t[3]) return;"
+    + "  e.style.setProperty('font-size', (t[1] * k).toFixed(2) + 'px', 'important'); if (/px$/.test(t[2])) e.style.setProperty('line-height', (parseFloat(t[2]) * k).toFixed(2) + 'px', 'important'); });"
+    + " window.dispatchEvent(new Event('resize')); return 'scaled ' + todo.length; })()" });
+// The sheet measured: every box, whether its text fits, what overlaps what.
+const LAYOUT = { expression: `JSON.stringify((function () {
+  var w = document.getElementById('hp-score-sheet'); if (!w) return { none: true };
+  var R = function (e) { var b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+  var clip = function (e) { return e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2; };
+  var label = function (e) { return (e.getAttribute('data-ss-k') || e.getAttribute('data-ss-score') && 'score' || e.getAttribute('data-ss-golfer') && 'chip' || e.className) + ':' + e.textContent; };
+  var over = function (a, b) { return Math.min(a.r, b.r) - Math.max(a.l, b.l) > 0.5 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 0.5; };
+  var card = w.querySelector('.hp-ss'), body = w.querySelector('.hp-ss-body'), foot = w.querySelector('.hp-ss-foot');
+  var out = { vw: innerWidth, vh: innerHeight, card: R(card), body: R(body), foot: R(foot), clipped: [], overlaps: [], small: [], covered: [], rowsOrder: [] };
+  var btns = [].slice.call(w.querySelectorAll('button')).filter(function (b) { return b.getBoundingClientRect().height > 0; });
+  btns.forEach(function (b) {
+    if (clip(b)) out.clipped.push(label(b) + ' ' + [b.scrollWidth, b.clientWidth, b.scrollHeight, b.clientHeight].join('/'));
+    if (b.getBoundingClientRect().height < 44) out.small.push(label(b) + ' ' + Math.round(b.getBoundingClientRect().height));
+    var r = R(b); if (r.l < -0.5 || r.r > innerWidth + 0.5) out.clipped.push('off screen ' + label(b));
+  });
+  [w.querySelector('.hp-ss-title'), w.querySelector('.hp-ss-meta')].concat([].slice.call(w.querySelectorAll('.hp-ss-h'))).forEach(function (e) { if (e && e.scrollWidth > e.clientWidth + 1) out.clipped.push('text ' + e.textContent); });
+  // Body buttons against body buttons (their own scrolled space), footer against footer; the body
+  // and the footer against each other are checked as boxes (the rows end above the footer).
+  var inFoot = function (b) { return foot.contains(b); };
+  for (var i = 0; i < btns.length; i++) for (var j = i + 1; j < btns.length; j++) if (inFoot(btns[i]) === inFoot(btns[j]) && over(R(btns[i]), R(btns[j]))) out.overlaps.push(label(btns[i]) + ' x ' + label(btns[j]));
+  var tl = w.querySelector('.hp-ss-title'), mt = w.querySelector('.hp-ss-meta');
+  if (mt.textContent && over(R(tl), R(mt))) out.overlaps.push('title x meta');
+  // The rows of the body, top to bottom: each starts below the one before.
+  var blocks = [].slice.call(body.children).filter(function (e) { return e.getBoundingClientRect().height > 0; });
+  for (var k = 1; k < blocks.length; k++) { var a = R(blocks[k - 1]), b = R(blocks[k]); if (b.t < a.b - 0.5) out.rowsOrder.push(blocks[k - 1].className + ' / ' + blocks[k].className); }
+  // Save / Notes: on top at their middles and corners.
+  [].slice.call(foot.querySelectorAll('button')).filter(function (b) { return b.getBoundingClientRect().height > 0; }).forEach(function (b) {
+    var r = R(b); [[(r.l + r.r) / 2, (r.t + r.b) / 2], [r.l + 12, r.b - 12], [r.r - 12, r.b - 12]].forEach(function (p) { var e = document.elementFromPoint(p[0], p[1]); if (!e || !b.contains(e)) out.covered.push(b.className + ' at ' + p.map(Math.round)); });
+    if (r.b > innerHeight + 0.5) out.covered.push(b.className + ' below the screen');
+  });
+  var saved = w.querySelector('.hp-ss-saved'); out.saved = saved ? R(saved) : null;
+  out.heightPct = Math.round(R(card).h / innerHeight * 100);
+  return out;
+})())` };
 const MY = { expression: `JSON.stringify((function () {
   var p = document.getElementById('hp-my-stats'), m = {};
   if (p) Array.prototype.forEach.call(p.querySelectorAll('[data-ms-miss]'), function (x) { m[x.getAttribute('data-ms-miss')] = x.querySelector('b').textContent; });
@@ -113,6 +165,8 @@ const MY = { expression: `JSON.stringify((function () {
     const errs = (list, tag) => list.forEach((x) => { const e = x && x.e ? x.e.filter((m) => !AUDIT_TRIM.test(m)) : []; if (e.length) fails.push(tag + ': page errors ' + e.join(' | ')); });
     const ok = (s) => s && typeof s === 'object';
 
+    const ONLY = process.env.SS_ONLY || '';
+    if (ONLY !== 'layout') {
     // ---- A: hole 5 (par 4), the whole flow ----------------------------------------------
     const base = round();
     const echoed = Object.assign({}, base, { scores: Object.assign({}, base.scores || {}, { p101_h5: 4, p102_h5: 5 }) });
@@ -189,6 +243,42 @@ const MY = { expression: `JSON.stringify((function () {
     report.E = s[0] && [s[0].hole, s[0].writes.filter((w) => /scores/.test(w))];
     f(ok(s[0]) && s[0].writes.indexOf('set events/' + CODE + '/scores/p101_h5=4') !== -1 && s[0].hole === 6, 'E: tournament mode: the sheet did not score: ' + JSON.stringify(report.E));
     errs(s, 'E');
+
+    }
+
+    // ---- L: the layout, three phones x two text sizes -------------------------------------
+    if (ONLY !== 'flow') {
+        report.L = {};
+        for (const phone of [SIZES.se, SIZES[15], SIZES.promax]) {
+            for (const [tname, k] of [['default', 1], ['largest', 1.35]]) {
+                const tag = phone.tag + '-' + tname;
+                const out = await go({ vp: phone, steps: START.concat([
+                    TAP('#gps-overlay .gps-score'), WAIT(600),
+                    TAP('#hp-score-sheet [data-ss-golfer="102"]'), WAIT(200), TAP('#hp-score-sheet [data-ss-score="5"]'), WAIT(200),
+                    TAP('#hp-score-sheet [data-ss-golfer="101"]'), WAIT(200), TAP('#hp-score-sheet [data-ss-score="4"]'), WAIT(200),
+                    TAP('#hp-score-sheet [data-ss-k="putts"][data-ss-v="2"]'), WAIT(200), TAP('#hp-score-sheet [data-ss-k="fw"][data-ss-v="hit"]'), WAIT(200),
+                    { expression: "(function(){ var b = document.querySelector('#hp-score-sheet .hp-ss-body'); b.scrollTop = 0; return 'top'; })()" },
+                    SCALE(k), WAIT(400), LAYOUT], shot('sheet-top-' + tag + '.png'), [SCROLL_BOTTOM, WAIT(300), LAYOUT], shot('sheet-bottom-' + tag + '.png')) });
+                const [t, b] = out;
+                report.L[tag] = t && { heightPct: t.heightPct, clipped: t.clipped.length, overlaps: t.overlaps.length };
+                const F = (c, m) => f(c, 'L ' + tag + ': ' + m);
+                F(ok(t) && !t.none, 'no sheet');
+                if (!ok(t) || t.none) continue;
+                F(t.card.l >= -0.5 && t.card.r <= t.vw + 0.5 && t.card.b <= t.vh + 0.5 && t.heightPct >= 85 && t.heightPct <= 92, 'the sheet is not inside the screen at ~90%: ' + JSON.stringify([t.card, t.heightPct]));
+                [t, b].forEach((x, i) => {
+                    const at = i ? 'scrolled down' : 'at the top';
+                    F(!x.clipped.length, at + ': cut off: ' + JSON.stringify(x.clipped));
+                    F(!x.overlaps.length, at + ': overlapping: ' + JSON.stringify(x.overlaps));
+                    F(!x.small.length, at + ': under 44px: ' + JSON.stringify(x.small));
+                    F(!x.covered.length, at + ': Save / Notes covered: ' + JSON.stringify(x.covered));
+                    F(!x.rowsOrder.length, at + ': rows overlapping: ' + JSON.stringify(x.rowsOrder));
+                    F(x.body.b <= x.foot.t + 0.5, at + ': the rows run under the footer: ' + JSON.stringify([x.body, x.foot]));
+                });
+                F(b.saved && b.saved.b <= b.foot.t + 0.5 && b.saved.t >= b.body.t - 0.5, 'scrolled down, "Saved on this phone" not in view above the footer: ' + JSON.stringify([b.saved, b.foot]));
+                errs(out, 'L ' + tag);
+            }
+        }
+    }
 
     console.log(JSON.stringify({ report, fails }, null, 1));
     console.log(fails.length ? 'FAILED ' + fails.length : 'PASSED');
