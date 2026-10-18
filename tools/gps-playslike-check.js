@@ -38,6 +38,13 @@
 //      point; the (i) sheet's heights row uses it ("you N ft ... your ~10 m square"); a reload
 //      (same phone) asks for it no more; elevPerLeg off: nothing asked near them. Arm 7
 //      (tournament) walks there too: still not one EPQS request.
+//  11  012 PART 5, bagAltitude ON: My bag says "My distances are from" a 1,257 ft course
+//      (Scottsdale-like): at Caledonia (the hole's tee / green heights, worked out inline)
+//      the line plays LONGER by ~2% per 1,000 ft, applied BEFORE wind and temperature (the
+//      inline formula); the suggestion is the club for it; the (i) sheet says "Altitude N ft
+//      vs Scottsdale (1,257 ft): +X". Then, in My bag: "A course I pick" > "This course"
+//      (this course's own height) - the altitude part is 0 and the line is the no-altitude
+//      number; "Sea level" is kept; "Don't adjust" (the default, arm 9) = today.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -288,6 +295,38 @@ const START = [W(2500), OPEN, W(3000)];
     report.ownSpotOff = { asked: near(s[0].epqs) };
     f(near(s[0].epqs).length === 0, '10: elevPerLeg off asked for the golfer\'s cell: ' + JSON.stringify(near(s[0].epqs)));
     errs(s, 'ownSpotOff');
+
+    // 11: 012 part 5 - "My distances are from" a 1,257 ft course.
+    const BASE_FT = 1257;
+    // This course's height = the mean of its whole-course samples, once they are all in (read
+    // from the phone's record; the formula below is inline).
+    const MEAN = { expression: "(function(){ var r = JSON.parse(localStorage.getItem('hardpan_celev_v1_caledonia')), s = 0, n = 0; Object.keys(r.h).forEach(function (k) { var a = r.h[k]; for (var i = 2; i < a.length; i += 3) if (typeof a[i] === 'number') { s += a[i]; n++; } }); return JSON.stringify({ mean: s / n }); })()" };
+    const DONE11 = { waitFor: "(function(){ try { return JSON.parse(localStorage.getItem('hardpan_celev_v1_caledonia')).done === true; } catch (e) { return false; } })()", timeout: 60000 };
+    let courseFt = 0;
+    const withAlt = (fromDeg, baseFt) => { const D = hav(ME, G1) / 0.9144, shot = brg(ME, G1), A = D * (1 - 0.02 * (courseFt - baseFt) / 1000);
+        const E = (20 + SLOPE * alongM(G1) - (20 + SLOPE * alongM(ME))) / 3, head = MPH * Math.cos(rad(fromDeg - shot));
+        return { D, A, alt: A - D, plays: A + E + (head > 0 ? A * 0.01 * head : A * 0.005 * head) + A * 0.001 * (70 - TEMP) }; };
+    const SEED_ALT = (alt) => "localStorage.setItem('hardpan_bag_v1', " + JSON.stringify(JSON.stringify({ v: 1, golfers: { 'n:manny orozco': { shots: {}, set: BAG, setupAt: 1, alt } } })) + ");";
+    const TAPB = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay " + sel + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
+    const BAGST = { expression: "JSON.stringify({ bag: JSON.parse(localStorage.getItem('hardpan_bag_v1')).golfers['n:manny orozco'].alt || null, now: (document.querySelector('#gps-overlay .gps-bag-alt-now') || {}).textContent || null })" };
+    s = await go({ simple: true, wind: INTO, seed: SEED_ALT({ mode: 'course', name: 'Scottsdale', ft: BASE_FT }), steps: START.concat([READY, DONE11, W(2500), MEAN, ST, TAP('.gps-pl-info'), W(400), SHEET, TAP('.gps-plinfo-done'),
+        TAPB('.gps-my-bag'), W(600), TAPB('[data-bag-alt="course"]'), W(300), TAPB('.gps-bag-alt-here'), W(600), BAGST, TAPB('.gps-bag-done'), W(800), ST, TAP('.gps-pl-info'), W(400), SHEET, TAP('.gps-plinfo-done'),
+        TAPB('.gps-my-bag'), W(600), TAPB('[data-bag-alt="sea"]'), W(400), BAGST]) });
+    const [aMean, a0, aRows, aBag, a1, aRows1, aSea] = s;
+    courseFt = aMean.mean;
+    const ea = withAlt(INTO, BASE_FT);
+    report.altitude = { courseFt, expected: { plays: Math.round(ea.plays), alt: Math.round(ea.alt) }, line: a0.line, sug: a0.sug, rows: aRows.rows, picked: aBag, lineSame: a1.line, rowsSame: aRows1.rows, sea: aSea };
+    const ma = /^Plays like (\d+)y$/.exec(a0.line || '');
+    f(ma && Math.abs(+ma[1] - ea.plays) <= 2, '11: altitude line ' + JSON.stringify(a0.line) + ', expected ~' + ea.plays.toFixed(1) + ' (inline, altitude first)');
+    f(ma && +ma[1] > Math.round(expect(INTO).plays), '11: a lower course than the baseline does not play longer: ' + JSON.stringify(a0.line));
+    f(ma && a0.sug === 'Suggested: ' + clubFor(+ma[1]), '11: the club is not for the altitude-adjusted ' + (ma && ma[1]) + ': ' + a0.sug);
+    f((aRows.rows || []).some((x) => new RegExp('^Altitude \\d+ ft vs Scottsdale \\(1,257 ft\\): \\+' + Math.round(ea.alt) + '$').test(x)), '11: the sheet\'s altitude row: ' + JSON.stringify(aRows.rows));
+    f(isFinite(courseFt) && courseFt > 0, '11: could not read this course\'s mean height: ' + courseFt);
+    f(aBag.bag && aBag.bag.mode === 'course' && aBag.bag.name === 'Caledonia Golf & Fish Club' && Math.abs(aBag.bag.ft - courseFt) <= 0.5, '11: "This course" did not keep this course\'s height: ' + JSON.stringify(aBag));
+    f(/^Plays like \d+y$/.test(a1.line || '') && Math.abs(+/\d+/.exec(a1.line)[0] - expect(INTO).plays) <= 2, '11: the same course as the baseline is not the no-altitude number: ' + a1.line);
+    f((aRows1.rows || []).some((x) => /^Altitude \d+ ft vs Caledonia Golf & Fish Club \(\d+ ft\): 0$/.test(x)), '11: same course: the altitude row is not 0: ' + JSON.stringify(aRows1.rows));
+    f(aSea.bag && aSea.bag.mode === 'sea' && /sea level/.test(aSea.now || ''), '11: "Sea level" not kept: ' + JSON.stringify(aSea));
+    errs(s, 'altitude');
 
     // 7: tournament mode.
     const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];

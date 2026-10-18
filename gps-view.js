@@ -2602,10 +2602,67 @@
     // target on the green's middle: -> the green. And the second leg, target -> green.
     function perLegSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('elevPerLeg') !== false; } catch (e) { return true; } }
     function isPar3() { return Number((typeof S.holeMeta === 'function' && (S.holeMeta(S.hole) || {}).par) || S.par) === 3; }
-    // The wind / air every leg's playsLike gets.
-    function playsAir(w) {
+    // The wind / air every leg's playsLike gets - and (012 part 5) the altitude vs the golfer's
+    // "My distances are from" baseline, and the temperature they set their numbers in.
+    function playsAir(w, r) {
         var has = !!(w && !w.none);
-        return { windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null };
+        var q = { windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null };
+        var al = altNow(r);
+        if (al && typeof al.tempBaseF === 'number') q.tempBaseF = al.tempBaseF;
+        if (al && typeof al.altFt === 'number' && typeof al.altBaseFt === 'number') { q.altFt = al.altFt; q.altBaseFt = al.altBaseFt; }
+        return q;
+    }
+    // ---- "MY DISTANCES ARE FROM" (012 part 5, switch bagAltitude) --------------------------
+    // THIS COURSE'S HEIGHT: the mean of the whole course's samples once they are all on the
+    // phone (the same number "This course" keeps as a baseline - so the same course is 0);
+    // until then the hole on screen's tee and green (the course samples / the course-point
+    // cache - USGS, US only), their mean; null when there is none (altitude not available
+    // here). Worked out on the phone; nothing is sent from here.
+    function altSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('bagAltitude') !== false; } catch (e) { return true; } }
+    function courseFtNow(r) {
+        var whole = courseMeanFt(S && S.courseKey, true);
+        if (whole != null) return whole;
+        if (!r) return null;
+        var a = r.tee ? ptElev(r, r.tee, 'tee') : null, b = r.mid ? ptElev(r, r.mid, 'mid') : null;
+        if (a != null && b != null) return (a + b) / 2;
+        return a != null ? a : b;
+    }
+    // { altFt, altBaseFt, tempBaseF, info: { ft, baseFt, baseName, na } } or null (switch off,
+    // tournament mode, no bag yet). "Don't adjust": no altitude (the temperature baseline only).
+    function altNow(r) {
+        if (!altSwitch() || tournament() || !S) return null;
+        var B = bagApi();
+        if (!B || !B.baseline) return null;
+        var a = B.baseline(bagGolfer()), base = B.baselineFt(a), out = { tempBaseF: a.tempF };
+        if (base === undefined) return out;
+        var ft = courseFtNow(r);
+        out.info = { ft: ft, baseFt: base, baseName: a.mode === 'course' ? a.name : '', na: ft == null || base == null };
+        if (!out.info.na) { out.altFt = ft; out.altBaseFt = base; }
+        return out;
+    }
+    // A PICKED COURSE'S HEIGHT, when the phone does not have it: ONE USGS EPQS request for the
+    // COURSE's own point (its clubhouse / green point from the course list, or the hole on
+    // screen's green) - never the golfer's - kept in the course-point cache, asked once.
+    // Never in tournament mode; US only; online only. done(ft | null).
+    function fetchCourseFt(p, done) {
+        if (tournament()) { done(null); return; }   // tournament mode: no elevation at all
+        if (!altSwitch() || !S || !S.pro || typeof fetch !== 'function' || !p || !inUS(p)) { done(null); return; }
+        var k = elevKey(p), have = lsGet(k);
+        if (have) { done(typeof have.ft === 'number' ? have.ft : null); return; }
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { done(null); return; }
+        fetch(epqsUrl(r5(p)), { mode: 'cors', credentials: 'omit' }).then(function (res) { if (!res.ok) throw new Error('epqs ' + res.status); return res.json(); }).then(function (j) {
+            var v = j && j.value != null ? Number(j.value) : NaN, ok = isFinite(v) && v > -1000;
+            lsSet(k, ok ? { ft: Math.round(v * 10) / 10 } : { none: 1 });
+            done(ok ? v : null);
+        }).catch(function () { done(null); });
+    }
+    // The whole course's mean height from its samples on this phone (hardpan_celev_v1_), or null;
+    // done: only once every point is in (no number that drifts while the course is sampled).
+    function courseMeanFt(key, done) {
+        var rec = key ? lsGet(CELEV_PREFIX + key) : null, sum = 0, n = 0;
+        if (done && !(rec && rec.done)) return null;
+        if (rec && rec.v === 1 && rec.h) Object.keys(rec.h).forEach(function (h) { var a = rec.h[h] || []; for (var i = 2; i < a.length; i += 3) if (typeof a[i] === 'number') { sum += a[i]; n++; } });
+        return n ? sum / n : null;
     }
     // Both legs, worked out on the phone: { toTarget, toGreen, single, heights } (gps-geo.playsLegs)
     // or null (tournament mode, no GPS Map, not measuring, on the green, outside the US).
@@ -2618,7 +2675,7 @@
         var tp = perLegSwitch() ? playsAim(r) : (S.target || null);
         var fromFt = originElev(r, o), targetFt = tp ? ptElev(r, tp) : null, greenFt = ptElev(r, r.mid, 'mid');
         var lg = G.playsLegs({ from: o.pt, target: tp, green: r.mid, fromFt: fromFt, targetFt: targetFt, greenFt: greenFt,
-            par3: perLegSwitch() && isPar3(), minYd: PLAYS_MIN_YD, air: playsAir(effectiveWind()) });
+            par3: perLegSwitch() && isPar3(), minYd: PLAYS_MIN_YD, air: playsAir(effectiveWind(), r) });
         if (lg) lg.heights = { from: fromFt, fromLabel: o.from === 'tee' ? 'tee' : 'you', target: lg.single ? null : targetFt, green: greenFt,
             ownCell: o.from !== 'tee' && !!ownSpotCell(r, o.pt) && fromFt != null };
         return lg;
@@ -2648,7 +2705,7 @@
         // Today's manual wind (build 3) beats the live reading.
         var w = effectiveWind(), has = !!(w && !w.none);
         var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
-        var q = playsAir(w);
+        var q = playsAir(w, r);
         q.yards = D; q.elevFromFt = originElev(r, o); q.elevToFt = to; q.shotBearingDeg = G.bearingDeg(o.pt, aim);
         return G.playsLike(q);
     }
@@ -2761,8 +2818,9 @@
         var w = effectiveWind(), has = !!(w && !w.none);
         var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
         var am = has && w.mph > 0 ? G.windAim(D, G.windRelative(w.fromDeg, G.bearingDeg(o.pt, aim), w.mph).cross) : null;
-        var lg = perLegSwitch() ? playsLegsNow() : null;
+        var lg = perLegSwitch() ? playsLegsNow() : null, al = altNow(r);
         return G.playsInfoRows({ pl: pl, yards: D, windMph: has ? w.mph : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null, aim: am, unit: units(),
+            alt: al && al.info, tempBaseF: al ? al.tempBaseF : null,
             label: (o.from === 'tee' ? 'Tee' : 'You') + ' \u2192 ' + (tp ? 'target' : 'green'),
             toGreen: lg && !lg.single ? lg.toGreen : null, heights: lg ? lg.heights : null });
     }
@@ -3581,6 +3639,7 @@
         var who = bagGolfer(), hcp = bagHcp(), m = units() === 'm', def = B.defaultCarries(hcp);
         sh.setAttribute('data-bag-view', 'setup');
         bagSavedLine(sh, B);
+        fillAlt(sh);
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
         sh.querySelector('.gps-bag-sub').textContent = 'Enter your carry for each club. ' + (hcp == null ? 'Starting numbers for a mid handicap' : 'Starting numbers for a ' + (hcp < 0 ? '+' + Math.abs(Math.round(hcp)) : Math.round(hcp)) + ' handicap')
             + ' \u2014 change any, clear the clubs you do not carry. Mark shot keeps them up to date.';
@@ -3618,6 +3677,7 @@
         var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
         sh.setAttribute('data-bag-view', 'list');
         bagSavedLine(sh, B);
+        fillAlt(sh);
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
         sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is the middle of your last 10 marked shots per club (odd ones left out); "entered" is a number you typed'
             + (setupSwitch() ? ' or set up (marked shots take over once a club has ' + B.LEARN_MIN + ')' : '') + '. On this phone only.';
@@ -3641,6 +3701,89 @@
             row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
             list.appendChild(row);
         });
+    }
+    // "MY DISTANCES ARE FROM" (012 part 5): Sea level | A course I pick | Don't adjust (the
+    // default - plays-like as before), and the typical temperature when the numbers were set
+    // (blank = 70). A course: THIS course (its height from the samples on the phone), or one
+    // found in the course list on the phone (HardPanGolfApi - its own point's height, once).
+    // On this phone only (never in the account sync).
+    function ftShown(x) { return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function fillAlt(sh) {
+        var box = sh && sh.querySelector('.gps-bag-alt'), B = bagApi();
+        if (!box || !B || !B.baseline) return;
+        var a = B.baseline(bagGolfer()), here = courseMeanFt(S.courseKey);
+        if (here == null) here = courseFtNow(resolved());
+        Array.prototype.forEach.call(box.querySelectorAll('[data-bag-alt]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-bag-alt') === a.mode || (S.altPicking && b.getAttribute('data-bag-alt') === 'course') ? 'true' : 'false'); });
+        var pick = box.querySelector('.gps-bag-alt-pick');
+        pick.style.display = S.altPicking ? '' : 'none';
+        var hereName = (S.round && S.round.courseName) || 'This course';
+        pick.querySelector('.gps-bag-alt-here').textContent = 'This course: ' + hereName;
+        var thisLine = here != null ? 'This course: ' + ftShown(here) + ' ft.' : 'This course: no height yet (US courses only).';
+        var now = S.altLooking ? 'Looking up ' + S.altLooking + '\u2019s height\u2026'
+            : a.mode === 'none' ? 'Plays-like uses your numbers as they are.'
+            : a.mode === 'sea' ? 'Your numbers are from sea level. ' + thisLine
+            : (a.ft != null ? 'Your numbers are from ' + a.name + ' (' + ftShown(a.ft) + ' ft). ' + thisLine : a.name + ': no US height, so altitude is not available.');
+        box.querySelector('.gps-bag-alt-now').textContent = now + ' On this phone only.';
+        var t = box.querySelector('.gps-bag-alt-temp');
+        if (t && document.activeElement !== t) t.value = a.tempF != null ? String(a.tempF) : '';
+    }
+    // The course list on this phone, by name: up to 8 { name, pt }.
+    function altFind(q) {
+        var d = window.HardPanGolfApi, w = String(q || '').trim().toLowerCase(), out = [];
+        if (!d || !d.courses || w.length < 3) return out;
+        Object.keys(d.courses).some(function (id) {
+            var c = d.courses[id];
+            if (!c || !isFinite(c.lat) || !isFinite(c.lng)) return false;
+            var nm = String(c.club || '') + (c.course && String(c.course) !== String(c.club) ? ' \u00b7 ' + c.course : '');
+            if (nm.toLowerCase().indexOf(w) !== -1) out.push({ name: nm, pt: [Number(c.lat), Number(c.lng)] });
+            return out.length >= 8;
+        });
+        return out;
+    }
+    function altList(sh) {
+        var list = sh.querySelector('.gps-bag-alt-list'), q = sh.querySelector('.gps-bag-alt-find');
+        if (!list) return;
+        list.textContent = '';
+        S.altFound = altFind(q && q.value);
+        S.altFound.forEach(function (c, i) { var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-bag-alt-pick', String(i)); b.textContent = c.name; list.appendChild(b); });
+    }
+    function altSet(a) {
+        var B = bagApi();
+        if (!B || !S) return;
+        var cur = B.baseline(bagGolfer());
+        B.setBaseline(bagGolfer(), Object.assign({ tempF: cur.tempF }, a));
+        var sh = bagSheet(); if (sh) fillAlt(sh);
+        render();
+    }
+    // A course picked: its height from the phone (this course's samples; the course-point
+    // cache), else ONE lookup of the course's own point (fetchCourseFt).
+    function altPickCourse(name, pt, ftKnown) {
+        if (!S) return;
+        S.altPicking = false;
+        if (ftKnown != null) { altSet({ mode: 'course', name: name, ft: ftKnown }); return; }
+        var mine = S;
+        S.altLooking = name; var sh = bagSheet(); if (sh) fillAlt(sh);
+        fetchCourseFt(pt, function (ft) { if (S !== mine) return; S.altLooking = null; altSet({ mode: 'course', name: name, ft: ft }); });
+    }
+    function altClick(t) {
+        var B = bagApi(), sh = bagSheet();
+        if (!B || !S || !sh) return false;
+        var m = t.closest('[data-bag-alt]');
+        if (m) {
+            var mode = m.getAttribute('data-bag-alt');
+            if (mode === 'course') { S.altPicking = !S.altPicking; fillAlt(sh); altList(sh); }
+            else { S.altPicking = false; altSet({ mode: mode }); }
+            return true;
+        }
+        if (t.closest('.gps-bag-alt-here')) {
+            var r = resolved(), ft = courseMeanFt(S.courseKey);
+            if (ft == null) ft = courseFtNow(r);
+            altPickCourse((S.round && S.round.courseName) || 'This course', r && (r.mid || r.tee), ft);
+            return true;
+        }
+        var p = t.closest('[data-bag-alt-pick]');
+        if (p) { var c = (S.altFound || [])[Number(p.getAttribute('data-bag-alt-pick'))]; if (c) altPickCourse(c.name, c.pt, null); return true; }
+        return false;
     }
     // ONE TAP (gps-features): the shot, here (the GPS position), then the club. Kept for later.
     function markShotWithClub() {
@@ -3965,6 +4108,15 @@
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
         // 010: where the numbers live, in one line (the account too only when clubsSync is live).
         +   '<div class="gps-bag-saved">Saved on this phone</div>'
+        // 012 part 5 (switch bagAltitude): where the numbers hold - for the altitude in plays-like.
+        +   '<div class="gps-bag-alt" data-feature="bagAltitude" role="group" aria-label="My distances are from">'
+        +     '<div class="gps-bag-alt-h">My distances are from:</div>'
+        +     '<div class="gps-bag-alt-row"><button type="button" data-bag-alt="sea">Sea level</button><button type="button" data-bag-alt="course">A course I pick</button><button type="button" data-bag-alt="none">' + "Don't adjust" + '</button></div>'
+        +     '<div class="gps-bag-alt-pick" style="display:none"><button type="button" class="gps-bag-alt-here">This course</button>'
+        +       '<input type="search" class="gps-bag-alt-find" placeholder="Find a course" aria-label="Find a course" autocomplete="off"><div class="gps-bag-alt-list"></div></div>'
+        +     '<div class="gps-bag-alt-now" role="status"></div>'
+        +     '<label class="gps-bag-alt-tl">Typical temperature when I set these <input type="number" inputmode="numeric" class="gps-bag-alt-temp" data-bag-alt-temp="1" min="-20" max="130" placeholder="70" aria-label="Typical temperature when I set these, degrees F"> \u00b0F</label>'
+        +   '</div>'
         +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
         // FIRST-TIME SETUP (009): "Enter your carry for each club" - in place of the list.
         +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
@@ -3983,6 +4135,8 @@
         +     '<li><b>Downwind:</b> about 0.5% shorter for every mph of tailwind - half as much.</li>'
         +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
         +     '<li><b>Temperature:</b> about 1 yard for every 10\u00b0F per 100 yards - longer when it is cold, shorter when it is warm (from 70\u00b0F).</li>'
+        // 012 part 5: the altitude, vs My bag's "My distances are from" (gps-geo ALT_PCT_PER_1000FT = 2).
+        +     '<li><b>Altitude:</b> with My bag\u2019s \u201cMy distances are from\u201d set, about 2% for every 1,000 feet above it (shorter) or below it (longer) - worked out first.</li>'
         +   '</ul>'
         +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your exact position; more than 30 yards off the hole\u2019s line, the height of the roughly 10-meter square you are in), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
@@ -4253,6 +4407,13 @@
         + '#gps-overlay .gps-bag{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
         + '#gps-overlay .gps-bag-head{display:flex;align-items:center;justify-content:space-between;}#gps-overlay .gps-bag-title{font:800 17px/1.15 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-sub{font:600 12px/1.3 ' + FONT + ';color:#c8d1ca;margin:4px 0 6px;}'
+        + '#gps-overlay .gps-bag-alt{margin:2px 0 10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06);font:600 13px/1.35 ' + FONT + ';}'
+        + '#gps-overlay .gps-bag-alt-h{font-weight:800;margin-bottom:6px;}#gps-overlay .gps-bag-alt-row{display:flex;gap:6px;flex-wrap:wrap;}'
+        + '#gps-overlay .gps-bag-alt-row button,#gps-overlay .gps-bag-alt-pick button{min-height:40px;border-radius:10px;padding:0 10px !important;font:700 13px/1 ' + FONT + ' !important;}'
+        + '#gps-overlay .gps-bag-alt-row button[aria-pressed="true"]{background:#d9f99d !important;color:#0b0f0c !important;}'
+        + '#gps-overlay .gps-bag-alt-pick{margin-top:6px;display:flex;flex-direction:column;gap:6px;}#gps-overlay .gps-bag-alt-find{min-height:40px;border-radius:10px;padding:0 10px;font:600 15px/1 ' + FONT + ';}'
+        + '#gps-overlay .gps-bag-alt-list{display:flex;flex-direction:column;gap:4px;}#gps-overlay .gps-bag-alt-list button{text-align:left;}'
+        + '#gps-overlay .gps-bag-alt-now{margin:6px 0;color:#c8d1ca;}#gps-overlay .gps-bag-alt-tl{display:block;color:#c8d1ca;}#gps-overlay .gps-bag-alt-temp{width:64px;min-height:36px;font:700 15px/1 ' + FONT + ';text-align:center;}'
         + '#gps-overlay .gps-bag-saved{font:600 11.5px/1.3 ' + FONT + ';color:#9ca3af;margin:0 0 6px;}'
         + '#gps-overlay .gps-bag-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
         + '#gps-overlay .gps-bag-name{flex:1 1 auto;font:700 15px/1.2 ' + FONT + ';}#gps-overlay .gps-bag-meta{flex:0 0 76px;font:600 11px/1.2 ' + FONT + ';color:#a7b3aa;}'
@@ -4565,6 +4726,8 @@
         if (!bagSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="clubs"]'), function (n) { n.parentNode.removeChild(n); });
         // BAG SETUP (009): its switch off = no setup in My bag (removed, not hidden).
         if (!setupSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagSetup"]'), function (n) { n.parentNode.removeChild(n); });
+        // 012 part 5: "My distances are from" - switch off = no section (and no altitude).
+        if (!altSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagAltitude"]'), function (n) { n.parentNode.removeChild(n); });
         // PLAYS-LIKE LINE (009): its switch off = no line (removed, not hidden).
         if (!plSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsBreakdown"]'), function (n) { n.parentNode.removeChild(n); });
         // HOW PLAYS-LIKE WORKS (009): the ⓘ opens it; its switch off = no ⓘ, no sheet.
@@ -4581,7 +4744,14 @@
         if (bagRow) bagRow.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-bag-club]') : null; if (b) { e.preventDefault(); bagPick(b.getAttribute('data-bag-club')); } });
         var bagEl = el.querySelector('.gps-bag');
         if (bagEl) {
+            bagEl.addEventListener('input', function (e) { if (S && e.target && e.target.classList && e.target.classList.contains('gps-bag-alt-find')) altList(bagEl); });
             bagEl.addEventListener('change', function (e) {
+                if (e.target && e.target.getAttribute && e.target.getAttribute('data-bag-alt-temp')) {
+                    var Bt = bagApi(); if (!Bt || !S) return;
+                    var cur = Bt.baseline(bagGolfer()), tv = e.target.value;
+                    Bt.setBaseline(bagGolfer(), Object.assign({}, cur, { tempF: tv === '' ? null : Number(tv) }));
+                    fillAlt(bagEl); render(); return;
+                }
                 var c = e.target && e.target.getAttribute && e.target.getAttribute('data-bag-edit'), B = bagApi();
                 if (!c || !B || !S) return;
                 var v = Number(e.target.value);
@@ -4592,6 +4762,7 @@
             bagEl.addEventListener('click', function (e) {
                 var t = e.target, B = bagApi();
                 if (!B || !S || !t || !t.closest) return;
+                if (altClick(t)) { e.preventDefault(); return; }
                 var r1 = t.closest('[data-bag-reset]');
                 if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); bagSaved(); fillBag(); render(); return; }
                 if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); bagSaved(); fillBag(); render(); }

@@ -154,3 +154,88 @@ test('012-4 gps-view: behind elevPerLeg - no projection, the own-spot cell gated
     assert.ok(/if \(tournament\(\) \|\| !S \|\| !S\.pro/.test(fnSrc(v, 'playsLegsNow')));
     assert.ok(/playsLegs: function \(\) \{ try \{ return playsLegsOut\(\); \}/.test(v), 'exported for layout D\'s bubble');
 });
+
+// ---- PART 5: "MY DISTANCES ARE FROM" - THE ALTITUDE BASELINE ---------------------------
+test('012-5 altitude: ALT_PCT_PER_1000FT = 2; 150 at sea level plays ~146 at 1,200 ft; same course = 0; a sea-level course vs a Scottsdale baseline plays longer', () => {
+    assert.strictEqual(geo.ALT_PCT_PER_1000FT, 2);
+    const up = geo.playsLike({ yards: 150, altFt: 1200, altBaseFt: 0 });
+    assert.strictEqual(up.yards, 146); assert.ok(Math.abs(up.terms.alt + 3.6) < 1e-9);
+    const same = geo.playsLike({ yards: 150, altFt: 1500, altBaseFt: 1500, tempF: 70 });
+    assert.strictEqual(same.terms.alt, 0); assert.strictEqual(same.yards, 150);
+    const scottsdale = geo.playsLike({ yards: 150, altFt: 10, altBaseFt: 1257 });
+    assert.ok(scottsdale.exact > 150 && scottsdale.yards === 154, 'plays longer: ' + scottsdale.exact);
+});
+test('012-5 altitude is applied BEFORE wind and temperature (their % on the adjusted yards); slope unchanged; the temperature baseline; "Don\'t adjust" = identical to today', () => {
+    const o = { yards: 150, elevFromFt: 100, elevToFt: 112, windMph: 10, windFromDeg: 0, shotBearingDeg: 0, tempF: 60 };
+    const today = geo.playsLike(o);
+    const alt = geo.playsLike(Object.assign({ altFt: 1200, altBaseFt: 0 }, o));
+    const A = 150 * (1 - 0.024);
+    assert.ok(Math.abs(alt.terms.wind - A * 0.01 * 10) < 1e-9, 'headwind 1% per mph of the ADJUSTED yards');
+    assert.ok(Math.abs(alt.terms.temp - A * 0.001 * 10) < 1e-9, 'temperature on the adjusted yards');
+    assert.strictEqual(alt.terms.elev, today.terms.elev, 'slope: 1 yd per 3 ft, either way');
+    assert.ok(Math.abs(alt.exact - (A + 4 + A * 0.1 + A * 0.01)) < 1e-9);
+    // The wind rule itself is untouched: 1% per mph into it, 0.5% per mph helping.
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 20, windFromDeg: 0, shotBearingDeg: 0 }).yards, 180);
+    assert.strictEqual(geo.playsLike({ yards: 150, windMph: 20, windFromDeg: 180, shotBearingDeg: 0 }).yards, 135);
+    // Don't adjust: no altitude inputs, no temperature baseline - exactly today's numbers.
+    assert.deepStrictEqual(geo.playsLike(Object.assign({}, o)), today);
+    assert.ok(!('alt' in today.terms));
+    // A temperature baseline: T compares to it (50 F set, 70 F today: warmer, plays shorter).
+    const tb = geo.playsLike({ yards: 150, tempF: 70, tempBaseF: 50 });
+    assert.ok(Math.abs(tb.terms.temp + 3) < 1e-9);
+    assert.deepStrictEqual(geo.playsLike({ yards: 150, tempF: 60 }), geo.playsLike({ yards: 150, tempF: 60, tempBaseF: null }), 'blank = 70 as before');
+});
+test('012-5 the (i) sheet: "Altitude 1,200 ft vs sea level: −6"; a course baseline by name; no US data: "altitude not available here"', () => {
+    const pl = geo.playsLike({ yards: 250, altFt: 1200, altBaseFt: 0 });
+    assert.strictEqual(geo.playsInfoRows({ pl, yards: 250, alt: { ft: 1200, baseFt: 0, baseName: '' } })[1], 'Altitude 1,200 ft vs sea level: −6');
+    const pc = geo.playsLike({ yards: 150, altFt: 20, altBaseFt: 1500 });
+    assert.strictEqual(geo.playsInfoRows({ pl: pc, yards: 150, alt: { ft: 20, baseFt: 1500, baseName: 'Grayhawk' } })[1], 'Altitude 20 ft vs Grayhawk (1,500 ft): +4');
+    const same = geo.playsLike({ yards: 150, altFt: 300, altBaseFt: 300 });
+    assert.strictEqual(geo.playsInfoRows({ pl: same, yards: 150, alt: { ft: 300, baseFt: 300, baseName: 'Home' } })[1], 'Altitude 300 ft vs Home (300 ft): 0');
+    assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60 }), yards: 150, alt: { ft: null, baseFt: 0, na: true } })[1], 'Altitude: not available here');
+    assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60, tempBaseF: 50 }), yards: 150, tempF: 60, tempBaseF: 50 })[1], 'Warm (60°F vs 50°F): −1', 'the temperature row names its baseline (warmer than it: shorter)');
+});
+function bagBox() {
+    const vm = require('vm'), store = {};
+    const sb = { JSON, Object, Math, Number, String, Date, isFinite, localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } } };
+    sb.window = sb; vm.createContext(sb); vm.runInContext(read('gps-shots.js'), sb);
+    return { B: sb.HardPanGpsBag, store };
+}
+test('012-5 My bag keeps the baseline per golfer, ON THIS PHONE ONLY (never in the account sync); default "Don\'t adjust"', () => {
+    if (!fs.existsSync(path.join(__dirname, 'gps-shots.js'))) return;
+    const { B, store } = bagBox();
+    const j = (x) => JSON.parse(JSON.stringify(x));
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'none', name: '', ft: null, tempF: null }, 'default: Don\'t adjust');
+    assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), undefined, 'Don\'t adjust: no altitude at all');
+    B.setBaseline('Manny Orozco', { mode: 'sea', tempF: 65 });
+    assert.deepStrictEqual(j(B.baseline('manny  orozco')), { mode: 'sea', name: '', ft: 0, tempF: 65 });
+    assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), 0);
+    B.setBaseline('Manny Orozco', { mode: 'course', name: 'Grayhawk Golf Club', ft: 1530.4, tempF: '' });
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'course', name: 'Grayhawk Golf Club', ft: 1530, tempF: null }, 'blank temperature = keep 70');
+    B.setBaseline('Joe Russo', { mode: 'course', name: 'Somewhere abroad', ft: null });
+    assert.strictEqual(B.baselineFt(B.baseline('Joe Russo')), null, 'a course with no US height: altitude not available');
+    B.setBaseline('X', { mode: 'moon', ft: 9 });
+    assert.strictEqual(B.baseline('X').mode, 'none', 'anything else: Don\'t adjust');
+    // Never in what the account sync would write; no position kept.
+    B.setup('Manny Orozco', { '7i': 150 });
+    assert.deepStrictEqual(Object.keys(j(B.syncShape('Manny Orozco'))), ['base']);
+    assert.ok(!/lat|lng|"p"/.test(store.hardpan_bag_v1));
+    B.resetAll('Manny Orozco');
+    assert.strictEqual(B.baseline('Manny Orozco').mode, 'none', 'Reset all clears it too');
+});
+test('012-5 gps-view: behind bagAltitude, never in tournament mode; the club for the ADJUSTED plays-like; the lookup a course point only', () => {
+    if (!fs.existsSync(path.join(__dirname, 'gps-view.js'))) return;
+    const v = read('gps-view.js');
+    assert.ok(/HardPanFeature\('bagAltitude'\)/.test(v));
+    assert.ok(/if \(!altSwitch\(\) \|\| tournament\(\) \|\| !S\) return null;/.test(fnSrc(v, 'altNow')), 'tournament / switch off: no altitude');
+    assert.ok(/if \(base === undefined\) return out;/.test(fnSrc(v, 'altNow')), 'Don\'t adjust: no altitude');
+    assert.ok(/q\.altFt = al\.altFt; q\.altBaseFt = al\.altBaseFt;/.test(fnSrc(v, 'playsAir')));
+    assert.ok(/var q = playsAir\(w, r\);/.test(fnSrc(v, 'playsTo')), 'every plays-like number (line, suggestion, pill) goes through it');
+    assert.ok(/B\.suggestClub\(B\.bag\(bagGolfer\(\)\), yd\)/.test(fnSrc(v, 'syncSuggest')) && /var yd = pl \? pl\.exact :/.test(fnSrc(v, 'syncSuggest')), 'the club for the adjusted plays-like');
+    const fc = fnSrc(v, 'fetchCourseFt');
+    assert.ok(/!inUS\(p\)/.test(fc) && /onLine === false/.test(fc) && /lsGet\(k\)/.test(fc) && !/\bfix\b|origin\(|o\.pt/.test(fc), 'US only, online, once; never the golfer');
+    assert.ok(/altPickCourse\(\(S\.round && S\.round\.courseName\) \|\| 'This course', r && \(r\.mid \|\| r\.tee\), ft\)/.test(v), 'this course: its own green / tee point');
+    ['My distances are from:', 'Sea level', 'A course I pick', "Don't adjust", 'Typical temperature when I set these'].forEach((w) => assert.ok(v.indexOf(w) !== -1, w));
+    assert.ok(/about 2% for every 1,000 feet above it/.test(v) && /var ALT_PCT_PER_1000FT = 2;/.test(read('gps-geo.js')), 'the (i) sheet says the very number the formula uses');
+    assert.ok(/data-feature="bagAltitude"/.test(v) && /if \(!altSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="bagAltitude"\]'\)/.test(v), 'switch off: removed');
+});

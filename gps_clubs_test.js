@@ -255,8 +255,10 @@ test('009 TOURNAMENT MODE (Rules of Golf 4.3): no plays-like, no club suggestion
     assert.ok(/if \(tournament\(\)\) return;/.test(fn('fetchElevs')));
     // ...and no other place in gps-view asks gps-offline for heights.
     assert.equal((v.match(/prefetchElevations\(/g) || []).length, 1, 'one call, the gated one');
-    // 012 part 4c: a second EPQS fetch - the golfer's own ~10 m cell center, off the line - gated the same.
-    assert.equal((v.match(/fetch\(epqsUrl\(/g) || []).length, 2, 'two EPQS fetches, both gated');
+    // 012 part 4c: a second EPQS fetch - the golfer's own ~10 m cell center, off the line - gated the same;
+    // 012 part 5: a third - a picked course's own point (My bag's "My distances are from") - gated the same.
+    assert.equal((v.match(/fetch\(epqsUrl\(/g) || []).length, 3, 'three EPQS fetches, every one gated');
+    assert.ok(/function fetchCourseFt\(p, done\) \{\s*if \(tournament\(\)\) \{ done\(null\); return; \}/.test(v), 'the course-height lookup: nothing in tournament mode');
     assert.ok(/function fetchOwnSpot\(c\) \{\s*if \(tournament\(\)\) return;/.test(v), 'the own-spot fetch: nothing in tournament mode');
     assert.ok(/fetch\(epqsUrl\(c\.pt\)/.test(fn('fetchOwnSpot')), 'the cell center only');
     // tools/gps-playslike-check.js arm 7 plays it: tournament on - no line, no suggestion, no EPQS request.

@@ -1189,22 +1189,35 @@
     //   plays like = round(D + E + W + T)
     // Only the terms whose data is there; null when none is. Pure: the screen
     // decides what is fresh enough to pass in.
+    // 012 PART 5 (switch bagAltitude) - "MY DISTANCES ARE FROM": the golfer's club numbers
+    // were set somewhere (sea level, a course they pick); thinner air carries the ball
+    // farther. With o.altFt (this course's height, feet) and o.altBaseFt (the baseline's):
+    //   altitude     A = D x (1 - ALT_PCT_PER_1000FT / 100 x (altFt - altBaseFt) / 1000)
+    //                terms.alt = A - D, and A is applied FIRST: the wind and the
+    //                temperature percentages then work on A (slope stays 1 yd per 3 ft).
+    // o.tempBaseF: the temperature the numbers were set in (else 70) - T compares to it.
+    // Neither given ("Don't adjust"): exactly as before.
+    // ALT_PCT_PER_1000FT = 2: about 2% shorter-playing for every 1,000 ft above the
+    // baseline (150 yds at sea level plays ~146 at 1,200 ft) - a common golf rule of thumb
+    // (published figures run ~1-2% per 1,000 ft of carry); kept simple, like the others.
+    var ALT_PCT_PER_1000FT = 2;
     function isNum(x) { return typeof x === 'number' && isFinite(x); }
     function playsLike(o) {
         if (!o || !isNum(o.yards)) return null;
-        var D = o.yards, terms = {}, n = 0;
+        var D0 = o.yards, D = D0, terms = {}, n = 0;
+        if (isNum(o.altFt) && isNum(o.altBaseFt)) { D = D0 * (1 - ALT_PCT_PER_1000FT / 100 * (o.altFt - o.altBaseFt) / 1000); terms.alt = D - D0; n++; }
         if (isNum(o.elevFromFt) && isNum(o.elevToFt)) { terms.elev = (o.elevToFt - o.elevFromFt) / 3; n++; }
         if (isNum(o.windMph) && isNum(o.windFromDeg) && isNum(o.shotBearingDeg)) {
             var head = o.windMph * Math.cos(toRad(o.windFromDeg - o.shotBearingDeg));
             terms.wind = head > 0 ? D * 0.01 * head : D * 0.005 * head;
             n++;
         }
-        if (isNum(o.tempF)) { terms.temp = D * 0.001 * (70 - o.tempF); n++; }
+        if (isNum(o.tempF)) { terms.temp = isNum(o.tempBaseF) ? D * 0.001 * (o.tempBaseF - o.tempF) : D * 0.001 * (70 - o.tempF); n++; }
         if (!n) return null;
         var exact = D + (terms.elev || 0) + (terms.wind || 0) + (terms.temp || 0);
         // NEVER SILLY (audit): extreme wind / slope inputs could show a negative "plays ~". The
         // estimate stays between half and 1.6 times the real distance.
-        exact = Math.max(D * 0.5, Math.min(D * 1.6, exact));
+        exact = Math.max(D0 * 0.5, Math.min(D0 * 1.6, exact));
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
 
@@ -1238,7 +1251,8 @@
     // that has data and rounds to something (uphill / downhill, the wind with its speed,
     // warm / cold with the temperatures), then the crosswind's aim-off. o: { pl, yards (the
     // raw distance), windMph, tempF, tempBaseF, aim (windAim's), unit, label }. Pure.
-    var MINUS = '−';
+    var MINUS = '\u2212';
+    function ftWords(x) { return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     function playsInfoRows(o) {
         o = o || {};
         var pl = o.pl, out = [];
@@ -1248,6 +1262,11 @@
         var sg = function (x) { return (x > 0 ? '+' : MINUS) + Math.abs(x); };
         var t = pl.terms || {};
         out.push((o.label || 'This shot') + ': ' + (isNum(o.yards) ? r(o.yards) + u + ', ' : '') + 'plays like ' + r(pl.exact));
+        // 012 part 5: "Altitude 1,200 ft vs sea level: \u22126" (applied first) - or why there is none.
+        var al = o.alt;
+        if (al && al.na) out.push('Altitude: not available here');
+        else if (al && isNum(al.ft)) out.push('Altitude ' + ftWords(al.ft) + ' ft vs ' + (al.baseName ? al.baseName + (isNum(al.baseFt) ? ' (' + ftWords(al.baseFt) + ' ft)' : '') : 'sea level')
+            + ': ' + (isNum(t.alt) && r(t.alt) ? sg(r(t.alt)) : '0'));
         if (isNum(t.elev) && r(t.elev)) out.push((t.elev > 0 ? 'Uphill' : 'Downhill') + ': ' + sg(r(t.elev)));
         if (isNum(t.wind) && r(t.wind)) out.push((t.wind > 0 ? 'Into the wind' : 'Downwind') + (isNum(o.windMph) ? ' (' + Math.round(o.windMph) + ' mph)' : '') + ': ' + sg(r(t.wind)));
         if (isNum(t.temp) && r(t.temp)) out.push((t.temp > 0 ? 'Cold' : 'Warm') + (isNum(o.tempF) ? ' (' + Math.round(o.tempF) + '°F vs ' + (isNum(o.tempBaseF) ? Math.round(o.tempBaseF) : 70) + '°F)' : '') + ': ' + sg(r(t.temp)));
@@ -1408,6 +1427,7 @@
     }
     var PLAYS_API = { playsParts: playsParts, playsText: playsText, playsInfoRows: playsInfoRows, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
         elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M,
+        ALT_PCT_PER_1000FT: ALT_PCT_PER_1000FT,
         playsLegs: playsLegs, legText: legText, LEG_SAME_M: LEG_SAME_M, offLineYards: offLineYards, OWN_SPOT_OFF_YD: OWN_SPOT_OFF_YD, elevCell: elevCell, ELEV_CELL_M: ELEV_CELL_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
