@@ -17,7 +17,10 @@
     'use strict';
     var W = typeof window !== 'undefined' ? window : {};
     var KEY = 'hardpan_stats_v1_';
-    var FW = { L: 'Left', hit: 'Hit', R: 'Right' };
+    // S (012 score sheet): the tee shot came up short of the fairway - a miss, like L / R.
+    var FW = { L: 'Left', hit: 'Hit', R: 'Right', S: 'Short' };
+    // 012: where the green was missed (the score sheet's GREEN IN REG row). 'hit' = on in regulation.
+    var GD = { hit: 'Hit', short: 'Short', long: 'Long', L: 'Left', R: 'Right' };
 
     function lsGet(k) { try { var v = W.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { W.localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
@@ -206,12 +209,21 @@
     function qPutts(v) { var n = Number(v); return v == null || v === '' || !isFinite(n) || n < 0 ? null : Math.min(4, Math.floor(n)); }
     function fwAsked(par) { return Number(par) >= 4; }
     // { putts, fw, gir } for one hole, recomputing GIR from the score it is given.
+    // 012: the green in regulation the golfer set themselves (gd: hit / short / long / L / R) wins
+    // over the one worked out from the score and putts; with none set, the worked-out answer.
+    function girOf(h, strokes, par) {
+        if (h && GD[h.gd]) return h.gd === 'hit';
+        return girAuto(Number(strokes) || 0, h && h.putts != null ? h.putts : null, Number(par));
+    }
     function qCell(h, strokes, par) {
         h = h || {};
         var putts = h.putts == null ? null : h.putts;
-        var gir = girAuto(Number(strokes) || 0, putts, Number(par));
-        return { putts: putts, fw: fwAsked(par) ? (h.fw || null) : null, gir: gir };
+        var auto = girAuto(Number(strokes) || 0, putts, Number(par));
+        return { putts: putts, fw: fwAsked(par) ? (h.fw || null) : null, gir: girOf(h, strokes, par),
+            // 012 (the score sheet): the rest of the hole - all optional, all on this phone.
+            girAuto: auto, gd: GD[h.gd] ? h.gd : null, bunker: h.bunker == null ? null : h.bunker, pen: h.pen == null ? null : h.pen, note: h.note || '' };
     }
+    function q3(v) { var n = Number(v); return v == null || v === '' || !isFinite(n) || n < 0 ? null : Math.min(3, Math.floor(n)); }
     function qHole(code, pid, n, strokes, par) { var r = qLoad(code, pid); return qCell(r && r.holes[String(n)], strokes, par); }
     // ctx: { code, course }. patch: { putts } or { fw } - null / undefined clears it.
     function qSet(ctx, pid, n, patch, strokes, par) {
@@ -220,7 +232,12 @@
         var h = rec.holes[n] || {};
         if ('putts' in patch) { var p = qPutts(patch.putts); if (p == null) delete h.putts; else h.putts = p; }
         if ('fw' in patch) { if (fwAsked(par) && FW[patch.fw]) h.fw = patch.fw; else delete h.fw; }
-        var g = girAuto(Number(strokes) || 0, h.putts == null ? null : h.putts, Number(par));
+        // 012: green missed where (or hit, against the worked-out answer), bunker shots, penalties, a note.
+        if ('gd' in patch) { if (GD[patch.gd]) h.gd = patch.gd; else delete h.gd; }
+        if ('bunker' in patch) { var b = q3(patch.bunker); if (b == null) delete h.bunker; else h.bunker = b; }
+        if ('pen' in patch) { var pn = q3(patch.pen); if (pn == null) delete h.pen; else h.pen = pn; }
+        if ('note' in patch) { var t = String(patch.note == null ? '' : patch.note).trim().slice(0, 500); if (t) h.note = t; else delete h.note; }
+        var g = girOf(h, strokes, par);
         if (g == null) delete h.gir; else h.gir = g;
         if (Number(strokes) > 0) rec.snap[n] = { s: Number(strokes), par: Number(par) };
         if (Object.keys(h).length) rec.holes[n] = h; else delete rec.holes[n];
@@ -246,7 +263,7 @@
             (ctx.holes || []).forEach(function (h) { rec.snap[String(h.n)] = { s: strokesOf(round, p.id, h.n), par: Number(h.par) || 0 }; });
             Object.keys(rec.holes).forEach(function (n) {
                 var x = rec.snap[n], h = rec.holes[n];
-                var g = x ? girAuto(x.s, h.putts == null ? null : h.putts, x.par) : null;
+                var g = GD[h.gd] ? h.gd === 'hit' : (x ? girAuto(x.s, h.putts == null ? null : h.putts, x.par) : null);
                 if (g == null) delete h.gir; else h.gir = g;
             });
             if (JSON.stringify(rec) !== was) lsSet(qKey(ctx.code, p.id), rec);
@@ -270,7 +287,9 @@
         var list = (rounds || []).filter(function (r) { return r && Object.keys(r.snap || {}).some(function (n) { return r.snap[n].s > 0; }); })
             .sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, last || 5);
         var o = { rounds: list.length, statRounds: 0, full: 0, scoringAvg: null, puttsPerHole: null, puttsPerRound: null, firPct: null, girPct: null, par3: null, par4: null, par5: null,
-            fir: 0, firOf: 0, gir: 0, girOf: 0, putts: 0, puttHoles: 0 };
+            fir: 0, firOf: 0, gir: 0, girOf: 0, putts: 0, puttHoles: 0,
+            // 012: where the misses went - tee shots (L / R / short) and greens (short / long / L / R).
+            teeMiss: { L: 0, R: 0, S: 0 }, greenMiss: { short: 0, long: 0, L: 0, R: 0 } };
         var tot = 0, byPar = { 3: [0, 0], 4: [0, 0], 5: [0, 0] };
         list.forEach(function (r) {
             var holes = r.holes || {}, keys = Object.keys(r.snap || {}), sum = 0, scored = 0;
@@ -281,15 +300,18 @@
                 if (byPar[x.par]) { byPar[x.par][0] += x.s; byPar[x.par][1]++; }
             });
             if (keys.length === 18 && scored === 18) { o.full++; tot += sum; }
-            var hasStats = Object.keys(holes).some(function (n) { return holes[n] && (holes[n].putts != null || holes[n].fw); });
+            var hasStats = Object.keys(holes).some(function (n) { return holes[n] && (holes[n].putts != null || holes[n].fw || GD[holes[n].gd]); });
             if (!hasStats) return;
             o.statRounds++;
             Object.keys(holes).forEach(function (n) {
                 var h = holes[n] || {}, x = r.snap[n] || null, par = x ? x.par : 0;
-                if (h.fw && FW[h.fw] && (!x || fwAsked(par))) { o.firOf++; if (h.fw === 'hit') o.fir++; }
+                if (h.fw && FW[h.fw] && (!x || fwAsked(par))) { o.firOf++; if (h.fw === 'hit') o.fir++; else o.teeMiss[h.fw]++; }
+                if (GD[h.gd] && h.gd !== 'hit') o.greenMiss[h.gd]++;
+                // A green the golfer set (gd) counts with or without putts; else worked out from score + putts.
+                if (GD[h.gd] && x && x.s > 0 && h.putts == null) { o.girOf++; if (h.gd === 'hit') o.gir++; return; }
                 if (h.putts == null || !x || !(x.s > 0)) return;
                 o.putts += h.putts; o.puttHoles++;
-                var g = girAuto(x.s, h.putts, par);
+                var g = GD[h.gd] ? h.gd === 'hit' : girAuto(x.s, h.putts, par);
                 if (g != null) { o.girOf++; if (g) o.gir++; }
             });
         });
@@ -359,7 +381,8 @@
                 + '#hp-my-stats .ms-body{max-width:520px;margin:0 auto;}#hp-my-stats .ms-seg{display:flex;gap:6px;margin:14px 0 6px;background:#e2f1ea;border-radius:999px;padding:4px;}'
                 + '#hp-my-stats .ms-seg button{flex:1;min-height:40px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}#hp-my-stats .ms-seg button.on{background:#0f4c3a;color:#fff;}'
                 + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-saved{font-size:12px;color:#6b7280;margin:4px 2px 0;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
-                + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}';
+                + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}'
+                + '#hp-my-stats .ms-miss{display:grid;gap:10px;margin-top:10px;}#hp-my-stats .ms-miss-line{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;color:#555;}#hp-my-stats .ms-miss-c b{font-size:20px;color:#0f4c3a;}';
             page.appendChild(st);
             var top = el('div', 'ms-top');
             var back = el('button', 'ms-back', '‹'); back.type = 'button'; back.setAttribute('aria-label', 'Back'); back.onclick = closeMy;
@@ -390,6 +413,20 @@
             ['Par 3 average', num(a.par3, 2), 'par3'], ['Par 4 average', num(a.par4, 2), 'par4'], ['Par 5 average', num(a.par5, 2), 'par5'], ['Putts / hole', num(a.puttsPerHole, 2), 'pph']]
             .forEach(function (x) { var t = el('div', 'ms-tile'); t.setAttribute('data-ms', x[2]); t.appendChild(el('div', 'k', x[0])); t.appendChild(el('div', 'v', String(x[1]))); g.appendChild(t); });
         body.appendChild(g);
+        // 012: WHERE THE MISSES GO - counted from the score sheet's tee shot and green in reg rows.
+        var tm = a.teeMiss || {}, gm = a.greenMiss || {};
+        var miss = el('div', 'ms-miss');
+        [['Tee shots missed', [['Left', tm.L, 'tee-L'], ['Right', tm.R, 'tee-R'], ['Short', tm.S, 'tee-S']]],
+            ['Greens missed', [['Short', gm.short, 'gir-short'], ['Long', gm.long, 'gir-long'], ['Left', gm.L, 'gir-L'], ['Right', gm.R, 'gir-R']]]]
+            .forEach(function (row) {
+                var t = el('div', 'ms-tile ms-miss-row');
+                t.appendChild(el('div', 'k', row[0]));
+                var line = el('div', 'ms-miss-line');
+                row[1].forEach(function (x) { var c = el('span', 'ms-miss-c'); c.setAttribute('data-ms-miss', x[2]); c.appendChild(el('b', null, String(x[1] || 0))); c.appendChild(el('span', null, ' ' + x[0])); line.appendChild(c); });
+                t.appendChild(line);
+                miss.appendChild(t);
+            });
+        body.appendChild(miss);
         body.appendChild(el('div', 'ms-note', 'Putts, fairways and greens come from rounds with stats entered. Scoring average: complete 18-hole rounds. Kept on this phone only.'));
     }
     // HOME (the GPS app): "My stats" - only with GPS Map, asked quietly (never a paywall),
@@ -408,9 +445,308 @@
         }, function () {});
     }
 
+    // ============================================================================
+    // THE SCORE SHEET (012, HardPanFeature('scoreSheet'); the GPS screen's Enter score)
+    //
+    // Tap Enter score on the GPS screen: a sheet slides up over the map (~90% of the
+    // screen, scrolls, swipe down to close). Golfer chips (the golfers this phone may
+    // score - the same boxes the card offers), SCORE as a 4x2 grid centred on par with the
+    // card's own marks, then - for the GPS golfer, or every golfer with "Track stats for
+    // others" (Tools, this phone) - PUTTS, TEE SHOT (not on a par 3), GREEN IN REG (Hit
+    // worked out from score - putts <= par - 2, shown "auto"; the golfer can change it),
+    // BUNKER SHOTS, PENALTIES and a note. "Save · Next hole" hands each score to the
+    // scorecard's own save (index.html gpsOpenSheet -> saveScore -> the offline queue) -
+    // nothing here writes a score. The stats go in the quick-stats record on this phone
+    // (hardpan_qstats_v1_<code>_p<id>), never to Firebase, never to a money engine.
+    // ============================================================================
+    var OTHERS_KEY = 'hardpan_stats_others';
+    function othersOn() { try { return W.localStorage.getItem(OTHERS_KEY) === '1'; } catch (e) { return false; } }
+    function setOthers(on) { try { if (on) W.localStorage.setItem(OTHERS_KEY, '1'); else W.localStorage.removeItem(OTHERS_KEY); } catch (e) {} }
+    // Seven scores, par always the third: par 3 -> 1..7, par 4 -> 2..8, par 5 -> 3..9. More = the rest, up to 15.
+    var SS_MAX = 15;
+    function ssGrid(par) { par = Number(par) || 4; var a = Math.max(1, par - 2), out = []; for (var i = 0; i < 7; i++) out.push(a + i); return out; }
+    function ssMore(par) { var g = ssGrid(par), out = []; for (var i = 1; i <= SS_MAX; i++) if (g.indexOf(i) === -1) out.push(i); return out; }
+    // GREEN IN REG as the sheet shows it: the golfer's own answer (gd), else Hit when the score
+    // and putts say so (auto), else nothing yet.
+    function ssGir(cell) {
+        if (cell && cell.gd) return { v: cell.gd, auto: false };
+        if (cell && cell.girAuto === true) return { v: 'hit', auto: true };
+        return { v: null, auto: false };
+    }
+    // The tap on a GREEN IN REG button -> the patch to store. Tapping what is shown clears the
+    // golfer's own answer (back to auto); Hit when auto already says Hit stores nothing.
+    function ssGirTap(cell, v) {
+        var cur = ssGir(cell);
+        if (cur.v === v) return { gd: null };
+        if (v === 'hit' && cell && cell.girAuto === true) return { gd: null };
+        return { gd: v };
+    }
+    function ssMark(n, par) {
+        var f = typeof W.scoreMark === 'function' ? W.scoreMark : null;
+        return f ? f(n, par) || '' : '';
+    }
+
+    var ss = null;          // { wrap, ctx, sel, pend, more, notes }
+    var ssDone = {};        // scores saved from the sheet this session: code|pid|hole -> n (before the database echoes them)
+    function ssSaved(pid) {
+        var c = ss.ctx, v = Number(c.score ? c.score(pid) : 0);
+        if (v > 0) return v;
+        var k = c.code + '|' + pid + '|' + c.hole;
+        return ssDone[k] || 0;
+    }
+    function ssStrokes(pid) { return ss.pend[pid] || ssSaved(pid); }
+    function ssStatsFor(pid) { var c = ss.ctx; return !!(c.stats && (String(pid) === String(c.pick) || othersOn())); }
+    function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
+    function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
+    function ssClose() { if (ss && ss.wrap) { ss.wrap.style.display = 'none'; ss.wrap.querySelector('.hp-ss').style.transform = ''; } if (ss) { ss.pend = {}; ss.ctx = null; } }
+    var SS_CSS = '#hp-score-sheet{position:absolute;inset:0;z-index:2147482000;background:rgba(0,0,0,.35);font:600 16px/1.25 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:#f4f4ef;color-scheme:dark;}'
+        + 'body > #hp-score-sheet{position:fixed;}'
+        + '#hp-score-sheet .hp-ss{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;height:90%;display:flex;flex-direction:column;background:#111611;border-radius:24px 24px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.45);transition:transform .18s ease;}'
+        + '#hp-score-sheet .hp-ss-handle{width:42px;height:5px;border-radius:3px;background:#5b625a;margin:10px auto 2px;flex:0 0 auto;}'
+        + '#hp-score-sheet .hp-ss-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 18px 4px;flex:0 0 auto;}'
+        + '#hp-score-sheet .hp-ss-title{font-size:clamp(20px,6vw,26px);font-weight:800;margin:0;color:#fff;}#hp-score-sheet .hp-ss-meta{font-size:14px;color:#a7aea4;white-space:nowrap;}'
+        + '#hp-score-sheet .hp-ss-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:4px 18px 14px;}'
+        + '#hp-score-sheet .hp-ss-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;}'
+        + '#hp-score-sheet .hp-ss-chip{min-height:44px;padding:0 18px;border-radius:999px;background:#262c26;color:#f4f4ef;font-size:17px;font-weight:700;}'
+        + '#hp-score-sheet .hp-ss-chip.on{background:#c8f07a;color:#0b0f0c;}'
+        + '#hp-score-sheet .hp-ss-h{margin:16px 0 8px;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d7dcd3;}#hp-score-sheet .hp-ss-h small{font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#8f978c;}'
+        + '#hp-score-sheet .hp-ss-opts{display:grid;gap:8px;}#hp-score-sheet .hp-ss-c4{grid-template-columns:repeat(4,minmax(0,1fr));}#hp-score-sheet .hp-ss-c5{grid-template-columns:repeat(5,minmax(0,1fr));}'
+        + '#hp-score-sheet .hp-ss-b{--ss-bg:#262c26;min-height:52px;border-radius:14px;background:var(--ss-bg);color:#f4f4ef;font-size:17px;font-weight:700;padding:0 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;}'
+        // The stats rows: equal buttons in one line while their words fit; at a large text size on a
+        // small phone they wrap onto a second line rather than cut a word off.
+        + '#hp-score-sheet .hp-ss-opts:not(.hp-ss-grid){display:flex;flex-wrap:wrap;}#hp-score-sheet .hp-ss-opts:not(.hp-ss-grid) .hp-ss-b{flex:1 1 0;min-width:max-content;padding:0 6px;white-space:nowrap;}'
+        + '#hp-score-sheet .hp-ss-b.on{--ss-bg:#c8f07a;color:#0b0f0c;}#hp-score-sheet .hp-ss-b small{font-size:12px;font-weight:600;opacity:.8;}'
+        + '#hp-score-sheet .hp-ss-grid .hp-ss-b{min-height:60px;font-size:22px;font-weight:800;}'
+        + '#hp-score-sheet .hp-ss-n{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;}'
+        // THE CARD'S MARKS (score-marks.js + score-marks-hp.js): double circle eagle or better, circle birdie,
+        // box bogey, double box double bogey or worse - in the number's own colour.
+        + '#hp-score-sheet .hp-ss-n.mark-birdie{box-shadow:inset 0 0 0 2px currentColor;border-radius:50%;}'
+        + '#hp-score-sheet .hp-ss-n.mark-eagle{box-shadow:inset 0 0 0 2px currentColor,inset 0 0 0 4px var(--ss-bg),inset 0 0 0 6px currentColor;border-radius:50%;}'
+        + '#hp-score-sheet .hp-ss-n.mark-bogey{box-shadow:inset 0 0 0 2px currentColor;border-radius:3px;width:34px;height:34px;}'
+        + '#hp-score-sheet .hp-ss-n.mark-double{box-shadow:inset 0 0 0 2px currentColor,inset 0 0 0 4px var(--ss-bg),inset 0 0 0 6px currentColor;border-radius:3px;}'
+        + '#hp-score-sheet .hp-ss-par .hp-ss-n{height:28px;}#hp-score-sheet .hp-ss-more{margin-top:8px;}'
+        + '#hp-score-sheet .hp-ss-note{font-size:14px;color:#a7aea4;margin:14px 2px 0;}'
+        + '#hp-score-sheet textarea.hp-ss-notes{width:100%;box-sizing:border-box;min-height:84px;margin-top:8px;border-radius:12px;border:1px solid #3a423a;background:#1b211b;color:#f4f4ef;font:500 16px/1.35 inherit;padding:10px;}'
+        + '#hp-score-sheet .hp-ss-saved{font-size:12px;color:#8f978c;margin:14px 2px 0;}'
+        // Notes | Save on one line; when Save's words do not fit beside Notes (large text, small phone),
+        // Save moves up onto its own line above Notes - never wrapped or cut.
+        + '#hp-score-sheet .hp-ss-foot{flex:0 0 auto;display:flex;flex-wrap:wrap-reverse;gap:12px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #262c26;}'
+        + '#hp-score-sheet .hp-ss-notes-btn{flex:1 1 28%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#262c26;color:#f4f4ef;font-size:18px;font-weight:600;}#hp-score-sheet .hp-ss-notes-btn.on{box-shadow:inset 0 0 0 2px #c8f07a;}'
+        + '#hp-score-sheet .hp-ss-save{flex:2 1 60%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#c8f07a;color:#0b0f0c;font-size:clamp(17px,5vw,21px);font-weight:800;}';
+    function ssEl(tag, cls, text, attrs) { var e = el(tag, cls, text); if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (tag === 'button') e.type = 'button'; return e; }
+    function ssBuild(host) {
+        var wrap = el('div', 'gps-scroll-ok');
+        wrap.id = 'hp-score-sheet';
+        wrap.setAttribute('role', 'dialog');
+        wrap.setAttribute('aria-modal', 'true');
+        wrap.setAttribute('aria-label', 'Enter score');
+        var st = el('style'); st.textContent = SS_CSS; wrap.appendChild(st);
+        var card = el('div', 'hp-ss');
+        card.appendChild(el('div', 'hp-ss-handle'));
+        var head = el('div', 'hp-ss-head'); head.appendChild(el('h2', 'hp-ss-title')); head.appendChild(el('div', 'hp-ss-meta')); card.appendChild(head);
+        card.appendChild(el('div', 'hp-ss-body'));
+        var foot = el('div', 'hp-ss-foot');
+        foot.appendChild(ssEl('button', 'hp-ss-notes-btn', 'Notes', { 'data-ss-notes': '1' }));
+        foot.appendChild(ssEl('button', 'hp-ss-save', 'Save', { 'data-ss-save': '1' }));
+        card.appendChild(foot);
+        wrap.appendChild(card);
+        wrap.addEventListener('click', ssClick);
+        wrap.addEventListener('input', function (e) {
+            var t = e.target;
+            if (!ss || !ss.ctx || !t || !t.classList || !t.classList.contains('hp-ss-notes')) return;
+            qSet(ss.ctx, ss.sel, ss.ctx.hole, { note: t.value }, ssStrokes(ss.sel), ss.ctx.par);
+        });
+        // SWIPE DOWN TO CLOSE: from the handle / title, or anywhere once the list is at its top.
+        var y0 = null, dy = 0;
+        card.addEventListener('touchstart', function (e) {
+            var body = card.querySelector('.hp-ss-body');
+            var inBody = body.contains(e.target);
+            if (e.target.closest && e.target.closest('textarea')) { y0 = null; return; }
+            y0 = (!inBody || body.scrollTop <= 0) && e.touches.length === 1 ? e.touches[0].clientY : null; dy = 0;
+        }, { passive: true });
+        card.addEventListener('touchmove', function (e) {
+            if (y0 == null) return;
+            dy = e.touches[0].clientY - y0;
+            if (dy > 0) { card.style.transition = 'none'; card.style.transform = 'translateY(' + dy + 'px)'; }
+        }, { passive: true });
+        card.addEventListener('touchend', function () {
+            if (y0 == null) return;
+            card.style.transition = '';
+            if (dy > 90) ssClose(); else card.style.transform = '';
+            y0 = null; dy = 0;
+        });
+        return wrap;
+    }
+    // ctx: { code, course, hole, par, si, yards, golfers: [{ id, name }], pick, stats (bool: GPS Map + quick
+    //        stats on), score(pid) -> saved score, save(pid, n) -> the card's own save, next() -> the next
+    //        hole in play order, last (no next hole), host }
+    function ssOpen(ctx) {
+        if (!ctx || !ctx.golfers || !ctx.golfers.length) return false;
+        if (!ss) ss = { wrap: null };
+        if (!ss.wrap) ss.wrap = ssBuild();
+        var host = ctx.host || W.document.body;
+        if (ss.wrap.parentNode !== host) host.appendChild(ss.wrap);
+        ss.ctx = ctx; ss.pend = {}; ss.more = false; ss.notes = false;
+        var pick = ctx.golfers.filter(function (g) { return String(g.id) === String(ctx.pick); })[0];
+        ss.sel = String((pick || ctx.golfers[0]).id);
+        ss.wrap.style.display = '';
+        ss.wrap.querySelector('.hp-ss').style.transform = '';
+        ssRender();
+        return true;
+    }
+    function ssRender() {
+        if (!ss || !ss.ctx) return;
+        var c = ss.ctx, w = ss.wrap, pid = ss.sel, par = Number(c.par) || 0;
+        w.querySelector('.hp-ss-title').textContent = 'Hole ' + c.hole + (par ? ' · Par ' + par : '');
+        w.querySelector('.hp-ss-meta').textContent = [c.si ? 'HCP ' + c.si : '', c.yards ? c.yards + 'y' : ''].filter(Boolean).join(' · ');
+        var body = w.querySelector('.hp-ss-body'), keep = body.scrollTop;
+        body.textContent = '';
+        // GOLFERS
+        var chips = el('div', 'hp-ss-chips');
+        c.golfers.forEach(function (g) {
+            var s = ssStrokes(String(g.id));
+            chips.appendChild(ssEl('button', 'hp-ss-chip' + (String(g.id) === pid ? ' on' : ''), (g.name || ('Player ' + g.id)) + (s ? ' · ' + s : ''), { 'data-ss-golfer': String(g.id), 'aria-pressed': String(g.id) === pid ? 'true' : 'false' }));
+        });
+        body.appendChild(chips);
+        // SCORE
+        var cur = ssStrokes(pid);
+        body.appendChild(el('div', 'hp-ss-h', 'Score'));
+        var grid = el('div', 'hp-ss-opts hp-ss-c4 hp-ss-grid');
+        var scoreBtn = function (n) {
+            var b = ssEl('button', 'hp-ss-b' + (cur === n ? ' on' : ''), null, { 'data-ss-score': String(n), 'aria-pressed': cur === n ? 'true' : 'false', 'aria-label': String(n) + (n === par ? ', par' : '') });
+            var m = ssMark(n, par);
+            b.appendChild(el('span', 'hp-ss-n' + (m ? ' mark-' + m : ''), String(n)));
+            if (n === par) { b.classList.add('hp-ss-par'); b.appendChild(el('small', null, 'Par')); }
+            return b;
+        };
+        var g7 = ssGrid(par), extra = ssMore(par);
+        g7.forEach(function (n) { grid.appendChild(scoreBtn(n)); });
+        var outside = cur && g7.indexOf(cur) === -1;
+        var mb = ssEl('button', 'hp-ss-b' + (outside ? ' on' : ''), null, { 'data-ss-more': '1', 'aria-expanded': ss.more ? 'true' : 'false' });
+        if (outside) { var m0 = ssMark(cur, par); mb.appendChild(el('span', 'hp-ss-n' + (m0 ? ' mark-' + m0 : ''), String(cur))); } else mb.appendChild(el('span', null, 'More'));
+        grid.appendChild(mb);
+        body.appendChild(grid);
+        if (ss.more) {
+            var mg = el('div', 'hp-ss-opts hp-ss-c4 hp-ss-grid hp-ss-more');
+            extra.forEach(function (n) { mg.appendChild(scoreBtn(n)); });
+            body.appendChild(mg);
+        }
+        // STATS - optional, this phone only.
+        var foot = w.querySelector('.hp-ss-foot');
+        var showStats = ssStatsFor(pid);
+        foot.querySelector('[data-ss-notes]').style.display = showStats ? '' : 'none';
+        foot.querySelector('[data-ss-notes]').classList.toggle('on', !!ss.notes);
+        foot.querySelector('[data-ss-save]').textContent = c.last ? 'Save' : 'Save · Next hole ›';
+        if (showStats) {
+            var cell = ssCell(pid);
+            var row = function (title, sub, key, cols, opts, on) {
+                var h = el('div', 'hp-ss-h', title); if (sub) h.appendChild(el('small', null, ' · ' + sub));
+                body.appendChild(h);
+                var o = el('div', 'hp-ss-opts hp-ss-c' + cols); o.setAttribute('data-ss-row', key);
+                opts.forEach(function (x) {
+                    var isOn = on(x[0]);
+                    var b = ssEl('button', 'hp-ss-b' + (isOn ? ' on' : ''), x[1], { 'data-ss-k': key, 'data-ss-v': String(x[0]), 'aria-pressed': isOn ? 'true' : 'false' });
+                    if (x[2] && isOn) b.appendChild(el('small', null, x[2]));
+                    o.appendChild(b);
+                });
+                body.appendChild(o);
+            };
+            row('Putts', null, 'putts', 5, [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4+']], function (v) { return cell.putts === v; });
+            if (fwAsked(par)) row('Tee shot', null, 'fw', 4, [['L', '← Left'], ['hit', 'Fairway'], ['R', 'Right →'], ['S', 'Short']], function (v) { return cell.fw === v; });
+            var gv = ssGir(cell);
+            row('Green in reg', 'auto from score + putts', 'gd', 5, [['hit', 'Hit', gv.auto ? 'auto' : ''], ['short', 'Short'], ['long', 'Long'], ['L', 'Left'], ['R', 'Right']], function (v) { return gv.v === v; });
+            row('Bunker shots', null, 'bunker', 4, [[0, '0'], [1, '1'], [2, '2'], [3, '3+']], function (v) { return cell.bunker === v; });
+            row('Penalties', null, 'pen', 4, [[0, '0'], [1, '1'], [2, '2'], [3, '3+']], function (v) { return cell.pen === v; });
+            if (ss.notes) {
+                body.appendChild(el('div', 'hp-ss-h', 'Notes'));
+                var ta = el('textarea', 'hp-ss-notes'); ta.value = cell.note || ''; ta.setAttribute('aria-label', 'Notes for this hole'); ta.maxLength = 500;
+                body.appendChild(ta);
+            }
+            body.appendChild(el('div', 'hp-ss-saved', 'Saved on this phone'));
+        } else if (c.stats) {
+            body.appendChild(el('div', 'hp-ss-note', 'Stats are kept for your golfer. To keep them for others too: Tools › Track stats for others.'));
+        }
+        body.scrollTop = keep;
+    }
+    function ssClick(e) {
+        if (!ss || !ss.ctx) return;
+        var t = e.target, b;
+        if (t === ss.wrap) { ssClose(); return; }
+        var c = ss.ctx, pid = ss.sel;
+        if ((b = t.closest('[data-ss-golfer]'))) { ss.sel = b.getAttribute('data-ss-golfer'); ss.more = false; ss.notes = false; ssRender(); return; }
+        if ((b = t.closest('[data-ss-more]'))) { ss.more = !ss.more; ssRender(); return; }
+        if ((b = t.closest('[data-ss-score]'))) {
+            var n = Number(b.getAttribute('data-ss-score'));
+            ss.pend[pid] = n;
+            // The score moved: a record that already holds this hole works its GIR out again.
+            var rec = qLoad(c.code, pid);
+            if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
+            if (ss.more && ssGrid(c.par).indexOf(n) === -1) ss.more = false;
+            ssRender(); return;
+        }
+        if ((b = t.closest('[data-ss-k]'))) {
+            if (!ssStatsFor(pid)) return;
+            var k = b.getAttribute('data-ss-k'), v = b.getAttribute('data-ss-v'), cell = ssCell(pid), patch = {};
+            if (k === 'gd') patch = ssGirTap(cell, v);
+            else if (k === 'fw') patch.fw = cell.fw === v ? null : v;
+            else { var nv = Number(v); patch[k] = cell[k] === nv ? null : nv; }
+            qSet(c, pid, c.hole, patch, ssStrokes(pid), c.par);
+            ssRender(); return;
+        }
+        if (t.closest('[data-ss-notes]')) { ss.notes = !ss.notes; ssRender(); if (ss.notes) { var ta = ss.wrap.querySelector('.hp-ss-notes'); if (ta) { try { ta.scrollIntoView({ block: 'center' }); ta.focus(); } catch (er) {} } } return; }
+        if (t.closest('[data-ss-save]')) { ssSave(); return; }
+    }
+    // SAVE: each score typed here, through the card's own save; then the next hole (the card's
+    // own Next - play order, the KP question) unless this is the last one.
+    function ssSave() {
+        var c = ss.ctx, pend = ss.pend;
+        Object.keys(pend).forEach(function (pid) {
+            var n = pend[pid];
+            if (!(n > 0)) return;
+            if (n !== Number(c.score ? c.score(pid) : 0)) c.save(pid, n);
+            ssDone[c.code + '|' + pid + '|' + c.hole] = n;
+            var rec = qLoad(c.code, pid);
+            if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
+        });
+        var last = c.last, next = c.next;
+        ssClose();
+        if (!last && typeof next === 'function') next();
+    }
+    // TOOLS: "Track stats for others" - this phone only, off by default.
+    function ssPlaceToggle(menu) {
+        if (!menu) return;
+        var b = menu.querySelector('.hp-ss-others');
+        if (!b) {
+            b = ssEl('button', 'gps-menu-item hp-ss-others', null, { role: 'menuitemcheckbox' });
+            b.addEventListener('click', function (e) { e.preventDefault(); setOthers(!othersOn()); label(); if (ssIsOpen()) ssRender(); });
+            menu.appendChild(b);
+        }
+        function label() { b.textContent = 'Track stats for others: ' + (othersOn() ? 'On' : 'Off'); b.setAttribute('aria-checked', othersOn() ? 'true' : 'false'); }
+        label();
+        return b;
+    }
+
+    function setTrackOthers(v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); }
+    function trackShown() {
+        try {
+            var F = W.HardPanFeature;
+            return typeof F === 'function' && F('scoreSheet') !== false && F('quickStats') !== false
+                && !!(W.HardPanGps && typeof W.HardPanGps.hasGpsPro === 'function' && W.HardPanGps.hasGpsPro());
+        } catch (e) { return false; }
+    }
     W.HardPanGpsStats = { open: open, close: close, refresh: refresh, isOpen: function () { return !!(sheet && sheet.style.display !== 'none' && cur); },
         girAuto: girAuto, holeView: holeView, summary: summary, season: season, load: load, setHole: setHole, ensure: ensure,
         // Quick stats on the scorecard (008) and My stats.
         quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked },
-        aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome };
+        aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome,
+        // "Track stats for others" (this phone, off by default): the state and its setter, for any Tools
+        // surface (the old drop-down via sheet.placeToggle, the Tools bottom sheet's ROUND switch). The
+        // setter redraws an open score sheet.
+        // Present only while the switch is meaningful (the score sheet and quick stats switched on, GPS
+        // Map): a Tools surface that shows the switch when these exist hides it otherwise.
+        get trackOthers() { return trackShown() ? othersOn : undefined; },
+        get setTrackOthers() { return trackShown() ? setTrackOthers : undefined; },
+        trackOthersShown: function () { return trackShown(); },
+        // The score sheet (012).
+        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();

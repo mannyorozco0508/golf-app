@@ -10,8 +10,9 @@
 //   A  stands on hole 4's green (no jump), walks to hole 5's tee, waits: after ~10 s
 //      GPS is on 5 with "Hole 5 >"; Undo -> hole 4 and no second jump while still on
 //      that tee; off the tee and back -> 5 again.
-//   B  taps Enter score on 4 (the card's score box) and walks to 5's tee: no jump while
-//      the score is open; back to the map -> 5.
+//   B  taps Enter score on 4 (the card's score box - the 012 score sheet switched off) and
+//      walks to 5's tee: no jump while the score is open; back to the map -> 5.
+//   B2 the same with the score sheet (012): no jump while the sheet is up; closed -> 5.
 //   C  hole 4's green set (a round pin) 15 m from 5's tee: standing on that green, on
 //      the tee point itself, no jump; 10 m past the tee (off the green) -> 5.
 //   D  a round off the 10th: from 18's green to 1's tee -> 1 ("Hole 1 >").
@@ -88,13 +89,21 @@ const START = [WAIT(2500), OPEN, WAIT(2500)];
     f(s[6].hole === 5, 'A: a new visit to 5\'s tee (after walking off it) did not advance: ' + s[6].hole);
     errs(s, 'A');
 
-    // B: Enter score is open (the card's box) - no jump; back to the map - the jump.
-    s = await go({ round: round(), hole: 4, at: G4, steps: START.concat([CLICK('#gps-overlay .gps-score'), WAIT(800), MOVE(T5), WAIT(13000), ST,
+    // B: Enter score is open (the card's box, the 012 score sheet off) - no jump; back to the map - the jump.
+    s = await go({ round: round(), hole: 4, at: G4, features: { autoAdvance: true, scoreSheet: false }, steps: START.concat([CLICK('#gps-overlay .gps-score'), WAIT(800), MOVE(T5), WAIT(13000), ST,
         { expression: "(function(){ if (document.activeElement) document.activeElement.blur(); return 'blur'; })()" }, OPEN, WAIT(12500), ST]) });
     report.B = s.map((x) => [x.hole, x.side, x.active]);
     f(s[0].hole === 4 && s[0].side === 'bets' && /score-input/.test(s[0].active || ''), 'B: jumped (or the score box closed) while a score was being entered: ' + JSON.stringify([s[0].hole, s[0].side, s[0].active]));
     f(s[1].hole === 5 && s[1].side === 'gps', 'B: back on the map on 5\'s tee, no advance: ' + JSON.stringify([s[1].hole, s[1].side]));
     errs(s, 'B');
+
+    // B2 (012): Enter score opens the score sheet over the map - no jump while it is up; closed - the jump.
+    s = await go({ round: round(), hole: 4, at: G4, steps: START.concat([CLICK('#gps-overlay .gps-score'), WAIT(800), MOVE(T5), WAIT(13000), ST,
+        { expression: "(function(){ var w = document.getElementById('hp-score-sheet'); if (!w) return 'none'; w.click(); return 'closed'; })()" }, WAIT(12500), ST]) });
+    report.B2 = s.map((x) => [x.hole, x.side]);
+    f(s[0].hole === 4 && s[0].side === 'gps', 'B2: jumped while the score sheet was up: ' + JSON.stringify(report.B2[0]));
+    f(s[1].hole === 5 && s[1].side === 'gps', 'B2: the sheet closed on 5\'s tee, no advance: ' + JSON.stringify(report.B2[1]));
+    errs(s, 'B2');
 
     // C: hole 4's green 15 m from 5's tee (a round pin): on it, no jump; past the tee, the jump.
     const pin = east(T5, -15);

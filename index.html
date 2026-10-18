@@ -6411,7 +6411,59 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // own Next does and GPS comes back on it. The KP question, when the hole has
     // one, comes first, on the card. Leaving the card any other way cancels this.
     let gpsScoreFrom = null;
+    // THE SCORE SHEET (012, HardPanFeature('scoreSheet'), gps-stats.js): Enter score on the GPS
+    // screen - any layout, it calls this - opens a sheet over the map instead. The golfers are the
+    // ones whose box the card offers for this hole; each score it saves goes through saveScore
+    // (the offline queue), exactly as a typed box; its Next is the card's own goToAdjacentHole.
+    // The switch off (or no box to score) = the card's box, below, exactly as before.
+    function gpsSheetOn() {
+        try { return typeof window.HardPanFeature === 'function' && window.HardPanFeature('scoreSheet') && !!(window.HardPanGpsStats && window.HardPanGpsStats.sheet); } catch (e) { return false; }
+    }
+    function gpsScoreGolfers(hole) {
+        const players = (currentData && currentData.players) || [];
+        const ids = [];
+        document.querySelectorAll('.score-input[data-hole="' + Number(hole) + '"]:not([disabled])').forEach(i => {
+            const id = i.getAttribute('data-player-id');
+            if (id != null && ids.indexOf(id) === -1) ids.push(id);
+        });
+        const list = ids.map(id => players.find(p => String(p.id) === id)).filter(p => p && p.out !== true && canWritePlayer(p.id));
+        const first = p => String(p.name || ('Player ' + p.id)).trim().split(/\s+/)[0];
+        return list.map(p => ({ id: p.id, name: list.filter(q => first(q) === first(p)).length > 1 ? String(p.name || '') : first(p) }));
+    }
+    function gpsOpenSheet(hole, playerId) {
+        const S = window.HardPanGpsStats.sheet;
+        const golfers = gpsScoreGolfers(hole);
+        if (!golfers.length) return false;
+        const n = Number(hole), meta = gpsHoleMeta(n) || {}, order = gpsHoleList();
+        const overlay = document.getElementById('gps-overlay');
+        return S.open({
+            code: currentMode, course: (currentData && currentData.courseName) || '', hole: n, par: Number(meta.par || gpsHolePar(n)) || 0, si: meta.si, yards: meta.yards,
+            golfers: golfers, pick: playerId != null ? playerId : qsMeId(), stats: qsOn(),
+            score: pid => Number(((currentData && currentData.scores) || {})['p' + pid + '_h' + n]) || 0,
+            save: (pid, v) => { const p = golfers.find(x => String(x.id) === String(pid)); saveScore(p ? p.id : pid, n, String(v)); },
+            next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
+            last: order.indexOf(n) === order.length - 1,
+            host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
+        });
+    }
+    // Tools > "Track stats for others" (this phone; off by default) - with the sheet and quick stats.
+    function gpsSheetPlace() {
+        // The sheet belongs to its hole: the hole changed under it (the card, the picker) - closed.
+        try {
+            const S = gpsSheetOn() ? window.HardPanGpsStats.sheet : null;
+            if (S && S.isOpen() && Number(S.hole()) !== Number(currentViewedHole)) S.close();
+        } catch (e) {}
+        // The Tools sheet (012, layouts D / C) has its own "Track stats for others" switch.
+        if (window.HardPanGps && typeof HardPanGps.toolsSheetOn === 'function' && HardPanGps.toolsSheetOn()) return;
+        try {
+            const menu = document.querySelector('#gps-overlay .gps-tools-menu');
+            const on = gpsSheetOn() && qsOn();
+            if (on && menu) window.HardPanGpsStats.sheet.placeToggle(menu);
+            else if (menu) { const b = menu.querySelector('.hp-ss-others'); if (b) b.remove(); }
+        } catch (e) {}
+    }
     function gpsOpenScore(hole, playerId) {
+        if (gpsSheetOn() && gpsOpenSheet(hole, playerId)) return;
         const g = window.HardPanGps;
         gpsScoreFrom = Number(hole);
         if (g) g.showSide('bets', { remember: false });
@@ -6492,6 +6544,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             g.setHole(currentViewedHole, par);
             g.roundUpdated(currentData, { canFix: roundOwnerHere() });
         }
+        gpsSheetPlace();
         // The round opened WITH SIGNAL: store the course's USGS imagery on the
         // phone for later. Sized from the course, never from the golfer.
         if (!gpsPrecacheAsked && navigator.onLine !== false) {
