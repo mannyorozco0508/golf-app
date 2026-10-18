@@ -610,6 +610,51 @@
         }
         Object.keys(S.markers || {}).forEach(function (k) { if (/^hz/.test(k) && !keep[k]) marker(k, null); });
     }
+    // ---- HAZARDS + LAYUPS SHEET (008, switch hazards) --------------------------------
+    // "Hazards" on the map: every hazard GolfAPI marks on this hole, with REACH (its near
+    // edge) and CARRY (its far edge) from the golfer - or from the tee, off the hole - and
+    // the layups: "Lay up to 100 = 164 from you" (50 / 75 / 100 / 125 / 150, only those
+    // short of the green). The points the app already has (gps-geo.hazardRows); nothing is
+    // fetched. Redrawn on every fix while it is open. A hole with no hazard data says so.
+    function hzSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('hazards') !== false; } catch (e) { return true; } }
+    function hzSheet() { return S && S.el.querySelector('.gps-hzs'); }
+    function hzOpen() { var h = hzSheet(); return !!(h && h.style.display !== 'none'); }
+    function openHazards() { var h = hzSheet(); if (!h || !S) return; closeMenus(); h.style.display = ''; fillHazards(); }
+    function closeHazards() { var h = hzSheet(); if (h) h.style.display = 'none'; }
+    function fillHazards() {
+        var h = hzSheet();
+        if (!h || !S || !G.hazardRows) return;
+        var u = units(), sfx = u === 'm' ? ' m' : '', d = function (m) { return G.shownDistance(m, u); };
+        var rec = osmRecord(S.courseKey), hr = rec && rec.holes && rec.holes[String(S.hole)];
+        var hz = (hr && hr.osm && hr.osm.hazards) || [];
+        var r = resolved(), o = origin(r);
+        var who = o && o.from === 'tee' ? 'from the tee' : 'from you';
+        h.querySelector('.gps-hzs-title').textContent = 'Hazards \u00b7 Hole ' + S.hole;
+        h.querySelector('.gps-hzs-sub').textContent = !o ? 'Finding you\u2026' : (u === 'm' ? 'Meters ' : 'Yards ') + who;
+        var list = h.querySelector('.gps-hzs-list'), lay = h.querySelector('.gps-hzs-lay');
+        list.textContent = ''; lay.textContent = '';
+        var row = function (box, cls, name, nums) {
+            var e = document.createElement('div'); e.className = 'gps-hzs-row ' + cls;
+            var a = document.createElement('span'); a.className = 'gps-hzs-name'; a.textContent = name;
+            var b = document.createElement('span'); b.className = 'gps-hzs-nums'; b.textContent = nums;
+            e.appendChild(a); e.appendChild(b); box.appendChild(e);
+        };
+        if (!hz.length) {
+            var none = document.createElement('div'); none.className = 'gps-hzs-none';
+            none.textContent = 'No hazard data for this hole.';
+            list.appendChild(none);
+        } else if (o) {
+            G.hazardRows(o.pt, hz, r && r.mid).forEach(function (z) {
+                var cls = z.type === 'w' ? 'gps-hzs-water' : 'gps-hzs-bunker';
+                if (z.behind) row(list, cls + ' gps-hzs-behind', z.name, 'behind ' + (o.from === 'tee' ? 'the tee' : 'you'));
+                else row(list, cls, z.name, 'reach ' + d(z.reachM) + sfx + ' \u00b7 carry ' + (z.carryM == null ? '\u2014' : d(z.carryM) + sfx));
+            });
+        }
+        var toGreen = o && r && r.mid ? G.haversineMeters(o.pt, r.mid) : null;
+        var lays = toGreen ? G.layupTargets(toGreen, u === 'm' ? 1 : G.M_PER_YD) : [];
+        h.querySelector('.gps-hzs-layh').style.display = lays.length ? '' : 'none';
+        lays.forEach(function (l) { row(lay, 'gps-hzs-layup', 'Lay up to ' + l.leave + sfx, '= ' + d(l.fromM) + sfx + ' ' + who); });
+    }
     function drawHoleAsk() {
         var want = S.holeAsk || [];
         Object.keys(S.markers || {}).forEach(function (k) { if (/^ask/.test(k) && !want.some(function (c) { return 'ask' + c.id === k; })) marker(k, null); });
@@ -2967,6 +3012,9 @@
         drawTarget();
         drawHoleAsk();
         drawHazards();
+        // HAZARDS SHEET (008): its button while measuring; open, it follows the golfer.
+        show('.gps-hz-btn', S.pro && S.mode === 'measure' && !S.replay && courseHasAnyData());
+        if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
         drawShots();
         placeZoom();
         placePills();
@@ -3310,6 +3358,7 @@
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
+        +   '<button type="button" class="gps-hz-btn gps-float" data-feature="hazards" style="display:none" aria-label="Hazards and layups on this hole">Hazards</button>'
         +   '<button type="button" class="gps-mark-shot gps-float" style="display:none" aria-label="Mark shot here">\uD83D\uDCCD Mark shot</button>'
         + '</div>'
         + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
@@ -3382,6 +3431,11 @@
         + '<div class="gps-credit-pop gps-float" style="display:none" role="dialog" aria-label="Map credits"></div>'
         // THE WIND DIAL (build 7): a sheet from the bottom. Drag the arrow to where
         // the wind blows (up, at the green flag, = toward the green); mph under it.
+        // HAZARDS + LAYUPS (008): a sheet from the bottom.
+        + '<div class="gps-hzs gps-float gps-scroll-ok" data-feature="hazards" style="display:none" role="dialog" aria-label="Hazards and layups">'
+        +   '<div class="gps-hzs-head"><div><div class="gps-hzs-title"></div><div class="gps-hzs-sub"></div></div><button type="button" class="gps-hzs-done">Done</button></div>'
+        +   '<div class="gps-hzs-list"></div><div class="gps-hzs-layh">LAY UP</div><div class="gps-hzs-lay"></div>'
+        + '</div>'
         + '<div class="gps-wind-sheet gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
         +   '<div class="gps-ws-head"><div class="gps-ws-title">Wind<small class="gps-ws-state"></small></div>'
         +     '<button type="button" class="gps-ws-live">Use live wind</button><button type="button" class="gps-ws-done">Done</button></div>'
@@ -3469,6 +3523,19 @@
         + '#gps-overlay .gps-hz{font:800 11px/1 ' + FONT + ';padding:3px 6px;border-radius:999px;border:1px solid rgba(11,15,12,.55);white-space:nowrap;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.35);}'
         + '#gps-overlay .gps-hz-bunker{background:#f3e3b5;color:#3a2e12;}'
         + '#gps-overlay .gps-hz-water{background:#9fd3ff;color:#0b2540;}'
+        + '#gps-overlay .gps-hz-btn{font-size:13px;white-space:nowrap;}'
+        // The stack is taller with Hazards: its own box lets a drag through to the map (only its buttons take taps).
+        + '#gps-overlay .gps-right{pointer-events:none;}#gps-overlay .gps-right > *{pointer-events:auto;}'
+        + '#gps-overlay .gps-hzs{position:absolute;z-index:46;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:62%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
+        + '#gps-overlay .gps-hzs-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}'
+        + '#gps-overlay .gps-hzs-title{font:800 17px/1.15 ' + FONT + ';}#gps-overlay .gps-hzs-sub{font:600 12px/1.2 ' + FONT + ';color:#c8d1ca;margin-top:2px;}'
+        + '#gps-overlay .gps-hzs-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
+        + '#gps-overlay .gps-hzs-row{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.08);font:700 15px/1.25 ' + FONT + ';}'
+        + '#gps-overlay .gps-hzs-nums{font-variant-numeric:tabular-nums;white-space:nowrap;color:#d9f99d;}'
+        + '#gps-overlay .gps-hzs-water .gps-hzs-name{color:#9fd3ff;}#gps-overlay .gps-hzs-bunker .gps-hzs-name{color:#f3e3b5;}'
+        + '#gps-overlay .gps-hzs-behind{opacity:.55;}#gps-overlay .gps-hzs-behind .gps-hzs-nums{color:#c8d1ca;}'
+        + '#gps-overlay .gps-hzs-none{padding:10px 2px;font:600 15px/1.3 ' + FONT + ';color:#f4f4ef;}'
+        + '#gps-overlay .gps-hzs-layh{font:800 11px/1 ' + FONT + ';letter-spacing:.1em;color:#a7b3aa;margin:12px 2px 4px;}'
         + '#gps-overlay .gps-ask-hole1{font:800 14px/1 ' + FONT + ';color:#0b0f0c;background:#d9f99d;border:2px solid #0b0f0c;border-radius:999px;padding:10px 14px;min-height:44px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);white-space:nowrap;}'
         + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tagged{padding-bottom:13px !important;}'
@@ -3861,6 +3928,10 @@
         on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
         on(el, '.gps-zoom', cycleZoom);
         on(el, '.gps-green-view', toggleGreenView);
+        // HAZARDS (008): the switch off = no button, no sheet (removed, not hidden).
+        if (!hzSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="hazards"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-hz-btn', function () { if (!S) return; if (hzOpen()) closeHazards(); else openHazards(); });
+        on(el, '.gps-hzs-done', closeHazards);
         on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
         var wsheet = el.querySelector('.gps-wind-sheet');
         if (wsheet) { wsheet.addEventListener('click', windSheetClick); bindDial(wsheet); }
@@ -4095,6 +4166,7 @@
         } else {
             // Kept running for IDLE_STOP_MS, so a quick look at Bets and back
             // does not cost a fresh fix; then stopped.
+            closeHazards();
             closeWindSheet();
             stopWindTick();
             // A shot replay does not keep turning the CARD's hole under a golfer typing a score.

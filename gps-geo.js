@@ -862,6 +862,52 @@
         return out;
     }
 
+    // ---- HAZARDS + LAYUPS (008, switch hazards) ---------------------------------------
+    // GolfAPI marks a hazard by its FRONT and BACK edge (two points, one when the edge
+    // is all it has); the app's copy keeps each point's kind (gb greenside bunker, fb
+    // fairway bunker, w water) and side (L / C / R), not which edge it is. So points of
+    // the same kind and side within 60 m of each other are ONE hazard (two at most).
+    // REACH = the yards to its near edge, CARRY = to its far edge (one point: reach
+    // only). Behind the golfer (every point behind them on the line to the green): no
+    // numbers, "behind". Pure; nothing is fetched.
+    var HAZARD_PAIR_M = 60, LAYUP_YD = [50, 75, 100, 125, 150];
+    var HAZARD_NAMES = { gb: 'Greenside bunker', fb: 'Fairway bunker', w: 'Water', b: 'Bunker' };
+    var HAZARD_SIDES = { L: 'left', C: 'center', R: 'right' };
+    function hazardGroups(hz) {
+        var out = [];
+        (hz || []).forEach(function (z) {
+            var pt = z && pinPt(z.pt);
+            if (!pt) return;
+            var g = out.filter(function (o) { return o.type === z.type && o.side === (z.side || '') && o.pts.length < 2 && haversineMeters(o.pts[0], pt) <= HAZARD_PAIR_M; })[0];
+            if (g) g.pts.push(pt); else out.push({ type: z.type, side: z.side || '', pts: [pt] });
+        });
+        return out;
+    }
+    // me: where the numbers are measured from; green: the hole's center (for "behind").
+    // Rows nearest first: { type, side, name, reachM, carryM (null: one point), behind }.
+    function hazardRows(me, hz, green) {
+        me = pinPt(me); green = pinPt(green);
+        if (!me) return [];
+        var proj = projector(me), gv = green ? proj.fwd(green) : null, gl = gv ? Math.sqrt(gv[0] * gv[0] + gv[1] * gv[1]) : 0;
+        var along = function (p) { if (!gl) return 1; var q = proj.fwd(p); return (q[0] * gv[0] + q[1] * gv[1]) / gl; };
+        var rows = hazardGroups(hz).map(function (g) {
+            var d = g.pts.map(function (p) { return haversineMeters(me, p); });
+            var behind = g.pts.every(function (p) { return along(p) < 0; });
+            return { type: g.type, side: g.side, name: (HAZARD_NAMES[g.type] || 'Hazard') + (HAZARD_SIDES[g.side] ? ' ' + HAZARD_SIDES[g.side] : ''),
+                     reachM: behind ? null : Math.min.apply(null, d), carryM: behind || g.pts.length < 2 ? null : Math.max.apply(null, d), behind: behind };
+        });
+        rows.sort(function (a, b) { return (a.behind ? 1 : 0) - (b.behind ? 1 : 0) || (a.reachM || 0) - (b.reachM || 0); });
+        return rows;
+    }
+    // LAY UP TO 50 / 75 / 100 / 125 / 150 (in the golfer's unit; unitM 0.9144 for yards,
+    // 1 for metres): how far from the golfer that leaves them, straight at the green.
+    // Only the ones shorter than the distance to the green. [{ leave, fromM }].
+    function layupTargets(toGreenM, unitM) {
+        var u = unitM || M_PER_YD;
+        if (!isFinite(toGreenM) || toGreenM <= 0) return [];
+        return LAYUP_YD.filter(function (l) { return l * u < toGreenM; }).map(function (l) { return { leave: l, fromM: toGreenM - l * u }; });
+    }
+
     // WIND from the National Weather Service hourly forecast (api.weather.gov),
     // first period: windSpeed "10 mph" or "5 to 10 mph", windDirection "NW".
     // Returns { mph, fromDeg, toDeg } (fromDeg: where it blows FROM, like the
@@ -1430,6 +1476,7 @@
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
+        hazardGroups: hazardGroups, hazardRows: hazardRows, layupTargets: layupTargets, LAYUP_YD: LAYUP_YD,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
