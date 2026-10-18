@@ -816,6 +816,25 @@
         S.gaCache = { k: ck, v: m ? m.record : null, how: m ? m.how : '' };
         return S.gaCache.v;
     }
+    // OPENSTREETMAP HOLE LINES ON A GOLFAPI COURSE (010, switch osmPath): the bundled course's
+    // drawn line for hole n (gps-geo.osmPathLines: matched by the link table or name + 5 km,
+    // the same hole number, its start within 40 m of GolfAPI's tee and its end within 40 m
+    // of GolfAPI's green center) - for the preview path and the default target ONLY. Every
+    // number stays GolfAPI's: the GolfAPI record is never touched. Bundled data only.
+    function osmPathOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('osmPath') !== false; } catch (e) { return true; } }
+    function osmPathFor(n) {
+        if (!S || !osmPathOn() || !G.osmPathLines) return null;
+        var rec = golfapiFor(S.courseKey);
+        // The bundled table not loaded yet: nothing now, and nothing remembered.
+        if (!rec || rec.src !== 'golfapi' || !window.HardPanGpsCourses) return null;
+        if (!S.opCache || S.opCache.rec !== rec) {
+            var v = null;
+            try { v = G.osmPathLines(window.HardPanGpsCourses, window.HardPanGolfApi || null, rec, S.courseKey, (S.round && S.round.courseName) || '', S.courseLoc || null); } catch (e) { v = null; }
+            S.opCache = { rec: rec, v: v };
+        }
+        var c = S.opCache.v;
+        return (c && c.lines && c.lines[String(n)]) || null;
+    }
 
     // ---- IMAGERY: USGS FROM THE PHONE FIRST, ESRI ON TOP --------------------
     function cachedTile(url) {
@@ -1156,6 +1175,12 @@
         var logo = S.el.querySelector('.gps-google-logo');
         if (logo) logo.style.display = g ? '' : 'none';
         txt('.gps-credit-txt', g ? (S.googleCopyright || 'Google') : (esriShown ? 'Powered by Esri' : 'USGS'));
+        // 010: an OpenStreetMap hole line shapes this GolfAPI hole's path - its ODbL credit
+        // on the map itself, not only behind ⓘ (where the lines' source always lists it).
+        var op = !!osmPathFor(S.hole), oc = S.el.querySelector('.gps-credit-osm');
+        if (oc) oc.style.display = op ? '' : 'none';
+        var me = S.el.querySelector('.gps-map');
+        if (me) me.setAttribute('data-osm-path', op ? '1' : '0');
         S.el.classList.toggle('gps-credit-google', g);
         var pop = S.el.querySelector('.gps-credit-pop');
         if (pop && pop.style.display !== 'none') fillCredits();
@@ -1553,7 +1578,7 @@
         if (!o || !center) return;
         var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
         var opts = {
-            par: S.par, tee: r.tee, mid: center, line: rec && rec.line, fairway: rec && rec.fairway,
+            par: S.par, tee: r.tee, mid: center, line: osmPathFor(S.hole) || (rec && rec.line), fairway: rec && rec.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
         };
         // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
@@ -1848,7 +1873,7 @@
     // The path for hole r; dragged: the golfer's moved target bends it.
     function flyPath(r, dragged) {
         var rec = holeOsm() || {};
-        return G.holePath({ tee: r.tee, mid: r.mid, line: rec.line, fairway: rec.fairway, hazards: rec.hazards, target: dragged || null });
+        return G.holePath({ tee: r.tee, mid: r.mid, line: osmPathFor(S.hole) || rec.line, fairway: rec.fairway, hazards: rec.hazards, target: dragged || null });
     }
     function flyPlan(r) {
         var path = flyPath(r, S.targetMoved ? S.target : null);
@@ -3835,7 +3860,7 @@
         + '</div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
-        + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
+        + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span class="gps-credit-osm" style="display:none">· © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
         + '<div class="gps-credit-pop gps-float" style="display:none" role="dialog" aria-label="Map credits"></div>'
         // THE WIND DIAL (build 7): a sheet from the bottom. Drag the arrow to where
         // the wind blows (up, at the green flag, = toward the green); mph under it.
@@ -4090,6 +4115,7 @@
         + '#gps-overlay .gps-google-logo{height:18px;width:auto;margin:0 10px 0 0;flex:0 0 auto;}'
         + '#gps-overlay.gps-credit-google .gps-credit{bottom:calc(env(safe-area-inset-bottom) + 5px);left:10px;right:10px;white-space:normal;}'
         + '#gps-overlay.gps-credit-google .gps-credit-txt{flex:1 1 auto;min-width:0;}'
+        + '#gps-overlay .gps-credit-osm a{color:inherit;text-decoration:none;}'
         + '#gps-overlay .gps-credit-i{font-size:13px;line-height:1;padding:2px 4px;min-height:22px;color:#f4f4ef;text-shadow:inherit;}'
         + '#gps-overlay .gps-credit-pop{position:absolute;z-index:40;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 26px);padding:10px 12px;font-size:12px;line-height:1.45;color:#f4f4ef;}'
         + '#gps-overlay .gps-credit-pop a{color:#d9f99d;}'

@@ -1757,12 +1757,85 @@
         return hit.length === 1 ? { record: golfapiRecord([hit[0]]), how: '"' + hit[0].club + ' / ' + hit[0].course + '" by name' } : null;
     }
 
+    // ---- OPENSTREETMAP HOLE LINES ON A GOLFAPI COURSE (010, switch osmPath) -------------
+    // GolfAPI almost never has a hole's line (its rare dogleg point `d`), so its preview
+    // flies straight and its default target sits on the straight line. The bundled
+    // OpenStreetMap course (gps-courses.js, in every build) often has the hole DRAWN.
+    // That drawn line - and nothing else from OSM - shapes the preview path and the
+    // default target. Every number shown stays GolfAPI's (one source per course): the
+    // GolfAPI record is never changed; the line is handed to holePath / pathTarget only.
+    // WHICH BUNDLED COURSE (strict), in order:
+    //   linked   the GolfAPI puller's link table (data.links: bundle key -> GolfAPI id)
+    //            names this GolfAPI course for a bundled key - the round's own key, else
+    //            the bundle key its name resolves to, else the one linked key;
+    //   by name  the round's key or name resolves to a bundled course (bundleKeyFor: the
+    //            key itself, a known alias, or the name within 5 km), and the GolfAPI
+    //            course's own point (or the round's) is within 5 km of it.
+    // Returns { key, how } or null.
+    function gaBaseIds(record) {
+        return ((record && record.golfapiIds) || []).map(function (id) { return String(id).split('#')[0]; });
+    }
+    function osmPathCourse(table, data, record, key, name, loc) {
+        if (!table || !record || !record.holes) return null;
+        var ids = gaBaseIds(record);
+        if (!ids.length) return null;
+        var isBundle = function (k) { return !!(k && k !== '_names' && table[k]); };
+        var alias = bundleKeyFor(table, key, name, loc);
+        var links = (data && data.links) || {};
+        // A course made from two nines ("Cameron + Stewart" split) is linked under its PAIRING:
+        // only the round's own bundle key (below) names the right pairing in the right order.
+        var nines = (record.golfapiIds || []).some(function (id) { return /#/.test(String(id)); });
+        var linked = nines ? [] : Object.keys(links).filter(function (k) { return isBundle(k) && ids.indexOf(String(links[k])) !== -1; });
+        if (linked.length) {
+            if (linked.indexOf(key) !== -1) return { key: key, how: 'linked' };
+            if (alias && linked.indexOf(alias) !== -1) return { key: alias, how: 'linked' };
+            if (linked.length === 1) return { key: linked[0], how: 'linked' };
+            return null;
+        }
+        if (!isBundle(alias)) return null;
+        var rec = table[alias], at = rec && (rec.compose ? bundlePoint(table[rec.compose[0]]) : bundlePoint(rec));
+        var c = data && data.courses && data.courses[ids[0]];
+        var where = (c && isFinite(c.lat) && isFinite(c.lng)) ? [Number(c.lat), Number(c.lng)] : pinPt(loc);
+        if (!at || !where || haversineMeters(at, where) > NEAR_M) return null;
+        return { key: alias, how: 'by name' };
+    }
+    // ONE HOLE, GUARDED: the bundled course's hole with the SAME NUMBER, its drawn line (3+
+    // points) starting within 40 m of GolfAPI's tee and ending within 40 m of GolfAPI's green
+    // center; GolfAPI's own line has no bend. The path line is GolfAPI's tee -> the OSM
+    // corners -> GolfAPI's green center. { line } or { reject: why }.
+    var OSM_PATH_M = 40;
+    function osmPathLine(gaHole, osmHole) {
+        var ga = gaHole && (gaHole.osm || gaHole), o = osmHole && (osmHole.osm || osmHole);
+        var tee = pinPt(ga && ga.tee), mid = pinPt(ga && (ga.mid || ga.end));
+        if (!tee || !mid) return { reject: 'no GolfAPI tee / green' };
+        if (((ga.line) || []).length >= 3) return { reject: 'GolfAPI has its own line' };
+        var line = ((o && o.line) || []).map(pinPt).filter(Boolean);
+        if (line.length < 3) return { reject: 'no drawn bend' };
+        var dS = haversineMeters(line[0], tee), dE = haversineMeters(line[line.length - 1], mid);
+        if (dS > OSM_PATH_M) return { reject: 'start ' + Math.round(dS) + ' m from the tee' };
+        if (dE > OSM_PATH_M) return { reject: 'end ' + Math.round(dE) + ' m from the green' };
+        return { line: [tee].concat(line.slice(1, -1), [mid]) };
+    }
+    // The whole course: { key, how, lines: { n: line }, rejected: { n: why } } or null.
+    function osmPathLines(table, data, record, key, name, loc) {
+        var m = osmPathCourse(table, data, record, key, name, loc);
+        if (!m) return null;
+        var osm = osmCourse(table, m.key), out = { key: m.key, how: m.how, lines: {}, rejected: {} };
+        Object.keys(record.holes).forEach(function (n) {
+            var oh = osm && osm.holes && osm.holes[n];
+            var r = oh ? osmPathLine(record.holes[n], oh) : { reject: 'no OSM hole ' + n };
+            if (r.line) out.lines[n] = r.line; else out.rejected[n] = r.reject;
+        });
+        return out;
+    }
+
     var api = {
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
         golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, golfapiNines: golfapiNines, ellipseRing: ellipseRing,
+        osmPathCourse: osmPathCourse, osmPathLine: osmPathLine, osmPathLines: osmPathLines, OSM_PATH_M: OSM_PATH_M,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

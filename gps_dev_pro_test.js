@@ -46,7 +46,7 @@ test('the build writes the switch only with GPS_DEV_PRO=1', () => {
 });
 test('HardPanFeature: every 008 switch exists and is on; exactly false turns one off', () => {
     const sb = { }; sb.window = sb; vm.createContext(sb); vm.runInContext(read('gps-config.js'), sb);
-    ['autoAdvance', 'quickStats', 'hazards', 'clubs', 'flyover', 'pathTarget', 'hpIndex'].forEach((n) => assert.strictEqual(sb.HardPanFeature(n), true, n));
+    ['autoAdvance', 'quickStats', 'hazards', 'clubs', 'flyover', 'pathTarget', 'hpIndex', 'osmPath'].forEach((n) => assert.strictEqual(sb.HardPanFeature(n), true, n));
     sb.HARDPAN_GPS_CONFIG.features.hazards = false;
     assert.strictEqual(sb.HardPanFeature('hazards'), false);
 });
