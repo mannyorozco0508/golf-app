@@ -94,8 +94,11 @@ const REAL_PAGES = ['index.html', 'admin.html', 'settlement.html', 'sidematches.
 //
 // Widening this makes the check STRONGER: it can now catch a guide quoting a
 // sentence that no page AND no shared builder contains.
+// gps-view.js (008): the GPS hole screen builds its buttons (Hazards, Mark shot,
+// Tools, My bag, Preview) in JS. It is GPS-only, so the Consumer tree has no file
+// and read() gives '' - and the guide's GPS section is stripped there too.
 const SHARED_COPY = ['round-role.js', 'course-import-rules.js', 'side-match-lines.js',
-    'handicap-labels.js', 'card-is-in.js', 'push-notify.js'];
+    'handicap-labels.js', 'card-is-in.js', 'push-notify.js', 'gps-view.js'];
 
 const read = (f) => (fs.existsSync(path.join(__dirname, f))
     ? decodeEscapes(fs.readFileSync(path.join(__dirname, f), 'utf8')) : '');
