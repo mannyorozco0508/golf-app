@@ -1227,6 +1227,8 @@
         // LAYOUT D: under the Games / round chip row too.
         var r2 = ldOn() && S.el.querySelector('.gps-ld-row2');
         if (r2 && r2.offsetParent !== null && tB != null) tB = Math.max(tB, r2.getBoundingClientRect().bottom);
+        // 012: the top bar's own bottom - the Tools sheet never reaches over it.
+        if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-bar-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
         if (tB != null) S.el.style.setProperty('--gps-top-b', Math.round(tB - S.el.getBoundingClientRect().top + 8) + 'px');
         // LAYOUT C: the panel's measured height - the credit, Recenter, zoom and the banner sit on it.
         // LAYOUT D: the bottom controls' measured height - the credit, the plays pill and Recenter sit on it.
@@ -3992,11 +3994,122 @@
         return { top: top - W.top, bottom: bot - W.top, left: 0, right: right - W.left, W: W };
     }
 
+    // ---- THE TOOLS SHEET (mailbox 012, Manny's Option 1; switch toolsSheet) -----------------
+    // In layouts D and C, Tools is a bottom sheet: SCREEN LAYOUT [HardPan | Bottom panel], UNITS
+    // [Yards | Meters], ROUND switches (Tournament mode, Auto-advance holes, Track stats for
+    // others), and MORE - a grid of tiles. ONE MODEL: every control runs the old menu's own
+    // button (still in the DOM, hidden) or the same function, so nothing is forked; a tile shows
+    // exactly when its menu item would. Settings save the moment they are tapped. Swipe down or
+    // tap outside to close; it never reaches over the top bar, and scrolls when it is taller.
+    // The old layout (C and D both off), or toolsSheet off: the old drop-down, unchanged.
+    function tsSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('toolsSheet') !== false; } catch (e) { return true; } }
+    function tsOn() { return !!(S && (S.ld || S.lc) && tsSwitch()); }
+    function tsSheet() { return S && S.el.querySelector('.gps-tsheet'); }
+    function tsOpen() { var t = tsSheet(); return !!(t && t.style.display !== 'none'); }
+    // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
+    var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
+        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'],
+        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
+        ['.gps-rechoose', '①', 'Hole 1 again']];
+    var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
+        + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
+        + '<div class="gps-ts-h">UNITS</div><div class="gps-ts-seg" data-ts-seg="units" role="radiogroup" aria-label="Units"><button type="button" data-v="yd" role="radio">Yards</button><button type="button" data-v="m" role="radio">Meters</button></div>'
+        + '<div class="gps-ts-h">ROUND</div><div class="gps-ts-rows">'
+        +   '<div class="gps-ts-row" data-ts-row="tourney"><span>🏆 Tournament mode</span><button type="button" class="gps-ts-sw" data-ts-sw="tourney" role="switch" aria-label="Tournament mode"><i></i></button></div>'
+        +   '<div class="gps-ts-row" data-ts-row="aa"><span>Auto-advance holes</span><button type="button" class="gps-ts-sw" data-ts-sw="aa" role="switch" aria-label="Auto-advance holes"><i></i></button></div>'
+        // THE SLOT for "Track stats for others" (gps-012s, HardPanGpsStats.trackOthers / setTrackOthers):
+        // shown only when that API is in the page.
+        +   '<div class="gps-ts-row" data-ts-row="others"><span>Track stats for others</span><button type="button" class="gps-ts-sw" data-ts-sw="others" role="switch" aria-label="Track stats for others"><i></i></button></div>'
+        + '</div>'
+        + '<div class="gps-ts-h">MORE</div><div class="gps-ts-grid">'
+        + TS_TILES.map(function (t) { return '<button type="button" class="gps-ts-tile" data-ts-tile="' + t[0] + '"><span class="gps-ts-ico" aria-hidden="true">' + t[1] + '</span><span>' + t[2] + '</span></button>'; }).join('')
+        + '</div>';
+    function tsStats() { var H = window.HardPanGpsStats; return H && typeof H.trackOthers === 'function' && typeof H.setTrackOthers === 'function' ? H : null; }
+    function tsSync() {
+        var t = tsSheet(); if (!t || !S) return;
+        var lay = layoutNow(), u = units();
+        var seg = function (k, v, on) { Array.prototype.forEach.call(t.querySelectorAll('[data-ts-seg="' + k + '"] button'), function (b) { var lit = b.getAttribute('data-v') === v; b.classList.toggle('on', lit); b.setAttribute('aria-checked', lit ? 'true' : 'false'); }); var sg = t.querySelector('[data-ts-seg="' + k + '"]'); if (sg) sg.style.display = on ? '' : 'none'; };
+        seg('layout', lay === 'd' ? 'd' : 'c', ldSwitch());
+        var lh = t.querySelector('[data-ts-sec="layout"]'); if (lh) lh.style.display = ldSwitch() ? '' : 'none';
+        seg('units', u === 'm' ? 'm' : 'yd', true);
+        var sw = function (k, on, shown, locked) {
+            var b = t.querySelector('[data-ts-sw="' + k + '"]'), row = t.querySelector('[data-ts-row="' + k + '"]');
+            if (row) row.style.display = shown ? '' : 'none';
+            if (b) { b.classList.toggle('on', !!on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.setAttribute('aria-disabled', locked ? 'true' : 'false'); }
+        };
+        sw('tourney', tournament(), true, tourneyRound());
+        sw('aa', aaOn(), !!S.el.querySelector('.gps-aa-toggle'));
+        var H = tsStats();
+        sw('others', H ? H.trackOthers() : false, !!H);
+        Array.prototype.forEach.call(t.querySelectorAll('[data-ts-tile]'), function (b) {
+            var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
+            b.style.display = m && m.style.display !== 'none' ? '' : 'none';
+        });
+    }
+    function openToolsSheet() {
+        var t = tsSheet(); if (!t) return;
+        render(); aaToggleText();
+        tsSync();
+        t.style.transform = ''; t.scrollTop = 0;
+        t.style.display = ''; show('.gps-ts-back', true);
+    }
+    function closeToolsSheet() { var t = tsSheet(); if (t) { t.style.display = 'none'; t.style.transform = ''; } show('.gps-ts-back', false); }
+    // Run an old menu button's own handler, keeping the sheet open (a setting).
+    function tsRun(sel) {
+        var b = S && S.el.querySelector('.gps-tools-menu ' + sel);
+        if (!b) return;
+        S.tsKeep = true;
+        try { b.click(); } finally { S.tsKeep = false; }
+        tsSync();
+    }
+    function tsClick(e) {
+        var t = e.target && e.target.closest ? e.target : null;
+        if (!t || !S) return;
+        var b;
+        if ((b = t.closest('[data-ts-seg] button'))) {
+            var k = b.parentNode.getAttribute('data-ts-seg'), v = b.getAttribute('data-v');
+            if (k === 'layout' && v !== layoutNow()) { S.tsKeep = true; try { setLayout(v); } finally { S.tsKeep = false; } tsSync(); }
+            if (k === 'units' && v !== (units() === 'm' ? 'm' : 'yd')) tsRun('.gps-units');
+            return;
+        }
+        if ((b = t.closest('[data-ts-sw]'))) {
+            var w = b.getAttribute('data-ts-sw');
+            if (w === 'tourney') tsRun('.gps-tourney-toggle');
+            else if (w === 'aa') tsRun('.gps-aa-toggle');
+            else if (w === 'others') { var H = tsStats(); if (H) { H.setTrackOthers(!H.trackOthers()); tsSync(); } }
+            return;
+        }
+        if ((b = t.closest('[data-ts-tile]'))) {
+            var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
+            closeToolsSheet();
+            if (m) m.click();
+        }
+    }
+    // Swipe down on its head (or anywhere while it is scrolled to the top): it follows the
+    // finger and closes past 70px.
+    function tsDrag(t) {
+        var y0 = null, dy = 0, id = null;
+        t.addEventListener('pointerdown', function (e) {
+            if (!e.target.closest('.gps-ts-head') && t.scrollTop > 0) return;
+            if (e.target.closest('button') && !e.target.closest('.gps-ts-head')) return;
+            y0 = e.clientY; dy = 0; id = e.pointerId;
+        });
+        t.addEventListener('pointermove', function (e) {
+            if (y0 == null || e.pointerId !== id) return;
+            dy = Math.max(0, e.clientY - y0);
+            if (dy > 4) t.style.transform = 'translateY(' + dy + 'px)';
+        });
+        var end = function () { if (y0 == null) return; y0 = null; if (dy > 70) closeToolsSheet(); else t.style.transform = ''; dy = 0; };
+        t.addEventListener('pointerup', end); t.addEventListener('pointercancel', end);
+    }
+
     // ---- MENUS: Tools and the hole picker ------------------------------------------
-    function closeMenus() { show('.gps-tools-menu', false); show('.gps-picker', false); }
+    function closeMenus() { show('.gps-tools-menu', false); show('.gps-picker', false); if (!(S && S.tsKeep)) closeToolsSheet(); }
     function toggleTools() {
         var m = S && S.el.querySelector('.gps-tools-menu');
         if (!m) return;
+        // 012: the Tools SHEET in layouts D and C (switch toolsSheet).
+        if (tsOn()) { var was = tsOpen(); closeMenus(); if (!was) openToolsSheet(); return; }
         var open = m.style.display === 'none';
         closeMenus();
         if (open) { render(); aaToggleText(); m.style.display = ''; }
@@ -4273,6 +4386,9 @@
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
         +   '<button type="button" class="gps-menu-item gps-pick-course" style="display:none">\u26F3 Pick another course</button>'
         + '</div>'
+        // THE TOOLS SHEET (012; layouts D and C, switch toolsSheet): filled from TS_MARKUP at mount.
+        + '<div class="gps-ts-back" style="display:none"></div>'
+        + '<div class="gps-tsheet gps-scroll-ok" data-feature="toolsSheet" style="display:none" role="dialog" aria-label="Tools"></div>'
         // THE HOLE PICKER.
         + '<div class="gps-picker" style="display:none" role="dialog" aria-label="Pick a hole"><div class="gps-picker-card gps-float"><div class="gps-picker-title">Go to hole</div><div class="gps-picker-grid"></div></div></div>'
         + '<div class="gps-credit"><img class="gps-google-logo" alt="Google Maps" style="display:none" src="' + GOOGLE.logo + '"><span class="gps-credit-txt"></span><span class="gps-credit-osm" style="display:none">· © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span><span aria-hidden="true">·</span><button type="button" class="gps-credit-i" aria-label="Map credits">ⓘ</button></div>'
@@ -4729,6 +4845,25 @@
         + '#gps-overlay.gps-ld .gps-pill-to,#gps-overlay.gps-ld .gps-pill-on{display:flex;align-items:baseline;justify-content:center;box-sizing:border-box;min-width:2.5em;height:2.5em;line-height:2.5em;padding:0 .35em;border-radius:1.25em;'
         +   'background:rgba(11,15,12,.92);color:#fff;font-weight:800;text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.4);}'
         + '#gps-overlay.gps-ld .gps-pill-to::after,#gps-overlay.gps-ld .gps-pill-on::after{content:attr(data-u);font-size:.6em;margin-left:1px;}'
+        // THE TOOLS SHEET (012, switch toolsSheet): layouts D and C only.
+        + '#gps-overlay .gps-ts-back{position:absolute;z-index:47;left:0;right:0;bottom:0;top:var(--gps-bar-b,0px);background:rgba(0,0,0,.35);}'
+        + '#gps-overlay .gps-tsheet{position:absolute;z-index:49;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;max-height:calc(100% - var(--gps-bar-b,0px));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;'
+        +   'padding:0 16px calc(env(safe-area-inset-bottom) + 16px);background:#0f1511;border-radius:24px 24px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.45);color:#f4f4ef;font-family:' + FONT + ';transition:transform .15s ease-out;}'
+        + '#gps-overlay .gps-ts-head{position:sticky;top:0;z-index:1;background:#0f1511;padding:10px 0 4px;touch-action:none;cursor:grab;}'
+        + '#gps-overlay .gps-ts-grip{display:block;width:40px;height:5px;border-radius:3px;background:rgba(244,244,239,.4);margin:0 auto 10px;}'
+        + '#gps-overlay .gps-ts-title{font:800 22px/1.2 ' + FONT + ';}'
+        + '#gps-overlay .gps-ts-h{font:800 12px/1 ' + FONT + ';letter-spacing:.1em;color:#a7b3aa;margin:16px 0 8px;}'
+        + '#gps-overlay .gps-ts-seg{display:flex;gap:4px;padding:4px;border-radius:16px;background:rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-ts-seg button{flex:1 1 0;min-width:0;min-height:44px;border-radius:12px;font:700 16px/1.2 ' + FONT + ';color:#f4f4ef;white-space:normal;}'
+        + '#gps-overlay .gps-ts-seg button.on{background:#c8f07a;color:#0b0f0c;}'
+        + '#gps-overlay .gps-ts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.1);font:700 17px/1.25 ' + FONT + ';}'
+        + '#gps-overlay .gps-ts-sw{flex:0 0 auto;position:relative;width:52px;height:32px;border-radius:16px !important;background:rgba(255,255,255,.22) !important;transition:background .15s;}'
+        + '#gps-overlay .gps-ts-sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);}'
+        + '#gps-overlay .gps-ts-sw.on{background:#7cc242 !important;}#gps-overlay .gps-ts-sw.on i{left:23px;}'
+        + '#gps-overlay .gps-ts-sw[aria-disabled="true"]{opacity:.55;}'
+        + '#gps-overlay .gps-ts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}'
+        + '#gps-overlay .gps-ts-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;padding:8px 4px;border-radius:14px;background:rgba(255,255,255,.07) !important;font:700 14px/1.2 ' + FONT + ';color:#f4f4ef;text-align:center;}'
+        + '#gps-overlay .gps-ts-ico{font-size:20px;line-height:1;}'
         // NO GPS MAP (paid launch): a round mounted without the entitlement never shows
         // the GPS side at all - no map, no yardage (the gate keeps it on the card).
         + '#gps-overlay.gps-locked{display:none !important;}';
@@ -4845,6 +4980,15 @@
             } else if (hit('.gps-ld-holelbl')) { e.preventDefault(); var sb = S.el.querySelector('.gps-score'); if (sb) sb.click(); }
         });
         on(el, '.gps-layout-pick', function () { if (S) setLayout(layoutNow() === 'd' ? 'c' : 'd'); });
+        // THE TOOLS SHEET (012): its controls, the swipe, and a tap outside it closes it.
+        var tsh = el.querySelector('.gps-tsheet');
+        if (tsh) { tsh.innerHTML = TS_MARKUP; tsh.addEventListener('click', tsClick); tsDrag(tsh); }
+        on(el, '.gps-ts-back', closeToolsSheet);
+        el.addEventListener('pointerdown', function (e) {
+            if (!tsOpen() || !e.target.closest) return;
+            if (e.target.closest('.gps-tsheet') || e.target.closest('.gps-tools') || e.target.closest('.gps-ts-back')) return;
+            closeToolsSheet();
+        }, true);
         on(el, '.gps-tools', toggleTools);
         on(el, '.gps-score-next', function () { closeMenus(); if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-score-prev', function () { closeMenus(); if (S && S.stepHole) S.stepHole(-1); });
@@ -5442,6 +5586,8 @@
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
         clubShort: clubShort,
+        // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
+        toolsSheetOn: function () { return tsOn(); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;

@@ -165,6 +165,21 @@ const CLIPS = { expression: "(function(){ var ov = document.getElementById('gps-
 const ONTOP = (sel) => ({ expression: "(function(){ var e = document.querySelector('#gps-overlay " + sel + "'); if (!e || e.offsetParent === null) return JSON.stringify({ ontop: null, sel: " + JSON.stringify(sel) + " });"
     + " var b = e.getBoundingClientRect(), x = b.left + b.width / 2, y = Math.min(b.top + b.height / 2, innerHeight - 4), h = document.elementFromPoint(x, y);"
     + " return JSON.stringify({ ontop: !!(h && e.contains(h)), sel: " + JSON.stringify(sel) + ", hit: h && h.className }); })()" });
+// THE TOOLS SHEET (012), measured: open, where (never over the top bar), on top, its choices and
+// switches as lit, the tiles shown, what the phone saved, the old drop-down hidden.
+const TS = { expression: "(function(){ var ov = document.getElementById('gps-overlay'); if (!ov) return JSON.stringify({ open: false, url: document.URL.split('/').pop(), tiles: [], e: window.__e }); var t = ov.querySelector('.gps-tsheet'), vis = function (e) { if (!e) return false; for (var x = e; x && x !== document.body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; } return e.getBoundingClientRect().height > 0; };"
+    + " var bar = ov.querySelector(ov.classList.contains('gps-ld') ? '.gps-ld-top' : (ov.classList.contains('gps-lc') ? '.gps-lc-top' : '.gps-top')), bb = bar && vis(bar) ? bar.getBoundingClientRect() : null; if (ov.classList.contains('gps-lc')) { ['.gps-lc-left', '.gps-lc-right'].forEach(function (s) { var e = ov.querySelector(s); if (vis(e)) { var r = e.getBoundingClientRect(); if (!bb || r.bottom > bb.bottom) bb = r; } }); }"
+    + " var open = vis(t), r = open ? t.getBoundingClientRect() : null, mid = open ? document.elementFromPoint(r.left + r.width / 2, Math.min(r.top + 40, innerHeight - 4)) : null;"
+    + " var lit = function (k) { var b = t && t.querySelector('[data-ts-seg=\"' + k + '\"] button.on'); return b ? b.getAttribute('data-v') : null; };"
+    + " var sw = function (k) { var b = t && t.querySelector('[data-ts-sw=\"' + k + '\"]'); return b && vis(b) ? b.classList.contains('on') : null; };"
+    + " var ls = function (k) { try { return localStorage.getItem(k); } catch (e) { return 'x'; } };"
+    + " var vis2 = function (s) { return vis(document.querySelector(s)); };"
+    + " return JSON.stringify({ open: open, top: r && Math.round(r.top), barB: bb && Math.round(bb.bottom), ontop: !!(mid && t.contains(mid)), scrolls: !!(t && t.scrollHeight > t.clientHeight + 1), canScroll: !!(t && /auto|scroll/.test(getComputedStyle(t).overflowY)),"
+    + "  layoutLit: lit('layout'), unitsLit: lit('units'), tourney: sw('tourney'), aa: sw('aa'), others: sw('others'), tiles: t ? [].filter.call(t.querySelectorAll('[data-ts-tile]'), vis).map(function (b) { return b.getAttribute('data-ts-tile'); }) : [],"
+    + "  oldMenu: vis2('#gps-overlay .gps-tools-menu'), layout: window.HardPanGps && HardPanGps.layout(), lsUnits: ls('hardpan_gps_units'), lsAa: ls('hardpan_gps_autoadvance'), lsTourney: ls('hardpan_tournament_phone'), lsLayout: ls('hardpan_gps_layout'),"
+    + "  pill: vis2('#gps-overlay .gps-ld-plays'), mText: (ov.querySelector('.gps-m') || {}).textContent, bag: vis2('#gps-overlay .gps-bag'), shotbar: vis2('#gps-overlay .gps-shotbar'), stats: vis2('#hp-my-stats') || vis2('.gps-stats-sheet'), banner: vis2('#gps-overlay .gps-banner') ? ov.querySelector('.gps-banner').textContent : null,"
+    + "  actions: vis2('#gps-overlay .gps-actions'), url: document.URL.split('/').pop(), e: window.__e }); })()" };
+const TSC = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-tsheet " + sel.replace(/'/g, "\\'") + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
 const SWITCH = [TAP('.gps-tools'), W(300), TAP('.gps-layout-pick'), W(1500)];
 
 // THE CREDIT, SEEN: on screen, nothing over its words, above the bottom controls (D: Mark shot; C: the panel).
@@ -231,7 +246,7 @@ function checkD(a, f, tag, o) {
 
     // LD_ARMS=esri,tap,switch,tourney,off (default: all); LD_SHOT_ONLY=1: just the screenshot arm.
     let s;
-    const ARMS = process.env.LD_SHOT_ONLY ? [] : (process.env.LD_ARMS || 'esri,usgs,tap,switch,tourney,off,sheet,sizes').split(',');
+    const ARMS = process.env.LD_SHOT_ONLY ? [] : (process.env.LD_ARMS || 'esri,usgs,tap,switch,tourney,off,sheet,tools,sizes').split(',');
     const TX = Math.round(VW * 0.4);
     const tapAt = (y) => ({ expression: "(function(){ var c = document.querySelector('#gps-overlay .maplibregl-canvas'); if (!c) return 'no canvas';"
         + " ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: " + TX + ", clientY: " + y + ", button: 0 })); }); return 'tapped'; })()" });
@@ -277,6 +292,65 @@ function checkD(a, f, tag, o) {
         report.sheet = sh.sheet == null ? 'no score sheet in this tree' : { open: sh.sheet, side: sh.side, ld: sh.ld, top: !!sh.top, oldTop: !!sh.oldTop };
         if (sh.sheet != null) f(sh.sheet === true && sh.side === 'gps' && sh.ld && sh.top && !sh.oldTop, 'sheet: the score sheet is not over layout D: ' + JSON.stringify(report.sheet));
         errs(s, 'sheet');
+    }
+    // THE TOOLS SHEET in D and in C: each setting flips at once and is saved (a reload), each tile
+    // runs its action, swipe / tap outside closes, it never covers the top bar; SE at the largest
+    // text scrolls. Screenshots tools-D-15.png, tools-C-15.png, tools-D-se-largest.png, tools-C-se-largest.png.
+    if (ARMS.includes('tools')) {
+        const tsShot = (n) => (SHOTS ? [{ shot: path.join(SHOTS, n), viewportOnly: true }] : []);
+        for (const lay of ['d', 'c']) {
+            const L = lay.toUpperCase(), seed = BAG + (lay === 'c' ? LAYOUT_C : '');
+            // T1: open; flip units, tournament, auto-advance - each at once; a reload keeps them.
+            s = await go({ esri: 'OK-3X', seed, steps: START.concat([TAP('.gps-tools'), W(500), TS], tsShot('tools-' + L + '-15.png'), [
+                TSC('[data-ts-seg="units"] [data-v="m"]'), W(500), TS, TSC('[data-ts-sw="tourney"]'), W(500), TS, TSC('[data-ts-sw="aa"]'), W(500), TS,
+                { expression: 'location.reload()' }, W(1000)], START, [TAP('.gps-tools'), W(500), TS,
+                TSC('[data-ts-seg="units"] [data-v="yd"]'), W(400), TSC('[data-ts-sw="tourney"]'), W(400), TSC('[data-ts-sw="aa"]'), W(400), TS]) });
+            const [o0, u1, t1, a1, r0, b0] = s;
+            report['tools' + L] = { open: o0, units: [u1.unitsLit, u1.lsUnits, u1.mText], tourney: [t1.tourney, t1.lsTourney, t1.pill], aa: [a1.aa, a1.lsAa], reload: [r0.unitsLit, r0.tourney, r0.aa], back: [b0.unitsLit, b0.tourney, b0.aa] };
+            f(o0.open && o0.ontop && !o0.oldMenu && o0.layout === lay && o0.layoutLit === lay && o0.unitsLit === 'yd' && o0.tourney === false && o0.others === null, L + ' tools: the sheet did not open as set: ' + JSON.stringify(o0));
+            f(o0.barB != null && o0.top >= o0.barB, L + ' tools: the sheet covers the top bar: ' + JSON.stringify([o0.top, o0.barB]));
+            f(u1.open && u1.unitsLit === 'm' && u1.lsUnits === 'm' && Number(u1.mText) < Number(o0.mText), L + ' tools: Meters did not take at once: ' + JSON.stringify([u1.unitsLit, u1.lsUnits, u1.mText, o0.mText]));
+            f(t1.open && t1.tourney === true && t1.lsTourney === '1' && !t1.pill, L + ' tools: Tournament mode did not take at once: ' + JSON.stringify(t1));
+            f(a1.open && a1.aa !== o0.aa && a1.lsAa !== o0.lsAa, L + ' tools: Auto-advance did not flip: ' + JSON.stringify([o0.aa, a1.aa, o0.lsAa, a1.lsAa]));
+            f(r0.open && r0.unitsLit === 'm' && r0.tourney === true && r0.aa === a1.aa, L + ' tools: not saved across a reload: ' + JSON.stringify(r0));
+            f(b0.unitsLit === 'yd' && b0.tourney === false && b0.aa === o0.aa, L + ' tools: did not flip back: ' + JSON.stringify(b0));
+            errs(s, 'tools' + L);
+            // T2: the layout choice switches live and keeps the sheet; swipe down closes; tap outside closes.
+            s = await go({ seed, steps: START.concat([TAP('.gps-tools'), W(400), TSC('[data-ts-seg="layout"] [data-v="' + (lay === 'd' ? 'c' : 'd') + '"]'), W(1500), TS,
+                TSC('[data-ts-seg="layout"] [data-v="' + lay + '"]'), W(1500), TS, { drag: '#gps-overlay .gps-ts-grip', dx: 0, dy: 160 }, W(500), TS,
+                TAP('.gps-tools'), W(400), TS, { expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-ts-back'); var r = b.getBoundingClientRect(); var x = r.left + 30, y = r.top + 40; var h = document.elementFromPoint(x, y); ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(function (t) { h.dispatchEvent(new (t.indexOf('pointer') === 0 ? PointerEvent : MouseEvent)(t, { bubbles: true, cancelable: true, clientX: x, clientY: y })); }); return 'outside'; })()" }, W(400), TS]) });
+            const [l1, l2, sw1, re1, out1] = s;
+            f(l1.open && l1.layout === (lay === 'd' ? 'c' : 'd') && l1.lsLayout === (lay === 'd' ? 'c' : null) && l2.layout === lay && l2.open, L + ' tools: the layout choice did not switch live with the sheet open: ' + JSON.stringify([l1.layout, l1.open, l1.lsLayout, l2.layout, l2.open]));
+            f(!sw1.open, L + ' tools: a swipe down did not close it');
+            f(re1.open && !out1.open, L + ' tools: a tap outside did not close it');
+            errs(s, 'tools2' + L);
+            // T3: every tile shown runs its action (Other course last: it leaves for Home).
+            const TILE_OK = { '.gps-my-bag': (x) => x.bag, '.gps-my-stats': (x) => x.stats, '.gps-replay': (x) => x.shotbar, '.gps-mark-shots': (x) => x.shotbar,
+                '.gps-refresh-gps': (x) => !!x.banner, '.gps-fix-green': (x) => x.actions || /Stand|Tap|green/i.test(x.banner || ''), '.gps-pick-course': (x) => /^home\.html/.test(x.url) };
+            const RESET = { expression: "(function(){ ['.gps-bag-done', '.gps-sb-done', '.gps-cancel'].forEach(function (s) { var b = document.querySelector('#gps-overlay ' + s); if (b && b.offsetParent !== null) b.click(); }); var st = document.getElementById('hp-my-stats'); if (st) st.style.display = 'none'; var ss = document.querySelector('.gps-stats-sheet'); if (ss) ss.style.display = 'none'; return 'reset'; })()" };
+            const tiles = (o0.tiles || []).filter((x) => x !== '.gps-pick-course').concat((o0.tiles || []).indexOf('.gps-pick-course') !== -1 ? ['.gps-pick-course'] : []);
+            const steps = START.slice();
+            tiles.forEach((tl) => steps.push(TAP('.gps-tools'), W(400), TSC('[data-ts-tile="' + tl + '"]'), W(1500), TS, RESET, W(500)));
+            s = await go({ seed, steps });
+            report['tiles' + L] = {};
+            tiles.forEach((tl, i) => {
+                const x = s[i];
+                report['tiles' + L][tl] = x ? { closed: !x.open, ok: TILE_OK[tl] ? TILE_OK[tl](x) : 'unchecked' } : null;
+                f(x && !x.open && (!TILE_OK[tl] || TILE_OK[tl](x)), L + ' tools: the tile ' + tl + ' did not run: ' + JSON.stringify(x));
+            });
+            ['.gps-fix-green', '.gps-refresh-gps', '.gps-my-stats', '.gps-my-bag', '.gps-replay', '.gps-pick-course', '.gps-mark-shots'].forEach((tl) => f(tiles.indexOf(tl) !== -1, L + ' tools: no ' + tl + ' tile'));
+            // T4: SE at the largest text - it scrolls, never over the top bar.
+            s = await go({ esri: 'OK-3X', seed, vw: 375, vh: 667, steps: START.concat([SCALE(1.35), W(1200), TAP('.gps-tools'), W(500), TS], tsShot('tools-' + L + '-se-largest.png'),
+                [{ expression: "(function(){ var t = document.querySelector('#gps-overlay .gps-tsheet'); t.scrollTop = t.scrollHeight; return t.scrollTop; })()" }, W(300), TS]) });
+            const [se0, se1] = s;
+            f(se0.open && se0.top >= se0.barB && se0.canScroll && se0.scrolls, L + ' tools SE largest: not scrollable under the top bar: ' + JSON.stringify(se0));
+            f(se1.open && se1.tiles.length >= 6, L + ' tools SE largest: the tiles are not reachable: ' + JSON.stringify(se1.tiles));
+            errs(s, 'toolsSE' + L);
+        }
+        // toolsSheet OFF: the old drop-down in D.
+        s = await go({ features: { toolsSheet: false }, steps: START.concat([TAP('.gps-tools'), W(400), TS]) });
+        f(!s[0].open && s[0].oldMenu, 'tools off: not the old drop-down: ' + JSON.stringify(s[0]));
+        errs(s, 'toolsOff');
     }
     if (ARMS.includes('esri')) {
     // 1-4: ESRI LIVE, the bag set up.

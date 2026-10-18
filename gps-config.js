@@ -75,7 +75,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // bar, a right rail, the plays-like pill, Mark shot + Enter score at the bottom), with
         // Tools > Screen layout: HardPan | Bottom panel (= layout C), per phone - off: no setting,
         // and the 011 behaviour exactly (C with gpsLayoutC, else the old layout).
-        gpsLayoutC: true, gpsRoundScore: true, gpsLayoutD: true },
+        gpsLayoutC: true, gpsRoundScore: true, gpsLayoutD: true,
+        // 012: toolsSheet = Tools as a bottom sheet in layouts D and C (layout / units choices,
+        // round switches, a grid of tiles) - off: the old drop-down there too.
+        toolsSheet: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
