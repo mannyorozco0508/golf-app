@@ -190,6 +190,10 @@ console.log('rules/database.rules.phase1.json written (phase 1: safe for today\'
 // ---- PHASE 2 ONLY: added after the phase-1 file is written --------------------------------
 // QUICK STATS (mailbox 008): events/<code>/stats/p<id>_h<n> = { putts, fw, gir }, written by any
 // signed-in golfer on the round, like scores. Until phase 2 ships, the app keeps stats on the phone.
-R.events.$eventCode.stats = { '.write': PLAY_WRITE, $k: { '.validate': "$k.matches(/^p[0-9]+_h([1-9]|1[0-8])$/) && newData.hasChildren() && (!newData.hasChild('putts') || (newData.child('putts').isNumber() && newData.child('putts').val() >= 0 && newData.child('putts').val() <= 9))" } };
+R.events.$eventCode.stats = { '.write': PLAY_WRITE, $statKey: {
+    '.validate': "$statKey.matches(/^p[0-9]+_h([1-9]|1[0-8])$/) && newData.hasChildren()",
+    putts: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 4' },
+    fw: { '.validate': "newData.isString() && (newData.val() === 'hit' || newData.val() === 'L' || newData.val() === 'R')" },
+    gir: { '.validate': 'newData.isBoolean()' }, $other: { '.validate': false } } };
 fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.proposed.json'), JSON.stringify({ rules: R }, null, 2) + '\n');
 console.log('rules/database.rules.proposed.json rewritten with the phase-2-only additions (stats)');

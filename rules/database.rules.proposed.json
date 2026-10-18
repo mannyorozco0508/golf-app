@@ -187,8 +187,20 @@
         },
         "stats": {
           ".write": "auth != null && root.child('events/' + $eventCode).exists()",
-          "$k": {
-            ".validate": "$k.matches(/^p[0-9]+_h([1-9]|1[0-8])$/) && newData.hasChildren() && (!newData.hasChild('putts') || (newData.child('putts').isNumber() && newData.child('putts').val() >= 0 && newData.child('putts').val() <= 9))"
+          "$statKey": {
+            ".validate": "$statKey.matches(/^p[0-9]+_h([1-9]|1[0-8])$/) && newData.hasChildren()",
+            "putts": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4"
+            },
+            "fw": {
+              ".validate": "newData.isString() && (newData.val() === 'hit' || newData.val() === 'L' || newData.val() === 'R')"
+            },
+            "gir": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }
