@@ -3610,6 +3610,7 @@
     // same); off, nothing moves and the old layout is exactly as it was.
     var PANEL_KEY = 'hardpan_gps_panel_';
     function lcSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsLayoutC') !== false; } catch (e) { return true; } }
+    function rsSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsRoundScore') !== false; } catch (e) { return true; } }
     function lcOn() { return !!(S && S.lc); }
     function buildLayoutC(el) {
         var q = function (sel) { return el.querySelector(sel); };
@@ -3626,6 +3627,8 @@
         chip.appendChild(l1); chip.appendChild(l2);
         right.appendChild(chip);
         top.appendChild(left); top.appendChild(right);
+        // The round chip: its own row under the top row, at the right - it may run in under Games.
+        if (rsSwitch()) top.appendChild(mk('button', 'gps-lc-score gps-float', { type: 'button', 'data-feature': 'gpsRoundScore', style: 'display:none', 'aria-label': 'Round score - open the scorecard' }));
         // THE PANEL
         var panel = mk('div', 'gps-panel', { role: 'region', 'aria-label': 'Distances and actions' });
         var handle = mk('button', 'gps-panel-handle', { type: 'button', 'aria-expanded': 'true', 'aria-label': 'Show less' });
@@ -3660,6 +3663,62 @@
         if (S.map && S.framed === 'hole' && !S.userMoved && S.view !== 'green' && !S.zoomStep) frameHole(false);
         else placePills();
     }
+    // THE ROUND SO FAR (switch gpsRoundScore): pure. Gross = strokes on the holes scored, to par
+    // on those holes; net = gross minus the handicap strokes on those holes, from the CANONICAL
+    // getStrokes(hole index, parseHcp(hcp)) the scorecard uses (handicap.js) - passed in as
+    // `strokes`. No handicap: net is null. "Thru" counts the holes actually scored (a start on
+    // 10 or a shotgun is still right).
+    function roundScore(o) {
+        var cd = (o && o.courseData) || [], sc = (o && o.scores) || {}, id = o && o.id, hcp = o && o.hcp;
+        var strokes = (o && typeof o.strokes === 'function') ? o.strokes : null;
+        var hasHcp = !!strokes && hcp != null && String(hcp).trim() !== '';
+        var thru = 0, gross = 0, par = 0, net = 0;
+        cd.forEach(function (h) {
+            if (!h || !h.hole) return;
+            var v = parseInt(sc['p' + id + '_h' + h.hole], 10);
+            if (!(v > 0)) return;
+            thru++; gross += v; par += Number(h.par) || 0;
+            if (hasHcp) net += v - (Number(strokes(h.hcpIndex, hcp)) || 0);
+        });
+        return { thru: thru, gross: gross, grossToPar: gross - par, net: hasHcp ? net : null, netToPar: hasHcp ? net - par : null };
+    }
+    function toParText(n) { return n === 0 ? 'E' : (n > 0 ? '+' + n : '−' + Math.abs(n)); }
+    // "Thru 3 · 14 (+2) · Net 13 (+1)"; "Thru 0 · E" before a score.
+    function roundScoreText(rs) {
+        if (!rs || !rs.thru) return 'Thru 0 · E';
+        return 'Thru ' + rs.thru + ' · ' + rs.gross + ' (' + toParText(rs.grossToPar) + ')' + (rs.net != null ? ' · Net ' + rs.net + ' (' + toParText(rs.netToPar) + ')' : '');
+    }
+    function cardStrokes() {
+        if (typeof getStrokes === 'function' && typeof parseHcp === 'function') return function (idx, hcp) { return getStrokes(idx, parseHcp(hcp)); };   /* global getStrokes, parseHcp */
+        return null;
+    }
+    function syncRoundChip() {
+        var b = S && S.el.querySelector('.gps-lc-score');
+        if (!b) return;
+        var d = roundData(), w = scoreFor();
+        if (!d || !w || !w.player) { b.style.display = 'none'; return; }
+        var rs = roundScore({ courseData: d.courseData || [], scores: w.scores, id: w.id, hcp: w.player.hcp, strokes: cardStrokes() });
+        var tp = function (n) { return n === 0 ? '' : (n < 0 ? 'gps-tp-under' : 'gps-tp-over'); };
+        var key = JSON.stringify(rs);
+        b.style.display = '';
+        if (b.getAttribute('data-rs') === key) return;
+        b.setAttribute('data-rs', key);
+        b.textContent = '';
+        // Three parts, each kept whole; a small phone with big text wraps BETWEEN them.
+        var part = function (text, n) {
+            var s = document.createElement('span'); s.textContent = text;
+            if (n != null) { var t = document.createElement('span'); var c = tp(n); if (c) t.className = c; t.textContent = '(' + toParText(n) + ')'; s.appendChild(t); }
+            if (b.firstChild) b.appendChild(document.createTextNode(' '));
+            b.appendChild(s);
+        };
+        if (!rs.thru) part('Thru 0 · E');
+        else {
+            part('Thru ' + rs.thru + ' ·');
+            part(rs.gross + ' ', rs.grossToPar);
+            if (rs.net != null) part('· Net ' + rs.net + ' ', rs.netToPar);
+        }
+        b.setAttribute('aria-label', roundScoreText(rs) + ' - open the scorecard');
+    }
     // What render fills in layout C only.
     function syncLayoutC(r, nums, acc) {
         if (!lcOn()) return;
@@ -3674,6 +3733,7 @@
         var a = S.el.querySelector('.gps-lc-acc');
         if (a) { var t = (acc && fix && !S.geoError) ? acc.text : ''; if (a.textContent !== t) a.textContent = t; a.style.display = t ? '' : 'none'; }
         syncPanel();
+        if (rsSwitch()) syncRoundChip();
         // The credit, Recenter and the zoom ride on the panel's top edge, whatever its height now.
         try { syncLayoutVars(); maybeRefit(); } catch (e) {}
     }
@@ -4306,6 +4366,7 @@
         + '#gps-overlay .gps-lc-top > *{pointer-events:auto;}'
         + '#gps-overlay .gps-lc-left{display:flex;align-items:center;gap:8px;flex:0 0 auto;}'
         + '#gps-overlay .gps-lc-right{display:flex;flex-direction:column;align-items:flex-end;min-width:0;}'
+        + '#gps-overlay .gps-lc-top > .gps-lc-score{grid-column:1 / -1;justify-self:end;}'
         + '#gps-overlay.gps-lc .gps-back{width:44px;height:44px;border-radius:50%;padding:0 0 3px;box-sizing:border-box;font-size:28px;}'
         + '#gps-overlay.gps-lc .gps-door-games{position:static;background:#ffd60a;color:#0b0f0c;min-height:44px;padding:0 16px;font:800 15px/1 ' + FONT + ';box-shadow:0 4px 12px rgba(0,0,0,.3);}'
         + '#gps-overlay .gps-lc-hole{display:flex;flex-direction:column;align-items:flex-end;padding:4px 12px;border-radius:14px;max-width:100%;box-sizing:border-box;}'
@@ -4317,6 +4378,10 @@
         + '#gps-overlay.gps-lc .gps-lc-meta:empty + .gps-wind::before{content:none;}'
         + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind-arrow{font-size:14px;}'
         + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind-tag{display:none !important;}'
+        + '#gps-overlay .gps-lc-score{min-height:32px;padding:4px 10px;border-radius:12px;font:800 12px/1.25 ' + FONT + ';color:#f4f4ef;max-width:100%;box-sizing:border-box;text-align:right;font-variant-numeric:tabular-nums;}'
+        // Wraps between its parts, never inside one ("Net 12 (+1)" stays whole) - big text, small phone.
+        + '#gps-overlay .gps-lc-score > span{white-space:nowrap;}'
+        + '#gps-overlay .gps-lc-score .gps-tp-under{color:#4ade80;}'
         // THE PANEL
         + '#gps-overlay .gps-panel{position:absolute;z-index:7;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;'
         +   'padding:0 10px calc(env(safe-area-inset-bottom) + 8px);background:rgba(12,18,14,.96);border-radius:24px 24px 0 0;border-top:1px solid rgba(217,249,157,.14);box-shadow:0 -6px 18px rgba(0,0,0,.3);color:#f4f4ef;touch-action:none;}'
@@ -4468,6 +4533,7 @@
         on(el, '.gps-hole-btn', openPicker);
         on(el, '.gps-lc-l1', openPicker);
         on(el, '.gps-panel-handle', togglePanel);
+        on(el, '.gps-lc-score', function () { if (!S) return; closeMenus(); S.userChoseSide = true; showSide('bets'); });
         on(el, '.gps-tools', toggleTools);
         on(el, '.gps-score-next', function () { closeMenus(); if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-score-prev', function () { closeMenus(); if (S && S.stepHole) S.stepHole(-1); });
@@ -5060,6 +5126,8 @@
         // THE WATCH (feature 10; gps_watch_test.js): what render sent, and a watch score in.
         watchSent: function () { return watchLast ? JSON.parse(watchLast) : null; },
         watchScore: function (ev) { return watchScore(ev); },
+        // LAYOUT C's round chip (011; gps_layout_c_test.js): pure.
+        roundScore: roundScore, roundScoreText: roundScoreText,
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
