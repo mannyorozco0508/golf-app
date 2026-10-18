@@ -20,6 +20,9 @@
 //      or at a green), NONE at or near any spot the golfer stood (they walk 3 spots, all off
 //      the line); kept on the phone in one record; a second visit (same phone) asks nothing.
 //   6  courseElev off: only the old 5 points a hole (tee, 25 / 50 / 75 %, green); no record.
+//   7  TOURNAMENT MODE (this phone's switch), with a full bag, wind and heights all there:
+//      no plays-like (no line, no "plays ~"), no club suggestion, no "Which club?" after
+//      Mark shot, and NOT ONE elevation request (nor a wind one).
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -166,11 +169,12 @@ const START = [W(2500), OPEN, W(3000)];
     errs(s, 'off');
 
     // 5: the whole course, once; course points only; never the golfer.
-    const os = require('os');
-    const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-playslike-'));
     const SPOT2 = dest(dest(T1, B1, L1 * 0.5), B1 - 90, 18), SPOT3 = dest(dest(T1, B1, L1 * 0.3), B1 + 90, 25);
     const DONE = { waitFor: "(function(){ try { return JSON.parse(localStorage.getItem('hardpan_celev_v1_caledonia')).done === true; } catch (e) { return false; } })()", timeout: 60000 };
-    s = await go({ wind: INTO, profileDir: prof, steps: START.concat([LINE_UP, { expression: 'window.__moveTo(' + SPOT2 + ')' }, W(1500), { expression: 'window.__moveTo(' + SPOT3 + ')' }, W(1500), DONE, W(500), ST, W(8000)]) });   // 8 s: Chrome writes local storage to disk lazily
+    // The second visit is a RELOAD on the same phone (the page and its fetch log start over; the
+    // phone's storage stays) - a cold browser restart can lose Chrome's last unflushed writes.
+    s = await go({ wind: INTO, steps: START.concat([LINE_UP, { expression: 'window.__moveTo(' + SPOT2 + ')' }, W(1500), { expression: 'window.__moveTo(' + SPOT3 + ')' }, W(1500), DONE, W(500), ST,
+        { expression: 'window.__moveTo(' + ME + ')' }, W(1500), { expression: 'location.reload()' }, W(1000)].concat(START, [LINE_UP, W(2500), ST])) });
     const all = s[0];
     const holes = Object.keys(table.caledonia.holes).map((n) => table.caledonia.holes[n].osm);
     // Distance (m) from p to a polyline - inline, flat-earth near the point.
@@ -190,12 +194,11 @@ const START = [W(2500), OPEN, W(3000)];
     [ME, SPOT2, SPOT3].forEach((g, i) => f(!reqs.some((p) => hav(p, g) < 8), '5: an EPQS request at / near the golfer\'s spot #' + (i + 1)));
     f(/uphill/.test(all.line || ''), '5: after the walk the line lost its slope: ' + all.line);
     errs(s, 'whole');
-    s = await go({ wind: INTO, profileDir: prof, steps: START.concat([LINE_UP, W(2500), ST]) });
+    s = [s[1]];
     report.again = { requests: (s[0].epqs || []).length, line: s[0].line };
     f((s[0].epqs || []).length === 0, '5: the second visit asked EPQS again: ' + (s[0].epqs || []).length);
     f(s[0].line === into.line, '5: the second visit (heights from the phone) reads ' + s[0].line + ', the first ' + into.line);
     errs(s, 'again');
-    try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) {}
 
     // 6: courseElev off - the 5 points a hole, as before; no course record.
     s = await go({ wind: INTO, features: { courseElev: false }, steps: START.concat([LINE_UP, W(4000), ST]) });
@@ -206,6 +209,21 @@ const START = [W(2500), OPEN, W(3000)];
     f(r6.length > 0 && r6.every((p) => five.some((q) => hav(p, q) < 1.5)), '6: courseElev off asked for other points: ' + JSON.stringify(r6.filter((p) => !five.some((q) => hav(p, q) < 1.5)).slice(0, 3)));
     f(r6.length <= 90 && s[0].celev === null, '6: courseElev off: ' + JSON.stringify(report.offElev));
     errs(s, 'offElev');
+
+    // 7: tournament mode.
+    const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];
+    const ASK = { expression: "JSON.stringify({ ask: " + vis('.gps-bagask') + " })" };
+    s = await go({ wind: INTO, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
+        { expression: 'window.__moveTo(' + dest(ME, B1, 120) + ')' }, W(1500), ...MARK, W(500), ASK, ST]) });
+    const [t0, tAsk, t1] = s;
+    report.tournament = { line: t0.line, sug: t0.sug, plays: t0.plays, epqs: (t1.epqs || []).length, nws: t1.nws, ask: tAsk.ask, celev: t1.celev };
+    f(!t0.line && !t1.line, '7: tournament: a plays-like line: ' + JSON.stringify([t0.line, t1.line]));
+    f(t0.plays === '' && t1.plays === '', '7: tournament: "plays ~" shown: ' + JSON.stringify([t0.plays, t1.plays]));
+    f(!t0.sug && !t1.sug, '7: tournament: a club suggestion: ' + JSON.stringify([t0.sug, t1.sug]));
+    f(!tAsk.ask, '7: tournament: "Which club?" after Mark shot: ' + tAsk.ask);
+    f((t1.epqs || []).length === 0 && t1.celev === null, '7: tournament: elevation was fetched: ' + (t1.epqs || []).length);
+    f(t1.nws === 0, '7: tournament: the weather service was asked: ' + t1.nws);
+    errs(s, 'tournament');
 
     console.log(JSON.stringify({ report, fails }, null, 1));
     process.exit(fails.length ? 1 : 0);

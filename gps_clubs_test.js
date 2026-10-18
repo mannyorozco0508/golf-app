@@ -239,3 +239,23 @@ test('gps-view: the plays-like line - behind playsBreakdown, never in tournament
     assert.ok(/syncBreakdown\(r, o, nums\);\s*\n\s*syncSuggest\(r, o, nums\);/.test(v), 'worked out before the plain suggestion');
     assert.ok(!/\.ref\(|fetch\(/.test(sec), 'nothing sent');
 });
+
+test('009 TOURNAMENT MODE (Rules of Golf 4.3): no plays-like, no club suggestion, no elevation fetch - every way in is shut', { skip }, () => {
+    const v = read('gps-view.js');
+    const fn = (name) => { const i = v.indexOf('function ' + name + '('); assert.ok(i > 0, name); return v.slice(i, v.indexOf('\n    }\n', i)); };
+    // 1. No plays-like: the one function every plays-like number comes from says null first.
+    assert.ok(/function playsTo\(targetPt\) \{\s*if \(tournament\(\)\) return null;/.test(v), 'playsTo: null in tournament mode');
+    assert.ok(/if \(plSwitch\(\) && !tournament\(\)/.test(fn('syncBreakdown')), 'the plays-like line');
+    assert.ok(/if \(tournament\(\)\) return \{ yd: yd \};/.test(fn('shotDetails')), 'a marked shot keeps its yards only');
+    // 2. No club suggestion, no "Which club?".
+    assert.ok(/if \(bagSwitch\(\) && !tournament\(\) && S\.pro/.test(fn('syncSuggest')));
+    assert.ok(/if \(!S \|\| !bagSwitch\(\) \|\| tournament\(\)/.test(fn('bagAsk')));
+    // 3. No elevation fetch: neither the whole-course prefetch nor the per-hole one.
+    assert.ok(/if \(!S \|\| !S\.pro \|\| S\.elevPrefetch \|\| cfg\(\)\.elevOnTee !== false \|\| tournament\(\)\) return;/.test(fn('prefetchCourseElevs')));
+    assert.ok(/if \(tournament\(\)\) return;/.test(fn('fetchElevs')));
+    // ...and no other place in gps-view asks gps-offline for heights.
+    assert.equal((v.match(/prefetchElevations\(/g) || []).length, 1, 'one call, the gated one');
+    assert.equal((v.match(/fetch\(epqsUrl\(/g) || []).length, 1, 'one EPQS fetch, the gated one');
+    // tools/gps-playslike-check.js arm 7 plays it: tournament on - no line, no suggestion, no EPQS request.
+    assert.ok(/7: tournament/.test(read('tools/gps-playslike-check.js')));
+});
