@@ -63,5 +63,77 @@
     function holesWithShots(code) {
         return Object.keys(load(code).holes).filter(function (k) { return (load(code).holes[k] || []).length; }).map(Number).sort(function (a, b) { return a - b; });
     }
+    // ---- MY BAG (008, switch clubs) --------------------------------------------------
+    // After a measured shot (Mark shot, the second tap) the golfer may say which club it
+    // was. Per golfer (the GPS screen's golfer, by name - the same golfer from round to
+    // round), the last 10 yardages per club are kept ON THIS PHONE (hardpan_bag_v1 -
+    // yards only, never a position). A club's number = the MEDIAN of those, outliers
+    // dropped (outside 1.5 x the interquartile range, once there are 4 or more); a number
+    // the golfer typed in My bag wins over it until reset. Nothing here leaves the phone.
+    var BAG_KEY = 'hardpan_bag_v1', BAG_LAST = 10;
+    var BAG = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
+        '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
+    function quantile(sorted, q) {
+        var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+        return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+    }
+    // The last 10, outliers dropped, the median: { yd, n (used), of (kept) } or null. Pure.
+    function clubAverage(list) {
+        var v = (list || []).map(Number).filter(function (x) { return isFinite(x) && x > 0; }).slice(-BAG_LAST);
+        if (!v.length) return null;
+        var s = v.slice().sort(function (a, b) { return a - b; });
+        if (s.length >= 4) {
+            var q1 = quantile(s, 0.25), q3 = quantile(s, 0.75), k = 1.5 * (q3 - q1);
+            s = s.filter(function (x) { return x >= q1 - k && x <= q3 + k; });
+        }
+        return { yd: Math.round(quantile(s, 0.5)), n: s.length, of: v.length };
+    }
+    // THE SUGGESTION: the club whose number is the shortest one that still gets there (>=
+    // the distance); none gets there - the longest (the closest). bag: { club: { yd } }. Pure.
+    function suggestClub(bag, yards) {
+        if (!bag || !isFinite(yards) || yards <= 0) return null;
+        var ks = BAG.filter(function (c) { return bag[c] && isFinite(bag[c].yd) && bag[c].yd > 0; });
+        if (!ks.length) return null;
+        var reach = ks.filter(function (c) { return bag[c].yd >= yards; }).sort(function (a, b) { return bag[a].yd - bag[b].yd; });
+        var c = reach.length ? reach[0] : ks.sort(function (a, b) { return bag[b].yd - bag[a].yd; })[0];
+        return { club: c, name: BAG_NAMES[c], yd: bag[c].yd };
+    }
+    function golferKey(name) { var n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); return n ? 'n:' + n : 'me'; }
+    function bagRec() { var r = lsGet(BAG_KEY); return r && r.v === 1 && r.golfers ? r : { v: 1, golfers: {} }; }
+    function bagOf(rec, g) { return rec.golfers[g] || (rec.golfers[g] = { shots: {}, set: {} }); }
+    function addClubShot(golfer, club, yd) {
+        yd = Math.round(Number(yd));
+        if (BAG.indexOf(club) === -1 || !(yd > 0 && yd < 450)) return false;
+        var r = bagRec(), b = bagOf(r, golferKey(golfer));
+        b.shots[club] = (b.shots[club] || []).concat([yd]).slice(-BAG_LAST);
+        return lsSet(BAG_KEY, r);
+    }
+    // My bag: a number typed in (or null to go back to the shots' median).
+    function setClub(golfer, club, yd) {
+        if (BAG.indexOf(club) === -1) return false;
+        var r = bagRec(), b = bagOf(r, golferKey(golfer));
+        yd = Math.round(Number(yd));
+        if (yd > 0 && yd < 450) b.set[club] = yd; else delete b.set[club];
+        return lsSet(BAG_KEY, r);
+    }
+    function resetClub(golfer, club) {
+        var r = bagRec(), b = bagOf(r, golferKey(golfer));
+        delete b.set[club]; delete b.shots[club];
+        return lsSet(BAG_KEY, r);
+    }
+    function resetBag(golfer) { var r = bagRec(); delete r.golfers[golferKey(golfer)]; return lsSet(BAG_KEY, r); }
+    // { club: { yd, n, set } } for every club with a number.
+    function bag(golfer) {
+        var b = bagRec().golfers[golferKey(golfer)] || { shots: {}, set: {} }, out = {};
+        BAG.forEach(function (c) {
+            var a = clubAverage((b.shots || {})[c]), set = (b.set || {})[c];
+            if (set) out[c] = { yd: set, n: a ? a.of : 0, set: true };
+            else if (a) out[c] = { yd: a.yd, n: a.of, set: false };
+        });
+        return out;
+    }
+    W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
+        add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY };
     W.HardPanGpsShots = { load: load, shots: shots, add: add, setLast: setLast, undo: undo, legs: legs, holesWithShots: holesWithShots, MAX_PER_HOLE: MAX_PER_HOLE, CLUBS: CLUBS };
 })();

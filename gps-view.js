@@ -2904,6 +2904,7 @@
 
         placeTarget(r);
         targetReadout();
+        syncSuggest(r, o, nums);
 
         // The green, set / fixed / undone.
         var noGreen = !r || !r.mid;
@@ -3064,6 +3065,8 @@
         S.measureShot = { text: G.shownDistance(m, units()) + (units() === 'm' ? ' m' : ' yds'), at: Date.now() };
         S.measureFrom = fix.pt;
         flash('Shot: ' + S.measureShot.text);
+        // MY BAG (008): which club was that? (skippable, never in the way)
+        bagAsk(m / G.M_PER_YD);
         render();
         setTimeout(function () { if (S) render(); }, 4100);
     }
@@ -3072,6 +3075,98 @@
         if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Shot: ' + S.measureShot.text;
         var d = fix ? G.haversineMeters(S.measureFrom, fix.pt) : 0;
         return '\uD83D\uDCCD ' + G.shownDistance(d, units()) + (units() === 'm' ? ' m' : ' yds');
+    }
+    // ---- MY CLUB DISTANCES + THE SUGGESTION (008, switch clubs) ----------------------
+    // After a measured shot (Mark shot, the second tap): "Which club?" - a row of chips
+    // that never blocks (Skip, or just walk on: it goes after 20 s). The yards go to the
+    // golfer's bag ON THIS PHONE (gps-shots.js HardPanGpsBag: median of the last 10 per
+    // club, outliers dropped). The map then says "Suggested: 7-iron (your 158)" for the
+    // plays-like distance to the center - or to the target once the golfer has moved it.
+    // TOURNAMENT MODE (Rules of Golf 4.3): no suggestion and no question. My bag (Tools)
+    // shows, edits and resets the numbers.
+    // NOT SYNCED: no path under the live rules lets a phone write per-golfer data of its
+    // own (pushPrefs/<uid> takes only bets / hype; organizers/<uid>/groups only groups), so
+    // the bag stays on the phone until a rule for it exists.
+    var BAG_ASK_MS = 20000;
+    function bagSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('clubs') !== false; } catch (e) { return true; } }
+    function bagApi() { return window.HardPanGpsBag || null; }
+    function bagGolfer() { var w = scoreFor(); return (w && w.player && w.player.name) || ''; }
+    function bagShown(yd) { return units() === 'm' ? Math.round(yd * G.M_PER_YD) : Math.round(yd); }
+    function bagAsk(yd) {
+        if (!S || !bagSwitch() || tournament() || !(yd > 0)) return;
+        var bar = S.el.querySelector('.gps-bagask');
+        if (!bar) return;
+        S.bagPending = { yd: yd, golfer: bagGolfer() };
+        withShots(function () {
+            var B = bagApi();
+            if (!B || !S || !S.bagPending) return;
+            bar.querySelector('.gps-bagask-head').textContent = 'Shot ' + bagShown(yd) + (units() === 'm' ? ' m' : ' yds') + ' \u00b7 which club?';
+            var row = bar.querySelector('.gps-bagask-row');
+            row.textContent = '';
+            B.BAG.forEach(function (c) {
+                var b = document.createElement('button');
+                b.type = 'button'; b.textContent = c; b.setAttribute('data-bag-club', c); b.setAttribute('aria-label', B.NAMES[c]);
+                row.appendChild(b);
+            });
+            bar.style.display = '';
+            clearTimeout(S.bagTimer);
+            S.bagTimer = setTimeout(function () { if (S) bagSkip(); }, BAG_ASK_MS);
+        });
+    }
+    function bagSkip() { var bar = S && S.el.querySelector('.gps-bagask'); if (bar) bar.style.display = 'none'; if (S) S.bagPending = null; }
+    function bagPick(club) {
+        var B = bagApi(), p = S && S.bagPending;
+        bagSkip();
+        if (!B || !p) return;
+        if (B.add(p.golfer, club, p.yd)) flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag');
+        else render();
+    }
+    function syncSuggest(r, o, nums) {
+        var el = S.el.querySelector('.gps-suggest');
+        if (!el) return;
+        var text = '';
+        if (bagSwitch() && !tournament() && S.pro && S.mode === 'measure' && o && o.from === 'me' && !(nums && nums.onGreen)) {
+            var B = bagApi();
+            if (!B) { if (!S.bagLoad) { S.bagLoad = true; withShots(function () { render(); }); } }
+            else {
+                var moved = !!(S.targetMoved && S.target), to = moved ? S.target : aimAt(r);
+                if (to) {
+                    var pl = playsTo(moved ? S.target : null);
+                    var yd = pl ? pl.exact : G.haversineMeters(o.pt, to) / G.M_PER_YD;
+                    var sg = yd >= 10 ? B.suggestClub(B.bag(bagGolfer()), yd) : null;
+                    if (sg) text = 'Suggested: ' + sg.name + ' (your ' + bagShown(sg.yd) + ')';
+                }
+            }
+        }
+        if (el.textContent !== text) el.textContent = text;
+        el.style.display = text ? '' : 'none';
+    }
+    function bagSheet() { return S && S.el.querySelector('.gps-bag'); }
+    function openBag() { var sh = bagSheet(); if (!sh || !S) return; closeMenus(); withShots(function () { if (!S) return; sh.style.display = ''; fillBag(); }); }
+    function closeBag() { var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
+    function fillBag() {
+        var sh = bagSheet(), B = bagApi();
+        if (!sh || !B) return;
+        var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
+        sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
+        sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': the middle of your last 10 marked shots per club (odd ones left out), or your own number. On this phone only.';
+        var list = sh.querySelector('.gps-bag-list');
+        list.textContent = '';
+        B.BAG.forEach(function (c) {
+            var v = mine[c], row = document.createElement('div');
+            row.className = 'gps-bag-row'; row.setAttribute('data-bag-row', c);
+            var nm = document.createElement('span'); nm.className = 'gps-bag-name'; nm.textContent = B.NAMES[c];
+            var inp = document.createElement('input');
+            inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '1'; inp.max = '449'; inp.className = 'gps-bag-yd'; inp.setAttribute('data-bag-edit', c);
+            inp.setAttribute('aria-label', B.NAMES[c] + (m ? ', meters' : ', yards'));
+            inp.value = v ? String(bagShown(v.yd)) : ''; inp.placeholder = '\u2014';
+            var meta = document.createElement('span'); meta.className = 'gps-bag-meta';
+            meta.textContent = !v ? 'no shots yet' : (v.set ? 'your number' : v.n + ' shot' + (v.n === 1 ? '' : 's'));
+            var rs = document.createElement('button'); rs.type = 'button'; rs.className = 'gps-bag-reset'; rs.setAttribute('data-bag-reset', c); rs.textContent = 'Reset';
+            rs.style.visibility = v ? '' : 'hidden';
+            row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
+            list.appendChild(row);
+        });
     }
     // ONE TAP (gps-features): the shot, here (the GPS position), then the club. Kept for later.
     function markShotWithClub() {
@@ -3347,6 +3442,7 @@
         + '<div class="gps-under">'
         +   '<div class="gps-sub gps-float"><span class="gps-acc"></span><span class="gps-src"></span></div>'
         +   '<div class="gps-tourney gps-float" style="display:none" aria-label="Tournament mode: distance only">TOURNAMENT</div>'
+        +   '<div class="gps-suggest gps-float" data-feature="clubs" style="display:none" role="status"></div>'
         +   '<div class="gps-green-dims gps-float" style="display:none"></div>'
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
@@ -3363,6 +3459,8 @@
         + '</div>'
         + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
         +   '<div class="gps-clubs-foot"><button type="button" class="gps-club-move">Move it on the map</button><button type="button" class="gps-club-skip">Skip</button></div></div>'
+        // MY BAG (008): "Which club?" after a measured shot - a chip row, never a blocking sheet.
+        + '<div class="gps-bagask gps-float" data-feature="clubs" style="display:none" role="group" aria-label="Which club?"><div class="gps-bagask-top"><span class="gps-bagask-head"></span><button type="button" class="gps-bagask-skip">Skip</button></div><div class="gps-bagask-row"></div></div>'
         // LEFT, ABOVE THE SCORECARD: Recenter, and you (or the tee) -> the target.
         + '<div class="gps-leftrow">'
         +   '<button type="button" class="gps-recenter gps-float" aria-label="Recenter on the hole">⌖</button>'
@@ -3383,6 +3481,11 @@
         +   '<button type="button" class="gps-tools gps-float" aria-label="Tools"><span class="gps-ico">⋯</span><span class="gps-cap">Tools</span></button>'
         + '</div>'
         // WHOSE SCORE (gps-start10): pick your group (more than one), then a golfer in it.
+        // MY BAG (008): see / edit / reset the club numbers.
+        + '<div class="gps-bag gps-float gps-scroll-ok" data-feature="clubs" style="display:none" role="dialog" aria-label="My bag">'
+        +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
+        +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
+        + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
         // GPS-4 "Add a game" - this round's golfers, a quick start, paste, full setup.
@@ -3420,6 +3523,7 @@
         +   '<button type="button" class="gps-menu-item gps-tourney-toggle"></button>'
         +   '<button type="button" class="gps-menu-item gps-aa-toggle" data-feature="autoAdvance"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
+        +   '<button type="button" class="gps-menu-item gps-my-bag" data-feature="clubs">My bag</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
@@ -3631,6 +3735,21 @@
         + '#gps-overlay .gps-clubs button{min-height:44px;min-width:52px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;cursor:pointer;}'
         + '#gps-overlay .gps-clubs-foot{display:flex;gap:8px;justify-content:space-between;}'
         + '#gps-overlay .gps-clubs .gps-club-skip{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;}'
+        + '#gps-overlay .gps-suggest{font:800 14px/1.2 ' + FONT + ';color:#d9f99d;padding:7px 11px;border-radius:12px;white-space:nowrap;}'
+        + '#gps-overlay .gps-bagask{position:absolute;z-index:45;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 72px);padding:8px 10px;border-radius:14px;font:700 14px/1.2 ' + FONT + ';}'
+        + '#gps-overlay .gps-bagask-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
+        + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
+        + '#gps-overlay .gps-bagask button{flex:0 0 auto;min-height:44px;min-width:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;}'
+        + '#gps-overlay .gps-bagask .gps-bagask-skip{min-width:0;background:transparent;border:0;color:#c8d1ca;font-size:14px;}'
+        + '#gps-overlay .gps-bag{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
+        + '#gps-overlay .gps-bag-head{display:flex;align-items:center;justify-content:space-between;}#gps-overlay .gps-bag-title{font:800 17px/1.15 ' + FONT + ';}'
+        + '#gps-overlay .gps-bag-sub{font:600 12px/1.3 ' + FONT + ';color:#c8d1ca;margin:4px 0 6px;}'
+        + '#gps-overlay .gps-bag-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-bag-name{flex:1 1 auto;font:700 15px/1.2 ' + FONT + ';}#gps-overlay .gps-bag-meta{flex:0 0 76px;font:600 11px/1.2 ' + FONT + ';color:#a7b3aa;}'
+        + '#gps-overlay .gps-bag-yd{width:64px;min-height:40px;box-sizing:border-box;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 16px/1 ' + FONT + ';text-align:center;}'
+        + '#gps-overlay .gps-bag-reset{min-height:40px;padding:0 8px;color:#fca5a5 !important;font-weight:700;}'
+        + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
+        + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
@@ -3923,6 +4042,30 @@
             S.osmShared = null;
             lookupCourse();
         });
+        // MY BAG (008): the switch off = no question, no suggestion, no My bag (removed, not hidden).
+        if (!bagSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="clubs"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-my-bag', openBag);
+        on(el, '.gps-bag-done', function () { closeBag(); render(); });
+        on(el, '.gps-bagask-skip', bagSkip);
+        var bagRow = el.querySelector('.gps-bagask-row');
+        if (bagRow) bagRow.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-bag-club]') : null; if (b) { e.preventDefault(); bagPick(b.getAttribute('data-bag-club')); } });
+        var bagEl = el.querySelector('.gps-bag');
+        if (bagEl) {
+            bagEl.addEventListener('change', function (e) {
+                var c = e.target && e.target.getAttribute && e.target.getAttribute('data-bag-edit'), B = bagApi();
+                if (!c || !B || !S) return;
+                var v = Number(e.target.value);
+                B.set(bagGolfer(), c, v > 0 ? (units() === 'm' ? v / G.M_PER_YD : v) : null);
+                fillBag(); render();
+            });
+            bagEl.addEventListener('click', function (e) {
+                var t = e.target, B = bagApi();
+                if (!B || !S || !t || !t.closest) return;
+                var r1 = t.closest('[data-bag-reset]');
+                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); fillBag(); render(); return; }
+                if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); fillBag(); render(); }
+            });
+        }
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.
         // Recenter also puts the target back at its default (build 6).
         on(el, '.gps-recenter', function () { if (S) { S.targetMoved = false; S.target = null; } frameHole(false); render(); });
