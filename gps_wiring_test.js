@@ -157,10 +157,12 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     // founding cap; no price (the store's own price only).
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagSetup', 'clubs', 'courseElev', 'flyover', 'gpsLayoutC', 'gpsRoundScore', 'hazards', 'hpIndex', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'quickStats', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsRoundScore', 'hazards', 'hpIndex', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'watch']);
     // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
-    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch').every(([, v]) => v === true));
+    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch' && k !== 'elevMyCell').every(([, v]) => v === true));
+    // 012: the golfer's ~10 m cell height fetch ships OFF (the location rule - Manny's own OK).
+    assert.strictEqual(cfg.features.elevMyCell, false, 'elevMyCell ships off');
     // 009: the My bag account sync is built but ships OFF (its rule is phase 2, not live).
     assert.strictEqual(cfg.clubsSync, false, 'clubsSync ships off until the player_clubs rule is live');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.

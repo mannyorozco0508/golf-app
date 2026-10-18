@@ -75,6 +75,8 @@
     var BAG = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
+    // 012: the short name a pill shows ("Plays like 249y · 3W").
+    var BAG_SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
     function quantile(sorted, q) {
         var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
         return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
@@ -180,6 +182,35 @@
     // "entered" (typed, or the setup's carry) or "learned" (the marked shots' median).
     function source(v) { return !v ? '' : (v.set || v.base ? 'entered' : 'learned'); }
 
+    // ---- "MY DISTANCES ARE FROM" (012 part 5, switch bagAltitude) ----------------------
+    // Where this golfer's club numbers hold: 'sea' (sea level, 0 ft), 'course' (a course they
+    // picked: its name and height in feet - null when it has no US height), or 'none' ("Don't
+    // adjust" - the DEFAULT: plays-like exactly as before). tempF: the typical temperature
+    // when they set them (blank = 70, as before). Kept per golfer ON THIS PHONE ONLY - it is
+    // not in syncShape, so the account sync never carries it; no position is kept (a
+    // course's name and height only).
+    var ALT_MODES = ['sea', 'course', 'none'];
+    function okFt(v) { v = Number(v); return v !== null && isFinite(v) && v > -1500 && v < 15000 ? Math.round(v) : null; }
+    function okTemp(v) { if (v === null || v === undefined || v === '') return null; v = Number(v); return isFinite(v) && v >= -20 && v <= 130 ? Math.round(v) : null; }
+    function baseline(golfer) {
+        var b = bagRec().golfers[golferKey(golfer)], a = (b && b.alt) || {};
+        var mode = ALT_MODES.indexOf(a.mode) !== -1 ? a.mode : 'none';
+        return { mode: mode, name: mode === 'course' ? String(a.name || '').slice(0, 80) : '', ft: mode === 'sea' ? 0 : (mode === 'course' && a.ft !== null && a.ft !== undefined ? okFt(a.ft) : null),
+            tempF: okTemp(a.tempF) };
+    }
+    // a: { mode, name, ft, tempF } - only those fields, checked; anything else is dropped.
+    function setBaseline(golfer, a) {
+        a = a || {};
+        var mode = ALT_MODES.indexOf(a.mode) !== -1 ? a.mode : 'none';
+        var r = bagRec(), b = bagOf(r, golferKey(golfer)), out = { mode: mode };
+        if (mode === 'course') { out.name = String(a.name || '').slice(0, 80); out.ft = a.ft === null || a.ft === undefined || a.ft === '' ? null : okFt(a.ft); }
+        var t = okTemp(a.tempF); if (t !== null) out.tempF = t;
+        b.alt = out;
+        return lsSet(BAG_KEY, r);
+    }
+    // The baseline's height for playsLike's altBaseFt: a number, null (a course with no height:
+    // altitude not available), or undefined ("Don't adjust": no altitude at all). Pure.
+    function baselineFt(a) { if (!a || a.mode === 'none') return undefined; return a.mode === 'sea' ? 0 : (typeof a.ft === 'number' && isFinite(a.ft) ? a.ft : null); }
     // ---- ACCOUNT SYNC (009) - BUILT, SWITCHED OFF (HARDPAN_GPS_CONFIG.clubsSync) -------
     // For a SIGNED-IN golfer's OWN bag only: player_clubs/<their uid>/me =
     //   { shots: { <club>: [yd, ... up to 10] }, set: { <club>: yd }, base: { <club>: yd } }
@@ -235,10 +266,11 @@
             }, function () { return false; });
         } catch (e) { return Promise.resolve(false); }
     }
-    W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
+    W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, SHORT: BAG_SHORT, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
         add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY,
         DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries,
         setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,
+        baseline: baseline, setBaseline: setBaseline, baselineFt: baselineFt, ALT_MODES: ALT_MODES,
         syncOn: syncOn, syncPath: syncPath, syncShape: syncShape, syncSave: syncSave, syncLoad: syncLoad };
     W.HardPanGpsShots = { load: load, shots: shots, add: add, setLast: setLast, undo: undo, legs: legs, holesWithShots: holesWithShots, MAX_PER_HOLE: MAX_PER_HOLE, CLUBS: CLUBS };
 })();
