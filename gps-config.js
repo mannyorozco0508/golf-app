@@ -58,6 +58,9 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // "HardPan Plus", auto-renewing yearly, a 7-day free trial as its introductory
     // offer. RevenueCat entitlement: gps_map. Manny creates these in App Store
     // Connect and RevenueCat; the ids here must match them exactly.
+    // THE 008 GPS FEATURES (Manny, 2026-10-18): each behind its own switch, so a broken one is
+    // turned off here without touching code. Read through HardPanFeature('<name>') (below).
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true },
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays
@@ -74,3 +77,5 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // The paywall's Terms of Use (EULA) and Privacy Policy links. Absolute: the
     // two pages are web pages, not in the app bundle (app_store_pages_test.js).
     iapTermsUrl: 'https://golf-app-5a5.pages.dev/terms.html', iapPrivacyUrl: 'https://golf-app-5a5.pages.dev/privacy.html' };
+// ONE READER FOR THE 008 SWITCHES: a feature is on unless its switch is exactly false.
+window.HardPanFeature = function (name) { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f[name] !== false; };

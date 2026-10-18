@@ -51,6 +51,13 @@ FILES.forEach((file) => {
     else fs.copyFileSync(src, path.join(OUT, file));
 });
 if (missing.length) { console.error('MISSING (declared, not at the repo root): ' + missing.join(', ')); process.exit(1); }
+// THE DEV SWITCH (mailbox 008): GPS_DEV_PRO=1 makes THIS build count as subscribed (Manny's Cmd+R
+// beta-testing of the GPS features while the store isn't set up). Written into the built
+// gps-config.js only; never archive a build made with it.
+if (process.env.GPS_DEV_PRO === '1') {
+    fs.appendFileSync(path.join(OUT, 'gps-config.js'), '\n// DEV BUILD (GPS_DEV_PRO=1): counts as subscribed. NEVER ARCHIVE THIS BUILD.\nwindow.HARDPAN_GPS_CONFIG.devPro = true;\n');
+    console.warn('DEV BUILD: GPS_DEV_PRO=1 - this build counts as subscribed. Do NOT archive or upload it.');
+}
 const lost = GPS.filter((f) => !fs.existsSync(path.join(OUT, f)));
 if (lost.length) { console.error('GPS files not in the app: ' + lost.join(', ')); process.exit(1); }
 
