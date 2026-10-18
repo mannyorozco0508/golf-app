@@ -565,6 +565,11 @@
           ".write": false
         }
       }
+    },
+    "gps_meta": {
+      "config": {
+        ".read": "auth != null"
+      }
     }
   }
 }

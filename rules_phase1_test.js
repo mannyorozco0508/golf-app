@@ -136,3 +136,11 @@ test('TRIPS: an anonymous organizer creates a trip stamped with its own uid, and
     assert.strictEqual(W(P1, d, ORG, '/trips/NEWY', { name: 'Y', createdAt: NOW, rounds: {} }), false, 'no ownerUid: refused (the app before this fix)');
     assert.strictEqual(W(P1, d2, anon('other'), '/trips/MINE/name', 'pwned'), false, 'not the owner');
 });
+test('GPS_META: the founding switch is readable by a signed-in phone, nothing else in gps_meta, and nobody writes it (Manny 2026-10-18)', () => {
+    const d = data(true); d.gps_meta = { config: { foundingOpen: true, foundingCap: 1000 }, day: { x: { searches: 3 } } };
+    assert.strictEqual(targaryen.database(P1, d).as(GOLFER).read('/gps_meta/config', NOW).allowed, true, 'the paywall reads the whole config node');
+    assert.strictEqual(targaryen.database(P1, d).as(OUT).read('/gps_meta/config', NOW).allowed, false, 'signed out: no');
+    assert.strictEqual(targaryen.database(P1, d).as(GOLFER).read('/gps_meta/day', NOW).allowed, false, 'the counters stay private');
+    assert.strictEqual(W(P1, d, GOLFER, '/gps_meta/config/foundingOpen', false), false, 'a phone cannot close (or open) the window');
+    assert.strictEqual(W(P1, d, OUT, '/gps_meta/config', { foundingOpen: true }), false, 'signed out: no write');
+});

@@ -161,6 +161,10 @@ R.course_gps = { $courseKey: {
             + " && (!data.exists() || " + EV + ".child('ownerUid').val() === auth.uid)",
         '.validate': "newData.hasChildren(['mid', 'at', 'ev']) && " + PIN_OK } },
     osm: { '.write': false }, holeChoice: { '.write': false }, $other: { '.write': false } } };
+// gps_meta/config: the founding-price switch the GPS Map paywall reads (foundingOpen, foundingCap;
+// mailbox 007, Manny's OK 2026-10-18). Readable by any signed-in phone; written only by the server /
+// the console (no .write). The rest of gps_meta (counters, alerts, raw pulls) stays unreadable.
+R.gps_meta = { config: { '.read': 'auth != null' } };
 // gps_courses / gps_links / gps_usage stay as live (read signed-in, written only by the server).
 
 fs.writeFileSync(path.join(HERE, 'rules', 'database.rules.proposed.json'), JSON.stringify({ rules: R }, null, 2) + '\n');

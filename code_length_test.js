@@ -445,6 +445,7 @@ describe('NOTHING ELSE MOVED', () => {
             // GPS server-written nodes, read by a signed-in phone (live).
             '/gps_courses/$courseId/.read',
             '/gps_links/$courseKey/.read',
+            '/gps_meta/config/.read',   // the founding switch the GPS Map paywall reads (Manny 2026-10-18)
             '/gps_usage/$uid/.read',
             '/organizers/$uid/.read',
             '/organizers/$uid/firstSeenAt/.write',

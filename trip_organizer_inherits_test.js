@@ -117,7 +117,7 @@ describe('3. IT GRANTS SCREENS, NOT WRITES', () => {
         // setup write on an owned round is still the owner's - or, in phase 1,
         // the owner of the trip the round names (tripCode); this wave still grants
         // screens only.
-        assert.equal(sha, '9f7a7fadc5c13faa',
+        assert.equal(sha, 'e702e430e4fb8172',
             'database.rules.json moved. This wave grants SCREENS only - a setup write still '
             + 'needs auth.uid === the round owner. If the rules genuinely changed, that is its '
             + 'own wave with Manny approving the diff, and this pin is re-pinned with the reason.');
