@@ -764,7 +764,9 @@
         loadScript('gps-offline.js', function () { return !!window.HardPanGpsOffline; }, function () {
             var O = window.HardPanGpsOffline;
             if (!O || S !== mine) return;
-            O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '').then(function () { if (S === mine) syncPlays(); });
+            // 009 (courseElev on): the WHOLE course's samples, this hole first; the screen redraws as they arrive.
+            O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '', { first: S.hole, progress: function () { if (S === mine) { S.celev = null; syncPlays(); } } })
+                .then(function () { if (S === mine) { S.celev = null; syncPlays(); } });
         });
     }
     function loadCourses(done) {
@@ -2425,13 +2427,43 @@
             if (S === mine) { syncPlays(); fetchElevs(); }
         }).catch(function () { mine.elevInFlight = false; mine.elevFailedAt = Date.now(); });
     }
-    // The golfer's height: their spot projected onto the tee -> green line, between
-    // the sampled points either side. From the tee: the tee's.
+    // THE WHOLE COURSE'S HEIGHTS (009, switch courseElev): the samples gps-offline.js kept
+    // for this course (hardpan_celev_v1_<course>: tee, every 25 yds along the hole, green
+    // front / center / back, hazards). A point's height - the golfer's spot, a tapped
+    // target, the green - is worked out HERE from this hole's nearest samples
+    // (gps-geo.elevFromSamples); the golfer's position is never sent anywhere. No samples
+    // near it: the tee -> green line's 5 points (below), as before.
+    var CELEV_PREFIX = 'hardpan_celev_v1_';
+    function celevSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('courseElev') !== false; } catch (e) { return true; } }
+    function holeSamples() {
+        if (!S || !celevSwitch() || !G.elevFromSamples) return null;
+        if (!S.celev || S.celev.key !== S.courseKey) {
+            var rec = lsGet(CELEV_PREFIX + S.courseKey), h = {};
+            if (rec && rec.v === 1 && rec.o && rec.h) Object.keys(rec.h).forEach(function (n) {
+                var a = rec.h[n] || [], list = [];
+                for (var i = 0; i + 2 < a.length; i += 3) list.push([rec.o[0] + a[i] / 1e5, rec.o[1] + a[i + 1] / 1e5, a[i + 2]]);
+                h[n] = list;
+            });
+            S.celev = { key: S.courseKey, h: h };
+        }
+        return S.celev.h[String(S.hole)] || null;
+    }
+    // A point's height: the course samples, else the tee -> green line (the tee's, the green's).
+    function ptElev(r, pt, which) {
+        if (!r || !pt) return null;
+        var sm = holeSamples(), v = sm ? G.elevFromSamples(sm, pt) : null;
+        if (v != null) return v;
+        if (which === 'tee') return elevAt(r.tee);
+        if (which === 'mid') return elevAt(r.mid);
+        return lineElev(r, pt);
+    }
+    // The golfer's height: from the course samples (009), else their spot projected onto
+    // the tee -> green line, between the sampled points either side. From the tee: the tee's.
     function originElev(r, o) {
         // No tee (a green tapped on an unmapped hole): no line to sample, no slope.
         if (!r.tee || !r.mid) return null;
-        if (o.from === 'tee') return elevAt(r.tee);
-        return lineElev(r, o.pt);
+        if (o.from === 'tee') return ptElev(r, r.tee, 'tee');
+        return ptElev(r, o.pt);
     }
     // A point's height, from where it projects onto the tee -> green line.
     function lineElev(r, pt) {
@@ -2462,7 +2494,7 @@
         if (D < PLAYS_MIN_YD) return null;
         // Today's manual wind (build 3) beats the live reading.
         var w = effectiveWind(), has = !!(w && !w.none);
-        var to = targetPt ? lineElev(r, targetPt) : elevAt(r.mid);
+        var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
         return G.playsLike({
             yards: D, elevFromFt: originElev(r, o), elevToFt: to,
             windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
@@ -3161,7 +3193,7 @@
         var brg = G.bearingDeg(from, pt);
         if (tournament()) return { yd: yd };
         var w = effectiveWind(), has = !!(w && !w.none);
-        var e0 = r ? (prev ? lineElev(r, from) : elevAt(r.tee)) : null, e1 = r ? lineElev(r, pt) : null;
+        var e0 = r ? (prev ? ptElev(r, from) : ptElev(r, r.tee, 'tee')) : null, e1 = r ? ptElev(r, pt) : null;
         var pl = G.playsLike({ yards: yd, elevFromFt: e0, elevToFt: e1, windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
             shotBearingDeg: brg, tempF: w && typeof w.tempF === 'number' ? w.tempF : null });
         var out = { yd: yd, plays: pl ? pl.yards : null, elevFt: e0 != null && e1 != null ? Math.round((e1 - e0) * 10) / 10 : null };

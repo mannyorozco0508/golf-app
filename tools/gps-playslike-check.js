@@ -15,6 +15,11 @@
 //   2  The same, DOWNWIND: "-W downwind (8 mph)" and |W| is half of the into-wind W (+-1).
 //   3  CROSSWIND (from the golfer's right): no wind part, "aim 6 yds right".
 //   4  playsBreakdown off: no line in the page; "Suggested:" (the plays-like number) is back.
+//   5  THE WHOLE COURSE'S HEIGHTS: opened with signal, every hole is sampled once - hole 1
+//      first, one request at a time; EVERY request is a course point (on a hole's own line,
+//      or at a green), NONE at or near any spot the golfer stood (they walk 3 spots, all off
+//      the line); kept on the phone in one record; a second visit (same phone) asks nothing.
+//   6  courseElev off: only the old 5 points a hole (tee, 25 / 50 / 75 %, green); no record.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -102,6 +107,7 @@ const ST = { expression: "JSON.stringify({ hole: HardPanGps.hole(), side: HardPa
     + " line: " + vis('.gps-pl-text') + ", lineEl: !!document.querySelector('#gps-overlay .gps-pl-line'), sug: " + vis('.gps-suggest') + ","
     + " plays: (document.querySelector('#gps-overlay .gps-plays') || {}).textContent || '', terms: (document.querySelector('#gps-overlay .gps-plays') || { getAttribute: function () { return ''; } }).getAttribute('data-terms'),"
     + " windBox: (document.querySelector('#gps-overlay .gps-wind-mph') || {}).textContent || '',"
+    + " celev: (function(){ try { var r = JSON.parse(localStorage.getItem('hardpan_celev_v1_caledonia')); return r ? { done: !!r.done, holes: Object.keys(r.h).length, bytes: localStorage.getItem('hardpan_celev_v1_caledonia').length } : null; } catch (e) { return null; } })(),"
     + " epqs: window.__epqs, nws: window.__nws.length, maxBusy: window.__epqsMaxBusy, e: window.__e })" };
 const W = (ms) => ({ sleep: ms });
 const LINE_UP = { waitFor: "(function(){ var e = document.querySelector('#gps-overlay .gps-pl-text'); return !!(e && /uphill/.test(e.textContent) && /mph|aim/.test(e.textContent)); })()", timeout: 25000 };
@@ -158,6 +164,48 @@ const START = [W(2500), OPEN, W(3000)];
     f(s[0].lineEl === false, '4: the line is in the page with its switch off');
     f(pn && s[0].sug === 'Suggested: ' + clubFor(+pn[1]), '4: switch off - the plain suggestion for plays ' + (pn && pn[1]) + ': ' + s[0].sug);
     errs(s, 'off');
+
+    // 5: the whole course, once; course points only; never the golfer.
+    const os = require('os');
+    const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'gps-playslike-'));
+    const SPOT2 = dest(dest(T1, B1, L1 * 0.5), B1 - 90, 18), SPOT3 = dest(dest(T1, B1, L1 * 0.3), B1 + 90, 25);
+    const DONE = { waitFor: "(function(){ try { return JSON.parse(localStorage.getItem('hardpan_celev_v1_caledonia')).done === true; } catch (e) { return false; } })()", timeout: 60000 };
+    s = await go({ wind: INTO, profileDir: prof, steps: START.concat([LINE_UP, { expression: 'window.__moveTo(' + SPOT2 + ')' }, W(1500), { expression: 'window.__moveTo(' + SPOT3 + ')' }, W(1500), DONE, W(500), ST, W(8000)]) });   // 8 s: Chrome writes local storage to disk lazily
+    const all = s[0];
+    const holes = Object.keys(table.caledonia.holes).map((n) => table.caledonia.holes[n].osm);
+    // Distance (m) from p to a polyline - inline, flat-earth near the point.
+    const toLine = (p, line) => { let best = Infinity; const k = 111320, kx = k * Math.cos(rad(p[0])); const xy = (q) => [(q[1] - p[1]) * kx, (q[0] - p[0]) * k];
+        for (let i = 1; i < line.length; i++) { const a = xy(line[i - 1]), b = xy(line[i]), dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy; const u = L2 ? Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / L2)) : 0; best = Math.min(best, Math.hypot(a[0] + u * dx, a[1] + u * dy)); } return best; };
+    const coursePt = (p) => holes.some((h) => { const line = [h.tee].concat(h.line || []).concat([h.mid]); return toLine(p, line) < 2.5 || hav(p, h.mid) < 45; });
+    const reqs = all.epqs || [];
+    report.whole = { requests: reqs.length, unique: new Set(reqs.map(String)).size, maxBusy: all.maxBusy, celev: all.celev, first: reqs[0] };
+    f(all.celev && all.celev.done && all.celev.holes === 18, '5: the whole course is not on the phone: ' + JSON.stringify(all.celev));
+    f(all.celev && all.celev.bytes < 12000, '5: the record is not compact: ' + JSON.stringify(all.celev));
+    f(reqs.length >= 18 * 12, '5: too few samples for 18 holes every 25 yds: ' + reqs.length);
+    f(new Set(reqs.map(String)).size === reqs.length, '5: a point was asked twice');
+    f(all.maxBusy === 1, '5: more than one EPQS request at once: ' + all.maxBusy);
+    f(reqs.length && hav(reqs[0], T1) < 2, '5: hole 1 (on screen) was not first: ' + JSON.stringify(reqs[0]));
+    const strange = reqs.filter((p) => !coursePt(p));
+    f(!strange.length, '5: EPQS asked for a point that is not a course point: ' + JSON.stringify(strange.slice(0, 3)));
+    [ME, SPOT2, SPOT3].forEach((g, i) => f(!reqs.some((p) => hav(p, g) < 8), '5: an EPQS request at / near the golfer\'s spot #' + (i + 1)));
+    f(/uphill/.test(all.line || ''), '5: after the walk the line lost its slope: ' + all.line);
+    errs(s, 'whole');
+    s = await go({ wind: INTO, profileDir: prof, steps: START.concat([LINE_UP, W(2500), ST]) });
+    report.again = { requests: (s[0].epqs || []).length, line: s[0].line };
+    f((s[0].epqs || []).length === 0, '5: the second visit asked EPQS again: ' + (s[0].epqs || []).length);
+    f(s[0].line === into.line, '5: the second visit (heights from the phone) reads ' + s[0].line + ', the first ' + into.line);
+    errs(s, 'again');
+    try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) {}
+
+    // 6: courseElev off - the 5 points a hole, as before; no course record.
+    s = await go({ wind: INTO, features: { courseElev: false }, steps: START.concat([LINE_UP, W(4000), ST]) });
+    const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const five = holes.flatMap((h) => [0, 0.25, 0.5, 0.75, 1].map((t) => lerp(h.tee, h.mid, t)));
+    const r6 = s[0].epqs || [];
+    report.offElev = { requests: r6.length, celev: s[0].celev, line: s[0].line };
+    f(r6.length > 0 && r6.every((p) => five.some((q) => hav(p, q) < 1.5)), '6: courseElev off asked for other points: ' + JSON.stringify(r6.filter((p) => !five.some((q) => hav(p, q) < 1.5)).slice(0, 3)));
+    f(r6.length <= 90 && s[0].celev === null, '6: courseElev off: ' + JSON.stringify(report.offElev));
+    errs(s, 'offElev');
 
     console.log(JSON.stringify({ report, fails }, null, 1));
     process.exit(fails.length ? 1 : 0);

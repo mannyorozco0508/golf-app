@@ -26,7 +26,10 @@ function course(id, lat) {
     return { id, club: 'Prestwick Golf Course', course: 'Prestwick', lat, lng: -78.96, holes: 18, pars: Array(18).fill(4), hcp: [], tees: [], h };
 }
 function sandbox(opts) {
-    const o = Object.assign({ online: true, ls: {}, cfg: { golfapi: true, osm: false, live: false } }, opts || {});
+    // 009: the 5-point heights below are what the courseElev switch OFF gives; the whole-course
+    // samples (the switch on, as it ships) have their own tests at the end (whole: true).
+    const o = Object.assign({ online: true, ls: {}, cfg: { golfapi: true, osm: false, live: false, features: { courseElev: false } } }, opts || {});
+    if (o.whole) o.cfg = Object.assign({}, o.cfg, { features: {}, elevGapMs: 0 });
     const store = o.ls, cache = new Map(), requests = [];
     const localStorage = { get length() { return Object.keys(store).length; }, key: (i) => Object.keys(store)[i], getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
     const caches = { open: () => Promise.resolve({ match: (u) => Promise.resolve(cache.get(u)), put: (u, r) => { cache.set(u, r); return Promise.resolve(); }, delete: (u) => Promise.resolve(cache.delete(u)) }) };
@@ -129,4 +132,100 @@ test('the GPS screen asks for NO height on the tee (elevOnTee: false) - the whol
     const consumer = require('./tools/gps-flag.js').applyFlag(a, false);
     assert.ok(!/gpsOffline|gps-offline|Download for offline/.test(consumer), 'none of it in the Consumer app');
     assert.ok(/\/\/ GPS:BEGIN\s*\n\s*if \(typeof gpsOfflineCardFill === 'function'\) gpsOfflineCardFill\(id\);\s*\n\s*\/\/ GPS:END/.test(a), 'the card from the pack with no signal');
+});
+
+// ---- 009: THE WHOLE COURSE'S HEIGHTS (switch courseElev, on as it ships) ----------------
+function slowSandbox(opts) {
+    // EPQS answers a few ms later; the most requests ever in flight at once is counted.
+    const t = sandbox(Object.assign({ whole: true }, opts || {}));
+    const inner = t.sb.fetch;
+    t.maxBusy = 0; let busy = 0;
+    t.sb.fetch = (url, o) => { busy++; t.maxBusy = Math.max(t.maxBusy, busy); return new Promise((ok) => setTimeout(ok, 2)).then(() => { busy--; return inner(url, o); }); };
+    return t;
+}
+const pointOf = (u) => { const q = /x=([-\d.]+)&y=([-\d.]+)/.exec(u); return [Number(q[2]), Number(q[1])]; };
+
+test('009: the constant the GPS screen reads the course record under is gps-offline\'s own', { skip }, () => {
+    const { O } = sandbox();
+    assert.ok(read('gps-view.js').includes(`var CELEV_PREFIX = '${O._const.CELEV_PREFIX}';`));
+    assert.match(read('gps-config.js'), /courseElev: true/);
+});
+
+test('009: the course opened with signal - every hole sampled ONCE (tee, every 25 yds, green front / center / back), one request at a time, the hole on screen first', { skip }, async () => {
+    const t = slowSandbox();
+    const rec = t.sb.HardPanGeo.golfapiMatch(t.sb.HardPanGolfApi, 'prestwick', '', null, 18, null).record;
+    const plan = t.sb.HardPanGeo.courseElevPoints(rec);
+    const want = Object.values(plan).reduce((n, l) => n + l.length, 0);
+    assert.ok(want >= 18 * 20, 'about 21 points a hole on a 437-yd hole: ' + want);
+    const r = await t.O.prefetchElevations('prestwick', '', { first: 7 });
+    assert.equal(r.whole, true); assert.equal(r.ok, true);
+    assert.equal(t.requests.length, want, 'each course point once');
+    assert.equal(t.maxBusy, 1, 'one at a time');
+    const first = t.requests.slice(0, plan['7'].length).map(pointOf);
+    assert.deepEqual(first, plan['7'].map((p) => [p[0], p[1]]), 'the hole on screen first');
+    assert.ok(t.requests.every((u) => /^https:\/\/epqs\.nationalmap\.gov\/v1\/json\?x=/.test(u)), 'USGS EPQS only');
+    // ONE compact key for the course, small; nothing under the old per-point keys.
+    const keys = Object.keys(t.store);
+    assert.deepEqual(keys, ['hardpan_celev_v1_prestwick']);
+    assert.ok(t.store.hardpan_celev_v1_prestwick.length < 12000, 'compact: ' + t.store.hardpan_celev_v1_prestwick.length + ' bytes for 18 holes');
+    const rc = JSON.parse(t.store.hardpan_celev_v1_prestwick);
+    assert.equal(rc.done, true);
+    // It decodes to the very heights EPQS gave, at the very points.
+    const got = t.O.celevSamples('prestwick');
+    assert.equal(got['1'].length, plan['1'].length);
+    got['1'].forEach(([la, ln, ft], i) => { assert.deepEqual([la, ln], plan['1'][i]); assert.equal(ft, Math.round(la * 1000) % 100 + 20); });
+    // Never fetched twice: a second open, a download - nothing asked.
+    const n = t.requests.length;
+    await t.O.prefetchElevations('prestwick', '');
+    const d = await t.O.download('prestwick', { card: CARD });
+    assert.equal(t.requests.filter((u) => /epqs/.test(u)).length, n, 'not asked again');
+    assert.equal(d.pack.elevCourse, true);
+    assert.deepEqual(Array.from(d.pack.elevPoints), []);
+    await t.O.remove('prestwick');
+    assert.ok(t.store.hardpan_celev_v1_prestwick, 'deleting the offline pack keeps the course\'s few-KB heights (never fetched twice)');
+});
+
+test('009: the samples are COURSE points - never the golfer; "no data" kept as none; no signal / outside the US: nothing asked (no fallback service)', { skip }, async () => {
+    assert.ok(!/geolocation|watchPosition|coords/.test(read('gps-offline.js').replace(/^\s*\/\/.*$/gm, '')), 'no position anywhere in gps-offline.js');
+    const t = slowSandbox({ noHeight: true });
+    await t.O.prefetchElevations('prestwick', '');
+    const n = t.requests.length;
+    assert.ok(n > 0);
+    assert.ok(JSON.parse(t.store.hardpan_celev_v1_prestwick).h['1'].filter((x, i) => i % 3 === 2).every((v) => v === null), 'none = null');
+    await t.O.prefetchElevations('prestwick', '');
+    assert.equal(t.requests.length, n, 'a none is not asked again');
+    const off = slowSandbox({ online: false });
+    assert.equal((await off.O.prefetchElevations('prestwick', '')).reason, 'offline');
+    assert.equal(off.requests.length, 0);
+    // Outside the US (a course at 56 N): no heights at all, and no other service is asked.
+    const abroad = sandbox({ whole: true });
+    abroad.sb.HardPanGolfApi.courses.SC = course('SC', 56.0);
+    abroad.sb.HardPanGolfApi.courses.SC.lng = -4.6;
+    Object.values(abroad.sb.HardPanGolfApi.courses.SC.h).forEach((h, i) => { const lng = -4.6 - i / 500; h.g = { f: [55.9999, lng], c: [56, lng], b: [56.0001, lng] }; h.t = { b: [55.9964, lng] }; });
+    abroad.sb.HardPanGolfApi.links.troon = 'SC';
+    const ra = await abroad.O.prefetchElevations('troon', '');
+    assert.equal(abroad.requests.length, 0, 'outside the US: nothing asked');
+    assert.equal(ra.elev.fetched, 0);
+    const src = read('gps-offline.js');
+    assert.ok(/Open-Meteo/.test(src) && /non-commercial/.test(src) && /HardPan is a paid app/.test(src), 'the reason is written down');
+    assert.ok(!/open-meteo\.com/i.test(src.replace(/^\s*\/\/.*$/gm, '')), 'Open-Meteo is not called');
+    assert.ok(!/elevFallbackUrl/.test(read('gps-config.js')), 'the fallback hook is left unset');
+});
+
+test('009: the switch off - the 5 points per hole, exactly as before', { skip }, async () => {
+    const t = sandbox();   // courseElev: false
+    const r = await t.O.prefetchElevations('prestwick');
+    assert.equal(r.elev.fetched, 90);
+    assert.equal(Object.keys(t.store).filter((k) => /celev/.test(k)).length, 0);
+});
+
+test('009: the GPS screen reads the course samples for the golfer, the target and the green - worked out on the phone; this hole first; off = as before', { skip }, () => {
+    const v = read('gps-view.js');
+    const sec = v.slice(v.indexOf('var CELEV_PREFIX'), v.indexOf('function lineElev('));
+    assert.ok(/HardPanFeature\('courseElev'\)/.test(sec) && /G\.elevFromSamples\(sm, pt\)/.test(sec), 'interpolated here');
+    assert.ok(!/fetch\(|\.ref\(|XMLHttpRequest/.test(sec), 'nothing sent from here');
+    assert.ok(/if \(o\.from === 'tee'\) return ptElev\(r, r\.tee, 'tee'\);\s*\n\s*return ptElev\(r, o\.pt\);/.test(v), 'the golfer');
+    assert.ok(/var to = targetPt \? ptElev\(r, targetPt\) : ptElev\(r, r\.mid, 'mid'\);/.test(v), 'the target / the green');
+    assert.ok(/O\.prefetchElevations\(S\.courseKey, \(S\.round && S\.round\.courseName\) \|\| '', \{ first: S\.hole,/.test(v), 'this hole first');
+    assert.ok(/function prefetchCourseElevs\(\) \{\s*if \(!S \|\| !S\.pro \|\| S\.elevPrefetch \|\| cfg\(\)\.elevOnTee !== false \|\| tournament\(\)\) return;/.test(v), 'GPS Map only, once, never in tournament mode');
 });
