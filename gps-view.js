@@ -2972,6 +2972,7 @@
         placePills();
         syncWind();
         maybeAskWho();
+        aaTick();
     }
     // ---- SHOT BY SHOT (gps-features): mark, then replay - on this phone only ------
     function shotsApi() { return window.HardPanGpsShots || null; }
@@ -3139,7 +3140,7 @@
         if (!m) return;
         var open = m.style.display === 'none';
         closeMenus();
-        if (open) { render(); m.style.display = ''; }
+        if (open) { render(); aaToggleText(); m.style.display = ''; }
     }
     function openPicker() {
         if (!S) return;
@@ -3155,6 +3156,81 @@
         if (!S || !h || h === S.hole) return;
         if (typeof S.gotoHole === 'function') S.gotoHole(h);
     }
+
+    // ---- AUTO-ADVANCE HOLES (008, switch autoAdvance) ---------------------------------
+    // The golfer walks off the green to the NEXT hole's tee (next in PLAY ORDER - the
+    // picker's list: start on 10, a shotgun hole) and stays there ~10 s: GPS moves to
+    // that hole, through the card's own goToHole (the KP gate holds), and says so - a
+    // small "Hole 5 >" toast with Undo (back to the hole it left; no second jump until
+    // the golfer has walked off that tee). Never while a score is being entered (the
+    // card showing, a box focused) or any sheet / menu is open on the map, never while
+    // setting a green, marking shots or replaying, and never from the current green
+    // (gps-geo.onNextTee). Tools > "Auto-advance holes" turns it off on this phone
+    // (hardpan_gps_autoadvance = '0'); the switch off = none of it exists.
+    // PRIVACY: the position is compared, never stored - only the On / Off choice is.
+    var AA_KEY = 'hardpan_gps_autoadvance', AA_DWELL_MS = 10000, AA_TOAST_MS = 8000, AA_LEAVE_M = 40;
+    function aaSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('autoAdvance') !== false; } catch (e) { return true; } }
+    function aaOn() { if (!aaSwitch()) return false; try { return localStorage.getItem(AA_KEY) !== '0'; } catch (e) { return true; } }
+    function aaHoleRec(n) {
+        var osm = osmRecord(S.courseKey);
+        return G.resolveHole(osm && osm.holes ? osm.holes[String(n)] : null, pinsFor(n));
+    }
+    // Anything open over the map or the card that a hole change would pull out from under.
+    function aaBusy() {
+        if (S.side !== 'gps' || S.mode !== 'measure' || S.shotMode || S.replay || S.shotAdjust || S.flying || !S.pro) return true;
+        var a = document.activeElement;
+        if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName || '')) return true;
+        if (paywallOpen()) return true;
+        var kp = document.getElementById('kp-force-overlay');
+        if (kp && kp.style.display === 'flex') return true;
+        return Array.prototype.some.call(S.el.querySelectorAll('[role="dialog"],[role="menu"]'), function (d) { return d.style.display !== 'none' && d.offsetParent !== null; });
+    }
+    function aaTick() {
+        if (!S || !G || !G.onNextTee) return;
+        var nx = aaOn() && typeof S.holeList === 'function' ? G.nextInPlayOrder(S.holeList() || [], S.hole) : null;
+        var nr = nx != null ? aaHoleRec(nx) : null;
+        dropStaleFix();
+        // UNDONE: no second jump while the golfer is still on that tee.
+        if (S.aaSkip != null && (!fix || !nr || !nr.tee || S.aaSkip !== nx || G.haversineMeters(fix.pt, nr.tee) > AA_LEAVE_M)) S.aaSkip = null;
+        var cur = resolved(), nums = cur && fix ? G.holeNumbers(fix.pt, cur) : null;
+        var there = !!(fix && nr && nr.tee && G.onNextTee({ me: fix.pt, acc: fix.acc, tee: nr.tee, green: cur && cur.mid, onGreen: !!(nums && nums.onGreen) }));
+        if (!there || S.aaSkip === nx || aaBusy()) { S.aaDwell = null; return; }
+        var now = Date.now();
+        if (!S.aaDwell || S.aaDwell.hole !== nx) {
+            S.aaDwell = { hole: nx, since: now };
+            clearTimeout(S.aaTimer);
+            // A phone standing still may report less often: look again when the wait is up.
+            S.aaTimer = setTimeout(function () { if (S) render(); }, AA_DWELL_MS + 150);
+            return;
+        }
+        if (now - S.aaDwell.since < AA_DWELL_MS) return;
+        var from = S.hole;
+        S.aaDwell = null;
+        if (typeof S.gotoHole === 'function') S.gotoHole(nx); else setHole(nx);
+        if (S && Number(S.hole) === Number(nx)) aaToast(from, nx);
+    }
+    function aaToast(from, to) {
+        var t = S && S.el.querySelector('.gps-aa-toast');
+        if (!t) return;
+        t.setAttribute('data-from', String(from));
+        t.setAttribute('data-to', String(to));
+        var l = t.querySelector('.gps-aa-text');
+        if (l) l.textContent = 'Hole ' + to + ' \u203A';
+        t.style.display = '';
+        clearTimeout(S.aaToastTimer);
+        S.aaToastTimer = setTimeout(function () { if (S) aaHideToast(); }, AA_TOAST_MS);
+    }
+    function aaHideToast() { var t = S && S.el.querySelector('.gps-aa-toast'); if (t) t.style.display = 'none'; }
+    function aaUndo() {
+        var t = S && S.el.querySelector('.gps-aa-toast');
+        if (!t) return;
+        var from = Number(t.getAttribute('data-from')), to = Number(t.getAttribute('data-to'));
+        aaHideToast();
+        if (!from || Number(S.hole) !== to) return;
+        S.aaSkip = to;
+        if (typeof S.gotoHole === 'function') S.gotoHole(from); else setHole(from);
+    }
+    function aaToggleText() { txt('.gps-aa-toggle', 'Auto-advance holes: ' + (aaOn() ? 'On' : 'Off')); }
 
     // ---- FREE PAN, KEPT ON THE COURSE ------------------------------------------------
     // Pan and zoom anywhere on the course (one finger pans, two pinch); the map
@@ -3244,6 +3320,8 @@
         +   '<div class="gps-target-row gps-float" style="display:none"><span class="gps-to-here"></span><span class="gps-to-plays"></span><span class="gps-here-center gps-sr"></span></div>'
         + '</div>'
         + '<div class="gps-banner gps-float" style="display:none"></div>'
+        // AUTO-ADVANCE (008): "Hole 5 >" with Undo, for a few seconds after a jump.
+        + '<div class="gps-aa-toast gps-float" data-feature="autoAdvance" style="display:none" role="status"><span class="gps-aa-text"></span><button type="button" class="gps-aa-undo">Undo</button></div>'
         // BOTTOM: the scorecard (left), Enter Score + next hole (center), Tools (right).
         + '<div class="gps-bottom">'
         +   '<button type="button" class="gps-side-bets gps-float" aria-label="Scorecard"><span class="gps-ico">▤</span><span class="gps-cap">Card</span></button>'
@@ -3291,6 +3369,7 @@
         +   '<button type="button" class="gps-menu-item gps-refresh-gps" style="display:none">Refresh GPS data</button>'
         +   '<button type="button" class="gps-menu-item gps-units"></button>'
         +   '<button type="button" class="gps-menu-item gps-tourney-toggle"></button>'
+        +   '<button type="button" class="gps-menu-item gps-aa-toggle" data-feature="autoAdvance"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
@@ -3467,6 +3546,8 @@
         + '#gps-overlay .gps-score-next{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-left:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-banner{position:absolute;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(var(--gps-attrib-h) + 74px);padding:10px 14px;border-radius:999px;font-weight:800;font-size:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
         + '#gps-overlay.gps-banner-up .gps-banner{bottom:calc(var(--gps-attrib-h) + 128px);}'
+        + '#gps-overlay .gps-aa-toast{position:absolute;z-index:8;left:50%;transform:translateX(-50%);top:calc(var(--gps-top-b) + 6px);display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;font:800 16px/1 ' + FONT + ';white-space:nowrap;}'
+        + '#gps-overlay .gps-aa-undo{min-height:40px;padding:0 14px;border-radius:999px;background:#d9f99d !important;color:#0b0f0c !important;font:800 14px/1 ' + FONT + ' !important;}'
         + '#gps-overlay.gps-pinning .gps-banner{bottom:calc(var(--gps-attrib-h) + var(--gps-actions-h,58px) + 16px);}'
         + '#gps-overlay .gps-actions{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 8px);display:flex;flex-wrap:wrap;gap:8px;padding:8px;}'
         + '#gps-overlay .gps-btn{flex:1 1 auto;min-height:42px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);font-weight:700;padding:8px 12px;}'
@@ -3664,6 +3745,16 @@
             if (tourneyRound()) { flash('Tournament mode is on for this round - only the organizer can turn it off (Round Setup)'); return; }
             try { if (tourneyPhone()) localStorage.removeItem(TOURNEY_KEY); else localStorage.setItem(TOURNEY_KEY, '1'); } catch (e) {}
             closeMenus(); S.windKick = true; render();
+        });
+        // AUTO-ADVANCE (008): the switch off = no toggle, no toast, no jump (removed, not hidden).
+        if (!aaSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="autoAdvance"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-aa-undo', function () { if (S) aaUndo(); });
+        on(el, '.gps-aa-toggle', function () {
+            if (!S) return;
+            try { if (aaOn()) localStorage.setItem(AA_KEY, '0'); else localStorage.removeItem(AA_KEY); } catch (e) {}
+            S.aaDwell = null;
+            aaToggleText();
+            flash(aaOn() ? 'Auto-advance holes is on' : 'Auto-advance holes is off');
         });
         on(el, '.gps-refresh-gps', function () {
             if (!S) return;
@@ -4029,6 +4120,8 @@
         S.target = null; S.targetMoved = false;
         // Mark shot starts over on a new hole (audit C8): it measured from the last hole's spot.
         S.measureFrom = null; S.measureShot = null;
+        // AUTO-ADVANCE (008): a new hole starts any wait over.
+        S.aaDwell = null;
         S.framed = null;
         frameHole(false);
         render();

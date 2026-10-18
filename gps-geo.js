@@ -789,6 +789,28 @@
         return null;
     }
 
+    // ---- AUTO-ADVANCE (008, switch autoAdvance) --------------------------------------
+    // The hole after `cur` in the round's PLAY ORDER - the list the hole picker shows
+    // (start on 10: 10..18, 1..9; a shotgun hole: its own rotation). null after the
+    // last hole played, or for a hole not in the list: never a wrap to the first tee.
+    function nextInPlayOrder(list, cur) {
+        var l = (list || []).map(Number), i = l.indexOf(Number(cur));
+        return i === -1 || i + 1 >= l.length ? null : l[i + 1];
+    }
+    var NEXT_TEE_M = 25, GREEN_CLEAR_M = 20, NEXT_TEE_ACC_M = 30;
+    // Is the golfer ON THE NEXT HOLE'S TEE? Within 25 m of its tee point, OFF the
+    // current green (not inside it, and more than 20 m from its center - a green with
+    // no outline is a center only), on a fix good enough to tell (+-30 m or better).
+    // o: { me, acc (m), tee (the next hole's), green (the current hole's center),
+    // onGreen (holeNumbers' answer for the current hole) }. Pure.
+    function onNextTee(o) {
+        if (!o || !pinPt(o.me) || !pinPt(o.tee)) return false;
+        if (isFinite(o.acc) && o.acc > NEXT_TEE_ACC_M) return false;
+        if (o.onGreen) return false;
+        if (pinPt(o.green) && haversineMeters(pinPt(o.me), pinPt(o.green)) <= GREEN_CLEAR_M) return false;
+        return haversineMeters(pinPt(o.me), pinPt(o.tee)) <= NEXT_TEE_M;
+    }
+
     // A NUMBER THAT FITS. Four digits at most - 9999 yards is five and a half
     // miles, so anything longer is not a golf distance and shows as a dash
     // rather than pushing the layout off the screen.
@@ -1409,6 +1431,7 @@
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
+        nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
