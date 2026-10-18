@@ -1,4 +1,4 @@
-# HardPan 2.0 - App Store listing (DRAFT for Manny to paste; mailbox 007, 2026-10-17)
+# HardPan 2.0 - App Store listing (DRAFT for Manny to paste; mailbox 007, 2026-10-17; GPS features added in 008, 2026-10-18)
 
 Pricing (007): games, scoring and settling up are FREE. EVERY GPS feature needs the GPS Map
 subscription (com.rattlegolf.app.gpsmap.yearly, group "HardPan Plus"): a 7-day free trial, then
@@ -23,7 +23,13 @@ HardPan is golf GPS and a live scorecard for the games your group already plays.
 GPS
 - Front, middle and back yardages to every green, and to any spot you tap on the map
 - Wind and plays-like distances
-- Satellite view of each hole, tee to green
+- Satellite view of each hole, tee to green, and a hole preview that flies you from the tee to the green
+- Moves to the next hole by itself when you walk onto the next tee (you can turn it off)
+- Hazards and layups: yards to reach and carry the bunkers and water on the hole, where the course
+  map has them
+- Your club distances: mark a shot, pick the club, and HardPan suggests a club for the next one
+- Quick stats as you play (putts, fairways, greens in regulation) and a My stats page
+- HardPan Index: an unofficial handicap-style number from your rounds (not an official handicap)
 - Works for every golfer in your group, on their own phone
 
 GAMES (always free)
@@ -50,12 +56,18 @@ Privacy Policy: https://golf-app-5a5.pages.dev/privacy.html
 (Also set the App Store "License Agreement" to the standard EULA or link the Terms above, and put the
 Privacy Policy URL in App Privacy.)
 
+Wording rules (008): the HardPan Index is always "unofficial" and is never called USGA, GHIN or
+an official handicap. No Apple Watch line: the Watch app is a plan and a scaffold only, not built
+into the app. Hazards say "where the course map has them" because some courses have no hazard data.
+
 ## Keywords (100 max, comma separated, no spaces)
 golf,gps,yardage,rangefinder,scorecard,nassau,skins,leaderboard,golf games,handicap,course,tee times
 (100 - at the limit)
 
 ## What's New (2.0)
 - HardPan GPS: yardages to every green, wind and plays-like - 7-day free trial
+- GPS: auto-advance holes, hazards and layups, club suggestions, hole preview, quick stats and the
+  unofficial HardPan Index
 - New icon
 - Games, scoring and the leaderboard stay free
 

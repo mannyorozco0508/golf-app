@@ -182,6 +182,233 @@
         body.appendChild(g2);
     }
 
+    // ============================================================================
+    // QUICK STATS ON THE SCORECARD (008, HardPanFeature('quickStats'); part of GPS Map)
+    //
+    // Per golfer per hole, one tap each under the golfer's score box: PUTTS (0, 1, 2,
+    // 3, 4+), FAIRWAY (left / hit / right - par 4s and 5s only) and GREEN IN
+    // REGULATION, worked out from the score and the putts (score - putts <= par - 2).
+    // The shape is the one a round would hold - events/<code>/stats/p<id>_h<n> =
+    // { putts, fw, gir } - but the live rules (phase 1) refuse that child to anyone
+    // but the round's owner, so it is KEPT ON THIS PHONE ONLY, one record per round
+    // per golfer: localStorage hardpan_qstats_v1_<code>_p<id>. Nothing here writes to
+    // Firebase, and nothing here is read by a money engine.
+    //
+    // A record also holds a copy of that golfer's scores and the card's pars (snap),
+    // so My stats adds up later - on Home, with no round loaded. The golfer this phone
+    // IS for a round (me: true) is set by the scorecard (index.html qsSync).
+    // ============================================================================
+    var QKEY = 'hardpan_qstats_v1_';
+    function qKey(code, pid) { return QKEY + code + '_p' + pid; }
+    function qLoad(code, pid) { var r = lsGet(qKey(code, pid)); return r && r.v === 1 ? r : null; }
+    function qNew(ctx, pid) { return { v: 1, code: String(ctx.code), pid: String(pid), course: ctx.course || '', at: Date.now(), holes: {}, snap: {} }; }
+    // 4 means "4+".
+    function qPutts(v) { var n = Number(v); return v == null || v === '' || !isFinite(n) || n < 0 ? null : Math.min(4, Math.floor(n)); }
+    function fwAsked(par) { return Number(par) >= 4; }
+    // { putts, fw, gir } for one hole, recomputing GIR from the score it is given.
+    function qCell(h, strokes, par) {
+        h = h || {};
+        var putts = h.putts == null ? null : h.putts;
+        var gir = girAuto(Number(strokes) || 0, putts, Number(par));
+        return { putts: putts, fw: fwAsked(par) ? (h.fw || null) : null, gir: gir };
+    }
+    function qHole(code, pid, n, strokes, par) { var r = qLoad(code, pid); return qCell(r && r.holes[String(n)], strokes, par); }
+    // ctx: { code, course }. patch: { putts } or { fw } - null / undefined clears it.
+    function qSet(ctx, pid, n, patch, strokes, par) {
+        var rec = qLoad(ctx.code, pid) || qNew(ctx, pid);
+        n = String(n);
+        var h = rec.holes[n] || {};
+        if ('putts' in patch) { var p = qPutts(patch.putts); if (p == null) delete h.putts; else h.putts = p; }
+        if ('fw' in patch) { if (fwAsked(par) && FW[patch.fw]) h.fw = patch.fw; else delete h.fw; }
+        var g = girAuto(Number(strokes) || 0, h.putts == null ? null : h.putts, Number(par));
+        if (g == null) delete h.gir; else h.gir = g;
+        if (Number(strokes) > 0) rec.snap[n] = { s: Number(strokes), par: Number(par) };
+        if (Object.keys(h).length) rec.holes[n] = h; else delete rec.holes[n];
+        lsSet(qKey(ctx.code, pid), rec);
+        return qCell(h, strokes, par);
+    }
+    // The round as this phone sees it: the golfer this phone is (meId) gets a record (so
+    // a round with no stats still counts toward the scoring average); every golfer who
+    // already has one gets their scores copied and GIR worked out again.
+    // ctx: { code, course, round: { players, scores }, holes: [{ n, par }] }
+    function qSync(ctx, meId) {
+        if (!ctx || !ctx.code) return;
+        var round = ctx.round || {};
+        (round.players || []).forEach(function (p) {
+            var mine = meId != null && String(p.id) === String(meId);
+            var rec = qLoad(ctx.code, p.id);
+            if (!rec && !mine) return;
+            rec = rec || qNew(ctx, p.id);
+            var was = JSON.stringify(rec);
+            rec.me = mine;
+            if (ctx.course) rec.course = ctx.course;
+            rec.snap = {};
+            (ctx.holes || []).forEach(function (h) { rec.snap[String(h.n)] = { s: strokesOf(round, p.id, h.n), par: Number(h.par) || 0 }; });
+            Object.keys(rec.holes).forEach(function (n) {
+                var x = rec.snap[n], h = rec.holes[n];
+                var g = x ? girAuto(x.s, h.putts == null ? null : h.putts, x.par) : null;
+                if (g == null) delete h.gir; else h.gir = g;
+            });
+            if (JSON.stringify(rec) !== was) lsSet(qKey(ctx.code, p.id), rec);
+        });
+    }
+
+    // ---- MY STATS (pure) ------------------------------------------------------------
+    // One round for the golfer: { code, at, holes: { n: { putts, fw } }, snap: { n: { s, par } } }.
+    // Rounds count when the golfer has a score; the newest `last` of them are the window.
+    //   rounds          rounds in the window
+    //   scoringAvg      mean total of the window's COMPLETE 18-hole rounds (own scores)
+    //   par3/4/5        mean score on every scored par 3 / 4 / 5 in the window
+    //   statRounds      rounds in the window with any putts or fairway entered - only
+    //                   they count toward putts, FIR and GIR
+    //   puttsPerHole    putts / holes with putts entered (and a score)
+    //   puttsPerRound   puttsPerHole x 18 (an 18-hole round's worth, so a round with a
+    //                   hole or two skipped still counts)
+    //   firPct          fairways hit / fairways answered (par 4s and 5s)
+    //   girPct          greens hit / holes with a score and putts
+    function aggregate(rounds, last) {
+        var list = (rounds || []).filter(function (r) { return r && Object.keys(r.snap || {}).some(function (n) { return r.snap[n].s > 0; }); })
+            .sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, last || 5);
+        var o = { rounds: list.length, statRounds: 0, full: 0, scoringAvg: null, puttsPerHole: null, puttsPerRound: null, firPct: null, girPct: null, par3: null, par4: null, par5: null,
+            fir: 0, firOf: 0, gir: 0, girOf: 0, putts: 0, puttHoles: 0 };
+        var tot = 0, byPar = { 3: [0, 0], 4: [0, 0], 5: [0, 0] };
+        list.forEach(function (r) {
+            var holes = r.holes || {}, keys = Object.keys(r.snap || {}), sum = 0, scored = 0;
+            keys.forEach(function (n) {
+                var x = r.snap[n];
+                if (!(x.s > 0)) return;
+                scored++; sum += x.s;
+                if (byPar[x.par]) { byPar[x.par][0] += x.s; byPar[x.par][1]++; }
+            });
+            if (keys.length === 18 && scored === 18) { o.full++; tot += sum; }
+            var hasStats = Object.keys(holes).some(function (n) { return holes[n] && (holes[n].putts != null || holes[n].fw); });
+            if (!hasStats) return;
+            o.statRounds++;
+            Object.keys(holes).forEach(function (n) {
+                var h = holes[n] || {}, x = r.snap[n] || null, par = x ? x.par : 0;
+                if (h.fw && FW[h.fw] && (!x || fwAsked(par))) { o.firOf++; if (h.fw === 'hit') o.fir++; }
+                if (h.putts == null || !x || !(x.s > 0)) return;
+                o.putts += h.putts; o.puttHoles++;
+                var g = girAuto(x.s, h.putts, par);
+                if (g != null) { o.girOf++; if (g) o.gir++; }
+            });
+        });
+        if (o.full) o.scoringAvg = tot / o.full;
+        [3, 4, 5].forEach(function (p) { if (byPar[p][1]) o['par' + p] = byPar[p][0] / byPar[p][1]; });
+        if (o.puttHoles) { o.puttsPerHole = o.putts / o.puttHoles; o.puttsPerRound = o.puttsPerHole * 18; }
+        if (o.firOf) o.firPct = o.fir / o.firOf;
+        if (o.girOf) o.girPct = o.gir / o.girOf;
+        return o;
+    }
+    // Every round on this phone, as the golfer this phone is. A round's golfer: the record
+    // the scorecard marked me; else the "This is me" (golfapp_me_<code>) or the GPS name
+    // tag (hardpan_gps_golfer_<code>). The GPS screen's own sheet (hardpan_stats_v1_, one
+    // golfer a round) is read too; a hole entered on the scorecard wins over it.
+    function myRounds() {
+        var byCode = {}, legacy = {};
+        try {
+            for (var i = 0; i < W.localStorage.length; i++) {
+                var k = W.localStorage.key(i);
+                if (!k) continue;
+                if (k.indexOf(QKEY) === 0) { var r = lsGet(k); if (r && r.v === 1 && r.code) (byCode[r.code] = byCode[r.code] || []).push(r); }
+                else if (k.indexOf(KEY) === 0) { var l = lsGet(k); if (l && l.v === 1 && l.code && l.player) legacy[l.code] = l; }
+            }
+        } catch (e) {}
+        var out = [];
+        var codes = Object.keys(byCode).concat(Object.keys(legacy).filter(function (c) { return !byCode[c]; }));
+        codes.forEach(function (code) {
+            var recs = byCode[code] || [], me = recs.filter(function (r) { return r.me === true; })[0];
+            if (!me) {
+                var id = null; try { id = W.localStorage.getItem('golfapp_me_' + code) || W.localStorage.getItem('hardpan_gps_golfer_' + code); } catch (e) {}
+                me = recs.filter(function (r) { return id != null && String(r.pid) === String(id); })[0] || null;
+            }
+            var lg = legacy[code];
+            if (lg && me && String(lg.player) !== String(me.pid)) lg = null;
+            if (!me && !lg) return;
+            var r0 = { code: code, course: (me && me.course) || (lg && lg.course) || '', at: (me && me.at) || (lg && lg.at) || 0, holes: {}, snap: {} };
+            if (lg) {
+                Object.keys(lg.holes || {}).forEach(function (n) { var h = lg.holes[n] || {}; r0.holes[n] = { putts: h.putts == null ? null : h.putts, fw: h.fw || null }; });
+                Object.keys(lg.snap || {}).forEach(function (n) { r0.snap[n] = { s: lg.snap[n].strokes || 0, par: lg.snap[n].par }; });
+                if (lg.at && (!r0.at || lg.at < r0.at)) r0.at = lg.at;
+            }
+            if (me) {
+                Object.keys(me.holes || {}).forEach(function (n) { r0.holes[n] = me.holes[n]; });
+                if (Object.keys(me.snap || {}).length) r0.snap = me.snap;
+            }
+            out.push(r0);
+        });
+        return out;
+    }
+
+    // ---- THE MY STATS PAGE --------------------------------------------------------------
+    var NKEY = 'hardpan_mystats_last';
+    function lastN() { var v = null; try { v = W.localStorage.getItem(NKEY); } catch (e) {} return v === '20' ? 20 : 5; }
+    var page = null;
+    function closeMy() { if (page) page.style.display = 'none'; }
+    function openMy() {
+        var d = W.document;
+        if (!page) {
+            page = el('div', 'hp-my-stats');
+            page.id = 'hp-my-stats';
+            page.setAttribute('role', 'dialog');
+            page.setAttribute('aria-label', 'My stats');
+            var st = el('style');
+            st.textContent = '#hp-my-stats{position:fixed;inset:0;z-index:2147482500;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#f0f4f2;color:#1a1a1a;color-scheme:light;font:600 15px/1.35 -apple-system,system-ui,sans-serif;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box;}'
+                + '#hp-my-stats .ms-top{display:flex;align-items:center;gap:10px;max-width:520px;margin:0 auto;}#hp-my-stats .ms-title{font-weight:800;font-size:1.25rem;color:#0f4c3a;}'
+                + '#hp-my-stats .ms-back{min-width:44px;min-height:44px;border:0;background:#fff;border-radius:12px;font-size:1.5rem;color:#0f4c3a;cursor:pointer;}'
+                + '#hp-my-stats .ms-body{max-width:520px;margin:0 auto;}#hp-my-stats .ms-seg{display:flex;gap:6px;margin:14px 0 6px;background:#e2f1ea;border-radius:999px;padding:4px;}'
+                + '#hp-my-stats .ms-seg button{flex:1;min-height:40px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}#hp-my-stats .ms-seg button.on{background:#0f4c3a;color:#fff;}'
+                + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
+                + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}';
+            page.appendChild(st);
+            var top = el('div', 'ms-top');
+            var back = el('button', 'ms-back', '‹'); back.type = 'button'; back.setAttribute('aria-label', 'Back'); back.onclick = closeMy;
+            top.appendChild(back); top.appendChild(el('div', 'ms-title', 'My stats'));
+            page.appendChild(top);
+            page.appendChild(el('div', 'ms-body'));
+            d.body.appendChild(page);
+        }
+        page.style.display = '';
+        renderMy();
+    }
+    function renderMy() {
+        if (!page) return;
+        var body = page.querySelector('.ms-body'), n = lastN(), a = aggregate(myRounds(), n);
+        body.textContent = '';
+        var seg = el('div', 'ms-seg');
+        [5, 20].forEach(function (k) {
+            var b = el('button', k === n ? 'on' : '', 'Last ' + k); b.type = 'button'; b.setAttribute('data-ms-last', String(k));
+            b.onclick = function () { try { W.localStorage.setItem(NKEY, String(k)); } catch (e) {} renderMy(); };
+            seg.appendChild(b);
+        });
+        body.appendChild(seg);
+        body.appendChild(el('div', 'ms-note', a.rounds ? (a.rounds + ' round' + (a.rounds === 1 ? '' : 's') + ' on this phone · ' + a.statRounds + ' with putts or fairways') : 'No rounds on this phone yet. Tap putts and fairways under your score on the card.'));
+        var g = el('div', 'ms-grid');
+        [['Putts / round', num(a.puttsPerRound, 1), 'putts'], ['Fairways (FIR)', pct(a.firPct), 'fir'], ['Greens (GIR)', pct(a.girPct), 'gir'], ['Scoring average', num(a.scoringAvg, 1), 'avg'],
+            ['Par 3 average', num(a.par3, 2), 'par3'], ['Par 4 average', num(a.par4, 2), 'par4'], ['Par 5 average', num(a.par5, 2), 'par5'], ['Putts / hole', num(a.puttsPerHole, 2), 'pph']]
+            .forEach(function (x) { var t = el('div', 'ms-tile'); t.setAttribute('data-ms', x[2]); t.appendChild(el('div', 'k', x[0])); t.appendChild(el('div', 'v', String(x[1]))); g.appendChild(t); });
+        body.appendChild(g);
+        body.appendChild(el('div', 'ms-note', 'Putts, fairways and greens come from rounds with stats entered. Scoring average: complete 18-hole rounds. Kept on this phone only.'));
+    }
+    // HOME (the GPS app): "My stats" - only with GPS Map, asked quietly (never a paywall),
+    // and only when the switch is on.
+    function placeHome(mount) {
+        if (!mount || typeof W.HardPanFeature !== 'function' || !W.HardPanFeature('quickStats')) return;
+        var G = W.HardPanGps;
+        if (!G || typeof G.requireGps !== 'function') return;
+        G.requireGps({ quiet: true }, function () {
+            if (mount.querySelector('[data-hp-mystats]')) return;
+            var b = el('button', 'hp-row', null); b.type = 'button'; b.setAttribute('data-hp-mystats', '1'); b.style.margin = '12px 0';
+            b.appendChild(el('span', 'n', '📊 My stats'));
+            b.appendChild(el('span', null, '›'));
+            b.onclick = openMy;
+            mount.appendChild(b);
+        }, function () {});
+    }
+
     W.HardPanGpsStats = { open: open, close: close, refresh: refresh, isOpen: function () { return !!(sheet && sheet.style.display !== 'none' && cur); },
-        girAuto: girAuto, holeView: holeView, summary: summary, season: season, load: load, setHole: setHole, ensure: ensure };
+        girAuto: girAuto, holeView: holeView, summary: summary, season: season, load: load, setHole: setHole, ensure: ensure,
+        // Quick stats on the scorecard (008) and My stats.
+        quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked },
+        aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome };
 })();

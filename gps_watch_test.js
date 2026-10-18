@@ -1,0 +1,154 @@
+// ============================================================================
+// THE APPLE WATCH, PHONE SIDE (feature 10 - plan + scaffold, docs/WATCH-APP-PLAN.md)
+//   gps-view.js sends the CURRENT hole's front / center / back to
+//   window.Capacitor.Plugins.HardPanWatch.sendHole(...) when the plugin exists AND the
+//   'watch' switch (gps-config.js features.watch) is on. Today neither is true: no plugin
+//   ships and the switch is false, so nothing happens. A stubbed plugin proves the payload,
+//   that only numbers (never a coordinate) go to the watch, that an unentitled phone sends no
+//   numbers (007), and that a score from the watch goes through the host's own saveScore.
+// ============================================================================
+'use strict';
+const test0 = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
+const test = (n, f) => test0(n, { skip: ON ? false : 'Consumer tree: no gps-view.js' }, f);
+const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
+
+function el() {
+    const e = { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+        setAttribute() {}, getAttribute() { return null; }, removeAttribute() {}, appendChild(c) { c.parentNode = e; return c; },
+        removeChild() {}, insertBefore(c) { return c; }, addEventListener() {}, removeEventListener() {},
+        querySelector() { return null; }, querySelectorAll() { return []; }, textContent: '', innerHTML: '' };
+    return e;
+}
+// The phone is ~243 yds short of the green's center on hole 4 (0.002 deg of latitude).
+const HERE = { latitude: 33.4480, longitude: -79.15, accuracy: 5 };
+// world({ watch, plugin, pro, tournament }) -> { V, sent, listeners, saved }
+function world(o) {
+    o = Object.assign({ watch: true, plugin: true, pro: true }, o);
+    const sent = [], listeners = {}, saved = [];
+    let pendingAsked = 0;
+    const nav = { userAgent: 'iPhone', geolocation: { watchPosition(ok) { ok({ coords: HERE, timestamp: Date.now() }); return 7; }, clearWatch() {} } };
+    const document = { createElement: el, body: el(), documentElement: el(), head: el(), addEventListener() {}, removeEventListener() {},
+        getElementById() { return null; }, querySelector() { return null; }, querySelectorAll() { return []; }, visibilityState: 'visible' };
+    const store = {};
+    const sb = { document, navigator: nav, JSON, Object, Math, Number, String, Date, Promise, RegExp, isFinite, Array, console,
+        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
+        setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {} };
+    sb.window = sb; sb.addEventListener = () => {}; sb.removeEventListener = () => {};
+    vm.createContext(sb);
+    vm.runInContext(read('gps-config.js'), sb);
+    const cfg = sb.HARDPAN_GPS_CONFIG;
+    cfg.iap = false; cfg.paywall = !o.pro;           // the one check (hasGpsPro), without a store
+    if (o.watch !== undefined) cfg.features.watch = o.watch;
+    vm.runInContext(read('gps-geo.js'), sb);
+    if (o.plugin) sb.Capacitor = { Plugins: { HardPanWatch: {
+        sendHole(m) { sent.push(JSON.parse(JSON.stringify(m))); return Promise.resolve(); },
+        pending() { pendingAsked++; return Promise.resolve({ items: o.pending || [] }); },
+        addListener(name, fn) { (listeners[name] = listeners[name] || []).push(fn); return Promise.resolve({ remove() {} }); } } } };
+    vm.runInContext(read('gps-view.js'), sb);
+    const G = sb.HardPanGeo, V = sb.HardPanGps;
+    sb.currentData = { players: [{ id: 1, name: 'Manny' }, { id: 2, name: 'Pat' }], scores: { p1_h4: '5' }, tournamentMode: !!o.tournament };
+    const pin = G.makePin([33.45, -79.15], [33.4499, -79.15], [33.4501, -79.15], null, Date.now(), 'gps');
+    const opts = { courseKey: 'test_course', hole: 3, par: 4, eventCode: 'ABC', round: { gpsPins: { h4: pin } } };
+    if (o.saveScore !== false) opts.saveScore = (pid, h, v) => saved.push([pid, h, v]);
+    assert.strictEqual(V.mount(opts), true);
+    V.showSide('gps');
+    V.setHole(4, 5);
+    return { V, sent, listeners, saved, sb, round: opts.round, pendingAsked: () => pendingAsked };
+}
+
+test('the switch ships off, and there is no plugin: nothing is sent, nothing is listened for', () => {
+    assert.match(read('gps-config.js'), /features: \{[^}]*\bwatch: false\b[^}]*\}/);
+    const shipped = world({ watch: undefined, plugin: false });
+    assert.strictEqual(shipped.sent.length, 0);
+    assert.strictEqual(shipped.V.watchSent(), null);
+});
+test('the plugin present but the switch false: nothing is sent', () => {
+    const w = world({ watch: false, plugin: true });
+    assert.strictEqual(w.sent.length, 0);
+    assert.deepStrictEqual(Object.keys(w.listeners), [], 'no watch listener is hooked');
+});
+test('the switch on but no plugin (every build today): nothing happens, nothing breaks', () => {
+    const w = world({ watch: true, plugin: false });
+    assert.strictEqual(w.sent.length, 0);
+    assert.strictEqual(w.V.hole(), 4);
+});
+test('switch on + plugin: the current hole\'s F / C / B, in the golfer\'s units', () => {
+    const w = world();
+    const last = w.sent[w.sent.length - 1];
+    assert.deepStrictEqual(last, { hole: 4, par: 5, front: 231, center: 243, back: 255, units: 'yd', onGreen: false, entitled: true, tournament: false, score: 5, round: 'ABC' });
+    assert.deepStrictEqual(Object.keys(last).sort(), ['back', 'center', 'entitled', 'front', 'hole', 'onGreen', 'par', 'round', 'score', 'tournament', 'units']);
+    // NO LOCATION DATA LEAVES THE PHONE: numbers only - no lat / lng, no point, no accuracy.
+    assert.ok(!/lat|lng|lon|pt|acc|33\.4|79\.1/i.test(JSON.stringify(last)), JSON.stringify(last));
+    assert.deepStrictEqual(w.V.watchSent(), last);
+});
+test('only on a change: the same numbers again send nothing; a new hole sends once', () => {
+    const w = world();
+    const n = w.sent.length;
+    w.V.setHole(4, 5);
+    w.V.roundUpdated(w.round, {});
+    assert.strictEqual(w.sent.length, n, 'unchanged numbers are not resent');
+    w.V.setHole(5, 4);
+    assert.strictEqual(w.sent.length, n + 1);
+    assert.strictEqual(w.sent[n].hole, 5);
+    assert.strictEqual(w.sent[n].front, null, 'hole 5 has no green here: no number, never a guess');
+});
+test('meters when the golfer reads meters', () => {
+    const w = world();
+    w.sb.localStorage.setItem('hardpan_gps_units', 'm');
+    w.V.setHole(5, 4); w.V.setHole(4, 5);
+    const last = w.sent[w.sent.length - 1];
+    assert.strictEqual(last.units, 'm');
+    assert.ok(last.center >= 220 && last.center <= 224, String(last.center));
+});
+test('GPS Map (007): an unentitled phone sends entitled: false and no numbers', () => {
+    const w = world({ pro: false });
+    for (const m of w.sent) { assert.strictEqual(m.entitled, false); assert.strictEqual(m.front, null); assert.strictEqual(m.center, null); assert.strictEqual(m.back, null); }
+});
+test('tournament mode rides along (distance only is still allowed)', () => {
+    const w = world({ tournament: true });
+    const last = w.sent[w.sent.length - 1];
+    assert.strictEqual(last.tournament, true);
+    assert.strictEqual(last.center, 243);
+});
+test('the watch talks back: a hole change and the golfer\'s own score, through the host\'s saveScore', () => {
+    const w = world();
+    assert.deepStrictEqual(Object.keys(w.listeners).sort(), ['watchHole', 'watchScore']);
+    w.listeners.watchHole[0]({ hole: 6 });
+    assert.strictEqual(w.V.hole(), 6);
+    w.listeners.watchHole[0]({ hole: 99 });
+    assert.strictEqual(w.V.hole(), 6, 'no such hole: ignored');
+    w.listeners.watchScore[0]({ hole: 4, strokes: 4 });
+    assert.deepStrictEqual(w.saved, [[1, 4, '4']], 'the phone\'s own golfer, the app\'s own write');
+    for (const bad of [{ hole: 4, strokes: 0 }, { hole: 4, strokes: 2.5 }, { hole: 0, strokes: 4 }, { hole: 4, strokes: 30 }, null]) w.listeners.watchScore[0](bad);
+    assert.strictEqual(w.saved.length, 1, 'nonsense from the watch writes nothing');
+    w.listeners.watchScore[0]({ hole: 4, strokes: 6, round: 'OTHER' });
+    assert.strictEqual(w.saved.length, 1, 'a score queued for another round is never written here');
+    w.listeners.watchScore[0]({ hole: 5, strokes: 3, round: 'ABC' });
+    assert.deepStrictEqual(w.saved[1], [1, 5, '3']);
+});
+test('scores kept while the phone app was not running are written once the screen is up', async () => {
+    const w = world({ pending: [{ kind: 'score', hole: 2, strokes: 6, round: 'ABC', id: 'a' }, { kind: 'score', hole: 3, strokes: 4, round: 'OLD', id: 'b' }] });
+    await new Promise((r) => setImmediate(r));
+    assert.strictEqual(w.pendingAsked(), 1, 'asked once');
+    assert.deepStrictEqual(w.saved, [[1, 2, '6']], 'this round\'s score written; another round\'s dropped');
+});
+test('no saveScore handed over (index.html today): a watch score writes nothing', () => {
+    const w = world({ saveScore: false });
+    assert.strictEqual(w.V.watchScore({ hole: 4, strokes: 4 }), false);
+});
+test('a spectator\'s phone never writes a score from the watch', () => {
+    const w = world();
+    w.sb.HardPanDoors = { spectating: () => true };
+    assert.strictEqual(w.V.watchScore({ hole: 4, strokes: 4 }), false);
+    assert.strictEqual(w.saved.length, 0);
+});
+test('the scaffold is not in the Xcode project (the current build is unaffected)', () => {
+    const pbx = read('gps-beta/ios/App/App.xcodeproj/project.pbxproj');
+    assert.ok(!/HardPanWatch|WatchSession|PhoneBridge|watchkitapp|WatchConnectivity/.test(pbx));
+    for (const f of ['gps-beta/ios/Watch/HardPanWatch/HardPanWatchApp.swift', 'gps-beta/ios/App/PhoneBridge/HardPanWatchPlugin.swift', 'docs/WATCH-APP-PLAN.md']) assert.ok(fs.existsSync(path.join(__dirname, f)), f);
+});

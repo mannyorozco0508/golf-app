@@ -4503,7 +4503,7 @@
 // itself ships in the iOS app only), map pars never touch the card, Palmbrook,
 // a hole drawn per tee, green multipolygons. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v354-gps-livefix';
+const CACHE_VERSION = 'golfapp-v355-gps-plus';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4729,6 +4729,8 @@ const SHELL_FILES = [
     './league-ui.js',
     './points.html',
     './score-marks-hp.js',
+    // HardPan Index (unofficial): the 18s this phone scored, worked out on the phone (008).
+    './hp-index.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
     // GPS:END

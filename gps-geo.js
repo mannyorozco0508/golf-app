@@ -776,6 +776,34 @@
         return { center: center, zoom: zoom, bearing: bearing };
     }
 
+    // ---- HOLE FLYOVER (008, switch flyover) -------------------------------------------
+    // Where the camera is a fraction t (0 = the tee, 1 = the green) of the way along the
+    // hole's own line (tee -> dogleg -> green; just tee -> green without one), by
+    // distance, and which way it looks: toward a point a fifth of the hole further on
+    // (the last fifth looks at the green from where that fifth starts, so the view never
+    // spins over the flag). Pure: { pt, bearing } or null.
+    function flyoverFrame(line, t) {
+        var pts = (line || []).map(pinPt).filter(Boolean);
+        if (pts.length < 2) return null;
+        var segs = [], total = 0;
+        for (var i = 1; i < pts.length; i++) { var m = haversineMeters(pts[i - 1], pts[i]); segs.push(m); total += m; }
+        if (!(total > 0)) return null;
+        var at = function (f) {
+            var want = Math.max(0, Math.min(1, f)) * total;
+            for (var j = 0; j < segs.length; j++) {
+                if (want <= segs[j] || j === segs.length - 1) {
+                    var k = segs[j] ? Math.min(1, want / segs[j]) : 0;
+                    return [pts[j][0] + (pts[j + 1][0] - pts[j][0]) * k, pts[j][1] + (pts[j + 1][1] - pts[j][1]) * k];
+                }
+                want -= segs[j];
+            }
+            return pts[pts.length - 1];
+        };
+        var tt = Math.max(0, Math.min(1, Number(t) || 0));
+        var from = tt > 0.8 ? at(0.8) : at(tt), to = tt > 0.8 ? pts[pts.length - 1] : at(tt + 0.2);
+        return { pt: at(tt), bearing: bearingDeg(from, to) };
+    }
+
     // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
     // the hole; the TEE when they are more than offYards from the green, or have
     // no fix at all (planning a hole from the clubhouse, or a GPS that has not
@@ -787,6 +815,28 @@
         if (tee) return { from: 'tee', pt: tee };
         if (fixPt && !greenMid) return { from: 'me', pt: fixPt };
         return null;
+    }
+
+    // ---- AUTO-ADVANCE (008, switch autoAdvance) --------------------------------------
+    // The hole after `cur` in the round's PLAY ORDER - the list the hole picker shows
+    // (start on 10: 10..18, 1..9; a shotgun hole: its own rotation). null after the
+    // last hole played, or for a hole not in the list: never a wrap to the first tee.
+    function nextInPlayOrder(list, cur) {
+        var l = (list || []).map(Number), i = l.indexOf(Number(cur));
+        return i === -1 || i + 1 >= l.length ? null : l[i + 1];
+    }
+    var NEXT_TEE_M = 25, GREEN_CLEAR_M = 20, NEXT_TEE_ACC_M = 30;
+    // Is the golfer ON THE NEXT HOLE'S TEE? Within 25 m of its tee point, OFF the
+    // current green (not inside it, and more than 20 m from its center - a green with
+    // no outline is a center only), on a fix good enough to tell (+-30 m or better).
+    // o: { me, acc (m), tee (the next hole's), green (the current hole's center),
+    // onGreen (holeNumbers' answer for the current hole) }. Pure.
+    function onNextTee(o) {
+        if (!o || !pinPt(o.me) || !pinPt(o.tee)) return false;
+        if (isFinite(o.acc) && o.acc > NEXT_TEE_ACC_M) return false;
+        if (o.onGreen) return false;
+        if (pinPt(o.green) && haversineMeters(pinPt(o.me), pinPt(o.green)) <= GREEN_CLEAR_M) return false;
+        return haversineMeters(pinPt(o.me), pinPt(o.tee)) <= NEXT_TEE_M;
     }
 
     // A NUMBER THAT FITS. Four digits at most - 9999 yards is five and a half
@@ -838,6 +888,52 @@
         }
         marks.forEach(function (y) { arc(pin, origin, y, 'pin'); });
         return out;
+    }
+
+    // ---- HAZARDS + LAYUPS (008, switch hazards) ---------------------------------------
+    // GolfAPI marks a hazard by its FRONT and BACK edge (two points, one when the edge
+    // is all it has); the app's copy keeps each point's kind (gb greenside bunker, fb
+    // fairway bunker, w water) and side (L / C / R), not which edge it is. So points of
+    // the same kind and side within 60 m of each other are ONE hazard (two at most).
+    // REACH = the yards to its near edge, CARRY = to its far edge (one point: reach
+    // only). Behind the golfer (every point behind them on the line to the green): no
+    // numbers, "behind". Pure; nothing is fetched.
+    var HAZARD_PAIR_M = 60, LAYUP_YD = [50, 75, 100, 125, 150];
+    var HAZARD_NAMES = { gb: 'Greenside bunker', fb: 'Fairway bunker', w: 'Water', b: 'Bunker' };
+    var HAZARD_SIDES = { L: 'left', C: 'center', R: 'right' };
+    function hazardGroups(hz) {
+        var out = [];
+        (hz || []).forEach(function (z) {
+            var pt = z && pinPt(z.pt);
+            if (!pt) return;
+            var g = out.filter(function (o) { return o.type === z.type && o.side === (z.side || '') && o.pts.length < 2 && haversineMeters(o.pts[0], pt) <= HAZARD_PAIR_M; })[0];
+            if (g) g.pts.push(pt); else out.push({ type: z.type, side: z.side || '', pts: [pt] });
+        });
+        return out;
+    }
+    // me: where the numbers are measured from; green: the hole's center (for "behind").
+    // Rows nearest first: { type, side, name, reachM, carryM (null: one point), behind }.
+    function hazardRows(me, hz, green) {
+        me = pinPt(me); green = pinPt(green);
+        if (!me) return [];
+        var proj = projector(me), gv = green ? proj.fwd(green) : null, gl = gv ? Math.sqrt(gv[0] * gv[0] + gv[1] * gv[1]) : 0;
+        var along = function (p) { if (!gl) return 1; var q = proj.fwd(p); return (q[0] * gv[0] + q[1] * gv[1]) / gl; };
+        var rows = hazardGroups(hz).map(function (g) {
+            var d = g.pts.map(function (p) { return haversineMeters(me, p); });
+            var behind = g.pts.every(function (p) { return along(p) < 0; });
+            return { type: g.type, side: g.side, name: (HAZARD_NAMES[g.type] || 'Hazard') + (HAZARD_SIDES[g.side] ? ' ' + HAZARD_SIDES[g.side] : ''),
+                     reachM: behind ? null : Math.min.apply(null, d), carryM: behind || g.pts.length < 2 ? null : Math.max.apply(null, d), behind: behind };
+        });
+        rows.sort(function (a, b) { return (a.behind ? 1 : 0) - (b.behind ? 1 : 0) || (a.reachM || 0) - (b.reachM || 0); });
+        return rows;
+    }
+    // LAY UP TO 50 / 75 / 100 / 125 / 150 (in the golfer's unit; unitM 0.9144 for yards,
+    // 1 for metres): how far from the golfer that leaves them, straight at the green.
+    // Only the ones shorter than the distance to the green. [{ leave, fromM }].
+    function layupTargets(toGreenM, unitM) {
+        var u = unitM || M_PER_YD;
+        if (!isFinite(toGreenM) || toGreenM <= 0) return [];
+        return LAYUP_YD.filter(function (l) { return l * u < toGreenM; }).map(function (l) { return { leave: l, fromM: toGreenM - l * u }; });
     }
 
     // WIND from the National Weather Service hourly forecast (api.weather.gov),
@@ -1408,8 +1504,11 @@
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
+        hazardGroups: hazardGroups, hazardRows: hazardRows, layupTargets: layupTargets, LAYUP_YD: LAYUP_YD,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
+        nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
+        flyoverFrame: flyoverFrame,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,

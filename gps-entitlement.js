@@ -80,6 +80,10 @@
     // Configure the SDK once. Resolves true when it is ready to be asked.
     function start() {
         if (started) return started;
+        // DEV BUILD ONLY (mailbox 008): tools/build-gps-app.js with GPS_DEV_PRO=1 adds devPro to the
+        // BUILT config (never the repo's), so Manny's Cmd+R build reaches GPS without a store. A
+        // release build is built without it and stays behind the paywall.
+        if (cfg().devPro === true) { set(true); started = Promise.resolve(false); return started; }
         var P = plugin(), key = String(cfg().revenueCatKey || '');
         if (!enabled() || !P || !key) { started = Promise.resolve(false); return started; }
         started = Promise.resolve().then(function () {
@@ -99,6 +103,7 @@
     function refresh(cb) {
         var done = function (v) { if (typeof cb === 'function') cb(v); };
         if (!enabled()) { done(false); return; }
+        if (cfg().devPro === true) { set(true); done(true); return; }   // the dev build (see start)
         start().then(function (ok) {
             if (!ok) { set(false); return false; }
             return plugin().getCustomerInfo().then(function (r) { set(activeIn(infoOf(r))); return pro; });

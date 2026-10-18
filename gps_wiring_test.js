@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js', 'gps-entitlement.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js', 'gps-entitlement.js', 'hp-index.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -56,7 +56,7 @@ test('every GPS file is in the sw shell and CONSUMER_SHELL, each inside a GPS bl
         assert.ok(sw.includes(`'./${f}'`) && !swOff.includes(`'./${f}'`), 'sw.js shell, inside a GPS block: ' + f);
         assert.ok(fs.existsSync(path.join(__dirname, f)), 'exists: ' + f);
     });
-    assert.ok(/CACHE_VERSION = 'golfapp-v354-gps-livefix'/.test(sw));
+    assert.ok(/CACHE_VERSION = 'golfapp-v355-gps-plus'/.test(sw));
 });
 
 test('Esri tiles never reach the service worker; the USGS course cache survives a shell update', { skip }, () => {
@@ -155,7 +155,12 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.strictEqual(cfg.paywall, false, 'paywall (iap off only) stays false');
     // gps-store-iap (2026-10-17): the in-app purchase settings - an EMPTY RevenueCat key; the
     // founding cap; no price (the store's own price only).
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats', 'watch']);
+    // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
+    assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
+    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch').every(([, v]) => v === true));
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
