@@ -495,6 +495,18 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // put back: a screenshot of the first 844px of a trip page shows
                 // the header and nothing anybody asked about. Pushes the path and
                 // the byte count, so a check can fail when nothing was captured.
+                // { shot: <path>, viewportOnly: true } - just the screen as the phone shows it
+                // (a fixed full-screen overlay stretched to the page's height otherwise).
+                if (step.shot && step.viewportOnly) {
+                    const shot = await rpc(ws, id++, 'Page.captureScreenshot', { format: 'png' });
+                    const data = shot.result && shot.result.data;
+                    if (!data) { value.push('no screenshot: ' + JSON.stringify(shot.error || {})); continue; }
+                    const buf = Buffer.from(data, 'base64');
+                    const out = path.isAbsolute(step.shot) ? step.shot : path.join(REPO_ROOT, step.shot);
+                    fs.writeFileSync(out, buf);
+                    value.push('shot ' + out + ' ' + buf.length + ' bytes viewport');
+                    continue;
+                }
                 if (step.shot) {
                     const metrics = await rpc(ws, id++, 'Page.getLayoutMetrics', {});
                     const css = (metrics.result && (metrics.result.cssContentSize || metrics.result.contentSize)) || {};
