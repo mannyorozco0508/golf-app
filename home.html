@@ -25,6 +25,9 @@
 <script src="gps-entitlement.js"></script>
 <script src="gps-view.js"></script>
 <script src="gps-live.js"></script>
+<!-- MY STATS (008, HardPanFeature('quickStats')): putts, fairways, greens and scoring, from this
+     phone's own rounds. GPS Map only - asked quietly, so Home never shows a paywall for it. -->
+<script src="gps-stats.js"></script>
 <style>
   :root { --hp-green: #0f4c3a; --hp-green-soft: #e2f1ea; --hp-navy: #1d3557; --hp-navy-soft: #e3e9f2; --hp-bg: #f0f4f2; --hp-card: #ffffff; --hp-text: #1a1a1a; --hp-muted: #555; --hp-line: #d0e1db; --hp-warn: #8a5a00; --hp-warn-soft: #fbefd9; }
   /* ALWAYS THE LIGHT THEME (Manny, 2026-10-12): these screens never follow the phone's dark mode. */
@@ -99,6 +102,7 @@
     <span class="hp-last" style="display:none;">LAST USED</span>
   </button>
   <div id="hp-resume"></div>
+  <div id="hp-mystats-main"></div>
   <div class="hp-note">We'll remember your pick. Switch anytime from the top bar.</div>
   <div class="hp-foot">
     <button type="button" class="hp-link" data-hp-act="code">Have a game code?</button>
@@ -120,6 +124,7 @@
   <div class="hp-sec" id="hp-near"><div class="hp-sec-h">NEAR YOU</div><div id="hp-near-list" style="display:flex;flex-direction:column;gap:10px;"><div class="hp-status">Finding courses near you&hellip;</div></div></div>
   <div class="hp-sec" id="hp-recent" style="display:none;"><div class="hp-sec-h">RECENT</div><div id="hp-recent-list" style="display:flex;flex-direction:column;gap:10px;"></div></div>
   <div id="hp-gps-status" class="hp-status" role="status"></div>
+  <div id="hp-mystats-gps"></div>
   <div class="hp-note" style="margin-top:auto;padding-top:20px;">No sign-in needed for courses that are GPS ready.</div>
 </div>
 
@@ -163,6 +168,7 @@
 <script src="front-door.js"></script>
 <script>
     if (window.HardPanHome) window.HardPanHome.start(db);
+    if (window.HardPanGpsStats) ['hp-mystats-main', 'hp-mystats-gps'].forEach(function (id) { window.HardPanGpsStats.placeHome(document.getElementById(id)); });
 </script>
 </body>
 </html>
