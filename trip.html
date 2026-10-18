@@ -2003,14 +2003,7 @@ html {
                 uiFail('\u26A0\uFE0F TRIP NOT CREATED\nThe trip could not be set up just now. Nothing was saved. Try again.');
                 return;
             }
-            // THE WALL, the same sentence the wizard shows, and only when the
-            // refusal is the gate (organizer-gate reads the uid's node back).
-            if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
-                window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
-                    uiFail(why === 'trial-ended' ? window.organizerGate.WALL : `Error building trip: ${err.message}`);
-                });
-                return;
-            }
+            // NO WALL (job 021): a refused trip is its own error, said as it is.
             uiFail(`Error building trip: ${err.message}`);
         });
     }

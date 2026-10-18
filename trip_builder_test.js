@@ -167,7 +167,12 @@ const UNCHANGED = {
     // in this file, 2026-10-17): +13 lines after WALL, 0 removed - on Android only, WALL is
     // reassigned to plain words with no prices. ensureOrganizer and stamp, the two paths the
     // builder calls, are byte-identical. was 8bff990e9bdc00ceaca42392cf9dbea42ec61b87aa92bd2fc41f0736a155773d
-    'organizer-gate.js': '55c83cb5f34ea9948e6affb5f8a8abaf15d589a5982306b92f6205dc0f8fa16d'
+    // RE-PINNED (android-gps, job 021, Manny approved 2026-10-17): the wall is removed on
+    // every platform - WALL, explainRefusal, NOTICE_DAYS and the standing line's words go;
+    // standingLine returns ''. ensureOrganizer, stamp, isPermissionDenied, standingOf,
+    // readStanding and isRoundOrganizer are byte-identical (compared function by function).
+    // was 55c83cb5f34ea9948e6affb5f8a8abaf15d589a5982306b92f6205dc0f8fa16d
+    'organizer-gate.js': '6e5885db29e61f5175b1c6b047e29e94bbfeeffa0937d68188900b2487888f79'
 };
 test('the Ryder engine and the code / organizer helpers are byte-identical to main', () => {
     Object.keys(UNCHANGED).forEach((f) => assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, f))).digest('hex'), UNCHANGED[f], f + ' changed'));

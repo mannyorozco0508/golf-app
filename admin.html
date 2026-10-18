@@ -3961,10 +3961,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // yesterday and says nothing today has a new uid and a fresh trial.
     let organizerRecord;   // undefined until the read answers; null = no record
     function renderOrganizerStanding() {
-        // ANDROID SAYS NOTHING HERE (job 012). The Play listing promises no trial and
-        // sells no pass, so neither line is shown in the Android app. iOS and the
-        // website keep it.
-        const text = !isAndroidShell() && window.organizerGate
+        // NOTHING ON ANY PLATFORM (job 021; Android since job 012): standingLine is
+        // empty now that setting up rounds has no window. The mounts stay, empty.
+        const text = window.organizerGate
             ? window.organizerGate.standingLine(window.organizerGate.standingOf(organizerRecord, Date.now()))
             : '';
         ['lobby-standing', 'rr-standing', 'wz-standing'].forEach(id => {
@@ -14354,17 +14353,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;
                 saveBtn.disabled = false;
-                // THE WALL. A refused round write is the gate only when this uid's
-                // window has closed and no pass is live - organizer-gate reads the
-                // uid's own node back to say so. Any other refusal keeps the honest
-                // SDK message, so the wall never explains a failure it did not cause.
-                if (window.organizerGate.isPermissionDenied(err) && window.authBootState && window.authBootState.uid) {
-                    window.organizerGate.explainRefusal(db, window.authBootState.uid).then((why) => {
-                        uiFail(why === 'trial-ended' ? window.organizerGate.WALL : `Save error: ${err.message}`);
-                    });
-                    return;
-                }
-                uiFail(`Save error: ${err.message}`); 
+                // NO WALL (job 021): the live rules refuse no organizer on a clock, so a
+                // refused save is its own error, said as it is.
+                uiFail(`Save error: ${err.message}`);
             });
 
         } catch (e) {

@@ -242,6 +242,11 @@ Screenshots (0.2 (7) on the emulator): 01 Home, 02 Near you (Caledonia), 03 GPS 
 - [x] Full suite: 11076 tests, 11070 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
 - [x] **Approved by Manny (job 018, 2026-10-17 4:27 PM AZ):** the `organizer-gate.js` edit (the Android wall text) and the `trip_builder_test.js` re-pin of `organizer-gate.js` from job 015.
 
+## 7d. 0.2 (versionCode 10) (job 021)
+- [x] The 21-day wall removed on every platform (shared code): no wall, no prices, no "Free trial · N days left", no "Founder pass" line. Live rules already allowed day-22 creates (console backup 2026-10-17, targaryen). Repo rules files: clause removed, nothing else changed.
+- [x] AAB (clean build) 5,768,614 bytes, sha256 `cd0a423add31…`, signer SHA-1 **92:A2:04:D8:21:67:16:18:E2:C7:0D:0A:5E:4D:00:A8:78:DD:A7:3B**. The four changed app files in the AAB are byte-identical to source.
+- [x] Full suite: 11078 tests, 11072 pass, 0 fail, 0 cancelled, 4 skipped, 2 todo.
+
 ## 9. Post-launch: App Links (order approved by Manny, job 012; nothing deployed yet)
 Tested on the emulator (URGENT-010): the link opens the app warm and cold, and a cold start signs in with no paste. Real phones send these links to the browser until step 2.
 Steps 1 and 2 both wait for the app to exist in Play Console (the Play App Signing SHA-256).

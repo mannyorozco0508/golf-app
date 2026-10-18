@@ -27,7 +27,7 @@ android {
         // number). versionName may match iOS when shipping together —
         // android_release_test.js pins this literal and holds it to semver;
         // move both together.
-        versionCode 9
+        versionCode 10
         versionName "0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

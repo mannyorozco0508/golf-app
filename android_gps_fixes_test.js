@@ -525,11 +525,12 @@ describe('012. THE ANDROID ACCOUNT WORDS: no trial, no pass, email only', () => 
         ['lobby-standing', 'wz-standing', 'rr-standing'].forEach(id => assert.equal(txt(sb, id), '', id + ' speaks on Android'));
     });
 
-    test('iOS UNCHANGED: the same arrival says "Free trial · N days left" on all three', { skip }, async () => {
-        const sb = arrive('ios');
-        await flush(); await flush();
-        ['lobby-standing', 'wz-standing', 'rr-standing'].forEach(id =>
-            assert.match(txt(sb, id), /^Free trial · \d+ days? left to set up new rounds$/, id + ' lost its line on iOS'));
+    test('iOS and the website too since job 021: the same arrival is empty on all three (the line is retired everywhere)', { skip }, async () => {
+        for (const platform of ['ios', 'web']) {
+            const sb = arrive(platform);
+            await flush(); await flush();
+            ['lobby-standing', 'wz-standing', 'rr-standing'].forEach(id => assert.equal(txt(sb, id), '', id + ' speaks on ' + platform));
+        }
     });
 
     test('Android: the signed-out email lead promises no trial or pass', { skip }, async () => {
@@ -594,11 +595,14 @@ describe('012. THE ANDROID ACCOUNT WORDS: no trial, no pass, email only', () => 
 // beforeScripts), as it does in the native shell.
 // CANNOT PROVE: the refusal itself (that is the live rules; wave2_rules_test.js holds
 // the rules file, including EXPIRED1 - an expired owner still edits an existing round).
+// JOB 021 SUPERSEDES THE WALL HALF: the wall is gone on every platform (the live rules have
+// no 21-day window). The two wall tests below now hold that a refused day-22 save says its
+// own error on android, ios and web alike. The sign-in-note half is unchanged.
 // BASELINE (whole file, 35 tests): against pre-015 email-link-auth.js e5ae7c217885 and
 // organizer-gate.js 4042160ee3dd, 33 pass / 2 fail - the 2 are this block's Android tests;
 // its 2 iOS/web tests pass before and after (31 older + 2 = 33). After the change: 35 / 0.
 // ---------------------------------------------------------------------------
-describe('015. Android: the wall names no price, trial or pass; the sign-in notes neither', () => {
+describe('015/021. No wall on any platform; the Android sign-in notes name no trial or pass', () => {
     const DAY = 86400000;
     const settle = () => new Promise(r => setTimeout(r, 30));
     const DENIED = () => Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
@@ -624,22 +628,18 @@ describe('015. Android: the wall names no price, trial or pass; the sign-in note
         return sb.window.__alerts;
     }
 
-    test('Android, day 22, Save refused: the golfer reads the Android wall - paused, what still works, support email - and nothing priced', { skip }, async () => {
+    test('Android, day 22, Save refused: its own error, nothing priced, no wall (job 021)', { skip }, async () => {
         const alerts = await wallFor('android');
         assert.equal(alerts.length, 1, JSON.stringify(alerts));
-        const w = alerts[0];
-        assert.match(w, /^⛳ New rounds are paused for this organizer account\./);
-        assert.match(w, /Joining, scoring and watching rounds still work/);
-        assert.match(w, /support@rattlegolf\.com/);
-        assert.match(w, /This one was not saved/);
-        assert.ok(!SELLS.test(w), 'the Android wall sells or prices something: ' + w);
+        assert.match(alerts[0], /^Save error: PERMISSION_DENIED/);
+        assert.ok(!SELLS.test(alerts[0]), 'the refusal sells or prices something: ' + alerts[0]);
     });
 
-    test('iOS and the website UNCHANGED: the same refusal shows the old wall, prices and all, identical on both', { skip }, async () => {
+    test('iOS and the website: the same refusal says the same thing - no wall there either (job 021)', { skip }, async () => {
         const ios = await wallFor('ios'), web = await wallFor('web');
         assert.equal(ios.length, 1); assert.equal(JSON.stringify(ios), JSON.stringify(web));
-        assert.match(ios[0], /^⛳ Your free trial has ended\./);
-        assert.match(ios[0], /Season Pass \(\$29\.99 a year\)/);
+        assert.match(ios[0], /^Save error: PERMISSION_DENIED/);
+        assert.ok(!/free trial has ended|\$29\.99|\$19\.99/.test(ios[0]));
     });
 
     const LINK = '?apiKey=test-key&oobCode=oob-wave1&mode=signIn&lang=en';

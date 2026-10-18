@@ -19,42 +19,21 @@
 //      the multi-path update is atomic, so one round without it refuses the
 //      whole batch, good rounds included.
 //
-// THE WALL. When the round write is refused, the golfer gets a sentence, not
-// an SDK error - but only when the refusal IS the gate: organizers/<uid> is
-// read back (a uid may read its own node) and the wall shows when the window
-// has closed and no pass is live. Any other PERMISSION_DENIED (a shape
-// validation, a rule the page did not expect) keeps the page's own error, so
-// the wall never lies about why. Inside the window nothing is shown at all:
-// no banner, no countdown. The trial is invisible until it matters.
-//
-// NOT HERE: StoreKit, purchases, a buy button. The sentence says what a pass
-// costs and that passes are not on sale in the app yet. The trial keyed on the
-// anonymous uid is a learning gate, not the entitlement mechanism (MONETIZATION
-// .md, "The rule as drafted").
+// NO WALL (job 021, Manny 2026-10-17: games and bet tracking are free; GPS is the
+// paid part). The LIVE rules have no 21-day window - read from the console backup
+// of 2026-10-17 and checked with targaryen: a day-22 organizer CAN create a round.
+// So the old wall ("Your free trial has ended... $29.99... $19.99") and its Android
+// variant could only ever explain a refusal the server no longer makes; they are
+// gone, on every platform, and a refused save says its own error. firstSeenAt and
+// pass are still written and read (ensureOrganizer, standingOf) - nothing deleted -
+// but no screen counts trial days or names a pass any more (standingLine is empty).
 // ============================================================================
 (function () {
     if (typeof window === 'undefined') return;
 
-    var TRIAL_MS = 21 * 24 * 60 * 60 * 1000;   // the rule's 1814400000
-
-    // THE COPY - one sentence per line, shown in the page's alert.
-    var WALL = '⛳ Your free trial has ended.\n\n'
-        + 'Joining a round is free, always. Setting one up needs a pass — one person per group: '
-        + 'a Season Pass ($29.99 a year) or a Trip Pass ($19.99).\n\n'
-        + 'Passes aren’t on sale in the app yet. The rounds you already set up still work. This one was not saved.';
-    // ANDROID (job 015): the same refusal in plain words - no prices, no trial, no pass,
-    // nothing to buy, because the Android app sells nothing. The rule is unchanged: only a
-    // NEW round is refused; joining, scoring and watching are not gated at all. iOS and
-    // the website keep the sentence above.
-    var androidShell = (function () {
-        try { return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android'); }
-        catch (e) { return false; }
-    })();
-    if (androidShell) {
-        WALL = '⛳ New rounds are paused for this organizer account.\n\n'
-            + 'Joining, scoring and watching rounds still work, and the rounds you already set up still work. This one was not saved.\n\n'
-            + 'Email support@rattlegolf.com and we’ll sort it out.';
-    }
+    // The old rule's window (1814400000 ms). Kept only so standingOf can still describe
+    // a record (the delete warning reads whether a pass is live); nothing refuses on it.
+    var TRIAL_MS = 21 * 24 * 60 * 60 * 1000;
 
     function isPermissionDenied(err) {
         var s = String((err && (err.code || err.message)) || '');
@@ -195,25 +174,9 @@
         return false;
     }
 
-    // After a refused round write: 'trial-ended' when the gate is the reason,
-    // 'inside-window' / 'no-record' / 'unknown' otherwise (the caller keeps its
-    // own error message for those).
-    // The read is raced against a short timer: with no socket it would never
-    // answer, and a wall that never appears is worse than the SDK's message.
+    // The organizer-record read (readStanding) is raced against this: with no socket it
+    // would never answer.
     var READ_MS = 2500;
-    function explainRefusal(db, uid) {
-        var read = db.ref('organizers/' + uid).once('value');
-        var timer = new Promise(function (resolve) { setTimeout(function () { resolve({ val: function () { return undefined; } }); }, READ_MS); });
-        return Promise.race([read, timer]).then(function (snap) {
-            var o = (snap && typeof snap.val === 'function') ? snap.val() : null;
-            if (o === undefined) return 'unknown';   // the read did not answer in time
-            if (!o || typeof o.firstSeenAt !== 'number') return 'no-record';
-            var now = Date.now();
-            var passLive = !!(o.pass && typeof o.pass.expiresAt === 'number' && o.pass.expiresAt > now);
-            if (passLive) return 'unknown';
-            return now >= o.firstSeenAt + TRIAL_MS ? 'trial-ended' : 'inside-window';
-        }, function () { return 'unknown'; });
-    }
 
     // ---- WHERE THE TRIAL STANDS (2026-09-20) ---------------------------------
     //
@@ -234,7 +197,8 @@
     // 21 the trial line is always there while a trial runs, and a phone that said
     // "Founder pass" yesterday saying "Free trial · 21 days left" today is a
     // sentence APPEARING. That is the signal worth having.
-    var NOTICE_DAYS = 21;
+    // (job 021: the line is retired - see standingLine. This history is kept because it
+    // says why a pass is tied to a device's uid, which is still true of the records.)
     var DAY_MS = 86400000;
 
     // The raw record -> what it means at `now`. null when unknown.
@@ -257,23 +221,10 @@
         return { kind: 'trial', endsAt: endsAt, daysLeft: Math.ceil((endsAt - t) / DAY_MS) };
     }
 
-    function fmtDate(ms) {
-        try { return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
-        catch (e) { return ''; }
-    }
-
-    // One line, or ''. Nothing for 'ended' (the wall), 'none', null, or a trial
-    // with more than NOTICE_DAYS left (none, at 21: every live trial says its days).
+    // NOTHING, ALWAYS (job 021). Setting up rounds is free with no window, so there is
+    // no "Free trial \u00B7 N days left" to count and no "Founder pass" to name. The three
+    // mounts (lobby, Review, Round Ready) still render from this, and render empty.
     function standingLine(st) {
-        if (!st) return '';
-        if (st.kind === 'pass') {
-            if (st.passKind === 'founder') return 'Founder pass \u00B7 setting up rounds is free';
-            var label = st.passKind ? st.passKind.charAt(0).toUpperCase() + st.passKind.slice(1) + ' pass' : 'Pass';
-            return label + ' \u00B7 rounds free to set up until ' + fmtDate(st.expiresAt);
-        }
-        if (st.kind === 'trial' && st.daysLeft <= NOTICE_DAYS) {
-            return 'Free trial \u00B7 ' + st.daysLeft + (st.daysLeft === 1 ? ' day' : ' days') + ' left to set up new rounds';
-        }
         return '';
     }
 
@@ -415,16 +366,13 @@
 
     window.organizerGate = {
         TRIAL_MS: TRIAL_MS,
-        NOTICE_DAYS: NOTICE_DAYS,
         READ_MS: READ_MS,
-        WALL: WALL,
         isPermissionDenied: isPermissionDenied,
         ensureOrganizer: ensureOrganizer,
         stamp: stamp,
         heldOrganizerToken: heldOrganizerToken,
         rememberOrganizerToken: rememberOrganizerToken,
         isRoundOrganizer: isRoundOrganizer,
-        explainRefusal: explainRefusal,
         standingOf: standingOf,
         standingLine: standingLine,
         readStanding: readStanding,

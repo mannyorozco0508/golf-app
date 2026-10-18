@@ -50,7 +50,20 @@ were reproduced on an iPhone.
      still show all of it, plus the four `email-link-auth.js` notes ("the free trial and a
      founder pass stay with you"). **Job 015:** those four notes are now Android-gated
      too; iOS and the website still show them.
-   - **G7 (job 015): THE DAY-22 WALL ON iOS NAMES PRICES WITH NO WAY TO PAY.** The live
+   - **G6/G7 RESOLVED IN SHARED CODE (job 021, Manny 2026-10-17: games and bet tracking are
+     free; GPS is the paid part).** The LIVE rules have no 21-day window (console backup of
+     2026-10-17; targaryen: a day-22 organizer can create). The wall was never a client
+     block - it only explained a server refusal - so on live it could not appear. Removed on
+     EVERY platform in `organizer-gate.js` (WALL, explainRefusal, NOTICE_DAYS; standingLine
+     returns ''), `admin.html`, `trip.html`, `front-door.js`. The repo `database.rules.json`
+     and `database.rules.stage2-ownersetup.json` no longer carry the clause either.
+     **The iOS session must:** take these files at merge (no iOS-only code involved); bump
+     `sw.js` CACHE_VERSION at merge (shell files changed); and decide on the trial / founder
+     words still left for iOS only - the four `email-link-auth.js` notes, `account-exit.js`
+     founderMaybe / founderUnknown, the static `#email-link-lead` and `#oauth-lead` text and
+     the `oauthTap` success line in `admin.html`, and `oauth-signin.js` notes. They promise a
+     trial that no longer exists.
+   - (History) **G7 (job 015): THE DAY-22 WALL ON iOS NAMES PRICES WITH NO WAY TO PAY.** The live
      rule refuses a NEW round once `firstSeenAt + 21 days` has passed and no pass is live,
      on every platform. iOS and the website then show "Your free trial has ended… a Season
      Pass ($29.99 a year) or a Trip Pass ($19.99)… Passes aren't on sale in the app yet."

@@ -1,38 +1,22 @@
 // ============================================================================
-// A LINE THAT SAYS WHERE THE TRIAL STANDS (2026-09-20)
+// THE STANDING LINE IS RETIRED (job 021, Manny 2026-10-17: games and bet tracking
+// are free; GPS is the paid part).
 //
-// The Wave 2 gate refuses a new round once an organizer's 21 days are up, and
-// until now the wall was the first anyone heard of it - on a first tee, with the
-// round typed in and not saved. Nothing read organizers/<uid>/firstSeenAt except
-// the gate's own explainRefusal, after the refusal.
+// From 2026-09-20 this line said where an organizer's 21-day window stood -
+// "Founder pass · setting up rounds is free", "Free trial · 6 days left to set up
+// new rounds" - on the lobby, the Review step and Round Ready, right before the
+// wall. The LIVE rules no longer have the window (console backup of 2026-10-17,
+// checked with targaryen: a day-22 organizer can create a round), the wall is gone
+// (organizer_gate_test.js), and a countdown to nothing would be a false sentence.
 //
-// organizers/<uid> is readable by its own uid (database.rules.json), so after
-// authReady the page reads it ONCE (organizer-gate.js readStanding, raced
-// against a short timer like explainRefusal) and says one line, on Round Ready
-// and on the wizard's Review step - the two screens an organizer stands on
-// right before the wall:
-//
-//   a live pass         "Founder pass · setting up rounds is free"
-//                       (another kind: "Season pass · rounds free to set up until
-//                       Mar 4, 2027")
-//   inside the window   "Free trial · 6 days left to set up new rounds", every
-//                       day of it (NOTICE_DAYS is 21, the whole window); "1 day
-//                       left" on the last day
-//   otherwise           nothing - ended (the wall speaks), no record (not an
-//                       organizer), the read failed or timed out (say nothing
-//                       rather than guess)
-//
-// THIS IS THE TELL for the uid problem: a pass is attached to the device's
-// storage, not to Manny. A reinstall signs in as a new uid and the next round
-// starts a fresh 21 days. A phone that said "Founder pass" yesterday and says
-// "Free trial · 21 days left" today is how he finds out - a sentence APPEARING,
-// which is why NOTICE_DAYS is the whole window and not a week (at 7 the fresh
-// trial was silent for two weeks and the signal was an absence).
+// WHAT STAYS, AND IS HELD HERE: the page still reads organizers/<uid> ONCE after
+// authReady (readStanding) and standingOf still describes the record - the delete
+// warning in account-exit.js reads whether a pass is live. Only the words go:
+// standingLine is empty for every record, and all three mounts render empty.
 //
 // HARNESS. The record arrives through the page's own once() read of
-// organizers/<uid> (the stub answers from __dbReads); the uid is the auth
-// stub's 'anon-stub'. The pure functions take `now` so a distance is a number,
-// not a wait. No rules change - page-only, plus organizer-gate.js.
+// organizers/<uid> (the stub answers from __dbReads); the uid is the auth stub's
+// 'anon-stub'. Nothing here calls the loader.
 // ============================================================================
 
 const { describe, test } = require('node:test');
@@ -58,56 +42,34 @@ function gate() {
 const line = (record, now) => { const g = gate(); return g.standingLine(g.standingOf(record, now === undefined ? NOW : now)); };
 const trialRecord = daysLeft => ({ firstSeenAt: NOW + daysLeft * DAY - TRIAL });   // ends exactly daysLeft days from NOW
 
-describe('THE PURE PART: a record and a clock in, one line out', () => {
-    test('a founder pass', () => {
-        assert.equal(line({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } }), 'Founder pass · setting up rounds is free');
-    });
-    test('another kind of pass names itself and its date', () => {
-        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4), kind: 'season' } }), 'Season pass · rounds free to set up until Mar 4, 2027');
-        assert.equal(line({ firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4) } }), 'Pass · rounds free to set up until Mar 4, 2027');
-    });
-    test('a pass that has EXPIRED is not a pass: the trial (or the wall) decides', () => {
-        assert.equal(line({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: NOW - 1, kind: 'season' } }), 'Free trial · 18 days left to set up new rounds');
-        assert.equal(line({ firstSeenAt: NOW - 16 * DAY, pass: { expiresAt: NOW - 1 } }), 'Free trial · 5 days left to set up new rounds');
-    });
-    test('inside the window at several distances: counted every day of it, 21 down to 1', () => {
-        assert.equal(line(trialRecord(21)), 'Free trial · 21 days left to set up new rounds');
-        assert.equal(line(trialRecord(14)), 'Free trial · 14 days left to set up new rounds');
-        assert.equal(line(trialRecord(8)), 'Free trial · 8 days left to set up new rounds');
-        assert.equal(line(trialRecord(7)), 'Free trial · 7 days left to set up new rounds');
-        assert.equal(line(trialRecord(6)), 'Free trial · 6 days left to set up new rounds');
-        assert.equal(line(trialRecord(2)), 'Free trial · 2 days left to set up new rounds');
-        assert.equal(line(trialRecord(1)), 'Free trial · 1 day left to set up new rounds');
-    });
-    test('a partial day counts as a day - it ends TODAY, so "1 day left", never "0 days"', () => {
-        assert.equal(line({ firstSeenAt: NOW + 6 * 3600000 - TRIAL }), 'Free trial · 1 day left to set up new rounds');   // six hours left
-        assert.equal(line({ firstSeenAt: NOW + 7 * DAY + 1 - TRIAL }), 'Free trial · 8 days left to set up new rounds', 'a hair over seven days is the eighth day');
-        assert.equal(line({ firstSeenAt: NOW + 7 * DAY - TRIAL }), 'Free trial · 7 days left to set up new rounds');
-        assert.equal(line({ firstSeenAt: NOW }), 'Free trial · 21 days left to set up new rounds', 'stamped this second: the whole window ahead, said');
-    });
-    test('the counting agrees with the rule, to the millisecond: the day the rule closes is the day the line stops', () => {
-        // the rule: now < firstSeenAt + 1814400000
-        const rec = { firstSeenAt: NOW - TRIAL + 1 };   // 1 ms left
-        assert.equal(line(rec, NOW), 'Free trial · 1 day left to set up new rounds');
-        assert.equal(line(rec, NOW + 1), '', 'closed: the wall speaks now, not this line');
-    });
-    test('outside the window: nothing (the wall is the sentence for that)', () => {
-        assert.equal(line({ firstSeenAt: NOW - 30 * DAY }), '');
-    });
-    test('no record, a malformed record, an unknown read: nothing', () => {
-        assert.equal(line(null), '');
-        assert.equal(line({}), '');
-        assert.equal(line({ firstSeenAt: 'yesterday' }), '');
-        assert.equal(line(undefined), '');
+describe('THE PURE PART: every record, no line', () => {
+    const RECORDS = [
+        ['a founder pass', { firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } }],
+        ['a season pass', { firstSeenAt: NOW - 40 * DAY, pass: { expiresAt: Date.UTC(2027, 2, 4), kind: 'season' } }],
+        ['an expired pass', { firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: NOW - 1, kind: 'season' } }],
+        ['day one of the old window', { firstSeenAt: NOW }],
+        ['six days left of it', trialRecord(6)],
+        ['one day left of it', trialRecord(1)],
+        ['long past it', { firstSeenAt: NOW - 30 * DAY }],
+        ['no record', null], ['a malformed record', { firstSeenAt: 'yesterday' }], ['an unknown read', undefined]
+    ];
+    RECORDS.forEach(([label, rec]) => test(label + ': nothing', () => assert.equal(line(rec), '')));
+    test('standingOf still describes the record (the delete warning reads it) - the data path is untouched', () => {
         const g = gate();
-        assert.equal(g.standingLine(g.standingOf(undefined, NOW)), '');
+        assert.equal(g.standingOf({ firstSeenAt: NOW - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } }, NOW).kind, 'pass');
+        assert.equal(g.standingOf(trialRecord(6), NOW).kind, 'trial');
+        assert.equal(g.standingOf({ firstSeenAt: NOW - 30 * DAY }, NOW).kind, 'ended');
+        assert.equal(g.standingOf(null, NOW).kind, 'none');
         assert.equal(g.standingOf(undefined, NOW), null, 'unknown stays unknown');
-    });
-    test('the two constants are the gate\'s: 21 days from the rule, and notice for all of them', () => {
-        const g = gate();
         assert.equal(g.TRIAL_MS, 1814400000);
-        assert.equal(g.NOTICE_DAYS, 21, 'the tell needs the trial line present from day one');
-        assert.match(read('database.rules.json'), /firstSeenAt'\)\.val\(\) \+ 1814400000/);
+        assert.equal(g.NOTICE_DAYS, undefined, 'the notice window went with the line');
+    });
+    test('the repo rules no longer carry the window either (job 021; the live rules had already dropped it)', () => {
+        ['database.rules.json', 'database.rules.stage2-ownersetup.json'].forEach(f => {
+            const r = read(f);
+            assert.match(r, /"organizers"/, f + ' was read');
+            assert.ok(!/1814400000/.test(r), f + ' still has the 21-day window');
+        });
     });
 });
 
@@ -154,61 +116,32 @@ function page(record, opts) {
 }
 const nowRecord = daysLeft => ({ firstSeenAt: Date.now() + daysLeft * DAY - TRIAL });
 
-describe('THE PAGE: Round Ready and the Review step say the same line, from one read', () => {
-    test('a founder pass, on all three screens - the lobby the moment the read answers, with no render call', async () => {
-        const p = page({ firstSeenAt: Date.now() - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } });
-        await p.boot();
-        assert.equal(p.lobby(), 'Founder pass · setting up rounds is free', 'the home screen, from the load alone');
-        p.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(p.rr(), 'Founder pass · setting up rounds is free');
-        assert.equal(p.wz(), 'Founder pass · setting up rounds is free');
+describe('THE PAGE: one read, three empty mounts, for any record', () => {
+    [['a founder pass', () => ({ firstSeenAt: Date.now() - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } })],
+     ['five days left of the old window', () => nowRecord(5)],
+     ['a fresh stamp (a reinstall)', () => ({ firstSeenAt: Date.now() })],
+     ['no record', () => null]
+    ].forEach(([label, rec]) => {
+        test(label + ': the lobby, Round Ready and the Review step say nothing', async () => {
+            const p = page(rec());
+            await p.boot();
+            p.run('renderWizardReview(); renderRoundReady({ players: [] });');
+            assert.equal(p.lobby(), ''); assert.equal(p.rr(), ''); assert.equal(p.wz(), '');
+            assert.equal((p.sb.__onceReads || []).length, 1, 'the record is still read, once');
+        });
     });
-    test('five days left, and twenty days left, on all three screens', async () => {
-        const a = page(nowRecord(5)); await a.boot(); a.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(a.lobby(), 'Free trial · 5 days left to set up new rounds');
-        assert.equal(a.rr(), 'Free trial · 5 days left to set up new rounds');
-        assert.equal(a.wz(), 'Free trial · 5 days left to set up new rounds');
-        const b = page(nowRecord(20)); await b.boot(); b.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(b.lobby(), 'Free trial · 20 days left to set up new rounds');
-        assert.equal(b.rr(), 'Free trial · 20 days left to set up new rounds'); assert.equal(b.wz(), 'Free trial · 20 days left to set up new rounds');
-    });
-    test('THE TELL: the same home screen, a fresh record with no pass - a sentence appears', async () => {
-        const before = page({ firstSeenAt: Date.now() - 3 * DAY, pass: { expiresAt: 4102444800000, kind: 'founder' } });
-        await before.boot();
-        assert.equal(before.lobby(), 'Founder pass · setting up rounds is free');
-        const after = page({ firstSeenAt: Date.now() });   // a reinstall: a new uid, a fresh stamp, no pass
-        await after.boot();
-        assert.equal(after.lobby(), 'Free trial · 21 days left to set up new rounds', 'day one of a trial this phone should not be on - the tell');
-    });
-    test('not an organizer (no record): nothing, on any screen', async () => {
-        const p = page(null); await p.boot(); p.run('renderWizardReview(); renderRoundReady({ players: [] });');
-        assert.equal(p.lobby(), ''); assert.equal(p.rr(), ''); assert.equal(p.wz(), '');
-    });
-    test('the read fails: nothing said, nothing guessed', async () => {
-        const p = page(nowRecord(3), { failRead: true }); await p.boot(); p.run('renderRoundReady({ players: [] });');
-        assert.equal(p.rr(), '');
-    });
-    test('the read never answers: nothing, and the page does not hang on it', async () => {
-        // READ_MS is the gate's 2500 ms; the mounts stay empty throughout (the
-        // timer resolves to unknown later, which also says nothing).
-        const p = page(nowRecord(3), { hang: true });
-        await p.boot(); p.run('renderRoundReady({ players: [] }); renderWizardReview();');
-        assert.equal(p.rr(), ''); assert.equal(p.wz(), '');
-        assert.equal((p.sb.__onceReads || []).length, 1, 'the read was attempted');
+    test('the read fails, or never answers: nothing, and the page does not hang', async () => {
+        const a = page(nowRecord(3), { failRead: true }); await a.boot(); a.run('renderRoundReady({ players: [] });');
+        assert.equal(a.rr(), '');
+        const b = page(nowRecord(3), { hang: true }); await b.boot(); b.run('renderRoundReady({ players: [] }); renderWizardReview();');
+        assert.equal(b.rr(), ''); assert.equal(b.wz(), '');
+        assert.equal((b.sb.__onceReads || []).length, 1, 'the read was attempted');
     });
     test('no session (authReady rejects): nothing, and no read is attempted', async () => {
         const p = page(nowRecord(3), { noSession: true });
         await p.boot(); p.run('renderRoundReady({ players: [] });');
         assert.equal(p.rr(), '');
         assert.equal((p.sb.__onceReads || []).length, 0);
-    });
-    test('the record is read ONCE, by the page on load, and rendered from memory on every screen after', async () => {
-        const p = page(nowRecord(4));
-        await p.boot();
-        p.run('renderWizardReview(); renderRoundReady({ players: [] }); renderWizardReview();');
-        assert.equal((p.sb.__onceReads || []).length, 1);
-        assert.equal(p.wz(), 'Free trial · 4 days left to set up new rounds');
-        assert.equal(p.rr(), 'Free trial · 4 days left to set up new rounds');
     });
     test('the mounts exist where the organizer stands: the lobby, Round Ready and the Review step, and nowhere the golfer does', () => {
         const a = read('admin.html');

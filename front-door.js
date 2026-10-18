@@ -773,7 +773,8 @@
     }
     function failWhy(e) {
         if (e && e.code === 'timeout') return 'No answer from the server (' + e.message + ') - check your signal and try again.';
-        if (W.organizerGate && typeof W.organizerGate.isPermissionDenied === 'function' && W.organizerGate.isPermissionDenied(e)) return W.organizerGate.WALL || 'This account cannot start a new round.';
+        // NO WALL (job 021): a refusal is not a trial ending; say what happened.
+        if (W.organizerGate && typeof W.organizerGate.isPermissionDenied === 'function' && W.organizerGate.isPermissionDenied(e)) return 'The server did not save this round. Check your signal and try again; if it keeps happening, email support@rattlegolf.com.';
         return (e && e.message) || String(e);
     }
     var pending = null;   // { key, name, card } for "Play without GPS"

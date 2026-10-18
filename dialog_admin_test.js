@@ -452,16 +452,21 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // whose step does not change says why beside the button (wizardGoOrSay) - one
         // refusal for a step change that threw, one for a step that stayed put - in both
         // builds. Before it, the tap that did nothing said nothing.
+        // 72 ON android-2.0 (2026-10-25; Consumer 68). The base 683a58f6 measures 73 here (this
+        // assertion still said 71 there: two GPS-only messages, one uiFail and one uiToast, were
+        // added on the iOS line without a re-pin). Then the 21-day wall went (job 021):
+        // saveSettings no longer reads the organizer record back after a refusal to show the
+        // trial wall - that second uiFail is gone, in both builds (73 -> 72, Consumer 69 -> 68).
         const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
-        const want = GPS ? 71 : 69;
+        const want = GPS ? 72 : 68;
         assert.equal(refuse + fail + toast, want,
             'the alerts should still be ' + want + ' messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         if (GPS) {
             const off = codeOf(require('./tools/gps-flag.js').applyFlag(ADMIN, false));
             const m = (k) => (off.match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
-            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 69, 'the Consumer build of admin.html says 69');
-            assert.deepEqual([refuse - m('uiRefuse'), fail - m('uiFail'), toast - m('uiToast')], [0, 1, 1], 'the two GPS-only ones: one failure, one receipt');
+            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 68, 'the Consumer build of admin.html says 68');
+            assert.deepEqual([refuse - m('uiRefuse'), fail - m('uiFail'), toast - m('uiToast')], [0, 2, 2], 'the four GPS-only ones: two failures, two receipts');
         }
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".

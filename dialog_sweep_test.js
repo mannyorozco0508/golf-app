@@ -487,7 +487,10 @@ describe('6. THE SWEEP IS FINISHED', () => {
             // a golfer who thinks they posted the recap and did not is the
             // failure this page's split exists to prevent. The third one also
             // leaves the card on screen, so there is still a way to get it.
-            'trip.html':    { refuse: 31, fail: 15, toast: 9, confirm: 4 },
+            // fail 14 SINCE THE WALL WENT (job 021, 2026-10-17, was 15): buildTrip's
+            // second uiFail - the trial wall, chosen after reading the organizer record
+            // back - is gone; a refused trip says "Error building trip: ..." once.
+            'trip.html':    { refuse: 31, fail: 14, toast: 9, confirm: 4 },
             'skins.html':   { refuse: 2, fail: 3, toast: 0, confirm: 0 },
             'season.html':  { refuse: 6, fail: 3, toast: 0, confirm: 0 }
         };

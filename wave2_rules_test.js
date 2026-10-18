@@ -140,17 +140,19 @@ function scenario() {
         // refuse. Rules for a node nothing writes describe a feature that is gone.
     });
     const tests = Object.assign({
-        // CREATION - the gate
+        // CREATION - signed in, and stamped with your own uid. NO WINDOW (job 021,
+        // 2026-10-17): the live rules dropped the 21-day / pass clause, and so does this
+        // file now, so the expired, lapsed and brand-new organizers create like anyone.
         'events/NEW1': {
             cannotWrite: [
                 { auth: 'nobody', data: ROUND(null) }, { auth: 'nobody', data: ROUND('anon-org') },
-                { auth: 'newcomer', data: ROUND('anon-new') }, { auth: 'newcomer', data: ROUND(null) },
-                { auth: 'expired', data: ROUND('anon-expired') }, { auth: 'lapsed', data: ROUND('anon-lapsed') },
+                { auth: 'newcomer', data: ROUND(null) },
                 { auth: 'org', data: ROUND(null) }, { auth: 'org', data: ROUND('anon-stranger') }, { auth: 'stranger', data: ROUND('anon-org') }
             ],
-            canWrite: [{ auth: 'org', data: ROUND('anon-org') }, { auth: 'passed', data: ROUND('anon-passed') }, { auth: 'edge', data: ROUND('anon-edge') }, { auth: 'email', data: ROUND('u-email') }]
+            canWrite: [{ auth: 'org', data: ROUND('anon-org') }, { auth: 'passed', data: ROUND('anon-passed') }, { auth: 'edge', data: ROUND('anon-edge') }, { auth: 'email', data: ROUND('u-email') },
+                { auth: 'newcomer', data: ROUND('anon-new') }, { auth: 'expired', data: ROUND('anon-expired') }, { auth: 'lapsed', data: ROUND('anon-lapsed') }]
         },
-        'events/NEW2': { cannotWrite: [{ auth: 'expired', data: ROUND('anon-expired') }] },
+        'events/NEW2': { canWrite: [{ auth: 'expired', data: ROUND('anon-expired') }] },
         // LEGACY whole-record writes, as today; no claim path
         'events/LEGACY1': { canWrite: [{ auth: 'nobody', data: played({ eventName: 'Legacy round renamed', gameFormat: 'nassau' }) }],
             cannotWrite: [{ auth: 'nobody', data: null }, { auth: 'org', data: played({ eventName: 'claimed', ownerUid: 'anon-org' }) }] },
@@ -313,9 +315,14 @@ describe('THE CONTROLS - each mutation of a COPY of the rules is caught by named
         });
     }
     const write = r => r.events.$eventCode['.write'];
-    control('the trial and pass clause removed (any identified user creates forever)', r => { r.events.$eventCode['.write'] = write(r).replace(/ && \(\(root\.child\('organizers\/' \+ auth\.uid \+ '\/firstSeenAt'\)[\s\S]*?\)\)\)/, ')'); },
+    // RE-POINTED (job 021): the clause is gone, so "remove it" would mutate nothing. The
+    // control now puts a 21-day window BACK on create - the wall returning - and the rows
+    // that say the expired, lapsed and brand-new organizer create must catch it.
+    control('a 21-day window put back on create (the wall returns)', r => { r.events.$eventCode['.write'] = write(r).replace("newData.child('ownerUid').val() === auth.uid", "newData.child('ownerUid').val() === auth.uid && root.child('organizers/' + auth.uid + '/firstSeenAt').exists() && now < root.child('organizers/' + auth.uid + '/firstSeenAt').val() + 1814400000"); },
         [[/^events\/NEW1$/, 'newcomer'], [/^events\/NEW1$/, 'expired'], [/^events\/NEW1$/, 'lapsed'], [/^events\/NEW2$/, 'expired']]);
-    control('the ownerUid === auth.uid check dropped from creation', r => { r.events.$eventCode['.write'] = write(r).replace("newData.child('ownerUid').val() === auth.uid && ", ''); r.events.$eventCode.ownerUid['.validate'] = '(!data.parent().exists() && auth != null) || (data.exists() && newData.val() === data.val())'; },
+    // RE-POINTED (job 021): with the window gone the check is the last term of the create
+    // clause, so the old search string (which ended in " && ") matched nothing - inert.
+    control('the ownerUid === auth.uid check dropped from creation', r => { const before = write(r); r.events.$eventCode['.write'] = before.replace("auth != null && newData.child('ownerUid').val() === auth.uid)", 'auth != null)'); assert.notEqual(write(r), before, 'the mutation found nothing to drop'); r.events.$eventCode.ownerUid['.validate'] = '(!data.parent().exists() && auth != null) || (data.exists() && newData.val() === data.val())'; },
         [[/^events\/NEW1$/, 'org']]);   // org creating with no owner / a stranger's uid gets through; the stranger still has no trial
     control('creation opened to nobody (auth != null dropped)', r => { r.events.$eventCode['.write'] = "(!data.exists()) || (data.exists() && (newData.exists() || !data.hasChild('scores')))"; r.events.$eventCode.ownerUid['.validate'] = '(!data.parent().exists()) || (data.exists() && newData.val() === data.val())'; },
         [[/^events\/NEW1$/, 'null'], [/^events\/NEW1$/, 'newcomer']]);
@@ -385,11 +392,11 @@ describe('THE SEAM - two meanings of auth, kept apart', () => {
         assert.match(rules.events.$eventCode['.write'], /newData\.child\('ownerUid'\)\.val\(\) === auth\.uid/);
         assert.ok(!/sign_in_provider/.test(rules.events.$eventCode['.write']));
     });
-    test('the trial is 21 days or a pass on CREATE only; an owned round is the owner; a legacy round stays the old open rule; pass is unwritable', () => {
+    test('CREATE has no window (job 021); an owned round is the owner; a legacy round stays the old open rule; pass is unwritable', () => {
         const w = rules.events.$eventCode['.write'];
         const ev = rules.events.$eventCode;
-        assert.match(w, /now < root\.child\('organizers\/' \+ auth\.uid \+ '\/firstSeenAt'\)\.val\(\) \+ 1814400000/);
-        assert.match(w, /root\.child\('organizers\/' \+ auth\.uid \+ '\/pass\/expiresAt'\)\.val\(\) > now/);
+        assert.match(w, /!data\.exists\(\) && auth != null && newData\.child\('ownerUid'\)\.val\(\) === auth\.uid\)/, 'create: signed in and stamped with your own uid, nothing more');
+        assert.ok(!/1814400000|pass\/expiresAt/.test(w), 'a trial window or a pass condition is back on the events write');
         // RE-PINNED 2026-10-05: the owner clause no longer carries the scores guard.
         // The owner-delete rule published that day, so an owned round is the
         // owner's whatever it holds - including a delete after it has been played.
