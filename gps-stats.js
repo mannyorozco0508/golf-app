@@ -731,6 +731,10 @@
         // Quick stats on the scorecard (008) and My stats.
         quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked },
         aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome,
+        // "Track stats for others" (this phone, off by default): the state and its setter, for any Tools
+        // surface (the old drop-down via sheet.placeToggle, the Tools bottom sheet's ROUND switch). The
+        // setter redraws an open score sheet.
+        trackOthers: othersOn, setTrackOthers: function (v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); },
         // The score sheet (012).
         sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();
