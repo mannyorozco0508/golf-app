@@ -4729,6 +4729,8 @@ const SHELL_FILES = [
     './league-ui.js',
     './points.html',
     './score-marks-hp.js',
+    // HardPan Index (unofficial): the 18s this phone scored, worked out on the phone (008).
+    './hp-index.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
     // GPS:END

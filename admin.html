@@ -37,6 +37,10 @@
     <!-- Two front doors: GPS / Games & Bets, chosen once on this phone (HardPan app, gps-doors). -->
     <script src="front-door.js"></script>
     <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- HardPan Index (unofficial): the Account card and the Round Setup chip (HardPan, 008). -->
+    <script src="hp-index.js"></script>
+    <!-- GPS:END -->
     <script src="./firebase-database-compat.js"></script>
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
@@ -10040,6 +10044,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         refreshAccountState();
         try { syncLegalLinks(); } catch (e) { }
         el.classList.add('open');
+        // GPS:BEGIN
+        // HardPan Index (unofficial): shown here to a GPS Map phone with the switch on (hp-index.js).
+        if (window.HardPanIndex) { try { window.HardPanIndex.showInAccount(); } catch (e) { } }
+        // GPS:END
         // NOTHING IS FOCUSED ON ARRIVAL ANY MORE. The email box is behind "Use email
         // instead", so focusing it would open the keyboard over the two buttons a
         // golfer is meant to tap. toggleEmailFallback focuses it when it is asked for.
