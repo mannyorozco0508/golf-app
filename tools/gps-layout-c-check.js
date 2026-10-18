@@ -36,7 +36,7 @@
 //      panel and Recenter / zoom; Set the green > Set by tapping: "Tap the CENTER of the green"
 //      the same, with the panel's Cancel showing.
 //   E3 LOCATION DENIED: the message whole and clear of the top row / panel; the score button
-//      opens the card's box for the hole; a score typed there: back on GPS the round chip
+//      opens the card's box for the hole (with the 012 score sheet on: the sheet, over the map); a score typed there: back on GPS the round chip
 //      says Thru 4.
 //   E4 THE CREDITS WITH ESRI LIVE (Esri's terms) AND AN OSM LINE (010, ODbL): Esri stood in (a
 //      key, its tiles from a stand-in host) on a GolfAPI hole shaped by an OSM line - the line
@@ -321,8 +321,13 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         // E3: location denied; then the score button (on hole 4), and a score typed on the card.
         s = await go({ phone, denied: true, steps: [W(2500), OPEN, W(3000), { waitFor: "/Location is off/.test((document.querySelector('#gps-overlay .gps-msg') || {}).textContent || '')", timeout: 20000 }, W(800), SCALE(k), W(1200), MEASURE].concat(shot(tag + '-denied'),
             [TAP('#gps-overlay .gps-score-next'), W(900), TAP('#gps-overlay .gps-score-next'), W(900), TAP('#gps-overlay .gps-score-next'), W(900), TAP('#gps-overlay .gps-score'), W(1200),
-                { expression: "JSON.stringify({ side: HardPanGps.side(), focus: (function(){ var a = document.activeElement; return a && a.classList.contains('score-input') ? { hole: a.getAttribute('data-hole'), player: a.getAttribute('data-player-id') } : null; })() })" },
-                { expression: "(function(){ var a = document.activeElement; if (!a || !a.classList.contains('score-input')) return 'no box'; a.value = '5'; a.dispatchEvent(new Event('input', { bubbles: true })); a.dispatchEvent(new Event('change', { bubbles: true })); a.blur(); return 'typed'; })()" }, W(1200),
+                // 012: with the score sheet on (HardPanFeature('scoreSheet')), the score button opens the sheet over
+                // the map instead of the card's box - the score is then saved from the sheet (the same saveScore).
+                { expression: "JSON.stringify({ side: HardPanGps.side(), focus: (function(){ var a = document.activeElement; return a && a.classList.contains('score-input') ? { hole: a.getAttribute('data-hole'), player: a.getAttribute('data-player-id') } : null; })(),"
+                    + " sheet: (function(){ var w = document.getElementById('hp-score-sheet'); if (!w || w.style.display === 'none') return null; var on = w.querySelector('.hp-ss-chip.on'); return { title: (w.querySelector('.hp-ss-title') || {}).textContent, player: on ? on.getAttribute('data-ss-golfer') : null }; })(),"
+                    + " sheetOn: typeof HardPanFeature === 'function' && HardPanFeature('scoreSheet') !== false && !!(window.HardPanGpsStats && HardPanGpsStats.sheet) })" },
+                { expression: "(function(){ var w = document.getElementById('hp-score-sheet'); if (w && w.style.display !== 'none') { var b = w.querySelector('[data-ss-score=\\'5\\']'); if (!b) return 'no 5'; b.click(); w.querySelector('[data-ss-save]').click(); return 'saved from the sheet'; }"
+                    + " var a = document.activeElement; if (!a || !a.classList.contains('score-input')) return 'no box'; a.value = '5'; a.dispatchEvent(new Event('input', { bubbles: true })); a.dispatchEvent(new Event('change', { bubbles: true })); a.blur(); return 'typed'; })()" }, W(1200),
                 OPEN, W(1500), MEASURE]) });
         const [d0, d1, d2] = s;
         report[tag + ' E3'] = { msg: d0.msg, card: d1, chip: d2 && d2.chipText };
@@ -331,7 +336,8 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         const u = d0.under, mBox = u && d0.msg ? { l: d0.msg.l, r: d0.msg.r, t: Math.max(d0.msg.t, u.t), b: Math.min(d0.msg.b, u.b) } : null;
         f(u && mBox && d0.panel && u.b <= d0.panel.t && mBox.t >= clearTopOf(d0) && (!u.scrolls || u.canScroll) && !hits(mBox, d0.recenter) && !hits(mBox, d0.zoom), tag + ' E3: the message sits under the top row / panel / buttons: ' + JSON.stringify([d0.msg, u, d0.panel && d0.panel.t]));
         report[tag + ' E3'].scrolls = !!(u && u.scrolls);
-        f(d1 && d1.side === 'bets' && d1.focus && d1.focus.hole === '4' && d1.focus.player === '101', tag + ' E3: the score button did not open the card\'s box for hole 4: ' + JSON.stringify(d1));
+        if (d1 && d1.sheetOn) f(d1.side === 'gps' && d1.sheet && /^Hole 4 /.test(d1.sheet.title || '') && d1.sheet.player === '101', tag + ' E3: the score button did not open the score sheet for hole 4 over the map: ' + JSON.stringify(d1));
+        else f(d1 && d1.side === 'bets' && d1.focus && d1.focus.hole === '4' && d1.focus.player === '101', tag + ' E3: the score button did not open the card\'s box for hole 4: ' + JSON.stringify(d1));
         const want4 = expectChip(r0, DELTAS.concat([5 - r0.courseData.slice().sort((x, y) => x.hole - y.hole)[3].par]));
         f(d2 && d2.chipText === want4, tag + ' E3: after a score on hole 4 the chip says ' + JSON.stringify(d2 && d2.chipText) + ', expected ' + JSON.stringify(want4));
         errs(s, tag + ' E3');
