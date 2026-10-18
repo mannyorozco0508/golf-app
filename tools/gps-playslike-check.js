@@ -33,6 +33,11 @@
 //      "This shot" carries the breakdown: "You → green: D yds, plays like N", "Uphill: +E",
 //      "Into the wind (8 mph): +W", "Warm (80°F vs 70°F): −T"; a crosswind: "Crosswind: aim
 //      6 yds right" in the sheet, never on the line.
+//  10  012 PART 4c, elevPerLeg ON: the golfer 70 m off hole 1's line - EXACTLY ONE EPQS request
+//      near them, at the CENTER of their ~10 m grid cell (worked out inline), never their own
+//      point; the (i) sheet's heights row uses it ("you N ft ... your ~10 m square"); a reload
+//      (same phone) asks for it no more; elevPerLeg off: nothing asked near them. Arm 7
+//      (tournament) walks there too: still not one EPQS request.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -264,11 +269,31 @@ const START = [W(2500), OPEN, W(3000)];
     f((s[1].rows || []).indexOf('Crosswind: aim ' + ec.aim + ' yds ' + ec.aimSide) !== -1, '9: crosswind: the sheet has no "Crosswind: aim ' + ec.aim + ' yds ' + ec.aimSide + '": ' + JSON.stringify(s[1].rows));
     errs(s, 'simpleCross');
 
+    // 10: 012 part 4c - off the line: the height of the golfer's ~10 m cell, its center only.
+    const OFF = dest(dest(T1, B1, L1 - 160 * 0.9144), B1 + 90, 70);
+    // The cell, inline (rows of 10 m of latitude; across, 10 m at the row's own latitude).
+    const cellOf = (p) => { const dLat = 10 / (R * Math.PI / 180), i = Math.floor(p[0] / dLat), latC = (i + 0.5) * dLat, dLng = dLat / Math.cos(rad(latC)), j = Math.floor(p[1] / dLng); return [latC, (j + 0.5) * dLng]; };
+    const CELL = cellOf(OFF);
+    const OWN = { waitFor: "Array.prototype.some.call(document.querySelectorAll('#gps-overlay .gps-plinfo-now .gps-plinfo-row'), function (d) { return /10 m square/.test(d.textContent); })", timeout: 25000 };
+    s = await go({ simple: true, at: OFF, wind: INTO, steps: START.concat([READY, TAP('.gps-pl-info'), OWN, W(500), SHEET, ST, { expression: 'location.reload()' }, W(1000)].concat(START, [READY, W(2500), ST])) });
+    const near = (list) => (list || []).filter((p) => hav(p, OFF) < 12);
+    const o1 = s[1], o2 = s[2];
+    report.ownSpot = { cell: CELL, asked: near(o1.epqs), again: near(o2.epqs), rows: s[0].rows };
+    f(near(o1.epqs).length === 1, '10: not exactly one EPQS request near the golfer: ' + JSON.stringify(near(o1.epqs)));
+    f(near(o1.epqs).every((p) => hav(p, CELL) < 0.3 && hav(p, OFF) > 0.05 && hav(p, OFF) <= 7.2), '10: the request is not the cell center: ' + JSON.stringify(near(o1.epqs)) + ' vs ' + JSON.stringify(CELL));
+    f((s[0].rows || []).some((x) => x.indexOf('you ' + Math.round(ftAt(CELL)) + ' ft') !== -1), '10: the heights row does not use the cell\'s height ' + Math.round(ftAt(CELL)) + ': ' + JSON.stringify(s[0].rows));
+    f(near(o2.epqs).length === 0, '10: the second visit asked for the cell again');
+    errs(s, 'ownSpot');
+    s = await go({ simple: true, at: OFF, wind: INTO, features: { elevPerLeg: false }, steps: START.concat([READY, W(3000), ST]) });
+    report.ownSpotOff = { asked: near(s[0].epqs) };
+    f(near(s[0].epqs).length === 0, '10: elevPerLeg off asked for the golfer\'s cell: ' + JSON.stringify(near(s[0].epqs)));
+    errs(s, 'ownSpotOff');
+
     // 7: tournament mode.
     const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];
     const ASK = { expression: "JSON.stringify({ ask: " + vis('.gps-bagask') + " })" };
     s = await go({ simple: true, wind: INTO, seed: "localStorage.setItem('hardpan_tournament_phone', '1');", steps: START.concat([W(6000), ST, ...MARK,
-        { expression: 'window.__moveTo(' + dest(ME, B1, 120) + ')' }, W(1500), ...MARK, W(500), ASK, ST]) });
+        { expression: 'window.__moveTo(' + dest(ME, B1, 120) + ')' }, W(1500), ...MARK, W(500), ASK, { expression: 'window.__moveTo(' + OFF + ')' }, W(2500), ST]) });
     const [t0, tAsk, t1] = s;
     report.tournament = { line: t0.line, sug: t0.sug, plays: t0.plays, epqs: (t1.epqs || []).length, nws: t1.nws, ask: tAsk.ask, celev: t1.celev };
     f(!t0.line && !t1.line, '7: tournament: a plays-like line: ' + JSON.stringify([t0.line, t1.line]));

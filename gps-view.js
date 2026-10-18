@@ -2519,6 +2519,9 @@
         if (v != null) return v;
         if (which === 'tee') return elevAt(r.tee);
         if (which === 'mid') return elevAt(r.mid);
+        // 012 (elevPerLeg): real heights at the real points only - never a point projected onto
+        // the straight tee -> green line (wrong on a dogleg, wrong off the line).
+        if (perLegSwitch()) return null;
         return lineElev(r, pt);
     }
     // The golfer's height: from the course samples (009), else their spot projected onto
@@ -2526,6 +2529,9 @@
     function originElev(r, o) {
         // No tee (a green tapped on an unmapped hole): no line to sample, no slope.
         if (!r.tee || !r.mid) return null;
+        // 012 (elevPerLeg): more than 30 yds off the hole's line, the height of the golfer's own
+        // ~10 m cell (ownSpotFt - the one position-derived point ever sent, see there).
+        if (perLegSwitch() && o.from !== 'tee') { var own = ownSpotFt(r, o.pt); if (own != null) return own; }
         if (o.from === 'tee') return ptElev(r, r.tee, 'tee');
         return ptElev(r, o.pt);
     }
@@ -2544,6 +2550,89 @@
         }
         return null;
     }
+    // ---- THE GOLFER'S OWN SPOT, OFF THE HOLE (012 part 4c, switch elevPerLeg) -------------
+    // PRIVACY - THE ONLY TIME A POINT DERIVED FROM THE GOLFER'S POSITION LEAVES THE PHONE
+    // (mailbox 012 item 4c allows exactly this): when the golfer stands MORE THAN 30 YDS OFF
+    // THE HOLE'S LINE (gps-geo.OWN_SPOT_OFF_YD - the course's own samples are too far away to
+    // say how high they stand), the phone asks USGS EPQS - US only, no account, no id, no
+    // round - for the height of the CENTER of the ~10 m grid cell they are in
+    // (gps-geo.elevCell), NEVER their exact position. Each cell is asked once, ever, and kept
+    // on the phone (hardpan_elev_cell_v1_<row,col>); one request at a time; never in
+    // tournament mode, never without GPS Map, never with the switch off, never offline. Under
+    // 30 yds off the line: nothing is sent - the course samples say it. elevPerLeg off: never.
+    var CELL_PREFIX = 'hardpan_elev_cell_v1_';
+    function holeLineFor(r) {
+        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
+        var line = (osmPathFor(S.hole) || (rec && rec.line) || []).filter(Boolean);
+        return [r.tee].concat(line).concat([r.mid]);
+    }
+    function ownSpotCell(r, pt) {
+        if (!S || !r || !r.tee || !r.mid || !pt || !perLegSwitch()) return null;
+        var off = G.offLineYards(pt, holeLineFor(r));
+        return off != null && off > G.OWN_SPOT_OFF_YD ? G.elevCell(pt) : null;
+    }
+    function ownSpotFt(r, pt) {
+        var c = ownSpotCell(r, pt);
+        if (!c) return null;
+        var v = lsGet(CELL_PREFIX + c.key);
+        if (v && typeof v.ft === 'number') return v.ft;
+        if (!v) fetchOwnSpot(c);
+        return null;
+    }
+    function fetchOwnSpot(c) {
+        if (tournament()) return;   // tournament mode: no elevation at all
+        if (!perLegSwitch() || !S || !S.pro || S.side !== 'gps' || S.cellInFlight || typeof fetch !== 'function') return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        if (S.cellFailedAt && Date.now() - S.cellFailedAt < 60000) return;
+        if (!c || !inUS(c.pt) || lsGet(CELL_PREFIX + c.key) != null) return;
+        var mine = S, k = CELL_PREFIX + c.key;
+        S.cellInFlight = true;
+        // The cell's CENTER (c.pt), never the golfer's own point.
+        fetch(epqsUrl(c.pt), { mode: 'cors', credentials: 'omit' }).then(function (res) { if (!res.ok) throw new Error('epqs ' + res.status); return res.json(); }).then(function (j) {
+            var v = j && j.value != null ? Number(j.value) : NaN;
+            lsSet(k, isFinite(v) && v > -1000 ? { ft: Math.round(v * 10) / 10 } : { none: 1 });
+            mine.cellInFlight = false;
+            if (S === mine) render();
+        }).catch(function () { mine.cellInFlight = false; mine.cellFailedAt = Date.now(); });
+    }
+    // ---- ELEVATION PER LEG (012 part 4, switch elevPerLeg) ---------------------------------
+    // Off: the 009 behaviour (golfer -> the moved target or the green; heights from the course
+    // samples, else projected onto the tee -> green line). On: the leg the golfer is about to
+    // hit is you (or the tee) -> the target on screen (the default one too); a par 3, or a
+    // target on the green's middle: -> the green. And the second leg, target -> green.
+    function perLegSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('elevPerLeg') !== false; } catch (e) { return true; } }
+    function isPar3() { return Number((typeof S.holeMeta === 'function' && (S.holeMeta(S.hole) || {}).par) || S.par) === 3; }
+    // The wind / air every leg's playsLike gets.
+    function playsAir(w) {
+        var has = !!(w && !w.none);
+        return { windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null };
+    }
+    // Both legs, worked out on the phone: { toTarget, toGreen, single, heights } (gps-geo.playsLegs)
+    // or null (tournament mode, no GPS Map, not measuring, on the green, outside the US).
+    function playsLegsNow() {
+        if (tournament() || !S || !S.pro || S.mode !== 'measure') return null;
+        var r = resolved(), o = origin(r);
+        if (!r || !o || !r.mid || !inUS(r.mid)) return null;
+        var nums = G.holeNumbers(o.pt, r);
+        if (nums && nums.onGreen) return null;
+        var tp = perLegSwitch() ? playsAim(r) : (S.target || null);
+        var fromFt = originElev(r, o), targetFt = tp ? ptElev(r, tp) : null, greenFt = ptElev(r, r.mid, 'mid');
+        var lg = G.playsLegs({ from: o.pt, target: tp, green: r.mid, fromFt: fromFt, targetFt: targetFt, greenFt: greenFt,
+            par3: perLegSwitch() && isPar3(), minYd: PLAYS_MIN_YD, air: playsAir(effectiveWind()) });
+        if (lg) lg.heights = { from: fromFt, fromLabel: o.from === 'tee' ? 'tee' : 'you', target: lg.single ? null : targetFt, green: greenFt,
+            ownCell: o.from !== 'tee' && !!ownSpotCell(r, o.pt) && fromFt != null };
+        return lg;
+    }
+    // For layout D's bubble on the target ("60 · plays 63"): the second leg, or null.
+    function legOut(leg) {
+        if (!leg) return null;
+        var m = units() === 'm', k = m ? G.M_PER_YD : 1;
+        return { yards: Math.round(leg.yards * k), plays: leg.pl ? Math.round(leg.pl.exact * k) : null, unit: m ? 'm' : 'y', text: G.legText(leg, units()) };
+    }
+    function playsLegsOut() {
+        var lg = playsLegsNow();
+        return lg ? { toTarget: legOut(lg.toTarget), toGreen: legOut(lg.toGreen), single: lg.single, par3: perLegSwitch() && isPar3() } : null;
+    }
     function playsNow() { return playsTo(null); }
     // To the aim (CENTER / PIN: target null), or to any point on the hole (the
     // target): its height from the tee -> green line, like the golfer's.
@@ -2559,11 +2648,9 @@
         // Today's manual wind (build 3) beats the live reading.
         var w = effectiveWind(), has = !!(w && !w.none);
         var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
-        return G.playsLike({
-            yards: D, elevFromFt: originElev(r, o), elevToFt: to,
-            windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
-            shotBearingDeg: G.bearingDeg(o.pt, aim), tempF: w && typeof w.tempF === 'number' ? w.tempF : null
-        });
+        var q = playsAir(w);
+        q.yards = D; q.elevFromFt = originElev(r, o); q.elevToFt = to; q.shotBearingDeg = G.bearingDeg(o.pt, aim);
+        return G.playsLike(q);
     }
     function syncPlays() {
         if (!S) return;
@@ -2594,7 +2681,13 @@
     // no parts: the why moved into the (i) sheet ("This shot", fillPlaysInfo). Off: the 009 line.
     function simpleSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsSimple') !== false; } catch (e) { return true; } }
     // Where the plays-like line measures to: the moved target, else the green's center (null).
+    // 012 (elevPerLeg): the target on screen (default or moved) - a par 3, or a target on the
+    // green's middle: the green (null).
     function playsAim(r) {
+        if (S && perLegSwitch()) {
+            if (isPar3() || !S.target || !r || !r.mid || G.haversineMeters(S.target, r.mid) < G.LEG_SAME_M) return null;
+            return S.target;
+        }
         return S && S.targetMoved && S.target ? S.target : null;
     }
     function syncBreakdown(r, o, nums) {
@@ -2668,8 +2761,10 @@
         var w = effectiveWind(), has = !!(w && !w.none);
         var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
         var am = has && w.mph > 0 ? G.windAim(D, G.windRelative(w.fromDeg, G.bearingDeg(o.pt, aim), w.mph).cross) : null;
+        var lg = perLegSwitch() ? playsLegsNow() : null;
         return G.playsInfoRows({ pl: pl, yards: D, windMph: has ? w.mph : null, tempF: w && typeof w.tempF === 'number' ? w.tempF : null, aim: am, unit: units(),
-            label: (o.from === 'tee' ? 'Tee' : 'You') + ' \u2192 ' + (tp ? 'target' : 'green') });
+            label: (o.from === 'tee' ? 'Tee' : 'You') + ' \u2192 ' + (tp ? 'target' : 'green'),
+            toGreen: lg && !lg.single ? lg.toGreen : null, heights: lg ? lg.heights : null });
     }
     function fillPlaysInfo() {
         var sh = plInfoSheet(), box = sh && sh.querySelector('.gps-plinfo-now');
@@ -3454,8 +3549,10 @@
             else {
                 bagSyncLoad(B);
                 var moved = !!(S.targetMoved && S.target), to = moved ? S.target : aimAt(r);
+                // 012 (elevPerLeg): the club for the leg the golfer is about to hit (playsAim).
+                if (perLegSwitch()) { moved = !!playsAim(r); to = playsAim(r) || aimAt(r); }
                 if (to) {
-                    var pl = playsTo(moved ? S.target : null);
+                    var pl = playsTo(moved ? to : null);
                     var yd = pl ? pl.exact : G.haversineMeters(o.pt, to) / G.M_PER_YD;
                     var sg = yd >= 10 ? B.suggestClub(B.bag(bagGolfer()), yd) : null;
                     if (sg) text = 'Suggested: ' + sg.name + ' (your ' + bagShown(sg.yd) + ')';
@@ -3887,7 +3984,7 @@
         +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
         +     '<li><b>Temperature:</b> about 1 yard for every 10\u00b0F per 100 yards - longer when it is cold, shorter when it is warm (from 70\u00b0F).</li>'
         +   '</ul>'
-        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your position), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
+        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your exact position; more than 30 yards off the hole\u2019s line, the height of the roughly 10-meter square you are in), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
@@ -4921,6 +5018,8 @@
         playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },
         playsClub: function () { try { return playsClubNow(); } catch (e) { return null; } },
         openPlaysInfo: function () { try { openPlaysInfo(); } catch (e) {} },
+        // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
+        playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,

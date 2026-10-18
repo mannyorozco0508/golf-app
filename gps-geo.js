@@ -1252,6 +1252,21 @@
         if (isNum(t.wind) && r(t.wind)) out.push((t.wind > 0 ? 'Into the wind' : 'Downwind') + (isNum(o.windMph) ? ' (' + Math.round(o.windMph) + ' mph)' : '') + ': ' + sg(r(t.wind)));
         if (isNum(t.temp) && r(t.temp)) out.push((t.temp > 0 ? 'Cold' : 'Warm') + (isNum(o.tempF) ? ' (' + Math.round(o.tempF) + '°F vs ' + (isNum(o.tempBaseF) ? Math.round(o.tempBaseF) : 70) + '°F)' : '') + ': ' + sg(r(t.temp)));
         if (o.aim && o.aim.yd) out.push('Crosswind: aim ' + (m ? Math.max(1, Math.round(o.aim.yd * M_PER_YD)) + ' m ' : o.aim.yd + (o.aim.yd === 1 ? ' yd ' : ' yds ')) + o.aim.side);
+        // 012 part 4 (elevPerLeg): the second leg, target -> green, with its own slope / wind.
+        var g = o.toGreen;
+        if (g && isNum(g.yards)) {
+            var gt = (g.pl && g.pl.terms) || {}, gp = [];
+            if (isNum(gt.elev) && r(gt.elev)) gp.push((gt.elev > 0 ? 'uphill ' : 'downhill ') + sg(r(gt.elev)));
+            if (isNum(gt.wind) && r(gt.wind)) gp.push((gt.wind > 0 ? 'into the wind ' : 'downwind ') + sg(r(gt.wind)));
+            out.push('Target \u2192 green: ' + r(g.yards) + u + (g.pl ? ', plays like ' + r(g.pl.exact) : '') + (gp.length ? ' (' + gp.join(', ') + ')' : ''));
+        }
+        // The heights used, where they were read (feet, as USGS gives them).
+        var h = o.heights;
+        if (h) {
+            var hs = [];
+            [['from', h.fromLabel || 'you'], ['target', 'target'], ['green', 'green']].forEach(function (x) { if (isNum(h[x[0]])) hs.push(x[1] + ' ' + Math.round(h[x[0]]) + ' ft'); });
+            if (hs.length) out.push('Heights: ' + hs.join(' \u00b7 ') + (h.ownCell ? ' (your height: your ~10 m square)' : ''));
+        }
         return out;
     }
     // CROSSWIND = AIM OFF, NO DISTANCE CHANGE. The rule (a common rule of thumb, kept
@@ -1333,8 +1348,67 @@
         near.slice(0, 3).filter(function (n) { return n.d <= ELEV_REACH_M; }).forEach(function (n) { var w = 1 / (n.d * n.d); sw += w; sv += w * n.ft; });
         return sv / sw;
     }
+    // ---- ELEVATION PER LEG (012 part 4, switch elevPerLeg) --------------------------
+    // EACH LEG ITS OWN PLAYS-LIKE: you (or the tee) -> the target, and the target -> the
+    // green's middle, each with its own distance, its own bearing (so the wind is the wind
+    // FOR THAT LEG) and the heights AT ITS OWN TWO ENDS - read at the real points (the
+    // golfer's spot, the target, the green), never projected onto the straight tee -> green
+    // line. A par 3, no target, or a target on the green's middle (within LEG_SAME_M): one
+    // leg, to the green. o: { from, target, green, fromFt, targetFt, greenFt, par3, minYd,
+    // air: { windMph, windFromDeg, tempF, ... } - passed to playsLike as they are }.
+    // Returns { toTarget: leg, toGreen: leg | null, single } - a leg { yards (exact), plays
+    // (whole yards, or null under minYd / no data), pl (playsLike's result), bearing } - or
+    // null without a from and a green. Pure.
+    var LEG_SAME_M = 5;
+    function playsLegs(o) {
+        if (!o || !o.from || !o.green) return null;
+        var min = isNum(o.minYd) ? o.minYd : 0, air = o.air || {};
+        var leg = function (a, b, fa, fb) {
+            var yd = haversineMeters(a, b) / M_PER_YD, br = bearingDeg(a, b), pl = null;
+            if (yd >= min) {
+                var q = {}; Object.keys(air).forEach(function (k) { q[k] = air[k]; });
+                q.yards = yd; q.elevFromFt = fa; q.elevToFt = fb; q.shotBearingDeg = br;
+                pl = playsLike(q);
+            }
+            return { yards: yd, plays: pl ? pl.yards : null, pl: pl, bearing: br };
+        };
+        var single = !!o.par3 || !o.target || haversineMeters(o.target, o.green) < LEG_SAME_M;
+        if (single) return { toTarget: leg(o.from, o.green, o.fromFt, o.greenFt), toGreen: null, single: true };
+        return { toTarget: leg(o.from, o.target, o.fromFt, o.targetFt), toGreen: leg(o.target, o.green, o.targetFt, o.greenFt), single: false };
+    }
+    // THE SECOND LEG'S BUBBLE (layout D): "60 · plays 63" - the yards, and what they play like
+    // when that is known ("60" alone when not). unit 'm': meters. Pure.
+    function legText(leg, unit) {
+        if (!leg || !isNum(leg.yards)) return '';
+        var k = unit === 'm' ? M_PER_YD : 1, y = Math.round(leg.yards * k);
+        return leg.pl && isNum(leg.pl.exact) ? y + ' \u00b7 plays ' + Math.round(leg.pl.exact * k) : String(y);
+    }
+    // HOW FAR OFF THE HOLE'S LINE (yards) a point is - line: [tee, ...bends, green]. Pure.
+    var OWN_SPOT_OFF_YD = 30;
+    function offLineYards(pt, line) {
+        if (!pt || !line || line.length < 2) return null;
+        return alongLine(pt, line).d / M_PER_YD;
+    }
+    // THE GOLFER'S SPOT, BLURRED TO A ~10 m GRID CELL (012 part 4c). PRIVACY: when the golfer
+    // is more than OWN_SPOT_OFF_YD off the hole's line (the course's own samples are too far
+    // to say how high they stand), the GPS screen asks USGS for the height of the CENTER of
+    // the ~10 m x 10 m cell they are in - never their exact position - and keeps it on the
+    // phone per cell (asked once, ever). Rows of ELEV_CELL_M degrees-of-latitude-in-metres;
+    // across, the same metres at that row's own latitude, so a cell is ~10 m square anywhere.
+    // Every point in a cell gives the same key and center. { key: 'row,col', pt: [lat, lng] }.
+    // Pure.
+    var ELEV_CELL_M = 10;
+    function elevCell(pt, m) {
+        if (!pt || !isNum(pt[0]) || !isNum(pt[1])) return null;
+        var dLat = (m || ELEV_CELL_M) / (EARTH_RADIUS_M * Math.PI / 180);
+        var i = Math.floor(pt[0] / dLat), latC = (i + 0.5) * dLat;
+        var dLng = dLat / Math.cos(toRad(latC)), j = Math.floor(pt[1] / dLng);
+        var r6 = function (x) { return Math.round(x * 1e6) / 1e6; };
+        return { key: i + ',' + j, pt: [r6(latC), r6((j + 0.5) * dLng)] };
+    }
     var PLAYS_API = { playsParts: playsParts, playsText: playsText, playsInfoRows: playsInfoRows, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
-        elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M };
+        elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M,
+        playsLegs: playsLegs, legText: legText, LEG_SAME_M: LEG_SAME_M, offLineYards: offLineYards, OWN_SPOT_OFF_YD: OWN_SPOT_OFF_YD, elevCell: elevCell, ELEV_CELL_M: ELEV_CELL_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
     // Shared by the app (gps-view.js lookupCourse) and tools/gps-coverage.js, so
