@@ -2813,6 +2813,9 @@
         var aim = aimAt(r);
         txt('.gps-m', (nums && aim && o) ? d(G.haversineMeters(o.pt, aim)) : '—');
         txt('.gps-b', nums ? d(nums.backM) : '—');
+        // THE WATCH (feature 10): the same three numbers to an Apple Watch, when the native
+        // plugin exists and the 'watch' switch is on. Never allowed to break the screen.
+        try { watchSync(nums, aim, o, u); } catch (e) {}
 
         dropStaleFix();
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
@@ -3605,6 +3608,9 @@
             round: opts.round || null, db: opts.db || null, canFix: !!opts.canFix, eventCode: String(opts.eventCode || ''),
             writeRoundPin: opts.writeRoundPin || null, stepHole: opts.stepHole || null,
             openScore: opts.openScore || null,
+            // THE WATCH (feature 10): the app's own score write (index.html saveScore), when the host
+            // hands it over. Not handed over (today): a score from the watch writes nothing.
+            saveScore: opts.saveScore || null,
             holeMeta: opts.holeMeta || null, holeList: opts.holeList || null, gotoHole: opts.gotoHole || null,
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
             geoError: null, framed: null, mapRequested: false, windKick: true, windPan: 0, loadingCourses: !window.HardPanGpsCourses,
@@ -4016,6 +4022,81 @@
 
     // The scorecard's hole changed (Prev/Next on either side, the 1-18 picker, a
     // landing). Same hole: nothing. New hole: a fresh target and a fresh frame.
+    // ---- THE APPLE WATCH (feature 10 - docs/WATCH-APP-PLAN.md) ------------------
+    // The phone is the only GPS: it sends the CURRENT hole's front / center / back (numbers
+    // in the golfer's units - never a coordinate) to window.Capacitor.Plugins.HardPanWatch,
+    // which hands them to WatchConnectivity (the golfer's own paired watch; nothing leaves
+    // the phone for a server). No plugin (every build today) or the 'watch' switch off
+    // (gps-config.js features.watch: false): nothing is sent, nothing is listened for.
+    // GPS Map (007): an unentitled phone sends entitled: false and no numbers.
+    var watchLast = null, watchHooked = false;
+    function watchPlugin() {
+        try {
+            if (typeof window.HardPanFeature !== 'function' || window.HardPanFeature('watch') !== true) return null;
+            var C = window.Capacitor, p = C && C.Plugins && C.Plugins.HardPanWatch;
+            return p && typeof p.sendHole === 'function' ? p : null;
+        } catch (e) { return null; }
+    }
+    function watchNum(m, u) {
+        if (m == null || !G) return null;
+        var v = G.distanceIn(m, u);
+        return (v == null || !isFinite(v) || v < 0 || v > 9999) ? null : Math.round(v);
+    }
+    // The payload: { hole, par, front, center, back, units, onGreen, entitled, tournament, score, round }.
+    // round is the round's code: a score the watch queued for another round is never written here.
+    function watchPayload(nums, aim, o, u) {
+        var pro = hasGpsPro(), hole = Number(S.hole);
+        var par = Number((typeof S.holeMeta === 'function' && (S.holeMeta(hole) || {}).par) || S.par) || null;
+        var front = null, center = null, back = null, onGreen = false;
+        if (pro && nums) {
+            onGreen = !!nums.onGreen;
+            front = onGreen ? null : watchNum(nums.frontM, u);
+            center = (aim && o) ? watchNum(G.haversineMeters(o.pt, aim), u) : null;
+            back = watchNum(nums.backM, u);
+        }
+        return { hole: hole, par: par, front: front, center: center, back: back, units: u === 'm' ? 'm' : 'yd',
+            onGreen: onGreen, entitled: pro, tournament: tournament(), score: myScore(hole), round: String(S.eventCode || '') };
+    }
+    function watchSync(nums, aim, o, u) {
+        var p = watchPlugin();
+        if (!p || !S) return false;
+        watchHook(p);
+        var msg = watchPayload(nums, aim, o, u), key = JSON.stringify(msg);
+        // Only on a change: render runs on every fix, the watch needs a new number, not a new message.
+        if (key === watchLast) return false;
+        watchLast = key;
+        var r = p.sendHole(msg);
+        if (r && typeof r.then === 'function') r.then(null, function () { watchLast = null; });
+        return true;
+    }
+    // The watch talks back: a hole change (+/-) and the golfer's own score for a hole.
+    function watchHook(p) {
+        if (watchHooked || typeof p.addListener !== 'function') return;
+        watchHooked = true;
+        p.addListener('watchHole', function (ev) {
+            var h = Number(ev && ev.hole);
+            if (!S || !(h >= 1 && h <= 36)) return;
+            if (typeof S.gotoHole === 'function') S.gotoHole(h); else setHole(h);
+        });
+        p.addListener('watchScore', function (ev) { watchScore(ev); });
+        // Scores the watch sent while the phone app was not running: kept natively, written now.
+        if (typeof p.pending === 'function') {
+            Promise.resolve(p.pending()).then(function (r) { ((r && r.items) || []).forEach(function (ev) { watchScore(ev); }); }, function () {});
+        }
+    }
+    // THE SAME SCORE WRITE THE APP MAKES: the host's saveScore (offline queue, permissions and
+    // rules all apply there). Only for this phone's own golfer, never as a spectator.
+    function watchScore(ev) {
+        var h = Number(ev && ev.hole), n = Number(ev && ev.strokes);
+        if (!S || typeof S.saveScore !== 'function' || readOnlyHere()) return false;
+        if (!(h >= 1 && h <= 36) || !(n >= 1 && n <= 20) || Math.floor(n) !== n) return false;
+        if (ev.round != null && String(ev.round) !== String(S.eventCode || '')) return false;
+        var w = scoreFor();
+        if (!w || w.id == null) return false;
+        S.saveScore(w.id, h, String(n));
+        return true;
+    }
+
     function setHole(hole, par) {
         if (!S) return;
         hole = Number(hole);
@@ -4058,6 +4139,7 @@
         stopWindTick();
         stopReplayTimer();
         fix = null;
+        watchLast = null;   // a new round sends its first hole again
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('offline', onOffline);
@@ -4099,6 +4181,9 @@
         // Build 5: does hole n have a green (or tee) to measure to? The card asks
         // before it hands a hole back to GPS.
         holeHasData: function (n) { try { return holeHasData(n); } catch (e) { return false; } },
+        // THE WATCH (feature 10; gps_watch_test.js): what render sent, and a watch score in.
+        watchSent: function () { return watchLast ? JSON.parse(watchLast) : null; },
+        watchScore: function (ev) { return watchScore(ev); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;

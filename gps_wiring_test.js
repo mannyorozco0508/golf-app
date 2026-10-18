@@ -157,8 +157,10 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     // founding cap; no price (the store's own price only).
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats']);
-    assert.ok(Object.values(cfg.features).every((v) => v === true));
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats', 'watch']);
+    // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
+    assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
+    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch').every(([, v]) => v === true));
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
