@@ -1064,18 +1064,27 @@
         map.on('click', function (e) { onMapTap([e.lngLat.lat, e.lngLat.lng]); });
         S.map = map;
         S.styleReady = false;
-        map.on('load', function () {
-            if (!S || S.map !== map) return;
+        // READY WHEN THE STYLE IS: MapLibre's 'load' also waits for every tile of the first
+        // (world) view, and one slow or stuck tile (a weak signal on the course; a busy
+        // phone - 012: the layout-D check under load, gps-check's "tee at x -255") left the
+        // map at its world view with the hole never framed. The style being in is all the
+        // framing needs: 'style.load', 'load', or 4 s on, whichever comes first.
+        var ready = function () {
+            if (!S || S.map !== map || S.styleReady) return;
+            if (!map.getStyle || !(function () { try { return !!map.getSource('usgs'); } catch (e) { return false; } })()) return;
             S.styleReady = true;
             if (S.googleOn) addGoogleLayer();
             limitToCourse();
             frameHole(true);
             render();
-            // READY: loaded, framed on the hole and drawn. data-zoom alone is not
-            // this - tile data sets it before the load event (a check that waited
-            // for it read a map still at its world view, tee at x -255).
+            // READY: framed on the hole and drawn. data-zoom alone is not this - tile
+            // data sets it first (a check that waited for it read a map still at its
+            // world view, tee at x -255).
             el.setAttribute('data-ready', '1');
-        });
+        };
+        map.on('style.load', ready);
+        map.on('load', ready);
+        setTimeout(ready, 4000);
     }
 
     // WHAT THE MAP IS DOING, on the map element - so a check (and anybody with the

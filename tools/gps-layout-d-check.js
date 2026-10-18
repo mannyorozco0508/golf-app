@@ -128,7 +128,7 @@ const MEASURE = { expression: "(function(){ var ov = document.getElementById('gp
     + "  mFont: (function(){ var e = ov.querySelector('.gps-num-mid .gps-big'); return e ? getComputedStyle(e).fontSize : null; })(), mColor: (function(){ var e = ov.querySelector('.gps-num-mid .gps-big'); return e ? getComputedStyle(e).color : null; })(),"
     + "  topBg: (function(){ var e = ov.querySelector('.gps-ld-top'); return e ? getComputedStyle(e).backgroundColor : null; })(), scoreBg: (function(){ var e = ov.querySelector('.gps-scorebox'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
     + "  pillBg: (function(){ var e = ov.querySelector('.gps-ld-plays'); return e ? getComputedStyle(e).backgroundColor : null; })(),"
-    + "  pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
+    + "  map: mapEl ? { zoom: mapEl.getAttribute('data-zoom'), center: mapEl.getAttribute('data-center'), bearing: mapEl.getAttribute('data-bearing'), w: mapEl.clientWidth, h: mapEl.clientHeight, ready: mapEl.getAttribute('data-ready'), bounds: mapEl.getAttribute('data-bounds'), tiles: mapEl.getAttribute('data-tiles-loaded'), side: document.body.className } : null, pick: R('.gps-layout-pick'), pickText: T('.gps-layout-pick'), plinfo: R('.gps-plinfo'), esriPx: !!(window.HardPanGps), vh: innerHeight, vw: innerWidth, e: window.__e }); })()" };
 const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay " + sel + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
 const WAIT_MAP = { waitFor: "(function () { var m = document.querySelector('#gps-overlay .gps-map'); return !!(m && m.dataset.ready === '1' && Number(m.dataset.zoom) > 3); })()", timeout: 45000 };
 const READY = { waitFor: "(function(){ var p = document.querySelector('#gps-overlay .gps-ld-pltext'), q = document.querySelector('#gps-overlay .gps-pl-text'); var m = document.querySelector('#gps-overlay .gps-m'); return !!(((p && /\\d/.test(p.textContent)) || (q && /Plays/.test(q.textContent))) && m && /\\d/.test(m.textContent)); })()", timeout: 25000 };
@@ -192,27 +192,33 @@ function checkD(a, f, tag, o) {
     const errs = (list, tag) => list.forEach((x) => { if (x.e && x.e.length) fails.push(tag + ': page errors ' + x.e.join(' | ')); });
     const want = expectChip(round());
 
-    // LD_SHOT_ONLY=1: just the screenshot arm (a first look).
+    // LD_ARMS=esri,tap,switch,tourney,off (default: all); LD_SHOT_ONLY=1: just the screenshot arm.
     let s;
-    if (!process.env.LD_SHOT_ONLY) {
-    // 1-4: ESRI LIVE, the bag set up; a tap just under the top bar.
+    const ARMS = process.env.LD_SHOT_ONLY ? [] : (process.env.LD_ARMS || 'esri,tap,switch,tourney,off').split(',');
     const TX = Math.round(VW * 0.4);
     const tapAt = (y) => ({ expression: "(function(){ var c = document.querySelector('#gps-overlay .maplibregl-canvas'); if (!c) return 'no canvas';"
         + " ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: " + TX + ", clientY: " + y + ", button: 0 })); }); return 'tapped'; })()" });
+    let topB = 80;
+    if (ARMS.includes('esri')) {
+    // 1-4: ESRI LIVE, the bag set up.
     s = await go({ esri: 'OK-3X', seed: BAG, steps: START.concat([MEASURE]) });
     const a = s[0];
     const c0 = checkD(a, f, 'esri', { esri: true, club: true, want });
-    report.d = { top: a.top, hole: a.holeText, mid: [a.mLbl, a.mText, a.mFont], par: a.parText, chip: a.chipText, rail: a.rail.map((x) => x.cls + ' ' + x.w + 'x' + x.h), pill: [a.raw, a.plText], mark: a.markText, score: [a.holeLbl, a.scoreText], credit: a.creditText, clear: c0, tee: a.tee, green: a.green, bubbles: [a.pillTo, a.pillOn] };
+    report.d = { top: a.top, hole: a.holeText, mid: [a.mLbl, a.mText, a.mFont], par: a.parText, chip: a.chipText, rail: a.rail.map((x) => x.cls + ' ' + x.w + 'x' + x.h), pill: [a.raw, a.plText], mark: a.markText, score: [a.holeLbl, a.scoreText], credit: a.creditText, clear: c0, tee: a.tee, green: a.green, bubbles: [a.pillTo, a.pillOn], map: a.map };
+    if (a.top) topB = a.top.b;
     errs(s, 'esri');
+    }
+    if (ARMS.includes('tap')) {
     // The tap under the top bar (the bar's own y + its height): the target comes back into the clear map.
-    s = await go({ seed: BAG, steps: START.concat([MEASURE, tapAt(Math.round((a.top ? a.top.b : 80) + 6)), W(900), MEASURE, TAP('.gps-ld-plays'), W(400), MEASURE]) });
+    s = await go({ seed: BAG, steps: START.concat([MEASURE, tapAt(Math.round(topB + 6)), W(900), MEASURE, TAP('.gps-ld-plays'), W(400), MEASURE]) });
     const [t0, t1, t2] = s;
     const ct = clearOf(t1);
-    report.tap = { y: (a.top ? a.top.b : 80) + 6, target: t1.target, clear: ct };
+    report.tap = { y: topB + 6, target: t1.target, clear: ct };
     f(t1.target && t1.target.t >= ct.top && t1.target.b <= ct.bottom, '4: the tapped target is not in the clear map: ' + JSON.stringify([t1.target, ct]));
     f(t2.plinfo, '3: tapping the pill does not open the ⓘ sheet');
-    if (SHOT) { /* the screenshot arm below */ }
     errs(s, 'tap');
+    }
+    if (ARMS.includes('switch')) {
 
     // 5: Tools > Screen layout, live: D -> C (no reload), remembered (a reload), C -> D. No bag: no club.
     s = await go({ steps: START.concat([MEASURE, TAP('.gps-tools'), W(300), MEASURE], SWITCH, [MEASURE, { expression: 'location.reload()' }, W(1000)], START, [MEASURE, TAP('.gps-tools'), W(300), MEASURE], SWITCH, [MEASURE]) });
@@ -227,11 +233,15 @@ function checkD(a, f, tag, o) {
     f(dBack.layout === 'd', '5: HardPan did not switch back to D');
     if (dBack.layout === 'd') checkD(dBack, f, 'back');
     errs(s, 'switch');
+    }
+    if (ARMS.includes('tourney')) {
 
     // 6: tournament mode - no pill.
     s = await go({ seed: BAG, steps: START.concat([TAP('.gps-tools'), W(300), TAP('.gps-tourney-toggle'), W(1500), MEASURE]) });
     f(s[0].ld && !s[0].pill, '6: the plays pill shows in tournament mode');
     errs(s, 'tourney');
+    }
+    if (ARMS.includes('off')) {
 
     // 7: gpsLayoutD off - layout C, no setting.
     s = await go({ features: { gpsLayoutD: false }, steps: START.concat([MEASURE, TAP('.gps-tools'), W(300), MEASURE]) });
