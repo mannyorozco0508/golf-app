@@ -72,7 +72,8 @@ const MY = `JSON.stringify((function () {
   var t = {}; if (p) Array.prototype.forEach.call(p.querySelectorAll('[data-ms]'), function (x) { t[x.getAttribute('data-ms')] = x.querySelector('.v').textContent; });
   var on = p && p.querySelector('.ms-seg .on');
   return { open: !!(p && p.style.display !== 'none' && p.getBoundingClientRect().height > 0), tiles: t, last: on ? on.textContent : null,
-    note: p ? (p.querySelector('.ms-note') || {}).textContent : null, e: window.__e };
+    note: p ? (p.querySelector('.ms-note') || {}).textContent : null,
+    saved: (function () { var x = p && p.querySelector('.ms-saved'); return x && x.getBoundingClientRect().height > 0 ? x.textContent : null; })(), e: window.__e };
 })())`;
 const EVAL = (js) => ({ expression: js });
 // Types a score into the first box the phone can score, and leaves the box FOCUSED (still typing).
@@ -120,6 +121,7 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
     f(c2 && c2.writes.some((w) => /scores\/p\d+_h1$|scores$|^update events\/QSTA01$/.test(w)) , 'the score itself was not saved: ' + JSON.stringify(c2 && c2.writes));
     f(c2 && !c2.writes.some((w) => /stats/.test(w)), 'stats were written to the database: ' + JSON.stringify(c2 && c2.writes));
     f(m1 && m1.open, 'Round Menu -> My stats did not open: ' + JSON.stringify(m1));
+    f(m1 && m1.saved === 'Saved on this phone', 'My stats does not say "Saved on this phone": ' + JSON.stringify(m1 && m1.saved));
     f(m1 && m1.last === 'Last 5' && m1.tiles.putts === '36.0' && m1.tiles.fir === '100%' && m1.tiles.gir === '100%' && m1.tiles.par4 === (c2 && /Par 4/.test(c2.par) ? '4.00' : m1.tiles.par4), 'My stats numbers: ' + JSON.stringify(m1 && m1.tiles));
     f(m1 && m1.tiles.avg === '—', 'scoring average from a 1-hole round: ' + (m1 && m1.tiles.avg));
     f(m2 && m2.last === 'Last 20' && m2.tiles.putts === '36.0', 'Last 20: ' + JSON.stringify(m2));

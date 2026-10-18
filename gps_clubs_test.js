@@ -274,3 +274,13 @@ test('009: "How plays-like works" - the (i) on the plays-like line, plain words,
     assert.ok(/1 yard for every 10\\u00b0F per 100 yards/.test(sheet) && /D \* 0\.001 \* \(70 - o\.tempF\)/.test(g));
     assert.ok(/only on US courses/.test(sheet) && /estimate/.test(sheet) && /never your position/.test(sheet) && /Tournament mode turns all of it off/.test(sheet));
 });
+
+test('010: My bag says "Saved on this phone" - one small grey line under the heading, in the list and the setup', { skip }, () => {
+    const v = read('gps-view.js');
+    assert.match(v, /<div class="gps-bag-sub"><\/div>'\n(?:\s*\/\/[^\n]*\n)?\s*\+\s*'<div class="gps-bag-saved">Saved on this phone<\/div>'/);
+    assert.equal((v.match(/class="gps-bag-saved"/g) || []).length, 1, 'one line');
+    assert.equal((v.match(/bagSavedLine\(sh, B\);/g) || []).length, 2, 'set in the list and in the setup');
+    // Honest: the account is named only when the bag really syncs (clubsSync, which ships off).
+    assert.match(v, /function bagSavedLine\(sh, B\) \{ var e = sh\.querySelector\('\.gps-bag-saved'\); if \(e\) e\.textContent = bagSyncCan\(B\) \? 'Saved on this phone and your account' : 'Saved on this phone'; \}/);
+    assert.match(v, /#gps-overlay \.gps-bag-saved\{font:600 11\.5px\/1\.3 ' \+ FONT \+ ';color:#9ca3af;margin:0 0 6px;\}/);
+});

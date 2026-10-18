@@ -71,8 +71,8 @@ const ST = { expression: "JSON.stringify({ hole: HardPanGps.hole(), side: HardPa
     + " sug: (function(){ var e = document.querySelector('#gps-overlay .gps-suggest'); return e ? (e.style.display === 'none' ? '' : e.textContent) : null; })(),"
     + " ask: (function(){ var e = document.querySelector('#gps-overlay .gps-bagask'); return e ? (e.style.display === 'none' ? '' : e.querySelector('.gps-bagask-head').textContent + ' | ' + [].map.call(e.querySelectorAll('[data-bag-club]'), function (b) { return b.textContent; }).join(' ')) : null; })(),"
     + " myBag: !!document.querySelector('#gps-overlay .gps-my-bag'),"
-    + " bag: (function(){ var e = document.querySelector('#gps-overlay .gps-bag'); if (!e) return null; if (e.style.display === 'none') return ''; return { title: e.querySelector('.gps-bag-title').textContent, rows: [].filter.call(e.querySelectorAll('.gps-bag-row'), function (r) { return r.querySelector('input').value; }).map(function (r) { return [r.getAttribute('data-bag-row'), r.querySelector('input').value, r.querySelector('.gps-bag-meta').textContent]; }) }; })(),"
-    + " setup: (function(){ var e = document.querySelector('#gps-overlay .gps-bag'); if (!e || e.style.display === 'none' || e.getAttribute('data-bag-view') !== 'setup') return null; return { sub: e.querySelector('.gps-bag-sub').textContent, rows: [].map.call(e.querySelectorAll('[data-bag-setup]'), function (i) { return [i.getAttribute('data-bag-setup'), i.value]; }) }; })(),"
+    + " bag: (function(){ var e = document.querySelector('#gps-overlay .gps-bag'); if (!e) return null; if (e.style.display === 'none') return ''; return { title: e.querySelector('.gps-bag-title').textContent, savedLine: (function(){ var x = e.querySelector('.gps-bag-saved'); return x && x.getBoundingClientRect().height > 0 ? x.textContent : null; })(), rows: [].filter.call(e.querySelectorAll('.gps-bag-row'), function (r) { return r.querySelector('input').value; }).map(function (r) { return [r.getAttribute('data-bag-row'), r.querySelector('input').value, r.querySelector('.gps-bag-meta').textContent]; }) }; })(),"
+    + " setup: (function(){ var e = document.querySelector('#gps-overlay .gps-bag'); if (!e || e.style.display === 'none' || e.getAttribute('data-bag-view') !== 'setup') return null; return { sub: e.querySelector('.gps-bag-sub').textContent, savedLine: (function(){ var x = e.querySelector('.gps-bag-saved'); return x && x.getBoundingClientRect().height > 0 ? x.textContent : null; })(), rows: [].map.call(e.querySelectorAll('[data-bag-setup]'), function (i) { return [i.getAttribute('data-bag-setup'), i.value]; }) }; })(),"
     + " hasSetup: !!document.querySelector('#gps-overlay .gps-bag-setup'),"
     + " clubWrites: (window.__coldWrites || []).filter(function (w) { return /player_clubs/.test(w.path); }),"
     + " store: localStorage.getItem('hardpan_bag_v1'), e: window.__e })" };
@@ -103,6 +103,7 @@ const START = [W(2500), OPEN, W(3000)];
     f(!/\d+\.\d{4,}/.test(after.store || picked.store || ''), '1: a coordinate went into the bag record');
     f(at153.sug === 'Suggested: 7-iron (your ' + SHOT1 + ')', '2: 153 out (center ' + at153.m + '): ' + at153.sug);
     f(at137.sug === 'Suggested: 8-iron (your ' + SHOT2 + ')', '2: 137 out (center ' + at137.m + '): ' + at137.sug);
+    f(bag1.bag && bag1.bag.savedLine === 'Saved on this phone', '3: My bag does not say "Saved on this phone": ' + JSON.stringify(bag1.bag && bag1.bag.savedLine));
     f(bag1.bag && bag1.bag.title === 'My bag · Manny' && JSON.stringify(bag1.bag.rows) === JSON.stringify([['7i', String(SHOT1), 'learned · 1 shot'], ['8i', String(SHOT2), 'learned · 1 shot']]), '3: My bag: ' + JSON.stringify(bag1.bag));
     f(typed158.sug === 'Suggested: 7-iron (your 158)', '3: the typed 158 is not what the suggestion uses: ' + typed158.sug);
     f(bag2.bag && JSON.stringify(bag2.bag.rows[0]) === JSON.stringify(['7i', '158', 'entered']), '3: My bag after the edit: ' + JSON.stringify(bag2.bag));
@@ -135,6 +136,7 @@ const START = [W(2500), OPEN, W(3000)];
     report.setup = { sub: su.setup && su.setup.sub, first: su.setup && su.setup.rows.slice(0, 8), saved: saved.bag && saved.bag.rows.slice(0, 8), sug: sugAfter.sug };
     const want9 = { Dr: 238, '3w': 214, '7i': 152, PW: 122 };   // the table, 9 of the way from scratch to 10
     f(su.setup && /^Enter your carry for each club\. Starting numbers for a 9 handicap/.test(su.setup.sub), '6: My bag did not open on the setup for a 9 handicap: ' + JSON.stringify(su.setup || su.bag));
+    f(su.setup && su.setup.savedLine === 'Saved on this phone', '6: the setup does not say "Saved on this phone": ' + JSON.stringify(su.setup && su.setup.savedLine));
     f(su.setup && Object.keys(want9).every((c) => su.setup.rows.some(([k, v]) => k === c && v === String(want9[c]))), '6: the starting carries for a 9: ' + JSON.stringify(su.setup && su.setup.rows));
     f(saved.bag && saved.bag.rows.length === 13 && saved.bag.rows.every((r) => r[2] === 'entered') && saved.bag.rows.some((r) => r[0] === '7i' && r[1] === '158') && !saved.bag.rows.some((r) => r[0] === 'LW'), '6: after Save: ' + JSON.stringify(saved.bag));
     f(sugAfter.sug === 'Suggested: 7-iron (your 158)', '6: the suggestion from the setup carries (153 out): ' + sugAfter.sug);

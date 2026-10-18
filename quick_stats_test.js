@@ -219,3 +219,21 @@ test('phase 1 rules: a non-owner golfer cannot write events/<code>/stats (so sta
     assert.strictEqual(as2({ uid: 'golfer', provider: 'anonymous' }).write('/events/ABC123/stats/p101_h1', { putts: 9 }).allowed, false);
     assert.strictEqual(as2(null).write('/events/ABC123/stats/p101_h1', v).allowed, false);
 });
+
+test('010: My stats says "Saved on this phone" - one small grey line at the top, before Last 5 / Last 20', { skip }, () => {
+    const { createDocument } = require('./helpers/mini-dom.js');
+    const store = {};
+    const localStorage = { get length() { return Object.keys(store).length; }, key: (i) => Object.keys(store)[i], getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+    const sb = { localStorage, JSON, Object, Math, Number, String, Date, isFinite, document: createDocument() };
+    sb.window = sb;
+    vm.createContext(sb);
+    vm.runInContext(read('gps-stats.js'), sb);
+    sb.HardPanGpsStats.openMy();
+    const page = sb.document.getElementById('hp-my-stats');
+    const body = page.querySelector('.ms-body');
+    const line = body.querySelectorAll('.ms-saved');
+    assert.equal(line.length, 1, 'exactly one');
+    assert.equal(line[0].textContent, 'Saved on this phone');
+    assert.equal(body.children[0], line[0], 'the first line of the page body');
+    assert.match(read('gps-stats.js'), /#hp-my-stats \.ms-saved\{font-size:12px;color:#6b7280;margin:4px 2px 0;\}/, 'small and grey, like the notes');
+});

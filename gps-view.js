@@ -3416,6 +3416,7 @@
         if (!sh || !B) return;
         var who = bagGolfer(), hcp = bagHcp(), m = units() === 'm', def = B.defaultCarries(hcp);
         sh.setAttribute('data-bag-view', 'setup');
+        bagSavedLine(sh, B);
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
         sh.querySelector('.gps-bag-sub').textContent = 'Enter your carry for each club. ' + (hcp == null ? 'Starting numbers for a mid handicap' : 'Starting numbers for a ' + (hcp < 0 ? '+' + Math.abs(Math.round(hcp)) : Math.round(hcp)) + ' handicap')
             + ' \u2014 change any, clear the clubs you do not carry. Mark shot keeps them up to date.';
@@ -3445,12 +3446,14 @@
         bagSaved();
         fillBag(); render();
     }
+    function bagSavedLine(sh, B) { var e = sh.querySelector('.gps-bag-saved'); if (e) e.textContent = bagSyncCan(B) ? 'Saved on this phone and your account' : 'Saved on this phone'; }
     function closeBag() { var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
     function fillBag() {
         var sh = bagSheet(), B = bagApi();
         if (!sh || !B) return;
         var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
         sh.setAttribute('data-bag-view', 'list');
+        bagSavedLine(sh, B);
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
         sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is the middle of your last 10 marked shots per club (odd ones left out); "entered" is a number you typed'
             + (setupSwitch() ? ' or set up (marked shots take over once a club has ' + B.LEARN_MIN + ')' : '') + '. On this phone only.';
@@ -3796,6 +3799,8 @@
         // MY BAG (008): see / edit / reset the club numbers.
         + '<div class="gps-bag gps-float gps-scroll-ok" data-feature="clubs" style="display:none" role="dialog" aria-label="My bag">'
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
+        // 010: where the numbers live, in one line (the account too only when clubsSync is live).
+        +   '<div class="gps-bag-saved">Saved on this phone</div>'
         +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
         // FIRST-TIME SETUP (009): "Enter your carry for each club" - in place of the list.
         +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
@@ -4081,6 +4086,7 @@
         + '#gps-overlay .gps-bag{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
         + '#gps-overlay .gps-bag-head{display:flex;align-items:center;justify-content:space-between;}#gps-overlay .gps-bag-title{font:800 17px/1.15 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-sub{font:600 12px/1.3 ' + FONT + ';color:#c8d1ca;margin:4px 0 6px;}'
+        + '#gps-overlay .gps-bag-saved{font:600 11.5px/1.3 ' + FONT + ';color:#9ca3af;margin:0 0 6px;}'
         + '#gps-overlay .gps-bag-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
         + '#gps-overlay .gps-bag-name{flex:1 1 auto;font:700 15px/1.2 ' + FONT + ';}#gps-overlay .gps-bag-meta{flex:0 0 76px;font:600 11px/1.2 ' + FONT + ';color:#a7b3aa;}'
         + '#gps-overlay .gps-bag-yd{width:64px;min-height:40px;box-sizing:border-box;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 16px/1 ' + FONT + ';text-align:center;}'
