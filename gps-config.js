@@ -61,7 +61,7 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // THE 008 GPS FEATURES (Manny, 2026-10-18): each behind its own switch, so a broken one is
     // turned off here without touching code. Read through HardPanFeature('<name>') (below).
     // watch (feature 10, docs/WATCH-APP-PLAN.md): OFF - no watch app or plugin ships yet.
-    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true, watch: false },
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false },
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays

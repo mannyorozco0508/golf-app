@@ -1544,15 +1544,21 @@
     // is the CARD's (S.par). It follows as they walk; once touched it stays put
     // until the hole changes or Recenter. Dragging it does not pan the map (a
     // marker drag belongs to the marker); a drag anywhere else pans.
+    function pathTargetOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('pathTarget') !== false; } catch (e) { return true; } }
     function placeTarget(r) {
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
         if (!o || !center) return;
         var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var p = G.defaultTarget({
+        var opts = {
             par: S.par, tee: r.tee, mid: center, line: rec && rec.line, fairway: rec && rec.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
-        });
+        };
+        // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
+        // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
+        var p = pathTargetOn() && r.tee && G.pathTarget
+            ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) }))
+            : G.defaultTarget(opts);
         if (p) S.target = p;
     }
     function drawTargetLines() {

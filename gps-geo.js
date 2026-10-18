@@ -943,6 +943,32 @@
     }
 
 
+    // ---- THE DEFAULT TARGET ON THE PATH (009, switch pathTarget) ---------------------
+    // With a bent path (gps-geo.holePath, never the dragged target) the default target
+    // sits AT THE DOGLEG when its corner is in the landing zone (60 yds short of the
+    // default shot to 20 past it - from the tee, or from the golfer standing back on
+    // the hole - and 60 or more from the green), else the default shot along the path. A par 3, a straight path or none: exactly defaultTarget.
+    // o: defaultTarget's, plus path.
+    function pathTarget(o) {
+        var path = o && o.path;
+        if (!o || !o.mid || Number(o.par) === 3 || !path || !path.pts || path.pts.length < 3 || path.src === 'target') return defaultTarget(o);
+        var pts = path.pts, shotM = (o.shotYd || DEFAULT_SHOT_YD) * M_PER_YD;
+        var line = path.src === 'centerline' && o.line && o.line.length >= 3 ? o.line : pts;
+        var me = o.from === 'me' && pinPt(o.pt);
+        if (!me || haversineMeters(me, o.mid) > GREEN_REACH_YD * M_PER_YD) {
+            // Measured from where the walk starts: the tee, or the golfer's spot on the path.
+            var total = polyLen(pts), from = me ? alongLine(me, pts).t * total : 0, best = null, run = 0;
+            for (var i = 1; i + 1 < pts.length; i++) {
+                run += haversineMeters(pts[i - 1], pts[i]);
+                var turn = turnAt(pts[i - 1], pts[i], pts[i + 1]), ahead = run - from;
+                if (turn >= PATH_MIN_TURN_DEG && ahead >= shotM - 60 * M_PER_YD && ahead <= shotM + 20 * M_PER_YD
+                    && haversineMeters(pts[i], o.mid) >= MIN_LEFT_YD * M_PER_YD && (!best || turn > best.turn)) best = { pt: pts[i], turn: turn };
+            }
+            if (best) return snapToFairway(best.pt, o.fairway);
+        }
+        return defaultTarget(Object.assign({}, o, { line: line }));
+    }
+
     // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
     // the hole; the TEE when they are more than offYards from the green, or have
     // no fix at all (planning a hole from the clubhouse, or a GPS that has not
@@ -1647,7 +1673,7 @@
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
-        flyoverFrame: flyoverFrame, holePath: holePath, flyoverPlan: flyoverPlan, flyoverCamera: flyoverCamera, fitCamera: fitCamera, pathBearing: pathBearing,
+        flyoverFrame: flyoverFrame, holePath: holePath, flyoverPlan: flyoverPlan, flyoverCamera: flyoverCamera, pathTarget: pathTarget, fitCamera: fitCamera, pathBearing: pathBearing,
         FLYOVER_MS: FLYOVER_MS, PATH_MIN_TURN_DEG: PATH_MIN_TURN_DEG,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,

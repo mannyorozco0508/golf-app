@@ -18,6 +18,10 @@
 //   4  prefers-reduced-motion: no flight (no camera frames) - the whole hole framed at
 //      once with the words, then the normal view.
 //   5  The 008 switch off: no Preview button in the page.
+//   6  THE DEFAULT TARGET ON THE PATH (009, switch pathTarget): on the dogleg the white
+//      target starts on the corner (switch off: 260 along the line, past it); drawn
+//      straight with a fairway mapped, it sits on the fairway's bend, off the straight
+//      line; straight with nothing else, it is where it always was (switch on = off).
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -28,6 +32,7 @@ const { arriveCold, fileUrl } = require(path.join(HERE, 'tools/lib/cold-arrival.
 const { wizardSavedRound } = require(path.join(HERE, 'helpers/wizard-saved-round.js'));
 const { iapStub } = require(path.join(HERE, 'tools/lib/iap-stub.js'));
 const table = require(path.join(HERE, 'gps-courses.js'));
+const geo = require(path.join(HERE, 'gps-geo.js'));
 
 const CODE = 'FLYOVR';
 const R = 6371008.8, rad = (d) => d * Math.PI / 180;
@@ -157,6 +162,22 @@ const bear = (a, b) => { const y = Math.sin(rad(b[1] - a[1])) * Math.cos(rad(b[0
     report.off = s.map((x) => [x.ready, x.btn, x.cap]);
     f(s[0].ready && s[0].btn === null && s[0].cap === null, '5: switch off, but Preview is in the page: ' + JSON.stringify(report.off));
     errs(s, 'off');
+
+    // 6: the default target on the path.
+    const tgtRun = async (o) => { const r = await go(Object.assign({ steps: START.concat([W(800), TARGET]) }, o)); errs(r, 'target6'); return r[0].target; };
+    const offLine = (p, line) => geo.alongLine(p, line).d;
+    const straightLine = [H.tee, H.line[H.line.length - 1]], drawn = [H.tee].concat(H.line.slice(1));
+    const on = await tgtRun({}), off = await tgtRun({ features: { pathTarget: false } });
+    const sOn = await tgtRun({ pre: STRAIGHT(false) }), sOff = await tgtRun({ pre: STRAIGHT(false), features: { pathTarget: false } });
+    const fwOn = await tgtRun({ pre: STRAIGHT(true) });
+    const fwPath = geo.holePath({ tee: H.tee, mid: H.mid || H.end, line: straightLine, fairway: H.fairway });
+    report.defaultTarget = { bend: BEND, on, off, straightOn: sOn, straightOff: sOff, fairwayOn: fwOn, fairwayPath: fwPath && fwPath.src,
+        onToBendM: on && Math.round(hav(on, BEND)), offToBendM: off && Math.round(hav(off, BEND)), straightMovedM: sOn && sOff && +hav(sOn, sOff).toFixed(2),
+        fairwayOffStraightM: fwOn && Math.round(offLine(fwOn, straightLine)), fairwayOffPathM: fwOn && fwPath && Math.round(offLine(fwOn, fwPath.pts)) };
+    f(on && hav(on, BEND) < 10 && offLine(on, drawn) < 10, '6: on the dogleg the default target is not on the corner: ' + JSON.stringify(report.defaultTarget));
+    f(off && hav(off, BEND) > 25 && offLine(off, drawn) < 5, '6: switch off: not the old 260-along-the-line target: ' + JSON.stringify(report.defaultTarget));
+    f(sOn && sOff && hav(sOn, sOff) < 1 && offLine(sOn, straightLine) < 3, '6: a straight hole with no path: the target moved: ' + JSON.stringify(report.defaultTarget));
+    f(fwPath && fwPath.src === 'fairway' && fwOn && offLine(fwOn, fwPath.pts) < 15 && offLine(fwOn, straightLine) > 15, '6: drawn straight with a fairway: not on the fairway path: ' + JSON.stringify(report.defaultTarget));
 
     console.log(JSON.stringify({ report, fails }, null, 1));
     process.exit(fails.length ? 1 : 0);
