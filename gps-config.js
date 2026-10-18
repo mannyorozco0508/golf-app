@@ -66,8 +66,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // playsInfo = the (i) "How plays-like works" sheet on that line;
     // courseElev = the whole course's heights sampled once (tee, every 25 yds, green, hazards;
     // USGS, US only) - off: the 5 points per hole (tee, 25 / 50 / 75 %, green) as before.
+    // scoreSheet (012): Enter score on the GPS screen opens the score sheet (score grid, putts, tee shot,
+    // green in reg, bunker, penalties, notes - the stats on this phone) - off: the card's score box, as before.
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true },
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, scoreSheet: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
