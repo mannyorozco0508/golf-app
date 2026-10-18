@@ -61,7 +61,9 @@ const FETCH = "(function(){ var real = window.fetch; var T1 = " + JSON.stringify
     + "   return Promise.resolve(new Response('{}', { status: 404 })); }"
     + "  return real.apply(this, arguments); }; })();";
 const SEED = "(function(){ try { if (sessionStorage.getItem('__s')) return; sessionStorage.setItem('__s','1'); localStorage.setItem('hardpan_round_side','gps|" + CODE + "'); localStorage.setItem('hardpan_last_hole_" + CODE + "','1');"
-    + " localStorage.setItem('hardpan_gps_whoasked_" + CODE + "','1'); localStorage.setItem('hardpan_gps_golfer_" + CODE + "','101'); localStorage.setItem('hardpan_gps_autoadvance','0'); } catch(e){} })();";
+    + " localStorage.setItem('hardpan_gps_whoasked_" + CODE + "','1'); localStorage.setItem('hardpan_gps_golfer_" + CODE + "','101'); localStorage.setItem('hardpan_gps_autoadvance','0');"
+    // 012: layout D is the default now - this check plays C (Tools > Screen layout: Bottom panel).
+    + " localStorage.setItem('hardpan_gps_layout','c'); } catch(e){} })();";
 const DELTAS = [1, 0, 1];   // Manny's holes 1-3 against par
 function round() {
     const r = wizardSavedRound({ code: CODE, golfers: 2, names: ['Manny Orozco', 'Joe Russo'], hcps: [9, 12], ownerUid: 'anon-cold', thru: 0, flights: false,
