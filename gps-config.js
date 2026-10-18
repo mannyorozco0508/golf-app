@@ -81,7 +81,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // adjust" (default Don't adjust) + typical temperature; plays-like adjusts ~2% per 1,000 ft
     // of altitude vs that baseline (on this phone only) - off: no section, no altitude.
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false },
+        // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
+        // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
+        // the old layout exactly. gpsRoundScore = the "Thru 3 · 14 (+2) · Net 13 (+1)" chip.
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
