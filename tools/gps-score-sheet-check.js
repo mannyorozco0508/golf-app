@@ -92,6 +92,9 @@ const ST = { expression: `JSON.stringify((function () {
     queue: Object.keys(localStorage).filter(function (k) { return /offline|queue/i.test(k); }).map(function (k) { return k + '=' + (localStorage.getItem(k) || '').length; }),
     ls: ls, writes: (window.__coldWrites || []).map(function (x) { return x.op + ' ' + x.path + '=' + JSON.stringify(x.value); }), e: window.__e };
 })())` };
+// THE PREVIOUS-HOLE BUTTON THE LAYOUT SHOWS (the old top panel's ‹, layout D's ‹ beside Enter score):
+// the visible one is marked, then tapped for real.
+const PREV = { expression: "(function(){ var b = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay [aria-label=\\'Previous hole\\']'), function (x) { var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden'; })[0]; if (!b) return 'none'; b.setAttribute('data-ss-prev', '1'); return b.className; })()" };
 const SCROLL_BOTTOM = { expression: "(function(){ var b = document.querySelector('#hp-score-sheet .hp-ss-body'); if (!b) return 'none'; b.scrollTop = b.scrollHeight; return 'scrolled'; })()" };
 const shot = (name) => SHOTS ? [{ shot: path.join(SHOTS, name), viewportOnly: true }] : [];
 const MY = { expression: `JSON.stringify((function () {
@@ -124,7 +127,7 @@ const MY = { expression: `JSON.stringify((function () {
         TAP('#hp-score-sheet [data-ss-k="gd"][data-ss-v="short"]'), WAIT(250), ST,
         TAP('#hp-score-sheet [data-ss-save]'), WAIT(1200), ST,
         { deliver: { path: 'events/' + CODE, value: echoed } }, WAIT(900), ST,
-        TAP('#gps-overlay .gps-prev'), WAIT(1200), TAP('#gps-overlay .gps-score'), WAIT(600), ST,
+        PREV, TAP('#gps-overlay [data-ss-prev]'), WAIT(1200), TAP('#gps-overlay .gps-score'), WAIT(600), ST,
         // A tap on the dimmed map above the sheet closes it; then the card.
         { expression: "(function(){ var w = document.getElementById('hp-score-sheet'); if (w) w.click(); return 'closed'; })()" }, WAIT(300),
         { expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-side-bets'); if (b) { b.click(); return 'card'; } return 'no toggle'; })()" }, WAIT(900), ST,
@@ -152,6 +155,7 @@ const MY = { expression: `JSON.stringify((function () {
     f(ok(a5) && a5.writes.some((w) => /auditLog/.test(w)), 'A: no audit entry (not the card\'s save?): ' + JSON.stringify(a5 && a5.writes));
     f(ok(a5) && !a5.open && a5.hole === 6 && a5.cardHole === 6 && a5.side === 'gps', 'A: after Save: next hole on GPS: ' + JSON.stringify(a5 && { open: a5.open, hole: a5.hole, card: a5.cardHole, side: a5.side }));
     f(ok(a6) && JSON.stringify(a6.box5) === '["4","5"]', 'A: the scorecard does not show the saved scores: ' + JSON.stringify(a6 && a6.box5));
+    f(ok(a7) && a7.hole === 5, 'A: the previous-hole button did not go back to 5: ' + (a7 && a7.hole));
     f(ok(a7) && a7.open && a7.title === 'Hole 5 · Par 4' && a7.chips.indexOf('Manny · 4*') !== -1 && a7.chips.indexOf('Joe · 5') !== -1, 'A: back on 5 the chips: ' + JSON.stringify(a7 && a7.chips));
     f(ok(a8) && !a8.open && a8.side === 'bets', 'A: a tap above the sheet did not close it: ' + JSON.stringify(a8 && [a8.open, a8.side]));
     f(ok(m1) && m1.open && m1.miss['gir-short'] === '1' && m1.miss['tee-L'] === '0', 'A: My stats miss counts: ' + JSON.stringify(m1));
