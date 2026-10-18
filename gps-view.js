@@ -1546,15 +1546,21 @@
     // is the CARD's (S.par). It follows as they walk; once touched it stays put
     // until the hole changes or Recenter. Dragging it does not pan the map (a
     // marker drag belongs to the marker); a drag anywhere else pans.
+    function pathTargetOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('pathTarget') !== false; } catch (e) { return true; } }
     function placeTarget(r) {
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
         if (!o || !center) return;
         var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var p = G.defaultTarget({
+        var opts = {
             par: S.par, tee: r.tee, mid: center, line: rec && rec.line, fairway: rec && rec.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
-        });
+        };
+        // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
+        // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
+        var p = pathTargetOn() && r.tee && G.pathTarget
+            ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) }))
+            : G.defaultTarget(opts);
         if (p) S.target = p;
     }
     function drawTargetLines() {
@@ -1822,32 +1828,57 @@
     // target, its ring label, the green, a pin, the dot or a control: it slides
     // along its line (and off to either side of it) to the first clear spot, and
     // hides when there is none. The same numbers stay under FRONT / CENTER / BACK.
-    // ---- HOLE FLYOVER / PREVIEW (008, switch flyover) ---------------------------------
-    // "Preview": the camera flies the hole from the tee to the green along the hole's own
-    // line (gps-geo.flyoverFrame) in about 4 s, tilted, with "Hole 5 · Par 4 · 385 yds"
-    // over it, then comes back to the normal hole view. Drawn by MapLibre - no video. Any
-    // touch stops it (back to the hole view). prefers-reduced-motion: no flight - the
-    // whole hole framed at once, the same words, then the normal view.
-    var FLY_MS = 4000, FLY_STILL_MS = 2500, FLY_PITCH = 50;
+    // ---- HOLE FLYOVER / PREVIEW (008, switch flyover; 009: the hole's path) ----------
+    // "Preview": the camera flies the HOLE'S PATH (gps-geo.holePath: its own drawn line
+    // with a dogleg, else the golfer's dragged target as the bend, else the fairway's
+    // middle, else the bunkers either side, else straight) in about 5 s
+    // (gps-geo.flyoverPlan / flyoverCamera): the whole hole first, then down the path
+    // tilted - wide enough for the fairway and its hazards, turning at the dogleg - and
+    // flat on the green with its F / C / B pins, with "Hole 5 · Par 4 · 385 yds" over
+    // it, then back to the normal hole view. Drawn by MapLibre - no video. Any touch
+    // stops it (back to the hole view). prefers-reduced-motion: no flight - the whole
+    // hole framed at once, the same words, then the normal view.
+    var FLY_STILL_MS = 2500, FLY_PITCH = 50;
     function flySwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('flyover') !== false; } catch (e) { return true; } }
     function reducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
-    function flyLine(r) {
-        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var line = rec && rec.line && rec.line.length >= 2 ? rec.line.slice() : [r.tee, r.mid];
-        line[0] = r.tee; line[line.length - 1] = r.mid;   // a set green is where the flight ends
-        return line;
+    function holeOsm() {
+        var osm = osmRecord(S.courseKey);
+        return (osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm) || null;
+    }
+    // The path for hole r; dragged: the golfer's moved target bends it.
+    function flyPath(r, dragged) {
+        var rec = holeOsm() || {};
+        return G.holePath({ tee: r.tee, mid: r.mid, line: rec.line, fairway: rec.fairway, hazards: rec.hazards, target: dragged || null });
+    }
+    function flyPlan(r) {
+        var path = flyPath(r, S.targetMoved ? S.target : null);
+        if (!path) return null;
+        var rec = holeOsm() || {}, o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
+        var extra = (rec.hazards || []).map(function (z) { return z.pt; });
+        (rec.fairway || []).forEach(function (ring) { extra = extra.concat(ring); });
+        var el = S.el.querySelector('.gps-map');
+        var plan = G.flyoverPlan({ path: path.pts, green: r.green || [], pins: [nums.front, r.mid, nums.back].filter(Boolean), extra: extra,
+            view: { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 600 }, pad: S.pad || viewPad(), maxZoom: maxZoomNow() });
+        if (plan) plan.src = path.src;
+        return plan;
     }
     function flyCaption(r) {
         var m = (typeof S.holeMeta === 'function' ? S.holeMeta(S.hole) : null) || {}, u = units();
         var par = m.par != null ? m.par : S.par;
         var len = m.yards ? (u === 'm' ? Math.round(m.yards * G.M_PER_YD) : m.yards) : G.shownDistance(G.haversineMeters(r.tee, r.mid), u);
-        return 'Hole ' + S.hole + (par != null ? ' \u00b7 Par ' + par : '') + ' \u00b7 ' + len + (u === 'm' ? ' m' : ' yds');
+        return 'Hole ' + S.hole + (par != null ? ' · Par ' + par : '') + ' · ' + len + (u === 'm' ? ' m' : ' yds');
     }
     function flyMark(state) { var el = S && S.el.querySelector('.gps-map'); if (el) el.setAttribute('data-fly', state); }
+    // On screen? (the checks read it: the start shows the tee and the green, the end the pins).
+    function onScreen(map, el, pts) {
+        try {
+            return pts.every(function (p) { var q = map.project(ll(p)); return q.x >= 0 && q.y >= 0 && q.x <= el.clientWidth && q.y <= el.clientHeight; }) ? '1' : '0';
+        } catch (e) { return ''; }
+    }
     function startFlyover() {
-        if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverFrame) return;
+        if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverPlan) return;
         var r = resolved();
-        if (!r || !r.tee || !r.mid) { flash('Preview needs this hole\u2019s tee and green'); return; }
+        if (!r || !r.tee || !r.mid) { flash('Preview needs this hole’s tee and green'); return; }
         closeMenus();
         var cap = S.el.querySelector('.gps-fly-cap');
         if (cap) { cap.textContent = flyCaption(r); cap.style.display = ''; }
@@ -1861,22 +1892,30 @@
             render();
             return;
         }
-        var cam = holeView();
-        if (!cam) return;
-        var line = flyLine(r), maxZ = maxZoomNow();
-        var z0 = Math.min(maxZ, cam.zoom + 1.4), z1 = Math.min(maxZ, cam.zoom + 2.1);
+        var plan = flyPlan(r);
+        if (!plan) return;
+        var pad = S.pad || viewPad(), o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
+        var pins = [nums.front, r.mid, nums.back].filter(Boolean);
         try { map.setMaxPitch(FLY_PITCH); } catch (e) {}
-        S.flying = { t0: Date.now(), frames: 0 };
+        S.flying = { t0: Date.now(), frames: 0, trail: [] };
         flyMark('flying');
+        if (el) { el.setAttribute('data-fly-src', plan.src); el.setAttribute('data-fly-path', plan.pts.map(function (p) { return p[0].toFixed(6) + ',' + p[1].toFixed(6); }).join(';')); el.removeAttribute('data-fly-start-fit'); el.removeAttribute('data-fly-end-fit'); }
         var step = function () {
             if (S !== mine || !S.flying || S.flying.still) return;
-            var t = Math.min(1, (Date.now() - S.flying.t0) / FLY_MS);
-            var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in and out
-            var fr = G.flyoverFrame(line, e);
-            if (fr) {
-                try { map.jumpTo({ center: ll(fr.pt), bearing: fr.bearing, zoom: z0 + (z1 - z0) * e, pitch: FLY_PITCH * Math.min(1, t / 0.15), padding: { top: 0, bottom: 0, left: 0, right: 0 } }); } catch (x) {}
-                S.flying.frames++;
-                if (el) { el.setAttribute('data-fly-at', fr.pt[0].toFixed(6) + ',' + fr.pt[1].toFixed(6)); el.setAttribute('data-fly-frames', String(S.flying.frames)); el.setAttribute('data-fly-pitch', String(Math.round(map.getPitch()))); }
+            var t = Math.min(1, (Date.now() - S.flying.t0) / plan.ms);
+            var c = G.flyoverCamera(plan, t);
+            if (c) {
+                try { map.jumpTo({ center: ll(c.center), bearing: c.bearing, zoom: c.zoom, pitch: c.pitch, padding: pad }); } catch (x) {}
+                var f = S.flying;
+                f.frames++;
+                if (f.frames % 3 === 1) f.trail.push(c.center[0].toFixed(6) + ',' + c.center[1].toFixed(6));
+                if (el) {
+                    el.setAttribute('data-fly-at', c.center[0].toFixed(6) + ',' + c.center[1].toFixed(6)); el.setAttribute('data-fly-frames', String(f.frames));
+                    el.setAttribute('data-fly-pitch', String(Math.round(map.getPitch()))); el.setAttribute('data-fly-zoom', c.zoom.toFixed(2)); el.setAttribute('data-fly-bearing', String(Math.round(c.bearing)));
+                    el.setAttribute('data-fly-trail', f.trail.join(';'));
+                    if (f.frames === 1) { el.setAttribute('data-fly-start-fit', onScreen(map, el, [r.tee, r.mid])); el.setAttribute('data-fly-z0', c.zoom.toFixed(2)); }
+                    if (t >= 0.95 && !f.endFit) { f.endFit = 1; el.setAttribute('data-fly-end-fit', onScreen(map, el, pins)); el.setAttribute('data-fly-z1', c.zoom.toFixed(2)); }
+                }
             }
             if (t >= 1) { endFlyover('done'); return; }
             S.flying.raf = requestAnimationFrame(step);

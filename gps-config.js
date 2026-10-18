@@ -66,8 +66,9 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // playsInfo = the (i) "How plays-like works" sheet on that line;
     // courseElev = the whole course's heights sampled once (tee, every 25 yds, green, hazards;
     // USGS, US only) - off: the 5 points per hole (tee, 25 / 50 / 75 %, green) as before.
-    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true, watch: false, bagSetup: true,
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
         playsBreakdown: true, playsInfo: true, courseElev: true },
+    // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // MY BAG ACCOUNT SYNC (009): the signed-in golfer's own bag to player_clubs/<uid>/me. OFF:
     // that rule is phase 2 and not live (writes would be refused) - the bag stays on the phone.
     clubsSync: false,
