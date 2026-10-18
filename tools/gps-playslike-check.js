@@ -23,6 +23,9 @@
 //   7  TOURNAMENT MODE (this phone's switch), with a full bag, wind and heights all there:
 //      no plays-like (no line, no "plays ~"), no club suggestion, no "Which club?" after
 //      Mark shot, and NOT ONE elevation request (nor a wind one).
+//   8  "How plays-like works": the (i) on the line opens it - uphill/downhill ~1 yd per 3 ft,
+//      into wind ~1% per mph, downwind ~0.5%, crosswind = aim off, temperature, US only,
+//      estimates; Done closes it. playsInfo off: no (i), no sheet (the line stays).
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -209,6 +212,22 @@ const START = [W(2500), OPEN, W(3000)];
     f(r6.length > 0 && r6.every((p) => five.some((q) => hav(p, q) < 1.5)), '6: courseElev off asked for other points: ' + JSON.stringify(r6.filter((p) => !five.some((q) => hav(p, q) < 1.5)).slice(0, 3)));
     f(r6.length <= 90 && s[0].celev === null, '6: courseElev off: ' + JSON.stringify(report.offElev));
     errs(s, 'offElev');
+
+    // 8: the info sheet, and its switch.
+    const INFO = { expression: "JSON.stringify({ i: !!document.querySelector('#gps-overlay .gps-pl-info'), sheet: (function(){ var e = document.querySelector('#gps-overlay .gps-plinfo'); return e ? (e.style.display === 'none' ? '' : e.innerText) : null; })(), line: " + vis('.gps-pl-text') + " })" };
+    const TAP = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay " + sel + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
+    s = await go({ wind: INTO, steps: START.concat([LINE_UP, W(500), INFO, TAP('.gps-pl-info'), W(400), INFO, TAP('.gps-plinfo-done'), W(300), INFO]) });
+    const [i0, i1, i2] = s;
+    report.info = { before: i0.sheet, open: i1.sheet, after: i2.sheet };
+    f(i0.i === true && i0.sheet === '', '8: the (i) is not on the line, or the sheet shows unasked: ' + JSON.stringify(i0));
+    const words = ['How plays-like works', 'estimate', '1 yard for every 3 feet', '1% longer for every mph of headwind', '0.5% shorter for every mph of tailwind', 'Crosswind: no change in distance - aim off', '1 yard for every 10\u00b0F per 100 yards', 'only on US courses', 'Tournament mode turns all of it off'];
+    words.forEach((w) => f(i1.sheet && i1.sheet.indexOf(w) !== -1, '8: the sheet does not say "' + w + '": ' + JSON.stringify(i1.sheet)));
+    f(i2.sheet === '', '8: Done did not close it');
+    errs(s, 'info');
+    s = await go({ wind: INTO, features: { playsInfo: false }, steps: START.concat([LINE_UP, W(500), INFO]) });
+    report.infoOff = s[0];
+    f(s[0].i === false && s[0].sheet === null && /uphill/.test(s[0].line || ''), '8: playsInfo off: ' + JSON.stringify(s[0]));
+    errs(s, 'infoOff');
 
     // 7: tournament mode.
     const MARK = [{ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-mark-shot'); if (!b) return 'none'; b.click(); return 'ok'; })()" }, W(400)];

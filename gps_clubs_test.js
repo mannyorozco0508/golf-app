@@ -259,3 +259,18 @@ test('009 TOURNAMENT MODE (Rules of Golf 4.3): no plays-like, no club suggestion
     // tools/gps-playslike-check.js arm 7 plays it: tournament on - no line, no suggestion, no EPQS request.
     assert.ok(/7: tournament/.test(read('tools/gps-playslike-check.js')));
 });
+
+test('009: "How plays-like works" - the (i) on the plays-like line, plain words, the very numbers the formula uses; behind playsInfo', { skip }, () => {
+    const v = read('gps-view.js'), g = read('gps-geo.js');
+    const a = v.indexOf('<div class="gps-plinfo'), sheet = v.slice(a, v.indexOf("+ '</div>'", a));
+    assert.ok(a > 0 && /data-feature="playsInfo"/.test(sheet));
+    assert.ok(/class="gps-pl-info" data-feature="playsInfo" aria-label="How plays-like works"/.test(v), 'the (i) on the line');
+    assert.ok(/if \(!plInfoSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="playsInfo"\]'\)/.test(v), 'switch off: removed');
+    // The words match the formula (gps-geo playsLike / windAim).
+    assert.ok(/1 yard for every 3 feet/.test(sheet) && /terms\.elev = \(o\.elevToFt - o\.elevFromFt\) \/ 3/.test(g));
+    assert.ok(/1% longer for every mph of headwind/.test(sheet) && /D \* 0\.01 \* head/.test(g));
+    assert.ok(/0\.5% shorter for every mph of tailwind/.test(sheet) && /D \* 0\.005 \* head/.test(g));
+    assert.ok(/Crosswind:<\/b> no change in distance - aim off/.test(sheet) && /about 0\.5% of the distance for every mph across/.test(sheet) && /var AIM_PER_MPH = 0\.005;/.test(g));
+    assert.ok(/1 yard for every 10\\u00b0F per 100 yards/.test(sheet) && /D \* 0\.001 \* \(70 - o\.tempF\)/.test(g));
+    assert.ok(/only on US courses/.test(sheet) && /estimate/.test(sheet) && /never your position/.test(sheet) && /Tournament mode turns all of it off/.test(sheet));
+});

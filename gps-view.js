@@ -2523,6 +2523,7 @@
     // (gps-geo.windAim: ~0.5% of the distance per mph across, aim into the wind). With the
     // club on this line the plain "Suggested:" line steps aside. No plays-like data: no
     // line (the plain suggestion, if any). Tournament mode: none of it.
+    function plInfoSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsInfo') !== false; } catch (e) { return true; } }
     function plSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsBreakdown') !== false; } catch (e) { return true; } }
     function syncBreakdown(r, o, nums) {
         S.plClub = false;
@@ -3687,7 +3688,8 @@
         +   '<div class="gps-tourney gps-float" style="display:none" aria-label="Tournament mode: distance only">TOURNAMENT</div>'
         +   '<div class="gps-suggest gps-float" data-feature="clubs" style="display:none" role="status"></div>'
         // PLAYS-LIKE, SPELLED OUT (009): "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm -> 6-iron (your 170)".
-        +   '<div class="gps-pl-line gps-float" data-feature="playsBreakdown" style="display:none" role="status"><span class="gps-pl-text"></span></div>'
+        +   '<div class="gps-pl-line gps-float" data-feature="playsBreakdown" style="display:none" role="status"><span class="gps-pl-text"></span>'
+        +     '<button type="button" class="gps-pl-info" data-feature="playsInfo" aria-label="How plays-like works">\u24D8</button></div>'
         +   '<div class="gps-green-dims gps-float" style="display:none"></div>'
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
@@ -3735,6 +3737,19 @@
         +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
         +   '<div class="gps-bag-setup-foot" data-feature="bagSetup"><button type="button" class="gps-bag-setup-save">Save my bag</button><button type="button" class="gps-bag-setup-skip">Not now</button></div>'
         +   '<button type="button" class="gps-bag-setup-open" data-feature="bagSetup">Start over from my handicap</button>'
+        + '</div>'
+        // HOW PLAYS-LIKE WORKS (009, switch playsInfo): the ⓘ on the plays-like line. Plain words.
+        + '<div class="gps-plinfo gps-float gps-scroll-ok" data-feature="playsInfo" style="display:none" role="dialog" aria-label="How plays-like works">'
+        +   '<div class="gps-bag-head"><div class="gps-bag-title">How plays-like works</div><button type="button" class="gps-plinfo-done">Done</button></div>'
+        +   '<p>Plays-like is how long the shot will play - the yards, adjusted. It is an estimate.</p>'
+        +   '<ul>'
+        +     '<li><b>Uphill / downhill:</b> about 1 yard for every 3 feet the target is above or below you.</li>'
+        +     '<li><b>Into the wind:</b> about 1% longer for every mph of headwind.</li>'
+        +     '<li><b>Downwind:</b> about 0.5% shorter for every mph of tailwind - half as much.</li>'
+        +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
+        +     '<li><b>Temperature:</b> about 1 yard for every 10\u00b0F per 100 yards - longer when it is cold, shorter when it is warm (from 70\u00b0F).</li>'
+        +   '</ul>'
+        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your position), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
@@ -3990,6 +4005,10 @@
         + '#gps-overlay .gps-suggest{font:800 14px/1.2 ' + FONT + ';color:#d9f99d;padding:7px 11px;border-radius:12px;white-space:nowrap;}'
         + '#gps-overlay .gps-pl-line{display:flex;align-items:center;gap:6px;max-width:calc(100vw - 24px);box-sizing:border-box;font:800 13px/1.25 ' + FONT + ';color:#d9f99d;padding:6px 10px;border-radius:12px;}'
         + '#gps-overlay .gps-pl-text{flex:1 1 auto;min-width:0;}'
+        + '#gps-overlay .gps-pl-info{flex:0 0 auto;min-width:36px;min-height:36px;border-radius:18px;border:0;background:transparent;color:#d9f99d;font:800 18px/1 ' + FONT + ';padding:0;}'
+        + '#gps-overlay .gps-plinfo{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font:600 14px/1.4 ' + FONT + ';touch-action:pan-y;}'
+        + '#gps-overlay .gps-plinfo ul{margin:6px 0;padding-left:18px;}#gps-overlay .gps-plinfo li{margin:4px 0;}#gps-overlay .gps-plinfo p{margin:6px 0;color:#c8d1ca;}'
+        + '#gps-overlay .gps-plinfo-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bagask{position:absolute;z-index:45;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 72px);padding:8px 10px;border-radius:14px;font:700 14px/1.2 ' + FONT + ';}'
         + '#gps-overlay .gps-bagask-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
         + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
@@ -4310,6 +4329,10 @@
         if (!setupSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagSetup"]'), function (n) { n.parentNode.removeChild(n); });
         // PLAYS-LIKE LINE (009): its switch off = no line (removed, not hidden).
         if (!plSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsBreakdown"]'), function (n) { n.parentNode.removeChild(n); });
+        // HOW PLAYS-LIKE WORKS (009): the ⓘ opens it; its switch off = no ⓘ, no sheet.
+        if (!plInfoSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsInfo"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-pl-info', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (!sh) return; closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; });
+        on(el, '.gps-plinfo-done', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (sh) sh.style.display = 'none'; });
         on(el, '.gps-bag-setup-save', saveSetup);
         on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
         on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
