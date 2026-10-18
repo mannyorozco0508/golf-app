@@ -176,7 +176,7 @@ const TS = { expression: "(function(){ var ov = document.getElementById('gps-ove
     + " var vis2 = function (s) { return vis(document.querySelector(s)); };"
     + " return JSON.stringify({ open: open, top: r && Math.round(r.top), barB: bb && Math.round(bb.bottom), ontop: !!(mid && t.contains(mid)), scrolls: !!(t && t.scrollHeight > t.clientHeight + 1), canScroll: !!(t && /auto|scroll/.test(getComputedStyle(t).overflowY)),"
     + "  layoutLit: lit('layout'), unitsLit: lit('units'), tourney: sw('tourney'), aa: sw('aa'), others: sw('others'), tiles: t ? [].filter.call(t.querySelectorAll('[data-ts-tile]'), vis).map(function (b) { return b.getAttribute('data-ts-tile'); }) : [],"
-    + "  oldMenu: vis2('#gps-overlay .gps-tools-menu'), layout: window.HardPanGps && HardPanGps.layout(), lsUnits: ls('hardpan_gps_units'), lsAa: ls('hardpan_gps_autoadvance'), lsTourney: ls('hardpan_tournament_phone'), lsLayout: ls('hardpan_gps_layout'),"
+    + "  oldMenu: vis2('#gps-overlay .gps-tools-menu'), layout: window.HardPanGps && HardPanGps.layout(), lsUnits: ls('hardpan_gps_units'), lsAa: ls('hardpan_gps_autoadvance'), lsTourney: ls('hardpan_tournament_phone'), lsLayout: ls('hardpan_gps_layout'), lsOthers: ls('hardpan_stats_others'), othersApi: !!(window.HardPanGpsStats && typeof HardPanGpsStats.trackOthers === 'function'), othersNow: window.HardPanGpsStats && typeof HardPanGpsStats.trackOthers === 'function' ? HardPanGpsStats.trackOthers() : null,"
     + "  pill: vis2('#gps-overlay .gps-ld-plays'), mText: (ov.querySelector('.gps-m') || {}).textContent, bag: vis2('#gps-overlay .gps-bag'), shotbar: vis2('#gps-overlay .gps-shotbar'), stats: vis2('#hp-my-stats') || vis2('.gps-stats-sheet'), banner: vis2('#gps-overlay .gps-banner') ? ov.querySelector('.gps-banner').textContent : null,"
     + "  actions: vis2('#gps-overlay .gps-actions'), url: document.URL.split('/').pop(), e: window.__e }); })()" };
 const TSC = (sel) => ({ expression: "(function(){ var b = document.querySelector('#gps-overlay .gps-tsheet " + sel.replace(/'/g, "\\'") + "'); if (!b) return 'none'; b.click(); return 'ok'; })()" });
@@ -304,17 +304,23 @@ function checkD(a, f, tag, o) {
             const L = lay.toUpperCase(), seed = BAG + (lay === 'c' ? LAYOUT_C : '');
             // T1: open; flip units, tournament, auto-advance - each at once; a reload keeps them.
             s = await go({ esri: 'OK-3X', seed, steps: START.concat([TAP('.gps-tools'), W(500), TS], tsShot('tools-' + L + '-15.png'), [
-                TSC('[data-ts-seg="units"] [data-v="m"]'), W(500), TS, TSC('[data-ts-sw="tourney"]'), W(500), TS, TSC('[data-ts-sw="aa"]'), W(500), TS,
+                TSC('[data-ts-seg="units"] [data-v="m"]'), W(500), TS, TSC('[data-ts-sw="tourney"]'), W(500), TS, TSC('[data-ts-sw="aa"]'), W(500), TS, TSC('[data-ts-sw="others"]'), W(500), TS,
                 { expression: 'location.reload()' }, W(1000)], START, [TAP('.gps-tools'), W(500), TS,
-                TSC('[data-ts-seg="units"] [data-v="yd"]'), W(400), TSC('[data-ts-sw="tourney"]'), W(400), TSC('[data-ts-sw="aa"]'), W(400), TS]) });
-            const [o0, u1, t1, a1, r0, b0] = s;
+                TSC('[data-ts-seg="units"] [data-v="yd"]'), W(400), TSC('[data-ts-sw="tourney"]'), W(400), TSC('[data-ts-sw="aa"]'), W(400), TSC('[data-ts-sw="others"]'), W(400), TS]) });
+            const [o0, u1, t1, a1, x1, r0, b0] = s;
             report['tools' + L] = { open: o0, units: [u1.unitsLit, u1.lsUnits, u1.mText], tourney: [t1.tourney, t1.lsTourney, t1.pill], aa: [a1.aa, a1.lsAa], reload: [r0.unitsLit, r0.tourney, r0.aa], back: [b0.unitsLit, b0.tourney, b0.aa] };
-            f(o0.open && o0.ontop && !o0.oldMenu && o0.layout === lay && o0.layoutLit === lay && o0.unitsLit === 'yd' && o0.tourney === false && o0.others === null, L + ' tools: the sheet did not open as set: ' + JSON.stringify(o0));
+            f(o0.open && o0.ontop && !o0.oldMenu && o0.layout === lay && o0.layoutLit === lay && o0.unitsLit === 'yd' && o0.tourney === false && o0.others === (o0.othersApi ? false : null), L + ' tools: the sheet did not open as set: ' + JSON.stringify(o0));
             f(o0.barB != null && o0.top >= o0.barB, L + ' tools: the sheet covers the top bar: ' + JSON.stringify([o0.top, o0.barB]));
             f(u1.open && u1.unitsLit === 'm' && u1.lsUnits === 'm' && Number(u1.mText) < Number(o0.mText), L + ' tools: Meters did not take at once: ' + JSON.stringify([u1.unitsLit, u1.lsUnits, u1.mText, o0.mText]));
             f(t1.open && t1.tourney === true && t1.lsTourney === '1' && !t1.pill, L + ' tools: Tournament mode did not take at once: ' + JSON.stringify(t1));
             f(a1.open && a1.aa !== o0.aa && a1.lsAa !== o0.lsAa, L + ' tools: Auto-advance did not flip: ' + JSON.stringify([o0.aa, a1.aa, o0.lsAa, a1.lsAa]));
             f(r0.open && r0.unitsLit === 'm' && r0.tourney === true && r0.aa === a1.aa, L + ' tools: not saved across a reload: ' + JSON.stringify(r0));
+            // Track stats for others (gps-012s's HardPanGpsStats.setTrackOthers): flips, is saved, a reload keeps it.
+            if (o0.othersApi) {
+                f(x1.others === true && x1.othersNow === true && x1.lsOthers != null && x1.lsOthers !== o0.lsOthers, L + ' tools: Track stats for others did not flip through setTrackOthers: ' + JSON.stringify([o0.others, x1.others, x1.othersNow, o0.lsOthers, x1.lsOthers]));
+                f(r0.others === true, L + ' tools: Track stats for others not kept across a reload: ' + JSON.stringify(r0.others));
+                f(b0.others === false, L + ' tools: Track stats for others did not flip back');
+            } else f(x1.others === null, L + ' tools: a Track stats switch with no stats API: ' + JSON.stringify(x1.others));
             f(b0.unitsLit === 'yd' && b0.tourney === false && b0.aa === o0.aa, L + ' tools: did not flip back: ' + JSON.stringify(b0));
             errs(s, 'tools' + L);
             // T2: the layout choice switches live and keeps the sheet; swipe down closes; tap outside closes.
