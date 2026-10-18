@@ -155,12 +155,14 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.strictEqual(cfg.paywall, false, 'paywall (iap off only) stays false');
     // gps-store-iap (2026-10-17): the in-app purchase settings - an EMPTY RevenueCat key; the
     // founding cap; no price (the store's own price only).
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'clubs', 'flyover', 'hazards', 'hpIndex', 'quickStats', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagSetup', 'clubs', 'courseElev', 'flyover', 'hazards', 'hpIndex', 'pathTarget', 'playsBreakdown', 'playsInfo', 'quickStats', 'watch']);
     // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
     assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch').every(([, v]) => v === true));
+    // 009: the My bag account sync is built but ships OFF (its rule is phase 2, not live).
+    assert.strictEqual(cfg.clubsSync, false, 'clubsSync ships off until the player_clubs rule is live');
     // GPS LIVE (gps-live): OpenStreetMap off, live on, our functions' own origin.
     assert.strictEqual(cfg.osm, false); assert.strictEqual(cfg.live, true);
     assert.strictEqual(cfg.liveBase, 'https://us-central1-golfapp-9fb21.cloudfunctions.net', 'our Cloud Functions - never GolfAPI itself');
@@ -390,8 +392,8 @@ test('build 6 smart default target, on the bundled holes: par 3 center; 260 alon
     const me = G.pointAlongHole(h2.line, h2.tee, 100 * 0.9144);
     const tm = def('caledonia', 2, { from: 'me', pt: me });
     assert.ok(Math.abs(yd(G.haversineMeters(me, tm)) - 260) <= 12, 'from the golfer: ' + yd(G.haversineMeters(me, tm)));
-    // Par comes from the CARD: gps-view hands defaultTarget S.par.
-    assert.ok(/G\.defaultTarget\(\{\s*par: S\.par,/.test(read('gps-view.js')));
+    // Par comes from the CARD: gps-view hands defaultTarget (and 009's pathTarget, the same options) S.par.
+    assert.ok(/var opts = \{\s*par: S\.par,/.test(read('gps-view.js')) && /G\.defaultTarget\(opts\)/.test(read('gps-view.js')));
     assert.ok(/'\.gps-recenter', function \(\) \{ if \(S\) \{ S\.targetMoved = false; S\.target = null; \}/.test(read('gps-view.js')), 'Recenter resets it');
 });
 

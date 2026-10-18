@@ -764,7 +764,9 @@
         loadScript('gps-offline.js', function () { return !!window.HardPanGpsOffline; }, function () {
             var O = window.HardPanGpsOffline;
             if (!O || S !== mine) return;
-            O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '').then(function () { if (S === mine) syncPlays(); });
+            // 009 (courseElev on): the WHOLE course's samples, this hole first; the screen redraws as they arrive.
+            O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '', { first: S.hole, progress: function () { if (S === mine) { S.celev = null; syncPlays(); } } })
+                .then(function () { if (S === mine) { S.celev = null; syncPlays(); } });
         });
     }
     function loadCourses(done) {
@@ -1544,15 +1546,21 @@
     // is the CARD's (S.par). It follows as they walk; once touched it stays put
     // until the hole changes or Recenter. Dragging it does not pan the map (a
     // marker drag belongs to the marker); a drag anywhere else pans.
+    function pathTargetOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('pathTarget') !== false; } catch (e) { return true; } }
     function placeTarget(r) {
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
         if (!o || !center) return;
         var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var p = G.defaultTarget({
+        var opts = {
             par: S.par, tee: r.tee, mid: center, line: rec && rec.line, fairway: rec && rec.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
-        });
+        };
+        // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
+        // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
+        var p = pathTargetOn() && r.tee && G.pathTarget
+            ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) }))
+            : G.defaultTarget(opts);
         if (p) S.target = p;
     }
     function drawTargetLines() {
@@ -1820,32 +1828,57 @@
     // target, its ring label, the green, a pin, the dot or a control: it slides
     // along its line (and off to either side of it) to the first clear spot, and
     // hides when there is none. The same numbers stay under FRONT / CENTER / BACK.
-    // ---- HOLE FLYOVER / PREVIEW (008, switch flyover) ---------------------------------
-    // "Preview": the camera flies the hole from the tee to the green along the hole's own
-    // line (gps-geo.flyoverFrame) in about 4 s, tilted, with "Hole 5 · Par 4 · 385 yds"
-    // over it, then comes back to the normal hole view. Drawn by MapLibre - no video. Any
-    // touch stops it (back to the hole view). prefers-reduced-motion: no flight - the
-    // whole hole framed at once, the same words, then the normal view.
-    var FLY_MS = 4000, FLY_STILL_MS = 2500, FLY_PITCH = 50;
+    // ---- HOLE FLYOVER / PREVIEW (008, switch flyover; 009: the hole's path) ----------
+    // "Preview": the camera flies the HOLE'S PATH (gps-geo.holePath: its own drawn line
+    // with a dogleg, else the golfer's dragged target as the bend, else the fairway's
+    // middle, else the bunkers either side, else straight) in about 5 s
+    // (gps-geo.flyoverPlan / flyoverCamera): the whole hole first, then down the path
+    // tilted - wide enough for the fairway and its hazards, turning at the dogleg - and
+    // flat on the green with its F / C / B pins, with "Hole 5 · Par 4 · 385 yds" over
+    // it, then back to the normal hole view. Drawn by MapLibre - no video. Any touch
+    // stops it (back to the hole view). prefers-reduced-motion: no flight - the whole
+    // hole framed at once, the same words, then the normal view.
+    var FLY_STILL_MS = 2500, FLY_PITCH = 50;
     function flySwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('flyover') !== false; } catch (e) { return true; } }
     function reducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
-    function flyLine(r) {
-        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var line = rec && rec.line && rec.line.length >= 2 ? rec.line.slice() : [r.tee, r.mid];
-        line[0] = r.tee; line[line.length - 1] = r.mid;   // a set green is where the flight ends
-        return line;
+    function holeOsm() {
+        var osm = osmRecord(S.courseKey);
+        return (osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm) || null;
+    }
+    // The path for hole r; dragged: the golfer's moved target bends it.
+    function flyPath(r, dragged) {
+        var rec = holeOsm() || {};
+        return G.holePath({ tee: r.tee, mid: r.mid, line: rec.line, fairway: rec.fairway, hazards: rec.hazards, target: dragged || null });
+    }
+    function flyPlan(r) {
+        var path = flyPath(r, S.targetMoved ? S.target : null);
+        if (!path) return null;
+        var rec = holeOsm() || {}, o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
+        var extra = (rec.hazards || []).map(function (z) { return z.pt; });
+        (rec.fairway || []).forEach(function (ring) { extra = extra.concat(ring); });
+        var el = S.el.querySelector('.gps-map');
+        var plan = G.flyoverPlan({ path: path.pts, green: r.green || [], pins: [nums.front, r.mid, nums.back].filter(Boolean), extra: extra,
+            view: { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 600 }, pad: S.pad || viewPad(), maxZoom: maxZoomNow() });
+        if (plan) plan.src = path.src;
+        return plan;
     }
     function flyCaption(r) {
         var m = (typeof S.holeMeta === 'function' ? S.holeMeta(S.hole) : null) || {}, u = units();
         var par = m.par != null ? m.par : S.par;
         var len = m.yards ? (u === 'm' ? Math.round(m.yards * G.M_PER_YD) : m.yards) : G.shownDistance(G.haversineMeters(r.tee, r.mid), u);
-        return 'Hole ' + S.hole + (par != null ? ' \u00b7 Par ' + par : '') + ' \u00b7 ' + len + (u === 'm' ? ' m' : ' yds');
+        return 'Hole ' + S.hole + (par != null ? ' · Par ' + par : '') + ' · ' + len + (u === 'm' ? ' m' : ' yds');
     }
     function flyMark(state) { var el = S && S.el.querySelector('.gps-map'); if (el) el.setAttribute('data-fly', state); }
+    // On screen? (the checks read it: the start shows the tee and the green, the end the pins).
+    function onScreen(map, el, pts) {
+        try {
+            return pts.every(function (p) { var q = map.project(ll(p)); return q.x >= 0 && q.y >= 0 && q.x <= el.clientWidth && q.y <= el.clientHeight; }) ? '1' : '0';
+        } catch (e) { return ''; }
+    }
     function startFlyover() {
-        if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverFrame) return;
+        if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverPlan) return;
         var r = resolved();
-        if (!r || !r.tee || !r.mid) { flash('Preview needs this hole\u2019s tee and green'); return; }
+        if (!r || !r.tee || !r.mid) { flash('Preview needs this hole’s tee and green'); return; }
         closeMenus();
         var cap = S.el.querySelector('.gps-fly-cap');
         if (cap) { cap.textContent = flyCaption(r); cap.style.display = ''; }
@@ -1859,22 +1892,30 @@
             render();
             return;
         }
-        var cam = holeView();
-        if (!cam) return;
-        var line = flyLine(r), maxZ = maxZoomNow();
-        var z0 = Math.min(maxZ, cam.zoom + 1.4), z1 = Math.min(maxZ, cam.zoom + 2.1);
+        var plan = flyPlan(r);
+        if (!plan) return;
+        var pad = S.pad || viewPad(), o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
+        var pins = [nums.front, r.mid, nums.back].filter(Boolean);
         try { map.setMaxPitch(FLY_PITCH); } catch (e) {}
-        S.flying = { t0: Date.now(), frames: 0 };
+        S.flying = { t0: Date.now(), frames: 0, trail: [] };
         flyMark('flying');
+        if (el) { el.setAttribute('data-fly-src', plan.src); el.setAttribute('data-fly-path', plan.pts.map(function (p) { return p[0].toFixed(6) + ',' + p[1].toFixed(6); }).join(';')); el.removeAttribute('data-fly-start-fit'); el.removeAttribute('data-fly-end-fit'); }
         var step = function () {
             if (S !== mine || !S.flying || S.flying.still) return;
-            var t = Math.min(1, (Date.now() - S.flying.t0) / FLY_MS);
-            var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in and out
-            var fr = G.flyoverFrame(line, e);
-            if (fr) {
-                try { map.jumpTo({ center: ll(fr.pt), bearing: fr.bearing, zoom: z0 + (z1 - z0) * e, pitch: FLY_PITCH * Math.min(1, t / 0.15), padding: { top: 0, bottom: 0, left: 0, right: 0 } }); } catch (x) {}
-                S.flying.frames++;
-                if (el) { el.setAttribute('data-fly-at', fr.pt[0].toFixed(6) + ',' + fr.pt[1].toFixed(6)); el.setAttribute('data-fly-frames', String(S.flying.frames)); el.setAttribute('data-fly-pitch', String(Math.round(map.getPitch()))); }
+            var t = Math.min(1, (Date.now() - S.flying.t0) / plan.ms);
+            var c = G.flyoverCamera(plan, t);
+            if (c) {
+                try { map.jumpTo({ center: ll(c.center), bearing: c.bearing, zoom: c.zoom, pitch: c.pitch, padding: pad }); } catch (x) {}
+                var f = S.flying;
+                f.frames++;
+                if (f.frames % 3 === 1) f.trail.push(c.center[0].toFixed(6) + ',' + c.center[1].toFixed(6));
+                if (el) {
+                    el.setAttribute('data-fly-at', c.center[0].toFixed(6) + ',' + c.center[1].toFixed(6)); el.setAttribute('data-fly-frames', String(f.frames));
+                    el.setAttribute('data-fly-pitch', String(Math.round(map.getPitch()))); el.setAttribute('data-fly-zoom', c.zoom.toFixed(2)); el.setAttribute('data-fly-bearing', String(Math.round(c.bearing)));
+                    el.setAttribute('data-fly-trail', f.trail.join(';'));
+                    if (f.frames === 1) { el.setAttribute('data-fly-start-fit', onScreen(map, el, [r.tee, r.mid])); el.setAttribute('data-fly-z0', c.zoom.toFixed(2)); }
+                    if (t >= 0.95 && !f.endFit) { f.endFit = 1; el.setAttribute('data-fly-end-fit', onScreen(map, el, pins)); el.setAttribute('data-fly-z1', c.zoom.toFixed(2)); }
+                }
             }
             if (t >= 1) { endFlyover('done'); return; }
             S.flying.raf = requestAnimationFrame(step);
@@ -2425,13 +2466,43 @@
             if (S === mine) { syncPlays(); fetchElevs(); }
         }).catch(function () { mine.elevInFlight = false; mine.elevFailedAt = Date.now(); });
     }
-    // The golfer's height: their spot projected onto the tee -> green line, between
-    // the sampled points either side. From the tee: the tee's.
+    // THE WHOLE COURSE'S HEIGHTS (009, switch courseElev): the samples gps-offline.js kept
+    // for this course (hardpan_celev_v1_<course>: tee, every 25 yds along the hole, green
+    // front / center / back, hazards). A point's height - the golfer's spot, a tapped
+    // target, the green - is worked out HERE from this hole's nearest samples
+    // (gps-geo.elevFromSamples); the golfer's position is never sent anywhere. No samples
+    // near it: the tee -> green line's 5 points (below), as before.
+    var CELEV_PREFIX = 'hardpan_celev_v1_';
+    function celevSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('courseElev') !== false; } catch (e) { return true; } }
+    function holeSamples() {
+        if (!S || !celevSwitch() || !G.elevFromSamples) return null;
+        if (!S.celev || S.celev.key !== S.courseKey) {
+            var rec = lsGet(CELEV_PREFIX + S.courseKey), h = {};
+            if (rec && rec.v === 1 && rec.o && rec.h) Object.keys(rec.h).forEach(function (n) {
+                var a = rec.h[n] || [], list = [];
+                for (var i = 0; i + 2 < a.length; i += 3) list.push([rec.o[0] + a[i] / 1e5, rec.o[1] + a[i + 1] / 1e5, a[i + 2]]);
+                h[n] = list;
+            });
+            S.celev = { key: S.courseKey, h: h };
+        }
+        return S.celev.h[String(S.hole)] || null;
+    }
+    // A point's height: the course samples, else the tee -> green line (the tee's, the green's).
+    function ptElev(r, pt, which) {
+        if (!r || !pt) return null;
+        var sm = holeSamples(), v = sm ? G.elevFromSamples(sm, pt) : null;
+        if (v != null) return v;
+        if (which === 'tee') return elevAt(r.tee);
+        if (which === 'mid') return elevAt(r.mid);
+        return lineElev(r, pt);
+    }
+    // The golfer's height: from the course samples (009), else their spot projected onto
+    // the tee -> green line, between the sampled points either side. From the tee: the tee's.
     function originElev(r, o) {
         // No tee (a green tapped on an unmapped hole): no line to sample, no slope.
         if (!r.tee || !r.mid) return null;
-        if (o.from === 'tee') return elevAt(r.tee);
-        return lineElev(r, o.pt);
+        if (o.from === 'tee') return ptElev(r, r.tee, 'tee');
+        return ptElev(r, o.pt);
     }
     // A point's height, from where it projects onto the tee -> green line.
     function lineElev(r, pt) {
@@ -2462,7 +2533,7 @@
         if (D < PLAYS_MIN_YD) return null;
         // Today's manual wind (build 3) beats the live reading.
         var w = effectiveWind(), has = !!(w && !w.none);
-        var to = targetPt ? lineElev(r, targetPt) : elevAt(r.mid);
+        var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
         return G.playsLike({
             yards: D, elevFromFt: originElev(r, o), elevToFt: to,
             windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
@@ -2481,6 +2552,44 @@
         // Its line is kept either way, so the map does not jump when it appears.
         el.style.visibility = pl ? '' : 'hidden';
         el.setAttribute('data-terms', pl ? Object.keys(pl.terms).join(' ') : '');
+    }
+    // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) ------------------------
+    // ONE LINE under the numbers: "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm ->
+    // 6-iron (your 170) · aim 4 yds left" - to the center, or to the target once the golfer
+    // has moved it. The parts are playsLike's own terms (gps-geo.playsParts; a term with no
+    // data is left out); the club is the bag's for the PLAYS-LIKE distance (switch clubs,
+    // from the golfer's spot); CROSSWIND changes no distance - it is the aim-off
+    // (gps-geo.windAim: ~0.5% of the distance per mph across, aim into the wind). With the
+    // club on this line the plain "Suggested:" line steps aside. No plays-like data: no
+    // line (the plain suggestion, if any). Tournament mode: none of it.
+    function plInfoSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsInfo') !== false; } catch (e) { return true; } }
+    function plSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsBreakdown') !== false; } catch (e) { return true; } }
+    function syncBreakdown(r, o, nums) {
+        S.plClub = false;
+        var el = S.el.querySelector('.gps-pl-line');
+        if (!el) return;
+        var text = '';
+        if (plSwitch() && !tournament() && S.pro && S.mode === 'measure' && o && !(nums && nums.onGreen)) {
+            var moved = !!(S.targetMoved && S.target), aim = moved ? S.target : aimAt(r);
+            var pl = aim ? playsTo(moved ? S.target : null) : null;
+            if (pl) {
+                var w = effectiveWind(), has = !!(w && !w.none), m = units() === 'm';
+                var parts = G.playsParts(pl, has ? w.mph : null, units());
+                text = 'Plays ' + (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (parts.length ? ': ' + parts.join(', ') : '');
+                var B = bagApi();
+                if (bagSwitch() && B && o.from === 'me') {
+                    var sg = B.suggestClub(B.bag(bagGolfer()), pl.exact);
+                    if (sg) { text += ' \u2192 ' + sg.name + ' (your ' + bagShown(sg.yd) + ')'; S.plClub = true; }
+                }
+                if (has && w.mph > 0) {
+                    var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD, rel = G.windRelative(w.fromDeg, G.bearingDeg(o.pt, aim), w.mph), am = G.windAim(D, rel.cross);
+                    if (am) text += ' \u00b7 aim ' + (m ? Math.max(1, Math.round(am.yd * G.M_PER_YD)) + ' m ' : am.yd + (am.yd === 1 ? ' yd ' : ' yds ')) + am.side;
+                }
+            }
+        }
+        var t = el.querySelector('.gps-pl-text');
+        if (t.textContent !== text) t.textContent = text;
+        el.style.display = text ? '' : 'none';
     }
 
     // ---- THE PAYWALL AND THE GATE (paid launch: Manny, mailbox 007, 2026-10-17) ------
@@ -2987,6 +3096,7 @@
 
         placeTarget(r);
         targetReadout();
+        syncBreakdown(r, o, nums);
         syncSuggest(r, o, nums);
 
         // The green, set / fixed / undone.
@@ -3123,7 +3233,7 @@
         var brg = G.bearingDeg(from, pt);
         if (tournament()) return { yd: yd };
         var w = effectiveWind(), has = !!(w && !w.none);
-        var e0 = r ? (prev ? lineElev(r, from) : elevAt(r.tee)) : null, e1 = r ? lineElev(r, pt) : null;
+        var e0 = r ? (prev ? ptElev(r, from) : ptElev(r, r.tee, 'tee')) : null, e1 = r ? ptElev(r, pt) : null;
         var pl = G.playsLike({ yards: yd, elevFromFt: e0, elevToFt: e1, windMph: has ? w.mph : null, windFromDeg: has ? w.fromDeg : null,
             shotBearingDeg: brg, tempF: w && typeof w.tempF === 'number' ? w.tempF : null });
         var out = { yd: yd, plays: pl ? pl.yards : null, elevFt: e0 != null && e1 != null ? Math.round((e1 - e0) * 10) / 10 : null };
@@ -3169,14 +3279,50 @@
     // plays-like distance to the center - or to the target once the golfer has moved it.
     // TOURNAMENT MODE (Rules of Golf 4.3): no suggestion and no question. My bag (Tools)
     // shows, edits and resets the numbers.
-    // NOT SYNCED: no path under the live rules lets a phone write per-golfer data of its
-    // own (pushPrefs/<uid> takes only bets / hype; organizers/<uid>/groups only groups), so
-    // the bag stays on the phone until a rule for it exists.
+    // NOT SYNCED (yet): no path under the live rules lets a phone write per-golfer data of
+    // its own (pushPrefs/<uid> takes only bets / hype; organizers/<uid>/groups only groups).
+    // 009: the sync is BUILT (gps-shots.js syncLoad / syncSave: player_clubs/<uid>/me, the
+    // signed-in golfer's OWN bag only) behind HARDPAN_GPS_CONFIG.clubsSync, which ships
+    // false until the phase-2 rule is live - so today the bag stays on the phone.
+    // FIRST-TIME SETUP (009, switch bagSetup): My bag opens on "Enter your carry for each
+    // club", filled from the golfer's handicap (the round's, else their HardPan Index, else
+    // a mid 15) - a starting point, every number editable; each club then says "entered"
+    // or "learned" (gps-shots.js: the shots take over once a club has 3 of its own).
     var BAG_ASK_MS = 20000;
     function bagSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('clubs') !== false; } catch (e) { return true; } }
     function bagApi() { return window.HardPanGpsBag || null; }
     function bagGolfer() { var w = scoreFor(); return (w && w.player && w.player.name) || ''; }
     function bagShown(yd) { return units() === 'm' ? Math.round(yd * G.M_PER_YD) : Math.round(yd); }
+    function setupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('bagSetup') !== false; } catch (e) { return true; } }
+    // THE GOLFER'S HANDICAP for the setup's starting carries: the round's (a "+2" is -2),
+    // else - the phone's own golfer - their HardPan Index; else null (the mid default).
+    function bagHcp() {
+        var w = scoreFor(), h = w && w.player ? String(w.player.hcp == null ? '' : w.player.hcp).trim() : '';
+        if (h && isFinite(Number(h.replace(/^\+/, '')))) return /^\+/.test(h) ? -Number(h.slice(1)) : Number(h);
+        try {
+            var I = window.HardPanIndex;
+            if (bagIsMe() && I && typeof I.current === 'function' && typeof window.HardPanFeature === 'function' && window.HardPanFeature('hpIndex')) {
+                var c = I.current();
+                if (c && typeof c.index === 'number' && isFinite(c.index)) return c.index;
+            }
+        } catch (e) {}
+        return null;
+    }
+    // THE SIGNED-IN GOLFER'S OWN BAG (the only one the account sync touches): the GPS
+    // screen's golfer is the one this phone said it is, and the account is a real sign-in.
+    function bagIsMe() { try { var w = scoreFor(), me = typeof resolvedMeId === 'function' ? resolvedMeId() : null; return !!(w && me != null && String(w.id) === String(me)); } catch (e) { return false; } }   /* global resolvedMeId */
+    function bagUid() { try { var u = window.firebase && window.firebase.auth && window.firebase.auth().currentUser; return u && !u.isAnonymous && u.uid ? String(u.uid) : null; } catch (e) { return null; } }
+    function bagSyncCan(B) { return !!(B && B.syncOn() && S && S.db && bagIsMe() && bagUid()); }
+    function bagSaved() { var B = bagApi(); if (bagSyncCan(B)) B.syncSave(S.db, bagUid(), bagGolfer()); }
+    // Once per golfer per sign-in: the account's numbers onto this phone.
+    function bagSyncLoad(B) {
+        if (!bagSyncCan(B)) return;
+        var k = bagUid() + '|' + bagGolfer();
+        if (S.bagSynced === k) return;
+        S.bagSynced = k;
+        var mine = S;
+        B.syncLoad(S.db, bagUid(), bagGolfer()).then(function (got) { if (got && S === mine) { render(); if (bagSheet() && bagSheet().style.display !== 'none') fillBag(); } });
+    }
     function bagAsk(yd) {
         if (!S || !bagSwitch() || tournament() || !(yd > 0)) return;
         var bar = S.el.querySelector('.gps-bagask');
@@ -3203,7 +3349,7 @@
         var B = bagApi(), p = S && S.bagPending;
         bagSkip();
         if (!B || !p) return;
-        if (B.add(p.golfer, club, p.yd)) flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag');
+        if (B.add(p.golfer, club, p.yd)) { bagSaved(); flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag'); }
         else render();
     }
     function syncSuggest(r, o, nums) {
@@ -3214,6 +3360,7 @@
             var B = bagApi();
             if (!B) { if (!S.bagLoad) { S.bagLoad = true; withShots(function () { render(); }); } }
             else {
+                bagSyncLoad(B);
                 var moved = !!(S.targetMoved && S.target), to = moved ? S.target : aimAt(r);
                 if (to) {
                     var pl = playsTo(moved ? S.target : null);
@@ -3223,18 +3370,65 @@
                 }
             }
         }
+        // 009: the plays-like line already says the club - not twice.
+        if (S.plClub) text = '';
         if (el.textContent !== text) el.textContent = text;
         el.style.display = text ? '' : 'none';
     }
     function bagSheet() { return S && S.el.querySelector('.gps-bag'); }
-    function openBag() { var sh = bagSheet(); if (!sh || !S) return; closeMenus(); withShots(function () { if (!S) return; sh.style.display = ''; fillBag(); }); }
+    function openBag() {
+        var sh = bagSheet(); if (!sh || !S) return; closeMenus();
+        withShots(function () {
+            var B = bagApi(); if (!S || !B) return;
+            bagSyncLoad(B);
+            sh.style.display = '';
+            if (setupSwitch() && B.needsSetup(bagGolfer())) fillSetup(); else fillBag();
+        });
+    }
+    // "Enter your carry for each club": the starting carries for the golfer's handicap, editable.
+    function fillSetup() {
+        var sh = bagSheet(), B = bagApi();
+        if (!sh || !B) return;
+        var who = bagGolfer(), hcp = bagHcp(), m = units() === 'm', def = B.defaultCarries(hcp);
+        sh.setAttribute('data-bag-view', 'setup');
+        sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
+        sh.querySelector('.gps-bag-sub').textContent = 'Enter your carry for each club. ' + (hcp == null ? 'Starting numbers for a mid handicap' : 'Starting numbers for a ' + (hcp < 0 ? '+' + Math.abs(Math.round(hcp)) : Math.round(hcp)) + ' handicap')
+            + ' \u2014 change any, clear the clubs you do not carry. Mark shot keeps them up to date.';
+        var list = sh.querySelector('.gps-bag-setup');
+        list.textContent = '';
+        B.BAG.forEach(function (c) {
+            var row = document.createElement('div');
+            row.className = 'gps-bag-srow'; row.setAttribute('data-bag-srow', c);
+            var nm = document.createElement('span'); nm.className = 'gps-bag-name'; nm.textContent = B.NAMES[c];
+            var inp = document.createElement('input');
+            inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '1'; inp.max = '449'; inp.className = 'gps-bag-yd'; inp.setAttribute('data-bag-setup', c);
+            inp.setAttribute('aria-label', B.NAMES[c] + ' carry' + (m ? ', meters' : ', yards'));
+            inp.value = String(bagShown(def[c])); inp.placeholder = '\u2014';
+            row.appendChild(nm); row.appendChild(inp);
+            list.appendChild(row);
+        });
+    }
+    function saveSetup() {
+        var sh = bagSheet(), B = bagApi();
+        if (!sh || !B || !S) return;
+        var carries = {};
+        Array.prototype.forEach.call(sh.querySelectorAll('[data-bag-setup]'), function (i) {
+            var v = Number(i.value);
+            if (v > 0) carries[i.getAttribute('data-bag-setup')] = units() === 'm' ? v / G.M_PER_YD : v;
+        });
+        B.setup(bagGolfer(), carries);
+        bagSaved();
+        fillBag(); render();
+    }
     function closeBag() { var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
     function fillBag() {
         var sh = bagSheet(), B = bagApi();
         if (!sh || !B) return;
         var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
+        sh.setAttribute('data-bag-view', 'list');
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
-        sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': the middle of your last 10 marked shots per club (odd ones left out), or your own number. On this phone only.';
+        sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is the middle of your last 10 marked shots per club (odd ones left out); "entered" is a number you typed'
+            + (setupSwitch() ? ' or set up (marked shots take over once a club has ' + B.LEARN_MIN + ')' : '') + '. On this phone only.';
         var list = sh.querySelector('.gps-bag-list');
         list.textContent = '';
         B.BAG.forEach(function (c) {
@@ -3246,7 +3440,10 @@
             inp.setAttribute('aria-label', B.NAMES[c] + (m ? ', meters' : ', yards'));
             inp.value = v ? String(bagShown(v.yd)) : ''; inp.placeholder = '\u2014';
             var meta = document.createElement('span'); meta.className = 'gps-bag-meta';
-            meta.textContent = !v ? 'no shots yet' : (v.set ? 'your number' : v.n + ' shot' + (v.n === 1 ? '' : 's'));
+            // "entered" (typed, or the setup's carry) / "learned" (the marked shots' median).
+            meta.textContent = !v ? 'no shots yet' : B.source(v) === 'entered' ? 'entered' + (v.base && v.n ? ' \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's') : '')
+                : 'learned \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's');
+            meta.setAttribute('data-bag-src', B.source(v));
             var rs = document.createElement('button'); rs.type = 'button'; rs.className = 'gps-bag-reset'; rs.setAttribute('data-bag-reset', c); rs.textContent = 'Reset';
             rs.style.visibility = v ? '' : 'hidden';
             row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
@@ -3529,6 +3726,9 @@
         +   '<div class="gps-sub gps-float"><span class="gps-acc"></span><span class="gps-src"></span></div>'
         +   '<div class="gps-tourney gps-float" style="display:none" aria-label="Tournament mode: distance only">TOURNAMENT</div>'
         +   '<div class="gps-suggest gps-float" data-feature="clubs" style="display:none" role="status"></div>'
+        // PLAYS-LIKE, SPELLED OUT (009): "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm -> 6-iron (your 170)".
+        +   '<div class="gps-pl-line gps-float" data-feature="playsBreakdown" style="display:none" role="status"><span class="gps-pl-text"></span>'
+        +     '<button type="button" class="gps-pl-info" data-feature="playsInfo" aria-label="How plays-like works">\u24D8</button></div>'
         +   '<div class="gps-green-dims gps-float" style="display:none"></div>'
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
@@ -3572,6 +3772,23 @@
         + '<div class="gps-bag gps-float gps-scroll-ok" data-feature="clubs" style="display:none" role="dialog" aria-label="My bag">'
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
         +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
+        // FIRST-TIME SETUP (009): "Enter your carry for each club" - in place of the list.
+        +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
+        +   '<div class="gps-bag-setup-foot" data-feature="bagSetup"><button type="button" class="gps-bag-setup-save">Save my bag</button><button type="button" class="gps-bag-setup-skip">Not now</button></div>'
+        +   '<button type="button" class="gps-bag-setup-open" data-feature="bagSetup">Start over from my handicap</button>'
+        + '</div>'
+        // HOW PLAYS-LIKE WORKS (009, switch playsInfo): the ⓘ on the plays-like line. Plain words.
+        + '<div class="gps-plinfo gps-float gps-scroll-ok" data-feature="playsInfo" style="display:none" role="dialog" aria-label="How plays-like works">'
+        +   '<div class="gps-bag-head"><div class="gps-bag-title">How plays-like works</div><button type="button" class="gps-plinfo-done">Done</button></div>'
+        +   '<p>Plays-like is how long the shot will play - the yards, adjusted. It is an estimate.</p>'
+        +   '<ul>'
+        +     '<li><b>Uphill / downhill:</b> about 1 yard for every 3 feet the target is above or below you.</li>'
+        +     '<li><b>Into the wind:</b> about 1% longer for every mph of headwind.</li>'
+        +     '<li><b>Downwind:</b> about 0.5% shorter for every mph of tailwind - half as much.</li>'
+        +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
+        +     '<li><b>Temperature:</b> about 1 yard for every 10\u00b0F per 100 yards - longer when it is cold, shorter when it is warm (from 70\u00b0F).</li>'
+        +   '</ul>'
+        +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (never your position), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
@@ -3825,6 +4042,12 @@
         + '#gps-overlay .gps-clubs-foot{display:flex;gap:8px;justify-content:space-between;}'
         + '#gps-overlay .gps-clubs .gps-club-skip{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;}'
         + '#gps-overlay .gps-suggest{font:800 14px/1.2 ' + FONT + ';color:#d9f99d;padding:7px 11px;border-radius:12px;white-space:nowrap;}'
+        + '#gps-overlay .gps-pl-line{display:flex;align-items:center;gap:6px;max-width:calc(100vw - 24px);box-sizing:border-box;font:800 13px/1.25 ' + FONT + ';color:#d9f99d;padding:6px 10px;border-radius:12px;}'
+        + '#gps-overlay .gps-pl-text{flex:1 1 auto;min-width:0;}'
+        + '#gps-overlay .gps-pl-info{flex:0 0 auto;min-width:36px;min-height:36px;border-radius:18px;border:0;background:transparent;color:#d9f99d;font:800 18px/1 ' + FONT + ';padding:0;}'
+        + '#gps-overlay .gps-plinfo{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font:600 14px/1.4 ' + FONT + ';touch-action:pan-y;}'
+        + '#gps-overlay .gps-plinfo ul{margin:6px 0;padding-left:18px;}#gps-overlay .gps-plinfo li{margin:4px 0;}#gps-overlay .gps-plinfo p{margin:6px 0;color:#c8d1ca;}'
+        + '#gps-overlay .gps-plinfo-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bagask{position:absolute;z-index:45;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 72px);padding:8px 10px;border-radius:14px;font:700 14px/1.2 ' + FONT + ';}'
         + '#gps-overlay .gps-bagask-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
         + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
@@ -3839,6 +4062,11 @@
         + '#gps-overlay .gps-bag-reset{min-height:40px;padding:0 8px;color:#fca5a5 !important;font-weight:700;}'
         + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
+        + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
+        + '#gps-overlay .gps-bag-srow{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-bag-setup-foot{display:flex;gap:10px;justify-content:center;margin-top:10px;}'
+        + '#gps-overlay .gps-bag-setup-save{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
+        + '#gps-overlay .gps-bag-setup-skip,#gps-overlay .gps-bag-setup-open{min-height:44px;padding:0 14px;color:#c8d1ca !important;font-weight:700;}#gps-overlay .gps-bag-setup-open{display:block;margin:4px auto 0;}'
         + '#gps-overlay .gps-tools-menu{position:absolute;z-index:9;right:8px;bottom:calc(var(--gps-attrib-h) + 70px);display:flex;flex-direction:column;min-width:210px;padding:6px;}'
         + '#gps-overlay .gps-menu-item{text-align:left;padding:12px 12px;min-height:44px;border-radius:10px;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-menu-item + .gps-menu-item{border-top:1px solid rgba(255,255,255,.08);}'
@@ -4136,6 +4364,17 @@
         });
         // MY BAG (008): the switch off = no question, no suggestion, no My bag (removed, not hidden).
         if (!bagSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="clubs"]'), function (n) { n.parentNode.removeChild(n); });
+        // BAG SETUP (009): its switch off = no setup in My bag (removed, not hidden).
+        if (!setupSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagSetup"]'), function (n) { n.parentNode.removeChild(n); });
+        // PLAYS-LIKE LINE (009): its switch off = no line (removed, not hidden).
+        if (!plSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsBreakdown"]'), function (n) { n.parentNode.removeChild(n); });
+        // HOW PLAYS-LIKE WORKS (009): the ⓘ opens it; its switch off = no ⓘ, no sheet.
+        if (!plInfoSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsInfo"]'), function (n) { n.parentNode.removeChild(n); });
+        on(el, '.gps-pl-info', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (!sh) return; closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; });
+        on(el, '.gps-plinfo-done', function () { var sh = S && S.el.querySelector('.gps-plinfo'); if (sh) sh.style.display = 'none'; });
+        on(el, '.gps-bag-setup-save', saveSetup);
+        on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
+        on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
         on(el, '.gps-my-bag', openBag);
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
         on(el, '.gps-bagask-skip', bagSkip);
@@ -4148,14 +4387,15 @@
                 if (!c || !B || !S) return;
                 var v = Number(e.target.value);
                 B.set(bagGolfer(), c, v > 0 ? (units() === 'm' ? v / G.M_PER_YD : v) : null);
+                bagSaved();
                 fillBag(); render();
             });
             bagEl.addEventListener('click', function (e) {
                 var t = e.target, B = bagApi();
                 if (!B || !S || !t || !t.closest) return;
                 var r1 = t.closest('[data-bag-reset]');
-                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); fillBag(); render(); return; }
-                if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); fillBag(); render(); }
+                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); bagSaved(); fillBag(); render(); return; }
+                if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); bagSaved(); fillBag(); render(); }
             });
         }
         // RECENTER: back to the hole's own view - tee at the bottom, green at the top.

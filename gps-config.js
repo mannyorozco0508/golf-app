@@ -61,7 +61,17 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // THE 008 GPS FEATURES (Manny, 2026-10-18): each behind its own switch, so a broken one is
     // turned off here without touching code. Read through HardPanFeature('<name>') (below).
     // watch (feature 10, docs/WATCH-APP-PLAN.md): OFF - no watch app or plugin ships yet.
-    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true, watch: false },
+    // 009 (mailbox 009 part B): bagSetup = My bag's first-time "Enter your carry for each club";
+    // playsBreakdown = the one-line "Plays 168: +6 uphill, +9 into wind (12 mph) -> 6-iron";
+    // playsInfo = the (i) "How plays-like works" sheet on that line;
+    // courseElev = the whole course's heights sampled once (tee, every 25 yds, green, hazards;
+    // USGS, US only) - off: the 5 points per hole (tee, 25 / 50 / 75 %, green) as before.
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
+        playsBreakdown: true, playsInfo: true, courseElev: true },
+    // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
+    // MY BAG ACCOUNT SYNC (009): the signed-in golfer's own bag to player_clubs/<uid>/me. OFF:
+    // that rule is phase 2 and not live (writes would be refused) - the bag stays on the phone.
+    clubsSync: false,
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays

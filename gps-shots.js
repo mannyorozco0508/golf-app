@@ -69,7 +69,8 @@
     // round), the last 10 yardages per club are kept ON THIS PHONE (hardpan_bag_v1 -
     // yards only, never a position). A club's number = the MEDIAN of those, outliers
     // dropped (outside 1.5 x the interquartile range, once there are 4 or more); a number
-    // the golfer typed in My bag wins over it until reset. Nothing here leaves the phone.
+    // the golfer typed in My bag wins over it until reset. Nothing here leaves the phone -
+    // except the account sync below (009), which ships switched OFF (clubsSync: false).
     var BAG_KEY = 'hardpan_bag_v1', BAG_LAST = 10;
     var BAG = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
@@ -119,21 +120,125 @@
     }
     function resetClub(golfer, club) {
         var r = bagRec(), b = bagOf(r, golferKey(golfer));
-        delete b.set[club]; delete b.shots[club];
+        delete b.set[club]; delete b.shots[club]; if (b.base) delete b.base[club];
         return lsSet(BAG_KEY, r);
     }
     function resetBag(golfer) { var r = bagRec(); delete r.golfers[golferKey(golfer)]; return lsSet(BAG_KEY, r); }
-    // { club: { yd, n, set } } for every club with a number.
+    // ---- FIRST-TIME SETUP (009, switch bagSetup) ------------------------------------
+    // "Enter your carry for each club": the golfer's handicap gives a starting carry per
+    // club (this table, scratch / 10 / 20 / 30, straight-line in between; under 0 = scratch,
+    // over 30 = 30), every one editable. They are a STARTING POINT ("entered"): once a club
+    // has LEARN_MIN marked shots of its own, the shots' median ("learned") takes over. A
+    // number typed in My bag later still wins over both (as in 008).
+    var DEFAULT_HCPS = [0, 10, 20, 30];
+    var DEFAULT_CARRY = {
+        Dr: [260, 235, 210, 185], '3w': [235, 212, 190, 170], '5w': [220, 198, 178, 160], Hy: [210, 188, 170, 152],
+        '4i': [200, 178, 160, 142], '5i': [190, 170, 152, 135], '6i': [180, 160, 143, 127], '7i': [170, 150, 134, 118],
+        '8i': [160, 140, 125, 110], '9i': [148, 130, 115, 100], PW: [136, 120, 105, 90], GW: [122, 107, 94, 80],
+        SW: [105, 92, 80, 68], LW: [85, 75, 65, 55] };
+    var MID_HCP = 15, LEARN_MIN = 3;
+    // { club: yards } for a handicap (a number, or anything else: the mid default). Pure.
+    function defaultCarries(hcp) {
+        var h = Number(hcp);
+        if (hcp === null || hcp === undefined || hcp === '' || !isFinite(h)) h = MID_HCP;
+        h = Math.max(DEFAULT_HCPS[0], Math.min(DEFAULT_HCPS[DEFAULT_HCPS.length - 1], h));
+        var i = 1;
+        while (i < DEFAULT_HCPS.length - 1 && h > DEFAULT_HCPS[i]) i++;
+        var t = (h - DEFAULT_HCPS[i - 1]) / (DEFAULT_HCPS[i] - DEFAULT_HCPS[i - 1]), out = {};
+        BAG.forEach(function (c) { var v = DEFAULT_CARRY[c]; out[c] = Math.round(v[i - 1] + (v[i] - v[i - 1]) * t); });
+        return out;
+    }
+    function okYd(v) { v = Math.round(Number(v)); return v > 0 && v < 450 ? v : null; }
+    // Setup done: the carries kept as the bag's starting point (base). carries: { club: yd }.
+    function setup(golfer, carries) {
+        var r = bagRec(), b = bagOf(r, golferKey(golfer)), base = {};
+        BAG.forEach(function (c) { var v = okYd((carries || {})[c]); if (v) base[c] = v; });
+        b.base = base; b.setupAt = Date.now();
+        return lsSet(BAG_KEY, r);
+    }
+    // "Not now": not asked again on this phone (no carries kept).
+    function skipSetup(golfer) { var r = bagRec(), b = bagOf(r, golferKey(golfer)); b.setupAt = b.setupAt || Date.now(); return lsSet(BAG_KEY, r); }
+    // The first-time setup is due: nothing in this golfer's bag, and never done / skipped here.
+    function needsSetup(golfer) {
+        var b = bagRec().golfers[golferKey(golfer)];
+        if (!b) return true;
+        if (b.setupAt) return false;
+        return !['shots', 'set', 'base'].some(function (f) { return b[f] && Object.keys(b[f]).length; });
+    }
+    // { club: { yd, n, set, base? } } for every club with a number. set: typed in My bag;
+    // base: the setup's carry (fewer than LEARN_MIN shots of its own yet); neither: learned.
     function bag(golfer) {
         var b = bagRec().golfers[golferKey(golfer)] || { shots: {}, set: {} }, out = {};
         BAG.forEach(function (c) {
-            var a = clubAverage((b.shots || {})[c]), set = (b.set || {})[c];
+            var a = clubAverage((b.shots || {})[c]), set = (b.set || {})[c], base = (b.base || {})[c];
             if (set) out[c] = { yd: set, n: a ? a.of : 0, set: true };
-            else if (a) out[c] = { yd: a.yd, n: a.of, set: false };
+            else if (a && (!base || a.of >= LEARN_MIN)) out[c] = { yd: a.yd, n: a.of, set: false };
+            else if (base) out[c] = { yd: base, n: a ? a.of : 0, set: false, base: true };
         });
         return out;
     }
+    // "entered" (typed, or the setup's carry) or "learned" (the marked shots' median).
+    function source(v) { return !v ? '' : (v.set || v.base ? 'entered' : 'learned'); }
+
+    // ---- ACCOUNT SYNC (009) - BUILT, SWITCHED OFF (HARDPAN_GPS_CONFIG.clubsSync) -------
+    // For a SIGNED-IN golfer's OWN bag only: player_clubs/<their uid>/me =
+    //   { shots: { <club>: [yd, ... up to 10] }, set: { <club>: yd }, base: { <club>: yd } }
+    // (clubs Dr 3w 5w Hy 4i-9i PW GW SW LW; yards whole numbers 1-449; Firebase keeps an
+    // array as { 0: yd, 1: yd, ... }). Yards only - never a position, never another golfer.
+    // The rule for it is phase 2 and NOT live, so the switch ships false: no read, no
+    // write, the bag stays on the phone. On: load(db, uid, golfer) at sign-in (a phone
+    // takes, per club, the account's numbers where it has none of its own), and
+    // save(db, uid, golfer) after every change.
+    var SYNC_ROOT = 'player_clubs/', SYNC_ME = 'me';
+    function syncOn() { try { return !!(W.HARDPAN_GPS_CONFIG && W.HARDPAN_GPS_CONFIG.clubsSync === true); } catch (e) { return false; } }
+    function syncPath(uid) { return SYNC_ROOT + String(uid) + '/' + SYNC_ME; }
+    function okUid(uid) { return typeof uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(uid); }
+    function clubMap(m, list) {
+        var out = {};
+        BAG.forEach(function (c) {
+            var v = m && m[c];
+            if (list) {
+                var arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []);
+                arr = arr.map(okYd).filter(Boolean).slice(-BAG_LAST);
+                if (arr.length) out[c] = arr;
+            } else { var y = okYd(v); if (y) out[c] = y; }
+        });
+        return out;
+    }
+    // The record written: exactly { shots, set, base } (empty ones left out).
+    function syncShape(golfer) {
+        var b = bagRec().golfers[golferKey(golfer)] || {}, out = {};
+        var sh = clubMap(b.shots, true), st = clubMap(b.set, false), bs = clubMap(b.base, false);
+        if (Object.keys(sh).length) out.shots = sh;
+        if (Object.keys(st).length) out.set = st;
+        if (Object.keys(bs).length) out.base = bs;
+        return out;
+    }
+    function syncSave(db, uid, golfer) {
+        if (!syncOn() || !okUid(uid) || !db || typeof db.ref !== 'function') return Promise.resolve(false);
+        try { return Promise.resolve(db.ref(syncPath(uid)).set(syncShape(golfer))).then(function () { return true; }, function () { return false; }); } catch (e) { return Promise.resolve(false); }
+    }
+    function syncLoad(db, uid, golfer) {
+        if (!syncOn() || !okUid(uid) || !db || typeof db.ref !== 'function') return Promise.resolve(false);
+        try {
+            return Promise.resolve(db.ref(syncPath(uid)).once('value')).then(function (snap) {
+                var v = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!v || typeof v !== 'object') return false;
+                var r = bagRec(), b = bagOf(r, golferKey(golfer)), got = false;
+                [['shots', true], ['set', false], ['base', false]].forEach(function (f) {
+                    var remote = clubMap(v[f[0]], f[1]);
+                    b[f[0]] = b[f[0]] || {};
+                    Object.keys(remote).forEach(function (c) { if (b[f[0]][c] == null) { b[f[0]][c] = remote[c]; got = true; } });
+                });
+                if (got && b.base && Object.keys(b.base).length && !b.setupAt) b.setupAt = Date.now();
+                return got ? lsSet(BAG_KEY, r) : false;
+            }, function () { return false; });
+        } catch (e) { return Promise.resolve(false); }
+    }
     W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
-        add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY };
+        add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY,
+        DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries,
+        setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,
+        syncOn: syncOn, syncPath: syncPath, syncShape: syncShape, syncSave: syncSave, syncLoad: syncLoad };
     W.HardPanGpsShots = { load: load, shots: shots, add: add, setLast: setLast, undo: undo, legs: legs, holesWithShots: holesWithShots, MAX_PER_HOLE: MAX_PER_HOLE, CLUBS: CLUBS };
 })();

@@ -23,11 +23,13 @@ HardPan is golf GPS and a live scorecard for the games your group already plays.
 GPS
 - Front, middle and back yardages to every green, and to any spot you tap on the map
 - Wind and plays-like distances
-- Satellite view of each hole, tee to green, and a hole preview that flies you from the tee to the green
+- Satellite view of each hole, tee to green, and a hole preview that flies you down the hole to the green
 - Moves to the next hole by itself when you walk onto the next tee (you can turn it off)
 - Hazards and layups: yards to reach and carry the bunkers and water on the hole, where the course
   map has them
-- Your club distances: mark a shot, pick the club, and HardPan suggests a club for the next one
+- Your club distances: enter your carries or let HardPan learn them from the shots you mark, and it
+  suggests a club from the plays-like distance (slope where US elevation data exists, wind,
+  temperature) - with the breakdown shown
 - Quick stats as you play (putts, fairways, greens in regulation) and a My stats page
 - HardPan Index: an unofficial handicap-style number from your rounds (not an official handicap)
 - Works for every golfer in your group, on their own phone
@@ -66,8 +68,8 @@ golf,gps,yardage,rangefinder,scorecard,nassau,skins,leaderboard,golf games,handi
 
 ## What's New (2.0)
 - HardPan GPS: yardages to every green, wind and plays-like - 7-day free trial
-- GPS: auto-advance holes, hazards and layups, club suggestions, hole preview, quick stats and the
-  unofficial HardPan Index
+- GPS: auto-advance holes, hazards and layups, club suggestions from the plays-like distance, a hole
+  preview that follows the fairway, quick stats and the unofficial HardPan Index
 - New icon
 - Games, scoring and the leaderboard stay free
 

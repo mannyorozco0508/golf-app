@@ -752,9 +752,15 @@
         var pts = [tee].concat(greenPts || []).filter(function (p) { return p && isFinite(p[0]) && isFinite(p[1]); });
         if (!tee || pts.length < 2) return null;
         var g = polygonCentroid(greenPts) || greenPts[0];
-        var bearing = bearingDeg(tee, g);
+        return fitCamera(pts, bearingDeg(tee, g), view, pad, maxZoom);
+    }
+    // The camera that fits every point of `pts` with `bearing` up, inside the view
+    // minus `pad` (holeCamera's fit, for any points and any bearing). Pure.
+    function fitCamera(pts, bearing, view, pad, maxZoom) {
+        pts = (pts || []).filter(function (p) { return p && isFinite(p[0]) && isFinite(p[1]); });
+        if (!pts.length) return null;
         var th = toRad(bearing);
-        var origin = tee, proj = projector(origin);
+        var origin = pts[0], proj = projector(origin);
         var uv = pts.map(function (p) {
             var xy = proj.fwd(p);                       // x east, y north (m)
             return [xy[0] * Math.cos(th) - xy[1] * Math.sin(th),   // u: screen-right
@@ -802,6 +808,165 @@
         var tt = Math.max(0, Math.min(1, Number(t) || 0));
         var from = tt > 0.8 ? at(0.8) : at(tt), to = tt > 0.8 ? pts[pts.length - 1] : at(tt + 0.2);
         return { pt: at(tt), bearing: bearingDeg(from, to) };
+    }
+
+    // ---- THE HOLE'S PATH + THE PREVIEW FLIGHT ALONG IT (009) --------------------------
+    // Manny (mailbox 009): the preview flew the straight white line and sat too close. It
+    // now flies the HOLE'S PATH, the best one the data has, in this order:
+    //   centerline  the hole's own drawn line with a bend in it (OpenStreetMap golf=hole,
+    //               or GolfAPI's dogleg point) - tee -> its corners -> green;
+    //   target      the golfer's dragged target as the bend (tee -> target -> green);
+    //   fairway     the middle of the fairway mapped for the hole (all its pieces);
+    //   hazards     the middle between a left and a right fairway bunker (GolfAPI);
+    //   straight    tee -> green, only when there is nothing else.
+    // A bend counts only between the tee and the green (5-95% of the way, 25 m or more
+    // short of the green, the detour at most 1.6x the straight line); a bend made from
+    // the fairway or bunkers that turns less than 8 degrees is the straight line.
+    // Pure: { pts: [tee, ..., green], src } or null.
+    var PATH_MIN_TURN_DEG = 8, PATH_MAX_DETOUR = 1.6, FLYOVER_MS = 5200, FLY_GLIDE_PITCH = 40;
+    function polyLen(pts) { var m = 0; for (var i = 1; i < pts.length; i++) m += haversineMeters(pts[i - 1], pts[i]); return m; }
+    function turnAt(a, b, c) { var d = Math.abs(bearingDeg(b, c) - bearingDeg(a, b)) % 360; return d > 180 ? 360 - d : d; }
+    function maxTurn(pts) { var m = 0; for (var i = 1; i + 1 < pts.length; i++) m = Math.max(m, turnAt(pts[i - 1], pts[i], pts[i + 1])); return m; }
+    // How far (0..1) p sits along tee -> green.
+    function alongStraight(tee, mid, p) {
+        var proj = projector(tee), g = proj.fwd(mid), q = proj.fwd(p), L2 = g[0] * g[0] + g[1] * g[1];
+        return L2 ? (q[0] * g[0] + q[1] * g[1]) / L2 : 0;
+    }
+    function bendOk(tee, mid, b) {
+        var f = alongStraight(tee, mid, b), d = haversineMeters(tee, mid);
+        return f > 0.05 && f < 0.95 && haversineMeters(b, mid) > 25 && haversineMeters(tee, b) + haversineMeters(b, mid) <= PATH_MAX_DETOUR * d;
+    }
+    function byAlong(tee, mid, list) {
+        return list.filter(function (b) { return bendOk(tee, mid, b); })
+            .sort(function (a, b) { return alongStraight(tee, mid, a) - alongStraight(tee, mid, b); });
+    }
+    // o: { tee, mid, line?, target?, fairway? (rings), hazards? ([{ type, side, pt }]) }
+    function holePath(o) {
+        var tee = pinPt(o && o.tee), mid = pinPt(o && o.mid);
+        if (!tee || !mid || haversineMeters(tee, mid) < 1) return null;
+        var line = ((o.line) || []).map(pinPt).filter(Boolean);
+        if (line.length >= 3) {
+            var inner = byAlong(tee, mid, line.slice(1, -1));
+            if (inner.length) return { pts: [tee].concat(inner, [mid]), src: 'centerline' };
+        }
+        var t = pinPt(o.target);
+        if (t && bendOk(tee, mid, t)) return { pts: [tee, t, mid], src: 'target' };
+        var derived = function (bends, src) {
+            var p = [tee].concat(byAlong(tee, mid, bends), [mid]);
+            return p.length >= 3 && maxTurn(p) >= PATH_MIN_TURN_DEG ? { pts: p, src: src } : null;
+        };
+        // The fairway: ONE bend, the middle of all its pieces that lie between the tee and
+        // the green, weighted by size (pieces one by one zigzag on a split fairway).
+        var sx = 0, sy = 0, sw = 0, fproj = projector(tee);
+        (o.fairway || []).forEach(function (r) {
+            var c = r && r.length >= 3 ? polygonCentroid(r) : null;
+            if (!c || !bendOk(tee, mid, c)) return;
+            var xy = r.map(fproj.fwd), a = 0;
+            for (var i = 0; i < xy.length; i++) { var q = xy[(i + 1) % xy.length]; a += xy[i][0] * q[1] - q[0] * xy[i][1]; }
+            var w = Math.abs(a) / 2 || 1, cxy = fproj.fwd(c);
+            sx += cxy[0] * w; sy += cxy[1] * w; sw += w;
+        });
+        var fw = sw ? derived([fproj.inv([sx / sw, sy / sw])], 'fairway') : null;
+        if (fw) return fw;
+        // A LEFT and a RIGHT fairway bunker at about the same distance: the fairway runs between them.
+        var fb = (o.hazards || []).filter(function (z) { return z && z.type === 'fb' && pinPt(z.pt); });
+        var L = fb.filter(function (z) { return z.side === 'L'; }), R = fb.filter(function (z) { return z.side === 'R'; }), mids = [];
+        L.forEach(function (l) {
+            var la = alongStraight(tee, mid, pinPt(l.pt)), best = null;
+            R.forEach(function (r) { var d = Math.abs(alongStraight(tee, mid, pinPt(r.pt)) - la); if (d < 0.15 && (!best || d < best.d)) best = { d: d, pt: pinPt(r.pt) }; });
+            if (best) mids.push(midpoint(pinPt(l.pt), best.pt));
+        });
+        var hz = derived(mids.filter(function (m, i) { return !mids.slice(0, i).some(function (n) { return haversineMeters(m, n) < 30; }); }), 'hazards');
+        if (hz) return hz;
+        return { pts: [tee, mid], src: 'straight' };
+    }
+    // The point a fraction f (0..1) of the way along pts, by distance.
+    function alongPts(pts, f) {
+        var total = polyLen(pts), want = Math.max(0, Math.min(1, f)) * total;
+        for (var j = 1; j < pts.length; j++) {
+            var m = haversineMeters(pts[j - 1], pts[j]);
+            if (want <= m || j === pts.length - 1) {
+                var k = m ? Math.min(1, want / m) : 0;
+                return [pts[j - 1][0] + (pts[j][0] - pts[j - 1][0]) * k, pts[j - 1][1] + (pts[j][1] - pts[j - 1][1]) * k];
+            }
+            want -= m;
+        }
+        return pts[pts.length - 1];
+    }
+    // Which way the camera looks at fraction s: from a little behind to a little ahead on
+    // the path, so it turns smoothly through a dogleg (and holds still over the green).
+    function pathBearing(pts, s) {
+        var a = Math.max(0, Math.min(0.8, s - 0.1)), b = Math.min(1, Math.max(s + 0.15, a + 0.2));
+        return bearingDeg(alongPts(pts, a), alongPts(pts, b));
+    }
+    function smooth01(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+    function lerpBearing(a, b, w) { var d = ((b - a + 540) % 360) - 180; return (a + d * w + 360) % 360; }
+    function blendCam(a, b, w) {
+        return { center: [a.center[0] + (b.center[0] - a.center[0]) * w, a.center[1] + (b.center[1] - a.center[1]) * w],
+                 zoom: a.zoom + (b.zoom - a.zoom) * w, bearing: lerpBearing(a.bearing, b.bearing, w) };
+    }
+    // THE FLIGHT. o: { path (pts), green (outline pts), pins (F / C / B pts), extra (hazard
+    // points and fairway outlines: how wide the glide looks), view { w, h }, pad, maxZoom }.
+    //   start  the whole hole - every path point, the green and its pins - tee to green up;
+    //   glide  down the path, wide enough for the fairway and the hazards beside it (120 m
+    //          across at least, never closer than 1.2 zoom steps inside the whole-hole view);
+    //   end    the green and its F / C / B pins, looking the way the path arrives.
+    function flyoverPlan(o) {
+        var pts = ((o && o.path) || []).map(pinPt).filter(Boolean);
+        if (pts.length < 2 || !(polyLen(pts) > 0)) return null;
+        var view = o.view || { w: 390, h: 600 }, pad = o.pad || {}, maxZ = o.maxZoom == null ? 22 : o.maxZoom;
+        var green = ((o.green) || []).map(pinPt).filter(Boolean), pins = ((o.pins) || []).map(pinPt).filter(Boolean);
+        var start = fitCamera(pts.concat(green, pins), bearingDeg(pts[0], pts[pts.length - 1]), view, pad, maxZ);
+        var hw = 60;
+        ((o.extra) || []).forEach(function (p) { p = pinPt(p); if (!p) return; var a = alongLine(p, pts); if (a.t > 0.02 && a.t < 0.98) hw = Math.max(hw, a.d + 20); });
+        hw = Math.min(hw, 130);
+        var availW = Math.max(40, view.w - (pad.left || 0) - (pad.right || 0));
+        var k = EQUATOR_M * Math.cos(toRad(pts[0][0])) / 512;
+        var glideZoom = Math.max(start.zoom, Math.min(Math.log2(k * availW / (2 * hw)), start.zoom + 1.2, maxZ));
+        var endB = pathBearing(pts, 1), ring = [];
+        (green.length ? green : []).concat(pins, [pts[pts.length - 1]]).forEach(function (p) { [0, 90, 180, 270].forEach(function (b) { ring.push(destination(p, b, 18)); }); });
+        var end = fitCamera(ring, endB, view, pad, maxZ);
+        return { pts: pts, start: start, end: end, glideZoom: glideZoom, ms: FLYOVER_MS };
+    }
+    // The camera a fraction t (0..1) of the way through the flight: { center, zoom,
+    // bearing, pitch, along }. Holds the whole hole a moment, dives toward the tee while
+    // tilting, glides the path, settles flat on the green and holds it. Pure.
+    function flyoverCamera(plan, t) {
+        if (!plan) return null;
+        t = Math.max(0, Math.min(1, Number(t) || 0));
+        var s = smooth01((t - 0.08) / 0.82), wA = smooth01((t - 0.04) / 0.30), wE = smooth01((t - 0.70) / 0.22);
+        var glide = { center: alongPts(plan.pts, s), zoom: plan.glideZoom, bearing: pathBearing(plan.pts, s) };
+        var c = blendCam(blendCam(plan.start, glide, wA), plan.end, wE);
+        c.pitch = FLY_GLIDE_PITCH * wA * (1 - wE);
+        c.along = s;
+        return c;
+    }
+
+
+    // ---- THE DEFAULT TARGET ON THE PATH (009, switch pathTarget) ---------------------
+    // With a bent path (gps-geo.holePath, never the dragged target) the default target
+    // sits AT THE DOGLEG when its corner is in the landing zone (60 yds short of the
+    // default shot to 20 past it - from the tee, or from the golfer standing back on
+    // the hole - and 60 or more from the green), else the default shot along the path. A par 3, a straight path or none: exactly defaultTarget.
+    // o: defaultTarget's, plus path.
+    function pathTarget(o) {
+        var path = o && o.path;
+        if (!o || !o.mid || Number(o.par) === 3 || !path || !path.pts || path.pts.length < 3 || path.src === 'target') return defaultTarget(o);
+        var pts = path.pts, shotM = (o.shotYd || DEFAULT_SHOT_YD) * M_PER_YD;
+        var line = path.src === 'centerline' && o.line && o.line.length >= 3 ? o.line : pts;
+        var me = o.from === 'me' && pinPt(o.pt);
+        if (!me || haversineMeters(me, o.mid) > GREEN_REACH_YD * M_PER_YD) {
+            // Measured from where the walk starts: the tee, or the golfer's spot on the path.
+            var total = polyLen(pts), from = me ? alongLine(me, pts).t * total : 0, best = null, run = 0;
+            for (var i = 1; i + 1 < pts.length; i++) {
+                run += haversineMeters(pts[i - 1], pts[i]);
+                var turn = turnAt(pts[i - 1], pts[i], pts[i + 1]), ahead = run - from;
+                if (turn >= PATH_MIN_TURN_DEG && ahead >= shotM - 60 * M_PER_YD && ahead <= shotM + 20 * M_PER_YD
+                    && haversineMeters(pts[i], o.mid) >= MIN_LEFT_YD * M_PER_YD && (!best || turn > best.turn)) best = { pt: pts[i], turn: turn };
+            }
+            if (best) return snapToFairway(best.pt, o.fairway);
+        }
+        return defaultTarget(Object.assign({}, o, { line: line }));
     }
 
     // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
@@ -1042,6 +1207,103 @@
         exact = Math.max(D * 0.5, Math.min(D * 1.6, exact));
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
+
+    // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) -------------------------
+    // ONE LINE the golfer can check: "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm".
+    // Each part is playsLike's own term, rounded to the yard; a term with no data is not
+    // in pl.terms and so is left out; a term that rounds to 0 says nothing and is left out.
+    // pl: playsLike's result; windMph: the reading's speed (shown as the golfer sees it on
+    // the wind box); unit: 'm' for meters (else yards). Pure.
+    function playsParts(pl, windMph, unit) {
+        var out = [], t = (pl && pl.terms) || {}, k = unit === 'm' ? M_PER_YD : 1;
+        var sg = function (x) { return (x > 0 ? '+' : '-') + Math.abs(x); };
+        var r = function (x) { return Math.round(x * k); };
+        if (isNum(t.elev) && r(t.elev)) out.push(sg(r(t.elev)) + (t.elev > 0 ? ' uphill' : ' downhill'));
+        if (isNum(t.wind) && r(t.wind)) out.push(sg(r(t.wind)) + (t.wind > 0 ? ' into wind' : ' downwind') + (isNum(windMph) ? ' (' + Math.round(windMph) + ' mph)' : ''));
+        if (isNum(t.temp) && r(t.temp)) out.push(sg(r(t.temp)) + (t.temp > 0 ? ' cold' : ' warm'));
+        return out;
+    }
+    // CROSSWIND = AIM OFF, NO DISTANCE CHANGE. The rule (a common rule of thumb, kept
+    // simple on purpose): the ball drifts about 0.5% of the shot's distance per mph of
+    // crosswind - 150 yds in a 10 mph crosswind drifts ~8 yds. Aim that far INTO the
+    // wind. cross: windRelative's (+ = blowing LEFT TO RIGHT, so the ball goes right:
+    // aim left). Under 2 yds (inside what GPS can tell): nothing to say (null). Pure.
+    var AIM_PER_MPH = 0.005;
+    function windAim(yards, crossMph) {
+        if (!isNum(yards) || !isNum(crossMph) || yards <= 0) return null;
+        var yd = Math.round(yards * AIM_PER_MPH * Math.abs(crossMph));
+        if (yd < 2) return null;
+        return { yd: yd, side: crossMph > 0 ? 'left' : 'right' };
+    }
+    // ---- THE WHOLE COURSE'S HEIGHTS (009, switch courseElev) --------------------------
+    // The points sampled once per course (USGS EPQS, COURSE POINTS ONLY - never the
+    // golfer): per hole the tee; every ELEV_STEP_YD along the hole's own line (its
+    // centerline, doglegs followed; the straight tee -> green line when there is none);
+    // the green's front, center and back (along the line of play into it); and each
+    // hazard point. To 5 decimals, each once. rec: a course GPS record ({ holes:
+    // { n: { osm } } }). Returns { "1": [[lat, lng], ...], ... }. Pure.
+    var ELEV_STEP_YD = 25;
+    function r5pt(p) { return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]; }
+    function walkLine(line, stepM) {
+        var out = [line[0]];
+        var carry = 0;
+        for (var i = 1; i < line.length; i++) {
+            var a = line[i - 1], b = line[i], len = haversineMeters(a, b);
+            var s = stepM - carry;
+            while (s <= len) { var t = s / len; out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); s += stepM; }
+            carry = len - (s - stepM);
+        }
+        return out;
+    }
+    function holeElevPoints(o) {
+        o = o && (o.osm || o);
+        var mid = o && pinPt(o.mid), tee = o && pinPt(o.tee);
+        if (!mid) return [];
+        var pts = [], seen = {};
+        var add = function (p) { p = pinPt(p); if (!p) return; p = r5pt(p); var k = p[0] + ',' + p[1]; if (!seen[k]) { seen[k] = 1; pts.push(p); } };
+        var line = (o.line && o.line.length >= 2) ? o.line.map(pinPt).filter(Boolean) : (tee ? [tee, mid] : null);
+        if (line && line.length >= 2) {
+            if (tee && haversineMeters(tee, line[0]) > 5) line = [tee].concat(line);
+            if (haversineMeters(line[line.length - 1], mid) > 5) line = line.concat([mid]);
+            if (tee) add(tee);
+            walkLine(line, ELEV_STEP_YD * M_PER_YD).forEach(add);
+        } else if (tee) add(tee);
+        add(mid);
+        if (o.green && o.green.length >= 3) {
+            var from = line && line.length >= 2 ? line[line.length - 2] : tee;
+            var g = from ? greenNumbers(from, o.green, mid) : null;
+            if (g) { add(g.front); add(g.back); }
+        }
+        (o.hazards || []).forEach(function (z) { if (z) add(z.pt); });
+        return pts;
+    }
+    function courseElevPoints(rec) {
+        var out = {};
+        Object.keys((rec && rec.holes) || {}).forEach(function (n) { var p = holeElevPoints(rec.holes[n]); if (p.length) out[n] = p; });
+        return out;
+    }
+    // A POINT'S HEIGHT FROM THE HOLE'S SAMPLES, worked out ON THE PHONE (the golfer's
+    // spot, a tapped target, the green): a sample within 2 m is that sample; else the
+    // inverse-distance-weighted mean (weight 1/d^2) of the nearest 3 sampled points with
+    // a height, within ELEV_REACH_M. Nothing that close: null (no guess, no slope term).
+    // samples: [[lat, lng, ft | null], ...]. Pure.
+    var ELEV_REACH_M = 150;
+    function elevFromSamples(samples, pt) {
+        if (!samples || !samples.length || !pt) return null;
+        var near = [];
+        samples.forEach(function (s) {
+            if (!s || !isNum(s[2])) return;
+            near.push({ d: haversineMeters(pt, s), ft: s[2] });
+        });
+        near.sort(function (a, b) { return a.d - b.d; });
+        if (!near.length || near[0].d > ELEV_REACH_M) return null;
+        if (near[0].d < 2) return near[0].ft;
+        var sw = 0, sv = 0;
+        near.slice(0, 3).filter(function (n) { return n.d <= ELEV_REACH_M; }).forEach(function (n) { var w = 1 / (n.d * n.d); sw += w; sv += w * n.ft; });
+        return sv / sw;
+    }
+    var PLAYS_API = { playsParts: playsParts, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
+        elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
     // Shared by the app (gps-view.js lookupCourse) and tools/gps-coverage.js, so
@@ -1508,7 +1770,8 @@
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
-        flyoverFrame: flyoverFrame,
+        flyoverFrame: flyoverFrame, holePath: holePath, flyoverPlan: flyoverPlan, flyoverCamera: flyoverCamera, pathTarget: pathTarget, fitCamera: fitCamera, pathBearing: pathBearing,
+        FLYOVER_MS: FLYOVER_MS, PATH_MIN_TURN_DEG: PATH_MIN_TURN_DEG,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,
@@ -1516,6 +1779,7 @@
         greenNumbers: greenNumbers, compactRing: compactRing, osmToCourseGps: osmToCourseGps, outerRings: outerRings,
         resolveHole: resolveHole, holeNumbers: holeNumbers, makePin: makePin, undoPin: undoPin, pinPt: pinPt
     };
+    Object.keys(PLAYS_API).forEach(function (k) { api[k] = PLAYS_API[k]; });   // 009: plays-like parts, aim-off, course heights
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window !== 'undefined') window.HardPanGeo = api;
 })();

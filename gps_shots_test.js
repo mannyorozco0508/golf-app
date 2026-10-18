@@ -55,7 +55,15 @@ test('the GPS screen: Tools > Mark shots / Replay round; a tap in mark mode mark
     assert.ok(/gps-mark-shots">Mark shots</.test(v) && /gps-replay">Replay round</.test(v));
     assert.ok(/if \(S\.shotMode\) \{ addShot\(pt, 'tap'\); return; \}\s*\n\s*if \(S\.replay\) return;\s*\n\s*\/\/ Tap anywhere: the target jumps there\./.test(v), 'mark mode takes the tap; replay ignores it');
     assert.ok(/function stopReplayTimer\(\)/.test(v) && /function unmount\(\) \{[\s\S]{0,120}stopReplayTimer\(\);/.test(v), 'the replay timer stops with the screen');
-    assert.ok(!/firebase|\.ref\(|fetch\(|XMLHttpRequest/.test(src), 'no database, no network');
+    // 009: the ONE database path is My bag's account sync (player_clubs/<uid>/me), switched off
+    // (clubsSync) until its rule is live - gps_clubs_test.js holds it. The rest: none.
+    const raw = read('gps-shots.js'), a = raw.indexOf('// ---- ACCOUNT SYNC (009)'), b = raw.indexOf('    W.HardPanGpsBag = {');
+    assert.ok(a > 0 && b > a, 'the sync is one marked section');
+    const sync = raw.slice(a, b);
+    assert.ok(/function syncSave\(db, uid, golfer\) \{\s*if \(!syncOn\(\)/.test(sync) && /function syncLoad\(db, uid, golfer\) \{\s*if \(!syncOn\(\)/.test(sync), 'every database call behind the switch');
+    assert.ok(!/fetch\(|XMLHttpRequest/.test(sync));
+    assert.ok(!/firebase|\.ref\(|fetch\(|XMLHttpRequest/.test((raw.slice(0, a) + raw.slice(b)).replace(/^\s*\/\/.*$/gm, '')), 'no database, no network');
+    void src;
 });
 
 test('one-tap Mark shot: the club, the yards, wind, slope and plays-like saved with the shot; the club picked after; moving it', { skip }, () => {
