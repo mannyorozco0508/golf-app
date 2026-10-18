@@ -1212,8 +1212,12 @@
     // bar's height (two or three lines with the Esri credit) and the top panel's.
     function syncLayoutVars() {
         if (!S) return;
+        // LAYOUT C: the panel's measured height - the credit sits on it (so first), and Recenter, the
+        // zoom and the banner on the credit (--gps-attrib-h: the bottom of the screen to its top).
+        var pn = lcOn() && S.el.querySelector('.gps-panel');
+        if (pn && pn.offsetParent !== null) S.el.style.setProperty('--gps-panel-h', Math.round(S.el.getBoundingClientRect().bottom - pn.getBoundingClientRect().top) + 'px');
         S.el.style.setProperty('--gps-attrib-h', attribH() + 'px');
-        var t = S.el.querySelector('.gps-top');
+        var t = S.el.querySelector(lcOn() ? '.gps-lc-top' : '.gps-top');
         if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-top-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
     }
     // The hole's own view follows the screen until the golfer moves the map: the
@@ -1221,7 +1225,7 @@
     function maybeRefit() {
         // Never from inside a frame: MapLibre fires move events DURING jumpTo, and a
         // refit from there was a refit loop that froze the page (check, 2026-10-08).
-        if (!S || !S.map || S.framing || S.framed !== 'hole' || S.userMoved || S.zoomStep || S.view === 'green') return;
+        if (!S || !S.map || S.framing || S.framed !== 'hole' || S.userMoved || S.zoomStep || S.view === 'green' || S.flying) return;
         var h = attribH();
         if (S.attribAt != null && h !== S.attribAt) { frameHole(false); return; }
         // ... or the floating panels changed size (the top panel's text arrived).
@@ -1362,6 +1366,8 @@
         var vis = function (sel) { var e = S.el.querySelector(sel); if (!e || e.offsetParent === null) return null; var b = e.getBoundingClientRect(); return b.height ? b : null; };
         var top = VIEW_PAD.top;
         var tb = vis('.gps-top');
+        // LAYOUT C: under the top row (the taller of its two sides), above the panel.
+        if (lcOn()) { ['.gps-lc-left', '.gps-lc-right', '.gps-lc-score'].forEach(function (sel) { var b = vis(sel); if (b) tb = (!tb || b.bottom > tb.bottom) ? b : tb; }); }
         // The line under the top panel is held at its full height (28px) even
         // before its text arrives - a frame taken while it was empty let the back
         // of Pine Lakes #10's green slip under it once "±6 yds" filled it.
@@ -1369,14 +1375,19 @@
         var sb = vis('.gps-sub');
         if (sb) top = Math.max(top, sb.bottom - W.top + 12);
         var bottomEdge = W.bottom - attribH();
-        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
+        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions', '.gps-panel'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
         var bottom = W.bottom - bottomEdge + 14;
         // Always leave the hole at least 160px: a panel measured mid-layout (the
         // first, slow load) must not leave no room at all - the camera then had
         // nothing to fit into and the map stayed at its world view.
         var room = W.height - top - bottom;
-        if (room < 160) { var k = Math.max(0, (W.height - 160) / Math.max(1, top + bottom)); top *= k; bottom *= k; }
-        return { top: Math.round(top), bottom: Math.round(bottom), left: SIDE_PAD, right: SIDE_PAD };
+        // (Layout C measures a fixed top row and panel; the floor is lower there - 100px - so a small
+        // phone with big text still fits the hole BETWEEN them rather than under the top row.)
+        var floor = lcOn() ? 100 : 160;
+        if (room < floor) { var k = Math.max(0, (W.height - floor) / Math.max(1, top + bottom)); top *= k; bottom *= k; }
+        // No right-hand stack in layout C: the hole gets the width.
+        var side = lcOn() ? 28 : SIDE_PAD;
+        return { top: Math.round(top), bottom: Math.round(bottom), left: side, right: side };
     }
     function holeView() {
         if (!S || !S.map) return null;
@@ -1397,8 +1408,8 @@
         if (!box || box.clientWidth < 10 || box.clientHeight < 10) { S.needsFrame = true; return; }
         S.needsFrame = false;
         syncLayoutVars();
-        limitToCourse();
         var cam = holeView();
+        limitToCourse(cam);
         if (cam) {
             S.pad = viewPad();
             S.framing = true;
@@ -1648,6 +1659,7 @@
                 // The click MapLibre may fire at the end of a drag must not be read as
                 // a tap that moves the target again.
                 S.dragging = false; S.dragEndedAt = Date.now();
+                clampTarget();
                 render();
             });
             S.targetMarker = m;
@@ -1998,14 +2010,15 @@
         var lblRect = rectOf(lblEl, wrapR), lblObs = null;
         if (lblRect) { add(lblRect, M); lblObs = obstacles[obstacles.length - 1]; }
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
-        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
         // distances can stay clear of them.
         placeGreenLabels();
         Array.prototype.forEach.call(S.el.querySelectorAll('.gps-green-lbl'), function (el) { if (el.style.display !== 'none') add(rectOf(el, wrapR), 2); });
         // Never under the status bar or the top panel, never over the bottom row.
-        var topR = rectOf(S.el.querySelector('.gps-top'), wrapR), botR = rectOf(S.el.querySelector('.gps-bottom'), wrapR);
+        var topR = rectOf(S.el.querySelector('.gps-top'), wrapR), botR = rectOf(S.el.querySelector(lcOn() ? '.gps-panel' : '.gps-bottom'), wrapR);
         var safeTop = Math.max(M, topR ? topR.b + M : 0);
+        if (lcOn()) ['.gps-lc-left', '.gps-lc-right', '.gps-lc-score'].forEach(function (sel) { var rc = rectOf(S.el.querySelector(sel), wrapR); if (rc) safeTop = Math.max(safeTop, rc.b + M); });
         var safeBot = Math.min(H - M, botR ? botR.t - M : H);
         // The wind sheet (build 7) is a floor too while it is open.
         var wsR = rectOf(S.el.querySelector('.gps-wind-sheet'), wrapR);
@@ -3026,6 +3039,7 @@
         // Tap anywhere: the target jumps there.
         S.target = pt;
         S.targetMoved = true;
+        clampTarget();
         render();
     }
 
@@ -3048,6 +3062,7 @@
         var z = S && S.el && S.el.querySelector('.gps-zoom');
         var stack = S && S.el && S.el.querySelector('.gps-right');
         if (!z || !stack || typeof z.getBoundingClientRect !== 'function') return;
+        if (lcOn()) return;   // layout C: CSS puts it at the right, just above the panel
         var h = z.offsetHeight || 44, vh = window.innerHeight || 0, top = vh / 2 - h / 2, low = 0;
         Array.prototype.forEach.call(stack.children, function (c) { if (c.offsetParent !== null) { var b = c.getBoundingClientRect(); if (b.height) low = Math.max(low, b.bottom); } });
         if (low && top < low + 8) top = low + 8;
@@ -3237,6 +3252,7 @@
         show('.gps-hz-btn', S.pro && S.mode === 'measure' && !S.replay && courseHasAnyData());
         if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
         drawShots();
+        syncLayoutC(r, nums, acc);
         placeZoom();
         placePills();
         syncWind();
@@ -3586,6 +3602,164 @@
         return parts.join(' · ');
     }
 
+    // ---- LAYOUT C (mailbox 011, Manny picked mockup C; switch gpsLayoutC) -----------
+    // The map clear at the top: Back + Games at the left, the hole chip (and the round's
+    // score chip) at the right. Everything else in ONE bottom panel: F / MIDDLE / B, the
+    // plays line, Green | Hazards | Mark shot | Preview, and the score row. The existing
+    // elements are MOVED into it (their handlers, selectors and render code stay the
+    // same); off, nothing moves and the old layout is exactly as it was.
+    var PANEL_KEY = 'hardpan_gps_panel_';
+    function lcSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsLayoutC') !== false; } catch (e) { return true; } }
+    function rsSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsRoundScore') !== false; } catch (e) { return true; } }
+    function lcOn() { return !!(S && S.lc); }
+    function buildLayoutC(el) {
+        var q = function (sel) { return el.querySelector(sel); };
+        var mk = function (tag, cls, attrs) { var e = document.createElement(tag); e.className = cls; Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); }); return e; };
+        var put = function (box, sel) { var e = q(sel); if (e) box.appendChild(e); return e; };
+        el.classList.add('gps-lc');
+        // TOP
+        var top = mk('div', 'gps-lc-top'), left = mk('div', 'gps-lc-left'), right = mk('div', 'gps-lc-right');
+        put(left, '.gps-back'); put(left, '.gps-door-games');
+        var chip = mk('div', 'gps-lc-hole gps-float');
+        var l1 = mk('button', 'gps-lc-l1', { type: 'button', 'aria-label': 'Pick a hole' });
+        var l2 = mk('div', 'gps-lc-l2'), meta = mk('span', 'gps-lc-meta');
+        l2.appendChild(meta); put(l2, '.gps-wind');
+        chip.appendChild(l1); chip.appendChild(l2);
+        right.appendChild(chip);
+        top.appendChild(left); top.appendChild(right);
+        // The round chip: its own row under the top row, at the right - it may run in under Games.
+        if (rsSwitch()) top.appendChild(mk('button', 'gps-lc-score gps-float', { type: 'button', 'data-feature': 'gpsRoundScore', style: 'display:none', 'aria-label': 'Round score - open the scorecard' }));
+        // THE PANEL
+        var panel = mk('div', 'gps-panel', { role: 'region', 'aria-label': 'Distances and actions' });
+        var handle = mk('button', 'gps-panel-handle', { type: 'button', 'aria-expanded': 'true', 'aria-label': 'Show less' });
+        handle.appendChild(mk('span', 'gps-panel-grip'));
+        var nums = mk('div', 'gps-lc-nums');
+        [['.gps-num-f', 'FRONT'], ['.gps-num-mid', 'MIDDLE'], ['.gps-num-b', 'BACK']].forEach(function (x) {
+            var n = put(nums, x[0]); var lb = n && n.querySelector('.gps-lbl'); if (lb) lb.textContent = x[1];
+        });
+        var plays = mk('div', 'gps-lc-plays');
+        put(plays, '.gps-pl-line'); put(plays, '.gps-suggest');
+        plays.appendChild(mk('div', 'gps-lc-acc', { style: 'display:none' }));
+        var acts = mk('div', 'gps-lc-acts');
+        put(acts, '.gps-green-view'); put(acts, '.gps-hz-btn'); put(acts, '.gps-mark-shot'); put(acts, '.gps-fly-btn');
+        panel.appendChild(handle); panel.appendChild(nums); panel.appendChild(plays); panel.appendChild(acts);
+        put(panel, '.gps-bottom'); put(panel, '.gps-actions');
+        var credit = q('.gps-credit');
+        el.insertBefore(top, credit); el.insertBefore(panel, credit);
+    }
+    function panelCollapsed() { try { return localStorage.getItem(PANEL_KEY + String((S && S.eventCode) || '')) === '0'; } catch (e) { return false; } }
+    function syncPanel() {
+        if (!lcOn()) return;
+        var p = S.el.querySelector('.gps-panel'), h = S.el.querySelector('.gps-panel-handle'), c = panelCollapsed();
+        if (p) p.classList.toggle('gps-panel-collapsed', c);
+        if (h) { h.setAttribute('aria-expanded', c ? 'false' : 'true'); h.setAttribute('aria-label', c ? 'Show more' : 'Show less'); }
+    }
+    function togglePanel() {
+        if (!lcOn()) return;
+        try { localStorage.setItem(PANEL_KEY + String(S.eventCode || ''), panelCollapsed() ? '1' : '0'); } catch (e) {}
+        syncPanel();
+        syncLayoutVars();
+        // The hole is re-fitted into the new room above the panel (unless the golfer moved the map).
+        if (S.map && S.framed === 'hole' && !S.userMoved && S.view !== 'green' && !S.zoomStep) frameHole(false);
+        else placePills();
+    }
+    // THE ROUND SO FAR (switch gpsRoundScore): pure. Gross = strokes on the holes scored, to par
+    // on those holes; net = gross minus the handicap strokes on those holes, from the CANONICAL
+    // getStrokes(hole index, parseHcp(hcp)) the scorecard uses (handicap.js) - passed in as
+    // `strokes`. No handicap: net is null. "Thru" counts the holes actually scored (a start on
+    // 10 or a shotgun is still right).
+    function roundScore(o) {
+        var cd = (o && o.courseData) || [], sc = (o && o.scores) || {}, id = o && o.id, hcp = o && o.hcp;
+        var strokes = (o && typeof o.strokes === 'function') ? o.strokes : null;
+        var hasHcp = !!strokes && hcp != null && String(hcp).trim() !== '';
+        var thru = 0, gross = 0, par = 0, net = 0;
+        cd.forEach(function (h) {
+            if (!h || !h.hole) return;
+            var v = parseInt(sc['p' + id + '_h' + h.hole], 10);
+            if (!(v > 0)) return;
+            thru++; gross += v; par += Number(h.par) || 0;
+            if (hasHcp) net += v - (Number(strokes(h.hcpIndex, hcp)) || 0);
+        });
+        return { thru: thru, gross: gross, grossToPar: gross - par, net: hasHcp ? net : null, netToPar: hasHcp ? net - par : null };
+    }
+    function toParText(n) { return n === 0 ? 'E' : (n > 0 ? '+' + n : '−' + Math.abs(n)); }
+    // "Thru 3 · 14 (+2) · Net 13 (+1)"; "Thru 0 · E" before a score.
+    function roundScoreText(rs) {
+        if (!rs || !rs.thru) return 'Thru 0 · E';
+        return 'Thru ' + rs.thru + ' · ' + rs.gross + ' (' + toParText(rs.grossToPar) + ')' + (rs.net != null ? ' · Net ' + rs.net + ' (' + toParText(rs.netToPar) + ')' : '');
+    }
+    function cardStrokes() {
+        if (typeof getStrokes === 'function' && typeof parseHcp === 'function') return function (idx, hcp) { return getStrokes(idx, parseHcp(hcp)); };   /* global getStrokes, parseHcp */
+        return null;
+    }
+    function syncRoundChip() {
+        var b = S && S.el.querySelector('.gps-lc-score');
+        if (!b) return;
+        var d = roundData(), w = scoreFor();
+        if (!d || !w || !w.player) { b.style.display = 'none'; return; }
+        var rs = roundScore({ courseData: d.courseData || [], scores: w.scores, id: w.id, hcp: w.player.hcp, strokes: cardStrokes() });
+        var tp = function (n) { return n === 0 ? '' : (n < 0 ? 'gps-tp-under' : 'gps-tp-over'); };
+        var key = JSON.stringify(rs);
+        b.style.display = '';
+        if (b.getAttribute('data-rs') === key) return;
+        b.setAttribute('data-rs', key);
+        b.textContent = '';
+        // Three parts, each kept whole; a small phone with big text wraps BETWEEN them.
+        var part = function (text, n) {
+            var s = document.createElement('span'); s.textContent = text;
+            if (n != null) { var t = document.createElement('span'); var c = tp(n); if (c) t.className = c; t.textContent = '(' + toParText(n) + ')'; s.appendChild(t); }
+            if (b.firstChild) b.appendChild(document.createTextNode(' '));
+            b.appendChild(s);
+        };
+        if (!rs.thru) part('Thru 0 · E');
+        else {
+            part('Thru ' + rs.thru + ' ·');
+            part(rs.gross + ' ', rs.grossToPar);
+            if (rs.net != null) part('· Net ' + rs.net + ' ', rs.netToPar);
+        }
+        b.setAttribute('aria-label', roundScoreText(rs) + ' - open the scorecard');
+    }
+    // What render fills in layout C only.
+    function syncLayoutC(r, nums, acc) {
+        if (!lcOn()) return;
+        var m = (typeof S.holeMeta === 'function') ? (S.holeMeta(S.hole) || {}) : {};
+        var par = m.par != null ? m.par : S.par;
+        txt('.gps-lc-l1', 'Hole ' + S.hole + (par != null ? ' · Par ' + par : '') + ' ▾');
+        txt('.gps-lc-meta', holeMetaLine(r).replace(/^Par \d+( · )?/, ''));
+        // No front / back for this hole: MIDDLE alone, no blank columns.
+        var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
+        show('.gps-num-f', edges); show('.gps-num-b', edges);
+        // The honest accuracy line, only with a reading.
+        var a = S.el.querySelector('.gps-lc-acc');
+        if (a) { var t = (acc && fix && !S.geoError) ? acc.text : ''; if (a.textContent !== t) a.textContent = t; a.style.display = t ? '' : 'none'; }
+        syncPanel();
+        if (rsSwitch()) syncRoundChip();
+        // The credit, Recenter and the zoom ride on the panel's top edge, whatever its height now.
+        try { syncLayoutVars(); maybeRefit(); } catch (e) {}
+    }
+    // The tap-anywhere target (and its distances) never under the top row or the panel:
+    // a point there is pulled back into the clear map, along the screen's up / down.
+    function lcClear() {
+        if (!lcOn() || !S.map) return null;
+        var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return null;
+        var W = wrap.getBoundingClientRect();
+        var rc = function (sel) { var e = S.el.querySelector(sel); if (!e || e.offsetParent === null) return null; var b = e.getBoundingClientRect(); return b.height ? b : null; };
+        var lt = rc('.gps-lc-left'), rt = rc('.gps-lc-right'), sc = rc('.gps-lc-score'), pn = rc('.gps-panel');
+        var top = Math.max(lt ? lt.bottom : 0, rt ? rt.bottom : 0, sc ? sc.bottom : 0) - W.top;
+        var bot = (pn ? pn.top : W.bottom) - W.top;
+        return { top: top + 30, bottom: bot - 30, left: 24, right: W.width - 24 };
+    }
+    function clampTarget() {
+        var c = lcClear();
+        if (!c || !S.target) return false;
+        var p = S.map.project(ll(S.target));
+        var x = Math.min(Math.max(p.x, c.left), c.right), y = Math.min(Math.max(p.y, c.top), c.bottom);
+        if (Math.abs(x - p.x) < 0.5 && Math.abs(y - p.y) < 0.5) return false;
+        var q = S.map.unproject([x, y]);
+        S.target = [q.lat, q.lng];
+        return true;
+    }
+
     // ---- MENUS: Tools and the hole picker ------------------------------------------
     function closeMenus() { show('.gps-tools-menu', false); show('.gps-picker', false); }
     function toggleTools() {
@@ -3693,12 +3867,24 @@
     // Score's › all go back to a hole's own view. Esri tiles load only as you
     // pan; offline, the pre-cached USGS area is the same course area.
     var PAN_MARGIN_M = 400, MIN_ZOOM = 13;
-    function limitToCourse() {
+    function limitToCourse(cam) {
         if (!S || !S.map || !G) return;
         var osm = osmRecord(S.courseKey);
         var mids = function (pins) { return Object.keys(pins || {}).map(function (k) { return pins[k] && pins[k].mid; }).filter(Boolean); };
         var extra = mids(S.round && S.round.gpsPins).concat(mids(S.localPins)).concat(mids(S.courseRec && S.courseRec.pins));
         var b = G.courseBounds(osm, extra, PAN_MARGIN_M);
+        cam = cam || (S.framed === 'hole' ? S.camera : null);
+        // ROOM FOR THE HOLE'S OWN FRAME (011): MapLibre keeps the WHOLE screen inside the limit,
+        // padding and all. A hole near the course's edge, framed small into what the panels leave
+        // (a small phone, big text), was pushed sideways off its frame. The limit gives way just
+        // enough for that one camera - never less than the course + 400 m.
+        if (b && cam && cam.center && isFinite(cam.zoom)) {
+            var cv = S.map.getCanvas ? S.map.getCanvas() : null, w = cv ? cv.clientWidth : 0, h = cv ? cv.clientHeight : 0;
+            var pd = viewPad(), off = Math.max(Math.abs(pd.top - pd.bottom), Math.abs(pd.left - pd.right)) / 2;
+            var mpp = 40075016.7 * Math.cos(cam.center[0] * Math.PI / 180) / (512 * Math.pow(2, cam.zoom));
+            var dLat = ((h / 2 + off) * mpp + 30) / 111320, dLng = ((w / 2 + off) * mpp + 30) / (111320 * Math.cos(cam.center[0] * Math.PI / 180));
+            b = { west: Math.min(b.west, cam.center[1] - dLng), east: Math.max(b.east, cam.center[1] + dLng), south: Math.min(b.south, cam.center[0] - dLat), north: Math.max(b.north, cam.center[0] + dLat) };
+        }
         // A HOLE WITH NO DATA is framed on the golfer, so the green can be tapped:
         // no limit then - an unmapped hole can lie outside the mapped ones' area
         // (Pine Lakes is mapped in part), and a limit would hold the map off it.
@@ -4172,6 +4358,74 @@
         +   'box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none;}'
         + '.gps-target .gps-ring-lbl{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;background:rgba(11,15,12,.78);color:#ffffff;'
         +   'font:700 10px/1 ' + FONT + ';padding:2px 5px;border-radius:999px;white-space:nowrap;}'
+        // LAYOUT C (011, switch gpsLayoutC): the map clear at the top, one panel at the bottom.
+        // Only under #gps-overlay.gps-lc - off, not one of these rules applies.
+        + '#gps-overlay.gps-lc{--gps-panel-h:200px;}'
+        + '#gps-overlay.gps-lc .gps-top,#gps-overlay.gps-lc .gps-right,#gps-overlay.gps-lc .gps-yardbox{display:none !important;}'
+        + '#gps-overlay .gps-lc-top{position:absolute;z-index:8;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:6px 8px;pointer-events:none;}'
+        + '#gps-overlay .gps-lc-top > *{pointer-events:auto;}'
+        + '#gps-overlay .gps-lc-left{display:flex;align-items:center;gap:8px;flex:0 0 auto;}'
+        + '#gps-overlay .gps-lc-right{display:flex;flex-direction:column;align-items:flex-end;min-width:0;}'
+        + '#gps-overlay .gps-lc-top > .gps-lc-score{grid-column:1 / -1;justify-self:end;}'
+        + '#gps-overlay.gps-lc .gps-back{width:44px;height:44px;border-radius:50%;padding:0 0 3px;box-sizing:border-box;font-size:28px;}'
+        + '#gps-overlay.gps-lc .gps-door-games{position:static;background:#ffd60a;color:#0b0f0c;min-height:44px;padding:0 16px;font:800 15px/1 ' + FONT + ';box-shadow:0 4px 12px rgba(0,0,0,.3);}'
+        + '#gps-overlay .gps-lc-hole{display:flex;flex-direction:column;align-items:flex-end;padding:4px 12px;border-radius:14px;max-width:100%;box-sizing:border-box;}'
+        + '#gps-overlay .gps-lc-l1{min-height:24px;padding:0;font:800 15px/1.2 ' + FONT + ';color:#f4f4ef;text-align:right;}'
+        + '#gps-overlay .gps-lc-l2{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;min-height:22px;font:600 13px/1.2 ' + FONT + ';color:#c8d1ca;white-space:nowrap;max-width:100%;}'
+        + '#gps-overlay .gps-lc-meta{overflow:hidden;text-overflow:ellipsis;min-width:0;}'
+        + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind{display:inline-flex;align-items:center;gap:2px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 0 0 2px !important;min-height:22px;font:700 13px/1.2 ' + FONT + ';color:#bfdbfe;border-radius:0;flex:0 0 auto;}'
+        + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind::before{content:"\\00b7";color:#c8d1ca;margin:0 5px 0 3px;}'
+        + '#gps-overlay.gps-lc .gps-lc-meta:empty + .gps-wind::before{content:none;}'
+        + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind-arrow{font-size:14px;}'
+        + '#gps-overlay.gps-lc .gps-lc-l2 .gps-wind-tag{display:none !important;}'
+        + '#gps-overlay .gps-lc-score{min-height:32px;padding:4px 10px;border-radius:12px;font:800 12px/1.25 ' + FONT + ';color:#f4f4ef;max-width:100%;box-sizing:border-box;text-align:right;font-variant-numeric:tabular-nums;}'
+        // Wraps between its parts, never inside one ("Net 12 (+1)" stays whole) - big text, small phone.
+        + '#gps-overlay .gps-lc-score > span{white-space:nowrap;}'
+        + '#gps-overlay .gps-lc-score .gps-tp-under{color:#4ade80;}'
+        // THE PANEL
+        + '#gps-overlay .gps-panel{position:absolute;z-index:7;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;'
+        +   'padding:0 10px calc(env(safe-area-inset-bottom) + 8px);background:rgba(12,18,14,.96);border-radius:24px 24px 0 0;border-top:1px solid rgba(217,249,157,.14);box-shadow:0 -6px 18px rgba(0,0,0,.3);color:#f4f4ef;touch-action:none;}'
+        + '#gps-overlay .gps-panel-handle{align-self:center;width:88px;height:22px;display:flex;align-items:center;justify-content:center;padding:0;margin-bottom:-6px;}'
+        + '#gps-overlay .gps-panel-grip{width:40px;height:5px;border-radius:3px;background:rgba(244,244,239,.45);}'
+        + '#gps-overlay .gps-lc-nums{display:flex;align-items:flex-end;justify-content:space-around;gap:6px;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-num{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-lbl{font-size:11px;letter-spacing:.1em;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-big{font-size:26px;color:#f4f4ef;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-num-mid{flex:1.3 1 0;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-num-mid .gps-big{font-size:48px;line-height:1;color:#d9f99d;}'
+        + '#gps-overlay.gps-lc .gps-lc-nums .gps-plays:empty{display:none;}'
+        + '#gps-overlay.gps-lc .gps-panel:has(.gps-pl-line:not([style*="none"])) .gps-plays{display:none;}'
+        + '#gps-overlay .gps-lc-plays{display:flex;flex-direction:column;align-items:center;gap:2px;}'
+        + '#gps-overlay.gps-lc .gps-lc-plays .gps-pl-line,#gps-overlay.gps-lc .gps-lc-plays .gps-suggest{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 4px;justify-content:center;text-align:center;color:#fbbf24;max-width:100%;}'
+        + '#gps-overlay.gps-lc .gps-lc-plays .gps-pl-info{color:#fbbf24;min-height:32px;}'
+        + '#gps-overlay .gps-lc-acc{font:600 12px/1.2 ' + FONT + ';color:#a7b3aa;text-align:center;}'
+        + '#gps-overlay .gps-lc-acts{display:flex;gap:6px;}'
+        + '#gps-overlay.gps-lc .gps-lc-acts > *{flex:1 1 0;min-width:0;min-height:44px;padding:0 4px;display:flex;align-items:center;justify-content:center;gap:3px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font:800 13px/1.1 ' + FONT + ';text-align:center;white-space:normal;overflow:hidden;}'
+        + '#gps-overlay .gps-lc-acts:not(:has(> :not([style*="none"]))){display:none;}'
+        + '#gps-overlay.gps-lc .gps-panel .gps-bottom{position:static;height:auto;min-height:54px;}'
+        // ONE WAY TO A NEW GAME (Manny, 011): the Games pill at the top does what + Game did - the
+        // score row drops + Game and Enter score takes its width. (The old layout keeps it.)
+        + '#gps-overlay.gps-lc .gps-panel .gps-door-add{display:none !important;}'
+        + '#gps-overlay.gps-lc .gps-panel .gps-actions{position:static;padding:0;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;}'
+        + '#gps-overlay .gps-panel-collapsed .gps-lc-plays,#gps-overlay .gps-panel-collapsed .gps-lc-acts{display:none !important;}'
+        // Over the map, ON the panel: the credit just above its top edge; Recenter (left) and the
+        // zoom (right) above that; the banner and the notes above those. Sheets cover the panel.
+        // The credit wraps (never runs off a small screen): Esri, OSM, the (i) - one line or two.
+        + '#gps-overlay.gps-lc .gps-credit,#gps-overlay.gps-lc.gps-credit-google .gps-credit{bottom:calc(var(--gps-panel-h) + 4px);right:12px;flex-wrap:wrap;white-space:normal;}'
+        + '#gps-overlay.gps-lc .gps-credit > *{white-space:nowrap;}'
+        + '#gps-overlay.gps-lc .gps-credit-pop{bottom:calc(var(--gps-attrib-h) + 4px);}'
+        + '#gps-overlay.gps-lc .gps-leftrow{bottom:calc(var(--gps-attrib-h) + 6px);right:auto;}'
+        + '#gps-overlay.gps-lc .gps-zoom-side{top:auto !important;transform:none !important;bottom:calc(var(--gps-attrib-h) + 6px);width:44px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;}'
+        + '#gps-overlay.gps-lc .gps-banner,#gps-overlay.gps-lc.gps-pinning .gps-banner{bottom:calc(var(--gps-attrib-h) + 60px);white-space:normal;text-align:center;border-radius:16px;width:max-content;line-height:1.3;}'
+        + '#gps-overlay.gps-lc .gps-tiles-note{bottom:calc(var(--gps-attrib-h) + 114px);}'
+        + '#gps-overlay.gps-lc .gps-tools-menu{bottom:calc(var(--gps-panel-h) + 8px);z-index:30;max-height:calc(100% - var(--gps-panel-h) - env(safe-area-inset-top) - 24px);overflow-y:auto;box-sizing:border-box;}'
+        // "Which club?" (a few seconds after Mark shot) sits on the credit line, over Recenter / zoom -
+        // the panel (the score row, Next) and the credit stay usable. Its banner ("Shot: 120 yds") steps
+        // aside meanwhile: the chip row's own head says the same.
+        + '#gps-overlay.gps-lc .gps-bagask{bottom:calc(var(--gps-attrib-h) + 4px);background:rgba(12,18,14,.96);}'
+        + '#gps-overlay.gps-lc:has(> .gps-bagask:not([style*="none"])) .gps-banner{visibility:hidden;}'
+        + '#gps-overlay.gps-lc .gps-under{right:8px;max-height:calc(100% - var(--gps-top-b) - var(--gps-attrib-h) - 60px);overflow-y:auto;touch-action:pan-y;}'
+        + '#gps-overlay.gps-lc .gps-shotbar{top:var(--gps-top-b);}'
         // NO GPS MAP (paid launch): a round mounted without the entitlement never shows
         // the GPS side at all - no map, no yardage (the gate keeps it on the card).
         + '#gps-overlay.gps-locked{display:none !important;}';
@@ -4204,6 +4458,9 @@
         el.setAttribute('aria-label', 'GPS');
         el.innerHTML = MARKUP;
         document.body.appendChild(el);
+        // LAYOUT C (011): the same elements, moved into the top row and the bottom panel.
+        var lc = lcSwitch();
+        if (lc) buildLayoutC(el);
 
         var tg = document.createElement('div');
         tg.id = 'gps-side-toggle';
@@ -4228,8 +4485,17 @@
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
             geoError: null, framed: null, mapRequested: false, windKick: true, windPan: 0, loadingCourses: !window.HardPanGpsCourses,
             // Decided once per round, by the one check (hasGpsPro).
-            pro: hasGpsPro()
+            pro: hasGpsPro(),
+            lc: lc
         };
+        // LAYOUT C: the top row and the panel change height without a render (a longer plays line,
+        // the round chip wrapping, bigger text): the map's frame and what sits on the panel follow.
+        if (lc && typeof ResizeObserver === 'function') {
+            try {
+                S.lcRo = new ResizeObserver(function () { if (S && S.lc) { syncLayoutVars(); maybeRefit(); placePills(); } });
+                ['.gps-lc-top', '.gps-panel', '.gps-credit'].forEach(function (sel) { var n = el.querySelector(sel); if (n) S.lcRo.observe(n); });
+            } catch (e) { S.lcRo = null; }
+        }
         el.classList.toggle('gps-locked', !S.pro);
 
         // The golfer's own choice of side: remembered, and the landing leaves it be.
@@ -4265,6 +4531,9 @@
         el.addEventListener('pointerdown', function (e) { if (!e.target.closest || !e.target.closest('.gps-credit-i')) closeCredits(); }, true);
         on(el, '.gps-verify', function () { var v = S && S.el.querySelector('.gps-verify'); if (v) v.classList.toggle('gps-open'); });
         on(el, '.gps-hole-btn', openPicker);
+        on(el, '.gps-lc-l1', openPicker);
+        on(el, '.gps-panel-handle', togglePanel);
+        on(el, '.gps-lc-score', function () { if (!S) return; closeMenus(); S.userChoseSide = true; showSide('bets'); });
         on(el, '.gps-tools', toggleTools);
         on(el, '.gps-score-next', function () { closeMenus(); if (S && S.stepHole) S.stepHole(1); });
         on(el, '.gps-score-prev', function () { closeMenus(); if (S && S.stepHole) S.stepHole(-1); });
@@ -4810,6 +5079,7 @@
         stopWatch();
         stopWindTick();
         stopReplayTimer();
+        if (S && S.lcRo) { try { S.lcRo.disconnect(); } catch (e) {} S.lcRo = null; }
         fix = null;
         watchLast = null;   // a new round sends its first hole again
         document.removeEventListener('visibilitychange', onVisibility);
@@ -4856,6 +5126,8 @@
         // THE WATCH (feature 10; gps_watch_test.js): what render sent, and a watch score in.
         watchSent: function () { return watchLast ? JSON.parse(watchLast) : null; },
         watchScore: function (ev) { return watchScore(ev); },
+        // LAYOUT C's round chip (011; gps_layout_c_test.js): pure.
+        roundScore: roundScore, roundScoreText: roundScoreText,
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
