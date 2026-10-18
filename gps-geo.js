@@ -1043,6 +1043,35 @@
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
 
+    // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) -------------------------
+    // ONE LINE the golfer can check: "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm".
+    // Each part is playsLike's own term, rounded to the yard; a term with no data is not
+    // in pl.terms and so is left out; a term that rounds to 0 says nothing and is left out.
+    // pl: playsLike's result; windMph: the reading's speed (shown as the golfer sees it on
+    // the wind box); unit: 'm' for meters (else yards). Pure.
+    function playsParts(pl, windMph, unit) {
+        var out = [], t = (pl && pl.terms) || {}, k = unit === 'm' ? M_PER_YD : 1;
+        var sg = function (x) { return (x > 0 ? '+' : '-') + Math.abs(x); };
+        var r = function (x) { return Math.round(x * k); };
+        if (isNum(t.elev) && r(t.elev)) out.push(sg(r(t.elev)) + (t.elev > 0 ? ' uphill' : ' downhill'));
+        if (isNum(t.wind) && r(t.wind)) out.push(sg(r(t.wind)) + (t.wind > 0 ? ' into wind' : ' downwind') + (isNum(windMph) ? ' (' + Math.round(windMph) + ' mph)' : ''));
+        if (isNum(t.temp) && r(t.temp)) out.push(sg(r(t.temp)) + (t.temp > 0 ? ' cold' : ' warm'));
+        return out;
+    }
+    // CROSSWIND = AIM OFF, NO DISTANCE CHANGE. The rule (a common rule of thumb, kept
+    // simple on purpose): the ball drifts about 0.5% of the shot's distance per mph of
+    // crosswind - 150 yds in a 10 mph crosswind drifts ~8 yds. Aim that far INTO the
+    // wind. cross: windRelative's (+ = blowing LEFT TO RIGHT, so the ball goes right:
+    // aim left). Under 2 yds (inside what GPS can tell): nothing to say (null). Pure.
+    var AIM_PER_MPH = 0.005;
+    function windAim(yards, crossMph) {
+        if (!isNum(yards) || !isNum(crossMph) || yards <= 0) return null;
+        var yd = Math.round(yards * AIM_PER_MPH * Math.abs(crossMph));
+        if (yd < 2) return null;
+        return { yd: yd, side: crossMph > 0 ? 'left' : 'right' };
+    }
+    var PLAYS_API = { playsParts: playsParts, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH };
+
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
     // Shared by the app (gps-view.js lookupCourse) and tools/gps-coverage.js, so
     // the phone and the coverage report pick the same course and keep the same holes.
@@ -1516,6 +1545,7 @@
         greenNumbers: greenNumbers, compactRing: compactRing, osmToCourseGps: osmToCourseGps, outerRings: outerRings,
         resolveHole: resolveHole, holeNumbers: holeNumbers, makePin: makePin, undoPin: undoPin, pinPt: pinPt
     };
+    Object.keys(PLAYS_API).forEach(function (k) { api[k] = PLAYS_API[k]; });   // 009: plays-like parts, aim-off, course heights
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window !== 'undefined') window.HardPanGeo = api;
 })();

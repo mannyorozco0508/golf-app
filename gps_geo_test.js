@@ -734,3 +734,43 @@ test('a GolfAPI green whose centre is off the front-back midpoint: F < C < B fro
     const c0 = G.midpoint(f, b);
     assert.deepEqual(G.ellipseRing(f, b, c0), G.ellipseRing(f, b, null));
 });
+
+// ---- 009 PART B: THE PLAYS-LIKE LINE, THE WIND RULE PINNED, CROSSWIND = AIM OFF ----------
+test('the wind rule, PINNED: the same wind into the face vs straight behind - the downwind change is exactly half the into-wind change', () => {
+    for (const [yards, mph] of [[150, 10], [168, 12], [100, 5], [210, 20], [137, 7]]) {
+        const into = geo.playsLike({ yards, windMph: mph, windFromDeg: 90, shotBearingDeg: 90 });     // from where the shot goes: in the face
+        const down = geo.playsLike({ yards, windMph: mph, windFromDeg: 270, shotBearingDeg: 90 });    // from behind
+        close(into.terms.wind, yards * 0.01 * mph, 1e-9, 'headwind: 1% per mph');
+        close(down.terms.wind, -yards * 0.005 * mph, 1e-9, 'tailwind: 0.5% per mph');
+        close(Math.abs(down.terms.wind), Math.abs(into.terms.wind) / 2, 1e-9, 'downwind is half of into-wind at ' + yards + ' yds, ' + mph + ' mph');
+        assert.ok(into.exact > yards && down.exact < yards);
+    }
+    // A crosswind changes no distance (its aim-off is windAim's).
+    close(geo.playsLike({ yards: 150, windMph: 12, windFromDeg: 0, shotBearingDeg: 90 }).terms.wind, 0, 1e-9);
+});
+test('playsParts: one line, the terms rounded, signed and named; no data or 0 left out; meters', () => {
+    const pl = geo.playsLike({ yards: 150, elevFromFt: 100, elevToFt: 118, windMph: 6, windFromDeg: 90, shotBearingDeg: 90, tempF: 80 });
+    assert.deepStrictEqual(geo.playsParts(pl, 6), ['+6 uphill', '+9 into wind (6 mph)', '-1 warm'], '-1.5 rounds to -1');
+    const dn = geo.playsLike({ yards: 150, elevFromFt: 118, elevToFt: 100, windMph: 6, windFromDeg: 270, shotBearingDeg: 90, tempF: 50 });
+    assert.deepStrictEqual(geo.playsParts(dn, 6), ['-6 downhill', '-4 downwind (6 mph)', '+3 cold'], '-4.5 rounds to -4');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, tempF: 50 }), null), ['+3 cold'], 'only the terms with data');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, tempF: 70, elevFromFt: 10, elevToFt: 10 }), null), [], 'a term worth 0 says nothing');
+    assert.deepStrictEqual(geo.playsParts(geo.playsLike({ yards: 150, windMph: 6, windFromDeg: 90, shotBearingDeg: 90 })), ['+9 into wind'], 'no speed given: none shown');
+    assert.deepStrictEqual(geo.playsParts(pl, 6, 'm'), ['+5 uphill', '+8 into wind (6 mph)', '-1 warm'], 'meters');
+    assert.deepStrictEqual(geo.playsParts(null), []);
+});
+test('windAim: crosswind = aim off INTO the wind, ~0.5% of the distance per mph across; nothing under 2 yds', () => {
+    assert.strictEqual(geo.AIM_PER_MPH, 0.005);
+    assert.deepStrictEqual(geo.windAim(150, 10), { yd: 8, side: 'left' }, 'blowing left to right: the ball goes right - aim left');
+    assert.deepStrictEqual(geo.windAim(150, -10), { yd: 8, side: 'right' });
+    assert.deepStrictEqual(geo.windAim(160, 5), { yd: 4, side: 'left' });
+    assert.strictEqual(geo.windAim(150, 1), null, '0.75 yd -> 1: under 2, nothing to say');
+    assert.deepStrictEqual(geo.windAim(150, 2), { yd: 2, side: 'left' }, '1.5 yd rounds to 2: said');
+    assert.strictEqual(geo.windAim(150, 0), null);
+    assert.strictEqual(geo.windAim(null, 10), null);
+    // From windRelative: wind FROM the north (0), shot to the east (90) - from the golfer's left,
+    // blowing left to right across the shot: aim left.
+    const rel = geo.windRelative(0, 90, 12);
+    assert.ok(rel.cross > 0);
+    assert.deepStrictEqual(geo.windAim(150, rel.cross), { yd: 9, side: 'left' });
+});

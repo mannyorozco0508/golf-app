@@ -61,8 +61,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // THE 008 GPS FEATURES (Manny, 2026-10-18): each behind its own switch, so a broken one is
     // turned off here without touching code. Read through HardPanFeature('<name>') (below).
     // watch (feature 10, docs/WATCH-APP-PLAN.md): OFF - no watch app or plugin ships yet.
-    // 009 (mailbox 009 part B): bagSetup = My bag's first-time "Enter your carry for each club".
-    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true, watch: false, bagSetup: true },
+    // 009 (mailbox 009 part B): bagSetup = My bag's first-time "Enter your carry for each club";
+    // playsBreakdown = the one-line "Plays 168: +6 uphill, +9 into wind (12 mph) -> 6-iron".
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, hpIndex: true, watch: false, bagSetup: true,
+        playsBreakdown: true },
     // MY BAG ACCOUNT SYNC (009): the signed-in golfer's own bag to player_clubs/<uid>/me. OFF:
     // that rule is phase 2 and not live (writes would be refused) - the bag stays on the phone.
     clubsSync: false,

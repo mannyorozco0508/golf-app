@@ -224,3 +224,18 @@ test('gps-view: setup behind bagSetup; sync only for the signed-in golfer\'s own
     assert.equal((v.match(/bagSaved\(\);/g) || []).length, 5, 'saved after a club pick, a typed number, a reset, reset all and the setup');
     assert.ok(/'learned \\u00b7 '/.test(v) && /'entered'/.test(v), 'learned vs entered in My bag');
 });
+
+test('gps-view: the plays-like line - behind playsBreakdown, never in tournament mode, the club for the PLAYS-LIKE number, crosswind = aim-off', { skip }, () => {
+    const v = read('gps-view.js');
+    const sec = v.slice(v.indexOf('function syncBreakdown('), v.indexOf('// ---- THE PAYWALL AND THE GATE'));
+    assert.ok(/HardPanFeature\('playsBreakdown'\)/.test(v));
+    assert.ok(/if \(!plSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="playsBreakdown"\]'\)/.test(v), 'switch off: removed');
+    assert.ok(/if \(plSwitch\(\) && !tournament\(\) && S\.pro && S\.mode === 'measure'/.test(sec), 'never in tournament mode');
+    assert.ok(/G\.playsParts\(pl, has \? w\.mph : null, units\(\)\)/.test(sec) && /'Plays ' \+/.test(sec));
+    assert.ok(/B\.suggestClub\(B\.bag\(bagGolfer\(\)\), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
+    assert.ok(/bagSwitch\(\) && B && o\.from === 'me'/.test(sec), 'the club only with the clubs switch on, from the golfer');
+    assert.ok(/G\.windAim\(D, rel\.cross\)/.test(sec), 'crosswind: the aim-off');
+    assert.ok(/if \(S\.plClub\) text = '';/.test(v), 'the plain Suggested line steps aside');
+    assert.ok(/syncBreakdown\(r, o, nums\);\s*\n\s*syncSuggest\(r, o, nums\);/.test(v), 'worked out before the plain suggestion');
+    assert.ok(!/\.ref\(|fetch\(/.test(sec), 'nothing sent');
+});

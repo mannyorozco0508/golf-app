@@ -2482,6 +2482,43 @@
         el.style.visibility = pl ? '' : 'hidden';
         el.setAttribute('data-terms', pl ? Object.keys(pl.terms).join(' ') : '');
     }
+    // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) ------------------------
+    // ONE LINE under the numbers: "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm ->
+    // 6-iron (your 170) · aim 4 yds left" - to the center, or to the target once the golfer
+    // has moved it. The parts are playsLike's own terms (gps-geo.playsParts; a term with no
+    // data is left out); the club is the bag's for the PLAYS-LIKE distance (switch clubs,
+    // from the golfer's spot); CROSSWIND changes no distance - it is the aim-off
+    // (gps-geo.windAim: ~0.5% of the distance per mph across, aim into the wind). With the
+    // club on this line the plain "Suggested:" line steps aside. No plays-like data: no
+    // line (the plain suggestion, if any). Tournament mode: none of it.
+    function plSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('playsBreakdown') !== false; } catch (e) { return true; } }
+    function syncBreakdown(r, o, nums) {
+        S.plClub = false;
+        var el = S.el.querySelector('.gps-pl-line');
+        if (!el) return;
+        var text = '';
+        if (plSwitch() && !tournament() && S.pro && S.mode === 'measure' && o && !(nums && nums.onGreen)) {
+            var moved = !!(S.targetMoved && S.target), aim = moved ? S.target : aimAt(r);
+            var pl = aim ? playsTo(moved ? S.target : null) : null;
+            if (pl) {
+                var w = effectiveWind(), has = !!(w && !w.none), m = units() === 'm';
+                var parts = G.playsParts(pl, has ? w.mph : null, units());
+                text = 'Plays ' + (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (parts.length ? ': ' + parts.join(', ') : '');
+                var B = bagApi();
+                if (bagSwitch() && B && o.from === 'me') {
+                    var sg = B.suggestClub(B.bag(bagGolfer()), pl.exact);
+                    if (sg) { text += ' \u2192 ' + sg.name + ' (your ' + bagShown(sg.yd) + ')'; S.plClub = true; }
+                }
+                if (has && w.mph > 0) {
+                    var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD, rel = G.windRelative(w.fromDeg, G.bearingDeg(o.pt, aim), w.mph), am = G.windAim(D, rel.cross);
+                    if (am) text += ' \u00b7 aim ' + (m ? Math.max(1, Math.round(am.yd * G.M_PER_YD)) + ' m ' : am.yd + (am.yd === 1 ? ' yd ' : ' yds ')) + am.side;
+                }
+            }
+        }
+        var t = el.querySelector('.gps-pl-text');
+        if (t.textContent !== text) t.textContent = text;
+        el.style.display = text ? '' : 'none';
+    }
 
     // ---- THE PAYWALL AND THE GATE (paid launch: Manny, mailbox 007, 2026-10-17) ------
     // ALL of GPS is the "GPS Map" subscription: a 7-day free trial, then an
@@ -2987,6 +3024,7 @@
 
         placeTarget(r);
         targetReadout();
+        syncBreakdown(r, o, nums);
         syncSuggest(r, o, nums);
 
         // The green, set / fixed / undone.
@@ -3260,6 +3298,8 @@
                 }
             }
         }
+        // 009: the plays-like line already says the club - not twice.
+        if (S.plClub) text = '';
         if (el.textContent !== text) el.textContent = text;
         el.style.display = text ? '' : 'none';
     }
@@ -3614,6 +3654,8 @@
         +   '<div class="gps-sub gps-float"><span class="gps-acc"></span><span class="gps-src"></span></div>'
         +   '<div class="gps-tourney gps-float" style="display:none" aria-label="Tournament mode: distance only">TOURNAMENT</div>'
         +   '<div class="gps-suggest gps-float" data-feature="clubs" style="display:none" role="status"></div>'
+        // PLAYS-LIKE, SPELLED OUT (009): "Plays 168: +6 uphill, +9 into wind (12 mph), -1 warm -> 6-iron (your 170)".
+        +   '<div class="gps-pl-line gps-float" data-feature="playsBreakdown" style="display:none" role="status"><span class="gps-pl-text"></span></div>'
         +   '<div class="gps-green-dims gps-float" style="display:none"></div>'
         +   '<div class="gps-msg gps-float" style="display:none"></div>'
         +   '<div class="gps-verify gps-float" style="display:none"></div>'
@@ -3914,6 +3956,8 @@
         + '#gps-overlay .gps-clubs-foot{display:flex;gap:8px;justify-content:space-between;}'
         + '#gps-overlay .gps-clubs .gps-club-skip{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;}'
         + '#gps-overlay .gps-suggest{font:800 14px/1.2 ' + FONT + ';color:#d9f99d;padding:7px 11px;border-radius:12px;white-space:nowrap;}'
+        + '#gps-overlay .gps-pl-line{display:flex;align-items:center;gap:6px;max-width:calc(100vw - 24px);box-sizing:border-box;font:800 13px/1.25 ' + FONT + ';color:#d9f99d;padding:6px 10px;border-radius:12px;}'
+        + '#gps-overlay .gps-pl-text{flex:1 1 auto;min-width:0;}'
         + '#gps-overlay .gps-bagask{position:absolute;z-index:45;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 72px);padding:8px 10px;border-radius:14px;font:700 14px/1.2 ' + FONT + ';}'
         + '#gps-overlay .gps-bagask-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}'
         + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
@@ -4232,6 +4276,8 @@
         if (!bagSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="clubs"]'), function (n) { n.parentNode.removeChild(n); });
         // BAG SETUP (009): its switch off = no setup in My bag (removed, not hidden).
         if (!setupSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="bagSetup"]'), function (n) { n.parentNode.removeChild(n); });
+        // PLAYS-LIKE LINE (009): its switch off = no line (removed, not hidden).
+        if (!plSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="playsBreakdown"]'), function (n) { n.parentNode.removeChild(n); });
         on(el, '.gps-bag-setup-save', saveSetup);
         on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
         on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
