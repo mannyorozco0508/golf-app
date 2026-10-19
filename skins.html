@@ -45,6 +45,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
     <!-- THE BETS TAB WATCHES A GROUP'S OWN ACTION. Three more shared files since the
@@ -1260,6 +1261,35 @@ html {
             if ((sm.holeStake || 0) > 0) stakes.push(`$${sm.holeStake}/hole`);
             if ((sm.overallStake || 0) > 0) stakes.push(`$${sm.overallStake} overall`);
             formatLine = `Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${stakes.length ? ' • ' + stakes.join(' + ') : ''}`;
+        } else if (sm.format === 'hilo') {
+            // HI-LO (016): the live line from bet-strip's row (hilo-engine.js), then the
+            // Low Ball / High Ball money from the receipt - the same lines the Receipt
+            // prints, gated the same way, so nothing here computes money.
+            body += `<div class="bets-row"><span class="status-pill pill-main">${escapeHtml(row ? row.status : '')}</span></div>`;
+            const hlRc = (typeof buildSideMatchReceipts === 'function')
+                ? (buildSideMatchReceipts(currentData, courseData, savedScores) || []).find(x => x.matchId === matchId)
+                : null;
+            const hlFinished = (typeof computeRoundFinish === 'function')
+                && !!computeRoundFinish(currentData, courseData, savedScores).finished;
+            const hlDone = (typeof sideMatchRangeComplete === 'function')
+                && sideMatchRangeComplete(sm, players, courseData, savedScores, { roundFinished: hlFinished });
+            if (hlRc && typeof sideMatchBetLines === 'function') {
+                sideMatchBetLines(hlRc, { complete: hlDone }).forEach(l => {
+                    if (!l.moneyText) return;
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(l.label)} \u00B7 ${escapeHtml(l.result)}</span><span style="font-weight:bold;">${escapeHtml(l.moneyText)}</span></div>`;
+                });
+                const hlNet = hlDone && typeof sideMatchDecidedNet === 'function' ? sideMatchDecidedNet(hlRc) : 0;
+                body += `<div class="bets-row"><span>Ledger:</span><span>${escapeHtml(sideAName)}: ${fmtSideM(hlNet)} | ${escapeHtml(sideBName)}: ${fmtSideM(-hlNet)}</span></div>`;
+                if (hlNet !== 0) {
+                    const hlEach = (side, share) => side.map(pl => `${escapeHtml(pl.name.split(' ')[0])} ${fmtSideM(share)}`).join(' · ');
+                    body += `<div class="bets-row bets-sub"><span>Per golfer: ${hlEach(teamAPlayers, hlNet / teamAPlayers.length)}</span><span>${hlEach(teamBPlayers, -hlNet / teamBPlayers.length)}</span></div>`;
+                }
+                if (typeof sideMatchNetLine === 'function') {
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(sideMatchNetLine(hlRc, { complete: hlDone }))}</span></div>`;
+                }
+            }
+            isFinal = hlDone;
+            formatLine = `Hi-Lo • ${(sm.scoring || 'net').toUpperCase()} • $${sm.stake || 0}/point`;
         } else {
             const manualPresses = sm.presses ? Object.values(sm.presses) : [];
             const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));

@@ -57,6 +57,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="offline-queue.js"></script>
 <!-- GPS:BEGIN -->
 <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
@@ -1171,7 +1172,7 @@ html {
 
         let html = `<div class="receipt-match">`;
         html += `<div class="receipt-title">${escapeHtml(r.nameA)} vs ${escapeHtml(r.nameB)}</div>`;
-        html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? ' \u00B7 2v2 (best ball)' : ''}</div>`;
+        html += `<div class="receipt-sub">${r.format} \u00B7 ${r.scoring}${r.isTeam ? (r.format === 'Hi-Lo' ? ' \u00B7 2v2 (low ball + high ball)' : ' \u00B7 2v2 (best ball)') : ''}</div>`;
 
         // ONE BUILDER FOR THE MONEY SENTENCES (v258). The per-segment figure below
         // has been right since v141 and its gate - a winner AND money - is the gate

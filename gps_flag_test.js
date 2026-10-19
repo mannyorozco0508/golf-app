@@ -49,7 +49,10 @@ const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPan
 // (versions, one drain, this round only, stale ask, scoresVerified), the KP tag with the round,
 // escaped names (XSS) and the play-order hole list - so it is pinned to that, not main's.
 // Before: 0bbcaf20 (main 387cf89).
-const PRE_GPS_INDEX_SHA = 'f2761cc44cfbe2a6df746517928d0f2d020e97a4025dd5c9565f818bf91281a5';
+// 2026-10-19 (mailbox 016, the Hi-Lo 2v2 side bet, NOT YET OK'd by Manny): + ONE line, the
+// <script src="hilo-engine.js"> tag after aloha-bet.js - Hi-Lo is shared (sidematches.html is), so
+// the Consumer scorecard must load the module that prices it. Before: f2761cc4.
+const PRE_GPS_INDEX_SHA = '78900e1d3402e662ce9ce3a7b30a3839d10281977059601c46740c14ce23edc4';
 const GPS_SHELL = (() => {
     const m = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8'));
     return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
@@ -153,7 +156,7 @@ test('HARDPAN WEB BUILD (GPS_ENABLED=1): the GPS files and the toggle, in dist/h
     GPS_SHELL.forEach((f) => assert.ok(fs.existsSync(path.join(web, f)), 'dist/hardpan is missing ' + f));
     assert.ok(/<script src="gps-view\.js"><\/script>/.test(fs.readFileSync(path.join(web, 'index.html'), 'utf8')));
     assert.ok(/📍 GPS/.test(fs.readFileSync(path.join(web, 'gps-view.js'), 'utf8')), 'the toggle');
-    assert.ok(/const CACHE_VERSION = 'consumer-v193-gps-carry';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
+    assert.ok(/const CACHE_VERSION = 'consumer-v194-gps-hilo';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
 });
 
 test('THERE IS NO HARDPAN APP BUILD: sync-mobile-web.js refuses GPS_ENABLED=1 and writes nothing', () => {
