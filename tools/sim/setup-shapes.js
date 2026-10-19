@@ -70,8 +70,6 @@ const findings = [];
 // tomorrow's exact path). They stay in the summary with known: true and do not fail the run;
 // a NEW BLOCKER/HIGH does. Remove an id here when its fix lands.
 const KNOWN = {
-    'shotgun-hole': 'a group set to "Starts on Hole 10" opens on hole 1 when the phone saw the round before picking its group (hardpan_last_hole_<code> is per round, not per group)',
-    'shotgun-gps-hole': 'the same cause, on GPS',
     'airplane-kill-loses-round': 'Save & Start with no signal is held in memory only; a kill before the signal returns loses the round'
 };
 const paths = {};
