@@ -235,3 +235,13 @@ describe('FIX 10: a tee after the handicap/flight, a bracketed handicap or the c
         assert.deepEqual(rows('Zoe +4/A blue'), [['Zoe +4/A blue', '', null]]);
     });
 });
+
+describe('FIX 11: a "no handicap yet" mark is an empty handicap, not part of the name', () => {
+    test('"Noel -", "Glenn N/A", "Tom Kelly,NH", "Smith-Jones, --", "Glenn ?", "A Paul tbd"', () => {
+        assert.deepEqual(rows('Noel -\nGlenn N/A\nTom Kelly,NH\nSmith-Jones, --\nAl ?\nA Paul tbd'),
+            [['Noel', '', null], ['Glenn', '', null], ['Tom Kelly', '', null], ['Smith-Jones', '', null], ['Al', '', null], ['Paul', '', 'A']]);
+    });
+    test('unchanged: "Steve -3" is -3; "Ann Nash" is a name; a line that is only "-" is not emptied', () => {
+        assert.deepEqual(rows('Steve -3\nAnn Nash\n-'), [['Steve', '-3', null], ['Ann Nash', '', null], ['-', '', null]]);
+    });
+});

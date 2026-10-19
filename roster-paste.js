@@ -553,8 +553,13 @@ function rosterPasteBracketFlight(line) {
     if (!m || !t.slice(0, m.index).trim()) return { flight: null, rest: t };
     return { flight: (m[1] || m[2] || m[3]).toUpperCase(), rest: t.slice(0, m.index).replace(/[\s,\/|:\-\u2013\u2014]+$/, '').trim() };
 }
+// "NO HANDICAP YET" (URGENT-008): "Glenn -", "Glenn ?", "Glenn N/A", "Glenn NH",
+// "Glenn, tbd" - the organizer's mark for a golfer with no handicap. It was kept as
+// part of the name ("Glenn N/A"); it is an empty handicap. Only at the end of a
+// line, only these marks, and never the whole line.
+const ROSTER_NO_HCP_MARK = /([^\s,])[\s,]+(?:-{1,3}|\?{1,3}|n\/a|n\.a\.?|nh|tbd|no hcp|no handicap)$/i;
 function rosterPasteNormalizeGolfer(line) {
-    let t = String(line == null ? '' : line);
+    let t = String(line == null ? '' : line).replace(ROSTER_NO_HCP_MARK, '$1');
     t = t.replace(ROSTER_FLIGHT_WORD_BEFORE, '$1 $2').replace(ROSTER_FLIGHT_WORD_AFTER, '$1 $2');
     t = t.replace(ROSTER_HCP_WORD_BEFORE, '$1 $2').replace(ROSTER_HCP_WORD_AFTER, '$1');
     t = t.replace(ROSTER_SEP_BEFORE_HCP, '$1 ')
