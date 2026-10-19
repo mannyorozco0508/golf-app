@@ -5492,7 +5492,10 @@
             if (!S || !S.eventCode) { window.location.href = 'home.html#games'; return; }
             closeMenus();
             S.userChoseSide = true;
-            showSide('bets');
+            // A VISIT, NOT LEAVING GPS (URGENT-009, 013-4): the card is shown but "gps" stays the
+            // side this round reopens on - a game added from here (Round Setup / Side Matches Save)
+            // comes back to the GPS on the same hole, not the card.
+            showSide('bets', { remember: false });
             setTimeout(function () {
                 var m = document.getElementById('todays-games-mount'), D = window.HardPanDoors;
                 var rd = (typeof currentData !== 'undefined' ? currentData : null) || S.round;   /* global currentData */
