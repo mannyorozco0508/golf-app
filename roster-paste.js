@@ -338,7 +338,11 @@ function parsePlayerPasteText(text, teeNames) {
         // review says what it ignored.
         // "Skeens 2.0/A", "Glenn 12 B", "Matt (12) b": a trailing handicap and flight
         // (URGENT-004). Read first - the note stripper would take "(12)" as a note.
-        const trail = splitTrailingHcpFlight(line);
+        // URGENT-008: "Manny - 28.0", "Colm: 4.0", "Paul | 12 | A" - the separators
+        // organizers type between the name, the handicap and the flight - are spaces
+        // for the reading below. The line as typed (line) is what the preview shows.
+        const work = rosterPasteNormalizeGolfer(line);
+        const trail = splitTrailingHcpFlight(work);
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
@@ -350,7 +354,7 @@ function parsePlayerPasteText(text, teeNames) {
             return;
         }
         const noted = (typeof stripTrailingNote === 'function')
-            ? stripTrailingNote(line) : { text: line, note: '' };
+            ? stripTrailingNote(work) : { text: work, note: '' };
         if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
         const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
         // THE TEE COMES OFF AFTER the flight and the note, and BEFORE the name and
@@ -423,6 +427,29 @@ function rosterPasteCleanLine(raw) {
     return t;
 }
 
+// ---- WHAT SITS BETWEEN THE NAME, THE HANDICAP AND THE FLIGHT (URGENT-008) ----
+//
+// Measured by the fuzzer: "Manny - 28.0" read as a golfer named "Manny -";
+// "Colm: 4.0" as "Colm:"; "Paul/12" and "Paul | 12" kept the whole line as the
+// name. A dash, colon, bar or slash between the name and a handicap-shaped
+// number is a separator, and so is one between the handicap and a final A/B.
+//
+// THE SIGN IS KEPT: "Steve -3" (no space after the dash) is a handicap of -3, as
+// before - only a dash with spaces on BOTH sides is a separator. A dash glued to
+// letters ("Smith-Jones") is a name. A digit before a colon is a time ("8:10"),
+// not a separator.
+const ROSTER_HCP_AHEAD = '(?=\\(?[+-]?\\d{1,2}(?:\\.\\d)?\\)?(?:\\s|$|[\\/,|:\\-\\u2013\\u2014]))';
+const ROSTER_SEP_BEFORE_HCP = new RegExp('([^\\d\\s])\\s*[|\\/:]\\s*' + ROSTER_HCP_AHEAD, 'g');
+const ROSTER_DASH_BEFORE_HCP = new RegExp('\\s+[-\\u2013\\u2014]+\\s+' + ROSTER_HCP_AHEAD, 'g');
+const ROSTER_SEP_BEFORE_FLIGHT = /(\d\)?)\s*[|:\-\u2013\u2014]\s*([ABab])\s*$/;
+function rosterPasteNormalizeGolfer(line) {
+    let t = String(line == null ? '' : line);
+    t = t.replace(ROSTER_SEP_BEFORE_HCP, '$1 ')
+        .replace(ROSTER_DASH_BEFORE_HCP, ' ')
+        .replace(ROSTER_SEP_BEFORE_FLIGHT, '$1 $2');
+    return t.replace(/\s+/g, ' ').trim();
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     // IN NODE THERE IS NO SCRIPT ORDER. The browser gets stripTrailingNote from
     // my-groups.js, loaded before this file; a require here gives a test of this
@@ -432,7 +459,7 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { rosterPasteCleanLine, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+    module.exports = { rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }

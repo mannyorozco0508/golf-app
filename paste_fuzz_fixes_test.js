@@ -73,3 +73,19 @@ describe('FIX 2: headers are boundaries, not golfers', () => {
         assert.equal(R.rosterPasteSeparator('Group Captain Smith 8'), '');
     });
 });
+
+describe('FIX 3: a dash, colon, bar or slash between name, handicap and flight is a separator', () => {
+    test('"Manny - 28.0" is Manny / 28.0 (was a golfer named "Manny -")', () => {
+        assert.deepEqual(rows('Manny - 28.0\nBobby “The Hammer” Lee – 0.0'), [['Manny', '28.0', null], ['Bobby “The Hammer” Lee', '0.0', null]]);
+    });
+    test('"Colm: 4.0", "Paul/12", "Paul | 12 | A", "Jim: +2.0, B"', () => {
+        assert.deepEqual(rows('Colm: 4.0\nPaul/12\nAl | 12 | A\nJim: +2.0, B\nBo / 7 / b'),
+            [['Colm', '4.0', null], ['Paul', '12', null], ['Al', '12', 'A'], ['Jim', '+2.0', 'B'], ['Bo', '7', 'B']]);
+    });
+    test('the sign stays: "Steve -3" is -3; "Smith-Jones 12" is a hyphenated name; "A - Randy T 12" is still flight A', () => {
+        assert.deepEqual(rows('Steve -3\nSmith-Jones 12\nA - Randy T 12'), [['Steve', '-3', null], ['Smith-Jones', '12', null], ['Randy T', '12', 'A']]);
+    });
+    test('"Mary - blue" with no tee list is still the name as typed (no number after the dash)', () => {
+        assert.deepEqual(rows('Mary - blue'), [['Mary - blue', '', null]]);
+    });
+});
