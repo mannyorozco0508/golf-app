@@ -4503,7 +4503,10 @@
 // itself ships in the iOS app only), map pars never touch the card, Palmbrook,
 // a hole drawn per tee, green multipolygons. HardPan only.
 // GPS:END
-const CACHE_VERSION = 'golfapp-v359-gps-carry';
+// Moved to v360 (016, 2026-10-19): the Hi-Lo 2v2 side bet - hilo-engine.js joins
+// the shell, and New Action, the Bets tab, Matches, the scorecard and the Receipt
+// read it. A device on v359 cannot offer, show or settle a Hi-Lo.
+const CACHE_VERSION = 'golfapp-v360-gps-hilo';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4565,6 +4568,10 @@ const SHELL_FILES = [
     './player-tees.js',
     './handicap-labels.js',
     './aloha-bet.js',
+    // hilo-engine.js (016): the Hi-Lo 2v2 side bet - every rule and every number.
+    // settlement-engine.js and bet-strip.js call it through a typeof guard, so a
+    // cached shell without it would settle a Hi-Lo wager as nothing.
+    './hilo-engine.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.

@@ -49,10 +49,10 @@ const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPan
 // (versions, one drain, this round only, stale ask, scoresVerified), the KP tag with the round,
 // escaped names (XSS) and the play-order hole list - so it is pinned to that, not main's.
 // Before: 0bbcaf20 (main 387cf89).
-// 2026-10-19 Manny OK: Group Links fix in the Consumer app (mailbox 015 #2 - the Round
-// Menu's "Group Links" opens Scorekeeper Links inside the menu; it was a GPS block, now shared).
-// Before: f2761cc4 (gps-next 8595adc).
-const PRE_GPS_INDEX_SHA = 'f5b898ab03fb5e7c6355b71ce77ec0fbc66518fc56639e65eddf6a321112e882';
+// 2026-10-19 Manny OK: Group Links fix in the Consumer app (015 #2) + Hi-Lo (016, Manny's
+// "OK merge Hi-Lo": the <script src="hilo-engine.js"> tag; Hi-Lo is in both apps).
+// Before: f5b898ab (Group Links) / 78900e1d (Hi-Lo) / f2761cc4.
+const PRE_GPS_INDEX_SHA = '0e5bbce47cb30f26c38792ab602f0ca808b03169ece4f62fbab2a2d0492e57ac';
 const GPS_SHELL = (() => {
     const m = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8'));
     return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
@@ -156,7 +156,7 @@ test('HARDPAN WEB BUILD (GPS_ENABLED=1): the GPS files and the toggle, in dist/h
     GPS_SHELL.forEach((f) => assert.ok(fs.existsSync(path.join(web, f)), 'dist/hardpan is missing ' + f));
     assert.ok(/<script src="gps-view\.js"><\/script>/.test(fs.readFileSync(path.join(web, 'index.html'), 'utf8')));
     assert.ok(/📍 GPS/.test(fs.readFileSync(path.join(web, 'gps-view.js'), 'utf8')), 'the toggle');
-    assert.ok(/const CACHE_VERSION = 'consumer-v193-gps-carry';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
+    assert.ok(/const CACHE_VERSION = 'consumer-v194-gps-hilo';/.test(fs.readFileSync(path.join(web, 'sw.js'), 'utf8')), 'its own cache key');
 });
 
 test('THERE IS NO HARDPAN APP BUILD: sync-mobile-web.js refuses GPS_ENABLED=1 and writes nothing', () => {

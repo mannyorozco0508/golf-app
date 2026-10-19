@@ -161,7 +161,7 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // rather than quietly renumbered here, because a golden list that gets
     // edited whenever it goes red is not a golden list.
     const GOLDEN = {
-        'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '9f6a4fa7e4def756',
+        'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '88c8b8a76c24f6f3',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
         'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
         'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': 'f67a7b4390f5776f', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */
         'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
@@ -181,7 +181,7 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // bet-strip.js: CHANGED ON PURPOSE, AND IT IS A PROTECTED FILE.
     //
     // build 8      6a876155251e71a2
-    // this wave    3b2dd5fb785e16f3
+    // this wave    bca47bb80a6ea845   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
     //
     // WHY: on a FINISHED round every row on the Matches tab read "All square -
     // Thru 18", including the one Manny won 7&6. buildSideActionRows took its
@@ -195,7 +195,7 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // line that nothing else in the file moved with it.
     // ------------------------------------------------------------------------
     test('bet-strip.js moved, and only for the Matches tab fix', () => {
-        assert.equal(shaOf('bet-strip.js'), '3b2dd5fb785e16f3',
+        assert.equal(shaOf('bet-strip.js'), 'bca47bb80a6ea845',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
             'bet-strip.js is not the version this wave reviewed - re-pin it and say why.');
         const code = fs.readFileSync(path.join(__dirname, 'bet-strip.js'), 'utf8');
         // The fix is present and reads the receipt rather than re-deriving.

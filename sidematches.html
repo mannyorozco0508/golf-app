@@ -53,6 +53,7 @@
          same file - so the offer a golfer sees and the money that settles cannot
          come from two different readings. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <!-- THE CANONICAL STROKE ENGINES. This page used to carry its own copies of
          calculateHoleBetEngine / calculateOverallBetEngine, and those copies read
          p1/p2 only - they ignored config.sideA/sideB entirely. So a 2v2 Stroke Play
@@ -514,11 +515,13 @@ html {
                 <option value="match">Match Play Bet (Overall)</option>
                 <option value="nassau">Nassau Bet (F9 / B9 / 18)</option>
                 <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
+                <option value="hilo">Hi-Lo (2v2 &middot; low ball + high ball, $ a point)</option>
                 <option value="skins">Skins (pick who's in)</option>
                 <option value="dots">Dots / Junk (everyone playing)</option>
                 <option value="nines">9 Points (three golfers, 5-3-1)</option>
             </select>
             <p id="sm-format-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
+            <p id="sm-hilo-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">Tap four golfers. Every hole is two points: low ball (each side&rsquo;s best score) and high ball (each side&rsquo;s worse score). A tie is a wash. The side behind pays the point difference &times; the amount, split between its two golfers.</p>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
             <div class="control-group" id="sm-scoring-group">
@@ -534,7 +537,7 @@ html {
                 <input type="hidden" id="sm-scoring" value="net">
             </div>
             <div class="control-group" id="sm-stake-group">
-                <label>Stake ($)</label>
+                <label id="sm-stake-label">Stake ($)</label>
                 <div class="grid-4col" id="sm-stake-presets" style="margin-bottom:4px;">
                     <button type="button" class="preset-btn" onclick="setSmStakePreset(5)" style="padding:6px 2px; font-size:0.75rem;">$5</button>
                     <button type="button" class="preset-btn active" onclick="setSmStakePreset(20)" style="padding:6px 2px; font-size:0.75rem;">$20</button>
@@ -1580,6 +1583,13 @@ html {
         document.getElementById("sm-stake-group").style.display = (!isStroke && !fieldGame && !isNassau) ? "block" : "none";
         document.getElementById("sm-nassau-stake-group").style.display = (isNassau && !fieldGame) ? "block" : "none";
         document.getElementById("sm-press-rule-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+        // HI-LO (016): one amount, $ a point; no presses; 2v2 only - said up front.
+        const isHilo = format === 'hilo';
+        if (isHilo) document.getElementById("sm-press-rule-group").style.display = "none";
+        const stakeLbl = document.getElementById("sm-stake-label");
+        if (stakeLbl) stakeLbl.textContent = isHilo ? '$ per point' : 'Stake ($)';
+        const hiloNote = document.getElementById("sm-hilo-note");
+        if (hiloNote) hiloNote.style.display = isHilo ? 'block' : 'none';
         const apg = document.getElementById("sm-autopress-group");
         if (apg) apg.style.display = (isNassau && !fieldGame) ? "block" : "none";
         // PRICED AS IT IS REVEALED. Choosing Nassau is what makes this control
@@ -1949,6 +1959,12 @@ html {
         }
         // 2v2 Stroke Play is supported: the engine takes the whole side and scores it
         // best ball, and settlement splits the stake evenly between teammates.
+        // HI-LO (016) is 2v2 only: a 1v1 is not a pairing it can play.
+        if (format === 'hilo' && teamAIds.length !== 2) {
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Hi-Lo is two against two — tap two more golfers.</span>`;
+            preview.style.display = 'none';
+            return;
+        }
 
         // THE ANCHOR RULE, SHOWN BEFORE SAVE.
         //
@@ -2594,6 +2610,19 @@ html {
                 ? document.getElementById("sm-autopress-stake").value : null
         };
 
+        // HI-LO (016): four golfers, an amount, no presses.
+        if (format === 'hilo') {
+            if (!(typeof hiloShapeOk === 'function' && hiloShapeOk(teamAIds, teamBIds))) {
+                uiRefuse('\u26A0\uFE0F Hi-Lo is two against two \u2014 tap four golfers.');
+                return;
+            }
+            if (!((parseFloat(terms.stake) || 0) > 0)) {
+                uiRefuse('\u26A0\uFE0F Set the $ per point above 0, or this bet won\u2019t track any money.');
+                return;
+            }
+            terms.pressRule = 'none';
+        }
+
         // THE STROKE REFUSAL STAYS ON THIS SURFACE, because it is a sentence about
         // this form. challenges.js has the same rule for a challenge's terms; both
         // exist because a bet with neither amount tracks no money, and a golfer who
@@ -2647,7 +2676,7 @@ html {
             const teamBIds = (sm.teamBIds || []).map(String);
             const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
             const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
-            const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : 'Match Play');
+            const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'hilo' ? 'Hi-Lo' : 'Match Play'));
             const stakeText = sm.format === 'stroke'
                 ? `$${sm.holeStake || 0}/hole, $${sm.overallStake || 0} overall`
                 : `$${sm.stake || 0}`;
@@ -4361,6 +4390,8 @@ html {
                 }
                 if ((sm.overallStake || 0) > 0) stakes.push(`$${sm.overallStake} overall`);
                 if (stakes.length) formatLine += ` • ${stakes.join(' + ')}`;
+            } else if (sm.format === 'hilo') {
+                formatLine = `Hi-Lo • ${(sm.scoring || 'net').toUpperCase()} • $${sm.stake || 0}/point`;
             } else {
                 // NASSAU GETS THE SHARED LABEL. A Step-6 Nassau keeps its price in
                 // frontStake/backStake/overallStake and leaves `stake` at 0, so a
@@ -4388,6 +4419,8 @@ html {
                         html += `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press Overall</button>`;
                     }
                 }
+            } else if (sm.format === 'hilo') {
+                // Hi-Lo has no presses and no Aloha (016).
             } else {
                 // Press eligibility reads the engine's segment state - which base is
                 // still open, how far the match has gone - so the rule that decides

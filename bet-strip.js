@@ -803,6 +803,48 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
 
         const progress = matchProgress(matchPlayers, courseData, savedScores);
 
+        // HI-LO (016, ADDITIVE). Its own row, from hilo-engine.js: two contests a
+        // hole, read as points - "Hi-Lo: Bob + Manny +3 (Low 5-3, High 4-3)". No
+        // dollars until every hole in range is in (or the round is finished), the
+        // rule every other row here follows; then the decided money is the engine's
+        // toSideA, the same figure settlement pays.
+        if (sm.format === 'hilo') {
+            const hl = (typeof hiloForSideMatch === 'function')
+                ? hiloForSideMatch(sm, teamA, teamB,
+                    (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, courseData) : courseData,
+                    savedScores) : null;
+            if (!hl) return;
+            const nmA = hiloSideName(teamA), nmB = hiloSideName(teamB);
+            let hlDone = false;
+            if (typeof sideMatchRangeComplete === 'function') {
+                let roundDone = false;
+                if (typeof computeRoundFinish === 'function') {
+                    try { roundDone = !!computeRoundFinish(data, courseData, savedScores).finished; }
+                    catch (e) { roundDone = false; }
+                }
+                hlDone = !!sideMatchRangeComplete(sm, allPlayers, courseData, savedScores, { roundFinished: roundDone });
+            }
+            const meSide = iAmInB ? -1 : 1;
+            const lead = hl.diff * meSide;
+            const line = hiloLine(hl, nmA, nmB);
+            const decidedHl = hlDone ? hl.toSideA * meSide : 0;
+            rows.push({
+                key: id, playerIds: a.concat(b), label, isTeam, mine: !!(iAmInA || iAmInB),
+                format: 'Hi-Lo', status: line, sentence: line,
+                tone: hlDone ? 'final' : (hl.played === 0 ? 'idle' : (lead > 0 ? 'up' : (lead < 0 ? 'down' : 'even'))),
+                presses: [], netMoney: decidedHl, atStake: 0,
+                netText: sideMoneyText(decidedHl, 0, isTeam, !!(iAmInA || iAmInB),
+                    iAmInA ? teamA.length : (iAmInB ? teamB.length : Math.max(teamA.length, teamB.length))),
+                thru: progress.thru,
+                thruText: progress.thru > 0 ? `Through Hole ${progress.thru}` : 'Not started',
+                thruShort: progress.thru > 0 ? `Thru ${progress.thru}` : 'Not started',
+                waitingOn: progress.waitingOn,
+                canPress: false, nextPressHole: null, pressStake: sm.stake || 0,
+                stakeText: (sm.stake || 0) > 0 ? `$${sm.stake}/pt` : ''
+            });
+            return;
+        }
+
         let status = '', sentence = '', tone = 'idle', presses = [];
         let decided = 0, atStake = 0;
 
@@ -1124,6 +1166,10 @@ const ACTION_RANK = {
 // rows and the end-of-hole recap so the two can never describe a match differently.
 function sideMatchRoundConfig(sm, matchPlayers) {
     if (!sm || !matchPlayers || matchPlayers.length < 2) return null;
+    // HI-LO (016, ADDITIVE) is not match play and has no strip: buildSideActionRows
+    // draws it from hilo-engine.js, and the hole recap leaves it out rather than
+    // describe it in UP/DOWN words it does not use.
+    if (sm.format === 'hilo') return null;
     const teamA = (sm.teamAIds || []).map(String);
     const tagged = matchPlayers.map(p => Object.assign({}, p, {
         team: teamA.includes(String(p.id)) ? 'Team 1' : 'Team 2'

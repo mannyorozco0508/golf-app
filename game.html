@@ -43,6 +43,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
     <!-- net-finish-line.js: the Net Finish split, shared with the scorecard since
@@ -398,7 +399,8 @@ html {
                 if (sm.holeStake > 0) parts.push(money(sm.holeStake) + ' a hole');
                 if (sm.overallStake > 0) parts.push(money(sm.overallStake) + ' overall');
                 what = 'Stroke play' + (parts.length ? ', ' + parts.join(' and ') : '');
-            } else what = 'Match play' + (sm.stake > 0 ? ', ' + money(sm.stake) : '');
+            } else if (sm.format === 'hilo') what = 'Hi-Lo' + (sm.stake > 0 ? ', ' + money(sm.stake) + ' a point' : '');
+            else what = 'Match play' + (sm.stake > 0 ? ', ' + money(sm.stake) : '');
             lines.push('<div class="game-sub">⚔️ <strong>' + who + '</strong> — ' + what + ', ' + scoring + (sm.startHole > 1 ? ', from hole ' + sm.startHole : '') + '</div>');
         });
         if (typeof getRoundGames === 'function') {
