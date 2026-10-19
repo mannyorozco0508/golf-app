@@ -170,7 +170,7 @@ describe('1. A PLAYED ROUND KEEPS ITS ROSTER, ITS SCORES AND ITS MONEY', () => {
         assert.equal(sha12('money-engine.js'), '12bfa41c2c8e');
         assert.equal(sha12('settlement-engine.js'), '9f6a4fa7e4de');
         assert.equal(sha12('pool-engine.js'), '1530a0b955e2');
-        assert.equal(sha12('action-model.js'), '399ba26f0025');
+        assert.equal(sha12('action-model.js'), 'f67a7b4390f5');   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');
     });
 });

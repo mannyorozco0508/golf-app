@@ -180,7 +180,7 @@ describe('1. A PENDING CHALLENGE NEVER REACHES A SETTLEMENT', () => {
         assert.equal(sha12('money-engine.js'), '12bfa41c2c8e');
         assert.equal(sha12('settlement-engine.js'), '9f6a4fa7e4de');
         assert.equal(sha12('pool-engine.js'), '1530a0b955e2');
-        assert.equal(sha12('action-model.js'), '399ba26f0025');
+        assert.equal(sha12('action-model.js'), 'f67a7b4390f5');   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');
         assert.equal(sha12('helpers/match-engine-golden.json'), 'aa94f2749f5a',
             'the match-engine goldens moved - this wave changes no arithmetic');

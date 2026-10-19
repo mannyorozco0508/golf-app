@@ -95,7 +95,7 @@ const UNCHANGED = {
     'live-skins.js': '632bbb1a1dd3078a9ba79755581c0f44e46acca8bac94c37ea29f3b156ac4e1b',
     'trip-pots.js': '3d1b2506d3a716ced0f086996043e8f6736ff766db16e732eba60f80167e08a0',
     'tournament-engine.js': '3626301cf0c2a61438c5d8e566ffbc0094f8b980968f9c45d2e11fc2a426996c',
-    'action-model.js': '399ba26f0025b8d18fb240968c0922e7de8d7a22b616ac936cd4afa76ffd771b',
+    'action-model.js': 'f67a7b4390f5776f11e8ab5eb80308b914c6bb817b518b0480d186a7f518dd8f',   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
     'helpers/side-match-cards.js': 'dd02985ef9a151b72c28554b525eebc01cfe33e6402f31a03c3ddace1df106f8'
 };
 test('the existing money engines, settlement, side bets and game catalog are byte-identical to main', () => {

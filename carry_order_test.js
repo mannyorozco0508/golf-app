@@ -228,14 +228,14 @@ describe('4. EDGES THE FIX MUST NOT MOVE', () => {
         a.moneyPool.skins.carryOver = false; b.moneyPool.skins.carryOver = false;
         assert.deepEqual(weeklyNet(a), weeklyNet(b));
     });
-    // A stacked game bought on hole 5 of a 10th-tee round covers holes 5..18 and is
-    // played 10..18 then 5..9 (14 holes, $54 / 14 a unit). Ann 10 = 1u; 11..18 and
-    // 5..8 tie (12); Cal 9 = 13u. Nothing pending. Ann 54/14 - 18, Cal 13*54/14 - 18.
-    test('a skins game added from hole 5 on a 10th-tee round carries 10..18 then 5..9  [RED]', () => {
-        const v = 54 / 14;
-        near(stackedExact(stackedRound(10, { startHole: 5 })), { Ann: v - 18, Ben: -18, Cal: 13 * v - 18 });
-        // ...and the whole-dollar nets the golfers see: $3.86 and $50.14 -> $4 and $50.
-        near(stackedNet(stackedRound(10, { startHole: 5 })), { Ann: -14, Ben: -18, Cal: 32 });
+    // A stacked game bought on hole 5 of a 10th-tee round covers the holes still to
+    // PLAY from 5: 5..9 only (2026-10-19 Manny OK: gameHoles play order - 10..18 and
+    // 1..4 were played before it existed; this test used to pin 5..18 played 10..18
+    // then 5..9). 5 holes, $54 / 5 a unit: 5..8 tie, Cal wins 9 with the carry = 5u,
+    // the whole pot. Ann's skin on 10 was before the game. Ann -18, Ben -18, Cal +36.
+    test('a skins game added from hole 5 on a 10th-tee round covers 5..9 only', () => {
+        near(stackedExact(stackedRound(10, { startHole: 5 })), { Ann: -18, Ben: -18, Cal: 36 });
+        near(stackedNet(stackedRound(10, { startHole: 5 })), { Ann: -18, Ben: -18, Cal: 36 });
     });
 });
 
