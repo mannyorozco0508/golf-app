@@ -107,7 +107,7 @@ const CLASS = {
     'src:plain': 'COMMON', 'src:imessage': 'COMMON', 'src:notes': 'COMMON', 'src:excel': 'COMMON', 'src:sheets': 'COMMON',
     'ws:crlf': 'COMMON', 'ws:cr_only': 'RARE', 'ws:nbsp': 'COMMON', 'ws:trailing': 'COMMON', 'ws:smart_quotes': 'COMMON',
     'ws:zero_width': 'RARE',
-    'xl:header_row': 'COMMON', 'xl:first_last_cols': 'COMMON', 'xl:index_col': 'RARE', 'xl:empty_hcp_with_flight': 'RARE',
+    'xl:header_row': 'COMMON', 'xl:first_last_cols': 'COMMON', 'xl:index_col': 'RARE', 'xl:empty_hcp_with_flight': 'COMMON',
 };
 
 // ---- names -------------------------------------------------------------------
@@ -240,7 +240,7 @@ function genPaste() {
         T('name:dup');
     }
     players.forEach(p => T('name:' + p.kind));
-    if (order === 'trail_flight' && players.some(p => !p.hasHcp && p.flight)) T('order:trail_flight_nohcp');
+    if (order === 'trail_flight' && players.some(p => !p.hasHcp && p.flight)) T(sheet ? 'xl:empty_hcp_with_flight' : 'order:trail_flight_nohcp');
 
     const style = { src, sheet, order, sep, hcp, flight, brk, num, bullet, crlf, crOnly, nbsp, trailing, smart, zw, xlHeader, xlFirstLast, xlIndex };
     return { style, tags, players, groupSizes, dups };
@@ -292,7 +292,7 @@ function renderGolfer(p, style, lineNo) {
         if (style.order === 'trail_flight') cells.push(F);
         body = cells.join('\t').replace(/\t+$/, style.trailing ? '\t' : '');
         if (style.xlIndex) flagOk = true;
-        if (!H && F) { flagOk = true; }
+        // "Name<TAB><TAB>A": the empty cell says the A is in the flight column - exact.
     } else switch (style.order) {
         case 'name_hcp': body = N + (H ? sep + H : ''); break;
         case 'lead_flight': body = (F ? F + pick([' ', ' - ', ' · ', ': ', ', ', '\t']) : '') + N + (H ? sep + H : ''); break;
@@ -330,7 +330,8 @@ function renderGolfer(p, style, lineNo) {
 function header(style, gi) {
     const n = gi + 1;
     switch (style.brk) {
-        case 'group_header': return pick(['Group ' + n, 'Group ' + n + ':', 'GROUP ' + n, 'Group ' + n + ' -', 'Group #' + n, 'Grp ' + n + ':', 'Foursome ' + n, 'Group ' + n + ' - 8:' + (10 + n * 8) + ' AM', 'Group ' + n + ': 8:' + (10 + n * 8), 'group ' + n, 'Team ' + n + ':']);
+        case 'group_header': { const mm = String((10 + n * 8) % 60).padStart(2, '0');
+            return pick(['Group ' + n, 'Group ' + n + ':', 'GROUP ' + n, 'Group ' + n + ' -', 'Group #' + n, 'Grp ' + n + ':', 'Foursome ' + n, 'Group ' + n + ' - 8:' + mm + ' AM', 'Group ' + n + ': 8:' + mm, 'group ' + n, 'Team ' + n + ':']); }
         case 'number_header': return pick([n + '.', n + ')', '#' + n, n + ':']);
         case 'teetime_header': { const mm = String(10 + (n * 8) % 50).padStart(2, '0'); const h = 7 + Math.floor(n / 6);
             return pick(['Tee time ' + h + ':' + mm, h + ':' + mm, h + ':' + mm + ' AM', h + ':' + mm + ' AM', h + ':' + mm + 'am', 'Tee Time: ' + h + ':' + mm + ' AM', 'Tee time - ' + h + ':' + mm]); }
@@ -412,7 +413,9 @@ function judge(G, built, r) {
         out.push({ ln, l, res: 'fail', why, got });
     });
     const groupsOk = JSON.stringify(r.groups) === JSON.stringify(G.groupSizes);
-    const dupOk = G.dups.every(d => (r.duplicates || []).some(x => x.name.toLowerCase() === d));
+    // the review names the same name twice - checked where both lines read exactly
+    const dupOk = G.dups.every(d => out.filter(x => x.res === 'exact' && x.l.expect.name.toLowerCase() === d).length < 2
+        || (r.duplicates || []).some(x => x.name.toLowerCase() === d));
     return { lines: out, groupsOk, dupOk };
 }
 

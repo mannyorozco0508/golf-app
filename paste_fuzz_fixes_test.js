@@ -89,3 +89,14 @@ describe('FIX 3: a dash, colon, bar or slash between name, handicap and flight i
         assert.deepEqual(rows('Mary - blue'), [['Mary - blue', '', null]]);
     });
 });
+
+describe('FIX 4: a spreadsheet row with an empty handicap cell still has its flight', () => {
+    test('"Zack<TAB>Carrano<TAB><TAB>A" is Zack Carrano, no handicap, flight A', () => {
+        assert.deepEqual(rows('Name\tHCP\tFlight\r\nZack Carrano\t\tA\r\nSkeens\t2.0\tA\r\nLance\t\tb'),
+            [['Zack Carrano', '', 'A'], ['Skeens', '2.0', 'A'], ['Lance', '', 'B']]);
+        assert.deepEqual(rows('Zack\tCarrano\t\tB'), [['Zack Carrano', '', 'B']]);
+    });
+    test('no empty cell, no flight: "Matt<TAB>B" is a golfer named Matt B; "Glenn A" too', () => {
+        assert.deepEqual(rows('Matt\tB\nGlenn A'), [['Matt B', '', null], ['Glenn A', '', null]]);
+    });
+});

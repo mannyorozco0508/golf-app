@@ -314,7 +314,12 @@ function parsePlayerPasteText(text, teeNames) {
     lines.forEach((rawLine, idx) => {
         // URGENT-008: tabs, non-breaking spaces and runs of spaces are one space;
         // a bullet or a list number in front of the line is not part of the name.
-        const line = rosterPasteCleanLine(rawLine);
+        // A SPREADSHEET ROW WITH AN EMPTY HANDICAP CELL (URGENT-008): "Zack<TAB>Carrano
+        // <TAB><TAB>A". The empty cell says the A is a column of its own - the flight
+        // column - not a last initial; "Matt<TAB>B" (no empty cell) stays a name.
+        const cellRow = rosterPasteEmptyCellFlight(rawLine);
+        const cellFlight = cellRow.flight;
+        const line = rosterPasteCleanLine(cellRow.rest);
         // A BLANK LINE, A GROUP HEADER OR A BARE TEE TIME all close the current run.
         // See rosterPasteSeparator above for why a header must not be a golfer: six
         // "Group N" lines became six phantom golfers, each with a handicap.
@@ -346,7 +351,7 @@ function parsePlayerPasteText(text, teeNames) {
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
-            const fl = trail.flight || lead.flight || headerFlight;
+            const fl = trail.flight || lead.flight || cellFlight || headerFlight;
             if (fl) tp.flight = fl;
             validPlayers.push(tp);
             playerLines.push(idx + 1);
@@ -376,7 +381,7 @@ function parsePlayerPasteText(text, teeNames) {
         // accepted. Stored names are never rewritten; this is the paste only.
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
-        else if (headerFlight) player.flight = headerFlight;
+        else if (cellFlight || headerFlight) player.flight = cellFlight || headerFlight;
         if (teed.tee) player.teeName = teed.tee;
         validPlayers.push(player);
         playerLines.push(idx + 1);
@@ -427,6 +432,13 @@ function rosterPasteCleanLine(raw) {
     return t;
 }
 
+function rosterPasteEmptyCellFlight(raw) {
+    const t = String(raw == null ? '' : raw);
+    const m = /\t[ \u00A0]*\t[ \t\u00A0]*([ABab])[ \t\u00A0]*$/.exec(t);
+    if (!m || !t.slice(0, m.index).trim()) return { flight: null, rest: t };
+    return { flight: m[1].toUpperCase(), rest: t.slice(0, m.index) };
+}
+
 // ---- WHAT SITS BETWEEN THE NAME, THE HANDICAP AND THE FLIGHT (URGENT-008) ----
 //
 // Measured by the fuzzer: "Manny - 28.0" read as a golfer named "Manny -";
@@ -459,7 +471,7 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+    module.exports = { rosterPasteEmptyCellFlight, rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }
