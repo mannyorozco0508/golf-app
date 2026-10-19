@@ -431,7 +431,7 @@ const KNOWN = [
     // (URGENT-010 fixed the flights wording: Players now says the Weekly Game's skins are paid within each flight, matching the card.)
     // (URGENT-009 fixed "tap Open" -> "tap Join" on Round Ready.) Still open: in a one-group round the bare code is a read-only spectator.
     ['MEDIUM', 'B-weekly-new', 'In a one-group round the bare code is still a read-only spectator.', 'B-weekly-new/17-round-ready.png'],
-    ['MEDIUM', 'B-weekly-new', 'The Skins card says "Ties carry over." while its default is No Carry.', 'B-weekly-new/15-skins-on.png'],
+    // (URGENT-011 fixed the Skins card: its line now follows the carry choice - "No carry" by default - and it has Gross / Net.)
     ['LOW', 'B-weekly-new', 'Review shows "Players 20 added" with no groups / flights line. (URGENT-009 fixed the Players step naming the Weekly Game before one exists.)', 'B-weekly-new/07-step3-players.png'],
     ['LOW', 'B-weekly-new', 'The organizer who just put himself first in Group 1 is asked "How are you joining this round?" (could default: owner -> Group 1). (URGENT-009: "Who are you?" on GPS is no longer asked of the round\'s creator.)', 'B-weekly-new/18-card-how-joining.png'],
     ['LOW', 'B-weekly-new', 'The Weekly Game runs skins ("Skins takes the rest") and Also Playing has a separate $5 Skins game: two skins games on the card (Main Pool Skins + $5 Skins) - legitimate, but easy to double up by accident.', 'B-weekly-new/15-skins-on.png'],
