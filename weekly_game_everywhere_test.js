@@ -53,7 +53,7 @@ describe('NEITHER PAGE RENDERS "MAIN POOL"', () => {
 describe('EACH OF THE NINE, IN ITS OWN CONTEXT', () => {
     test('admin.html markup: the grouping note, the flights note, the checkbox, the stacked-skins note', () => {
         const s = rendered('admin.html');
-        assert.match(s, /every whole-field game, including the Weekly Game\./);
+        assert.match(s, /every whole-field game \(the Weekly Game too, if you set one up\)\./);
         assert.match(s, /Side matches and the Weekly Game never use flights\./);
         assert.match(s, /id="mp-enabled" onchange="mpToggle\(\)"> <strong>🏆 Weekly Game<\/strong>/);
         assert.match(s, /<p id="mp-skins-note">Weekly Game already includes its own Skins pot \\u2014 only add this if you want a second, separate skins game\.<\/p>/);

@@ -2180,7 +2180,7 @@ html {
         <div class="wizard-step-sub">Add everyone playing today, with the number beside each name.</div>
     <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45;"></p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-        ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game, including the Weekly Game.
+        ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game (the Weekly Game too, if you set one up).
     </div>
     <!-- DIFFERENT TEES, ON A STROKES ROUND. Hidden on a GHIN round, where the
          tee is already inside the course-handicap formula and adjusting again
@@ -2407,7 +2407,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
             <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>✨ Extras</strong></label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side pots. Set up who's in on the Action tab.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side pots, read from the scores.</p>
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
@@ -2994,9 +2994,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const saveBtn = document.getElementById('main-save-btn');
         if (saveBtn) {
+            // A ROUND THAT ALREADY EXISTS IS NOT STARTED AGAIN (URGENT-009, 013-20): reopened
+            // to add a game or a golfer, Save says what it does. (try: loadedPlayerCount is
+            // declared further down this script.)
+            let saved = false;
+            try { saved = loadedPlayerCount > 0; } catch (e) { saved = false; }
             saveBtn.textContent = isNewRyderCupChoice()
                 ? '\uD83C\uDFC6 Create Round \u0026 Set Up Cup'
-                : '\uD83D\uDCBE Save \u0026 Start Round';
+                : (saved ? '\uD83D\uDCBE Save changes' : '\uD83D\uDCBE Save \u0026 Start Round');
         }
     }
 
@@ -3818,7 +3823,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + '</div>'
                 + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
                 + 'One link for the whole round \u2014 each golfer picks their group when they open it. '
-                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, tap Open and pick your group.</div>'
+                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, type it in and tap Join, then pick your group.</div>'
                 + '</div>';
         }
         html += '<div class="wr-label" style="margin-bottom:4px;">' + (boundaries.length > 1 ? 'Or send each group its own link' : 'Scorekeeper Links') + '</div>'
@@ -11904,6 +11909,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
             loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
+            try { syncWizardNavLabels(); } catch (e) { /* the label follows on the next step change */ }
             loadedSideMatches = (isThisRound && snapshot.exists() && data.sideMatches) ? JSON.parse(JSON.stringify(data.sideMatches)) : {};
             loadedCourseKey = isThisRound && snapshot.exists() ? (data.activeCourseKey || null) : null;
             loadedCourseData = isThisRound && snapshot.exists() && Array.isArray(data.courseData) && data.courseData.length > 0

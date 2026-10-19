@@ -330,7 +330,7 @@ describe('ROUND READY: ONE LINK IS THE HEADLINE THING TO SEND', () => {
         const h = ready(12);
         const t = strip(h);
         assert.match(t, /Send this link to everyone/);
-        assert.match(t, /One link for the whole round — each golfer picks their group when they open it\. Or tell them the code MNDY2A: in the app, tap Open and pick your group\./);
+        assert.match(t, /One link for the whole round — each golfer picks their group when they open it\. Or tell them the code MNDY2A: in the app, type it in and tap Join, then pick your group\./);
         assert.match(h, /copyRoundLink\('https:\/\/golf-app-5a5\.pages\.dev\/index\.html\?game=MNDY2A'\)/, 'the bare round link, copyable - its own copier (2026-09-20; copyGroupLink(url, 0) said "Group 0")');
         assert.ok(h.indexOf('rr-round-link') < h.indexOf('class="group-link-row"'), 'headline first');
         assert.match(t, /Or send each group its own link/);
