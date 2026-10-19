@@ -397,7 +397,16 @@ class Phone {
     // ...and opened again from the home screen icon: the app's own start page.
     async reopen(url, settleMs) {
         if (!this.chrome || this.chrome.exitCode !== null || this.chrome.signalCode) await this._start();
-        await this.cdp('Page.navigate', { url: url || fileUrl('index.html') });
+        // A loaded machine can leave the relaunched browser's first tab unresponsive: one
+        // more relaunch (the same profile - the same phone), never a silent pass.
+        try { await this.cdp('Page.navigate', { url: url || fileUrl('index.html') }); }
+        catch (e) {
+            try { this.ws.close(); } catch (x) {}
+            registry.release(this.tracked);
+            if (this.chrome.exitCode === null) { const gone = new Promise((r) => this.chrome.once('exit', r)); this.chrome.kill('SIGTERM'); await Promise.race([gone, sleep(5000)]); }
+            await this._start();
+            await this.cdp('Page.navigate', { url: url || fileUrl('index.html') });
+        }
         await sleep(settleMs || 3500);
         await this.collect();
         return this;
