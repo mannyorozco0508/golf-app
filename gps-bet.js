@@ -245,7 +245,7 @@
         + '#hp-bet .hb-worst{font:500 13px/1.4 ' + FONT + ';color:#5d6b64;margin-top:12px;}'
         + '#hp-bet input.hb-custom{width:90px;min-height:40px;border:1.5px solid #0f4d3a;border-radius:999px;padding:0 12px;font:600 15px/1 ' + FONT + ';}'
         // THE CARD'S BAR (simpleFlow, card side): the money chip and + Bet over the Round Menu.
-        + '#hp-card-bet{position:fixed;z-index:9000;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 76px);display:none;align-items:center;justify-content:space-between;gap:8px;pointer-events:none;}'
+        + '#hp-card-bet{position:fixed;z-index:58;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 76px);display:none;align-items:center;justify-content:space-between;gap:8px;pointer-events:none;}'
         + 'body.hp-sf-card .scorecard-main::after{content:"";display:block;height:72px;}'
         + 'body.hp-sf-card #hp-card-bet{display:flex;}body.gps-side-gps #hp-card-bet{display:none !important;}'
         + '#hp-card-bet > *{pointer-events:auto;}'
