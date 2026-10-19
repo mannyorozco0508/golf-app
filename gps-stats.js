@@ -495,7 +495,9 @@
         return ssDone[k] || 0;
     }
     function ssStrokes(pid) { return ss.pend[pid] || ssSaved(pid); }
-    function ssStatsFor(pid) { var c = ss.ctx; return !!(c.stats && (String(pid) === String(c.pick) || othersOn())); }
+    // URGENT-005: the stats rows are for the golfer this phone IS (ctx.own - index.html qsOwnId), not
+    // whoever's chip is picked; nobody's when the phone is nobody; everyone's with Track stats for others.
+    function ssStatsFor(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && ((me != null && String(pid) === String(me)) || othersOn())); }
     function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
     function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
     function ssClose() { if (ss && ss.wrap) { ss.wrap.style.display = 'none'; ss.wrap.querySelector('.hp-ss').style.transform = ''; } if (ss) { ss.pend = {}; ss.ctx = null; } }

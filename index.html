@@ -6443,7 +6443,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const overlay = document.getElementById('gps-overlay');
         return S.open({
             code: currentMode, course: (currentData && currentData.courseName) || '', hole: n, par: Number(meta.par || gpsHolePar(n)) || 0, si: meta.si, yards: meta.yards,
-            golfers: golfers, pick: playerId != null ? playerId : qsMeId(), stats: qsOn(),
+            golfers: golfers, pick: playerId != null ? playerId : qsMeId(), own: qsOwnId(), stats: qsOn(),
             score: pid => Number(((currentData && currentData.scores) || {})['p' + pid + '_h' + n]) || 0,
             save: (pid, v) => { const p = golfers.find(x => String(x.id) === String(pid)); saveScore(p ? p.id : pid, n, String(v)); },
             next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
