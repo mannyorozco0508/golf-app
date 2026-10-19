@@ -346,12 +346,14 @@ function parsePlayerPasteText(text, teeNames) {
         // URGENT-008: "Manny - 28.0", "Colm: 4.0", "Paul | 12 | A" - the separators
         // organizers type between the name, the handicap and the flight - are spaces
         // for the reading below. The line as typed (line) is what the preview shows.
-        const work = rosterPasteNormalizeGolfer(line);
+        const bracketed = rosterPasteBracketFlight(line);
+        const lineFlight = cellFlight || bracketed.flight;
+        const work = rosterPasteNormalizeGolfer(bracketed.rest);
         const trail = splitTrailingHcpFlight(work);
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
-            const fl = trail.flight || lead.flight || cellFlight || headerFlight;
+            const fl = trail.flight || lead.flight || lineFlight || headerFlight;
             if (fl) tp.flight = fl;
             validPlayers.push(tp);
             playerLines.push(idx + 1);
@@ -381,7 +383,7 @@ function parsePlayerPasteText(text, teeNames) {
         // accepted. Stored names are never rewritten; this is the paste only.
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
-        else if (cellFlight || headerFlight) player.flight = cellFlight || headerFlight;
+        else if (lineFlight || headerFlight) player.flight = lineFlight || headerFlight;
         if (teed.tee) player.teeName = teed.tee;
         validPlayers.push(player);
         playerLines.push(idx + 1);
@@ -462,8 +464,27 @@ const ROSTER_SEP_BEFORE_FLIGHT = /(\d\)?)\s*[|:\-\u2013\u2014]\s*([ABab])\s*$/;
 const ROSTER_HCP_WORD = '(?:hcp|hdcp|hcap|hndcp|handicap|hc|idx|index)';
 const ROSTER_HCP_WORD_BEFORE = new RegExp('(^|[\\s,])[(\\[]?\\s*' + ROSTER_HCP_WORD + '\\.?\\s*[:#=\\-]?\\s*([+-]?\\d{1,2}(?:\\.\\d)?)\\s*[)\\]]?(?=\\s|$|[\\/,|])', 'gi');
 const ROSTER_HCP_WORD_AFTER = new RegExp('([+-]?\\d{1,2}(?:\\.\\d)?)\\s*' + ROSTER_HCP_WORD + '\\b\\.?', 'gi');
+// THE WORD "FLIGHT" (URGENT-008): "Glenn 12 B flight", "Glenn 12 Flight B",
+// "Glenn 12 (B)", "Flight A Skeens 2". The word, or the brackets, go when a lone A or
+// B sits right beside them; the letter is then read by the ordinary rules (leading,
+// or trailing AFTER a handicap). At the END of a line a bracketed letter "(B)" or the
+// word ("Flight B", "B flight") makes the flight explicit, so it is read even with no
+// handicap - nobody writes a last initial that way. "(B)" used to be taken off as a
+// note, and the flight lost (rosterPasteBracketFlight).
+const ROSTER_FLIGHT_WORD_BEFORE = /(^|[\s,])\s*(?:flight|flt)\.?\s*[:#\-]?\s*([AB])(?=\s|$|[,\/|])/gi;
+const ROSTER_FLIGHT_WORD_AFTER = /(^|[\s,])\s*([AB])\s*-?\s*(?:flight|flt)\b\.?:?/gi;
+// At the END of a line the flight is EXPLICIT - "(B)", "Flight B", "B flight" - and
+// is read even with no handicap before it.
+const ROSTER_FLIGHT_BRACKETS = /(?:^|[\s,\/|])\s*(?:[(\[]\s*([AB])\s*[)\]]|(?:flight|flt)\.?\s*[:#\-]?\s*([AB])|([AB])\s*-?\s*(?:flight|flt)\.?)\s*$/i;
+function rosterPasteBracketFlight(line) {
+    const t = String(line == null ? '' : line);
+    const m = ROSTER_FLIGHT_BRACKETS.exec(t);
+    if (!m || !t.slice(0, m.index).trim()) return { flight: null, rest: t };
+    return { flight: (m[1] || m[2] || m[3]).toUpperCase(), rest: t.slice(0, m.index).replace(/[\s,\/|]+$/, '').trim() };
+}
 function rosterPasteNormalizeGolfer(line) {
     let t = String(line == null ? '' : line);
+    t = t.replace(ROSTER_FLIGHT_WORD_BEFORE, '$1 $2').replace(ROSTER_FLIGHT_WORD_AFTER, '$1 $2');
     t = t.replace(ROSTER_HCP_WORD_BEFORE, '$1 $2').replace(ROSTER_HCP_WORD_AFTER, '$1');
     t = t.replace(ROSTER_SEP_BEFORE_HCP, '$1 ')
         .replace(ROSTER_DASH_BEFORE_HCP, ' ')

@@ -115,3 +115,21 @@ describe('FIX 5: the word "hcp" beside a handicap is not part of the name', () =
         assert.deepEqual(rows('Hector 12\nHcpman 3'), [['Hector', '12', null], ['Hcpman', '3', null]]);
     });
 });
+
+describe('FIX 6: the word "flight" and a bracketed letter', () => {
+    test('"Glenn 12 B flight", "Glenn 12 Flight B", "Glenn 12 (B)", "Glenn 12, flight A", "Bo 3 flt B"', () => {
+        assert.deepEqual(rows('Glenn 12 B flight\nAl 12 Flight B\nPaul 12 (B)\nJim 12, flight A\nBo 3 flt b'),
+            [['Glenn', '12', 'B'], ['Al', '12', 'B'], ['Paul', '12', 'B'], ['Jim', '12', 'A'], ['Bo', '3', 'B']]);
+    });
+    test('at the end of a line the flight is explicit even with no handicap: "Glenn (B)", "Glenn A flight"', () => {
+        assert.deepEqual(rows('Glenn (B)\nPaul A flight\nAl Flight b'), [['Glenn', '', 'B'], ['Paul', '', 'A'], ['Al', '', 'B']]);
+        assert.deepEqual(P('Glenn (B)').notedLines, [], '"(B)" is a flight, not a note');
+    });
+    test('leading: "Flight A Skeens 2", "A flight - Skeens 2"', () => {
+        assert.deepEqual(rows('Flight A Skeens 2\nB flight - Glenn 12'), [['Skeens', '2', 'A'], ['Glenn', '12', 'B']]);
+    });
+    test('not a flight: "Abe Flight 3", "Bo Flight", "Jim (A) Smith 4" (letter not at the end), and "Glenn A" stays a name', () => {
+        assert.deepEqual(rows('Abe Flight 3\nBo Flight\nJim (A) Smith 4\nGlenn A'),
+            [['Abe Flight', '3', null], ['Bo Flight', '', null], ['Jim (A) Smith', '4', null], ['Glenn A', '', null]]);
+    });
+});
