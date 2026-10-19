@@ -118,6 +118,12 @@
     <script src="gps-view.js"></script>
     <script src="hp-index.js"></script>   <!-- HardPan Index (unofficial): keeps this phone's golfer's finished 18s, on the phone only -->
     <script src="gps-stats.js"></script>   <!-- Quick stats on the card + My stats (008, HardPanFeature('quickStats'); GPS Map) -->
+    <!-- 017 (features.simpleFlow): one "+ Bet" sheet and the live money chip. A bet is written by
+         challenges.js sideMatchPayloadFromTerms - the builder New Action already uses. -->
+    <script src="challenges.js"></script>
+    <script src="gps-bet.js"></script>
+    <!-- 017 (simpleFlow): the 6-tile Round Menu, Share, Settle up, Bets as a sheet, the Card as a sheet over the map. -->
+    <script src="gps-round.js"></script>
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
     <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
@@ -3565,6 +3571,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
         // GPS:BEGIN
         gpsFollowHoleView();
+        // GPS:END
+        // GPS:BEGIN
+        // 017: the money chip and + Bet follow every render (a score anywhere moves the chip).
+        if (window.HardPanBet) { try { window.HardPanBet.refresh(); } catch (e) {} }
         // GPS:END
         // GPS:BEGIN
         qsAfterRender();   // quick stats (008): this phone's copy of the round, and My stats in the Round Menu

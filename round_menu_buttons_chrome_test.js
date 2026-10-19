@@ -26,7 +26,9 @@ const ROUND = { eventName: 'Saturday Game', courseName: 'Dobson Ranch', players:
     scores: {}, settlementMode: 'whole-dollar', ownerUid: 'anon-cold', organizerToken: TOK, groupSizeOverrides: { 0: 4, 1: 4 } };
 const URL = fileUrl('index.html', 'game=' + CODE + '&organizer=' + TOK);
 // The organizer on a two-group round already answered "How are you joining?" this session.
-const NO_PICKER = "try { sessionStorage.setItem('groupPickDismissed:" + CODE + "', '1'); } catch (e) {}";
+// TODAY'S Round Menu (the old flow): 017's simpleFlow is turned off on this phone - the new 6-tile
+// menu has its own test (gps017_round_chrome_test.js).
+const NO_PICKER = "try { sessionStorage.setItem('groupPickDismissed:" + CODE + "', '1'); localStorage.setItem('hardpan_simple_flow', 'off'); } catch (e) {}";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const VISIBLE = `function vis(e) { var r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return false;

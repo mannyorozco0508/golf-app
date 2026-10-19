@@ -22,7 +22,7 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-view.js'));
 const skip = ON ? false : 'Consumer tree (GPS_ENABLED=0): no GPS files to wire';
 
 const GPS_FILES = ['gps-geo.js', 'gps-view.js', 'gps-config.js', 'gps-courses.js', 'maplibre-gl.js', 'maplibre-gl.css',
-    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js', 'gps-entitlement.js', 'hp-index.js'];
+    'gps-coverage-az.js', 'gps-coverage-wa.js', 'gps-coverage-or.js', 'gps-coverage-ct.js', 'gps-coverage-fl.js', 'gps-match.js', 'gps-live.js', 'gps-offline.js', 'gps-stats.js', 'gps-shots.js', 'trip-setup-paste.js', 'setup-paste-ui.js', 'bbb-engine.js', 'vegas-engine.js', 'extra-games-ui.js', 'trip-builder.js', 'trip-builder-ui.js', 'cup-scoreboard.js', 'front-door.js', 'home.html', 'league-engine.js', 'league-ui.js', 'points.html', 'score-marks-hp.js', 'gps-entitlement.js', 'hp-index.js', 'gps-bet.js', 'gps-round.js'];
 
 test('the scorecard loads the small GPS files at boot, inside a GPS block, and NOT MapLibre or the course data', { skip }, () => {
     const html = read('index.html');
@@ -157,7 +157,7 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     // founding cap; no price (the store's own price only).
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'toolsSheet', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'simpleFlow', 'toolsSheet', 'watch']);
     // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
     assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch' && k !== 'elevMyCell').every(([, v]) => v === true));

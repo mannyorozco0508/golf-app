@@ -3600,6 +3600,7 @@
         drawShots();
         syncLayoutC(r, nums, acc);
         syncLayoutD(r, o, nums);
+        syncSimple();
         txt('.gps-layout-pick', 'Screen layout: ' + (layoutNow() === 'd' ? 'HardPan' : 'Bottom panel'));
         show('.gps-layout-pick', ldSwitch()); show('.gps-menu-h', ldSwitch());
         placeZoom();
@@ -4336,6 +4337,30 @@
         if (rsSwitch()) syncRoundChip();
         try { syncLayoutVars(); } catch (e) {}
     }
+    // ---- 017 SIMPLE FLOW (features.simpleFlow): + Bet and the money chip, layouts D and C ----
+    function sfSwitch() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.simpleFlow === true; } catch (e) { return false; } }
+    function sfOn() { return !!(S && (S.ld || S.lc) && sfSwitch() && window.HardPanBet && window.HardPanBet.on()); }
+    function syncSimple() {
+        if (!S) return;
+        var sf = sfOn();
+        S.el.classList.toggle('gps-sf', sf);
+        show('.gps-bet-btn', sf && S.mode === 'measure');
+        // The mockup's bar: Card | Enter score | + Bet. Tools moves to Round Menu > Round settings
+        // (HardPanGps.openTools); the Games pill opens the Round Menu.
+        var gp = S.el.querySelector('.gps-door-games');
+        if (gp) { var want = sf && S.eventCode && window.HardPanRound ? '\u2630 Menu' : 'Games'; if (gp.textContent !== want) gp.textContent = want; gp.setAttribute('aria-label', want === 'Games' ? 'Games home' : 'Round Menu'); }
+        var chip = S.el.querySelector('.gps-money');
+        if (!chip) return;
+        var m = sf ? (window.HardPanBet.money() || window.HardPanBet.refresh()) : null;
+        if (!sf || !m) { chip.style.display = 'none'; return; }
+        window.HardPanBet.paintChip(chip, m);
+        // Just above the bottom controls (D: the Mark shot bar; C: the panel), at the right.
+        var bot = S.el.querySelector(S.ld ? '.gps-ld-bottom' : '.gps-panel');
+        if (bot) {
+            var er = S.el.getBoundingClientRect(), br = bot.getBoundingClientRect();
+            if (br.height) chip.style.bottom = Math.max(0, Math.round(er.bottom - br.top + 8)) + 'px';
+        }
+    }
     // Tools > Screen layout: HardPan <-> Bottom panel, on this phone, at once.
     function setLayout(name) {
         try { if (name === 'c') localStorage.setItem(LAYOUT_KEY, 'c'); else localStorage.removeItem(LAYOUT_KEY); } catch (e) {}
@@ -4704,6 +4729,8 @@
         +     '<button type="button" class="gps-score-next" aria-label="Next hole">›</button>'
         +   '</div>'
         +   '<button type="button" class="gps-door-add gps-float" style="display:none" aria-label="Add a game"><span class="gps-ico">\uFF0B</span><span class="gps-cap">Game</span></button>'
+        // 017 (simpleFlow): ONE "+ Bet" (yellow) - the bet sheet (gps-bet.js). Layouts D and C only.
+        +   '<button type="button" class="gps-bet-btn gps-float" style="display:none" aria-label="Add a bet">+ Bet</button>'
         +   '<button type="button" class="gps-tools gps-float" aria-label="Tools"><span class="gps-ico">⋯</span><span class="gps-cap">Tools</span></button>'
         + '</div>'
         // WHOSE SCORE (gps-start10): pick your group (more than one), then a golfer in it.
@@ -4745,6 +4772,8 @@
         // 012: the words about the golfer's own grid cell appear ONLY when that fetch is on (elevMyCell + elevPerLeg; fillPlaysInfo).
         +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (<span class="gps-plinfo-pos">never your position</span>), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
+        // 017 (simpleFlow): "You: +$N \u00b7 3 bets" over the bottom, right. Tap = Bets.
+        + '<button type="button" class="gps-money hp-money-chip" style="display:none" aria-label="Your money - open Bets"></button>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
         // GPS-4 "Add a game" - this round's golfers, paste, full setup (no quick-start tiles, URGENT-010).
@@ -5241,6 +5270,11 @@
         // 012 (Manny): Games (top left) and + Game opened the same thing - D has the Games pill only;
         // its room goes to the Enter score button.
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{display:none !important;}'
+        // 017 (simpleFlow): Card | Hole N / Enter score | + Bet | Tools - + Bet yellow, as the mockup.
+        + '#gps-overlay .gps-bet-btn{flex:0 0 auto;width:66px;border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;font:800 16px/1 ' + FONT + ';padding:0 4px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:nowrap;}'
+        + '#gps-overlay .gps-money{position:absolute;z-index:8;right:10px;bottom:150px;border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 ' + FONT + ';cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:nowrap;}'
+        + '#gps-overlay .gps-money b{color:#c8f075;font-weight:800;}#gps-overlay .gps-money b.neg{color:#ff9b8a;}'
+        + '#gps-overlay.gps-sf .gps-bottom .gps-tools{display:none !important;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-ico{color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-cap{font-size:12px;color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-scorebox{background:var(--gps-ld-lime);border:0;border-radius:18px;}'
@@ -5484,11 +5518,15 @@
         // ➕ ADD A GAME (gps-doors): GPS-4 in the app; Round Setup for THIS round on the web.
         on(el, '.gps-add-game', function () { if (!S) return; closeMenus(); if (doorsOn()) openAddGame(); else window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); });
         on(el, '.gps-door-add', function () { openAddGame(); });
+        on(el, '.gps-bet-btn', function () { if (window.HardPanBet) window.HardPanBet.open(); });
+        on(el, '.gps-money', function () { if (window.HardPanBet) window.HardPanBet.openBets(); });
         on(el, '.gps-pick-course', function () { closeMenus(); window.location.href = 'home.html#pick'; });
         // "Games" IN A ROUND STAYS IN THE ROUND (Manny, 2026-10-16): the card side with this round's
         // games in view, or - no games yet - this round's own Add a game. Never the course picker;
         // Home's Games only when no round is open. The hole, the golfer pick and GPS stay (no reload).
         on(el, '.gps-door-games', function () {
+            // 017 (simpleFlow): the pill is "☰ Menu" - the 6-tile Round Menu over the map (gps-round.js).
+            if (sfOn() && S.eventCode && window.HardPanRound && window.HardPanRound.openMenu()) { closeMenus(); return; }
             if (!S || !S.eventCode) { window.location.href = 'home.html#games'; return; }
             closeMenus();
             S.userChoseSide = true;
@@ -6042,6 +6080,10 @@
         target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
         toolsSheetOn: function () { return tsOn(); },
+        // 017 (simpleFlow): Tools from Round Menu > Round settings - the map, then its Tools sheet.
+        openTools: function () { if (!S) return false; if (S.side !== 'gps' && !showSide('gps')) return false; closeMenus(); toggleTools(); return true; },
+        // 017: is the map built (the Card can then open as a sheet over it)?
+        mapReady: function () { return !!(S && S.map); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
