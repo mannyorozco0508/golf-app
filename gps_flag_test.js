@@ -49,7 +49,10 @@ const GPS_TOKENS = /gps-view|gps-geo|gps-config|gps-courses|HardPanGps\b|HardPan
 // (versions, one drain, this round only, stale ask, scoresVerified), the KP tag with the round,
 // escaped names (XSS) and the play-order hole list - so it is pinned to that, not main's.
 // Before: 0bbcaf20 (main 387cf89).
-const PRE_GPS_INDEX_SHA = 'f2761cc44cfbe2a6df746517928d0f2d020e97a4025dd5c9565f818bf91281a5';
+// 2026-10-19 Manny OK: Group Links fix in the Consumer app (mailbox 015 #2 - the Round
+// Menu's "Group Links" opens Scorekeeper Links inside the menu; it was a GPS block, now shared).
+// Before: f2761cc4 (gps-next 8595adc).
+const PRE_GPS_INDEX_SHA = 'f5b898ab03fb5e7c6355b71ce77ec0fbc66518fc56639e65eddf6a321112e882';
 const GPS_SHELL = (() => {
     const m = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(ROOT, 'sync-mobile-web.js'), 'utf8'));
     return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
