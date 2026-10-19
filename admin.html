@@ -4070,6 +4070,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return bits.join(' \u00B7 ');
     }
 
+    // [label, value] lines for the Review's PLAYERS section: groups ("5 × 4", or
+    // the sizes when they differ), flights ("A 10 · B 10") when on, and the tee
+    // (with how many golfers play another tee). Nothing here writes.
+    function reviewPlayerLines(n) {
+        const out = [];
+        if (n > 0 && typeof computeGroupSizes === 'function') {
+            const sizes = computeGroupSizes(n, groupSizeOverrides || {});
+            if (sizes.length > 1) {
+                const same = sizes.every((x) => x === sizes[0]);
+                out.push(['Groups', same ? sizes.length + ' \u00D7 ' + sizes[0] : sizes.length + ' groups (' + sizes.join(', ') + ')']);
+            } else if (sizes.length === 1) {
+                out.push(['Groups', '1 group of ' + sizes[0]]);
+            }
+        }
+        if (flightsEnabledNow()) {
+            const list = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim() || String(p.hcp || '').trim());
+            const a = list.filter((p) => p.flight !== 'B').length;
+            out.push(['Flights', 'A ' + a + ' \u00B7 B ' + (list.length - a)]);
+        }
+        const tee = (typeof readTeeRatingFromDom === 'function') ? readTeeRatingFromDom() : null;
+        if (tee && tee.teeKey && String(tee.teeName || '').trim()) {
+            let other = 0;
+            document.querySelectorAll('.player-row').forEach((row) => {
+                const k = row.getAttribute('data-tee-key') || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
+                if (k && k !== tee.teeKey) other++;
+            });
+            out.push(['Tee', escapeHtml(String(tee.teeName).trim()) + (other ? ' (' + other + ' golfer' + (other === 1 ? '' : 's') + ' on another tee)' : '')]);
+        }
+        return out;
+    }
+
     function renderWizardReview() {
         renderOrganizerStanding();
         const container = document.getElementById('wizard-review-summary');
@@ -4160,6 +4191,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         rows.push(['Tee rating', handicapReviewLine(), 1, SEC_SCORING]);
         rows.push(['Players', `${playerCount} added`, 5, SEC_PLAYERS]);
+        // GROUPS, FLIGHTS AND THE TEE (URGENT-009, 013-8). After a paste the Review
+        // said "20 added" and nothing else - not the five foursomes, not A 10 / B 10,
+        // not which tee. DISPLAY ONLY, each read the way the save reads it.
+        reviewPlayerLines(parseInt(playerCount, 10) || 0).forEach((r) => rows.push(r.concat([5, SEC_PLAYERS])));
         rows.push(['Extras', sideGamesText, 6, SEC_ACTION]);
         // A side match set up in the Games step is written by this same Save, so it
         // belongs on the last screen before playing. Read from what will be written -
