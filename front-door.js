@@ -644,6 +644,7 @@
                 var d = s && s.val ? s.val() : null;
                 if (!d) { today.style.display = 'none'; return; }
                 var ps = d.players || [], sc = d.scores || {}, thru = 0;
+                salwRow(d, last);
                 thru = thruOf(d);
                 var games = [];
                 if (d.gameFormat && d.gameFormat !== 'stroke') games.push(d.gameFormat.replace(/^\w/, function (x) { return x.toUpperCase(); }));
@@ -657,6 +658,7 @@
                     + '<span style="font-size:15px;font-weight:700;color:var(--hp-navy);">Open the round ›</span></button>';
             }, function () { today.style.display = 'none'; });
         } else today.style.display = 'none';
+        if (!last || !H.db) salwRow(null);
         // TRIPS & CUPS: every trip this phone has opened (as organizer or golfer), not only the last
         // one (Manny, 2026-10-13: "Myrtle Beach 2026" vanished). Trips are read only once signed in
         // (the live database refuses a trip to a session that is not), with one retry.
@@ -687,6 +689,23 @@
             });
         };
         load(0);
+    }
+    // SAME AS LAST WEEK ON THE GAMES START (URGENT-009, 013-2). Round Setup has had the button since
+    // 2026-10-05 (admin.html sameAsLastWeek: course, tees, games and money, roster with handicaps,
+    // groups and flights, into a NEW code; scores never), but in the app Home is this page and the
+    // lobby that holds it is never shown. Offered only to a returning organizer: lastRoomCode is
+    // written when this phone SAVES a round (Round Setup, or a GPS round started here), and the round
+    // must still have golfers to copy. The tap goes to Round Setup's own copier - one copier.
+    function salwRow(d, code) {
+        var box = $('hp-salw');
+        if (!box) return;
+        var ps = d && Array.isArray(d.players) ? d.players.filter(function (p) { return p && String(p.name || '').trim(); }) : [];
+        if (!d || !ps.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        box.style.display = '';
+        box.innerHTML = '<button type="button" class="hp-big" data-hp-act="same" style="background:#fff;color:var(--hp-navy);border:2px solid var(--hp-navy);">\uD83D\uDD01 Same as last week</button>'
+            + '<div class="hp-note" style="margin-top:6px;">' + esc(String(d.courseName || 'Your last round').split(' (')[0]) + ' \u00B7 ' + ps.length + ' golfer' + (ps.length === 1 ? '' : 's')
+            + ' \u2014 same course, tees, games and money, in a new round. Handicaps editable; no scores.</div>';
+        box.setAttribute('data-hp-salw', String(code || ''));
     }
     // The trips this phone knows: each one opened on the trip page (organizer or not), newest first,
     // and the last one remembered before this list existed.
@@ -731,6 +750,7 @@
             if (a === 'code') { setDoor('games'); show('games'); var i = $('hp-code'); if (i) i.focus(); }
             else if (a === 'signin') W.location.href = 'admin.html?account=1';
             else if (a === 'start') { ss(QUICK, null); W.location.href = 'admin.html?start=quick'; }
+            else if (a === 'same') { ss(QUICK, null); W.location.href = 'admin.html?start=same'; }
             else if (a === 'build') W.location.href = 'trip.html#build';
             else if (a === 'join') join();
             else if (a === 'tripcode') { var tci = $('hp-trip-code'), tcv = String((tci && tci.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (tcv.length >= 4) W.location.href = 'trip.html?trip=' + encodeURIComponent(tcv); }
@@ -934,6 +954,9 @@
         }
         if (p.get('account') && typeof W.openAccountPanel === 'function') { setTimeout(function () { try { W.openAccountPanel(); } catch (e) {} }, 300); return; }
         if (p.get('start') === 'quick' && !p.get('game')) { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); return; }
+        // Home > Games > Same as last week: Round Setup's own copier (checks the round, mints a NEW code,
+        // lands on Players with ?copyFrom).
+        if (p.get('start') === 'same' && !p.get('game')) { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek(W.document.getElementById('same-as-last-week')); return; }
         if (p.get('game')) {
             if (ss(QUICK)) { quickGps(); return; }
             var tpl = p.get('tpl'), paste = p.get('paste'), step = p.get('step'), fmt = p.get('fmt');

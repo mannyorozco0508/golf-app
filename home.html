@@ -133,6 +133,10 @@
   <div class="hp-top"><div class="hp-brand">HARDPAN</div><div class="hp-switch" role="tablist"><button type="button" class="gps" data-hp-door="gps" aria-pressed="false">GPS</button><button type="button" class="games on" data-hp-door="games" aria-pressed="true">Games</button></div></div>
   <h1>Games</h1>
   <button type="button" class="hp-big" data-hp-act="start">+ Start a round</button>
+  <!-- SAME AS LAST WEEK (URGENT-009, 013-2): a returning organizer's last round, copied into a NEW
+       round in one tap (Round Setup's own copier, admin.html sameAsLastWeek). Drawn by front-door.js
+       gamesView only when this phone has a last round with golfers in it. -->
+  <div id="hp-salw" style="display:none;margin-top:10px;"></div>
   <label class="hp-label" style="margin-top:14px;">Have a game code?
     <span class="hp-code"><input type="text" id="hp-code" placeholder="e.g. 4KX9TB" maxlength="200" autocapitalize="characters" autocorrect="off" spellcheck="false"><button type="button" data-hp-act="join">Join</button></span>
   </label>
