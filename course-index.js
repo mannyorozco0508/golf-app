@@ -64,7 +64,7 @@ var COURSE_INDEX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // The version in the stored blob. Bump it and every device rebuilds the index
 // from the database on its next load, which is the only migration this needs.
-var COURSE_INDEX_VERSION = 1;
+var COURSE_INDEX_VERSION = 2;   // 2 (URGENT-006): rebuild once so a record marked mergedInto leaves every picker
 
 // THE localStorage KEY. Shared per origin with nine Consumer pages and two
 // Tournament ones, so it is namespaced like golfapp-theme is.
@@ -111,10 +111,19 @@ function courseIndexKeysFrom(shallowVal) {
 
 // key -> name, from whole records. The cards are read and thrown away here on
 // purpose: this is the only thing that ever reaches localStorage.
+// A RECORD MERGED INTO ANOTHER (URGENT-006, 2026-10-18) IS NOT OFFERED. Two shared
+// records for one course (Dobson Ranch from GolfAPI and from GolfCourseAPI) showed as
+// two identical rows. The duplicate keeps its data - rounds already on it still load
+// it by key (ensureCard / the page's own read) - but it carries mergedInto: <key> and
+// no picker lists it. Undo is removing that one field.
+function courseIndexIsMerged(r) {
+    return !!(r && typeof r === 'object' && typeof r.mergedInto === 'string' && r.mergedInto);
+}
 function courseIndexNamesFrom(records) {
     var out = {};
     if (!records || typeof records !== 'object') return out;
     Object.keys(records).forEach(function (k) {
+        if (courseIndexIsMerged(records[k])) return;
         var name = records[k] && records[k].name;
         if (typeof name === 'string' && name.trim()) out[k] = name;
     });
@@ -304,7 +313,7 @@ function courseIndexLoader(deps) {
             // MAPPED - a round built on nothing.
             Object.keys(records).forEach(function (k) {
                 var r = records[k];
-                if (r && typeof r === 'object' && typeof r.name === 'string' && r.name.trim()) into[k] = r;
+                if (r && typeof r === 'object' && typeof r.name === 'string' && r.name.trim() && !courseIndexIsMerged(r)) into[k] = r;
             });
             saveIndex(courseIndexNamesFrom(records));
             apply();
@@ -348,7 +357,7 @@ function courseIndexLoader(deps) {
                 var names = {};
                 Object.keys(plan.names).forEach(function (k) { names[k] = plan.names[k]; });
                 plan.missing.forEach(function (k, i) {
-                    if (recs[i] && recs[i].name) { into[k] = recs[i]; names[k] = recs[i].name; }
+                    if (recs[i] && recs[i].name && !courseIndexIsMerged(recs[i])) { into[k] = recs[i]; names[k] = recs[i].name; }
                 });
                 saveIndex(names);
                 apply();
@@ -364,7 +373,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         COURSE_INDEX_TTL_MS, COURSE_INDEX_VERSION, COURSE_INDEX_CACHE_KEY,
         COURSE_INDEX_MISSING_LIMIT, courseIndexBytes, courseIndexShallowUrl,
-        courseIndexKeysFrom, courseIndexNamesFrom, courseIndexStubs,
+        courseIndexKeysFrom, courseIndexNamesFrom, courseIndexStubs, courseIndexIsMerged,
         courseIndexPlan, courseIndexSerialise, courseIndexParse, courseIndexLoader
     };
 }
