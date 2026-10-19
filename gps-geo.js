@@ -1100,6 +1100,83 @@
         if (!isFinite(toGreenM) || toGreenM <= 0) return [];
         return LAYUP_YD.filter(function (l) { return l * u < toGreenM; }).map(function (l) { return { leave: l, fromM: toGreenM - l * u }; });
     }
+    // ---- LAYUPS FROM YOU (014, switch layupFromYou) ------------------------------------
+    // Manny, hole 1 (par 5, 543): "Lay up to 150 = 393 from the tee" - nobody hits 393. Each
+    // row is now THE SHOT the golfer would hit from `from` (their spot, or the target ring):
+    // "Lay up to 100 -> hit 135". The shot goes through playsLike (air: the same wind /
+    // temperature / altitude inputs as the main number, elevAt(pt) the heights; no air =
+    // raw yards, as in tournament mode). Only shots between LAYUP_MIN_YD and the golfer's
+    // longest carry + 5% (maxYd; none = no top limit) are kept. Rows:
+    //   lay up to 50 / 75 / 100 / 125 / 150 - a spot that far (unitM) from the green's
+    //     center, on the straight line back toward `from`;
+    //   lay up short of [hazard] - a spot LAYUP_SHORT_YD short of the hazard's near edge,
+    //     along the line from `from` to the green (a hazard ahead, never a greenside bunker).
+    // Longest shot first: [{ kind: 'leave' | 'hazard', leave, name, aim, rawYd, pl, needYd }].
+    // o: { from, green, hazards, unitM, maxYd, air, fromFt, elevAt }. Pure.
+    var LAYUP_MIN_YD = 40, LAYUP_MAX_PAD = 1.05, LAYUP_SHORT_YD = 10, LAYUP_TEE_M = 25;
+    function layupPlan(o) {
+        o = o || {};
+        var from = pinPt(o.from), green = pinPt(o.green);
+        if (!from || !green) return [];
+        var u = o.unitM || M_PER_YD, toGreen = haversineMeters(from, green);
+        if (!(toGreen > 0)) return [];
+        var maxYd = isNum(o.maxYd) && o.maxYd > 0 ? o.maxYd * LAYUP_MAX_PAD : Infinity;
+        var back = bearingDeg(green, from), fwd = bearingDeg(from, green);
+        var shot = function (aim, rawYd) {
+            var pl = null;
+            if (o.air) {
+                var q = {}; Object.keys(o.air).forEach(function (k) { q[k] = o.air[k]; });
+                q.yards = rawYd; q.shotBearingDeg = bearingDeg(from, aim);
+                var tf = typeof o.elevAt === 'function' ? o.elevAt(aim) : null;
+                if (isNum(o.fromFt) && isNum(tf)) { q.elevFromFt = o.fromFt; q.elevToFt = tf; }
+                pl = playsLike(q);
+            }
+            return { aim: aim, rawYd: rawYd, pl: pl, needYd: pl ? pl.exact : rawYd };
+        };
+        var out = [];
+        LAYUP_YD.forEach(function (l) {
+            if (l * u >= toGreen) return;
+            var s = shot(destination(green, back, l * u), (toGreen - l * u) / M_PER_YD);
+            s.kind = 'leave'; s.leave = l; s.name = 'Lay up to ' + l;
+            out.push(s);
+        });
+        var proj = projector(from), gv = proj.fwd(green);
+        var along = function (p) { var q = proj.fwd(p); return (q[0] * gv[0] + q[1] * gv[1]) / toGreen; };
+        hazardGroups(o.hazards).forEach(function (g) {
+            if (g.type === 'gb') return;
+            var near = Math.min.apply(null, g.pts.map(along)), spot = near - LAYUP_SHORT_YD * M_PER_YD;
+            if (!(near > 0) || spot <= 0 || spot >= toGreen) return;
+            var s = shot(destination(from, fwd, spot), spot / M_PER_YD);
+            var nm = (HAZARD_NAMES[g.type] || 'Hazard') + (HAZARD_SIDES[g.side] ? ' ' + HAZARD_SIDES[g.side] : '');
+            s.kind = 'hazard'; s.leave = null; s.type = g.type; s.name = 'Lay up short of ' + nm.charAt(0).toLowerCase() + nm.slice(1);
+            out.push(s);
+        });
+        out = out.filter(function (s) { return s.needYd >= LAYUP_MIN_YD && s.needYd <= maxYd; });
+        out.sort(function (a, b) { return b.rawYd - a.rawYd; });
+        return out;
+    }
+    // WHERE THE LAYUPS COUNT FROM: the golfer's spot - unless they are on the tee box (within
+    // LAYUP_TEE_M of the tee, or measured from the tee) or no row fits from there; then the
+    // target ring, when it is set and nearer the green than they are ("From your target
+    // (223)"). Neither: from the tee / from you (rows may be empty: "Too far to lay up yet").
+    // o: layupPlan's, plus { from: { pt, kind: 'me' | 'tee' }, tee, target }.
+    // Returns { from: 'me' | 'tee' | 'target', fromM (origin -> target, for the header), rows,
+    // near (no rows because the green is inside the shortest layup + LAYUP_MIN_YD: go for it) }.
+    function layupFromYou(o) {
+        o = o || {};
+        var f = o.from || {}, pt = pinPt(f.pt), tee = pinPt(o.tee), target = pinPt(o.target), green = pinPt(o.green);
+        if (!pt || !green) return { from: f.kind || 'me', fromM: null, rows: [], near: false };
+        var near = function (p) { return haversineMeters(p, green) < LAYUP_YD[0] * (o.unitM || M_PER_YD) + LAYUP_MIN_YD * M_PER_YD; };
+        var onTee = f.kind === 'tee' || !!(tee && haversineMeters(pt, tee) <= LAYUP_TEE_M);
+        var at = function (p, ft) { var q = {}; Object.keys(o).forEach(function (k) { q[k] = o[k]; }); q.from = p; q.fromFt = ft; return q; };
+        var mine = layupPlan(at(pt, o.fromFt));
+        if (mine.length && !onTee) return { from: 'me', fromM: null, rows: mine, near: false };
+        if (target && haversineMeters(target, green) < haversineMeters(pt, green)) {
+            var tf = typeof o.elevAt === 'function' ? o.elevAt(target) : null;
+            return { from: 'target', fromM: haversineMeters(pt, target), rows: layupPlan(at(target, isNum(tf) ? tf : null)), near: near(target) };
+        }
+        return { from: onTee ? 'tee' : 'me', fromM: null, rows: mine, near: near(pt) };
+    }
 
     // WIND from the National Weather Service hourly forecast (api.weather.gov),
     // first period: windSpeed "10 mph" or "5 to 10 mph", windDirection "NW".
@@ -1965,6 +2042,7 @@
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,
         hazardGroups: hazardGroups, hazardRows: hazardRows, layupTargets: layupTargets, LAYUP_YD: LAYUP_YD,
+        layupPlan: layupPlan, layupFromYou: layupFromYou, LAYUP_MIN_YD: LAYUP_MIN_YD, LAYUP_MAX_PAD: LAYUP_MAX_PAD, LAYUP_SHORT_YD: LAYUP_SHORT_YD, LAYUP_TEE_M: LAYUP_TEE_M,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
