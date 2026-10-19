@@ -12,7 +12,8 @@
 //   3  The back "‹" -> the card side, the same page and hole; no way off the GPS screen drops
 //      the round unless the golfer chose to leave (Pick another course is that choice).
 //   4  (012) A round with games: Games -> Today's games, "+ Add game" at its top -> the Add a game
-//      sheet -> Skins -> Round Setup (Money, filled in) -> Save -> back in the round on hole 5.
+//      sheet -> Skins -> Round Setup (Money, filled in) -> Save -> back in the round on hole 5,
+//      on the GPS (URGENT-009, 013-4).
 // ============================================================================
 'use strict';
 const path = require('path');
@@ -62,7 +63,7 @@ const CLICK = (sel) => ({ expression: "(function(){ var b = document.querySelect
     // 4 (012, Manny): a round WITH games - Games pill -> Today's games -> "+ Add game" at its top ->
     // the app's Add a game sheet -> Skins -> Round Setup (Money, filled in) -> Save -> back in the
     // round, on the same hole.
-    const ST4 = "JSON.stringify({ url: document.URL.split('/').pop(), side: window.HardPanGps && HardPanGps.side(), hole: window.HardPanGps && HardPanGps.hole(), add: (function(){ var b = document.querySelector('#todays-games-mount .tg-add'); if (!b) return null; var r = b.getBoundingClientRect(); return { inView: r.top >= 0 && r.bottom <= innerHeight, text: b.textContent, top: b === b.parentNode.firstElementChild }; })(), addGame: (function(){ var a = document.getElementById('fd-addgame'); return !!(a && a.style.display !== 'none'); })(), e: window.__e })";
+    const ST4 = "JSON.stringify({ url: document.URL.split('/').pop(), ls: localStorage.getItem('hardpan_round_side'), side: window.HardPanGps && HardPanGps.side(), hole: window.HardPanGps && HardPanGps.hole(), add: (function(){ var b = document.querySelector('#todays-games-mount .tg-add'); if (!b) return null; var r = b.getBoundingClientRect(); return { inView: r.top >= 0 && r.bottom <= innerHeight, text: b.textContent, top: b === b.parentNode.firstElementChild }; })(), addGame: (function(){ var a = document.getElementById('fd-addgame'); return !!(a && a.style.display !== 'none'); })(), e: window.__e })";
     r = await go({ url: fileUrl('index.html', 'game=GBTN04'), db: DB({ GBTN04: round('GBTN04', { nassauStake: 5, gameFormat: 'nassau' }) }), settleMs: 3000, preScript: APP + ERR + SEED('GBTN04'), steps: [{ sleep: 2500 },
         { expression: "(function(){ goToHole(5); return 'h5'; })()" }, { sleep: 800 }, CLICK('#fd-gps-btn'), { sleep: 1200 },
         CLICK('#gps-overlay .gps-door-games'), { sleep: 1200 }, { expression: ST4 },
@@ -78,6 +79,12 @@ const CLICK = (sel) => ({ expression: "(function(){ var b = document.querySelect
     f(d1 && d1.addGame, '4: "+ Add game" did not open the Add a game sheet: ' + JSON.stringify(d1));
     f(d2 && /^admin\.html\?game=GBTN04&tpl=skins/.test(d2.url) && d2.skins >= 1, '4: Skins did not open Round Setup filled in: ' + JSON.stringify(d2));
     f(d3 && /^index\.html\?game=GBTN04/.test(d3.url) && d3.hole === 5, '4: after Save, not back in the round on hole 5: ' + JSON.stringify(d3));
+    // URGENT-009 (013-4): the journey started on GPS, so it comes back to the GPS - the Games pill
+    // is a visit to the card, not the golfer leaving GPS: "gps" stays the side this round reopens
+    // on. (This headless Chrome has no location, so the landing itself stays on the card here;
+    // tools/sim/setup-gps-first.js A-* paths, with a location, see the GPS side.)
+    f(d0 && d0.ls === 'gps|GBTN04', '4: the Games pill wrote the card as the side this round left on: ' + JSON.stringify(d0));
+    f(d3 && d3.ls === 'gps|GBTN04', '4: after Save, the round reopens on the CARD, not the GPS it started on: ' + JSON.stringify(d3));
     [a0, a1, a2, a3, b0, b1].forEach((x) => (x.e || []).filter((m) => !/reading 'ts'/.test(m)).forEach((m) => fails.push('error: ' + m)));
     console.log(JSON.stringify({ report, fails }, null, 1));
     process.exit(fails.length ? 1 : 0);

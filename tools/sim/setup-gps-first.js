@@ -293,7 +293,9 @@ async function playersFirst(s, names, gameName) {
     const inView = await s.j.evaluate("(function(){ var b = document.querySelector('#fd-need'); if (!b) return null; var r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; })()");
     if (!inView) s.find('MEDIUM', 'Players first: the "Add your golfers first" line and its Save button are scrolled off the top', 'the step opens scrolled to the player list; the button that goes on is out of sight');
     await addGolfers(s, names);
-    const goInView = await s.j.evaluate("(function(){ var b = document.querySelector('#fd-need .fd-need-go'); if (!b) return null; var r = b.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; })()");
+    // URGENT-009 (013-19): the banner's button, or the Players step's own Next that now says and
+    // does the same ("Save golfers · set up X", .fd-need-next).
+    const goInView = await s.j.evaluate("(function(){ return Array.prototype.some.call(document.querySelectorAll('#fd-need .fd-need-go, .fd-need-next'), function (b) { var r = b.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < innerHeight; }); })()");
     if (!goInView) s.find('LOW', '"Save golfers · set up ' + gameName + '" is off screen after adding golfers; "Next: Money" is the button in view', 'two buttons go on from Players; the in-view one skips the game the golfer picked');
     await s.tap('#fd-need .fd-need-go', null, 'save-golfers', { settle: 1500 });
     await s.waitNav(5000);

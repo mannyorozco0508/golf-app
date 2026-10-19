@@ -3336,12 +3336,22 @@
     }
     function closeWho() { var sh = S && S.el.querySelector('.gps-who-sheet'); if (sh) sh.style.display = 'none'; }
     function whoAsked() { try { return localStorage.getItem('hardpan_gps_whoasked_' + String(S.eventCode || '')) === '1'; } catch (e) { return true; } }
+    // This phone's signed-in uid created the round (the uid only - an organizer link held on
+    // another phone is not "golfer 1").
+    function creatorHere(d) {
+        try { var uid = window.authBootState && window.authBootState.uid; return !!(uid && d && d.ownerUid && String(d.ownerUid) === String(uid)); } catch (e) { return false; }
+    }
     // FIRST OPEN, NO PICK: "Who are you?" once per round on this phone (the app; more than one golfer).
     function maybeAskWho() {
         var d = roundData();
         if (!S || S.side !== 'gps' || !doorsOn() || !d || !d.players || d.players.length < 2 || whoAsked()) return;
         if (picked(d) != null || (typeof resolvedMeId === 'function' && resolvedMeId() != null)) return;
         try { localStorage.setItem('hardpan_gps_whoasked_' + String(S.eventCode || ''), '1'); } catch (e) {}
+        // THE ROUND'S CREATOR IS NOT ASKED (URGENT-009, 013-17): this phone made the round, and its
+        // golfer 1 is the organizer (Round Setup's first row, "Me" on a GPS-door round) - in the
+        // group this phone picked, he is the default already shown (scoreFor). Swipe / the name tag
+        // still change it.
+        if (creatorHere(d)) { var p0 = d.players[0], lg = lockedG(); if (p0 && (!lg || groupOf(p0.id) === lg)) return; }
         openWho(true);
     }
     // Swipe on the score: the next / previous golfer in the shown golfer's group.
@@ -5492,7 +5502,10 @@
             if (!S || !S.eventCode) { window.location.href = 'home.html#games'; return; }
             closeMenus();
             S.userChoseSide = true;
-            showSide('bets');
+            // A VISIT, NOT LEAVING GPS (URGENT-009, 013-4): the card is shown but "gps" stays the
+            // side this round reopens on - a game added from here (Round Setup / Side Matches Save)
+            // comes back to the GPS on the same hole, not the card.
+            showSide('bets', { remember: false });
             setTimeout(function () {
                 var m = document.getElementById('todays-games-mount'), D = window.HardPanDoors;
                 var rd = (typeof currentData !== 'undefined' ? currentData : null) || S.round;   /* global currentData */

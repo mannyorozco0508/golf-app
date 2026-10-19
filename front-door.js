@@ -1259,16 +1259,32 @@
         if (!host || $('fd-need')) return;
         var box = W.document.createElement('div');
         box.id = 'fd-need';
-        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card);';
+        // STICKY (013-19): the line and its Save stay on screen while golfers are typed below it.
+        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card); position:sticky; top:0; z-index:20; box-shadow:0 2px 10px rgba(0,0,0,.12);';
         box.innerHTML = '<div style="font-weight:800;font-size:1.02rem;color:#0f4c3a;">Add your golfers first, then we\u2019ll set up ' + esc(nx.name) + '.</div>'
             + '<div style="font-size:.8rem;opacity:.8;margin:4px 0 8px;">' + esc(nx.name) + ' needs ' + nx.need + ' golfers or more.</div>'
             + '<button type="button" class="btn-primary fd-need-go" style="width:100%;min-height:50px;font-weight:800;background:#0f4c3a;border-color:#0f4c3a;">Save golfers \u00b7 set up ' + esc(nx.name) + ' \u203a</button>';
         var prog = $('wizard-progress');
         if (prog && prog.parentNode) prog.parentNode.insertBefore(box, prog); else host.insertBefore(box, host.firstChild);
+        var go = function () { try { if (typeof W.saveSettings === 'function') W.saveSettings(); } catch (e) { try { console.error('[front door] players first', e); } catch (x) {} } };
         box.addEventListener('click', function (ev) {
             if (!ev.target.closest('.fd-need-go')) return;
-            try { if (typeof W.saveSettings === 'function') W.saveSettings(); } catch (e) { try { console.error('[front door] players first', e); } catch (x) {} }
+            go();
         });
+        // THE BUTTON IN VIEW GOES ON TO THE GAME (013-19): after the golfers are typed, the
+        // Players step's own "Next: Money" is the button on screen - it now says and does what
+        // the banner's does (Save golfers · set up <game>), not a detour through Money.
+        var SO = typeof WIZARD_STEP_OF !== 'undefined' ? WIZARD_STEP_OF : { players: 5 };   /* global WIZARD_STEP_OF */
+        var stepEl = $('wizard-step-' + SO.players), nextBtn = stepEl && stepEl.querySelector('.wizard-btn-next');
+        if (nextBtn) {
+            nextBtn.textContent = 'Save golfers \u00b7 set up ' + nx.name + ' \u203a';
+            nextBtn.classList.add('fd-need-next');
+            nextBtn.onclick = function (ev) { if (ev) ev.preventDefault(); go(); };
+        }
+        // IN VIEW WHEN PLAYERS OPENS (013-13): the step opened scrolled to the player list, with
+        // the line that says why - and its Save - off the top. After the step's own scroll.
+        var show = function () { try { box.scrollIntoView({ block: 'start' }); } catch (e) { try { box.scrollIntoView(); } catch (x) {} } };
+        show(); setTimeout(show, 350);
     }
     // The KP pool / weekly game: its section open on the Money step.
     function agOpenPool() {
@@ -1321,6 +1337,9 @@
     function todaysGamesAdd(mount) {
         if (!on() || !agCode() || spectating() || !mount) return;
         var card = mount.querySelector('.tg-card');
+        // ONE "+ Add a game" ON THE CARD (013-14): a round with no games has the GPS-3 strip's
+        // "+ Add a game" (gpsRoundStrip, the same rule) - Today's games does not add a second.
+        if (card && !hasGames(agRound())) { var old = card.querySelector('.tg-add'); if (old) old.parentNode.removeChild(old); return; }
         if (!card || card.querySelector('.tg-add')) return;
         var b = W.document.createElement('button');
         b.type = 'button'; b.className = 'tg-add';
@@ -1419,7 +1438,7 @@
             var bets = cur && Array.isArray(cur.bets) ? cur.bets : [];
             bets.push({ group: 'This round', a: s.a.map(agName), b: s.b.map(agName), front: q.amt, back: q.amt, overall: q.amt, press: null });
             ls(key, JSON.stringify({ at: Date.now(), bets: bets }));
-            W.location.href = 'sidematches.html' + base + '&hpfill=1';
+            W.location.href = 'sidematches.html' + base + '&hpfill=1&hpback=1';
             return;
         }
         var ids = q.tpl === 'vegas' ? s.a.concat(s.b) : q.ids;
@@ -1428,7 +1447,8 @@
     }
     function agRoute(g) {
         var code = agCode(), base = '?game=' + encodeURIComponent(code);
-        if (g.go === 'sm') return 'sidematches.html' + base + '&add=1' + (g.fmt ? '&fmt=' + g.fmt : '');
+        // &hpback=1 (URGENT-009, 013-5): Side Matches' Save goes back to the round it came from.
+        if (g.go === 'sm') return 'sidematches.html' + base + '&add=1' + (g.fmt ? '&fmt=' + g.fmt : '') + '&hpback=1';
         if (g.go === 'smlist') return 'sidematches.html' + base;
         if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
         if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;
