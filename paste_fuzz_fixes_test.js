@@ -100,3 +100,18 @@ describe('FIX 4: a spreadsheet row with an empty handicap cell still has its fli
         assert.deepEqual(rows('Matt\tB\nGlenn A'), [['Matt B', '', null], ['Glenn A', '', null]]);
     });
 });
+
+describe('FIX 5: the word "hcp" beside a handicap is not part of the name', () => {
+    test('"Skeens hcp 12", "Glenn HCP: 12.0 B", "Paul 3 hdcp", "Al (hcp 5)", "Bo (12 hcp) A", "Jim, hcp +2"', () => {
+        assert.deepEqual(rows('Skeens hcp 12\nGlenn HCP: 12.0 B\nPaul 3 hdcp\nAl (hcp 5)\nBo (12 hcp) A\nJim, hcp +2\nA Randy handicap 12'),
+            [['Skeens', '12', null], ['Glenn', '12.0', 'B'], ['Paul', '3', null], ['Al', '5', null], ['Bo', '12', 'A'], ['Jim', '+2', null], ['Randy', '12', 'A']]);
+    });
+    test('"(hcp 12)" is a handicap now, not a note that loses it', () => {
+        const r = P('Al (hcp 5)');
+        assert.deepEqual(r.notedLines, []);
+        assert.equal(r.validPlayers[0].hcp, '5');
+    });
+    test('a name that only starts like the word is untouched: "Hector 12", "Hcpman 3"', () => {
+        assert.deepEqual(rows('Hector 12\nHcpman 3'), [['Hector', '12', null], ['Hcpman', '3', null]]);
+    });
+});

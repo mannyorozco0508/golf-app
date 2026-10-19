@@ -454,8 +454,17 @@ const ROSTER_HCP_AHEAD = '(?=\\(?[+-]?\\d{1,2}(?:\\.\\d)?\\)?(?:\\s|$|[\\/,|:\\-
 const ROSTER_SEP_BEFORE_HCP = new RegExp('([^\\d\\s])\\s*[|\\/:]\\s*' + ROSTER_HCP_AHEAD, 'g');
 const ROSTER_DASH_BEFORE_HCP = new RegExp('\\s+[-\\u2013\\u2014]+\\s+' + ROSTER_HCP_AHEAD, 'g');
 const ROSTER_SEP_BEFORE_FLIGHT = /(\d\)?)\s*[|:\-\u2013\u2014]\s*([ABab])\s*$/;
+// THE WORD "HCP" (URGENT-008): "Skeens hcp 12", "Glenn HCP: 12.0", "Paul 3 hdcp",
+// "Al (hcp 5)". Before, "hcp 12" became part of the NAME ("Skeens hcp", 12) and
+// "(hcp 12)" was taken off as a note, losing the handicap. The word goes only when
+// a handicap-shaped number is right beside it; anywhere else it stays as typed (and
+// checkLines says so).
+const ROSTER_HCP_WORD = '(?:hcp|hdcp|hcap|hndcp|handicap|hc|idx|index)';
+const ROSTER_HCP_WORD_BEFORE = new RegExp('(^|[\\s,])[(\\[]?\\s*' + ROSTER_HCP_WORD + '\\.?\\s*[:#=\\-]?\\s*([+-]?\\d{1,2}(?:\\.\\d)?)\\s*[)\\]]?(?=\\s|$|[\\/,|])', 'gi');
+const ROSTER_HCP_WORD_AFTER = new RegExp('([+-]?\\d{1,2}(?:\\.\\d)?)\\s*' + ROSTER_HCP_WORD + '\\b\\.?', 'gi');
 function rosterPasteNormalizeGolfer(line) {
     let t = String(line == null ? '' : line);
+    t = t.replace(ROSTER_HCP_WORD_BEFORE, '$1 $2').replace(ROSTER_HCP_WORD_AFTER, '$1');
     t = t.replace(ROSTER_SEP_BEFORE_HCP, '$1 ')
         .replace(ROSTER_DASH_BEFORE_HCP, ' ')
         .replace(ROSTER_SEP_BEFORE_FLIGHT, '$1 $2');
