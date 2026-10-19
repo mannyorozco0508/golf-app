@@ -242,7 +242,7 @@ function genPaste() {
     players.forEach(p => T('name:' + p.kind));
     if (order === 'trail_flight' && players.some(p => !p.hasHcp && p.flight)) T(sheet ? 'xl:empty_hcp_with_flight' : 'order:trail_flight_nohcp');
 
-    const style = { src, sheet, order, sep, hcp, flight, brk, num, bullet, crlf, crOnly, nbsp, trailing, smart, zw, xlHeader, xlFirstLast, xlIndex };
+    const style = { single: size === 1, src, sheet, order, sep, hcp, flight, brk, num, bullet, crlf, crOnly, nbsp, trailing, smart, zw, xlHeader, xlFirstLast, xlIndex };
     return { style, tags, players, groupSizes, dups };
 }
 
@@ -306,10 +306,19 @@ function renderGolfer(p, style, lineNo) {
             }
             break;
         }
-        case 'name_flight_hcp': body = N + ' ' + F + sep + H; alt = { name: N + ' ' + F, hcp: expect.hcp, flight: undefined }; flagOk = true; break;
+        // AMBIGUOUS ("Matt B 12" is a last initial): the safe reading keeps the letter in
+        // the name, and the line must be flagged - except a ONE-golfer paste, where
+        // there is nothing to tell a flight list from a last initial.
+        case 'name_flight_hcp': body = N + ' ' + F + sep + H; alt = { name: N + ' ' + F, hcp: expect.hcp, plus: expect.plus, flight: undefined }; flagOk = true; safeOk = !!style.single; break;
         case 'hcp_name': body = H + ' ' + N + (F ? ' ' + F : ''); flagOk = true; break;
     }
-    if (p.kind === 'trailing_emoji') { body = body + ' ' + pick(['🔥', '⛳', '🏌️‍♂️']); flagOk = true; }
+    if (p.kind === 'trailing_emoji') {
+        const e = pick(['🔥', '⛳', '🏌️‍♂️']);
+        body = body + ' ' + e;
+        // after a handicap the emoji hides it ("Zack 12 🔥"): flagged. With no handicap
+        // it is simply part of the name as typed.
+        if (H) flagOk = true; else expect.name = p.name + ' ' + e;
+    }
     if (p.kind === 'emoji' || p.kind === 'last_first') flagOk = true;
     // numbering / bullets
     if (style.num === 'paren') body = lineNo + ') ' + body;
@@ -518,4 +527,5 @@ const summary = {
 if (setup) summary.tripSetupPaste = setup;
 if (!SHOW) console.log(JSON.stringify(summary, null, 1));
 else console.log(JSON.stringify({ common: summary.common, rare: summary.rare }));
-process.exit(common - commonPass > 0 ? 1 : 0);
+// exitCode, not exit(): exit() can cut off a large summary written to a pipe
+process.exitCode = common - commonPass > 0 ? 1 : 0;

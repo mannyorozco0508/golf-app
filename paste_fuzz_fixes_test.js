@@ -133,3 +133,63 @@ describe('FIX 6: the word "flight" and a bracketed letter', () => {
             [['Abe Flight', '3', null], ['Bo Flight', '', null], ['Jim (A) Smith', '4', null], ['Glenn A', '', null]]);
     });
 });
+
+describe('FIX 7: what the parser cannot read is said BEFORE saving (checkLines)', () => {
+    test('a number still in the name: "12 Skeens A" (handicap first), "Jimmy 12 \u{1F525}" (emoji after the number)', () => {
+        const c = P('12 Skeens A\nJimmy 12 \u{1F525}\nMarty 9').checkLines;
+        assert.deepEqual(c.map(x => [x.lineNumber, x.name]), [[1, '12 Skeens A'], [2, 'Jimmy 12 \u{1F525}']]);
+        assert.match(c[0].why, /number/);
+    });
+    test('a handicap that is not a number: "Orozco, Manny 12" put "Manny 12" in the handicap box', () => {
+        const c = P('Orozco, Manny 12').checkLines;
+        assert.equal(c.length, 1); assert.equal(c[0].hcp, 'Manny 12'); assert.match(c[0].why, /handicap box/);
+    });
+    test('"Name A 12" all down the list: the safe reading (A stays in the name) AND every line asked about', () => {
+        const r = P('Glenn B 12\nPaul A 3\nMarty B 9');
+        assert.deepEqual(r.validPlayers.map(p => [p.name, p.hcp, p.flight || null]), [['Glenn B', '12', null], ['Paul A', '3', null], ['Marty B', '9', null]]);
+        assert.deepEqual(r.checkLines.map(x => x.lineNumber), [1, 2, 3]);
+        assert.match(r.checkLines[0].why, /flight or a last initial/);
+    });
+    test('a last initial in an ordinary list is NOT nagged about: "Matt B 12", "Jim B"', () => {
+        assert.deepEqual(P('Matt B 12\nJim B\nMarty 9\nScott 7\nAl 4').checkLines, []);
+    });
+    test('...but where the paste uses flights, "Matt B" with no flight of its own is asked about', () => {
+        assert.deepEqual(P('A Marty 9\nMatt B\nB Scott 7').checkLines.map(x => x.name), ['Matt B']);
+    });
+    test('an ordinary paste has no check lines at all', () => {
+        assert.deepEqual(P('Skeens 2.0/A\nManny +2.0/A\nGlenn 12.0/B\n\nGroup 2:\nPaul (12) b\nJim, 7').checkLines, []);
+    });
+
+    // THE PREVIEW (admin.html), driven the way the modal drives it
+    const vm = require('vm');
+    const { loadHtmlInlineScript } = require('./helpers/load-script.js');
+    const preview = (text) => {
+        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+        vm.runInContext(`document.__mount(document.getElementById('player-list'));`, sb);
+        sb.__text = text;
+        vm.runInContext(`document.getElementById('paste-players-textarea').value = __text; previewPastedPlayers();`, sb);
+        return String(vm.runInContext("document.getElementById('paste-preview-summary').innerHTML", sb));
+    };
+    test('admin preview: a "Check these lines" entry names each line, what it was read as, and why', () => {
+        const html = preview('12 Skeens A\nOrozco, Manny 12\nMarty 9');
+        assert.match(html, /paste-flagged-line paste-check-line/);
+        assert.match(html, /Check these 2 lines before adding/);
+        assert.match(html, /Line 1: "12 Skeens A"/);
+        assert.match(html, /Line 2: "Orozco, Manny 12" → Orozco \/ Manny 12/);
+        assert.match(html, /3 players ready to add/, 'the golfers are still added - flagged, not dropped');
+    });
+    test('admin preview: an ordinary list shows no check entry; the text is escaped', () => {
+        assert.doesNotMatch(preview('Skeens 2.0/A\nGlenn 12.0/B'), /paste-check-line/);
+        const html = preview('<b>x</b> 12 Smith');
+        assert.doesNotMatch(html, /<b>x<\/b>/);
+    });
+});
+
+describe('FIX 8: separators around an explicit flight or the word hcp', () => {
+    test('"Randy – 26 - Flight A" and "Tommy Chen - +2 - A flight": no dash left on the line', () => {
+        assert.deepEqual(rows('Randy – 26 - Flight A\nTommy Chen - +2 - A flight'), [['Randy', '26', 'A'], ['Tommy Chen', '+2', 'A']]);
+    });
+    test('a bar or slash glued to the word: "SKEENS|hcp +5", "Pat Morrissey/HCP 21", "Old Tom|hdcp 15 / A"', () => {
+        assert.deepEqual(rows('B SKEENS|hcp +5\nPat Morrissey/HCP 21\nOld Tom|hdcp 15 / A'), [['SKEENS', '+5', 'B'], ['Pat Morrissey', '21', null], ['Old Tom', '15', 'A']]);
+    });
+});
