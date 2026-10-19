@@ -1144,11 +1144,37 @@
     }
 
     // ---- THE SCORECARD (index.html) ---------------------------------------------------
+    // BACK FROM A ROUND IN PROGRESS GOES HOME (URGENT-011, sims bug 5). The card is reached
+    // through pages that are not "back" from it: the group picker (index.html?game=X, before
+    // pickGroup added &group=N), Round Setup / Round Ready (START SCORING), the lobby that
+    // minted the code. Back walked into them - "How are you joining this round?" again, then
+    // Round Setup. The card now sits on a guard entry of its own: Back (history.back, the
+    // Android back button through pwa-boot.js) pops to the round's base entry, and from there
+    // goes Home - by history when the card was opened from Home (Resume, the GPS door), so no
+    // second Home is stacked; by replace otherwise, so the setup pages are never shown again.
+    function roundBackGuard(code) {
+        var Hs = W.history;
+        if (!Hs || typeof Hs.pushState !== 'function' || typeof Hs.replaceState !== 'function') return;
+        code = String(code).toUpperCase();
+        try {
+            var st = Hs.state;
+            // A reload of the card is already on its guard entry: nothing pushed twice.
+            if (!(st && st.hpRound === code)) { Hs.replaceState({ hpRoundBase: code }, ''); Hs.pushState({ hpRound: code }, ''); }
+        } catch (e) { return; }
+        W.addEventListener('popstate', function (e) {
+            var s = e && e.state;
+            if (!s || s.hpRoundBase !== code) return;
+            var ref = ''; try { ref = String(W.document.referrer || ''); } catch (x) { ref = ''; }
+            if (/\/home\.html(?:[?#]|$)/.test(ref)) { try { Hs.back(); return; } catch (x) {} }
+            W.location.replace('home.html');
+        });
+    }
     function scorecard() {
         var code = params().get('game');
         // A ROUND SAVED WITH NO SIGNAL (URGENT-009) is sent from here too, once there is signal.
         try { if (typeof db !== 'undefined') armHeld(db); } catch (e) {}   /* global db */
         if (!code || !on()) return;
+        roundBackGuard(code);
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         // THE ROUND'S ROLE GOES WITH IT (audit B6/B7): a spectator stays a spectator, a group's
         // scorekeeper stays that group's, when Resume / the GPS door / a return from the background
@@ -1919,7 +1945,8 @@
 
     W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
-        holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld };
+        holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
+        roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
