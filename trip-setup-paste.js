@@ -126,6 +126,11 @@ function tspPlayer(tok) {
         if (bare && +bare[2] >= -10 && +bare[2] <= 54) { t = bare[1]; hcp = bare[2]; }
     }
     var flight = null;
+    // "Skeens 2.0/A", "Skeens 2.0 A" (013): a handicap THEN a flight at the end of the
+    // line - Manny's pairings - read the way Paste Player List reads them (roster-paste.js
+    // URGENT-004). Only right after a handicap, so "Matt B" stays a last initial.
+    var tr = !hcp && typeof splitTrailingHcpFlight === 'function' ? splitTrailingHcpFlight(t) : null;
+    if (tr && tr.flight) { t = tr.name; hcp = tr.hcp; flight = tr.flight; }
     var fl = /^([AB])\s+(\S.*)$/.exec(t);
     if (fl) { flight = fl[1]; t = fl[2]; }
     t = t.replace(/\s+/g, ' ').trim();
@@ -140,6 +145,9 @@ function tspPlayersLine(s) {
     // "Manny Orozco, 12" is a handicap, not a second golfer called "12": a comma
     // followed by a number alone reads as "Manny Orozco (12)".
     s = String(s || '').replace(/,\s*([+-]?\d{1,2}(?:\.\d)?)\s*(?=$|[,;&\/]|\s+(?:vs\.?|v\.?|versus)\s)/gi, ' ($1)');
+    // "2.0/A" is a handicap and a flight, not a golfer called "A" (013, URGENT-004's form):
+    // a lone A or B straight after a handicap and a "/" joins that golfer before the split.
+    s = s.replace(/([+-]?\d{1,2}(?:\.\d)?\)?)\s*\/\s*([ABab])(?=\s*$|\s*[,;&]|\s+(?:vs\.?|v\.?|versus)\s)/g, '$1 $2');
     var sides = s.split(/\s+(?:vs\.?|v\.?|versus)\s+/i);
     var teams = sides.length === 2 ? [] : null;
     var players = [], bad = [];
