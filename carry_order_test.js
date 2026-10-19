@@ -107,6 +107,12 @@ function stackedRound(tee, gameExtra) {
     if (tee !== undefined) d.startingHole = tee;
     return d;
 }
+// The EXACT (pre whole-dollar) nets, for a pot whose unit is not a whole dollar:
+// computeCombinedNetTotals' netByName is rounded to the dollar, its `exact` is not.
+function stackedExact(d) {
+    const nb = E.computeCombinedNetTotals(d, d.courseData, d.scores).exact;
+    return { Ann: nb.ann.net, Ben: nb.ben.net, Cal: nb.cal.net };
+}
 function stackedNet(d) {
     const nb = E.computeCombinedNetTotals(d, d.courseData, d.scores).netByName;
     return { Ann: nb.ann.net, Ben: nb.ben.net, Cal: nb.cal.net };
@@ -227,7 +233,9 @@ describe('4. EDGES THE FIX MUST NOT MOVE', () => {
     // 5..8 tie (12); Cal 9 = 13u. Nothing pending. Ann 54/14 - 18, Cal 13*54/14 - 18.
     test('a skins game added from hole 5 on a 10th-tee round carries 10..18 then 5..9  [RED]', () => {
         const v = 54 / 14;
-        near(stackedNet(stackedRound(10, { startHole: 5 })), { Ann: v - 18, Ben: -18, Cal: 13 * v - 18 });
+        near(stackedExact(stackedRound(10, { startHole: 5 })), { Ann: v - 18, Ben: -18, Cal: 13 * v - 18 });
+        // ...and the whole-dollar nets the golfers see: $3.86 and $50.14 -> $4 and $50.
+        near(stackedNet(stackedRound(10, { startHole: 5 })), { Ann: -14, Ben: -18, Cal: 32 });
     });
 });
 

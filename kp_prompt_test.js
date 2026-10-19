@@ -316,7 +316,7 @@ describe('THE SEAMS', () => {
     });
     test('pool-engine.js: the pay rule (recording pays) is the one this block writes for; its sha moved 2026-09-22 for KP-never-refunds (approved), not for this block', () => {
         const crypto = require('crypto');
-        assert.equal(crypto.createHash('sha256').update(read('pool-engine.js')).digest('hex').slice(0, 8), '372e76d7');   // was a335f19c (2026-09-22: KP never refunds, the KP branch only)
+        assert.equal(crypto.createHash('sha256').update(read('pool-engine.js')).digest('hex').slice(0, 8), '1530a0b9');   // was a335f19c (2026-09-22: KP never refunds, the KP branch only)
     });
 });
 

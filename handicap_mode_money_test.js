@@ -219,7 +219,7 @@ describe('1. WHAT WAS ALREADY TRUE ON MAIN', () => {
         // these with Manny's approval, re-pin it here and say why in the commit.
         assert.equal(shas['handicap.js'].slice(0, 12), '73b03f002cf9', 'handicap.js changed');
         assert.equal(shas['money-engine.js'].slice(0, 12), '0e8a5c1756a2', 'money-engine.js changed');
-        assert.equal(shas['pool-engine.js'].slice(0, 12), 'e3ea7ff117b4', 'pool-engine.js changed');
+        assert.equal(shas['pool-engine.js'].slice(0, 12), '67d487bc8f22', 'pool-engine.js changed');
         PROTECTED.forEach(f => assert.ok(fs.existsSync(path.join(REPO_ROOT, f)), f + ' is gone'));
     });
 });

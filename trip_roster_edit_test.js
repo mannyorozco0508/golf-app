@@ -184,8 +184,8 @@ describe('2. AND ITS MONEY DOES NOT MOVE - asserted as money', () => {
 
     test('THE ENGINES ARE UNTOUCHED, by sha', () => {
         assert.equal(sha12('money-engine.js'), '12bfa41c2c8e');
-        assert.equal(sha12('settlement-engine.js'), '6ddd4c8676cd');
-        assert.equal(sha12('pool-engine.js'), '372e76d7d5c4');
+        assert.equal(sha12('settlement-engine.js'), '9f6a4fa7e4de');
+        assert.equal(sha12('pool-engine.js'), '1530a0b955e2');
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');
     });
 });

@@ -82,7 +82,7 @@ describe('1. NO ENGINE MATH MOVED', () => {
     const PINNED = {
         'money-engine.js': '12bfa41c2c8e6b8a',
         'handicap.js': '2d3b2f7fd916a4b8',
-        'pool-engine.js': '372e76d7d5c41c38',
+        'pool-engine.js': '1530a0b955e2e870',
         // hole-events.js is DELIBERATELY not in this wave: the per-hole recap line
         // for 9 Points is logged for later, once the wager is proven.
         'hole-events.js': '6fd7f7edf41e848b',

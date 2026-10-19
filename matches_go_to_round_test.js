@@ -210,7 +210,7 @@ describe('3. NO MONEY FILE MOVED FOR THIS', () => {
         const crypto = require('crypto');
         const sha = crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, 'settlement-engine.js'))).digest('hex').slice(0, 16);
-        assert.equal(sha, '6ddd4c8676cd8802',
+        assert.equal(sha, '9f6a4fa7e4def756',
             'settlement-engine.js changed. This wave reads it and changes nothing in it; '
             + 'if that is deliberate it needs saying out loud and re-approving.');
     });

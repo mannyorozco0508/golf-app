@@ -351,8 +351,12 @@
         const totalHoles = (courseData || []).length;
         const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
 
-        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
-        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+        // THE CARRY RIDES TO THE NEXT HOLE PLAYED (URGENT-011, approved): the same
+        // helper computeSkinsPayoutLinesFor already uses. A first-tee round gets the
+        // caller's own array back, so it settles byte-identically.
+        const walk = carryOver ? playOrderOf(data, courseData) : courseData;
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, walk, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, walk, savedScores, 'net') : { skins: [], pendingUnits: 0 };
 
         const totalPot = buyIn * allPlayers.length;
         let grossPot = 0, netPot = 0;
@@ -1959,6 +1963,8 @@
 
             holes.push(row);
         });
+        // Walked in play order (URGENT-011); listed by number, as the pages expect.
+        if (opts && opts.listByNumber) holes.sort((a, b) => Number(a.hole) - Number(b.hole));
 
         // Official THRU is the contiguous run from hole 1. A single gap stops it,
         // because "official thru 14" has to mean everything up to 14 is settled -
@@ -2023,14 +2029,16 @@
         const carryOver = (typeof skinsCarriesOver === 'function')
             ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
 
+        const walk = carryOver ? playOrderOf(data, courseData) : courseData;
+        const wOpts = walk === courseData ? opts : Object.assign({}, opts, { listByNumber: true });
         const one = {
             mode,
             carryOver,
             participants,
             gross: (mode === 'split' || mode === 'gross')
-                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'gross', carryOver, opts) : null,
+                ? buildSkinsLedgerFor(participants, walk, savedScores, 'gross', carryOver, wOpts) : null,
             net: (mode === 'split' || mode === 'net')
-                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
+                ? buildSkinsLedgerFor(participants, walk, savedScores, 'net', carryOver, wOpts) : null,
         };
         one.flights = [Object.assign({ flight: null }, one)];
         return one;
