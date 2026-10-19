@@ -6,6 +6,9 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const R = require('./roster-paste.js');
+// trip-setup-paste.js is a GPS_SHELL file (HardPan only): a Consumer tree (tools/gps-flag-tree.js)
+// does not have it, so FIX 13 / 13b skip there.
+const TSP_SKIP = require('fs').existsSync(require('path').join(__dirname, 'trip-setup-paste.js')) ? {} : { skip: 'Consumer tree: trip-setup-paste.js is HardPan only' };
 
 const P = (text) => R.parsePlayerPasteText(text, []);
 const rows = (text) => P(text).validPlayers.map(p => [p.name, p.hcp, p.flight || null]);
@@ -258,8 +261,8 @@ describe('FIX 12: separators around a tee or a no-handicap mark; two golfers on 
     });
 });
 
-describe('FIX 13: trip-setup-paste.js (the whole-round paste) reads a trailing flight, never a golfer "A"', () => {
-    const TSP = require('./trip-setup-paste.js');
+describe('FIX 13: trip-setup-paste.js (the whole-round paste) reads a trailing flight, never a golfer "A"', TSP_SKIP, () => {
+    const TSP = TSP_SKIP.skip ? null : require('./trip-setup-paste.js');
     const L = (s) => TSP.tspPlayersLine(s);
     test('"Skeens 2.0/A" is Skeens, 2.0, A - it made a second golfer named "A"', () => {
         assert.deepEqual(L('Skeens 2.0/A').players, [{ name: 'Skeens', hcp: '2.0', flight: 'A' }]);
@@ -283,8 +286,8 @@ describe('FIX 13: trip-setup-paste.js (the whole-round paste) reads a trailing f
     });
 });
 
-describe('FIX 13b: trip-setup-paste.js reads a leading flight set off by a dash or middot', () => {
-    const TSP = require('./trip-setup-paste.js');
+describe('FIX 13b: trip-setup-paste.js reads a leading flight set off by a dash or middot', TSP_SKIP, () => {
+    const TSP = TSP_SKIP.skip ? null : require('./trip-setup-paste.js');
     test('"A - Paul 12", "A \u00B7 Randy T 12", "A, O\'Neil 10.0" were "Not understood - ignored" / lost the flight', () => {
         const plan = TSP.parseSetupPaste('Group 1\nA - Paul 12\nA \u00B7 Randy T 12\nA, O\'Neil 10.0', {});
         assert.deepEqual(plan.days[0].groups[0].players.map(p => [p.name, p.hcp, p.flight]), [['Paul', '12', 'A'], ['Randy T', '12', 'A'], ["O'Neil", '10.0', 'A']]);
