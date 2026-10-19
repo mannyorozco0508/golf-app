@@ -923,6 +923,30 @@
         // A round saved with no signal goes up from here as soon as there is signal (URGENT-009).
         armHeld(db);
     }
+    // How far a round is: thru N in play order, and finished (every golfer has every hole).
+    function progressOf(d) {
+        var sc = (d && d.scores) || {}, ps = (d && d.players) || [], all = true;
+        ((d && d.courseData) || []).forEach(function (x) {
+            var h = Number(x.hole);
+            if (!ps.every(function (p) { return sc['p' + p.id + '_h' + h]; })) all = false;
+        });
+        var thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
+        return { thru: thru, finished: !!(all && thru) };
+    }
+    // The round as THIS PHONE has it: the scorecard's stored copy plus its own unsent edits.
+    function localRound(code) {
+        var q = oq(), s = lstore();
+        if (!q || !s || typeof q.loadSnapshot !== 'function') return null;
+        try {
+            var snap = q.loadSnapshot(s, code);
+            if (!snap || !snap.data) return null;
+            var d = snap.data;
+            if (typeof q.applyQueued === 'function' && typeof q.peek === 'function') d = q.applyQueued(d, q.peek(s) || [], String(code).toUpperCase()) || d;
+            if (!d.players || !d.courseData) return null;
+            var pr = progressOf(d);
+            return { data: d, thru: pr.thru, finished: pr.finished };
+        } catch (e) { return null; }
+    }
     // The last door highlighted; "Resume <course>" for a round in progress.
     function mainDecor() {
         ['gps', 'games'].forEach(function (d) {
@@ -938,28 +962,39 @@
         draftPaint();
         var box = $('hp-resume-round');
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
-        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
+        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return;
+        var tile = function (course, thru) {
+            return '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(course || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
+        };
         // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
         // copy - with no signal the read below never answers.
         var held = heldFor(lr.code);
         if (held) {
             var hv = held.value || {};
-            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(hv.courseName || lr.course || 'your round').split(' (')[0]) + '</button>'
+            box.innerHTML = tile(hv.courseName, 0)
                 + '<div class="hp-note" style="margin:-8px 0 14px;">\uD83D\uDCF4 Saved on this phone \u00b7 it will be sent when you have signal</div>';
         }
+        // THE ROUND'S OWN COPY ON THIS PHONE (URGENT-011, sims bug 2): with no signal the read
+        // below never answers, so Resume is painted at once from the copy the scorecard keeps
+        // (golfapp_snap_v1_<code>, with this phone's unsent scores on top) - the same copy the
+        // scorecard opens offline. The server only refreshes it, or removes it when it positively
+        // says the round is gone or finished; no answer leaves it standing.
+        else {
+            var local = localRound(lr.code);
+            if (local && !local.finished) box.innerHTML = tile(local.data.courseName, local.thru);
+        }
+        if (!H.db) return;
         timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
             var d = snap && snap.val ? snap.val() : null;
             // GONE from the server (gps-trapfix): forgotten here - no Resume, and the GPS door
             // opens the picker. Not a held round: that one is on its way (above).
             if (!d && heldFor(lr.code)) return;
-            if (!d) { forgetRound(lr.code, true); return; }
+            if (!d) { forgetRound(lr.code, true); if (!heldFor(lr.code)) box.innerHTML = ''; return; }
             if (!d.players || !d.courseData) return;
-            var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
-            holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (!every) all = false; });
-            thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
-            H.activeChecked = true; H.active = (all && thru) ? null : lr.code;
-            if (all && thru) return;   // finished
-            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(d.courseName || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
+            var pr = progressOf(d);
+            H.activeChecked = true; H.active = pr.finished ? null : lr.code;
+            if (pr.finished) { if (!heldFor(lr.code)) box.innerHTML = ''; return; }   // finished
+            box.innerHTML = tile(d.courseName, pr.thru);
         }, function () {});
     }
     // BACK FROM THE BACKGROUND AFTER A WHILE (60 min): Main again, like a launch.
