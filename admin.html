@@ -13107,7 +13107,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // own "Add initial" buttons waiting, rather than saved and refused at
             // Results. Not in the draft dry run (hpDraftRecord), which must keep
             // the whole round while the organizer is still fixing a name.
-            if (typeof hpDry === 'undefined' || !hpDry) {
+            let refuseSameNames = true;
+            // GPS:BEGIN
+            if (hpDry) refuseSameNames = false;   // the draft dry run keeps the whole round
+            // GPS:END
+            if (refuseSameNames) {
                 const same = rosterSameNames();
                 if (same.length) {
                     uiRefuse('\u26A0\uFE0F ' + same.map(sameNameLine).join('. ') + '. Save waits until the names differ.');
