@@ -1236,7 +1236,8 @@
         if (!host || $('fd-need')) return;
         var box = W.document.createElement('div');
         box.id = 'fd-need';
-        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card);';
+        // STICKY (013-19): the line and its Save stay on screen while golfers are typed below it.
+        box.style.cssText = 'margin:0 0 12px; padding:12px; border:2px solid #0f4c3a; border-radius:14px; background:var(--bg-card); position:sticky; top:0; z-index:20; box-shadow:0 2px 10px rgba(0,0,0,.12);';
         box.innerHTML = '<div style="font-weight:800;font-size:1.02rem;color:#0f4c3a;">Add your golfers first, then we\u2019ll set up ' + esc(nx.name) + '.</div>'
             + '<div style="font-size:.8rem;opacity:.8;margin:4px 0 8px;">' + esc(nx.name) + ' needs ' + nx.need + ' golfers or more.</div>'
             + '<button type="button" class="btn-primary fd-need-go" style="width:100%;min-height:50px;font-weight:800;background:#0f4c3a;border-color:#0f4c3a;">Save golfers \u00b7 set up ' + esc(nx.name) + ' \u203a</button>';

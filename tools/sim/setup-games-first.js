@@ -237,14 +237,16 @@ async function setupWeeklyGame(d, j, tag, returning) {
     check(tag, 'BLOCKER', boxes === 4, 'Group 1 card has its 4 score boxes: ' + boxes);
     // GPS from the scorecard, after the course and the nines were confirmed in setup.
     await d.tap('#fd-gps-btn', null, { ms: 6000 });
-    const g = JSON.parse(await d.eval("JSON.stringify({ side: HardPanGps.side(), hole: HardPanGps.hole(), who: (document.querySelector('#gps-overlay .gps-who-title') || {}).innerText || null, whoBtns: Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-who-list button'), function (b) { return b.offsetParent; }).map(function (b) { return b.innerText + (b.classList.contains('on') ? '*' : ''); }) })"));
+    const g = JSON.parse(await d.eval("JSON.stringify({ side: HardPanGps.side(), hole: HardPanGps.hole(), sheetUp: (function(){ var e = document.querySelector('#gps-overlay .gps-who-sheet'); return !!(e && e.style.display !== 'none' && e.getBoundingClientRect().height > 0); })(), tag: (document.querySelector('#gps-overlay .gps-who') || {}).innerText || null, who: (document.querySelector('#gps-overlay .gps-who-title') || {}).innerText || null, whoBtns: Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-who-list button'), function (b) { return b.offsetParent; }).map(function (b) { return b.innerText + (b.classList.contains('on') ? '*' : ''); }) })"));
     d.P.gps = g;
     check(tag, 'BLOCKER', g.side === 'gps' && g.hole === 1, 'GPS opens on hole 1: ' + JSON.stringify([g.side, g.hole]), await d.screen('gps-who'));
-    check(tag, 'HIGH', /Who are you\? Group 1/.test(g.who || '') && g.whoBtns.length === 4, 'Who are you? lists Group 1 only: ' + JSON.stringify(g));
+    // URGENT-009 (013-17): the organizer's own phone (it created the round, he is golfer 1 and
+    // picked Group 1) is not asked "Who are you?" - GPS shows him already.
+    check(tag, 'HIGH', !g.sheetUp && /Manny/.test(g.tag || ''), 'the organizer is not asked "Who are you?"; GPS shows Manny: ' + JSON.stringify(g));
     return { code, gpsWho: g };
 }
 async function scoreOnGps(d, j, tag, code, who, score, wantKey) {
-    if (who) await d.tap('#gps-overlay .gps-who-list button', '^' + who + '$', { ms: 2500 });
+    if (who && await d.eval("(function(){ var e = document.querySelector('#gps-overlay .gps-who-sheet'); return !!(e && e.style.display !== 'none' && e.getBoundingClientRect().height > 0); })()")) await d.tap('#gps-overlay .gps-who-list button', '^' + who + '$', { ms: 2500 });
     await d.shot('gps-map');
     await d.tap('#gps-overlay .gps-score', null, { ms: 1500 });
     const chip = await d.eval("(function(){ var c = document.querySelector('.hp-ss-chip.on'); return c ? c.innerText : null; })()");
@@ -324,7 +326,7 @@ async function main() {
                 const r2 = await setupWeeklyGame(d2, j, 'B-weekly-returning', true);
                 check('B-weekly-returning', 'BLOCKER', r2.code && r2.code !== code, 'a NEW round code the second week: ' + r2.code);
                 // Layout C spot-check: Tools > Screen layout > Bottom panel, then the score.
-                await d2.tap('#gps-overlay .gps-who-list button', '^Manny Orozco$', { ms: 2500 });
+                if (await d2.eval("(function(){ var e = document.querySelector('#gps-overlay .gps-who-sheet'); return !!(e && e.style.display !== 'none' && e.getBoundingClientRect().height > 0); })()")) await d2.tap('#gps-overlay .gps-who-list button', '^Manny Orozco$', { ms: 2500 });
                 await d2.tap('#gps-overlay .gps-tools', null, { ms: 800 });
                 await d2.shot('tools-sheet');
                 await d2.tap('#gps-overlay .gps-tsheet [data-ts-seg="layout"] button', '^Bottom panel$', { ms: 2000 });
@@ -427,10 +429,11 @@ const KNOWN = [
     ['MEDIUM', 'C-code-gps-new', 'GPS-first: GPS-1 ("Where are you playing?") has no game-code field and puts "YOU\'RE AT Dobson Ranch - SET UP - 1 TAP" first; a golfer at the course who taps it makes his own solo round instead of joining the weekly game (joining needs the GPS | Games switch).', 'C-code-gps-new/02-gps1.png'],
     ['MEDIUM', 'C-code-games-new', 'A golfer who joins without a group (the sheet, Just watching, a spectator) sees "Are you the organizer? Paste your organizer link. Unlock setup" at the top of the card.', 'C-code-games-new/04-how-joining.png'],
     ['MEDIUM', 'B-weekly-new', 'Flights wording: Players says "Side matches and the Weekly Game never use flights", yet the card shows the Weekly Game\'s skins as "Main Pool Skins - Flight A / Flight B" (money rule question for Manny, not changed).', 'C-code2-games-new/04-card-group2.png'],
-    ['MEDIUM', 'B-weekly-new', 'Round Ready says "Or tell them the code ...: in the app, tap Open and pick your group" - Home\'s button is "Join", not "Open"; in a one-group round the bare code is still a read-only spectator.', 'B-weekly-new/17-round-ready.png'],
+    // (URGENT-009 fixed "tap Open" -> "tap Join" on Round Ready.) Still open: in a one-group round the bare code is a read-only spectator.
+    ['MEDIUM', 'B-weekly-new', 'In a one-group round the bare code is still a read-only spectator.', 'B-weekly-new/17-round-ready.png'],
     ['MEDIUM', 'B-weekly-new', 'The Skins card says "Ties carry over." while its default is No Carry.', 'B-weekly-new/15-skins-on.png'],
-    ['LOW', 'B-weekly-new', 'Players step says "Anyone left out still plays every whole-field game, including the Weekly Game." before any Weekly Game exists; Review shows "Players 20 added" with no groups / flights line.', 'B-weekly-new/07-step3-players.png'],
-    ['LOW', 'B-weekly-new', 'The organizer who just put himself first in Group 1 is asked "How are you joining this round?" and then "Who are you?" on GPS (2 taps that could default: owner -> Group 1 -> Manny).', 'B-weekly-new/18-card-how-joining.png'],
+    ['LOW', 'B-weekly-new', 'Review shows "Players 20 added" with no groups / flights line. (URGENT-009 fixed the Players step naming the Weekly Game before one exists.)', 'B-weekly-new/07-step3-players.png'],
+    ['LOW', 'B-weekly-new', 'The organizer who just put himself first in Group 1 is asked "How are you joining this round?" (could default: owner -> Group 1). (URGENT-009: "Who are you?" on GPS is no longer asked of the round\'s creator.)', 'B-weekly-new/18-card-how-joining.png'],
     ['LOW', 'B-weekly-new', 'The Weekly Game runs skins ("Skins takes the rest") and Also Playing has a separate $5 Skins game: two skins games on the card (Main Pool Skins + $5 Skins) - legitimate, but easy to double up by accident.', 'B-weekly-new/15-skins-on.png'],
     ['LOW', 'B-weekly-returning', 'Games-1 still shows last week\'s round under YOUR ROUND ("THRU 1") 20 h later, while Main\'s Resume has (rightly) gone.', 'B-weekly-returning/02-games.png'],
 ];

@@ -72,6 +72,9 @@ describe('013-14: one "+ Add a game" on the card', () => {
 
 describe('013-13 / 013-19: Players first', () => {
     const f = between(read('front-door.js'), 'function agNeedBanner(nx)', 'function agOpenPool()');
+    test('the banner stays on screen while golfers are typed below it (sticky)', () => {
+        assert.match(f, /box\.style\.cssText = '[^']*position:sticky; top:0;/);
+    });
     test('the banner is scrolled into view when the step opens', () => {
         assert.match(f, /box\.scrollIntoView\(\{ block: 'start' \}\)/);
         assert.match(f, /setTimeout\(show, 350\)/);
