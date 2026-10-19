@@ -2817,7 +2817,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // GONE FROM THE SERVER (gps-trapfix): online, the server has no such round, and this phone
             // had it (it keeps a copy of what the server last sent) - say so over everything, with "Exit this
             // round". A round not saved yet (a player arriving early) is left to the card's own words.
-            if (!incoming && window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, currentMode) && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
+            // SAVED ON THIS PHONE AND NOT SENT YET (URGENT-009): not gone - on its way. The card shows
+            // this phone's copy (the held round plus any scores queued on top) until it lands.
+            if (!incoming && window.OfflineQueue && window.HardPanDoors && typeof window.HardPanDoors.heldFor === 'function' && window.HardPanDoors.heldFor(currentMode)) {
+                try { currentData = window.OfflineQueue.applyQueued({}, window.OfflineQueue.peek(localStorage) || [], currentMode) || {}; } catch (e) {}
+                if (typeof window.HardPanDoors.sendHeld === 'function') window.HardPanDoors.sendHeld(db);
+            }
+            else if (!incoming && window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, currentMode) && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
             hpFollowStart();
             hpCheckGroupKey();
             if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hasGroupLock && hpKeyState === 'bad');
@@ -9449,6 +9455,16 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             try { op = q.enqueue(store, { path: path, type: type, value: value, coalesceKey: coalesceKey || null }); }
             catch (e) { op = null; }
         }
+        // GPS:BEGIN
+        // THE ROUND ITSELF IS STILL ON THIS PHONE (URGENT-009): this change waits in the queue
+        // behind it - sent live now, it would reach the server before the round and be refused.
+        if (op && hpRoundHeld()) {
+            renderOfflineBadge();
+            ensureRetryTimer();
+            if (typeof window.HardPanDoors.sendHeld === 'function') window.HardPanDoors.sendHeld(db);
+            return new Promise(function () {});   // like any write with no signal: it settles when it is sent
+        }
+        // GPS:END
         var ref = db.ref(path);
         var p;
         if (type === 'remove') p = ref.remove();
@@ -9542,6 +9558,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         askAboutStale(q, store);
         var cutoff = Date.now() - ((q.STALE_MS) || 6 * 3600 * 1000);
         var only = function (op) { return ownOp(op) && (staleAnswer === true || !(Number(op.ts) < cutoff)); };
+        // GPS:BEGIN
+        // A ROUND SAVED WITH NO SIGNAL (URGENT-009) is front-door.js sendHeld's: its first write
+        // needs the organizer gate, which this plain replay does not do. And nothing else of this
+        // round goes before it: the rules refuse a score for a round that is not there yet.
+        { const only0 = only; only = function (op) { return only0(op) && !hpRoundHeld(); }; }
+        // GPS:END
         var touchedScores = false;
         return q.drain(store, function (op) {
             var ref = db.ref(op.path);
@@ -9567,6 +9589,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // navigator.onLine reports true on a phone with one dead bar, which is the
     // case this whole wave exists for. The online event is kept as a second
     // trigger because a websocket can take a while to notice it is back.
+    // GPS:BEGIN
+    function hpRoundHeld() {
+        try { return !!(currentMode && window.HardPanDoors && typeof window.HardPanDoors.heldFor === 'function' && window.HardPanDoors.heldFor(currentMode)); } catch (e) { return false; }
+    }
+    // The held round landed (front-door.js sendHeld): this round's queued scores can follow it.
+    try { window.addEventListener('hardpan:held-sent', function () { drainQueue('held-sent'); }); } catch (e) {}
+    // GPS:END
     function armQueueDrain() {
         try {
             db.ref('.info/connected').on('value', function (snap) {

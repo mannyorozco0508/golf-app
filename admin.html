@@ -12615,6 +12615,40 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // golfer watching the button is told the truth before they start tapping.
     const SAVE_SLOW_MS = 3000;
 
+    // GPS:BEGIN
+    // NO SIGNAL, KNOWN RATHER THAN GUESSED (URGENT-009). navigator.onLine is not trusted on its
+    // own - it reads true on a dead bar - so the round's own socket is asked too: RTDB's
+    // .info/connected says false while it cannot reach the server. Either one saying "no" is
+    // enough; neither having answered is "do not know", and the page says nothing about signal.
+    let hpConnected = null;
+    try { db.ref('.info/connected').on('value', (s) => { hpConnected = !!(s && typeof s.val === 'function' && s.val()); }); } catch (e) {}
+    function hpNoSignal() {
+        try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return true; } catch (e) {}
+        return hpConnected === false;
+    }
+    // SAVED ON THIS PHONE FIRST (URGENT-009, 013-1). The round goes to the durable queue
+    // (front-door.js holdRound) before the network write is issued, so a kill before the signal
+    // returns costs nothing: Home offers Resume and sends it when the signal is back.
+    function hpHoldRound(payload) {
+        try {
+            const D = window.HardPanDoors;
+            if (!D || typeof D.holdRound !== 'function' || !currentMode) return null;
+            let uid = null;
+            try { const u = window.firebase && firebase.auth && firebase.auth().currentUser; uid = (u && u.uid) || (window.authBootState && window.authBootState.uid) || null; } catch (e) { uid = null; }
+            const op = D.holdRound(currentMode, payload, { uid: uid, exists: loadedExistingRound, ownerUid: loadedOwnerUid });
+            return op ? { code: String(currentMode).toUpperCase(), op: op } : null;
+        } catch (e) { return null; }
+    }
+    function hpHeldWaiting(h) {
+        try { const D = window.HardPanDoors, cur = D && D.heldFor(h.code); return !!(cur && cur.v === h.op.v); } catch (e) { return false; }
+    }
+    function hpHeldLabel() {
+        return hpNoSignal()
+            ? '📴 No signal — your round is saved on this phone and will be sent when you’re back online.'
+            : '⏳ Still sending — your round is saved on this phone and will be sent when the signal is back.';
+    }
+    // GPS:END
+
     // ASYNC SINCE UI WAVE 3, for the unnamed-golfer warning below. Nothing
     // awaits saveSettings' return value - it is only ever reached from
     // onclick="saveSettings()" - and with named golfers no await executes, so the
@@ -13182,6 +13216,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // TOURNAMENT MODE (2026-10-15): true when ticked; null (this is an update) removes it, so a
             // round without it is shaped exactly as before.
             { const tm = document.getElementById('gps-tournament-mode'); if (tm) payload.tournamentMode = tm.checked ? true : null; }
+            // SAVED ON THIS PHONE BEFORE THE NETWORK WRITE (URGENT-009, 013-1): a kill while this
+            // save waits for signal no longer loses the round. After the threshold the button says
+            // so, in place of "keep this page open" - which is no longer the only way to keep it.
+            const hpHeld = hpHoldRound(payload);
+            const hpSlow = hpHeld ? setTimeout(() => {
+                if (saveBtn && saveBtn.disabled && hpHeldWaiting(hpHeld)) saveBtn.innerText = hpHeldLabel();
+            }, SAVE_SLOW_MS + 1) : null;
             // GPS:END
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js), in the order the rules
             // dictate: the token is awaited, organizers/<uid>/firstSeenAt is written
@@ -13221,6 +13262,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 });
             });
             if (window.GolfNet && typeof window.GolfNet.track === 'function') window.GolfNet.track(saveChain);
+            // GPS:BEGIN
+            // Landed: the phone's copy has done its job. Refused: there is nothing to send later.
+            if (hpHeld) saveChain.then(() => { clearTimeout(hpSlow); window.HardPanDoors.heldLanded(hpHeld.code, hpHeld.op); },
+                (err) => { clearTimeout(hpSlow); if (window.OfflineQueue && window.OfflineQueue.isPermanent(err)) window.HardPanDoors.heldRefused(hpHeld.code, hpHeld.op); });
+            // GPS:END
             saveChain.then(() => {
                 clearTimeout(slowTimer);
                 saveBtn.innerText = originalText;

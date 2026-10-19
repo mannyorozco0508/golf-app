@@ -70,7 +70,7 @@ const findings = [];
 // tomorrow's exact path). They stay in the summary with known: true and do not fail the run;
 // a NEW BLOCKER/HIGH does. Remove an id here when its fix lands.
 const KNOWN = {
-    'airplane-kill-loses-round': 'Save & Start with no signal is held in memory only; a kill before the signal returns loses the round'
+    // 'airplane-kill-loses-round' fixed by URGENT-009 (013-1): Save keeps the round in the durable queue first.
 };
 const paths = {};
 let current = null;
