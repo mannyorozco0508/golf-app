@@ -95,7 +95,11 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true, scoreSheet: true, gpsLayoutD: true, toolsSheet: true,
         // 014: layupFromYou = the Hazards sheet's layups count from the golfer ("Lay up to 100 -> hit 135 · 9i",
         // plays-like'd, club from My bag) or the target ring - off: the 008 rows ("= 393 from the tee").
-        layupFromYou: true },
+        layupFromYou: true,
+        // 017: simpleFlow = the simpler HardPan flow (one "+ Bet" sheet on GPS and the card, the
+        // live money chip, the 6-tile Round Menu, GPS <-> Card <-> Bets without leaving the map) -
+        // off: today's screens exactly. On in dev while Manny tries it.
+        simpleFlow: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the
