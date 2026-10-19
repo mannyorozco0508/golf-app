@@ -12636,6 +12636,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             let uid = null;
             try { const u = window.firebase && firebase.auth && firebase.auth().currentUser; uid = (u && u.uid) || (window.authBootState && window.authBootState.uid) || null; } catch (e) { uid = null; }
             const op = D.holdRound(currentMode, payload, { uid: uid, exists: loadedExistingRound, ownerUid: loadedOwnerUid });
+            // Saved: no draft of it any more (front-door.js clears the stored one) - and none pending.
+            if (op) { hpDraftDirty = false; if (hpDraftTimer) { clearTimeout(hpDraftTimer); hpDraftTimer = null; } }
             return op ? { code: String(currentMode).toUpperCase(), op: op } : null;
         } catch (e) { return null; }
     }
@@ -12646,6 +12648,126 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return hpNoSignal()
             ? '📴 No signal — your round is saved on this phone and will be sent when you’re back online.'
             : '⏳ Still sending — your round is saved on this phone and will be sent when the signal is back.';
+    }
+
+    // AN UNSAVED SETUP IS KEPT ON THIS PHONE (URGENT-009, 013-9). A kill mid-setup, Home -> GPS ->
+    // Games, or the top "← Back" used to drop the course, the golfers, the groups, the flights
+    // and the games with no word. Now, while a NEW round is being set up, the record its Save
+    // would write is kept as a draft (front-door.js draftKeep): Home, Games and Start a round offer
+    // "Resume your unsaved round setup?", and leaving asks first.
+    //
+    // THE DRAFT IS SAVE'S OWN RECORD, not a second copy of the field list: saveSettings is run
+    // dry (hpDry) and stops just before anything is asked or written - every refusal, the course
+    // publish and the roster memory swapped out for the run - so a field added to the round is in
+    // the draft by itself. loadModeData puts it back, the same restore an edit of a saved round
+    // gets, from a record that does not exist (so the round is still created as a new one).
+    var hpDry = null;
+    let hpDraftDirty = false, hpDraftTimer = null, hpDraftSkipLoad = false;
+    function hpDoors() { return (window.HardPanDoors && typeof window.HardPanDoors.draftKeep === 'function') ? window.HardPanDoors : null; }
+    function hpDraftRows() {
+        return Array.prototype.map.call(document.querySelectorAll('#player-list .player-row'), (row) => {
+            const n = row.querySelector('.p-name-input'), h = row.querySelector('.p-hcp-input');
+            return { id: playerIdOfRow(row), name: n ? String(n.value || '').trim() : '', hcp: h ? String(h.value || '').trim() : '' };
+        });
+    }
+    function hpDraftRecord() {
+        const G = (typeof globalThis !== 'undefined') ? globalThis : window;
+        const swaps = { uiRefuse: () => null, uiFail: () => null, uiToast: () => null, uiConfirm: () => Promise.resolve(false),
+            goToWizardStep: () => {}, syncCoachGateNote: () => {}, isNativeApp: () => true };
+        const was = {};
+        let roster = null;
+        try { roster = localStorage.getItem('golfAppRoster'); } catch (e) {}
+        Object.keys(swaps).forEach((k) => { was[k] = G[k]; G[k] = swaps[k]; });
+        hpDry = { payload: null };
+        let rec = null;
+        try { saveSettings(); rec = hpDry.payload; } catch (e) { rec = null; }
+        finally {
+            hpDry = null;
+            Object.keys(swaps).forEach((k) => { G[k] = was[k]; });
+            try { if (roster === null) localStorage.removeItem('golfAppRoster'); else localStorage.setItem('golfAppRoster', roster); } catch (e) {}
+        }
+        const raw = hpDraftRows();
+        if (!rec) {
+            // REFUSED (no course yet, a Wolf with three...): the golfers and the format are kept.
+            rec = { gameFormat: (document.getElementById('game-format-select') || {}).value || '', groupSizeOverrides: groupSizeOverrides,
+                courseName: courseSearchInput.value.trim(), players: raw.map((r) => ({ id: r.id, name: r.name, hcp: r.hcp })) };
+        } else {
+            rec = JSON.parse(JSON.stringify(rec));
+            // An empty box is saved as "Player N"; the draft gives the box back empty.
+            (rec.players || []).forEach((p, i) => { if (raw[i] && !raw[i].name) p.name = ''; });
+            delete rec.organizerToken;
+        }
+        return rec;
+    }
+    function hpDraftWanted() {
+        if (!currentMode || loadedExistingRound || !hpDraftDirty || !hpDoors()) return false;
+        if (hpDoors().heldFor && hpDoors().heldFor(currentMode)) return false;   // saved: a round now
+        const a = document.getElementById('admin-screen');
+        return !!(a && a.style.display !== 'none');
+    }
+    function hpDraftKeepNow() {
+        if (hpDraftTimer) { clearTimeout(hpDraftTimer); hpDraftTimer = null; }
+        if (!hpDraftWanted()) return false;
+        const btn = document.getElementById('main-save-btn');
+        if (btn && btn.disabled) return false;   // a real save is in flight
+        const rec = hpDraftRecord();
+        const named = (rec.players || []).filter((p) => p && p.name).length;
+        if (!rec.activeCourseKey && !rec.courseName && !named) return false;   // nothing worth asking about
+        hpDoors().draftKeep({ code: currentMode, step: currentWizardStep, record: rec, course: rec.courseName || '', golfers: named });
+        return true;
+    }
+    function hpDraftSoon() {
+        hpDraftDirty = true;
+        if (hpDraftTimer) clearTimeout(hpDraftTimer);
+        hpDraftTimer = setTimeout(() => { hpDraftTimer = null; try { hpDraftKeepNow(); } catch (e) {} }, 500);
+    }
+    function hpInSetup(t) { const a = document.getElementById('admin-screen'); return !!(a && t && typeof a.contains === 'function' && a.contains(t)); }
+    // BEFORE A LEAVE (the nav bar's Home, the top "← Back"): asked, with the draft kept first.
+    async function hpLeaveClick(e) {
+        const t = e && e.target && e.target.closest ? e.target.closest('#admin-screen .back-btn, #admin-screen #app-nav-bar a[href]') : null;
+        if (!t || !hpDraftWanted()) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        const kept = hpDraftKeepNow();
+        const go = await uiConfirm({ title: 'Leave round setup?',
+            body: 'This round isn’t saved yet.' + (kept ? ' Your setup is kept on this phone — Home will offer to resume it.' : ' What you set up here will be lost.'),
+            confirmText: 'Leave', cancelText: 'Keep setting up', danger: !kept });
+        if (!go) return;
+        hpDraftDirty = false;
+        const href = t.getAttribute('href');
+        if (href) window.location.href = href; else goBack();
+    }
+    try {
+        document.addEventListener('click', hpLeaveClick, true);
+        ['input', 'change', 'click'].forEach((ev) => document.addEventListener(ev, (e) => { if (e && hpInSetup(e.target)) hpDraftSoon(); }, true));
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { hpDraftKeepNow(); } catch (e) {} } });
+        window.addEventListener('pagehide', () => { try { hpDraftKeepNow(); } catch (e) {} });
+    } catch (e) {}
+    // ?draft=1 (Resume your unsaved round setup): the draft goes back in place of the empty record.
+    function hpDraftArrive() {
+        const D = hpDoors();
+        if (!D || urlParams.get('draft') !== '1' || !currentMode) return;
+        const d = D.draftRead();
+        if (!d || String(d.code).toUpperCase() !== String(currentMode).toUpperCase()) return;
+        const loadReal = loadModeData;
+        // The arrival's own load of the (empty) record must not wipe the draft a moment later.
+        hpDraftSkipLoad = true;
+        loadModeData = function (k) {
+            if (hpDraftSkipLoad && String(k).toUpperCase() === String(currentMode).toUpperCase()) { hpDraftSkipLoad = false; return Promise.resolve(); }
+            return loadReal.apply(this, arguments);
+        };
+        const own = Object.prototype.hasOwnProperty.call(db, 'ref'), ref0 = db.ref;
+        const want = 'events/' + currentMode;
+        const fake = { val: () => JSON.parse(JSON.stringify(d.record)), exists: () => false };
+        db.ref = function (p) { if (p === want) return { once: () => Promise.resolve(fake) }; return ref0.apply(db, arguments); };
+        let pr;
+        try { pr = loadReal(currentMode); } finally { if (own) db.ref = ref0; else delete db.ref; }
+        hpDraftDirty = true;
+        Promise.resolve(pr).then(() => {
+            setTimeout(() => {
+                if (typeof d.step === 'number') goToWizardStep(d.step);
+                if (typeof uiToast === 'function') uiToast('Your unsaved setup is back.');
+            }, 400);
+        });
     }
     // GPS:END
 
@@ -13167,6 +13289,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             //
             // Guarded on typeof for the same reason every other consumer of that file
             // is: if the script did not load, the round still saves.
+            // GPS:BEGIN
+            // A DRAFT, NOT A SAVE (URGENT-009, 013-9): the record this Save would write, and stop -
+            // before any question, before anything is written (hpDraftRecord).
+            if (hpDry) { hpDry.payload = payload; return; }
+            // GPS:END
             const placeholderNames = (typeof isPlaceholderPlayerName === 'function')
                 ? playersList.filter(p => isPlaceholderPlayerName(p.name)).map(p => p.name)
                 : [];
@@ -13417,6 +13544,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // ?eventType=club still behaves exactly as it did. Only this block, the one
     // that revealed the sentence with no tile chosen, is gone.
 
+    // GPS:BEGIN
+    hpDraftArrive();
+    // GPS:END
     if (currentMode) {
         // THE ONE LOADER ON ARRIVAL. This block decides, and nothing else loads:
         // an edit loads the round; a copy loads the source; a fresh code loads

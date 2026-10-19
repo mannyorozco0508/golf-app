@@ -635,6 +635,7 @@
         loadScriptTimed('gps-courses.js', function () { count(); });
     }
     function gamesView() {
+        draftPaint();
         var last = ls('lastRoomCode'), trip = ls('lastTripCode');
         var today = $('hp-today'), card = $('hp-today-card');
         if (last && H.db) {
@@ -737,6 +738,8 @@
             return;
         }
         if ((b = t.closest('[data-hp-open]'))) { W.location.href = roundHref(b.getAttribute('data-hp-open')); return; }
+        if ((b = t.closest('[data-hp-draft]'))) { var dr = draftRead(); if (dr) W.location.href = draftHref(dr); else draftPaint(); return; }
+        if ((b = t.closest('[data-hp-draft-discard]'))) { draftClear(b.getAttribute('data-hp-draft-discard')); draftPaint(); return; }
         if ((b = t.closest('[data-hp-trip]'))) { W.location.href = 'trip.html?trip=' + encodeURIComponent(b.getAttribute('data-hp-trip')); return; }
         if ((b = t.closest('[data-hp-act]'))) {
             var a = b.getAttribute('data-hp-act');
@@ -908,9 +911,12 @@
             c.classList.toggle('last', door() === d);
             var tag = c.querySelector('.hp-last'); if (tag) tag.style.display = door() === d ? '' : 'none';
         });
-        var box = $('hp-resume');
-        if (!box) return;
-        box.innerHTML = '';
+        var box0 = $('hp-resume');
+        if (!box0) return;
+        // A round's own Resume first, then an unsaved setup's (URGENT-009).
+        box0.innerHTML = '<div id="hp-resume-round"></div><div id="hp-draft-m"></div>';
+        draftPaint();
+        var box = $('hp-resume-round');
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
         // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
@@ -957,7 +963,11 @@
             return;
         }
         if (p.get('account') && typeof W.openAccountPanel === 'function') { setTimeout(function () { try { W.openAccountPanel(); } catch (e) {} }, 300); return; }
-        if (p.get('start') === 'quick' && !p.get('game')) { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); return; }
+        if (p.get('start') === 'quick' && !p.get('game')) {
+            // AN UNSAVED SETUP WAITING (URGENT-009): asked before a new code is minted.
+            draftAsk().then(function (went) { if (!went && typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
+            return;
+        }
         if (p.get('game')) {
             if (ss(QUICK)) { quickGps(); return; }
             var tpl = p.get('tpl'), paste = p.get('paste'), step = p.get('step'), fmt = p.get('fmt');
@@ -1849,6 +1859,7 @@
         if (lr && String(lr.code || '').toUpperCase() === code) { lr.at = Date.now(); if (!lr.course) lr.course = value.courseName || ''; }
         else lr = { code: code, at: Date.now(), course: value.courseName || '' };
         ls('hardpan_last_round', JSON.stringify(lr));
+        draftClear(code);   // saved: no longer a draft (URGENT-009, 013-9)
         return op;
     }
     // Round Setup's own write landed: the held copy has done its job.
@@ -1908,6 +1919,55 @@
         setTimeout(kick, 800);
     }
 
+    // ---- AN UNSAVED SETUP IS KEPT ON THIS PHONE (URGENT-009, 013-9) -------------------------
+    // Round Setup keeps the record its Save would write (course, golfers, groups, flights, games)
+    // as a draft while it is being built: a kill, Home -> GPS -> Games, or "<- Back" no longer
+    // throws it away. One draft - the round being set up - for a day. Home and Games ask
+    // "Resume your unsaved round setup?"; so does Start a round.
+    var DRAFT = 'hardpan_setup_draft_v1', DRAFT_MS = 24 * 3600 * 1000;
+    function draftRead() {
+        var d = null; try { d = JSON.parse(ls(DRAFT) || 'null'); } catch (e) { d = null; }
+        if (!d || !d.code || !d.record || Date.now() - (d.at || 0) > DRAFT_MS) return null;
+        if (heldFor(d.code)) return null;   // saved since: a round, not a draft
+        return d;
+    }
+    function draftKeep(d) { if (d && d.code) ls(DRAFT, JSON.stringify(Object.assign({}, d, { code: String(d.code).toUpperCase(), at: Date.now() }))); }
+    function draftClear(code) { var d = null; try { d = JSON.parse(ls(DRAFT) || 'null'); } catch (e) { d = null; } if (!code || !d || String(d.code).toUpperCase() === String(code).toUpperCase()) ls(DRAFT, null); }
+    function draftHref(d) { return 'admin.html?game=' + encodeURIComponent(d.code) + '&draft=1'; }
+    function draftLine(d) {
+        var bits = [];
+        if (d.course) bits.push(String(d.course).split(' (')[0]);
+        if (d.golfers) bits.push(d.golfers + ' golfer' + (d.golfers === 1 ? '' : 's'));
+        return bits.join(' \u00b7 ');
+    }
+    function draftHtml(d) {
+        var line = draftLine(d);
+        return '<div class="hp-draft" style="margin:0 0 14px;">'
+            + '<button type="button" class="hp-resume hp-draft-resume" data-hp-draft="' + esc(d.code) + '" style="margin:0;">\u25B6 Resume your unsaved round setup?'
+            + (line ? '<span style="display:block;font-weight:600;font-size:13px;margin-top:3px;">' + esc(line) + '</span>' : '') + '</button>'
+            + '<button type="button" class="hp-link muted" data-hp-draft-discard="' + esc(d.code) + '" style="display:block;margin:2px auto 0;">Discard it</button></div>';
+    }
+    // Home: inside #hp-resume (under a round's own Resume). Games: above YOUR ROUND.
+    function draftPaint() {
+        var d = draftRead();
+        var m = $('hp-draft-m'), g = $('hp-draft-g'), today = $('hp-today');
+        if (m) m.innerHTML = d ? draftHtml(d) : '';
+        if (!g && today && today.parentNode) { g = W.document.createElement('div'); g.id = 'hp-draft-g'; today.parentNode.insertBefore(g, today); }
+        if (g) g.innerHTML = d ? draftHtml(d) : '';
+    }
+    // Start a round with a draft waiting: asked first. Resolves true when it went to the draft.
+    function draftAsk() {
+        var d = draftRead();
+        if (!d || typeof W.uiConfirm !== 'function') return Promise.resolve(false);
+        var line = draftLine(d);
+        return W.uiConfirm({ title: 'Resume your unsaved round setup?', body: (line ? line + '. ' : '') + 'It was never saved - it is kept on this phone.',
+            confirmText: 'Resume it', cancelText: 'Start a new one', danger: false }).then(function (yes) {
+            if (yes) { W.location.href = draftHref(d); return true; }
+            draftClear(d.code);
+            return false;
+        }, function () { return false; });
+    }
+
     // GPS-4's quick starts: Round Setup's own templates (admin.html gpsApplyTemplate).
     var QUICK_STARTS = [
         { tpl: 'nassau', name: 'Nassau', sub: '$5 front \u00b7 back \u00b7 total' },
@@ -1916,6 +1976,7 @@
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
     W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+        draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
