@@ -650,10 +650,63 @@
                 else row(list, cls, z.name, 'reach ' + d(z.reachM) + sfx + ' \u00b7 carry ' + (z.carryM == null ? '\u2014' : d(z.carryM) + sfx));
             });
         }
+        var lf = h.querySelector('.gps-hzs-layfrom');
+        if (layupSwitch() && G.layupFromYou) { fillLayups(h, lay, lf, r, o, hz, row); return; }
+        if (lf) lf.style.display = 'none';
         var toGreen = o && r && r.mid ? G.haversineMeters(o.pt, r.mid) : null;
         var lays = toGreen ? G.layupTargets(toGreen, u === 'm' ? 1 : G.M_PER_YD) : [];
         h.querySelector('.gps-hzs-layh').style.display = lays.length ? '' : 'none';
         lays.forEach(function (l) { row(lay, 'gps-hzs-layup', 'Lay up to ' + l.leave + sfx, '= ' + d(l.fromM) + sfx + ' ' + who); });
+    }
+    // ---- LAYUPS FROM YOU (014, switch layupFromYou) ----------------------------------
+    // Each layup row is the SHOT from the golfer's spot: "Lay up to 100 → hit 135 · 9i"
+    // (gps-geo.layupFromYou). The shot is plays-like'd the way the main number is (the same
+    // wind / temperature / altitude baseline - playsAir - and the heights already on the
+    // phone); the club is My bag's, else the bag setup's carries for the golfer's handicap.
+    // Only shots from ~40 yds to their longest carry + 5%; "Lay up short of [hazard]" rows
+    // when the hole has hazard points. On the tee box, or nothing fits from their spot: from
+    // the target ring ("From your target (223)"). Tournament mode: raw yards, no club, no
+    // plays-like. Worked out on the phone; nothing is fetched, stored or sent from here.
+    // Off: the 008 rows ("Lay up to 100 = 164 from you").
+    function layupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('layupFromYou') !== false; } catch (e) { return true; } }
+    // { bag: { club: { yd } }, own } - My bag when it has a number, else the setup's defaults.
+    function layupCarries(B, useBag) {
+        var b = useBag ? B.bag(bagGolfer()) : null;
+        if (b && Object.keys(b).length) return { bag: b, own: true };
+        var dc = B.defaultCarries(bagHcp()), out = {};
+        Object.keys(dc).forEach(function (c) { out[c] = { yd: dc[c] }; });
+        return { bag: out, own: false };
+    }
+    function fillLayups(h, lay, lf, r, o, hz, row) {
+        var u = units(), m = u === 'm', sfx = m ? ' m' : '', d = function (x) { return G.shownDistance(x, u); };
+        var head = h.querySelector('.gps-hzs-layh');
+        if (!o || !r || !r.mid) { head.style.display = 'none'; if (lf) lf.style.display = 'none'; return; }
+        var B = bagApi();
+        if (!B && !S.layLoad) { S.layLoad = true; withShots(function () { if (hzOpen()) fillHazards(); }); }
+        var tq = tournament(), clubs = !tq && bagSwitch() && !!B;
+        var cs = B ? layupCarries(B, clubs) : null, maxYd = null;
+        if (cs) Object.keys(cs.bag).forEach(function (c) { var y = cs.bag[c] && cs.bag[c].yd; if (y > 0 && (maxYd == null || y > maxYd)) maxYd = y; });
+        var pl = !tq && S.pro && S.mode === 'measure' && inUS(r.mid);
+        var plan = G.layupFromYou({ from: { pt: o.pt, kind: o.from }, tee: r.tee, target: S.target, green: r.mid, hazards: hz, unitM: m ? 1 : G.M_PER_YD, maxYd: maxYd,
+            air: pl ? playsAir(effectiveWind(), r) : null, fromFt: pl ? originElev(r, o) : null, elevAt: pl ? function (p) { return ptElev(r, p); } : null });
+        head.style.display = '';
+        if (lf) {
+            lf.textContent = plan.from === 'target' ? 'From your target (' + d(plan.fromM) + sfx + ')' : plan.from === 'tee' ? 'From the tee' : 'From you';
+            lf.style.display = '';
+        }
+        lay.setAttribute('data-from', plan.from);
+        if (!plan.rows.length) {
+            var none = document.createElement('div'); none.className = 'gps-hzs-none gps-hzs-laynone';
+            none.textContent = plan.near ? 'Close enough to go at the green.' : 'Too far to lay up yet. This updates after your next shot.';
+            lay.appendChild(none);
+            return;
+        }
+        plan.rows.forEach(function (x) {
+            var hit = Math.round(x.needYd * (m ? G.M_PER_YD : 1));
+            var sg = clubs && cs ? B.suggestClub(cs.bag, x.needYd) : null;
+            row(lay, 'gps-hzs-layup' + (x.kind === 'hazard' ? ' gps-hzs-layhz' : ''), x.name + (x.kind === 'leave' ? sfx : ''),
+                '\u2192 hit ' + hit + sfx + (sg ? ' \u00b7 ' + ((B.SHORT && B.SHORT[sg.club]) || sg.club) : ''));
+        });
     }
     function drawHoleAsk() {
         var want = S.holeAsk || [];
@@ -4749,7 +4802,7 @@
         // HAZARDS + LAYUPS (008): a sheet from the bottom.
         + '<div class="gps-hzs gps-float gps-scroll-ok" data-feature="hazards" style="display:none" role="dialog" aria-label="Hazards and layups">'
         +   '<div class="gps-hzs-head"><div><div class="gps-hzs-title"></div><div class="gps-hzs-sub"></div></div><button type="button" class="gps-hzs-done">Done</button></div>'
-        +   '<div class="gps-hzs-list"></div><div class="gps-hzs-layh">LAY UP</div><div class="gps-hzs-lay"></div>'
+        +   '<div class="gps-hzs-list"></div><div class="gps-hzs-layh">LAY UP</div><div class="gps-hzs-layfrom" style="display:none"></div><div class="gps-hzs-lay"></div>'
         + '</div>'
         + '<div class="gps-wind-sheet gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
         +   '<div class="gps-ws-head"><div class="gps-ws-title">Wind<small class="gps-ws-state"></small></div>'
@@ -4850,6 +4903,7 @@
         + '#gps-overlay .gps-hzs-water .gps-hzs-name{color:#9fd3ff;}#gps-overlay .gps-hzs-bunker .gps-hzs-name{color:#f3e3b5;}'
         + '#gps-overlay .gps-hzs-behind{opacity:.55;}#gps-overlay .gps-hzs-behind .gps-hzs-nums{color:#c8d1ca;}'
         + '#gps-overlay .gps-hzs-none{padding:10px 2px;font:600 15px/1.3 ' + FONT + ';color:#f4f4ef;}'
+        + '#gps-overlay .gps-hzs-layfrom{font:700 13px/1.2 ' + FONT + ';color:#c8d1ca;margin:0 2px 2px;}'
         + '#gps-overlay .gps-hzs-layh{font:800 11px/1 ' + FONT + ';letter-spacing:.1em;color:#a7b3aa;margin:12px 2px 4px;}'
         + '#gps-overlay .gps-ask-hole1{font:800 14px/1 ' + FONT + ';color:#0b0f0c;background:#d9f99d;border:2px solid #0b0f0c;border-radius:999px;padding:10px 14px;min-height:44px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);white-space:nowrap;}'
         + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
@@ -5985,6 +6039,8 @@
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
         clubShort: clubShort,
+        // 014: the target ring's point (the layups count from it on the tee box), or null.
+        target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
         toolsSheetOn: function () { return tsOn(); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS

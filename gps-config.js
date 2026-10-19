@@ -92,7 +92,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // and the 011 behaviour exactly (C with gpsLayoutC, else the old layout).
         // 012: toolsSheet = Tools as a bottom sheet in layouts D and C (layout / units choices,
         // round switches, a grid of tiles) - off: the old drop-down there too.
-        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true, scoreSheet: true, gpsLayoutD: true, toolsSheet: true },
+        playsBreakdown: true, playsInfo: true, courseElev: true, osmPath: true, playsSimple: true, elevPerLeg: true, bagAltitude: true, elevMyCell: false, gpsLayoutC: true, gpsRoundScore: true, scoreSheet: true, gpsLayoutD: true, toolsSheet: true,
+        // 014: layupFromYou = the Hazards sheet's layups count from the golfer ("Lay up to 100 -> hit 135 · 9i",
+        // plays-like'd, club from My bag) or the target ring - off: the 008 rows ("= 393 from the tee").
+        layupFromYou: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the

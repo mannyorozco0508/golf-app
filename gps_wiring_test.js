@@ -157,7 +157,7 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     // founding cap; no price (the store's own price only).
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'toolsSheet', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'toolsSheet', 'watch']);
     // Feature 10 (the Apple Watch): its switch ships OFF; every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, false, 'the watch switch ships off');
     assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'watch' && k !== 'elevMyCell').every(([, v]) => v === true));
