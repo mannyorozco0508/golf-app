@@ -6441,6 +6441,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // unreachable, which is a signal problem and reads as one.
     function reportCodeIssueFailure(err, what) {
         const m = String((err && err.message) || err || '');
+        // GPS:BEGIN
+        // NO SIGNAL, AND THE PAGE KNOWS IT (URGENT-009, 013-16): the socket says it is down (or the
+        // phone says it is offline), so the reason is said plainly. A new round needs a code checked
+        // against the server, so with no signal it cannot be started here: try again with signal.
+        // Only when it is KNOWN - a timeout on a live socket keeps the words below.
+        if (err && err.code === 'timeout' && hpNoSignal()) {
+            uiFail('\uD83D\uDCF4 No signal \u2014 try again when you have a connection.\n'
+                + 'The new ' + what + ' was not started; nothing was saved.');
+            return;
+        }
+        // GPS:END
         // A TIMEOUT SAYS "NOT CREATED", NOT "CHECK YOUR SIGNAL". The issuer gives
         // up after its own timer (code-issuer.js, err.code 'timeout') when the
         // code check never answers - a dead socket, a captive portal, a bar of

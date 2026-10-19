@@ -809,6 +809,8 @@ async function airplane(killIt) {
     const st = await ph.json("{ url: document.URL, text: document.body.innerText.replace(/\\s+/g,' ').slice(0, 300), connecting: /Connecting/.test(document.body.innerText) }");
     P.offlineStart = st;
     check(!st.connecting, 'HIGH', 'airplane-start-connecting', '"Start a round" with no signal sits on "Connecting…"', { shot: P.shots[P.shots.length - 1], cause: st.text });
+    // URGENT-009 (013-16): and it says why, plainly.
+    check(/No signal/.test(st.text), 'MEDIUM', 'airplane-start-no-signal', '"Start a round" with no signal does not say there is no signal', { shot: P.shots[P.shots.length - 1], cause: st.text });
     errorsFinding(ph, 'airplane Start a round');
     await ph.close();
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}
