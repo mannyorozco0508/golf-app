@@ -24,15 +24,22 @@
 // of its golfers; the bare link of a multi-group round (a spectator) starts nothing.
 //
 // THE CHIP: "You: +$12 · 3 bets" - computeCombinedNetTotals (settlement-engine.js,
-// the number the Results page and Finish show), read only, for this phone's golfer.
+// the number the Results page and Finish show), read only, for this phone's golfer;
+// the count is this golfer's side bets.
 // Tap = Bets.
 // ============================================================================
 (function () {
     'use strict';
     if (typeof window === 'undefined') return;
 
+    // ON: the switch is on AND this phone has not turned the new flow off ("hardpan_simple_flow" =
+    // "off" in localStorage - the old screens on one phone, to compare; the old-flow tests use it).
     function on() {
-        try { return typeof window.HardPanFeature === 'function' && window.HardPanFeature('simpleFlow') !== false && ((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true; } catch (e) { return false; }
+        try {
+            if (!(typeof window.HardPanFeature === 'function' && ((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true)) return false;
+            try { if (localStorage.getItem('hardpan_simple_flow') === 'off') return false; } catch (e) {}
+            return true;
+        } catch (e) { return false; }
     }
     function hiloHere() { return typeof window.hiloShapeOk === 'function' && typeof window.hiloForSideMatch === 'function'; }
 
@@ -187,16 +194,8 @@
             var row = (res.netByName || {})[String(p.name).trim().toLowerCase()];
             net = row ? Number(row.net) || 0 : 0;
         } catch (e) { return null; }
+        // "· N bets" = this golfer's side bets (Manny, 017): not the round's own games.
         var n = 0;
-        try {
-            (typeof getRoundGames === 'function' ? getRoundGames(d) : []).forEach(function (g) {
-                if (!(Number(g.stake) > 0)) return;
-                var cfg = g.config || {}, part = cfg.participantIds;
-                if (cfg.enabled === false) return;
-                if (part && part.map(String).indexOf(me) === -1) return;
-                n++;
-            });
-        } catch (e) {}
         Object.keys(d.sideMatches || {}).forEach(function (k) {
             var sm = d.sideMatches[k] || {};
             if ((sm.teamAIds || []).concat(sm.teamBIds || []).map(String).indexOf(me) > -1) n++;
@@ -245,10 +244,15 @@
         + '#hp-bet .hb-worst{font:500 13px/1.4 ' + FONT + ';color:#5d6b64;margin-top:12px;}'
         + '#hp-bet input.hb-custom{width:90px;min-height:40px;border:1.5px solid #0f4d3a;border-radius:999px;padding:0 12px;font:600 15px/1 ' + FONT + ';}'
         // THE CARD'S BAR (simpleFlow, card side): the money chip and + Bet over the Round Menu.
-        + '#hp-card-bet{position:fixed;z-index:58;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 76px);display:none;align-items:center;justify-content:space-between;gap:8px;pointer-events:none;}'
-        + 'body.hp-sf-card .scorecard-main::after{content:"";display:block;height:72px;}'
-        + 'body.hp-sf-card #hp-card-bet{display:flex;}body.gps-side-gps #hp-card-bet{display:none !important;}'
-        + '#hp-card-bet > *{pointer-events:auto;}'
+        // THE ONE BOTTOM BAR (simpleFlow) on the card and over Bets: ☰ Menu | 📍 GPS | ▤ Card | + Bet,
+        // the money chip just above it at the right. It replaces the Round Menu pill (gps-round.js).
+        + '#hp-card-bet{position:fixed;z-index:58;left:0;right:0;bottom:0;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:none;align-items:stretch;gap:8px;background:rgba(244,247,245,.97);border-top:1px solid #dfe6e2;box-shadow:0 -4px 16px rgba(0,0,0,.08);}'
+        + 'body.hp-sf-card .scorecard-main::after{content:"";display:block;height:84px;}'
+        + 'body.hp-sf-card #hp-card-bet{display:flex;}body.gps-side-gps #hp-card-bet{display:none;}'
+        + 'body.hp-bets-open #hp-card-bet{display:flex !important;z-index:10120;}'
+        + '#hp-card-bet .hp-bar-btn{flex:1 1 0;min-width:0;min-height:50px;border:0;border-radius:14px;background:#0f1a14;color:#f4f4ef;font:800 15px/1.1 ' + FONT + ';cursor:pointer;white-space:nowrap;}'
+        + '#hp-card-bet .hp-bet-btn{flex:1 1 0;min-height:50px;}'
+        + '#hp-card-bet .hp-money-chip{position:absolute;right:10px;bottom:calc(100% + 8px);}'
         + '.hp-money-chip{border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}'
         + '.hp-money-chip b{color:#c8f075;font-weight:800;}.hp-money-chip b.neg{color:#ff9b8a;}'
         + '.hp-bet-btn{border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;min-height:48px;padding:0 18px;font:800 17px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}';
@@ -262,7 +266,7 @@
         ensureCss();
         r = document.createElement('div');
         r.id = 'hp-bet'; r.setAttribute('role', 'dialog'); r.setAttribute('aria-modal', 'true'); r.setAttribute('aria-label', 'New bet');
-        r.innerHTML = '<div class="hb-scrim"></div><div class="hb-panel"></div>';
+        r.innerHTML = '<div class="hb-scrim"></div><div class="hb-panel gps-scroll-ok"></div>';
         document.body.appendChild(r);
         r.addEventListener('click', onClick);
         r.addEventListener('change', onChange);
@@ -405,10 +409,21 @@
         ensureCss();
         bar = document.createElement('div');
         bar.id = 'hp-card-bet';
-        bar.innerHTML = '<button type="button" class="hp-money-chip" data-hp-money="card" style="display:none" aria-label="Your money - open Bets"></button><span></span>'
+        bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Round');
+        bar.innerHTML = '<button type="button" class="hp-money-chip" data-hp-money="card" style="display:none" aria-label="Your money - open Bets"></button>'
+            + '<button type="button" class="hp-bar-btn" data-hp-bar="menu" style="display:none" aria-label="Round Menu">\u2630 Menu</button>'
+            + '<button type="button" class="hp-bar-btn" data-hp-bar="gps" style="display:none" aria-label="Back to the map">\uD83D\uDCCD GPS</button>'
+            + '<button type="button" class="hp-bar-btn" data-hp-bar="card" style="display:none" aria-label="Scorecard">\u25A4 Card</button>'
             + '<button type="button" class="hp-bet-btn" aria-label="Add a bet">+ Bet</button>';
-        bar.querySelector('.hp-bet-btn').addEventListener('click', function (e) { e.preventDefault(); open(); });
-        bar.querySelector('.hp-money-chip').addEventListener('click', function (e) { e.preventDefault(); openBets(); });
+        bar.addEventListener('click', function (e) {
+            var b = e.target && e.target.closest ? e.target.closest('button') : null;
+            if (!b) return;
+            e.preventDefault();
+            if (b.classList.contains('hp-bet-btn')) { open(); return; }
+            if (b.classList.contains('hp-money-chip')) { openBets(); return; }
+            var R = window.HardPanRound, k = b.getAttribute('data-hp-bar');
+            if (R && typeof R.go === 'function') R.go(k);
+        });
         document.body.appendChild(bar);
         return bar;
     }
@@ -423,14 +438,20 @@
     }
     var last = null;
     function refresh() {
-        if (!on()) { document.body.classList.remove('hp-sf-card'); return null; }
+        if (!on()) { document.body.classList.toggle('hp-sf-card', false); return null; }   // toggle: no write when unchanged (gps-round.js observes <body>)
         var d = data();
         var live = !!(d && code() && (d.players || []).length);
         document.body.classList.toggle('hp-sf-card', live);
         if (!live) return null;
         var m = moneyNow();
         last = m;
-        paintChip(cardBar().querySelector('.hp-money-chip'), m);
+        var bar = cardBar();
+        paintChip(bar.querySelector('.hp-money-chip'), m);
+        var R = window.HardPanRound;
+        if (R && typeof R.barFor === 'function') {
+            var want = R.barFor();   // { menu, gps, card }
+            ['menu', 'gps', 'card'].forEach(function (k) { var e = bar.querySelector('[data-hp-bar="' + k + '"]'); if (e) e.style.display = want[k] ? '' : 'none'; });
+        }
         Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-money'), function (el) { paintChip(el, m); });
         return m;
     }

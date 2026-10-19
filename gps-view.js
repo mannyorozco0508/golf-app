@@ -4339,12 +4339,16 @@
     }
     // ---- 017 SIMPLE FLOW (features.simpleFlow): + Bet and the money chip, layouts D and C ----
     function sfSwitch() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.simpleFlow === true; } catch (e) { return false; } }
-    function sfOn() { return !!(S && (S.ld || S.lc) && sfSwitch() && window.HardPanBet); }
+    function sfOn() { return !!(S && (S.ld || S.lc) && sfSwitch() && window.HardPanBet && window.HardPanBet.on()); }
     function syncSimple() {
         if (!S) return;
         var sf = sfOn();
         S.el.classList.toggle('gps-sf', sf);
         show('.gps-bet-btn', sf && S.mode === 'measure');
+        // The mockup's bar: Card | Enter score | + Bet. Tools moves to Round Menu > Round settings
+        // (HardPanGps.openTools); the Games pill opens the Round Menu.
+        var gp = S.el.querySelector('.gps-door-games');
+        if (gp) { var want = sf && S.eventCode && window.HardPanRound ? '\u2630 Menu' : 'Games'; if (gp.textContent !== want) gp.textContent = want; gp.setAttribute('aria-label', want === 'Games' ? 'Games home' : 'Round Menu'); }
         var chip = S.el.querySelector('.gps-money');
         if (!chip) return;
         var m = sf ? (window.HardPanBet.money() || window.HardPanBet.refresh()) : null;
@@ -5270,6 +5274,7 @@
         + '#gps-overlay .gps-bet-btn{flex:0 0 auto;width:66px;border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;font:800 16px/1 ' + FONT + ';padding:0 4px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:nowrap;}'
         + '#gps-overlay .gps-money{position:absolute;z-index:8;right:10px;bottom:150px;border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 ' + FONT + ';cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:nowrap;}'
         + '#gps-overlay .gps-money b{color:#c8f075;font-weight:800;}#gps-overlay .gps-money b.neg{color:#ff9b8a;}'
+        + '#gps-overlay.gps-sf .gps-bottom .gps-tools{display:none !important;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-ico{color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-cap{font-size:12px;color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-scorebox{background:var(--gps-ld-lime);border:0;border-radius:18px;}'
@@ -5520,6 +5525,8 @@
         // games in view, or - no games yet - this round's own Add a game. Never the course picker;
         // Home's Games only when no round is open. The hole, the golfer pick and GPS stay (no reload).
         on(el, '.gps-door-games', function () {
+            // 017 (simpleFlow): the pill is "☰ Menu" - the 6-tile Round Menu over the map (gps-round.js).
+            if (sfOn() && S.eventCode && window.HardPanRound && window.HardPanRound.openMenu()) { closeMenus(); return; }
             if (!S || !S.eventCode) { window.location.href = 'home.html#games'; return; }
             closeMenus();
             S.userChoseSide = true;
@@ -6073,6 +6080,10 @@
         target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
         toolsSheetOn: function () { return tsOn(); },
+        // 017 (simpleFlow): Tools from Round Menu > Round settings - the map, then its Tools sheet.
+        openTools: function () { if (!S) return false; if (S.side !== 'gps' && !showSide('gps')) return false; closeMenus(); toggleTools(); return true; },
+        // 017: is the map built (the Card can then open as a sheet over it)?
+        mapReady: function () { return !!(S && S.map); },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
