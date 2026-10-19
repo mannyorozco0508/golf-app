@@ -2461,6 +2461,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // tee) while the round was open on 1. Before anyone has a score, the card - and GPS with it -
     // goes to the new first hole; a round already being played is left where it is.
     let hpStartWas = null;
+    // THE LAST HOLE THIS PHONE WAS ON IS PER GROUP (013, two-tee start): a phone that saw the
+    // round before its group was picked (START SCORING, a code join) stored hole 1, and Group 4
+    // off the 10th then opened on 1. A ?group= card keeps its own; the group-less view keeps the
+    // old key (unchanged for a phone that never picks a group).
+    function hpLastHoleKey() { return 'hardpan_last_hole_' + currentMode + (hasGroupLock && lockedGroup ? '_g' + lockedGroup : ''); }
     function hpFollowStart() {
         try {
             if (!currentData || !Array.isArray(currentData.courseData) || typeof groupStartHole !== 'function') return;
@@ -2473,7 +2478,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             const at = currentData.courseData.find(h => Number(h.hole) === Number(start));
             if (!at) return;
             currentViewedHole = at.hole;
-            try { localStorage.removeItem('hardpan_last_hole_' + currentMode); } catch (e) {}
+            try { localStorage.removeItem(hpLastHoleKey()); } catch (e) {}
         } catch (e) {}
     }
     function hpSha256(text) {
@@ -6518,7 +6523,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     });
     let gpsPrecacheAsked = false;
     function gpsFollowHoleView() {
-        try { if (currentMode && currentViewedHole != null) localStorage.setItem('hardpan_last_hole_' + currentMode, String(currentViewedHole)); } catch (e) {}
+        try {
+            // Not while "How are you joining this round?" is up: that view's hole is nobody's.
+            const gp = hasGroupLock ? null : document.getElementById('group-pick-overlay');
+            const picking = !!(gp && gp.style.display === 'flex');
+            if (currentMode && currentViewedHole != null && !picking) localStorage.setItem(hpLastHoleKey(), String(currentViewedHole));
+        } catch (e) {}
         const g = window.HardPanGps;
         if (!g || !currentMode || !currentData) return;
         const key = gpsCourseKey();
@@ -13050,7 +13060,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // this round; kept per round by gpsFollowHoleView.
         if (currentViewedHole === null) {
             try {
-                const lh = Number(localStorage.getItem('hardpan_last_hole_' + currentMode));
+                let lh = Number(localStorage.getItem(hpLastHoleKey()));
+                // A phone mid-round before this change kept the round-wide key: still used, but
+                // only for a group that starts on its round's first hole (never for one off the 10th).
+                if (!lh && hasGroupLock && lockedGroup && typeof groupStartHole === 'function' && typeof teeStartHole === 'function'
+                    && groupStartHole(currentData || {}, courseData || [], lockedGroup) === teeStartHole({ startingHole: 1 }, courseData || [])) {
+                    lh = Number(localStorage.getItem('hardpan_last_hole_' + currentMode));
+                }
                 const at = lh ? (courseData || []).find(h => Number(h.hole) === lh) : null;
                 if (at) currentViewedHole = at.hole;
             } catch (e) {}
