@@ -413,7 +413,7 @@ function buildText(G) {
                 // TWO GOLFERS ON ONE LINE ("Manny 8, Jimmy 11"): the roster paste reads one
                 // golfer a line, so this can only be flagged.
                 const p2 = G.players[pi++]; k++;
-                const ln2 = renderGolfer(p2, s, lineNo);
+                const ln2 = renderGolfer(p2, Object.assign({}, s, { num: 'none', bullet: 'none', trailing: false }), lineNo);
                 lines.push({ text: ln.text + pick([', ', ' & ', ' / ']) + ln2.text, kind: 'golfer', multi: true, expect: { name: '\u0000' }, flagOk: true, safeOk: false, alt: null, player: p });
             } else lines.push(ln);
             lineNo++;

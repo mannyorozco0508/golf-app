@@ -299,7 +299,8 @@ function splitTrailingTee(text, teeNames) {
     // URGENT-008: "after the handicap" includes the other ways a handicap ends a line -
     // with its flight ("Zoe +4/A blue"), bracketed ("Skeens (8) white"), or in the
     // comma form ("Ray, 9.0 white").
-    const afterHcp = BARE_HCP_RE.test(m[1]) || /,\s*[+-]?\d{1,2}(?:\.\d)?$/.test(m[1]) || !!splitTrailingHcpFlight(m[1]);
+    const afterHcp = BARE_HCP_RE.test(m[1]) || /,\s*[+-]?\d{1,2}(?:\.\d)?$/.test(m[1]) || !!splitTrailingHcpFlight(m[1])
+        || (typeof rosterPasteNormalizeGolfer === 'function' && !!splitTrailingHcpFlight(rosterPasteNormalizeGolfer(m[1])));
     if (!setOff && !afterHcp) return { tee: undefined, rest: text };
     return { tee: (teeNames || [])[hit], rest: setOff ? trimmed : m[1] };
 }
@@ -447,6 +448,7 @@ function rosterPasteCheckLines(players, lineNos, texts, anyFlight) {
         if (hcp !== '' && !/^[+-]?\d{1,2}(?:\.\d)?$/.test(hcp)) why = 'the handicap box would get "' + hcp + '"';
         else if (/\d/.test(name)) why = 'a number is still in the name - is it a handicap?';
         else if (/(?:^|[\s,(])(?:hcp|hdcp|handicap|flight|flt)(?:$|[\s,.:)])/i.test(name)) why = '"hcp" or "flight" is still in the name';
+        else if (/\s&\s|\/|\s\+\s|\sand\s/i.test(name)) why = 'two golfers on one line? Put each on its own line';
         else if (askLetters && !p.flight && loneLetter(name)) why = 'is the ' + name.slice(-1).toUpperCase() + ' a flight or a last initial?';
         if (why) out.push({ lineNumber: lineNos[i], text: texts[i], name, hcp, why });
     });
@@ -557,7 +559,7 @@ function rosterPasteBracketFlight(line) {
 // "Glenn, tbd" - the organizer's mark for a golfer with no handicap. It was kept as
 // part of the name ("Glenn N/A"); it is an empty handicap. Only at the end of a
 // line, only these marks, and never the whole line.
-const ROSTER_NO_HCP_MARK = /([^\s,])[\s,]+(?:-{1,3}|\?{1,3}|n\/a|n\.a\.?|nh|tbd|no hcp|no handicap)$/i;
+const ROSTER_NO_HCP_MARK = /([^\s,:|\/\u2013\u2014-])(?:\s*[,:|\/\u2013\u2014-]\s*|\s+)(?:-{1,3}|\?{1,3}|n\/a|n\.a\.?|nh|tbd|no hcp|no handicap)$/i;
 function rosterPasteNormalizeGolfer(line) {
     let t = String(line == null ? '' : line).replace(ROSTER_NO_HCP_MARK, '$1');
     t = t.replace(ROSTER_FLIGHT_WORD_BEFORE, '$1 $2').replace(ROSTER_FLIGHT_WORD_AFTER, '$1 $2');

@@ -245,3 +245,15 @@ describe('FIX 11: a "no handicap yet" mark is an empty handicap, not part of the
         assert.deepEqual(rows('Steve -3\nAnn Nash\n-'), [['Steve', '-3', null], ['Ann Nash', '', null], ['-', '', null]]);
     });
 });
+
+describe('FIX 12: separators around a tee or a no-handicap mark; two golfers on a line are asked about', () => {
+    test('"Joe A – +1.5 - A Blue": the tee after a dash-separated flight', () => {
+        assert.deepEqual(R.parsePlayerPasteText('Joe A – +1.5 - A Blue', ['Blue']).validPlayers, [{ name: 'Joe A', hcp: '+1.5', flight: 'A', teeName: 'Blue' }]);
+    });
+    test('"Zack Carrano: --", "Reese – -", "chris/N/A", "Anthony: - (captain)"', () => {
+        assert.deepEqual(rows('Zack Carrano: --\nReese – -\nchris/N/A\nAnthony: - (captain)').map(r => r[0]), ['Zack Carrano', 'Reese', 'chris', 'Anthony']);
+    });
+    test('"Glenn & Ryan A", "Manny / Jim" are asked about (one golfer a line); "Smith-Jones" is not', () => {
+        assert.deepEqual(P('Glenn & Ryan A\nManny / Jim\nSmith-Jones\nMarty 9').checkLines.map(c => c.lineNumber), [1, 2]);
+    });
+});
