@@ -312,11 +312,26 @@ async function openJourney(opts) {
     await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
         { width: v.width, height: v.height, deviceScaleFactor: 2, mobile: true });
     await rpc(ws, id++, 'Network.setBlockedURLs',
-        { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js', '*firebase-auth-compat.js'] });
+        { urls: ['*firebase-app-compat.js', '*firebase-database-compat.js', '*firebase-auth-compat.js'].concat(o.blockUrls || []) });
 
     let db = o.db || { events: {}, trips: {} };
     let injected = null;
     const log = [];
+    // EVERY CONSOLE ERROR AND UNCAUGHT EXCEPTION THE PAGE RAISED (mailbox 013, 2026-10-18), across
+    // every page of the journey, in order: { url, text }. Read-only; a simulation decides what fails.
+    const consoleErrors = [];
+    let pageUrl = '';
+    ws.addEventListener('message', ev => {
+        let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.method === 'Page.frameNavigated' && m.params && m.params.frame && !m.params.frame.parentId) pageUrl = m.params.frame.url;
+        if (m.method === 'Runtime.exceptionThrown' && m.params) {
+            const d = m.params.exceptionDetails || {};
+            consoleErrors.push({ url: pageUrl, text: String((d.exception && d.exception.description) || d.text || 'exception').split('\n')[0] });
+        }
+        if (m.method === 'Runtime.consoleAPICalled' && m.params && m.params.type === 'error') {
+            consoleErrors.push({ url: pageUrl, text: (m.params.args || []).map(a => a.value !== undefined ? String(a.value) : (a.description || a.type)).join(' ').split('\n')[0] });
+        }
+    });
 
     async function evaluate(expression) {
         const m = await rpc(ws, id++, 'Runtime.evaluate',
@@ -353,9 +368,37 @@ async function openJourney(opts) {
     const api = {
         get db() { return db; },
         log,
-        // A RAW DevTools command (013 setup sims): a real tap (Input.dispatchMouseEvent),
-        // a screenshot (Page.captureScreenshot). Calls nothing the page defines.
-        cdp(method, params) { return rpc(ws, id++, method, params || {}); },
+        consoleErrors,
+        // A raw DevTools command (mailbox 013): Emulation.*, Input.* - nothing the page defines.
+        async cdp(method, params) { return rpc(ws, id++, method, params || {}); },
+        // { shot } as arriveCold's viewportOnly: the screen as the phone shows it, to a PNG.
+        async shot(file) {
+            const r = await rpc(ws, id++, 'Page.captureScreenshot', { format: 'png' });
+            const data = r.result && r.result.data;
+            if (!data) return 0;
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            const buf = Buffer.from(data, 'base64');
+            fs.writeFileSync(file, buf);
+            return buf.length;
+        },
+        // A REAL TAP, as arriveCold's { tap }: scroll the element into view, settle, measure, then a
+        // mouse press/release at its centre. `pattern` (a RegExp) narrows to the first visible match
+        // whose text matches. Returns the point, or null when no visible element matched.
+        async tap(selector, pattern, opts2) {
+            const re = pattern ? String(pattern) : 'null';
+            const pick = `(function () { var re = ${re}; var els = Array.prototype.filter.call(document.querySelectorAll(${JSON.stringify(selector)}), function (e) { var r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return false; for (var x = e; x && x !== document.documentElement; x = x.parentElement) { var cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return !re || re.test(e.textContent || '') || re.test(e.getAttribute('aria-label') || ''); }); var el = els[${(opts2 && opts2.index) || 0}]; if (!el) return null; document.querySelectorAll('[data-jtap]').forEach(function (x) { x.removeAttribute('data-jtap'); }); el.setAttribute('data-jtap', '1'); el.scrollIntoView({ block: 'center' }); return 1; })()`;
+            const ok = await evaluate(pick);
+            if (!ok) { log.push('tap ' + selector + ' ' + (pattern || '') + ' -> none'); return null; }
+            await sleep(120);
+            const pt = await evaluate(`(function () { var el = document.querySelector('[data-jtap]'); if (!el) return null; var r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+            if (!pt) return null;
+            for (const type of ['mousePressed', 'mouseReleased']) {
+                await rpc(ws, id++, 'Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+            }
+            log.push('tap ' + selector + ' ' + (pattern || '') + ' at ' + pt.x + ',' + pt.y);
+            await sleep((opts2 && opts2.settleMs) || 350);
+            return pt;
+        },
         evaluate,
         harvest,
         async goto(url, settleMs) {
