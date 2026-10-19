@@ -2021,11 +2021,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     <div id="setup-entry-mount"></div>
     <div id="qr-share-mount"></div>
     <div id="group-links-panel" style="display:none;"></div>
-    <!-- PASTE-TO-CLAIM (v200): on a BARE link whose doors are hidden, the device
-         that was set up somewhere else pastes the organizer link and unlocks
-         setup here - nothing is written to Firebase. Empty on a group link, and
-         for the organizer, whose doors are already open. -->
-    <div id="organizer-claim-mount"></div>
+    <!-- PASTE-TO-CLAIM (v200) MOVED (URGENT-011, 013-11): the "Are you the
+         organizer?" box sat here, at the top of the card, where every golfer on
+         the bare link saw it. It now lives in the "How are you joining this
+         round?" sheet behind an "I'm the organizer" row - #organizer-claim-mount
+         is inside #group-pick-overlay below. -->
 
     <!-- The 1-18 circle strip lived here. It was clickable hole navigation plus a
          progress indicator, but on tablet widths the Live Action panel overlapped its
@@ -2231,6 +2231,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     <div class="modal-content">
         <div class="modal-header"><span id="group-pick-title">How are you joining this round?</span></div>
         <div id="group-pick-body"></div>
+        <!-- PASTE-TO-CLAIM (v200; moved here URGENT-011): filled only after the
+             golfer taps "I'm the organizer" - see openOrganizerClaim(). Nothing
+             is written to Firebase. Empty on a group link, for a spectator, and
+             for the organizer, whose doors are already open. -->
+        <div id="organizer-claim-mount"></div>
     </div>
 </div>
 
@@ -8520,8 +8525,39 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             hasGroupLock: hasGroupLock, isOrganizer: roundOwnerHere(), superseded: roundSuperseded(),
             players: players || [], boundaries: boundaries || [], label: golferLabel
         });
-        body.innerHTML = roleSheetRowsHtml(rows);
+        body.innerHTML = roleSheetRowsHtml(withOrganizerRow(rows));
         overlay.style.display = 'flex';
+        renderOrganizerClaim();
+    }
+
+    // "I'M THE ORGANIZER" (URGENT-011, 013-11). The paste-your-organizer-link box
+    // used to sit at the top of the card, so every golfer on the bare link read
+    // "Are you the organizer?" over their scores. It is now one row in this sheet,
+    // and the box opens only when that row is tapped. Offered on exactly the
+    // condition the box always had - a BARE link, the doors hidden, a round with a
+    // token to check against - and never to a spectator (GPS spectating hides the
+    // whole sheet). A golfer who arrives with a group, or who answered "Just
+    // watching", never sees the sheet and so never sees the row.
+    let organizerClaimOpen = false;
+    function organizerClaimOffered() {
+        if (hasGroupLock || !window.organizerGate) return false;
+        if (!(currentData && currentData.organizerToken)) return false;
+        if (typeof hpSpectating === 'function' && hpSpectating()) return false;
+        return !canReachSetup();
+    }
+    function withOrganizerRow(rows) {
+        if (!rows.length || !organizerClaimOffered()) return rows;
+        return rows.concat([{
+            role: 'organizer',
+            title: "I'm the organizer",
+            sub: 'Set this round up on another phone? Paste your organizer link to open setup here.'
+        }]);
+    }
+    function openOrganizerClaim() {
+        organizerClaimOpen = true;
+        renderOrganizerClaim();
+        const input = document.getElementById('oc-input');
+        if (input && typeof input.focus === 'function') { try { input.focus(); } catch (e) { /* no focus in this realm */ } }
     }
 
     // ONE BUILDER FOR THE ROWS, because two surfaces open this sheet - the
@@ -8531,7 +8567,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         return rows.map(r => {
             const onclick = r.role === 'scorekeeper'
                 ? 'pickGroup(' + r.group + ')'
-                : (r.role === 'playing' ? 'pickPlayingRole()' : 'dismissGroupPick()');
+                : (r.role === 'playing' ? 'pickPlayingRole()'
+                    : (r.role === 'organizer' ? 'openOrganizerClaim()' : 'dismissGroupPick()'));
             const cls = r.role === 'scorekeeper' ? 'btn-primary group-pick-btn' : 'btn-outline group-pick-btn';
             // data-role NAMES THE ROW. Before this the sheet had one btn-outline -
             // "Just watching" - and tools/ and the Chrome checks selected it by
@@ -8573,8 +8610,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             players: currentData.players || [], boundaries: roleBoundaries(), label: golferLabel
         });
         if (!rows.length) return;
-        body.innerHTML = roleSheetRowsHtml(rows);
+        body.innerHTML = roleSheetRowsHtml(withOrganizerRow(rows));
         overlay.style.display = 'flex';
+        renderOrganizerClaim();
     }
 
     // ---- THE ROLE, STORED PER ROUND ----
@@ -8664,6 +8702,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         storeRoundRole('watching');
         const overlay = document.getElementById('group-pick-overlay');
         if (overlay) overlay.style.display = 'none';
+        organizerClaimOpen = false;
+        renderOrganizerClaim();
         renderScorecard();
     }
 
@@ -8884,10 +8924,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // doors are hidden, one line and a box: paste the organizer link. Not on a
     // group link - a scorekeeper is not a locked-out organizer. Not when the doors
     // are already open, and not on a round with no token (nothing to check).
+    // URGENT-011: and only after "I'm the organizer" was tapped in the joining
+    // sheet - the mount lives inside that sheet now, not at the top of the card.
     function renderOrganizerClaim() {
         const mount = document.getElementById('organizer-claim-mount');
         if (!mount) return;
-        const show = !hasGroupLock && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
+        const show = organizerClaimOpen && !hasGroupLock && organizerClaimOffered() && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
         if (!show) { mount.innerHTML = ''; return; }
         mount.innerHTML = '<div class="claim-box">'
             + '<label class="claim-label" for="oc-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
@@ -8905,9 +8947,16 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             return result;
         }
         // The doors are a render away: the token is held now, so re-render the
-        // surfaces that read canReachSetup() and drop the box.
+        // surfaces that read canReachSetup() and drop the box. The "I'm the
+        // organizer" row goes with it: the sheet, if still up, is redrawn without it.
+        organizerClaimOpen = false;
         renderScorecard();
         renderOrganizerClaim();
+        const overlay = document.getElementById('group-pick-overlay');
+        const body = document.getElementById('group-pick-body');
+        if (overlay && body && overlay.style.display === 'flex' && body.innerHTML) {
+            body.innerHTML = body.innerHTML.replace(/<button[^>]*data-role="organizer"[\s\S]*?<\/button>/, '');
+        }
         return 'ok';
     }
 
