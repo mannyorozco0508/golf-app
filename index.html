@@ -2025,7 +2025,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
          that was set up somewhere else pastes the organizer link and unlocks
          setup here - nothing is written to Firebase. Empty on a group link, and
          for the organizer, whose doors are already open. -->
-    <div id="organizer-claim-mount"></div>
+    <!-- GPS:BEGIN --><!-- URGENT-011 (013-11): in HardPan this mount lives in the "How are you joining this round?" sheet (#group-pick-overlay), opened by its "I'm the organizer" row - not here at the top of the card.
+    // GPS:ELSE
+    // <div id="organizer-claim-mount"></div>
+    // GPS:END -->
 
     <!-- The 1-18 circle strip lived here. It was clickable hole navigation plus a
          progress indicator, but on tablet widths the Live Action panel overlapped its
@@ -2231,6 +2234,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     <div class="modal-content">
         <div class="modal-header"><span id="group-pick-title">How are you joining this round?</span></div>
         <div id="group-pick-body"></div>
+        <!-- GPS:BEGIN -->
+        <!-- PASTE-TO-CLAIM (v200; moved here URGENT-011): filled only after the
+             golfer taps "I'm the organizer" - see openOrganizerClaim(). Nothing
+             is written to Firebase. Empty on a group link, for a spectator, and
+             for the organizer, whose doors are already open. -->
+        <div id="organizer-claim-mount"></div>
+        <!-- GPS:END -->
     </div>
 </div>
 
@@ -8520,18 +8530,64 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             hasGroupLock: hasGroupLock, isOrganizer: roundOwnerHere(), superseded: roundSuperseded(),
             players: players || [], boundaries: boundaries || [], label: golferLabel
         });
-        body.innerHTML = roleSheetRowsHtml(rows);
+        // GPS:BEGIN
+        body.innerHTML = roleSheetRowsHtml(withOrganizerRow(rows));
         overlay.style.display = 'flex';
+        renderOrganizerClaim();
+        // GPS:ELSE
+        // body.innerHTML = roleSheetRowsHtml(rows);
+        // overlay.style.display = 'flex';
+        // GPS:END
     }
+    // GPS:BEGIN
+    // "I'M THE ORGANIZER" (URGENT-011, 013-11). The paste-your-organizer-link box
+    // used to sit at the top of the card, so every golfer on the bare link read
+    // "Are you the organizer?" over their scores. It is now one row in this sheet,
+    // and the box opens only when that row is tapped. Offered on exactly the
+    // condition the box always had - a BARE link, the doors hidden, a round with a
+    // token to check against - and never to a spectator (spectating hides the
+    // whole sheet). A golfer who arrives with a group, or who answered "Just
+    // watching", never sees the sheet and so never sees the row.
+    // HardPan only: the Consumer build keeps the box where it was (its
+    // index.html is pinned byte for byte by gps_flag_test.js).
+    let organizerClaimOpen = false;
+    function organizerClaimOffered() {
+        if (hasGroupLock || !window.organizerGate) return false;
+        if (!(currentData && currentData.organizerToken)) return false;
+        if (hpSpectating()) return false;
+        return !canReachSetup();
+    }
+    function withOrganizerRow(rows) {
+        if (!rows.length || !organizerClaimOffered()) return rows;
+        return rows.concat([{
+            role: 'organizer',
+            title: "I'm the organizer",
+            sub: 'Set this round up on another phone? Paste your organizer link to open setup here.'
+        }]);
+    }
+    function openOrganizerClaim() {
+        organizerClaimOpen = true;
+        renderOrganizerClaim();
+        const input = document.getElementById('oc-input');
+        if (input && typeof input.focus === 'function') { try { input.focus(); } catch (e) { /* no focus in this realm */ } }
+    }
+    // GPS:END
 
     // ONE BUILDER FOR THE ROWS, because two surfaces open this sheet - the
     // multi-group arrival and the single-group line - and a hand-written copy in
     // each is how one of them ends up offering something the other does not.
     function roleSheetRowsHtml(rows) {
         return rows.map(r => {
+            // GPS:BEGIN
             const onclick = r.role === 'scorekeeper'
                 ? 'pickGroup(' + r.group + ')'
-                : (r.role === 'playing' ? 'pickPlayingRole()' : 'dismissGroupPick()');
+                : (r.role === 'playing' ? 'pickPlayingRole()'
+                    : (r.role === 'organizer' ? 'openOrganizerClaim()' : 'dismissGroupPick()'));
+            // GPS:ELSE
+            // const onclick = r.role === 'scorekeeper'
+            //     ? 'pickGroup(' + r.group + ')'
+            //     : (r.role === 'playing' ? 'pickPlayingRole()' : 'dismissGroupPick()');
+            // GPS:END
             const cls = r.role === 'scorekeeper' ? 'btn-primary group-pick-btn' : 'btn-outline group-pick-btn';
             // data-role NAMES THE ROW. Before this the sheet had one btn-outline -
             // "Just watching" - and tools/ and the Chrome checks selected it by
@@ -8573,8 +8629,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             players: currentData.players || [], boundaries: roleBoundaries(), label: golferLabel
         });
         if (!rows.length) return;
-        body.innerHTML = roleSheetRowsHtml(rows);
+        // GPS:BEGIN
+        body.innerHTML = roleSheetRowsHtml(withOrganizerRow(rows));
         overlay.style.display = 'flex';
+        renderOrganizerClaim();
+        // GPS:ELSE
+        // body.innerHTML = roleSheetRowsHtml(rows);
+        // overlay.style.display = 'flex';
+        // GPS:END
     }
 
     // ---- THE ROLE, STORED PER ROUND ----
@@ -8664,6 +8726,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         storeRoundRole('watching');
         const overlay = document.getElementById('group-pick-overlay');
         if (overlay) overlay.style.display = 'none';
+        // GPS:BEGIN
+        organizerClaimOpen = false;
+        renderOrganizerClaim();
+        // GPS:END
         renderScorecard();
     }
 
@@ -8887,7 +8953,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function renderOrganizerClaim() {
         const mount = document.getElementById('organizer-claim-mount');
         if (!mount) return;
-        const show = !hasGroupLock && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
+        // GPS:BEGIN
+        // URGENT-011: and only after "I'm the organizer" was tapped in the joining
+        // sheet - the mount lives inside that sheet now, not at the top of the card.
+        const show = organizerClaimOpen && organizerClaimOffered() && !hasGroupLock && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
+        // GPS:ELSE
+        // const show = !hasGroupLock && !canReachSetup() && !!(currentData && currentData.organizerToken) && !!window.organizerGate;
+        // GPS:END
         if (!show) { mount.innerHTML = ''; return; }
         mount.innerHTML = '<div class="claim-box">'
             + '<label class="claim-label" for="oc-input">' + window.organizerGate.CLAIM_PROMPT + '</label>'
@@ -8906,8 +8978,19 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
         // The doors are a render away: the token is held now, so re-render the
         // surfaces that read canReachSetup() and drop the box.
+        // GPS:BEGIN
+        organizerClaimOpen = false;
+        // GPS:END
         renderScorecard();
         renderOrganizerClaim();
+        // GPS:BEGIN
+        // The "I'm the organizer" row goes too: the sheet, if still up, is redrawn without it.
+        const pickOverlay = document.getElementById('group-pick-overlay');
+        const pickBody = document.getElementById('group-pick-body');
+        if (pickOverlay && pickBody && pickOverlay.style.display === 'flex' && pickBody.innerHTML) {
+            pickBody.innerHTML = pickBody.innerHTML.replace(/<button[^>]*data-role="organizer"[\s\S]*?<\/button>/, '');
+        }
+        // GPS:END
         return 'ok';
     }
 

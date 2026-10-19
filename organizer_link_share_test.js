@@ -150,11 +150,24 @@ const tick = () => new Promise(r => setTimeout(r, 40));
 async function scorecard(data, search) {
     const sb = loadHtmlInlineScript('index.html', [], { search: search || '?game=org1', localStorage: true });
     sb.__d = J(data);
-    run(sb, "['group-filter-container', 'group-links-panel', 'organizer-claim-mount', 'players-sheet', 'players-sheet-body', 'players-sheet-money', 'players-sheet-warn'].forEach(function (id) { document.__mount(document.getElementById(id)); });");
+    run(sb, "['group-filter-container', 'group-links-panel', 'organizer-claim-mount', 'group-pick-overlay', 'group-pick-body', 'players-sheet', 'players-sheet-body', 'players-sheet-money', 'players-sheet-warn'].forEach(function (id) { document.__mount(document.getElementById(id)); });");
     await tick();
     const h = sb.__dbHandlers.find(x => x.event === 'value' && x.path === 'events/ORG1');
     h.cb({ val: () => J(data), exists: () => true });
     return sb;
+}
+// URGENT-011 (013-11): in HardPan the box is no longer on the card's top. It opens
+// from the "I'm the organizer" row of the "How are you joining this round?" sheet,
+// so a claim starts with that tap - the row's own onclick, run as written. The
+// Consumer build (GPS blocks removed; its index.html is pinned byte for byte by
+// gps_flag_test.js) keeps the box on the card, so there is no row to tap there.
+const ROW_TREE = /function openOrganizerClaim\(/.test(read('index.html'));
+function tapOrganizerRow(sb) {
+    if (!ROW_TREE) return;
+    const body = String(run(sb, "document.getElementById('group-pick-body').innerHTML || ''"));
+    const m = /<button[^>]*data-role="organizer"[^>]*onclick="([^"]+)"/.exec(body);
+    assert.ok(m, 'the joining sheet offers "I\'m the organizer": ' + body.slice(0, 300));
+    run(sb, m[1]);
 }
 const html = (sb, id) => String(run(sb, "(document.getElementById('" + id + "') || {}).innerHTML || ''"));
 // a note is written with textContent (a sentence, never markup), which mini-dom
@@ -174,6 +187,8 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
     test('ANOTHER DEVICE on the bare link (the 2026-09-21 case): the doors are hidden and the claim box is offered', async () => {
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }));
         assert.ok(!/Edit round setup|👥 Players/.test(html(sb, 'group-filter-container')), 'no doors');
+        if (ROW_TREE) assert.equal(html(sb, 'organizer-claim-mount'), '', 'not on arrival: the box waits behind the row');
+        tapOrganizerRow(sb);
         const box = html(sb, 'organizer-claim-mount');
         assert.match(box, /Are you the organizer\? Paste your organizer link\./);
         assert.match(box, /<input id="oc-input"/);
@@ -181,6 +196,7 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
     });
     test('a valid paste opens the doors, persists on this device, and writes NOTHING to the database', async () => {
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }));
+        tapOrganizerRow(sb);
         run(sb, "document.getElementById('oc-input').value = '" + ORIGIN + "/index.html?game=ORG1&organizer=" + TOKEN + "';");
         assert.equal(run(sb, 'submitOrganizerClaim()'), 'ok');
         assert.match(html(sb, 'group-filter-container'), /Edit round setup/, 'the doors are open now');
@@ -199,6 +215,7 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
     });
     test('a WRONG token: "That link isn’t for this round.", the doors stay shut, nothing stored (CONTROL: the right one opens them)', async () => {
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }));
+        tapOrganizerRow(sb);
         run(sb, "document.getElementById('oc-input').value = '" + ORIGIN + "/index.html?game=ORG1&organizer=" + OTHER + "';");
         assert.equal(run(sb, 'submitOrganizerClaim()'), 'wrong');
         assert.equal(text(sb, 'oc-note'), 'That link isn’t for this round.');
@@ -216,6 +233,7 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
     });
     test('a BARE TOKEN pasted (somebody read it out of the URL) is accepted', async () => {
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }));
+        tapOrganizerRow(sb);
         run(sb, "document.getElementById('oc-input').value = '  " + TOKEN + "  ';");
         assert.equal(run(sb, 'submitOrganizerClaim()'), 'ok');
         assert.match(html(sb, 'group-filter-container'), /Edit round setup/);
@@ -235,11 +253,12 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
         const fn = src.slice(src.indexOf('function renderGroupFilters(playersCount)'), src.indexOf('\n    function filterGroup'));
         assert.ok(fn.indexOf("if (hasGroupLock) {") < fn.indexOf('renderOrganizerClaim();'), 'the early return comes first');
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }), '?game=org1&group=2');
-        run(sb, 'renderOrganizerClaim();');
-        assert.equal(html(sb, 'organizer-claim-mount'), '', 'called directly on a locked link: still nothing');
+        run(sb, (ROW_TREE ? 'organizerClaimOpen = true; ' : '') + 'renderOrganizerClaim();');
+        assert.equal(html(sb, 'organizer-claim-mount'), '', 'called directly on a locked link (even with the row "tapped"): still nothing');
         // and a CLEAN case still renders, so the isolation test cannot be satisfied
         // by a renderer that simply refuses everything
         const bare = await scorecard(round({ ownerUid: 'a-different-browser' }));
+        tapOrganizerRow(bare);
         run(bare, 'renderOrganizerClaim();');
         assert.match(html(bare, 'organizer-claim-mount'), /Are you the organizer\?/);
     });
@@ -452,7 +471,7 @@ const PROBE1 = `(() => JSON.stringify({
 const C = {};
 before(async () => {
     const r = await arriveCold({ url: fileUrl('index.html', 'game=ORG1'), db: DB, settleMs: 4000, steps: [
-        { tap: '#group-pick-overlay [data-role="watching"]', nth: 0 }, { sleep: 250 },
+        { tap: '#group-pick-overlay [data-role="' + (ROW_TREE ? 'organizer' : 'watching') + '"]', nth: 0 }, { sleep: 250 },
         { expression: PROBE0 },
         { tap: '#oc-input', nth: 0 }, { sleep: 150 },
         ...(ORIGIN + '/index.html?game=ORG1&organizer=' + TOKEN).split('').map(ch => ({ cdp: { method: 'Input.insertText', params: { text: ch } } })),
