@@ -257,3 +257,37 @@ describe('FIX 12: separators around a tee or a no-handicap mark; two golfers on 
         assert.deepEqual(P('Glenn & Ryan A\nManny / Jim\nSmith-Jones\nMarty 9').checkLines.map(c => c.lineNumber), [1, 2]);
     });
 });
+
+describe('FIX 13: trip-setup-paste.js (the whole-round paste) reads a trailing flight, never a golfer "A"', () => {
+    const TSP = require('./trip-setup-paste.js');
+    const L = (s) => TSP.tspPlayersLine(s);
+    test('"Skeens 2.0/A" is Skeens, 2.0, A - it made a second golfer named "A"', () => {
+        assert.deepEqual(L('Skeens 2.0/A').players, [{ name: 'Skeens', hcp: '2.0', flight: 'A' }]);
+        assert.deepEqual(L('Tim K (16) / b').players, [{ name: 'Tim K', hcp: '16', flight: 'B' }]);
+        assert.deepEqual(L('Manny 8/A, Jim 9/b').players.map(p => [p.name, p.flight]), [['Manny', 'A'], ['Jim', 'B']]);
+    });
+    test('"Skeens 2.0 A" (space) is read too - it was "not a name I can read"', () => {
+        assert.deepEqual(L('Skeens 2.0 A').players, [{ name: 'Skeens', hcp: '2.0', flight: 'A' }]);
+    });
+    test('"B, Paul 23" is Paul in B, not a golfer "B" and a golfer "Paul"', () => {
+        assert.deepEqual(L('B, Paul 23').players, [{ name: 'Paul', hcp: '23', flight: 'B' }]);
+    });
+    test('a lone letter is flagged, never a golfer; "Matt B" is still a name; "Manny 8/Jim 9" is still two golfers', () => {
+        assert.deepEqual(L('A'), { players: [], teams: null, bad: ['A'] });
+        assert.deepEqual(L('Matt B').players, [{ name: 'Matt B', hcp: '' }]);
+        assert.deepEqual(L('Manny 8/Jim 9').players.map(p => p.name), ['Manny', 'Jim']);
+    });
+    test('in a whole plan: "Group 1" then "Skeens 2.0/A" is one golfer in the group', () => {
+        const plan = TSP.parseSetupPaste('Group 1\nSkeens 2.0/A\nGlenn 12.0/B', {});
+        assert.deepEqual(plan.days[0].groups[0].players.map(p => [p.name, p.hcp, p.flight]), [['Skeens', '2.0', 'A'], ['Glenn', '12.0', 'B']]);
+    });
+});
+
+describe('FIX 13b: trip-setup-paste.js reads a leading flight set off by a dash or middot', () => {
+    const TSP = require('./trip-setup-paste.js');
+    test('"A - Paul 12", "A \u00B7 Randy T 12", "A, O\'Neil 10.0" were "Not understood - ignored" / lost the flight', () => {
+        const plan = TSP.parseSetupPaste('Group 1\nA - Paul 12\nA \u00B7 Randy T 12\nA, O\'Neil 10.0', {});
+        assert.deepEqual(plan.days[0].groups[0].players.map(p => [p.name, p.hcp, p.flight]), [['Paul', '12', 'A'], ['Randy T', '12', 'A'], ["O'Neil", '10.0', 'A']]);
+        assert.deepEqual(plan.flags, []);
+    });
+});

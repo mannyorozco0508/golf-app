@@ -27,6 +27,7 @@
 //   node tools/sim/paste-fuzz.js --seed 7 --count 1 --show        (print a paste)
 //   node tools/sim/paste-fuzz.js --parser /tmp/old-roster-paste.js (another build)
 //   node tools/sim/paste-fuzz.js --setup   (also run trip-setup-paste.js over it)
+//   --setup-parser /tmp/old-trip-setup-paste.js (another build of that one)
 //   --fails N   print up to N failing examples per family (default 3)
 // ============================================================================
 'use strict';
@@ -537,7 +538,7 @@ if (SETUP) {
     // trailing-flight form, and only on golfer text (no headers): exact / flagged
     // (in its flags list) / fail.
     global.tripItinParseLine = undefined;
-    const TSP = require(path.join(ROOT, 'trip-setup-paste.js'));
+    const TSP = require(path.resolve(String(arg('setup-parser', path.join(ROOT, 'trip-setup-paste.js')))));
     rand = rng(SEED ^ 0x5eed);
     const fam = {};
     for (let n = 0; n < Math.min(COUNT, 2000); n++) {

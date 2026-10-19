@@ -126,11 +126,21 @@ function tspPlayer(tok) {
         if (bare && +bare[2] >= -10 && +bare[2] <= 54) { t = bare[1]; hcp = bare[2]; }
     }
     var flight = null;
-    var fl = /^([AB])\s+(\S.*)$/.exec(t);
+    // "Skeens 2.0 A", "Glenn (12) B": a flight AFTER the handicap (URGENT-004's form;
+    // URGENT-008 found this parser never read it). Only right after a handicap - a
+    // lone trailing letter with none before it ("Matt B") stays part of the name.
+    if (!hcp) {
+        var tf = /^(.+?)\s+[(\[]?\s*([+-]?\d{1,2}(?:\.\d)?)\s*[)\]]?\s+([ABab])$/.exec(t);
+        if (tf && +tf[2] >= -10 && +tf[2] <= 54) { t = tf[1]; hcp = tf[2]; flight = tf[3].toUpperCase(); }
+    }
+    var fl = flight ? null : /^([AB])\s+(\S.*)$/.exec(t);
     if (fl) { flight = fl[1]; t = fl[2]; }
     t = t.replace(/\s+/g, ' ').trim();
     // A name: 1-3 words, letters (an initial, an apostrophe, a hyphen are fine).
     if (!/^[A-Za-z][A-Za-z.'’-]*(?: [A-Za-z][A-Za-z.'’-]*){0,2}$/.test(t) || t.length > 30) return null;
+    // A LONE LETTER IS NOT A GOLFER (URGENT-008): it is a flight that lost its golfer
+    // ("Skeens 2.0/A" split at the slash) - flagged on review, never a player "A".
+    if (/^[A-Za-z]$/.test(t)) return null;
     var p = { name: t, hcp: hcp };
     if (flight) p.flight = flight;
     return p;
@@ -140,6 +150,12 @@ function tspPlayersLine(s) {
     // "Manny Orozco, 12" is a handicap, not a second golfer called "12": a comma
     // followed by a number alone reads as "Manny Orozco (12)".
     s = String(s || '').replace(/,\s*([+-]?\d{1,2}(?:\.\d)?)\s*(?=$|[,;&\/]|\s+(?:vs\.?|v\.?|versus)\s)/gi, ' ($1)');
+    // "Skeens 2.0/A", "Tim (16) / B": the slash between a handicap and a flight joins
+    // them - it is not a second golfer called "A". And "B, Paul 23", "A: Jim 4",
+    // "A - Jim 4", "A \u00B7 Randy T 12" (Manny's list): a leading flight set off by a
+    // comma, colon, dash or middot is the flight, not a golfer "B" or a line ignored.
+    s = s.replace(/(\d\)?)\s*\/\s*([ABab])(?=$|[\s,;&])/g, '$1 $2')
+        .replace(/^\s*([AB])\s*(?:[,:\u00B7\u2022]|-{1,2}|\.{2,3})\s*(?=[A-Za-z][A-Za-z.'\u2019-])/, '$1 ');
     var sides = s.split(/\s+(?:vs\.?|v\.?|versus)\s+/i);
     var teams = sides.length === 2 ? [] : null;
     var players = [], bad = [];
