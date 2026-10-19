@@ -139,7 +139,7 @@
     function shell(title, body, foot, n) {
         var bar = '';
         if (n) for (var i = 1; i <= 3; i++) bar += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
-        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">New round</span>')
+        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">' + (S.mode === 'same' ? 'Same as last week' : 'New round') + '</span>')
             + (n ? '<span class="sf-bar" aria-label="Step ' + n + ' of 3">' + bar + '</span>' : '') + '</div>'
             + '<h1>' + title + '</h1>' + body + '<div class="sf-foot">' + foot + '</div></div>';
     }
@@ -680,7 +680,7 @@
             W.location.href = 'home.html';
             return;
         }
-        if (a === 'next') { S.err2 = ''; if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } go(S.step + 1); return; }
+        if (a === 'next') { S.err2 = ''; if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
         if (a === 'roster') { away(step('players'), 'Roster done'); return; }
         if (a === 'moregames') { apply(); away(step('action'), 'Games done'); return; }

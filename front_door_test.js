@@ -65,8 +65,10 @@ test('gps-doors-fix: a launch goes straight to the doors; Main every launch; lig
     const s = read('front-door.js'), h = read('home.html');
     assert.match(s, /\(function launch\(\) \{/); assert.match(s, /W\.document\.documentElement\.style\.visibility = 'hidden';\n\s*W\.location\.replace\('home\.html'\);/);
     // Every launch opens Main - #gps / #pick too, under the GPS Map gate (paid launch, 2026-10-17).
-    assert.match(s, /else show\(h === 'games' \? h : 'main'\);/, 'every launch opens Main');
-    assert.match(s, /else if \(h === 'gps'\) \{ show\('main'\); gpsGate\(homeCourse\(\)/, '#gps: Main, then the gate');
+    // 017: Main is homeView() - the four-door Home with features.simpleFlow on, Main exactly when off.
+    assert.match(s, /else show\(h === 'games' \? h : homeView\(\)\);/, 'every launch opens Main');
+    assert.match(s, /function homeView\(\) \{ return simpleOn\(\) \? 'simple' : 'main'; \}/, 'Main when the switch is off');
+    assert.match(s, /else if \(h === 'gps'\) \{ show\(homeView\(\)\); gpsGate\(homeCourse\(\)/, '#gps: Main, then the gate');
     assert.ok(!/prefers-color-scheme/.test(h) && /<meta name="color-scheme" content="light only">/.test(h), 'home.html never follows dark mode');
     assert.match(s, /if \(live\(\)\) return !!golfapiLink\(key\)/, 'in the app, GPS READY = GolfAPI has it');
     const pick = s.slice(s.indexOf('function startRound('), s.indexOf('function pickCourse('));
