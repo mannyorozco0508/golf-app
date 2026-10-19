@@ -7,6 +7,7 @@
 // group wrong, the organizer alone in group 1. Now the removed golfer's group shrinks by one (and
 // goes when it empties). A real tap on the row's ✕.
 'use strict';
+if (!require('fs').existsSync(require('path').join(__dirname, 'gps-view.js'))) { console.log('Consumer tree (GPS_ENABLED=0): no GPS-door round - skipped.'); process.exit(0); }
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');

@@ -8,6 +8,7 @@
 // group or more; ticked, the field is exactly the paste. A short paste (three friends) leaves it
 // unticked and "Me" stays. Every step a real tap or keystroke.
 'use strict';
+if (!require('fs').existsSync(require('path').join(__dirname, 'gps-view.js'))) { console.log('Consumer tree (GPS_ENABLED=0): no GPS-door round - skipped.'); process.exit(0); }
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
