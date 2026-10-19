@@ -271,7 +271,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         ['scorebox', 'scoreCol'].forEach((x) => F(a[x] && !a[x].clip, 'L2: the score row is cut off (' + x + '): ' + JSON.stringify(a[x])));
         ['fBig', 'mBig', 'bBig'].forEach((x) => F(a[x] && !a[x].clip, 'L2: ' + x + ' cut off: ' + JSON.stringify(a[x])));
         F(a.mLbl === 'MIDDLE' && parseFloat(a.mFont) >= 44, 'L2: MIDDLE: ' + a.mLbl + ' ' + a.mFont);
-        F(a.plays && a.plays.l >= 0 && a.plays.r <= vw && !a.plays.clip && /^Plays \d+/.test(a.playsText || ''), 'L2: the plays line: ' + JSON.stringify([a.playsText, a.plays]));
+        F(a.plays && a.plays.l >= 0 && a.plays.r <= vw && !a.plays.clip && /^Plays (like )?\d+/.test(a.playsText || ''), 'L2: the plays line (009 "Plays 168: ...", or 012e playsSimple "Plays like 168y"): ' + JSON.stringify([a.playsText, a.plays]));
         F(/251, 191, 36/.test(a.playsColor || ''), 'L2: the plays line is not amber: ' + a.playsColor);
         F(/^±\d+ yds$/.test(a.accText || '') && a.acc && a.plays && a.acc.t >= a.plays.b - 1, 'L2: the accuracy line: ' + a.accText);
         const acts = [a.green, a.hz, a.mark, a.fly].filter(Boolean);
@@ -341,7 +341,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         if (d1 && d1.sheetOn) f(d1.side === 'gps' && d1.sheet && /^Hole 4 /.test(d1.sheet.title || '') && d1.sheet.player === '101', tag + ' E3: the score button did not open the score sheet for hole 4 over the map: ' + JSON.stringify(d1));
         else f(d1 && d1.side === 'bets' && d1.focus && d1.focus.hole === '4' && d1.focus.player === '101', tag + ' E3: the score button did not open the card\'s box for hole 4: ' + JSON.stringify(d1));
         const want4 = expectChip(r0, DELTAS.concat([5 - r0.courseData.slice().sort((x, y) => x.hole - y.hole)[3].par]));
-        f(sheetOn || (d2 && d2.chipText === want4), tag + ' E3: after a score on hole 4 the chip says ' + JSON.stringify(d2 && d2.chipText) + ', expected ' + JSON.stringify(want4));
+        f(d2 && d2.chipText === want4, tag + ' E3: after a score on hole 4 the chip says ' + JSON.stringify(d2 && d2.chipText) + ', expected ' + JSON.stringify(want4));
         errs(s, tag + ' E3');
         // E4: the OSM credit (010): a GolfAPI hole shaped by an OSM line.
         s = await go({ phone, hole: 13, at: GA.courses.CHK1.h[13].t.b, cfg: Object.assign({ osm: false, live: true, golfapi: true, golfapiFile: 'gps-golfapi-check.js' }, ESRI), pre: 'window.HardPanGolfApi = ' + JSON.stringify(GA) + ';',

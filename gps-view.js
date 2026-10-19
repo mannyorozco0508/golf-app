@@ -5218,8 +5218,10 @@
         +   'background:rgba(11,15,12,.92);color:#fff;font-weight:800;text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.4);}'
         + '#gps-overlay.gps-ld .gps-pill-to::after,#gps-overlay.gps-ld .gps-pill-on::after{content:attr(data-u);font-size:.6em;margin-left:1px;}'
         // THE TOOLS SHEET (012, switch toolsSheet): layouts D and C only.
+        // A tall sheet (big text, SE, the score sheet's extra switch) stops 48px under the top bar: a strip
+        // of the dimmed map always shows, to tap outside.
         + '#gps-overlay .gps-ts-back{position:absolute;z-index:47;left:0;right:0;bottom:0;top:var(--gps-bar-b,0px);background:rgba(0,0,0,.35);}'
-        + '#gps-overlay .gps-tsheet{position:absolute;z-index:49;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;max-height:calc(100% - var(--gps-bar-b,0px));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;'
+        + '#gps-overlay .gps-tsheet{position:absolute;z-index:49;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;max-height:calc(100% - var(--gps-bar-b,0px) - 48px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;'
         +   'padding:0 16px calc(env(safe-area-inset-bottom) + 16px);background:#0f1511;border-radius:24px 24px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.45);color:#f4f4ef;font-family:' + FONT + ';transition:transform .15s ease-out;}'
         + '#gps-overlay .gps-ts-head{position:sticky;top:0;z-index:1;background:#0f1511;padding:10px 0 4px;touch-action:none;cursor:grab;}'
         + '#gps-overlay .gps-ts-grip{display:block;width:40px;height:5px;border-radius:3px;background:rgba(244,244,239,.4);margin:0 auto 10px;}'

@@ -577,7 +577,8 @@ function CFG(o) {
     // THE OLD LAYOUT (011 / 012): this check plays the original GPS screen, which still ships with
     // the layout switches off. Layouts C and D and the sheets that come with them have their own
     // checks (tools/gps-layout-c-check.js, tools/gps-layout-d-check.js, tools/gps-score-sheet-check.js).
-    c.features = Object.assign({ gpsLayoutC: false, gpsRoundScore: false, gpsLayoutD: false, scoreSheet: false, toolsSheet: false }, o.features || {});
+    // 012e: the 009 plays rules too (one line with its breakdown, one elevation, no bag altitude, no "my cell").
+    c.features = Object.assign({ gpsLayoutC: false, gpsRoundScore: false, gpsLayoutD: false, scoreSheet: false, toolsSheet: false, playsSimple: false, elevPerLeg: false, bagAltitude: false, elevMyCell: false }, o.features || {});
     return `Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return ${JSON.stringify(c)}; }, set: function () {} });`
         + iapStub({ active: o.iapActive !== false, buy: o.buy || 'ok', key: false });
 }
@@ -1481,7 +1482,7 @@ function usgsFallbackFails(tag, g, why) {
     // round with no data rightly stays on the Card. The flow is checked on the
     // build 10 data path (OSM on, live off): what it tests is the landing and the
     // scoring, not where the greens come from (gps_live_app_test.js does that).
-    const OSM_PATH = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false,features:Object.assign({},v&&v.features,{gpsLayoutC:false,gpsRoundScore:false,gpsLayoutD:false,scoreSheet:false,toolsSheet:false})});}});})();"
+    const OSM_PATH = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false,features:Object.assign({},v&&v.features,{gpsLayoutC:false,gpsRoundScore:false,gpsLayoutD:false,scoreSheet:false,toolsSheet:false,playsSimple:false,elevPerLeg:false,bagAltitude:false,elevMyCell:false})});}});})();"
         // ... as a subscriber (paid launch): the shipped config's iap is ON; the App Store stubbed, active.
         + iapStub({ active: true });
     const typeScore = (d) => [{ cdp: { method: 'Input.insertText', params: { text: d } } }, { sleep: 350 }];
