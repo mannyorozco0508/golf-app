@@ -444,15 +444,19 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // confirms the setup is back (uiToast - a receipt of the restore that happened).
         // Those two live inside GPS blocks, so a Consumer build (tools/gps-flag-tree.js) has 66.
         // HardPan: 68 here AND exactly 66 once the GPS blocks are stripped (proves both are GPS-only).
+        // 69 SINCE URGENT-011 (2026-10-19, was 68; Consumer 67, was 66): saveSettings
+        // refuses a roster with two golfers of one name - "Two golfers named Matt:
+        // add a last initial. Save waits until the names differ." - a refusal,
+        // because nothing is written, and in both builds.
         const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
-        const want = GPS ? 68 : 66;
+        const want = GPS ? 69 : 67;
         assert.equal(refuse + fail + toast, want,
             'the alerts should still be ' + want + ' messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         if (GPS) {
             const off = codeOf(require('./tools/gps-flag.js').applyFlag(ADMIN, false));
             const m = (k) => (off.match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
-            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 66, 'the Consumer build of admin.html says 66');
+            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 67, 'the Consumer build of admin.html says 67');
             assert.deepEqual([refuse - m('uiRefuse'), fail - m('uiFail'), toast - m('uiToast')], [0, 1, 1], 'the two GPS-only ones: one failure, one receipt');
         }
         // Receipts are the minority and always will be: most of what a setup
