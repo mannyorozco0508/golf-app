@@ -22,12 +22,10 @@
 // BET, stored in sideMatches with teamAIds/teamBIds like Match Play and Nassau, and
 // its points are whole.
 //
-// NET. "Net uses the round's handicap strokes per hole": getStrokes(hcpIndex,
-// parseHcp(p.hcp)) from handicap.js - the strokes the card gives each golfer on
-// each hole, the same allocation the 2v2 Stroke Play side bet and the round-format
-// Hi-Lo use. NOT the match-play "off the low man" relative allocation that 2v2
-// Match Play / Nassau use (match-engine.js). That is a real choice and it is
-// flagged for Manny in the 016 report; it is one line (strokesFor) here.
+// NET (Manny, Oct 19): strokes OFF THE LOWEST HANDICAP IN THE MATCH, exactly as 2v2
+// Match Play / Nassau give them (handicap.js matchHandicapBaseline over all four
+// golfers, then allocateMatchStrokes of each golfer's difference from it). The
+// lowest golfer plays off zero; his own partner still receives the difference.
 //
 // A HOLE A GOLFER DOES NOT FINISH. The rule every other 2v2 bet in this app uses
 // (match-engine.js best ball, calculateOverallBetEngine's side best ball, and the
@@ -50,18 +48,18 @@
     function firstName(p) { return String((p && p.name) || '').trim().split(/\s+/)[0]; }
 
     // Strokes a golfer receives on one hole. Gross: none.
-    function strokesFor(p, hole, scoring) {
+    function strokesFor(p, hole, scoring, base) {
         if (scoring !== 'net') return 0;
-        if (typeof root.getStrokes !== 'function' || typeof root.parseHcp !== 'function') return 0;
-        return root.getStrokes(hole.hcpIndex, root.parseHcp(p.hcp));
+        if (typeof root.allocateMatchStrokes !== 'function' || typeof root.parseHcp !== 'function') return 0;
+        return root.allocateMatchStrokes(root.parseHcp(p.hcp) - (base || 0), hole.hcpIndex);
     }
 
     // The posted scores of one side on one hole, net or gross, ascending.
-    function sideScores(side, hole, scores, scoring) {
+    function sideScores(side, hole, scores, scoring, base) {
         var out = [];
         (side || []).forEach(function (p) {
             var v = scores['p' + p.id + '_h' + hole.hole];
-            if (v && Number(v) > 0) out.push(parseInt(v, 10) - strokesFor(p, hole, scoring));
+            if (v && Number(v) > 0) out.push(parseInt(v, 10) - strokesFor(p, hole, scoring, base));
         });
         return out.sort(function (a, b) { return a - b; });
     }
@@ -93,9 +91,13 @@
             played: 0, holesInRange: (holes || []).length, complete: false,
             holeLog: {}, stake: stake, scoring: scoring
         };
+        // ONE baseline for the whole match (the lowest handicap of all four).
+        var base = (scoring === 'net' && typeof root.matchHandicapBaseline === 'function')
+            ? root.matchHandicapBaseline(teamA.concat(teamB)) : 0;
+        r.baseline = base;
         (holes || []).forEach(function (h) {
-            var a = sideScores(teamA, h, scores, scoring);
-            var b = sideScores(teamB, h, scores, scoring);
+            var a = sideScores(teamA, h, scores, scoring, base);
+            var b = sideScores(teamB, h, scores, scoring, base);
             if (a.length === 0 || b.length === 0) return;   // not played by both sides
             r.played += 1;
             var aLow = a[0], bLow = b[0];

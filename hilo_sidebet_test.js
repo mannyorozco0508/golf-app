@@ -458,3 +458,24 @@ describe('5. NEW ACTION offers it, 2v2, $ a point, no presses (sidematches.html)
         assert.equal(C.challengeTermsRefuse({ format: 'hilo', stake: 5, startHole: 1 }), 'Pick Match Play, Nassau or Stroke Play.');
     });
 });
+
+// NET OFF THE LOWEST HANDICAP IN THE MATCH (Manny, Oct 19) - like 2v2 Match Play / Nassau.
+// Bob 2, Manny 12 | Carp 8, Scott 20 on a stroke-index-1 hole: baseline 2, so Bob gets 0,
+// Manny 1 (10 rel), Carp 1 (6 rel), Scott 1 (18 rel). Gross 4/6 | 5/6 -> net 4/5 | 4/5:
+// both points are a wash. With full course strokes (Bob 1, Scott 2) it would have been
+// low A, high B - so this hole tells the two rules apart.
+describe('Hi-Lo net strokes come off the lowest handicap in the match', () => {
+    test('one baseline for all four; the low golfer plays off zero; washes as hand-checked', () => {
+        const sb = load();
+        const A = [{ id: 1, name: 'Bob', hcp: '2' }, { id: 2, name: 'Manny', hcp: '12' }];
+        const B = [{ id: 3, name: 'Carp', hcp: '8' }, { id: 4, name: 'Scott', hcp: '20' }];
+        const holes = [{ hole: 1, par: 4, hcpIndex: 1 }];
+        const scores = { p1_h1: 4, p2_h1: 6, p3_h1: 5, p4_h1: 6 };
+        const r = J(sb.calculateHiLoSideMatch(A, B, holes, scores, { scoring: 'net', stake: 5 }));
+        assert.equal(r.baseline, 2);
+        assert.deepEqual([r.lowA, r.lowB, r.highA, r.highB], [0, 0, 0, 0]);
+        assert.equal(r.toSideA, 0);
+        const g = J(sb.calculateHiLoSideMatch(A, B, holes, scores, { scoring: 'gross', stake: 5 }));
+        assert.deepEqual([g.lowA, g.lowB, g.highA, g.highB], [1, 0, 0, 0], 'gross: Bob 4 beats Carp 5; high 6-6 wash');
+    });
+});
