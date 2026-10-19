@@ -9361,7 +9361,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
     function applyFlightSplit() {
         const cut = flightSplitCutoffNow();
-        if (cut == null) { uiRefuse('Type a handicap for the cutoff \u2014 A is up to that number, B is above it.'); return; }
+        // SAID INLINE, under the box (the preview line), not in a dialog.
+        if (cut == null) { refreshFlightSplitPreview(); const i = document.getElementById('flights-split-cutoff'); if (i && i.focus) i.focus(); return; }
         document.querySelectorAll('.player-row').forEach(row => {
             const btn = row.querySelector('.p-flight-input');
             if (!btn || flightHandSet.has(String(playerIdOfRow(row)))) return;
