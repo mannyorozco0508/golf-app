@@ -12,6 +12,11 @@ const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { makeCourseData } = require('./helpers/fixtures.js');
 const R = require('./roster-paste.js');
+// ?step=players opens an existing round's Players step through the HardPan front door
+// (front-door.js, GPS only). A Consumer build (tools/gps-flag-tree.js) opens an existing round
+// on the Review, and its organizer reaches Players by the Review's own "Edit" - a real tap too.
+const TO_PLAYERS = require('fs').existsSync(require('path').join(__dirname, 'gps-view.js')) ? []
+    : [{ tap: '.wizard-edit-link[onclick="goToWizardStep(5)"]' }, { sleep: 600 }];
 
 const CD = makeCourseData(18);
 const HCPS = ['+2', '3', '5', '8', '12', '15', '18', '22'];
@@ -28,7 +33,7 @@ const READ = `JSON.stringify({
     count: (document.getElementById('flights-count') || {}).textContent,
     rows: Array.prototype.map.call(document.querySelectorAll('#player-list .player-row'), function (r) { var f = r.querySelector('.p-flight-input'); return [(r.querySelector('.p-name-input') || {}).value, (r.querySelector('.p-hcp-input') || {}).value, f ? f.getAttribute('data-flight') : null]; }) })`;
 async function run(url, db, steps) {
-    const r = await arriveCold({ url, db, settleMs: 3000, viewport: { width: 393, height: 852 }, preScript: 'window.__hardpanDoors = true;', steps: [{ sleep: 1500 }].concat(steps) });
+    const r = await arriveCold({ url, db, settleMs: 3000, viewport: { width: 393, height: 852 }, preScript: 'window.__hardpanDoors = true;', steps: [{ sleep: 1500 }].concat(TO_PLAYERS, steps) });
     assert.equal(r.ok, true, r.reason);
     return r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 }

@@ -26,6 +26,11 @@ const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+// GPS-ONLY BY DESIGN: this code lives in GPS:BEGIN/END blocks (admin.html, index.html) and GPS
+// files (front-door.js, home.html), so a Consumer tree (tools/gps-flag-tree.js) skips these cases
+// and checks instead that none of it is left in the Consumer build.
+const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
+const GPS_ONLY = GPS ? {} : { skip: 'Consumer tree: GPS-only (GPS blocks / GPS files)' };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const ADMIN = read('admin.html');
 const SLOW_MS = Number((ADMIN.match(/const SAVE_SLOW_MS = (\d+);/) || [])[1]) || 3000;
@@ -70,7 +75,7 @@ const PAYLOAD = () => ({ courseName: 'Dobson Ranch Golf Course', activeCourseKey
     players: Array.from({ length: 20 }, (_, i) => ({ id: 'p' + i, name: 'Golfer ' + (i + 1), hcp: String(i) })),
     moneyPool: { enabled: true }, flights: { on: true } });
 
-describe('front-door.js holdRound / sendHeld: the round lives on the phone until the server has it', () => {
+describe('front-door.js holdRound / sendHeld: the round lives on the phone until the server has it', GPS_ONLY, () => {
     test('held, killed, reopened with no signal: the round is on the phone and Resume points at it', () => {
         const mem = new Map();
         const a = home(mem, { offline: true });
@@ -188,7 +193,7 @@ function pageReadyToSave(o) {
 const queueOf = (sb) => JSON.parse(sb.localStorage.getItem('golfapp_wq_v1') || '[]');
 
 describe('admin.html Save & Start: saved on this phone before the network write', () => {
-    test('with no signal: the round is queued at once, and after the threshold the button says no signal - saved on this phone', { timeout: SLOW_MS + 3000 }, async () => {
+    test('with no signal: the round is queued at once, and after the threshold the button says no signal - saved on this phone', Object.assign({ timeout: SLOW_MS + 3000 }, GPS_ONLY), async () => {
         const sb = pageReadyToSave({});
         const conn = sb.__dbHandlers.filter((h) => h.path === '.info/connected');
         assert.equal(conn.length, 1, 'the page watches its own socket');
@@ -219,7 +224,7 @@ describe('admin.html Save & Start: saved on this phone before the network write'
     });
 });
 
-describe('the scorecard sends nothing of a held round ahead of it (source pins, index.html is pinned outside GPS blocks)', () => {
+describe('the scorecard sends nothing of a held round ahead of it (source pins, index.html is pinned outside GPS blocks)', GPS_ONLY, () => {
     const idx = read('index.html');
     const gps = idx.split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
     test('its drain skips this round while the round itself is held', () => {
@@ -237,4 +242,8 @@ describe('the scorecard sends nothing of a held round ahead of it (source pins, 
         const h = read('home.html');
         assert.ok(h.indexOf('<script src="offline-queue.js"></script>') !== -1 && h.indexOf('<script src="offline-queue.js"></script>') < h.indexOf('<script src="front-door.js"></script>'));
     });
+});
+
+test('Consumer build: no held-round code is left in admin.html or index.html', { skip: GPS ? 'HardPan tree: covered above' : false }, () => {
+    ['admin.html', 'index.html'].forEach((f) => assert.ok(!/holdRound|heldFor|HardPanDoors|saved on this phone/.test(read(f)), f));
 });

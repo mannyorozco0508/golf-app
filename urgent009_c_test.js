@@ -7,9 +7,13 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
+// The GPS screen, the front door and the Side Matches hand-back are HardPan (GPS files / GPS
+// blocks): those suites skip in a Consumer tree (tools/gps-flag-tree.js); the wording suite runs in both.
+const GPS = fs.existsSync(path.join(__dirname, 'gps-view.js'));
+const SKIP = GPS ? {} : { skip: 'Consumer tree: GPS screen / front door / Side Matches hand-back are HardPan only' };
 const between = (s, a, b) => { const i = s.indexOf(a); assert.ok(i >= 0, 'missing: ' + a); const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? undefined : j); };
 
-describe('013-4: a game added from the GPS Games pill comes back to the GPS', () => {
+describe('013-4: a game added from the GPS Games pill comes back to the GPS', SKIP, () => {
     test('the Games pill shows the card without remembering "bets" as the side this round left on', () => {
         const h = between(read('gps-view.js'), "on(el, '.gps-door-games'", "on(el, '.gps-ag-back'");
         assert.match(h, /showSide\('bets', \{ remember: false \}\)/);
@@ -21,8 +25,8 @@ describe('013-4: a game added from the GPS Games pill comes back to the GPS', ()
     });
 });
 
-describe('013-5 / 013-12: Side Matches Save goes back to the round', () => {
-    const fd = read('front-door.js'), sm = read('sidematches.html');
+describe('013-5 / 013-12: Side Matches Save goes back to the round', SKIP, () => {
+    const fd = GPS ? read('front-door.js') : '', sm = read('sidematches.html');
     test('Add a game hands Side Matches &hpback=1 (All games rows; the Nassau quick start is gone, URGENT-010)', () => {
         assert.match(fd, /'sidematches\.html' \+ base \+ '&add=1' \+ \(g\.fmt \? '&fmt=' \+ g\.fmt : ''\) \+ '&hpback=1'/);
         // the Presses list is a list, not a Save: no hpback
@@ -61,7 +65,7 @@ describe('013-15: one "Starts on" on the Dots sheet', () => {
     });
 });
 
-describe('013-14: one "+ Add a game" on the card', () => {
+describe('013-14: one "+ Add a game" on the card', SKIP, () => {
     test('Today\'s games adds "+ Add game" only when the round has games (else the GPS-3 strip has it)', () => {
         const f = between(read('front-door.js'), 'function todaysGamesAdd(mount)', 'function agList()');
         assert.match(f, /if \(card && !hasGames\(agRound\(\)\)\) \{[^}]*removeChild[^}]*\}/);
@@ -69,8 +73,8 @@ describe('013-14: one "+ Add a game" on the card', () => {
     });
 });
 
-describe('013-13 / 013-19: Players first', () => {
-    const f = between(read('front-door.js'), 'function agNeedBanner(nx)', 'function agOpenPool()');
+describe('013-13 / 013-19: Players first', SKIP, () => {
+    const f = GPS ? between(read('front-door.js'), 'function agNeedBanner(nx)', 'function agOpenPool()') : '';
     test('the banner stays on screen while golfers are typed below it (sticky)', () => {
         assert.match(f, /box\.style\.cssText = '[^']*position:sticky; top:0;/);
     });
@@ -84,8 +88,8 @@ describe('013-13 / 013-19: Players first', () => {
     });
 });
 
-describe('013-17: the round\'s creator is not asked "Who are you?"', () => {
-    const g = read('gps-view.js');
+describe('013-17: the round\'s creator is not asked "Who are you?"', SKIP, () => {
+    const g = GPS ? read('gps-view.js') : '';
     test('creatorHere is the uid that made the round, nothing else', () => {
         const f = between(g, 'function creatorHere(d)', '\n    }\n');
         assert.match(f, /d\.ownerUid && String\(d\.ownerUid\) === String\(uid\)/);

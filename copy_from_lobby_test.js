@@ -201,7 +201,15 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         // 'draft' JOINED 2026-10-18 (URGENT-009, 013-9): Home's "Resume your unsaved round
         // setup?" opens admin.html?game=CODE&draft=1, and the page puts back the setup kept
         // on this phone for that code. Built by the app, read on arrival, GPS block only.
-        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'draft', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'step', 'trip']);
+        // So a Consumer build (tools/gps-flag-tree.js) reads every param but 'draft'; HardPan reads
+        // 'draft' too, and ONLY inside a GPS block (gone once the blocks are stripped).
+        const GPS = fs.existsSync(path.join(__dirname, 'gps-view.js'));
+        const SHARED = ['account', 'coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'step', 'trip'];
+        assert.deepEqual([...new Set(reads)].sort(), GPS ? [...SHARED, 'draft'].sort() : SHARED);
+        if (GPS) {
+            const off = require('./tools/gps-flag.js').applyFlag(ADMIN, false);
+            assert.deepEqual([...new Set([...off.matchAll(/urlParams\.get\('([A-Za-z]+)'\)/g)].map(m => m[1]))].sort(), SHARED, "'draft' is read only inside a GPS block");
+        }
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

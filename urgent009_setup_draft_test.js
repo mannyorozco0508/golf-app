@@ -20,6 +20,11 @@ const path = require('path');
 const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+// GPS-ONLY BY DESIGN: this code lives in GPS:BEGIN/END blocks (admin.html, index.html) and GPS
+// files (front-door.js, home.html), so a Consumer tree (tools/gps-flag-tree.js) skips these cases
+// and checks instead that none of it is left in the Consumer build.
+const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
+const GPS_ONLY = GPS ? {} : { skip: 'Consumer tree: GPS-only (GPS blocks / GPS files)' };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function page(search, seed) {
@@ -45,7 +50,7 @@ function buildSetup(sb) {
 }
 const draftOf = (sb) => JSON.parse(sb.localStorage.getItem('hardpan_setup_draft_v1') || 'null');
 
-describe('KEPT: Save\'s own record, from a dry run that does nothing else', () => {
+describe('KEPT: Save\'s own record, from a dry run that does nothing else', GPS_ONLY, () => {
     test('a setup with a course and golfers is kept, and the dry run writes nothing, asks nothing, leaves the button and the roster memory alone', () => {
         const sb = page('?game=DRAFT1');
         buildSetup(sb);
@@ -94,7 +99,7 @@ describe('KEPT: Save\'s own record, from a dry run that does nothing else', () =
     });
 });
 
-describe('BACK: ?draft=1 puts the draft back, as a new round', () => {
+describe('BACK: ?draft=1 puts the draft back, as a new round', GPS_ONLY, () => {
     test('the course and the golfers come back, and the round is still created as new', async () => {
         const a = page('?game=DRAFT6');
         buildSetup(a);
@@ -121,8 +126,8 @@ describe('BACK: ?draft=1 puts the draft back, as a new round', () => {
     });
 });
 
-describe('OFFERED and ASKED (front-door.js, admin.html)', () => {
-    const fd = read('front-door.js');
+describe('OFFERED and ASKED (front-door.js, admin.html)', GPS_ONLY, () => {
+    const fd = GPS ? read('front-door.js') : '';
     const admin = read('admin.html');
     const gps = admin.split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
     test('Home and Games: "Resume your unsaved round setup?" with Discard; Start a round asks before minting a code', () => {
@@ -143,4 +148,9 @@ describe('OFFERED and ASKED (front-door.js, admin.html)', () => {
         assert.ok(dry > 0 && dry < fn.indexOf('const placeholderNames') && dry < fn.indexOf('const saveChain'));
         assert.match(fn, /\/\/ GPS:BEGIN\s*\n\s*\/\/ A DRAFT, NOT A SAVE/);
     });
+});
+
+test('Consumer build: no setup-draft code is left in admin.html', { skip: GPS ? 'HardPan tree: covered above' : false }, () => {
+    const a = read('admin.html');
+    assert.ok(!/hardpan_setup_draft_v1|urlParams\.get\('draft'\)|hpDry|Leave round setup\?/.test(a));
 });

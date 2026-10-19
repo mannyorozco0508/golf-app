@@ -17,6 +17,11 @@ const path = require('path');
 const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+// GPS-ONLY BY DESIGN: this code lives in GPS:BEGIN/END blocks (admin.html, index.html) and GPS
+// files (front-door.js, home.html), so a Consumer tree (tools/gps-flag-tree.js) skips these cases
+// and checks instead that none of it is left in the Consumer build.
+const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
+const GPS_ONLY = GPS ? {} : { skip: 'Consumer tree: GPS-only (GPS blocks / GPS files)' };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function lobby(o) {
@@ -34,7 +39,7 @@ function lobby(o) {
 }
 
 describe('Start a round with no signal', () => {
-    test('the socket says it is down: "No signal - try again when you have a connection", once, nothing started', { timeout: 3000 }, async () => {
+    test('the socket says it is down: "No signal - try again when you have a connection", once, nothing started', Object.assign({ timeout: 3000 }, GPS_ONLY), async () => {
         const sb = lobby({ socket: false });
         vm.runInContext("selectHomeWidget('quick')", sb);
         await wait(300);
@@ -44,7 +49,7 @@ describe('Start a round with no signal', () => {
         assert.ok(!/saved on this phone/.test(sb.__alerts[0]), 'it is not saved: a round cannot start without a code');
         assert.equal(sb.__navigated, null);
     });
-    test('the phone says it is offline: the same words', { timeout: 3000 }, async () => {
+    test('the phone says it is offline: the same words', Object.assign({ timeout: 3000 }, GPS_ONLY), async () => {
         const sb = lobby({ offline: true });
         vm.runInContext("selectHomeWidget('quick')", sb);
         await wait(300);
@@ -58,4 +63,8 @@ describe('Start a round with no signal', () => {
         assert.match(sb.__alerts[0], /NOT CREATED/);
         assert.ok(!/signal|network/i.test(sb.__alerts[0]));
     });
+});
+
+test('Consumer build: no "No signal" Start-a-round words are left in admin.html', { skip: GPS ? 'HardPan tree: covered above' : false }, () => {
+    assert.ok(!/No signal - try again when you have a connection/.test(read('admin.html')));
 });

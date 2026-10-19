@@ -442,9 +442,19 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // SIGNAL fails in its own words ("No signal - try again when you have a
         // connection", uiFail - nothing was created), and Resume your unsaved round setup
         // confirms the setup is back (uiToast - a receipt of the restore that happened).
-        assert.equal(refuse + fail + toast, 68,
-            'the alerts should still be 68 messages, got '
+        // Those two live inside GPS blocks, so a Consumer build (tools/gps-flag-tree.js) has 66.
+        // HardPan: 68 here AND exactly 66 once the GPS blocks are stripped (proves both are GPS-only).
+        const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
+        const want = GPS ? 68 : 66;
+        assert.equal(refuse + fail + toast, want,
+            'the alerts should still be ' + want + ' messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
+        if (GPS) {
+            const off = codeOf(require('./tools/gps-flag.js').applyFlag(ADMIN, false));
+            const m = (k) => (off.match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
+            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 66, 'the Consumer build of admin.html says 66');
+            assert.deepEqual([refuse - m('uiRefuse'), fail - m('uiFail'), toast - m('uiToast')], [0, 1, 1], 'the two GPS-only ones: one failure, one receipt');
+        }
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
         assert.ok(toast < refuse, 'more things float than refuse: ' + toast + ' vs ' + refuse);

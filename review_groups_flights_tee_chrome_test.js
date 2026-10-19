@@ -9,6 +9,11 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { makeCourseData } = require('./helpers/fixtures.js');
+// ?step=players opens an existing round's Players step through the HardPan front door
+// (front-door.js, GPS only). A Consumer build (tools/gps-flag-tree.js) opens an existing round
+// on the Review, and its organizer reaches Players by the Review's own "Edit" - a real tap too.
+const TO_PLAYERS = require('fs').existsSync(require('path').join(__dirname, 'gps-view.js')) ? []
+    : [{ tap: '.wizard-edit-link[onclick="goToWizardStep(5)"]' }, { sleep: 600 }];
 
 const CD = makeCourseData(18);
 const TEES = { male: [{ name: 'Blue', slope: 130, rating: 71.2, parTotal: 72 }, { name: 'White', slope: 125, rating: 69.5, parTotal: 72 }] };
@@ -25,7 +30,7 @@ const LOOK = `JSON.stringify({ step: typeof currentWizardStep !== 'undefined' ? 
     text: ((document.getElementById('wizard-review-summary') || {}).innerText || '').replace(/\\s+/g, ' ').trim() })`;
 
 async function review(code, r, paste) {
-    const steps = [{ sleep: 1500 }];
+    const steps = [{ sleep: 1500 }].concat(TO_PLAYERS);
     if (paste) steps.push({ tap: 'button[onclick="openPastePlayersModal()"]' }, { sleep: 400 },
         { tap: '#paste-players-textarea' }, { cdp: { method: 'Input.insertText', params: { text: paste } } }, { sleep: 500 },
         { tap: '#paste-players-commit-btn' }, { sleep: 800 });
