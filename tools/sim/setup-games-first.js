@@ -428,7 +428,7 @@ const KNOWN = [
     ['HIGH', 'B-weekly-new', 'Flights (A/B) puts all 20 in A; the organizer taps 10 golfers one by one to make B (no "split by handicap").', 'B-weekly-new/10-flights-on.png'],
     ['MEDIUM', 'C-code-gps-new', 'GPS-first: GPS-1 ("Where are you playing?") has no game-code field and puts "YOU\'RE AT Dobson Ranch - SET UP - 1 TAP" first; a golfer at the course who taps it makes his own solo round instead of joining the weekly game (joining needs the GPS | Games switch).', 'C-code-gps-new/02-gps1.png'],
     ['MEDIUM', 'C-code-games-new', 'A golfer who joins without a group (the sheet, Just watching, a spectator) sees "Are you the organizer? Paste your organizer link. Unlock setup" at the top of the card.', 'C-code-games-new/04-how-joining.png'],
-    ['MEDIUM', 'B-weekly-new', 'Flights wording: Players says "Side matches and the Weekly Game never use flights", yet the card shows the Weekly Game\'s skins as "Main Pool Skins - Flight A / Flight B" (money rule question for Manny, not changed).', 'C-code2-games-new/04-card-group2.png'],
+    // (URGENT-010 fixed the flights wording: Players now says the Weekly Game's skins are paid within each flight, matching the card.)
     // (URGENT-009 fixed "tap Open" -> "tap Join" on Round Ready.) Still open: in a one-group round the bare code is a read-only spectator.
     ['MEDIUM', 'B-weekly-new', 'In a one-group round the bare code is still a read-only spectator.', 'B-weekly-new/17-round-ready.png'],
     ['MEDIUM', 'B-weekly-new', 'The Skins card says "Ties carry over." while its default is No Carry.', 'B-weekly-new/15-skins-on.png'],

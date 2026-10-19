@@ -114,7 +114,8 @@ describe('013-12 / 013-20: wording', () => {
         assert.doesNotMatch(a, /Set up who's in on the Action tab/);
         assert.match(a, /every whole-field game \(the Weekly Game too, if you set one up\)\./);
     });
-    test('the two money-wording questions for Manny are untouched', () => {
-        assert.match(a, /Side matches and the Weekly Game never use flights\./);
+    test('URGENT-010: Players says the Weekly Game\'s skins are paid within each flight', () => {
+        assert.match(a, /Side matches never use flights\. The Weekly Game&rsquo;s skins are paid within each flight\.<\/p>/);
+        assert.doesNotMatch(a, /Weekly Game never uses? flights/);
     });
 });

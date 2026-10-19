@@ -7,7 +7,7 @@
 // report listed, plus the two a comment-stripped re-scan found (admin.html's
 // grouping sentence and its flights sentence), now say Weekly Game:
 //   admin.html  the grouping note ("every whole-field game, including the …")
-//               the flights note ("Side matches and the … never use flights")
+//               the flights note ("… the Weekly Game's skins are paid within each flight")
 //               the wizard card's checkbox "🏆 …"
 //               the stacked-skins note ("… already includes its own Skins pot")
 //               ONE_POT_NOTE and SPLIT_NOTE, the v126-approved skins-scope
@@ -54,7 +54,8 @@ describe('EACH OF THE NINE, IN ITS OWN CONTEXT', () => {
     test('admin.html markup: the grouping note, the flights note, the checkbox, the stacked-skins note', () => {
         const s = rendered('admin.html');
         assert.match(s, /every whole-field game \(the Weekly Game too, if you set one up\)\./);
-        assert.match(s, /Side matches and the Weekly Game never use flights\./);
+        assert.match(s, /Side matches never use flights\. The Weekly Game&rsquo;s skins are paid within each flight\./);
+        assert.doesNotMatch(s, /Weekly Game never uses? flights/);
         assert.match(s, /id="mp-enabled" onchange="mpToggle\(\)"> <strong>🏆 Weekly Game<\/strong>/);
         assert.match(s, /<p id="mp-skins-note">Weekly Game already includes its own Skins pot \\u2014 only add this if you want a second, separate skins game\.<\/p>/);
     });
