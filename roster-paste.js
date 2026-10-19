@@ -88,6 +88,87 @@ function splitLeadingFlight(line) {
     return { flight: letter, rest: m[3], notAFlight: false };
 }
 
+// ---- A TRAILING HANDICAP AND FLIGHT (URGENT-004, 2026-10-18) ---------------
+//
+// Manny's Monday list is written handicap-then-flight at the END of each line:
+//
+//     Skeens 2.0/A
+//     Manny +2.0/A
+//     Glenn 12.0/B
+//
+// Before this, none of those read: "/A" is not a number, so BARE_HCP_RE failed and
+// the WHOLE line became the name, with no handicap and no flight - and switching
+// Flights on afterwards put all twenty golfers in A. (No build ever read this
+// form; only a LEADING flight, "A Skeens 2", was understood.)
+//
+// THE FLIGHT IS READ ONLY WHEN A HANDICAP COMES RIGHT BEFORE IT. "Matt B" and
+// "Jim B" stay last initials - the same rule as LEAD_FLIGHT_RE's "never a trailing
+// letter" - because a lone trailing letter is a name. Accepted between the number
+// and the letter: "/", ",", or whitespace (tabs too); the number may be bracketed:
+//     Name 12/B   Name 12 / b   Name, 12, B   Name 12 B   Name (12) B   Name\t12\tB
+// A plus handicap keeps its sign ("+2.0"), the way the app stores one; parseHcp in
+// handicap.js reads "+2" as two strokes given. Same -10..54 range as BARE_HCP_RE.
+const TRAIL_HCP_FLIGHT_RE = /^(.+?)[\s,]+\(?\s*([+-]?\d{1,2}(?:\.\d)?)\s*\)?\s*(?:[\/,]\s*|\s+)([ABab])$/;
+// "Name (12)" - a bracketed handicap with no flight. Read before the note
+// stripper, which would otherwise take "(12)" off the line as a note.
+const TRAIL_PAREN_HCP_RE = /^(.+?)\s*\(\s*([+-]?\d{1,2}(?:\.\d)?)\s*\)$/;
+function splitTrailingHcpFlight(line) {
+    const t = String(line == null ? '' : line).trim();
+    let m = TRAIL_HCP_FLIGHT_RE.exec(t);
+    if (m) {
+        const v = parseFloat(m[2]);
+        if (v >= -10 && v <= 54) return { name: m[1].replace(/[\s,]+$/, '').trim(), hcp: m[2], flight: m[3].toUpperCase() };
+    }
+    m = TRAIL_PAREN_HCP_RE.exec(t);
+    if (m) {
+        const v = parseFloat(m[2]);
+        if (v >= -10 && v <= 54) return { name: m[1].replace(/[\s,]+$/, '').trim(), hcp: m[2], flight: undefined };
+    }
+    return null;
+}
+
+// ROWS THAT ALREADY HOLD A WHOLE LINE AS THEIR NAME (URGENT-004). A list pasted
+// before this fix left "Glenn 12.0/B" in the name box with an empty handicap. When
+// the roster is drawn again (Flights switched on, the step reopened), such a row is
+// split into name / handicap / flight - but ONLY when its handicap box is empty, so
+// a number somebody typed is never replaced. Returns the fixed list (new objects)
+// and how many rows changed; nothing else on a row is touched.
+function fixPastedRows(list) {
+    let fixed = 0, anyFlight = false;
+    const out = (list || []).map(p => {
+        if (!p || String(p.hcp == null ? '' : p.hcp).trim() !== '') return p;
+        const r = splitTrailingHcpFlight(p.name);
+        if (!r || !r.name) return p;
+        fixed++;
+        const q = Object.assign({}, p, { name: r.name, hcp: r.hcp });
+        if (r.flight) { q.flight = r.flight; anyFlight = true; }
+        return q;
+    });
+    return { list: out, fixed, anyFlight };
+}
+
+// SAME NAME TWICE (URGENT-004): two "Matt"s are two golfers - never merged - but
+// the card and the board can't tell them apart, so the review names them and asks
+// for a last initial. Case-insensitive on the whole name; returns [{ name, count }].
+function duplicateRosterNames(list) {
+    const seen = {};
+    (list || []).forEach(p => {
+        const n = String((p && p.name) || '').trim();
+        if (!n) return;
+        const k = n.toLowerCase();
+        (seen[k] = seen[k] || { name: n, count: 0 }).count++;
+    });
+    return Object.keys(seen).map(k => seen[k]).filter(x => x.count > 1);
+}
+function duplicateNamesNote(list) {
+    const d = duplicateRosterNames(list);
+    if (!d.length) return '';
+    const words = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
+    return d.map(x => (words[x.count] || x.count) + ' golfers named ' + x.name).join(', ')
+        .replace(/^./, c => c.toUpperCase())
+        + ' - kept as separate golfers. Add a last initial so the card can tell them apart.';
+}
+
 // ---- A HEADER IS A BOUNDARY, NOT A GOLFER (2026-10-04) -------------------
 //
 // Manny pasted his real 24-golfer list, written the way a tee sheet is written:
@@ -220,6 +301,18 @@ function parsePlayerPasteText(text, teeNames) {
         // with NO handicap, because the note sat between the number and the end
         // of the line. The note is reported rather than dropped silently, so the
         // review says what it ignored.
+        // "Skeens 2.0/A", "Glenn 12 B", "Matt (12) b": a trailing handicap and flight
+        // (URGENT-004). Read first - the note stripper would take "(12)" as a note.
+        const trail = splitTrailingHcpFlight(line);
+        if (trail && trail.name) {
+            const lead = splitLeadingFlight(trail.name);
+            const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
+            const fl = trail.flight || lead.flight;
+            if (fl) tp.flight = fl;
+            validPlayers.push(tp);
+            groups[groups.length - 1]++;
+            return;
+        }
         const noted = (typeof stripTrailingNote === 'function')
             ? stripTrailingNote(line) : { text: line, note: '' };
         if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
@@ -252,7 +345,8 @@ function parsePlayerPasteText(text, teeNames) {
     const flights = anyFlight
         ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
         : null;
-    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights };
+    const duplicates = duplicateRosterNames(validPlayers);
+    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, duplicates };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -265,5 +359,6 @@ if (typeof module !== 'undefined' && module.exports) {
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
     module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
-        splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText };
+        splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
+        TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }
