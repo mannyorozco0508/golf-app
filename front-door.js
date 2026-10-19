@@ -487,7 +487,10 @@
             create(p.key, p.name, p.card, 'bets', p.opts).catch(function (e) { setupSay('Could not start ' + p.name, failWhy(e), { noGps: false }); });
             return;
         }
-        ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false }));
+        // NO GPS, REMEMBERED (URGENT-011, sims bug 6): Round Setup mints the round; the marker
+        // tells admin() to set it up as a scorecard round (no "Start GPS" box) and to keep the
+        // Card side for it, so START SCORING opens the card - never the GPS screen.
+        ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false, nogps: true }));
         W.location.href = 'admin.html?start=quick';
     }
     // ---- THE QUICK-START'S QUESTIONS (gps-oct15): what Round Setup asks, before the round exists ----
@@ -1070,6 +1073,16 @@
         var q = null;
         try { q = JSON.parse(ss(QUICK) || 'null'); } catch (e) { q = null; }
         if (!q || typeof q !== 'object') q = { auto: false };
+        // "Play without GPS (scorecard)" (URGENT-011, sims bug 6): this round is the Card's -
+        // remembered per round the way gps-view.js reads it (hardpan_round_side 'bets|CODE'),
+        // so START SCORING (and Resume) open the scorecard. Round Setup as it is, no GPS box;
+        // the marker is spent, so a later page of this session is not a quick start.
+        if (q.nogps) {
+            var code = params().get('game');
+            if (code) ls('hardpan_round_side', 'bets|' + code);
+            ss(QUICK, null);
+            return;
+        }
         var host = $('admin-screen');
         if (!host || $('fd-quick')) return;
         var box = W.document.createElement('div');
