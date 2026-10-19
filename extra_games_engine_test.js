@@ -85,7 +85,7 @@ test('Vegas: 10+ leads, both birdie = no flip, a hole counts only with all 4 sco
 // on gps-features - byte for byte. The new games live in their own files only.
 const UNCHANGED = {
     'money-engine.js': '12bfa41c2c8e6b8abfd397fbffb9b8606428a9229a605b87ad30fc0f7b51dbf0',
-    'settlement-engine.js': '9f6a4fa7e4def7563a3fa0e48b1930fb5bc1e8f9bab7492ed25726ed14b042f5',
+    'settlement-engine.js': '88c8b8a76c24f6f379668d41420677e4829e766ef01e5dd1cdebdaff580803c4',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
     'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     'match-engine.js': '42bb272d11814cafba0d9ad48322b1b14fbbbfab6677268ce231787f347e7fde',
     'pool-engine.js': '1530a0b955e2e8705748808a79a221a4790fe67419de06fb010cb9f59ec7e153',

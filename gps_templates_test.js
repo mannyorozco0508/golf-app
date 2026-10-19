@@ -39,7 +39,7 @@ test('no money engine, settlement or side-bet file differs from gps-live (acfe6c
     // URGENT-011 (approved, 2026-10-19): the skins carry follows the order played.
     // settlement-engine.js and pool-engine.js moved for that fix ONLY - accepted
     // at exactly these contents, so any other edit still fails here.
-    const APPROVED = { 'settlement-engine.js': '9f6a4fa7', 'pool-engine.js': '1530a0b9' };
+    const APPROVED = { 'settlement-engine.js': '88c8b8a7', 'pool-engine.js': '1530a0b9' };   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
     const sha8 = (f) => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
     changed = changed.split('\n').filter(f => f && !(APPROVED[f] && sha8(f) === APPROVED[f])).join('\n');
     assert.equal(changed, '', 'engine files untouched');
