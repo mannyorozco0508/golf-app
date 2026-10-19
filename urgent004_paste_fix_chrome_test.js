@@ -27,6 +27,7 @@ const DB = {
 const READ = `(function () {
     var rows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
     var note = document.getElementById('roster-fix-note');
+    var dup = document.getElementById('roster-dup-names');
     if (typeof refreshFlightsCount === 'function') refreshFlightsCount();
     return JSON.stringify({
         rows: rows.map(function (r) {
@@ -35,6 +36,8 @@ const READ = `(function () {
         }),
         count: (document.getElementById('flights-count') || {}).textContent || '',
         note: note && note.offsetParent !== null ? note.innerText : '',
+        dup: dup && dup.offsetParent !== null ? dup.innerText : '',
+        dupButtons: dup ? dup.querySelectorAll('.dup-add-initial').length : 0,
         writes: (window.__coldWrites || []).length
     });
 })()`;
@@ -53,7 +56,11 @@ describe("URGENT-004: Manny's 20 rows fix themselves when the round's Players st
         assert.deepEqual(s.rows.filter(x => x[2] === 'B').map(x => x[0]), ['Glenn', 'Marty', 'Scott', 'Eddie', 'Matt', 'Jeremy', 'Matt', 'Crone', 'Todd', 'Jim']);
         assert.equal(s.count, 'A: 10 · B: 10');
         assert.match(s.note, /Fixed 20 golfers' handicaps and flights\./);
-        assert.match(s.note, /Two golfers named Matt, two golfers named Mike/);
+        // The same-name ask sits right under the fix line (URGENT-011): one line per
+        // pair and an "Add initial" button per golfer.
+        assert.match(s.dup, /Two golfers named Matt: add a last initial/);
+        assert.match(s.dup, /Two golfers named Mike: add a last initial/);
+        assert.equal(s.dupButtons, 4);
         assert.equal(s.writes, 0, 'opening the step must not write the round');
     });
 });

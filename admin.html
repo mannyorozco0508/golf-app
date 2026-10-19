@@ -4173,7 +4173,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // wager that is genuinely running.
         Object.entries(captureAdditionalGames()).forEach(([format, cfg]) => {
             const spec = ADDITIONAL_GAME_CATALOG[format];
-            rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}`, 6, SEC_ACTION]);
+            const skinsBits = format === 'skins'
+                ? ` · ${cfg.skinsPotFormat === 'split' ? 'Gross & Net' : (cfg.skinsPotFormat === 'net' ? 'Net' : 'Gross')} · ${skinsCarriesOver(cfg.skinsCarryOver) ? 'Carry Over' : 'No Carry'}`
+                : '';
+            rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}${skinsBits}`, 6, SEC_ACTION]);
         });
         Object.values(captureSkinsInstances()).forEach(cfg => {
             // GPS:BEGIN
@@ -4905,7 +4908,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleStackedGame('${format}', this.checked)" style="width:18px; height:18px; margin:0;">
                     <strong>${spec.icon} ${spec.label}</strong>
                 </label>
-                <p style="font-size:0.7rem; color:var(--text-muted); margin:-2px 0 0 26px;">${spec.blurb}</p>
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:-2px 0 0 26px;"${format === 'skins' ? ' id="stacked-skins-blurb"' : ''}>${format === 'skins' ? stackedSkinsBlurb() : spec.blurb}</p>
                 <div style="margin:8px 0 0 26px; display:${on ? 'block' : 'none'};">
                     <label style="font-size:0.75rem;">${spec.stakeLabel}</label>
                     <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; margin-bottom:4px;">${presetHtml}</div>
@@ -4933,8 +4936,51 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return `<p class="flight-scope-line" style="font-size:0.72rem; color:var(--brand-green); margin:8px 0 0 0;">${text}</p>`;
     }
 
+    // THE STACKED SKINS CARD'S ONE-LINE RULE (URGENT-011). The catalog blurb used
+    // to end "Ties carry over." while the card's default - and what the engine
+    // pays on an untouched game - is NO CARRY. The line is now written from the
+    // same state the save writes: which scores decide a skin, and what a tie does.
+    function stackedSkinsPotFormat() {
+        const st = stackedGameState.skins || {};
+        return (st.potFormat === 'net' || st.potFormat === 'split') ? st.potFormat : 'gross';
+    }
+    function stackedSkinsBlurb() {
+        const st = stackedGameState.skins || {};
+        const pf = stackedSkinsPotFormat();
+        const who = pf === 'net' ? 'Low net score on a hole wins the skin.'
+            : pf === 'split' ? 'Half the pot on gross skins, half on net.'
+            : 'Low gross score on a hole wins the skin.';
+        return who + ' ' + (skinsCarriesOver(st.carryOver)
+            ? 'Ties carry over to the next hole.'
+            : 'No carry: a tied hole pays nobody.');
+    }
+
+    function setSkinsScoring(val) {
+        if (!stackedGameState.skins) stackedGameState.skins = { enabled: true, amount: '' };
+        stackedGameState.skins.potFormat = (val === 'net' || val === 'split') ? val : 'gross';
+        renderStackedGames();
+        updateWizardReview();
+    }
+
     function renderSkinsExtras() {
         const st = stackedGameState.skins || {};
+        const pf = stackedSkinsPotFormat();
+        // Gross / Net: the engine reads skinsPotFormat off the stacked game's
+        // config (resolveSkinsMode -> computeSkinsSettlementNet), so this is a
+        // choice it already pays. 'Gross & Net' is shown ONLY for a reopened game
+        // that was saved split - offered nowhere new, never lost on a re-save.
+        const scoreBtn = (val, label) => `<button type="button" onclick="setSkinsScoring('${val}')"
+                        style="flex:1; min-height:44px; border-radius:8px; font-size:0.8rem; cursor:pointer;
+                               border:1px solid ${pf === val ? 'var(--brand-green)' : 'var(--border-mid)'};
+                               background:${pf === val ? 'var(--brand-green)' : 'transparent'};
+                               color:${pf === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
+        const scoringHtml = `
+            <div style="margin-top:12px;">
+                <label style="font-size:0.75rem;">Scoring</label>
+                <div style="display:flex; gap:6px;">
+                    ${scoreBtn('gross', 'Gross')}${scoreBtn('net', 'Net')}${pf === 'split' ? scoreBtn('split', 'Gross &amp; Net') : ''}
+                </div>
+            </div>`;
         // skinsCarriesOver() decides what an untouched or absent flag means - NO
         // CARRY, the same answer the engine pays. `!== false` here painted Carry
         // Over on a state nobody had set, and the save below wrote it.
@@ -4957,7 +5003,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 ${on ? '\u2713 ' : ''}${escapeHtml(pl.name)}</button>`;
         }).join('');
 
-        return `
+        return `${scoringHtml}
             <div style="margin-top:12px;">
                 <label style="font-size:0.75rem;">Ties</label>
                 <div style="display:flex; gap:6px;">
@@ -5695,6 +5741,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // The catalog default (SKINS_CARRY_DEFAULT, false) is in `entry`
                 // already; `!== false` overwrote it with TRUE on an untouched state.
                 entry.skinsCarryOver = skinsCarriesOver(st.carryOver);
+                // Gross / Net (URGENT-011). Both fields, agreeing - resolveSkinsMode
+                // reads skinsPotFormat first. Untouched = the catalog's gross.
+                entry.skinsPotFormat = stackedSkinsPotFormat();
+                entry.skinsScoring = entry.skinsPotFormat === 'net' ? 'net' : 'gross';
                 // participantIds is written ONLY when the organizer actually narrowed the
                 // field. A whole-group game saves nothing, so it stays byte-identical to
                 // every skins game saved before this feature existed.
@@ -5770,6 +5820,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // A legacy game with no flag was PAID no-carry; reopening it as
                 // Carry Over and re-saving would have restated that money.
                 stackedGameState.skins.carryOver = skinsCarriesOver(saved.skins.skinsCarryOver);
+                // Reopen on the scoring the engine pays for this saved game -
+                // getRoundGames merges the catalog defaults under it, so resolve the
+                // same merge - and a re-save writes that mode back (a net or split
+                // game is never quietly turned gross).
+                const paidAs = Object.assign({}, spec.defaults, saved.skins);
+                stackedGameState.skins.potFormat = (typeof resolveSkinsMode === 'function')
+                    ? resolveSkinsMode(paidAs) : (paidAs.skinsPotFormat || 'gross');
                 if (Array.isArray(saved.skins.participantIds)) {
                     stackedGameState.skins.participantIds = saved.skins.participantIds.map(String);
                 }
@@ -10021,9 +10078,72 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         if (fixText != null) el.setAttribute('data-fix', fixText);
         const fix = el.getAttribute('data-fix') || '';
-        const dup = (typeof duplicateNamesNote === 'function') ? duplicateNamesNote(captureCurrentPlayerInputs()) : '';
-        el.textContent = [fix, dup].filter(Boolean).join(' ');
+        el.textContent = fix;
         el.style.display = el.textContent ? '' : 'none';
+        renderDuplicateNamesBlock();
+    }
+
+    // SAME NAME TWICE IS SETTLED HERE, NOT AT RESULTS (URGENT-011).
+    //
+    // URGENT-004 kept two pasted "Matt"s as two golfers and asked for a last
+    // initial - and nothing made anyone add one, so the round saved and the
+    // Receipt (duplicatePlayerNames in action-model.js, keyed the way every money
+    // total is keyed: trimmed + lowercased) refused to name who pays whom at the
+    // END. The ask now has a button on each golfer, and Save waits until the names
+    // differ. UI only: no golfer is merged, renamed or dropped by the app.
+    function rosterSameNames() {
+        const players = (typeof captureCurrentPlayerInputs === 'function') ? captureCurrentPlayerInputs() : [];
+        if (typeof duplicatePlayerNames === 'function') return duplicatePlayerNames(players);
+        const seen = {};
+        players.forEach((p) => {
+            const k = String((p && p.name) || '').trim().toLowerCase();
+            if (!k) return;
+            (seen[k] = seen[k] || { key: k, name: String(p.name).trim(), count: 0, ids: [] }).count++;
+            seen[k].ids.push(String(p.id));
+        });
+        return Object.keys(seen).map((k) => seen[k]).filter((x) => x.count > 1);
+    }
+    function sameNameLine(d) {
+        const words = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+        return (words[d.count] || d.count) + ' golfers named ' + d.name + ': add a last initial';
+    }
+    function renderDuplicateNamesBlock() {
+        const list = document.getElementById('player-list');
+        if (!list || !list.parentNode) return;
+        let el = document.getElementById('roster-dup-names');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'roster-dup-names';
+            el.className = 'paste-flagged-line';
+            el.setAttribute('role', 'status');
+            list.parentNode.insertBefore(el, list);
+        }
+        const same = rosterSameNames();
+        if (!same.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+        const rows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
+        const hcpOf = (id) => {
+            const r = rows.find((x) => x.getAttribute('data-player-id') === String(id));
+            const h = r && r.querySelector('.p-hcp-input');
+            return h && String(h.value || '').trim() ? ' (' + String(h.value).trim() + ')' : '';
+        };
+        el.innerHTML = same.map((d) => `<div class="dup-name-group" style="margin:2px 0 6px 0;"><b>${escapeHtml(sameNameLine(d))}</b>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">${d.ids.map((id) =>
+                `<button type="button" class="btn-outline dup-add-initial" data-player-id="${escapeHtml(String(id))}" onclick="addInitialFor('${escapeHtml(String(id))}')"
+                    style="min-height:44px; padding:6px 12px; font-size:0.8rem; width:auto;">Add initial · ${escapeHtml(d.name)}${escapeHtml(hcpOf(id))}</button>`).join('')}</div></div>`).join('')
+            + '<div style="font-size:0.75rem;">They stay separate golfers. Save waits until the names differ, so the card and who-pays-who can tell them apart.</div>';
+        el.style.display = '';
+    }
+    // ONE TAP: the golfer's own name box, focused, with a space after the name and
+    // the cursor at the end - the next key typed IS the initial ("Matt S").
+    function addInitialFor(id) {
+        const row = Array.prototype.find.call(document.querySelectorAll('#player-list .player-row'),
+            (r) => r.getAttribute('data-player-id') === String(id));
+        const input = row && row.querySelector('.p-name-input');
+        if (!input) return;
+        input.value = String(input.value || '').trim() + ' ';
+        try { input.focus(); } catch (e) { /* no layout */ }
+        try { const end = input.value.length; input.setSelectionRange(end, end); } catch (e) { /* not supported */ }
+        try { if (input.scrollIntoView) input.scrollIntoView({ block: 'center' }); } catch (e) { /* no layout */ }
     }
     function renderPlayerList(forceLoad = false) {
         const listContainer = document.getElementById("player-list");
@@ -10602,7 +10722,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // SAME NAME TWICE (URGENT-004): kept as two golfers, never merged - said here.
         if (typeof duplicateNamesNote === 'function') {
             const dupNote = duplicateNamesNote(validPlayers);
-            if (dupNote) html += `<div class="paste-flagged-line">\u2139\uFE0F ${escapeHtml(dupNote)}</div>`;
+            // ...and leads into what the roster then asks (URGENT-011): a button per
+            // golfer, and Save waiting until the names differ.
+            if (dupNote) html += `<div class="paste-flagged-line">\u2139\uFE0F ${escapeHtml(dupNote)} After adding, tap \u201CAdd initial\u201D beside each one \u2014 the round won\u2019t save until the names differ.</div>`;
         }
         if (flaggedFlights.length > 0) {
             const lineList = flaggedFlights.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
@@ -12496,7 +12618,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         void baseColumns; void flightColumn;
         row.innerHTML = `
             <button type="button" class="p-drag" aria-label="Move ${escapeHtml(name || 'this golfer')}: drag, or tap for Move up, Move down and Move to group" title="Drag to reorder - tap for more">&#8801;</button>
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}" onchange="typedRowChanged(this)">
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}" onchange="typedRowChanged(this)" oninput="renderDuplicateNamesBlock()">
             <input type="text" class="p-hcp-input" placeholder="${handicapSetupBoxLabel()}" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
             ${squadFieldHtml}
@@ -12977,6 +13099,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                         coachGateState(), coachGateSteps()));
                     if (typeof goToWizardStep === 'function') goToWizardStep(Number(unmet[0].step));
                     if (typeof syncCoachGateNote === 'function') syncCoachGateNote(unmet[0]);
+                    return;
+                }
+            }
+
+            // SAME NAME TWICE (URGENT-011): refused here, with the Players step's
+            // own "Add initial" buttons waiting, rather than saved and refused at
+            // Results. Not in the draft dry run (hpDraftRecord), which must keep
+            // the whole round while the organizer is still fixing a name.
+            if (typeof hpDry === 'undefined' || !hpDry) {
+                const same = rosterSameNames();
+                if (same.length) {
+                    uiRefuse('\u26A0\uFE0F ' + same.map(sameNameLine).join('. ') + '. Save waits until the names differ.');
+                    if (typeof goToWizardStep === 'function') goToWizardStep(WIZARD_STEP_OF.players);
+                    renderDuplicateNamesBlock();
                     return;
                 }
             }
