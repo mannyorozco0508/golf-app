@@ -233,7 +233,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
     f(rm1.open, '5b: ≡ Add a game did not open the sheet');
     f(/Team A: Manny Orozco & Joe Russo/.test(rm2.text) && /Add Nassau · \$10 each/.test(rm2.cta), '5b: Nassau config: ' + JSON.stringify([rm2.cta, rm2.text.slice(0, 300)]));
     const qb = JSON.parse(rm3.q || '{}').bets || [];
-    f(/sidematches\.html\?game=FDRND4&hpfill=1$/.test(rm3.url) && qb.length === 1 && qb[0].a.join() === 'Manny Orozco,Joe Russo' && qb[0].b.join() === 'Mike Dunn,Dave Kirk' && qb[0].front === 10 && qb[0].overall === 10, '5b: Add Nassau did not hand Side Bets the bet: ' + JSON.stringify([rm3.url, qb]));
+    f(/sidematches\.html\?game=FDRND4&hpfill=1&hpback=1$/.test(rm3.url) && qb.length === 1 && qb[0].a.join() === 'Manny Orozco,Joe Russo' && qb[0].b.join() === 'Mike Dunn,Dave Kirk' && qb[0].front === 10 && qb[0].overall === 10, '5b: Add Nassau did not hand Side Bets the bet: ' + JSON.stringify([rm3.url, qb]));
     r = await go({ url: fileUrl('sidematches.html', 'game=FDRND4&hpfill=1'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR + "try{localStorage.setItem('hardpan_paste_bets_v1_FDRND4'," + JSON.stringify(rm3.q || '') + ")}catch(e){}", steps: [
         { sleep: 1500 }, { expression: "JSON.stringify({ modal: getComputedStyle(document.getElementById('sidematch-modal')).display, fmt: document.getElementById('sm-format').value, front: document.getElementById('sm-front-stake').value, picks: typeof sidematchPickOrder !== 'undefined' ? sidematchPickOrder.map(String) : null, left: localStorage.getItem('hardpan_paste_bets_v1_FDRND4'), e: window.__e })" }] });
     report.smFill = J(r)[0];
@@ -255,7 +255,7 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, money: WIZARD_STEP_OF.action, skins: skinsInstances.map(function (s) { return s.skinsBuyIn; }), e: window.__e })" }] });
     report.tplSkinsPlain = J(r)[0];
     f(report.tplSkinsPlain.step === report.tplSkinsPlain.money && (report.tplSkinsPlain.skins || []).join() === '2', '5c: a plain Skins template is no longer $2: ' + JSON.stringify(report.tplSkinsPlain));
-    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money&pool=1$/,   // &pool=1: the Weekly Game section open (URGENT-001)
+    const ALL = { match: /sidematches\.html\?game=FDRND4&add=1&fmt=match&hpback=1$/, bestball: /admin\.html\?game=FDRND4&fmt=bestball$/, kp: /admin\.html\?game=FDRND4&step=money&pool=1$/,   // &pool=1: the Weekly Game section open (URGENT-001)
         wolf: /admin\.html\?game=FDRND4&tpl=wolf$/, presses: /sidematches\.html\?game=FDRND4$/ };
     report.allGames = {};
     for (const id of Object.keys(ALL)) {
@@ -268,6 +268,18 @@ const VIEW = "JSON.stringify({ url: document.URL, view: (document.querySelector(
         { sleep: 1000 }, { expression: "JSON.stringify({ modal: getComputedStyle(document.getElementById('sidematch-modal')).display, fmt: document.getElementById('sm-format').value, e: window.__e })" }] });
     report.smMatch = J(r)[0];
     f(report.smMatch.modal === 'flex' && report.smMatch.fmt === 'match' && !report.smMatch.e.length, '5c: Match play did not open Side Bets on Match play: ' + JSON.stringify(report.smMatch));
+    // URGENT-009 (013-5 / 013-15): from Add a game (&hpback=1), Dots shows ONE "Starts on", and its
+    // Save goes back to the round - not the Matches page. Without &hpback the page stays put.
+    const SMB = "JSON.stringify({ url: document.URL.split('/').pop(), starts: Array.prototype.filter.call(document.querySelectorAll('#sidematch-modal label'), function (l) { return /^Starts on$/.test(l.textContent.trim()) && l.getBoundingClientRect().height > 0; }).length, e: window.__e })";
+    for (const back of [true, false]) {
+        r = await go({ url: fileUrl('sidematches.html', 'game=FDRND4&add=1&fmt=dots' + (back ? '&hpback=1' : '')), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
+            { sleep: 1000 }, { expression: SMB }, CLICK('#sm-save-btn'), { sleep: 2500 }, { expression: SMB }] });
+        const [s0, s1] = J(r);
+        report['smDotsBack' + (back ? '' : 'No')] = [s0, s1];
+        f(s0 && s0.starts === 1, '5d: the Dots sheet does not show exactly one "Starts on": ' + JSON.stringify(s0));
+        if (back) f(s1 && /^index\.html\?game=FDRND4$/.test(s1.url), '5d: Dots Save from Add a game did not go back to the round: ' + JSON.stringify(s1));
+        else f(s1 && /^sidematches\.html/.test(s1.url), '5d: Dots Save on the Matches page left it: ' + JSON.stringify(s1));
+    }
     r = await go({ url: fileUrl('admin.html', 'game=FDRND4&fmt=bestball'), db: DB({ FDRND4: R4() }), settleMs: 5000, preScript: APP + ERR, steps: [
         { sleep: 2500 }, { expression: "JSON.stringify({ step: currentWizardStep, fmtStep: WIZARD_STEP_OF.format, sel: (document.querySelector('.fmt-card.selected, .fmt-card[aria-pressed=\"true\"], .fmt-card.active')||{}).id || null, e: window.__e })" }] });
     report.fmtBestBall = J(r)[0];

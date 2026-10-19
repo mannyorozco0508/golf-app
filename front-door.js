@@ -1396,7 +1396,7 @@
             var bets = cur && Array.isArray(cur.bets) ? cur.bets : [];
             bets.push({ group: 'This round', a: s.a.map(agName), b: s.b.map(agName), front: q.amt, back: q.amt, overall: q.amt, press: null });
             ls(key, JSON.stringify({ at: Date.now(), bets: bets }));
-            W.location.href = 'sidematches.html' + base + '&hpfill=1';
+            W.location.href = 'sidematches.html' + base + '&hpfill=1&hpback=1';
             return;
         }
         var ids = q.tpl === 'vegas' ? s.a.concat(s.b) : q.ids;
@@ -1405,7 +1405,8 @@
     }
     function agRoute(g) {
         var code = agCode(), base = '?game=' + encodeURIComponent(code);
-        if (g.go === 'sm') return 'sidematches.html' + base + '&add=1' + (g.fmt ? '&fmt=' + g.fmt : '');
+        // &hpback=1 (URGENT-009, 013-5): Side Matches' Save goes back to the round it came from.
+        if (g.go === 'sm') return 'sidematches.html' + base + '&add=1' + (g.fmt ? '&fmt=' + g.fmt : '') + '&hpback=1';
         if (g.go === 'smlist') return 'sidematches.html' + base;
         if (g.go === 'tpl') return 'admin.html' + base + '&tpl=' + g.tpl;
         if (g.go === 'fmt') return 'admin.html' + base + '&fmt=' + g.fmt;

@@ -728,7 +728,7 @@ html {
         </div>
 
         <!-- A golfer should never have to wonder which holes their money is riding on. -->
-        <div class="control-group" style="margin-bottom:12px;">
+        <div class="control-group" id="sm-start-hole-group" style="margin-bottom:12px;">
             <label>Starts on</label>
             <select id="sm-start-hole" onchange="renderStartHoleNote()"></select>
             <p id="sm-start-hole-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
@@ -764,9 +764,9 @@ html {
             <span>✅ Side Match Created!</span>
             <button class="close-modal" onclick="closeSideMatchLinksModal()">&times;</button>
         </div>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
+        <p id="sm-links-intro" style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
         <div id="sm-links-list"></div>
-        <button class="btn-primary" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
+        <button class="btn-primary" id="sm-links-done" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
     </div>
 </div>
 
@@ -1288,6 +1288,17 @@ html {
     }
 
     // GPS:BEGIN
+    // BACK TO THE ROUND AFTER SAVE (URGENT-009, 013-5). A game added from inside the round
+    // (front-door.js Add a game: &hpback=1) goes back to it once saved - the scorecard page,
+    // which reopens on the side (GPS or card) and hole this phone left it on - instead of
+    // leaving the golfer on the Matches page. Opened any other way, Side Matches stays put.
+    function hpBackWanted() { return urlParams.get('hpback') === '1' && !!currentMode; }
+    function hpBackToRound() {
+        if (!hpBackWanted()) return false;
+        const g = urlParams.get('group');
+        window.location.href = 'index.html?game=' + encodeURIComponent(currentMode) + (g ? '&group=' + encodeURIComponent(g) : '');
+        return true;
+    }
     // BETS FROM A PASTED ROUND (HardPan, gps-paste). Round Setup takes one 1v1 Nassau;
     // the rest of what was pasted (team vs team, the other foursomes) is listed here.
     // "Fill it in" opens the ordinary Add form with the group, the sides and the
@@ -1597,6 +1608,10 @@ html {
 
         const fieldBox = document.getElementById('sm-field-fields');
         if (fieldBox) fieldBox.style.display = fieldGame ? 'block' : 'none';
+        // ONE "Starts on" (013-15): a field game (Dots, Skins, 9 Points) has its own picker in
+        // sm-field-fields - the one saveFieldAction reads - so the match's picker is hidden.
+        const startBox = document.getElementById('sm-start-hole-group');
+        if (startBox) startBox.style.display = fieldGame ? 'none' : 'block';
         const skinsOnly = document.getElementById('sm-skins-only');
         if (skinsOnly) skinsOnly.style.display = (format === 'skins') ? 'block' : 'none';
         // Skins takes a buy-in per golfer; Dots is priced per dot. Naming the amount
@@ -2257,6 +2272,9 @@ html {
         const involvedIds = teamAIds.concat(teamBIds);
 
         let html = '';
+        // One group: the "send each player their own group's link" line is not true here (013-12).
+        const intro = document.getElementById('sm-links-intro');
+        if (intro) intro.style.display = isMultiGroup ? '' : 'none';
         if (!isMultiGroup) {
             html = `<div style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding:10px 0;">Only one group in this round — everyone already has score access via the main link.</div>`;
         } else {
@@ -2299,6 +2317,9 @@ html {
 
     function closeSideMatchLinksModal() {
         document.getElementById('sidematch-links-modal').style.display = 'none';
+        // GPS:BEGIN
+        if (hpBackToRound()) return;
+        // GPS:END
     }
 
     // Fills the start-hole picker, defaulting to the first hole nobody in the match has
@@ -2456,7 +2477,12 @@ html {
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
         db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
-            .then(() => { closeSideMatchModal(); })
+            .then(() => {
+                closeSideMatchModal();
+                // GPS:BEGIN
+                if (hpBackWanted()) { uiToast('\u2705 Saved'); hpBackToRound(); }
+                // GPS:END
+            })
             .catch(err => uiFail('\u26A0\uFE0F Could not save: ' + err.message));
     }
 
@@ -2601,6 +2627,11 @@ html {
         db.ref(`events/${currentMode}/sideMatches/${pushKey}`).set(payload)
             .then(() => {
                 closeSideMatchModal();
+                // GPS:BEGIN
+                // Added from inside the round (Add a game): one group has no links to send -
+                // straight back to the round; several groups see their links, then Got It goes back.
+                if (hpBackWanted() && !((currentData.players || []).length > 4)) { uiToast('\u2705 Side match saved'); hpBackToRound(); return; }
+                // GPS:END
                 openSideMatchLinksModal(teamAIds, teamBIds);
             })
             .catch(err => uiFail(`Failed to save: ${err.message}`));
