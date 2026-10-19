@@ -8,6 +8,16 @@
 // off the 10th - on hole 1. The memory is now per group (hardpan_last_hole_<code>_g<N>),
 // nothing is stored while the group sheet is up, and the old round-wide key is read
 // only for a group that starts on the round's first hole.
+//
+// THE REOPEN IS A KILLED APP OPENED AGAIN (013 follow-up). Under load the reopen read
+// g4=10 and no g1 key AT BOOT (measured with a boot-time read of localStorage): the first
+// session's last writes (g4=11 from Next, g1=1) never reached disk. The app wrote 11 at
+// once - the card's Next -> renderHoleView -> gpsFollowHoleView, synchronously; the step
+// below waits on it. What lost it was the harness: arriveCold ends Chrome with a bare
+// SIGTERM, and Chrome commits localStorage lazily, so an un-committed write dies with the
+// process. A phone swiped away goes to the background first and its storage is written
+// down; tools/sim/lib/phone.js kill() models exactly that (visibility hidden, a graceful
+// Browser.close, the process waited out), so the kill/reopen here uses it.
 // ============================================================================
 'use strict';
 const { test } = require('node:test');
@@ -43,6 +53,7 @@ const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === 
 
 test('Groups 4-5 on Hole 10: Keep score for Group 4 opens the card and GPS on 10; Group 1 on 1; a reopen keeps each group\'s hole; a back-nine round is unchanged', { skip, timeout: 240000 }, async () => {
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'twotee-'));
+    const profile2 = fs.mkdtempSync(path.join(os.tmpdir(), 'twotee-kill-'));
     try {
         // 1. START SCORING (no group): the sheet is up. Group 4 -> 10 on the card and on GPS;
         //    Next -> 11. Group 1 -> 1.
@@ -50,9 +61,11 @@ test('Groups 4-5 on Hole 10: Keep score for Group 4 opens the card and GPS on 10
             { expression: ST },
             PICK(4), { sleep: 4500 }, { expression: ST },
             GPS, { sleep: 3000 }, { expression: ST },
-            CARD, { sleep: 600 }, NEXT, { sleep: 800 }, { expression: ST },
+            CARD, { sleep: 600 }, NEXT, { waitFor: "localStorage.getItem('hardpan_last_hole_" + CODE + "_g4') === '11'", timeout: 8000 }, { expression: ST },
             GO('game=' + CODE + '&group=1'), { sleep: 4500 }, { expression: ST },
-            GPS, { sleep: 3000 }, { expression: ST }] });
+            GPS, { sleep: 3000 }, { expression: ST },
+            { waitFor: "localStorage.getItem('hardpan_last_hole_" + CODE + "_g1') === '1' && localStorage.getItem('hardpan_last_hole_" + CODE + "_g4') === '11'", timeout: 8000 },
+        ] });
         assert.equal(r.ok, true, r.reason);
         const [s0, g4, g4gps, g4next, g1, g1gps] = J(r);
         assert.ok(!s0.keys.some((k) => /=1$/.test(k)), 'hole 1 stored while "How are you joining?" was up: ' + s0.keys);
@@ -61,11 +74,23 @@ test('Groups 4-5 on Hole 10: Keep score for Group 4 opens the card and GPS on 10
         assert.equal(g4next.card, 11);
         assert.equal(g1.card, 1, 'Group 1 card: ' + JSON.stringify(g1));
         assert.equal(g1gps.gps, 1, 'Group 1 GPS: ' + JSON.stringify(g1gps));
-        // 2. Killed and opened again (same profile): each group's own hole.
-        r = await arriveCold({ url: fileUrl('index.html', 'game=' + CODE + '&group=4'), db: DB, settleMs: 4500, webgl: true, profileDir: profile, preScript: PRE, steps: [
-            { expression: ST }, GO('game=' + CODE + '&group=1'), { sleep: 4500 }, { expression: ST }] });
-        assert.equal(r.ok, true, r.reason);
-        const [re4, re1] = J(r);
+        // 2. Killed and opened again: a phone with Group 4's card on 11, swiped away and reopened.
+        const { Phone, Server } = require('./tools/sim/lib/phone.js');
+        const ph = await Phone.launch({ name: 'g4', server: new Server(DB), preScript: PRE + "try { if (!localStorage.getItem('hardpan_round_side')) localStorage.setItem('hardpan_round_side', 'bets'); } catch (e) {}",
+            profileDir: profile2, webgl: true, viewport: { width: 393, height: 852 }, url: fileUrl('index.html', 'game=' + CODE + '&group=4'), settleMs: 4500 });
+        await ph.eval(NEXT.expression);
+        assert.ok(await ph.waitFor("localStorage.getItem('hardpan_last_hole_" + CODE + "_g4') === '11'", 8000), 'Next did not store 11');
+        await ph.eval("(function(){ location.href = 'index.html?game=" + CODE + "&group=1'; return 1; })()");
+        await new Promise((res) => setTimeout(res, 4500));
+        const before = JSON.parse(await ph.eval(ST));
+        await ph.kill();
+        await ph.reopen(fileUrl('index.html', 'game=' + CODE + '&group=4'), 4500);
+        const re4 = JSON.parse(await ph.eval(ST));
+        await ph.eval("(function(){ location.href = 'index.html?game=" + CODE + "&group=1'; return 1; })()");
+        await new Promise((res) => setTimeout(res, 4500));
+        const re1 = JSON.parse(await ph.eval(ST));
+        await ph.close();
+        assert.equal(before.card, 1, 'Group 1 before the kill: ' + JSON.stringify(before));
         assert.equal(re4.card, 11, 'Group 4 after reopen: ' + JSON.stringify(re4));
         assert.equal(re1.card, 1, 'Group 1 after reopen: ' + JSON.stringify(re1));
         assert.ok(re4.keys.some((k) => k === 'hardpan_last_hole_' + CODE + '_g4=11'), re4.keys.join());
@@ -85,5 +110,5 @@ test('Groups 4-5 on Hole 10: Keep score for Group 4 opens the card and GPS on 10
         const [b2, b2gps] = J(r);
         assert.equal(b2.card, 10, 'back nine, Group 2: ' + JSON.stringify(b2));
         assert.equal(b2gps.gps, 10, 'back nine, Group 2 GPS: ' + JSON.stringify(b2gps));
-    } finally { try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {} }
+    } finally { for (const d of [profile, profile2]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) {} } }
 });
