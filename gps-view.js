@@ -3505,7 +3505,8 @@
         else if (S.loadingCourses) banner = 'Loading the course…';
         else if (S.holeAsk && S.holeAsk.length) banner = 'More than one course here - tap YOUR hole 1';
         // Never a dead end: it says what to do (anyone on the round can set it).
-        else if (noGreen) banner = S.pro ? 'No green mapped for this hole yet - Tools \u203a Set the green' : 'No green mapped for this hole yet';
+        // 017 (simpleFlow): no "Tools" on the bar any more - the short line (Round settings > GPS tools sets it).
+        else if (noGreen) banner = S.pro && !sfOn() ? 'No green mapped for this hole yet - Tools \u203a Set the green' : 'No green mapped for this hole yet';
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
 
@@ -6084,6 +6085,12 @@
         openTools: function () { if (!S) return false; if (S.side !== 'gps' && !showSide('gps')) return false; closeMenus(); toggleTools(); return true; },
         // 017: is the map built (the Card can then open as a sheet over it)?
         mapReady: function () { return !!(S && S.map); },
+        // 017 part D: the map may be built BEHIND the card (the Card is a sheet over it) - GPS Map
+        // only, and no location watch is started (that waits for the map to be shown).
+        canMap: function () { if (S && !S.pro && hasGpsPro()) becomePro(); return !!(S && S.pro); },
+        prepareMap: function () { if (!S) return false; if (!S.pro && hasGpsPro()) becomePro(); if (!S.pro) return false; ensureMap(); if (S.map) { try { S.map.resize(); } catch (e) {} } return true; },
+        // 017 part D (tests, read only): what the map shows - zoom, centre, the target ring, the hole.
+        view: function () { if (!S) return null; var m = S.map, c = null, z = null; try { if (m) { z = m.getZoom(); var cc = m.getCenter(); c = [cc.lat, cc.lng]; } } catch (e) {} return { hole: S.hole, zoom: z, center: c, target: S.target ? [S.target[0], S.target[1]] : null, built: !!m }; },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;

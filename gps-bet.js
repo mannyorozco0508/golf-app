@@ -251,7 +251,9 @@
         + 'body.hp-sf-card #hp-card-bet{display:flex;}body.gps-side-gps #hp-card-bet{display:none;}'
         + 'body.hp-bets-open #hp-card-bet{display:flex !important;z-index:10120;}'
         + '#hp-card-bet .hp-bar-btn{flex:1 1 0;min-width:0;min-height:50px;border:0;border-radius:14px;background:#0f1a14;color:#f4f4ef;font:800 15px/1.1 ' + FONT + ';cursor:pointer;white-space:nowrap;}'
-        + '#hp-card-bet .hp-bet-btn{flex:1 1 0;min-height:50px;}'
+        + '#hp-card-bet .hp-bar-icon{flex:0 0 48px;font-size:20px;}'
+        + '#hp-card-bet .hp-bar-score{flex:2 1 0;background:#c8f075;color:#0f1f17;font-size:16px;}'
+        + '#hp-card-bet .hp-bet-btn{flex:0 0 auto;min-height:50px;padding:0 14px;}'
         + '#hp-card-bet .hp-money-chip{position:absolute;right:10px;bottom:calc(100% + 8px);}'
         + '.hp-money-chip{border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}'
         + '.hp-money-chip b{color:#c8f075;font-weight:800;}.hp-money-chip b.neg{color:#ff9b8a;}'
@@ -411,9 +413,10 @@
         bar.id = 'hp-card-bet';
         bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Round');
         bar.innerHTML = '<button type="button" class="hp-money-chip" data-hp-money="card" style="display:none" aria-label="Your money - open Bets"></button>'
-            + '<button type="button" class="hp-bar-btn" data-hp-bar="menu" style="display:none" aria-label="Round Menu">\u2630 Menu</button>'
-            + '<button type="button" class="hp-bar-btn" data-hp-bar="gps" style="display:none" aria-label="Back to the map">\uD83D\uDCCD GPS</button>'
-            + '<button type="button" class="hp-bar-btn" data-hp-bar="card" style="display:none" aria-label="Scorecard">\u25A4 Card</button>'
+            + '<button type="button" class="hp-bar-btn hp-bar-icon" data-hp-bar="menu" style="display:none" aria-label="Round Menu">☰</button>'
+            + '<button type="button" class="hp-bar-btn" data-hp-bar="card" style="display:none" aria-label="Scorecard">Card</button>'
+            + '<button type="button" class="hp-bar-btn" data-hp-bar="gps" style="display:none" aria-label="Back to the map">📍 GPS</button>'
+            + '<button type="button" class="hp-bar-btn hp-bar-score" data-hp-bar="score" style="display:none" aria-label="Enter score">Enter score</button>'
             + '<button type="button" class="hp-bet-btn" aria-label="Add a bet">+ Bet</button>';
         bar.addEventListener('click', function (e) {
             var b = e.target && e.target.closest ? e.target.closest('button') : null;
@@ -450,9 +453,11 @@
         var R = window.HardPanRound;
         if (R && typeof R.barFor === 'function') {
             var want = R.barFor();   // { menu, gps, card }
-            ['menu', 'gps', 'card'].forEach(function (k) { var e = bar.querySelector('[data-hp-bar="' + k + '"]'); if (e) e.style.display = want[k] ? '' : 'none'; });
+            ['menu', 'gps', 'card', 'score'].forEach(function (k) { var e = bar.querySelector('[data-hp-bar="' + k + '"]'); if (e) e.style.display = want[k] ? '' : 'none'; });
         }
         Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-money'), function (el) { paintChip(el, m); });
+        // Part D: the Bets / Leaderboard frames get this round at once too (gps-round.js feed).
+        if (R && typeof R.feed === 'function') { try { R.feed(); } catch (e) {} }
         return m;
     }
 
@@ -466,6 +471,6 @@
     };
     window.HardPanBet = api;
     if (window.GolfBack && typeof window.GolfBack.register === 'function') {
-        try { window.GolfBack.register({ name: 'hp-bet', priority: 5, isOpen: isOpen, close: function () { if (st && st.step === 2) { st.step = 1; draw(); } else close(); } }); } catch (e) {}
+        try { window.GolfBack.register({ name: 'hp-bet', priority: 1, isOpen: isOpen, close: function () { if (st && st.step === 2) { st.step = 1; draw(); } else close(); } }); } catch (e) {}
     }
 })();
