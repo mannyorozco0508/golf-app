@@ -3751,6 +3751,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (data.birdieGameEnabled) actionLines.push('Birdie Game');
 
+        // THE WEEKLY GAME IS ACTION (URGENT-009, 013-7). A money pool is a pot, not
+        // a game in getRoundGames()'s model, so a round whose only money was the
+        // Weekly Game read "Just keeping score — no side games". DISPLAY ONLY: the
+        // line reads the saved moneyPool; nothing here computes or moves money.
+        const roundPool = data.moneyPool;
+        if (roundPool && roundPool.enabled) {
+            const buyIn = Number(roundPool.buyIn) || 0;
+            const parts = [];
+            if (roundPool.kp && (Number(roundPool.kp.amount) || 0) > 0) parts.push('KP');
+            if (roundPool.net) parts.push('Net');
+            if (roundPool.skins && roundPool.skins.mode && roundPool.skins.mode !== 'none') parts.push('Skins');
+            actionLines.push('\uD83C\uDFC6 ' + (buyIn > 0 ? '$' + buyIn + ' ' : '') + 'Weekly Game' + (parts.length ? ' \u2014 ' + parts.join(' \u00B7 ') : ''));
+        }
+
         const sideMatchCount = Object.keys(data.sideMatches || {}).length;
         if (sideMatchCount > 0) {
             actionLines.push(`${sideMatchCount} Side Bet${sideMatchCount === 1 ? '' : 's'}`);
