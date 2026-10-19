@@ -36,5 +36,11 @@ test('no money engine, settlement or side-bet file differs from gps-live (acfe6c
     let changed;
     try { changed = cp.execSync('git diff --name-only acfe6c6 -- money-engine.js settlement-engine.js match-engine.js pool-engine.js payouts.js live-skins.js side-match-lines.js aloha-bet.js action-model.js trip-pots.js', { cwd: __dirname, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
     catch (e) { return; }   // not a git checkout (a copied tree): nothing to compare
+    // URGENT-011 (approved, 2026-10-19): the skins carry follows the order played.
+    // settlement-engine.js and pool-engine.js moved for that fix ONLY - accepted
+    // at exactly these contents, so any other edit still fails here.
+    const APPROVED = { 'settlement-engine.js': '9f6a4fa7', 'pool-engine.js': '1530a0b9' };
+    const sha8 = (f) => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
+    changed = changed.split('\n').filter(f => f && !(APPROVED[f] && sha8(f) === APPROVED[f])).join('\n');
     assert.equal(changed, '', 'engine files untouched');
 });

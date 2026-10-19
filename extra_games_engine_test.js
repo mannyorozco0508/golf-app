@@ -85,10 +85,10 @@ test('Vegas: 10+ leads, both birdie = no flip, a hole counts only with all 4 sco
 // on gps-features - byte for byte. The new games live in their own files only.
 const UNCHANGED = {
     'money-engine.js': '12bfa41c2c8e6b8abfd397fbffb9b8606428a9229a605b87ad30fc0f7b51dbf0',
-    'settlement-engine.js': '6ddd4c8676cd880203fd9fc1bb81a48ad05275887002c6aa45d6d5a561105118',
+    'settlement-engine.js': '9f6a4fa7e4def7563a3fa0e48b1930fb5bc1e8f9bab7492ed25726ed14b042f5',
     'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     'match-engine.js': '42bb272d11814cafba0d9ad48322b1b14fbbbfab6677268ce231787f347e7fde',
-    'pool-engine.js': '372e76d7d5c41c38a905e395e6a748411ebeb0f5c12769bf827d29776cd69507',
+    'pool-engine.js': '1530a0b955e2e8705748808a79a221a4790fe67419de06fb010cb9f59ec7e153',
     'aloha-bet.js': '3a2ec9e85d2f07aa4826734ba52bd91d9bbe687f34c3364bbeda0c29388be700',
     'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
     'side-match-lines.js': 'eaf067c7d2ca94dc70c619bd2af1195dde1a10e40fed0d1132b3e464cb1445ab',

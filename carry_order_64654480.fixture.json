@@ -1,0 +1,594 @@
+{
+ "_source": "sim:nightly seed 64654480 (base 8019), round J9AGDH, 2026-10-19 - events/<code> as the app saved it, trimmed to the money fields (no tokens, uids or audit log)",
+ "eventName": "Single Round",
+ "settlementMode": "whole-dollar",
+ "skinsRounding": "odd-dollar",
+ "gameFormat": "stroke",
+ "moneyPool": {
+  "enabled": true,
+  "buyIn": 40,
+  "kp": {
+   "amount": 100,
+   "holes": [
+    4,
+    7,
+    12,
+    14,
+    17
+   ]
+  },
+  "skins": {
+   "mode": "remainder",
+   "scoring": "gross",
+   "carryOver": true
+  }
+ },
+ "flights": {
+  "enabled": true,
+  "scopes": {
+   "skins": "flight",
+   "birdies": "flight"
+  },
+  "skinsSplit": "headcount"
+ },
+ "courseData": [
+  {
+   "hole": 1,
+   "par": 5,
+   "hcpIndex": 3
+  },
+  {
+   "hole": 2,
+   "par": 4,
+   "hcpIndex": 11
+  },
+  {
+   "hole": 3,
+   "par": 4,
+   "hcpIndex": 7
+  },
+  {
+   "hole": 4,
+   "par": 3,
+   "hcpIndex": 15
+  },
+  {
+   "hole": 5,
+   "par": 5,
+   "hcpIndex": 1
+  },
+  {
+   "hole": 6,
+   "par": 4,
+   "hcpIndex": 9
+  },
+  {
+   "hole": 7,
+   "par": 3,
+   "hcpIndex": 17
+  },
+  {
+   "hole": 8,
+   "par": 4,
+   "hcpIndex": 13
+  },
+  {
+   "hole": 9,
+   "par": 5,
+   "hcpIndex": 5
+  },
+  {
+   "hole": 10,
+   "par": 4,
+   "hcpIndex": 8
+  },
+  {
+   "hole": 11,
+   "par": 4,
+   "hcpIndex": 12
+  },
+  {
+   "hole": 12,
+   "par": 3,
+   "hcpIndex": 16
+  },
+  {
+   "hole": 13,
+   "par": 5,
+   "hcpIndex": 2
+  },
+  {
+   "hole": 14,
+   "par": 3,
+   "hcpIndex": 18
+  },
+  {
+   "hole": 15,
+   "par": 4,
+   "hcpIndex": 6
+  },
+  {
+   "hole": 16,
+   "par": 4,
+   "hcpIndex": 10
+  },
+  {
+   "hole": 17,
+   "par": 3,
+   "hcpIndex": 14
+  },
+  {
+   "hole": 18,
+   "par": 5,
+   "hcpIndex": 4
+  }
+ ],
+ "startingHole": 10,
+ "teeRating": {
+  "teeKey": "male:0",
+  "teeName": "Men · Back",
+  "slope": 123,
+  "courseRating": 71.1,
+  "par": 72,
+  "allowance": 100
+ },
+ "handicapBasis": "as-entered",
+ "players": [
+  {
+   "id": 102,
+   "name": "Crone",
+   "hcp": "2",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 103,
+   "name": "Marty",
+   "hcp": "14",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 104,
+   "name": "Paul",
+   "hcp": "7",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 105,
+   "name": "Matt",
+   "hcp": "5",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 106,
+   "name": "Carl",
+   "hcp": "0",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 107,
+   "name": "Matt Q",
+   "hcp": "8",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 108,
+   "name": "Rico",
+   "hcp": "27",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 109,
+   "name": "Skeens",
+   "hcp": "18",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 110,
+   "name": "Lee",
+   "hcp": "1",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 111,
+   "name": "Tim",
+   "hcp": "0",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 112,
+   "name": "Jim",
+   "hcp": "20",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 113,
+   "name": "Glenn",
+   "hcp": "8",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  },
+  {
+   "id": 114,
+   "name": "Bob",
+   "hcp": "10",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "A"
+  },
+  {
+   "id": 115,
+   "name": "Hank",
+   "hcp": "23",
+   "team": "Team 1",
+   "squad": "red",
+   "playingForMoney": true,
+   "flight": "B"
+  }
+ ],
+ "scores": {
+  "p115_h10": 4,
+  "p115_h11": 6,
+  "p115_h12": 2,
+  "p115_h13": 5,
+  "p115_h14": 5,
+  "p115_h15": 4,
+  "p115_h16": 4,
+  "p115_h17": 3,
+  "p115_h18": 6,
+  "p115_h1": 4,
+  "p115_h2": 6,
+  "p115_h3": 7,
+  "p115_h4": 3,
+  "p115_h5": 6,
+  "p115_h6": 4,
+  "p115_h7": 4,
+  "p115_h8": 5,
+  "p115_h9": 6,
+  "p102_h1": 5,
+  "p102_h2": 4,
+  "p102_h3": 5,
+  "p102_h4": 4,
+  "p102_h5": 7,
+  "p102_h6": 5,
+  "p102_h7": 4,
+  "p102_h8": 3,
+  "p102_h9": 9,
+  "p102_h10": 4,
+  "p102_h11": 5,
+  "p102_h12": 2,
+  "p102_h13": 6,
+  "p102_h14": 2,
+  "p102_h15": 7,
+  "p102_h16": 4,
+  "p102_h17": 2,
+  "p102_h18": 4,
+  "p103_h1": 5,
+  "p103_h2": 3,
+  "p103_h3": 2,
+  "p103_h4": 4,
+  "p103_h5": 8,
+  "p103_h6": 4,
+  "p103_h7": 5,
+  "p103_h8": 5,
+  "p103_h9": 4,
+  "p103_h10": 5,
+  "p103_h11": 6,
+  "p103_h12": 6,
+  "p103_h13": 5,
+  "p103_h14": 3,
+  "p103_h15": 4,
+  "p103_h16": 5,
+  "p103_h17": 3,
+  "p103_h18": 4,
+  "p104_h1": 6,
+  "p104_h2": 4,
+  "p104_h3": 7,
+  "p104_h4": 6,
+  "p104_h5": 7,
+  "p104_h6": 8,
+  "p104_h7": 5,
+  "p104_h8": 4,
+  "p104_h9": 6,
+  "p104_h10": 6,
+  "p104_h11": 4,
+  "p104_h12": 4,
+  "p104_h13": 6,
+  "p104_h14": 4,
+  "p104_h15": 6,
+  "p104_h16": 4,
+  "p104_h17": 4,
+  "p104_h18": 5,
+  "p105_h1": 5,
+  "p105_h2": 3,
+  "p105_h3": 4,
+  "p105_h4": 3,
+  "p105_h5": 5,
+  "p105_h6": 6,
+  "p105_h7": 5,
+  "p105_h8": 8,
+  "p105_h9": 6,
+  "p105_h10": 4,
+  "p105_h11": 6,
+  "p105_h12": 5,
+  "p105_h13": 8,
+  "p105_h14": 4,
+  "p105_h15": 4,
+  "p105_h16": 2,
+  "p105_h17": 4,
+  "p105_h18": 6,
+  "p106_h1": 7,
+  "p106_h2": 8,
+  "p106_h3": 4,
+  "p106_h4": 3,
+  "p106_h5": 6,
+  "p106_h6": 5,
+  "p106_h7": 4,
+  "p106_h8": 4,
+  "p106_h9": 4,
+  "p106_h10": 4,
+  "p106_h11": 5,
+  "p106_h12": 5,
+  "p106_h13": 8,
+  "p106_h14": 5,
+  "p106_h15": 5,
+  "p106_h16": 3,
+  "p106_h17": 5,
+  "p106_h18": 5,
+  "p107_h1": 7,
+  "p107_h2": 4,
+  "p107_h3": 5,
+  "p107_h4": 3,
+  "p107_h5": 6,
+  "p107_h6": 5,
+  "p107_h7": 4,
+  "p107_h8": 6,
+  "p107_h9": 4,
+  "p107_h10": 3,
+  "p107_h11": 7,
+  "p107_h12": 3,
+  "p107_h13": 7,
+  "p107_h14": 4,
+  "p107_h15": 4,
+  "p107_h16": 5,
+  "p107_h17": 3,
+  "p107_h18": 6,
+  "p108_h1": 5,
+  "p108_h2": 5,
+  "p108_h3": 5,
+  "p108_h4": 4,
+  "p108_h5": 5,
+  "p108_h6": 6,
+  "p108_h7": 4,
+  "p108_h8": 7,
+  "p108_h9": 6,
+  "p108_h10": 4,
+  "p108_h11": 4,
+  "p108_h12": 4,
+  "p108_h13": 4,
+  "p108_h14": 4,
+  "p108_h15": 5,
+  "p108_h16": 6,
+  "p108_h17": 3,
+  "p108_h18": 5,
+  "p109_h1": 4,
+  "p109_h2": 7,
+  "p109_h3": 6,
+  "p109_h4": 4,
+  "p109_h5": 4,
+  "p109_h6": 5,
+  "p109_h7": 6,
+  "p109_h8": 6,
+  "p109_h9": 6,
+  "p109_h10": 4,
+  "p109_h11": 4,
+  "p109_h12": 4,
+  "p109_h13": 5,
+  "p109_h14": 6,
+  "p109_h15": 4,
+  "p109_h16": 7,
+  "p109_h17": 4,
+  "p109_h18": 4,
+  "p110_h1": 5,
+  "p110_h2": 5,
+  "p110_h3": 6,
+  "p110_h4": 3,
+  "p110_h5": 6,
+  "p110_h6": 3,
+  "p110_h7": 4,
+  "p110_h8": 4,
+  "p110_h9": 7,
+  "p110_h10": 5,
+  "p110_h11": 5,
+  "p110_h12": 4,
+  "p110_h13": 5,
+  "p110_h14": 5,
+  "p110_h15": 5,
+  "p110_h16": 4,
+  "p110_h17": 5,
+  "p110_h18": 6,
+  "p111_h1": 6,
+  "p111_h2": 4,
+  "p111_h3": 5,
+  "p111_h4": 2,
+  "p111_h5": 7,
+  "p111_h6": 4,
+  "p111_h7": 3,
+  "p111_h8": 6,
+  "p111_h9": 7,
+  "p111_h10": 5,
+  "p111_h11": 4,
+  "p111_h12": 4,
+  "p111_h13": 6,
+  "p111_h14": 6,
+  "p111_h15": 4,
+  "p111_h16": 5,
+  "p111_h17": 3,
+  "p111_h18": 6,
+  "p112_h1": 3,
+  "p112_h2": 5,
+  "p112_h3": 3,
+  "p112_h4": 5,
+  "p112_h5": 6,
+  "p112_h6": 5,
+  "p112_h7": 4,
+  "p112_h8": 5,
+  "p112_h9": 5,
+  "p112_h10": 5,
+  "p112_h11": 4,
+  "p112_h12": 3,
+  "p112_h13": 8,
+  "p112_h14": 6,
+  "p112_h15": 5,
+  "p112_h16": 4,
+  "p112_h17": 3,
+  "p112_h18": 5,
+  "p113_h1": 7,
+  "p113_h2": 4,
+  "p113_h3": 5,
+  "p113_h4": 3,
+  "p113_h5": 7,
+  "p113_h6": 5,
+  "p113_h7": 3,
+  "p113_h8": 4,
+  "p113_h9": 6,
+  "p113_h10": 4,
+  "p113_h11": 4,
+  "p113_h12": 4,
+  "p113_h13": 7,
+  "p113_h14": 7,
+  "p113_h15": 4,
+  "p113_h16": 4,
+  "p113_h17": 4,
+  "p113_h18": 5,
+  "p114_h1": 6,
+  "p114_h2": 4,
+  "p114_h3": 5,
+  "p114_h4": 4,
+  "p114_h5": 5,
+  "p114_h6": 5,
+  "p114_h7": 3,
+  "p114_h8": 4,
+  "p114_h9": 5,
+  "p114_h10": 5,
+  "p114_h11": 5,
+  "p114_h12": 4,
+  "p114_h13": 7,
+  "p114_h14": 3,
+  "p114_h15": 5,
+  "p114_h16": 4,
+  "p114_h17": 4,
+  "p114_h18": 4
+ },
+ "kpWinners": {
+  "h14": "115",
+  "h4": "115",
+  "h7": "115",
+  "h12": "103",
+  "h17": "104"
+ },
+ "kpLeaders": {
+  "h14": {
+   "playerId": "115",
+   "playerName": "Hank",
+   "group": 4,
+   "distanceInches": null,
+   "updatedAt": 1792383681108
+  },
+  "h4": {
+   "playerId": "115",
+   "playerName": "Hank",
+   "group": 4,
+   "distanceInches": null,
+   "updatedAt": 1792383698728
+  },
+  "h7": {
+   "playerId": "115",
+   "playerName": "Hank",
+   "group": 4,
+   "distanceInches": null,
+   "updatedAt": 1792383705684
+  },
+  "h12": {
+   "playerId": "103",
+   "playerName": "Marty",
+   "group": 1,
+   "distanceInches": 377,
+   "updatedAt": 1792383710357
+  },
+  "h17": {
+   "playerId": "104",
+   "playerName": "Paul",
+   "group": 1,
+   "distanceInches": 25,
+   "updatedAt": 1792383710357
+  }
+ },
+ "kpGroupAnswers": {
+  "h12": {
+   "g4": {
+    "answer": "none",
+    "at": 1792383675910
+   }
+  },
+  "h14": {
+   "g4": {
+    "answer": "115",
+    "at": 1792383681109
+   }
+  },
+  "h17": {
+   "g4": {
+    "answer": "none",
+    "at": 1792383688082
+   }
+  },
+  "h4": {
+   "g4": {
+    "answer": "115",
+    "at": 1792383698729
+   }
+  },
+  "h7": {
+   "g4": {
+    "answer": "115",
+    "at": 1792383705694
+   }
+  }
+ }
+}

@@ -161,8 +161,8 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // rather than quietly renumbered here, because a golden list that gets
     // edited whenever it goes red is not a golden list.
     const GOLDEN = {
-        'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '6ddd4c8676cd8802',
-        'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '372e76d7d5c41c38',
+        'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '9f6a4fa7e4def756',
+        'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
         'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': '399ba26f0025b8d1',
         'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
         'hole-events.js': '6fd7f7edf41e848b'
