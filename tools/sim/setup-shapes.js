@@ -212,9 +212,36 @@ async function setup(ph, o) {
     P.review = await ph.text('#wizard-review-summary');
     return P;
 }
+// SAME NAME TWICE (URGENT-011): Save waits until two golfers of one name differ, and
+// the Players step shows "Two golfers named Matt: add a last initial" with an "Add
+// initial" button per golfer. Manny's 20 pairings carry two Matts and two Mikes, so
+// the organizer does what the screen asks: tap "Add initial" (his name box opens with
+// a space after the name), type the letter, and go back to Review.
+async function addInitialsIfBlocked(ph) {
+    const P = paths[current];
+    const blocked = await ph.eval("(function(){ var b = document.getElementById('roster-dup-names'); return !!(b && b.offsetParent !== null && b.querySelector('.dup-add-initial')); })()");
+    if (!blocked) return false;
+    await shot(ph, 'same-name-blocked');
+    P.sameNameAsk = await ph.text('#roster-dup-names');
+    check(/golfers named \w+: add a last initial/.test(P.sameNameAsk || ''), 'HIGH', 'same-name-ask', 'Save was held for a same-name pair but Players does not say "add a last initial"', { cause: P.sameNameAsk });
+    const letters = ['S', 'K', 'R', 'T', 'W', 'P'];
+    for (let i = 0; i < letters.length; i++) {
+        const tapped = await ph.tap({ sel: '#roster-dup-names .dup-add-initial' }, { settle: 300 });
+        if (tapped == null) break;
+        await ph.cdp('Input.insertText', { text: letters[i] });
+        await ph.eval("(function(){ var a = document.activeElement; if (a && a.blur) a.blur(); return 1; })()");
+        await sleep(400);
+    }
+    P.initialsAdded = await ph.json("Array.prototype.map.call(document.querySelectorAll('#player-list .p-name-input'), function (i) { return i.value; }).filter(function (n) { return /^(Matt|Mike) /.test(n); })");
+    await shot(ph, 'same-name-fixed');
+    await ph.tap({ sel: 'button', text: /^Next: Money/ }, { settle: 1500 });
+    await ph.tap('#wizard-next-6', { settle: 1500 });
+    return true;
+}
 async function save(ph) {
     const P = paths[current];
     await ph.tap('#main-save-btn', { settle: 4000 });
+    if (await addInitialsIfBlocked(ph)) await ph.tap('#main-save-btn', { settle: 4000 });
     await ph.waitFor("(function(){ var r = document.getElementById('round-ready-screen'); return r && r.style.display === 'block'; })()", 10000);
     await shot(ph, 'round-ready');
     P.ready = await ph.visibleText();

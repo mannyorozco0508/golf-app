@@ -136,7 +136,10 @@
             if (skips.length) h.push('<div class="sp-box sp-skip"><b>Skipped (not a game in this app)</b><ul>' + skips.map(function (f) { return '<li>' + esc(f.text) + '</li>'; }).join('') + '</ul></div>');
             if (warns.length) h.push('<div class="sp-box sp-warn"><b>Check these</b><ul>' + warns.map(function (f) { return '<li>' + (f.line ? 'Line ' + f.line + ': ' : '') + esc(f.why) + (f.text && f.text !== f.why ? ' — “' + esc(f.text) + '”' : '') + '</li>'; }).join('') + '</ul></div>');
             var dupes = nearDupes(plan.days.reduce(function (a, d) { d.groups.forEach(function (g) { g.players.forEach(function (p) { a.push(p.name); }); }); return a; }, []));
-            if (dupes.length) h.push('<div class="sp-box sp-warn sp-dupes"><b>Two golfers, or one typed twice?</b> Both are kept \u2014 fix a name in the text if it\u2019s one person.<ul>' + dupes.map(function (x) { return '<li>' + esc(x.a) + ' / ' + esc(x.b) + (x.same ? ' (same name twice)' : '') + '</li>'; }).join('') + '</ul></div>');
+            if (dupes.length) h.push('<div class="sp-box sp-warn sp-dupes"><b>Two golfers, or one typed twice?</b> Both are kept \u2014 fix a name in the text if it\u2019s one person.<ul>' + dupes.map(function (x) { return '<li>' + esc(x.a) + ' / ' + esc(x.b) + (x.same ? ' (same name twice)' : '') + '</li>'; }).join('') + '</ul>'
+                // Same name twice in a ROUND: say now what Players will ask (URGENT-011).
+                + (opts.mode === 'round' && dupes.some(function (x) { return x.same; }) ? '<div class="sp-dupes-next">Same name twice: add a last initial in the text, or tap \u201CAdd initial\u201D on Players \u2014 the round won\u2019t save until the names differ.</div>' : '')
+                + '</div>');
             if (opts.mode === 'round' && plan.days[0]) {
                 var rf = roundFormat(plan.days[0]);
                 if (rf.notSet.length) h.push('<div class="sp-box sp-warn sp-notset"><b>Not set up</b> (' + esc(rf.notSet[0].why) + '; everyone plays stroke play \u2014 pick a format on the Games step if you want one):<ul>' + rf.notSet.map(function (x) { return '<li>' + esc(x.label) + ' \u2014 ' + esc(x.group) + '</li>'; }).join('') + '</ul></div>');

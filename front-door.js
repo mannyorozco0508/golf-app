@@ -487,7 +487,10 @@
             create(p.key, p.name, p.card, 'bets', p.opts).catch(function (e) { setupSay('Could not start ' + p.name, failWhy(e), { noGps: false }); });
             return;
         }
-        ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false }));
+        // NO GPS, REMEMBERED (URGENT-011, sims bug 6): Round Setup mints the round; the marker
+        // tells admin() to set it up as a scorecard round (no "Start GPS" box) and to keep the
+        // Card side for it, so START SCORING opens the card - never the GPS screen.
+        ss(QUICK, JSON.stringify({ key: null, name: p.name || '', auto: false, nogps: true }));
         W.location.href = 'admin.html?start=quick';
     }
     // ---- THE QUICK-START'S QUESTIONS (gps-oct15): what Round Setup asks, before the round exists ----
@@ -923,6 +926,30 @@
         // A round saved with no signal goes up from here as soon as there is signal (URGENT-009).
         armHeld(db);
     }
+    // How far a round is: thru N in play order, and finished (every golfer has every hole).
+    function progressOf(d) {
+        var sc = (d && d.scores) || {}, ps = (d && d.players) || [], all = true;
+        ((d && d.courseData) || []).forEach(function (x) {
+            var h = Number(x.hole);
+            if (!ps.every(function (p) { return sc['p' + p.id + '_h' + h]; })) all = false;
+        });
+        var thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
+        return { thru: thru, finished: !!(all && thru) };
+    }
+    // The round as THIS PHONE has it: the scorecard's stored copy plus its own unsent edits.
+    function localRound(code) {
+        var q = oq(), s = lstore();
+        if (!q || !s || typeof q.loadSnapshot !== 'function') return null;
+        try {
+            var snap = q.loadSnapshot(s, code);
+            if (!snap || !snap.data) return null;
+            var d = snap.data;
+            if (typeof q.applyQueued === 'function' && typeof q.peek === 'function') d = q.applyQueued(d, q.peek(s) || [], String(code).toUpperCase()) || d;
+            if (!d.players || !d.courseData) return null;
+            var pr = progressOf(d);
+            return { data: d, thru: pr.thru, finished: pr.finished };
+        } catch (e) { return null; }
+    }
     // The last door highlighted; "Resume <course>" for a round in progress.
     function mainDecor() {
         ['gps', 'games'].forEach(function (d) {
@@ -938,28 +965,39 @@
         draftPaint();
         var box = $('hp-resume-round');
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
-        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
+        if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return;
+        var tile = function (course, thru) {
+            return '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(course || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
+        };
         // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
         // copy - with no signal the read below never answers.
         var held = heldFor(lr.code);
         if (held) {
             var hv = held.value || {};
-            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(hv.courseName || lr.course || 'your round').split(' (')[0]) + '</button>'
+            box.innerHTML = tile(hv.courseName, 0)
                 + '<div class="hp-note" style="margin:-8px 0 14px;">\uD83D\uDCF4 Saved on this phone \u00b7 it will be sent when you have signal</div>';
         }
+        // THE ROUND'S OWN COPY ON THIS PHONE (URGENT-011, sims bug 2): with no signal the read
+        // below never answers, so Resume is painted at once from the copy the scorecard keeps
+        // (golfapp_snap_v1_<code>, with this phone's unsent scores on top) - the same copy the
+        // scorecard opens offline. The server only refreshes it, or removes it when it positively
+        // says the round is gone or finished; no answer leaves it standing.
+        else {
+            var local = localRound(lr.code);
+            if (local && !local.finished) box.innerHTML = tile(local.data.courseName, local.thru);
+        }
+        if (!H.db) return;
         timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
             var d = snap && snap.val ? snap.val() : null;
             // GONE from the server (gps-trapfix): forgotten here - no Resume, and the GPS door
             // opens the picker. Not a held round: that one is on its way (above).
             if (!d && heldFor(lr.code)) return;
-            if (!d) { forgetRound(lr.code, true); return; }
+            if (!d) { forgetRound(lr.code, true); if (!heldFor(lr.code)) box.innerHTML = ''; return; }
             if (!d.players || !d.courseData) return;
-            var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
-            holes.forEach(function (h) { var any = d.players.some(function (p) { return sc['p' + p.id + '_h' + h]; }); var every = d.players.every(function (p) { return sc['p' + p.id + '_h' + h]; }); if (!every) all = false; });
-            thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
-            H.activeChecked = true; H.active = (all && thru) ? null : lr.code;
-            if (all && thru) return;   // finished
-            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(d.courseName || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
+            var pr = progressOf(d);
+            H.activeChecked = true; H.active = pr.finished ? null : lr.code;
+            if (pr.finished) { if (!heldFor(lr.code)) box.innerHTML = ''; return; }   // finished
+            box.innerHTML = tile(d.courseName, pr.thru);
         }, function () {});
     }
     // BACK FROM THE BACKGROUND AFTER A WHILE (60 min): Main again, like a launch.
@@ -1035,6 +1073,16 @@
         var q = null;
         try { q = JSON.parse(ss(QUICK) || 'null'); } catch (e) { q = null; }
         if (!q || typeof q !== 'object') q = { auto: false };
+        // "Play without GPS (scorecard)" (URGENT-011, sims bug 6): this round is the Card's -
+        // remembered per round the way gps-view.js reads it (hardpan_round_side 'bets|CODE'),
+        // so START SCORING (and Resume) open the scorecard. Round Setup as it is, no GPS box;
+        // the marker is spent, so a later page of this session is not a quick start.
+        if (q.nogps) {
+            var code = params().get('game');
+            if (code) ls('hardpan_round_side', 'bets|' + code);
+            ss(QUICK, null);
+            return;
+        }
         var host = $('admin-screen');
         if (!host || $('fd-quick')) return;
         var box = W.document.createElement('div');
@@ -1109,11 +1157,37 @@
     }
 
     // ---- THE SCORECARD (index.html) ---------------------------------------------------
+    // BACK FROM A ROUND IN PROGRESS GOES HOME (URGENT-011, sims bug 5). The card is reached
+    // through pages that are not "back" from it: the group picker (index.html?game=X, before
+    // pickGroup added &group=N), Round Setup / Round Ready (START SCORING), the lobby that
+    // minted the code. Back walked into them - "How are you joining this round?" again, then
+    // Round Setup. The card now sits on a guard entry of its own: Back (history.back, the
+    // Android back button through pwa-boot.js) pops to the round's base entry, and from there
+    // goes Home - by history when the card was opened from Home (Resume, the GPS door), so no
+    // second Home is stacked; by replace otherwise, so the setup pages are never shown again.
+    function roundBackGuard(code) {
+        var Hs = W.history;
+        if (!Hs || typeof Hs.pushState !== 'function' || typeof Hs.replaceState !== 'function') return;
+        code = String(code).toUpperCase();
+        try {
+            var st = Hs.state;
+            // A reload of the card is already on its guard entry: nothing pushed twice.
+            if (!(st && st.hpRound === code)) { Hs.replaceState({ hpRoundBase: code }, ''); Hs.pushState({ hpRound: code }, ''); }
+        } catch (e) { return; }
+        W.addEventListener('popstate', function (e) {
+            var s = e && e.state;
+            if (!s || s.hpRoundBase !== code) return;
+            var ref = ''; try { ref = String(W.document.referrer || ''); } catch (x) { ref = ''; }
+            if (/\/home\.html(?:[?#]|$)/.test(ref)) { try { Hs.back(); return; } catch (x) {} }
+            W.location.replace('home.html');
+        });
+    }
     function scorecard() {
         var code = params().get('game');
         // A ROUND SAVED WITH NO SIGNAL (URGENT-009) is sent from here too, once there is signal.
         try { if (typeof db !== 'undefined') armHeld(db); } catch (e) {}   /* global db */
         if (!code || !on()) return;
+        roundBackGuard(code);
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         // THE ROUND'S ROLE GOES WITH IT (audit B6/B7): a spectator stays a spectator, a group's
         // scorekeeper stays that group's, when Resume / the GPS door / a return from the background
@@ -1884,7 +1958,8 @@
 
     W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
-        holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld };
+        holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
+        roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no

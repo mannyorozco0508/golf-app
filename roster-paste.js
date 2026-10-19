@@ -504,7 +504,12 @@ function rosterPasteCheckLines(players, lineNos, texts, anyFlight) {
         else if (/\d/.test(name)) why = 'a number is still in the name - is it a handicap?';
         else if (/(?:^|[\s,(])(?:hcp|hdcp|handicap|flight|flt)(?:$|[\s,.:)])/i.test(name)) why = '"hcp" or "flight" is still in the name';
         else if (/\s&\s|\/|\s\+\s|\sand\s/i.test(name)) why = 'two golfers on one line? Put each on its own line';
-        else if (askLetters && !p.flight && loneLetter(name)) why = 'is the ' + name.slice(-1).toUpperCase() + ' a flight or a last initial?';
+        // URGENT-011 (Manny, 013): "Name A 12" - a lone letter BETWEEN the name and
+        // a handicap - is not read as a flight (it stays in the name) and is ALWAYS
+        // asked about, whatever the rest of the list looks like. A lone letter with
+        // no handicap after it ("Tom B") is still asked only when the list reads
+        // flights or most lines end that way.
+        else if (!p.flight && loneLetter(name) && (askLetters || hcp !== '')) why = 'is the ' + name.slice(-1).toUpperCase() + ' a flight or a last initial?';
         if (why) out.push({ lineNumber: lineNos[i], text: texts[i], name, hcp, why });
     });
     return out;

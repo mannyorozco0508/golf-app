@@ -153,8 +153,12 @@ describe('FIX 7: what the parser cannot read is said BEFORE saving (checkLines)'
         assert.deepEqual(r.checkLines.map(x => x.lineNumber), [1, 2, 3]);
         assert.match(r.checkLines[0].why, /flight or a last initial/);
     });
-    test('a last initial in an ordinary list is NOT nagged about: "Matt B 12", "Jim B"', () => {
-        assert.deepEqual(P('Matt B 12\nJim B\nMarty 9\nScott 7\nAl 4').checkLines, []);
+    // URGENT-011 (Manny, 013): a lone letter BETWEEN the name and a handicap is now
+    // always asked about - "Matt B 12" used to pass silently in an ordinary list.
+    // A last initial with no handicap after it ("Jim B") still is not nagged about.
+    test('a last initial with no handicap after it is NOT nagged about in an ordinary list ("Jim B"); "Matt B 12" IS asked (URGENT-011)', () => {
+        assert.deepEqual(P('Matt B 12\nJim B\nMarty 9\nScott 7\nAl 4').checkLines.map(x => x.name), ['Matt B']);
+        assert.deepEqual(P('Jim B\nMarty 9\nScott 7\nAl 4').checkLines, []);
     });
     test('...but where the paste uses flights, "Matt B" with no flight of its own is asked about', () => {
         assert.deepEqual(P('A Marty 9\nMatt B\nB Scott 7').checkLines.map(x => x.name), ['Matt B']);
@@ -292,5 +296,43 @@ describe('FIX 13b: trip-setup-paste.js reads a leading flight set off by a dash 
         const plan = TSP.parseSetupPaste('Group 1\nA - Paul 12\nA \u00B7 Randy T 12\nA, O\'Neil 10.0', {});
         assert.deepEqual(plan.days[0].groups[0].players.map(p => [p.name, p.hcp, p.flight]), [['Paul', '12', 'A'], ['Randy T', '12', 'A'], ["O'Neil", '10.0', 'A']]);
         assert.deepEqual(plan.flags, []);
+    });
+});
+
+// ---- URGENT-011: MANNY'S THREE PASTE ANSWERS (013, "go with the recommendations") ----
+// (a) "Name A 12" - a letter between the name and the handicap - is NOT a flight:
+//     it stays in the name and the line is FLAGGED in checkLines, even alone.
+// (b) "A Flight" / "Flight B" header lines give the golfers under them that flight.
+// (c) handicap-first ("12 Skeens A") is FLAGGED, not guessed: no handicap is taken
+//     from the front of the line and no flight from its end.
+describe('URGENT-011: the three paste answers, pinned', () => {
+    test('(a) "Name A 12": kept as the name "Name A", handicap 12, no flight - and flagged', () => {
+        for (const text of ['Name A 12', 'Name A 12\nMarty 9\nScott 7\nAl 4', 'Skeens B 12.0\nGlenn 9']) {
+            const r = P(text);
+            assert.equal(r.validPlayers[0].flight || null, null, text + ': not read as a flight');
+            assert.match(r.validPlayers[0].name, /^\S+ [AB]$/, text + ': the letter stays in the name');
+            assert.ok(/^\d+(\.\d)?$/.test(r.validPlayers[0].hcp), text + ': the handicap is still read');
+            assert.equal(r.checkLines.length, 1, text + ': exactly that line is flagged');
+            assert.equal(r.checkLines[0].lineNumber, 1);
+            assert.match(r.checkLines[0].why, /flight or a last initial/);
+        }
+    });
+    test('(b) "A Flight" / "Flight B" headers: the golfers under each get that flight, and the headers are not golfers', () => {
+        for (const [ha, hb] of [['A Flight', 'Flight B'], ['Flight A', 'B Flight'], ['A flight:', 'Flight B -']]) {
+            const r = P(ha + '\nSkeens 2\nManny 4\n' + hb + '\nGlenn 12\nPaul 14');
+            assert.deepEqual(r.validPlayers.map(p => [p.name, p.hcp, p.flight || null]),
+                [['Skeens', '2', 'A'], ['Manny', '4', 'A'], ['Glenn', '12', 'B'], ['Paul', '14', 'B']], ha + ' / ' + hb);
+            assert.deepEqual(r.checkLines, [], 'nothing to ask: the flights are explicit');
+        }
+    });
+    test('(c) handicap first ("12 Skeens A", "12 Skeens"): flagged, not guessed - no handicap and no flight taken from it', () => {
+        for (const text of ['12 Skeens A\nGlenn 9', '12 Skeens\nGlenn 9']) {
+            const r = P(text);
+            const first = r.validPlayers[0];
+            assert.equal(first.hcp, '', text + ': the leading number is not taken as the handicap');
+            assert.equal(first.flight || null, null, text + ': no flight guessed');
+            assert.deepEqual(r.checkLines.map(x => x.lineNumber), [1], text + ': that line, and only that line, is flagged');
+            assert.match(r.checkLines[0].why, /number is still in the name/);
+        }
     });
 });
