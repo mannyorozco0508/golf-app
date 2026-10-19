@@ -438,8 +438,12 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // builder returns an empty list, which is a round with no code. A toast
         // rather than a refusal: nothing was refused, there is simply nothing
         // to draw yet, and the button is not dead the next time.
-        assert.equal(refuse + fail + toast, 66,
-            'the alerts should still be 66 messages, got '
+        // 68 SINCE URGENT-009 (2026-10-18, was 66), both GPS-only: Start a round with NO
+        // SIGNAL fails in its own words ("No signal - try again when you have a
+        // connection", uiFail - nothing was created), and Resume your unsaved round setup
+        // confirms the setup is back (uiToast - a receipt of the restore that happened).
+        assert.equal(refuse + fail + toast, 68,
+            'the alerts should still be 68 messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         // Receipts are the minority and always will be: most of what a setup
         // wizard says is "no, because".
@@ -454,7 +458,8 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // co-organizer added, a co-organizer removed. Both are things that happened.
         // 12 with the switch's two confirmations, which are receipts of a state change.
         // 13 with "<group> deleted" (v269), which is a receipt of a completed write.
-        assert.ok(toast <= 13, 'too much of this page floats away: ' + toast);
+        // 14 with "Your unsaved setup is back." (URGENT-009), a receipt of a restore.
+        assert.ok(toast <= 14, 'too much of this page floats away: ' + toast);
     });
 });
 

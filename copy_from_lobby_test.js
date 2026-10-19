@@ -198,7 +198,10 @@ describe('FIX 2 - createRoom carries copyFrom (the trip path)', () => {
         // thing left. Same sense as 'coach' and 'account': built by the app, read on
         // arrival, and it opens a screen the wizard already has. Only 'players' is
         // honoured - it is not a general jump.
-        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'step', 'trip']);
+        // 'draft' JOINED 2026-10-18 (URGENT-009, 013-9): Home's "Resume your unsaved round
+        // setup?" opens admin.html?game=CODE&draft=1, and the page puts back the setup kept
+        // on this phone for that code. Built by the app, read on arrival, GPS block only.
+        assert.deepEqual([...new Set(reads)].sort(), ['account', 'coach', 'copyFrom', 'draft', 'eventType', 'fresh', 'game', 'group', 'organizer', 'season', 'step', 'trip']);
         const cr = ADMIN.slice(ADMIN.indexOf('async function createRoom('), ADMIN.indexOf('function reportCodeIssueFailure('));
         assert.match(cr, /if \(tripLinkCode\) dest \+= `&trip=\$\{tripLinkCode\}`;/);
         assert.match(cr, /if \(copyFromCode\) dest \+= `&copyFrom=\$\{encodeURIComponent\(copyFromCode\)\}`;/);

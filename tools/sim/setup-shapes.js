@@ -70,7 +70,7 @@ const findings = [];
 // tomorrow's exact path). They stay in the summary with known: true and do not fail the run;
 // a NEW BLOCKER/HIGH does. Remove an id here when its fix lands.
 const KNOWN = {
-    'airplane-kill-loses-round': 'Save & Start with no signal is held in memory only; a kill before the signal returns loses the round'
+    // 'airplane-kill-loses-round' fixed by URGENT-009 (013-1): Save keeps the round in the durable queue first.
 };
 const paths = {};
 let current = null;
@@ -98,6 +98,13 @@ async function whoAmI(ph, name) {
     return true;
 }
 async function shot(ph, name) { const f = await ph.shot((ph.name === 'manny' ? '' : ph.name + '-') + name); paths[current].shots.push(f); paths[current].steps.push(name); return f; }
+// URGENT-009 (013-9): Start a round with an unsaved setup waiting asks "Resume your unsaved round
+// setup?" first. A path that means a NEW round answers "Start a new one".
+async function newSetupPlease(ph) {
+    const asked = await ph.eval("!!(document.querySelector('#ui-sheet-no') && /unsaved round setup/.test((document.querySelector('.ui-sheet-card')||{}).innerText||''))");
+    if (asked) await ph.tap('#ui-sheet-no', { settle: 4500 });
+    return asked;
+}
 const visible = (ph, sel) => ph.eval("(function(){ var e = document.querySelector(" + JSON.stringify(sel) + "); if (!e) return false; var r = e.getBoundingClientRect(); var s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; })()");
 const step = (ph) => ph.eval("typeof currentWizardStep !== 'undefined' ? currentWizardStep : null");
 const STEP_NAME = { 1: 'Course', 3: 'Games', 5: 'Players', 6: 'Money', 7: 'Review' };
@@ -118,6 +125,7 @@ async function setup(ph, o) {
     }
     await shot(ph, 'games');
     const started = await ph.tap({ sel: '#v-games [data-hp-act="start"]' }, { settle: 4500 });
+    await newSetupPlease(ph);
     check(started, 'BLOCKER', 'start-round', 'No "Start a round" on the Games door', { shot: P.shots[P.shots.length - 1] });
     await ph.waitFor("typeof currentWizardStep !== 'undefined' && !!document.querySelector('#fmt-card-stroke')", 8000);
     await shot(ph, 'step1-games');
@@ -552,7 +560,17 @@ PATHS['E-back'] = async function () {
         await shot(ph, 'top-back-link');
         const where = await ph.json("{ url: document.URL, view: (document.querySelector('.hp-view.on')||{}).id || null }");
         P.topBackWent = where;
-        check(!/home\.html/.test(where.url), 'MEDIUM', 'top-back-loses-setup', 'The setup page\'s top "← Back" leaves an unsaved setup (20 pasted golfers) with no warning', { repro: 'Mid-setup, tap "← Back" at the top', shot: P.shots[P.shots.length - 1], cause: JSON.stringify(where) });
+        // URGENT-009 (013-9): asked first ("Leave round setup?"), and the setup is kept as a draft.
+        const asked = await ph.json("{ open: !!document.querySelector('#ui-sheet-yes'), text: ((document.querySelector('.ui-sheet-card')||{}).innerText||'').replace(/\\s+/g,' ') }");
+        P.topBackAsked = asked;
+        check(!/home\.html/.test(where.url) && asked.open && /Leave round setup/.test(asked.text), 'MEDIUM', 'top-back-loses-setup', 'The setup page\'s top "← Back" leaves an unsaved setup (20 pasted golfers) with no warning', { repro: 'Mid-setup, tap "← Back" at the top', shot: P.shots[P.shots.length - 1], cause: JSON.stringify({ where, asked }) });
+        if (asked.open) {
+            await ph.tap('#ui-sheet-yes', { settle: 3000 });
+            await shot(ph, 'top-back-left');
+            const after = await ph.json("{ url: document.URL, draft: ((document.getElementById('hp-resume')||{}).innerText||'').replace(/\\s+/g,' ') }");
+            P.topBackLeft = after;
+            check(/Resume your unsaved round setup/.test(after.draft) || !/home\.html/.test(after.url), 'MEDIUM', 'top-back-no-draft', 'After "Leave", Home does not offer "Resume your unsaved round setup?"', { shot: P.shots[P.shots.length - 1], cause: JSON.stringify(after) });
+        }
     }
     errorsFinding(ph, 'Back path');
     await ph.close();
@@ -592,7 +610,17 @@ PATHS['E-kill'] = async function () {
         await ph.tap('#v-main .hp-door.games', { settle: 2500 });
         home.yourRound = ((await ph.text('#hp-today')) || '').slice(0, 160);
         await shot(ph, 'games-after-' + stop);
+        // The draft itself (URGENT-009): Resume it brings back the course and the 20 golfers.
+        if (stop === 'money' && /Resume your unsaved round setup/.test(home.resume)) {
+            await ph.tap('#v-games [data-hp-draft]', { settle: 5000 });
+            await shot(ph, 'draft-resumed-' + stop);
+            P.draftResume = await ph.json("{ url: document.URL, step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null, course: (document.getElementById('course-search-input')||{}).value || '', rows: Array.prototype.filter.call(document.querySelectorAll('#player-list .p-name-input'), function (i) { return i.value; }).length, weekly: !!(document.getElementById('mp-enabled')||{}).checked }");
+            check(P.draftResume.rows === 20 && /Dobson/.test(P.draftResume.course) && P.draftResume.weekly, 'MEDIUM', 'draft-resume', 'Resume your unsaved round setup did not bring back the course, the 20 golfers and the Weekly Game', { shot: P.shots[P.shots.length - 1], cause: JSON.stringify(P.draftResume) });
+            await ph.eval("location.href = 'home.html#games'");
+            await sleep(3000);
+        }
         await ph.tap({ sel: '#v-games [data-hp-act="start"]' }, { settle: 4500 });
+        await newSetupPlease(ph);
         const c1 = await code(ph);
         await ph.waitFor("!!document.querySelector('#fmt-card-stroke')", 6000);
         const again = await ph.json("{ step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null, course: (document.getElementById('course-search-input')||{}).value || '', rows: Array.prototype.filter.call(document.querySelectorAll('#player-list .p-name-input'), function (i) { return i.value; }).length }");
@@ -629,7 +657,10 @@ PATHS['E-switch'] = async function () {
     // Is there a GPS | Games switch on the setup screen at all?
     const sw = await ph.json("Array.prototype.filter.call(document.querySelectorAll('button, a, [role=tab]'), function (e) { var r = e.getBoundingClientRect(); return r.width > 0 && /^\\s*(📍\\s*)?GPS\\s*$/.test(e.innerText || ''); }).length");
     P.setupHasGpsSwitch = sw;
-    await ph.tap({ sel: 'button, a, div[onclick]', text: /^🏠\s*Home$|^Home$/ }, { settle: 3000 });
+    await ph.tap({ sel: 'button, a, div[onclick]', text: /^🏠\s*Home$|^Home$/ }, { settle: 1200 });
+    // URGENT-009 (013-9): "Leave round setup?" - the setup is kept on this phone; Leave.
+    P.leaveAsked = !!(await ph.eval("!!document.querySelector('#ui-sheet-yes')"));
+    if (P.leaveAsked) await ph.tap('#ui-sheet-yes', { settle: 3000 });
     await shot(ph, 'setup-tap-home');
     const h = await ph.json("{ url: document.URL, view: (document.querySelector('.hp-view.on')||{}).id || null, dialogs: (window.__DIALOGS||[]).length }");
     P.homeFromSetup = h;
@@ -778,6 +809,8 @@ async function airplane(killIt) {
     const st = await ph.json("{ url: document.URL, text: document.body.innerText.replace(/\\s+/g,' ').slice(0, 300), connecting: /Connecting/.test(document.body.innerText) }");
     P.offlineStart = st;
     check(!st.connecting, 'HIGH', 'airplane-start-connecting', '"Start a round" with no signal sits on "Connecting…"', { shot: P.shots[P.shots.length - 1], cause: st.text });
+    // URGENT-009 (013-16): and it says why, plainly.
+    check(/No signal/.test(st.text), 'MEDIUM', 'airplane-start-no-signal', '"Start a round" with no signal does not say there is no signal', { shot: P.shots[P.shots.length - 1], cause: st.text });
     errorsFinding(ph, 'airplane Start a round');
     await ph.close();
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (e) {}

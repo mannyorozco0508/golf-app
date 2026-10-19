@@ -635,14 +635,27 @@
         loadScriptTimed('gps-courses.js', function () { count(); });
     }
     function gamesView() {
+        draftPaint();
         var last = ls('lastRoomCode'), trip = ls('lastTripCode');
         var today = $('hp-today'), card = $('hp-today-card');
         if (last && H.db) {
             today.style.display = '';
             card.innerHTML = '<div class="hp-status">Loading your last round…</div>';
+            // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): shown from this phone's copy.
+            var heldCard = function () {
+                var h = heldFor(last);
+                if (!h) { today.style.display = 'none'; return; }
+                var hv = h.value || {};
+                $('hp-today-h').textContent = 'YOUR ROUND';
+                card.innerHTML = '<button type="button" class="hp-row" data-hp-open="' + esc(last) + '" style="flex-direction:column;align-items:stretch;gap:8px;">'
+                    + '<span class="n" style="font-weight:800;">' + esc(String(hv.courseName || 'Round').split(' (')[0]) + '</span>'
+                    + '<span class="s">' + (hv.players || []).length + ' golfer' + ((hv.players || []).length === 1 ? '' : 's') + ' \u00b7 \uD83D\uDCF4 saved on this phone, sent when you have signal</span>'
+                    + '<span style="font-size:15px;font-weight:700;color:var(--hp-navy);">Open the round \u203a</span></button>';
+            };
+            if (heldFor(last)) heldCard();
             timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) {
                 var d = s && s.val ? s.val() : null;
-                if (!d) { today.style.display = 'none'; return; }
+                if (!d) { heldCard(); return; }
                 var ps = d.players || [], sc = d.scores || {}, thru = 0;
                 salwRow(d, last);
                 thru = thruOf(d);
@@ -656,7 +669,7 @@
                     + '<span style="display:flex;justify-content:space-between;align-items:center;"><span class="n" style="font-weight:800;">' + esc(String(d.courseName || 'Round').split(' (')[0]) + '</span><span class="hp-badge navy">' + (thru ? 'THRU ' + thru : 'NOT STARTED') + '</span></span>'
                     + '<span class="s">' + ps.length + ' golfer' + (ps.length === 1 ? '' : 's') + (games.length ? ' · ' + esc(games.join(', ')) : '') + '</span>'
                     + '<span style="font-size:15px;font-weight:700;color:var(--hp-navy);">Open the round ›</span></button>';
-            }, function () { today.style.display = 'none'; });
+            }, heldCard);
         } else today.style.display = 'none';
         if (!last || !H.db) salwRow(null);
         // TRIPS & CUPS: every trip this phone has opened (as organizer or golfer), not only the last
@@ -744,6 +757,8 @@
             return;
         }
         if ((b = t.closest('[data-hp-open]'))) { W.location.href = roundHref(b.getAttribute('data-hp-open')); return; }
+        if ((b = t.closest('[data-hp-draft]'))) { var dr = draftRead(); if (dr) W.location.href = draftHref(dr); else draftPaint(); return; }
+        if ((b = t.closest('[data-hp-draft-discard]'))) { draftClear(b.getAttribute('data-hp-draft-discard')); draftPaint(); return; }
         if ((b = t.closest('[data-hp-trip]'))) { W.location.href = 'trip.html?trip=' + encodeURIComponent(b.getAttribute('data-hp-trip')); return; }
         if ((b = t.closest('[data-hp-act]'))) {
             var a = b.getAttribute('data-hp-act');
@@ -876,8 +891,9 @@
         if (!H.db || H.activeChecked) { open(); return true; }
         // ASKED FIRST (gps-trapfix): a round the server no longer has is never reopened - the
         // picker instead. No answer (no signal) still reopens it: the offline round is a feature.
+        if (heldFor(code)) { open(); return true; }
         timeout(H.db.ref('events/' + code + '/players').once('value'), 5000, 'round').then(function (s) {
-            if (s && typeof s.exists === 'function' && !s.exists()) { forgetRound(code, true); show('gps'); mainDecor(); }
+            if (s && typeof s.exists === 'function' && !s.exists() && !heldFor(code)) { forgetRound(code, true); show('gps'); mainDecor(); }
             else open();
         }, open);
         return true;
@@ -904,6 +920,8 @@
         else show(h === 'games' ? h : 'main');
         mainDecor();
         backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show('main'); mainDecor(); });
+        // A round saved with no signal goes up from here as soon as there is signal (URGENT-009).
+        armHeld(db);
     }
     // The last door highlighted; "Resume <course>" for a round in progress.
     function mainDecor() {
@@ -913,15 +931,27 @@
             c.classList.toggle('last', door() === d);
             var tag = c.querySelector('.hp-last'); if (tag) tag.style.display = door() === d ? '' : 'none';
         });
-        var box = $('hp-resume');
-        if (!box) return;
-        box.innerHTML = '';
+        var box0 = $('hp-resume');
+        if (!box0) return;
+        // A round's own Resume first, then an unsaved setup's (URGENT-009).
+        box0.innerHTML = '<div id="hp-resume-round"></div><div id="hp-draft-m"></div>';
+        draftPaint();
+        var box = $('hp-resume-round');
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000 || !H.db) return;
+        // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
+        // copy - with no signal the read below never answers.
+        var held = heldFor(lr.code);
+        if (held) {
+            var hv = held.value || {};
+            box.innerHTML = '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(hv.courseName || lr.course || 'your round').split(' (')[0]) + '</button>'
+                + '<div class="hp-note" style="margin:-8px 0 14px;">\uD83D\uDCF4 Saved on this phone \u00b7 it will be sent when you have signal</div>';
+        }
         timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
             var d = snap && snap.val ? snap.val() : null;
             // GONE from the server (gps-trapfix): forgotten here - no Resume, and the GPS door
-            // opens the picker.
+            // opens the picker. Not a held round: that one is on its way (above).
+            if (!d && heldFor(lr.code)) return;
             if (!d) { forgetRound(lr.code, true); return; }
             if (!d.players || !d.courseData) return;
             var sc = d.scores || {}, holes = d.courseData.map(function (x) { return Number(x.hole); }), thru = 0, all = true;
@@ -953,7 +983,11 @@
             return;
         }
         if (p.get('account') && typeof W.openAccountPanel === 'function') { setTimeout(function () { try { W.openAccountPanel(); } catch (e) {} }, 300); return; }
-        if (p.get('start') === 'quick' && !p.get('game')) { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); return; }
+        if (p.get('start') === 'quick' && !p.get('game')) {
+            // AN UNSAVED SETUP WAITING (URGENT-009): asked before a new code is minted.
+            draftAsk().then(function (went) { if (!went && typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
+            return;
+        }
         // Home > Games > Same as last week: Round Setup's own copier (checks the round, mints a NEW code,
         // lands on Players with ?copyFrom).
         if (p.get('start') === 'same' && !p.get('game')) { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek(W.document.getElementById('same-as-last-week')); return; }
@@ -1081,6 +1115,8 @@
     // ---- THE SCORECARD (index.html) ---------------------------------------------------
     function scorecard() {
         var code = params().get('game');
+        // A ROUND SAVED WITH NO SIGNAL (URGENT-009) is sent from here too, once there is signal.
+        try { if (typeof db !== 'undefined') armHeld(db); } catch (e) {}   /* global db */
         if (!code || !on()) return;
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         // THE ROUND'S ROLE GOES WITH IT (audit B6/B7): a spectator stays a spectator, a group's
@@ -1562,6 +1598,9 @@
     function forgetRound(code, gone) {
         code = String(code || '').toUpperCase();
         if (!code) return;
+        // SAVED ON THIS PHONE AND NOT SENT YET (URGENT-009): the server not having it is not
+        // "gone" - it is the round this phone is about to send. Never forgotten, never dropped.
+        if (heldFor(code)) return;
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (lr && String(lr.code || '').toUpperCase() === code) ls('hardpan_last_round', null);
         if (H.active === code || !H.active) { H.activeChecked = true; H.active = null; }
@@ -1818,6 +1857,160 @@
             else if (/trip\.html$/.test(path)) { trip(); if (on()) backFromBackground(function () { W.location.href = 'home.html'; }); }
         } catch (e) { try { console.error('[front door]', e); } catch (x) {} }
     }
+    // ---- A ROUND SAVED WITH NO SIGNAL IS KEPT ON THIS PHONE (URGENT-009, 013-1) ----------
+    // Round Setup's Save is one update() the SDK holds in memory: killed before the signal came
+    // back, the whole round was gone. Now Save writes the round to the durable queue
+    // (offline-queue.js, golfapp_wq_v1) FIRST - one op, events/<code>, coalesced on
+    // "round-setup:<code>" so a second Save of the same round replaces it in place - plus the
+    // round's stored copy (what Resume and an offline scorecard open) and the Resume pointer.
+    // It leaves the queue only when the server confirms it: Round Setup's own save (page still
+    // open), or sendHeld() here (Home, the scorecard) once there is signal. The SAME code and the
+    // same values each time, so a second send rewrites the same round - never a second round.
+    // sendHeld, not the scorecard's drain, sends it: a round's first write needs the organizer
+    // gate (organizers/<uid>/firstSeenAt, then ownerUid), which a plain replay does not do.
+    var HELD = 'round-setup:', HELD_META = 'hardpan_held_rounds_v1';
+    function oq() { return W.OfflineQueue || null; }
+    function lstore() { try { return W.localStorage; } catch (e) { return null; } }
+    function heldMeta(m) {
+        if (m !== undefined) { ls(HELD_META, JSON.stringify(m)); return m; }
+        try { var v = JSON.parse(ls(HELD_META) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; }
+    }
+    function isHeldOp(op) { return !!(op && typeof op.coalesceKey === 'string' && op.coalesceKey.indexOf(HELD) === 0); }
+    function heldOps() { var q = oq(), s = lstore(); if (!q || !s) return []; try { return (q.peek(s) || []).filter(isHeldOp); } catch (e) { return []; } }
+    function heldFor(code) { var k = HELD + String(code || '').toUpperCase(); return heldOps().filter(function (op) { return op.coalesceKey === k; })[0] || null; }
+    function tidyHeld() { var m = heldMeta(), live = {}, ch = false; heldOps().forEach(function (op) { live[op.coalesceKey.slice(HELD.length)] = 1; }); Object.keys(m).forEach(function (c) { if (!live[c]) { delete m[c]; ch = true; } }); if (ch) heldMeta(m); }
+    // o: { uid, exists, ownerUid } - what Round Setup knows of this round (organizer-gate stamp).
+    function holdRound(code, payload, o) {
+        var q = oq(), s = lstore(), G = W.organizerGate;
+        code = String(code || '').toUpperCase();
+        o = o || {};
+        if (!q || !s || !code || !payload) return null;
+        var value;
+        try { value = JSON.parse(JSON.stringify(payload)); } catch (e) { return null; }
+        if (o.uid && !value.ownerUid && G && typeof G.stamp === 'function') G.stamp(value, o.uid, { exists: !!o.exists, ownerUid: o.ownerUid || null });
+        var op = null;
+        try { op = q.enqueue(s, { path: 'events/' + code, type: 'update', value: value, coalesceKey: HELD + code }); } catch (e) { op = null; }
+        // STORAGE FULL (or refused): not held, and the caller says nothing it cannot keep.
+        if (!op || !heldFor(code)) return null;
+        var m = heldMeta(); m[code] = { at: Date.now(), exists: !!o.exists, ownerUid: o.ownerUid || null, course: value.courseName || '', golfers: (value.players || []).length }; heldMeta(m);
+        try {
+            var prev = q.loadSnapshot(s, code);
+            q.saveSnapshot(s, code, q.applyQueued((prev && prev.data) || {}, [op], code), (prev && prev.meta) || null);
+        } catch (e) {}
+        ls('lastRoomCode', code);
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        if (lr && String(lr.code || '').toUpperCase() === code) { lr.at = Date.now(); if (!lr.course) lr.course = value.courseName || ''; }
+        else lr = { code: code, at: Date.now(), course: value.courseName || '' };
+        ls('hardpan_last_round', JSON.stringify(lr));
+        draftClear(code);   // saved: no longer a draft (URGENT-009, 013-9)
+        return op;
+    }
+    // Round Setup's own write landed: the held copy has done its job.
+    function heldLanded(code, op) { var q = oq(), s = lstore(); if (q && s && op) { try { q.confirm(s, op.id, op.v); } catch (e) {} } tidyHeld(); }
+    // The server REFUSED the round (Round Setup says why): nothing to send later, and no Resume
+    // for a round that does not exist. A round that was already on the server keeps its copy.
+    function heldRefused(code, op) {
+        code = String(code || '').toUpperCase();
+        var meta = heldMeta()[code] || {};
+        heldLanded(code, op);
+        if (!meta.exists) {
+            ls('golfapp_snap_v1_' + code, null);
+            var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+            if (lr && String(lr.code || '').toUpperCase() === code) ls('hardpan_last_round', null);
+        }
+    }
+    var sendingHeld = false;
+    function sendHeld(db) {
+        var q = oq(), s = lstore(), G = W.organizerGate;
+        if (sendingHeld || !q || !s || !db || typeof db.ref !== 'function') return Promise.resolve(null);
+        if (!heldOps().length) return Promise.resolve(null);
+        // An offline write never settles (offline-queue.js): not while the phone says it has nothing.
+        if (W.navigator && W.navigator.onLine === false) return Promise.resolve(null);
+        sendingHeld = true;
+        return q.drain(s, function (op) {
+            var code = String(op.path).replace(/^events\//, '');
+            var meta = heldMeta()[code] || {};
+            var v = JSON.parse(JSON.stringify(op.value || {}));
+            var go = function (uid) {
+                if (uid && !v.ownerUid && G && typeof G.stamp === 'function') G.stamp(v, uid, { exists: !!meta.exists, ownerUid: meta.ownerUid || null });
+                return db.ref(op.path).update(v);
+            };
+            return (G && typeof G.ensureOrganizer === 'function') ? G.ensureOrganizer(db).then(go) : go(null);
+        }, { timeoutMs: 15000, only: isHeldOp }).then(function (r) {
+            sendingHeld = false; tidyHeld();
+            // The scorecard's own queue (scores typed on the held round) can follow it now.
+            if (r && r.sent) { try { W.dispatchEvent(new W.CustomEvent('hardpan:held-sent', { detail: r })); } catch (e) {} }
+            return r;
+        }, function () { sendingHeld = false; return null; });
+    }
+    // WHEN: now, when the socket or the OS says the signal is back, and every 20 s while anything
+    // is held (only then - a timer that never stops is a battery cost and a test that never ends).
+    var heldArmed = false, heldTimer = null;
+    function armHeld(db) {
+        if (!db || !heldOps().length) return;
+        var kick = function () {
+            sendHeld(db).then(function () {
+                if (!heldOps().length) { if (heldTimer) { clearInterval(heldTimer); heldTimer = null; } return; }
+                if (!heldTimer) heldTimer = setInterval(function () { if (!heldOps().length) { clearInterval(heldTimer); heldTimer = null; return; } sendHeld(db); }, 20000);
+            });
+        };
+        if (!heldArmed) {
+            heldArmed = true;
+            try { W.addEventListener('online', kick); } catch (e) {}
+            try { db.ref('.info/connected').on('value', function (snap) { if (snap && typeof snap.val === 'function' && snap.val() === true) kick(); }); } catch (e) {}
+        }
+        setTimeout(kick, 800);
+    }
+
+    // ---- AN UNSAVED SETUP IS KEPT ON THIS PHONE (URGENT-009, 013-9) -------------------------
+    // Round Setup keeps the record its Save would write (course, golfers, groups, flights, games)
+    // as a draft while it is being built: a kill, Home -> GPS -> Games, or "<- Back" no longer
+    // throws it away. One draft - the round being set up - for a day. Home and Games ask
+    // "Resume your unsaved round setup?"; so does Start a round.
+    var DRAFT = 'hardpan_setup_draft_v1', DRAFT_MS = 24 * 3600 * 1000;
+    function draftRead() {
+        var d = null; try { d = JSON.parse(ls(DRAFT) || 'null'); } catch (e) { d = null; }
+        if (!d || !d.code || !d.record || Date.now() - (d.at || 0) > DRAFT_MS) return null;
+        if (heldFor(d.code)) return null;   // saved since: a round, not a draft
+        return d;
+    }
+    function draftKeep(d) { if (d && d.code) ls(DRAFT, JSON.stringify(Object.assign({}, d, { code: String(d.code).toUpperCase(), at: Date.now() }))); }
+    function draftClear(code) { var d = null; try { d = JSON.parse(ls(DRAFT) || 'null'); } catch (e) { d = null; } if (!code || !d || String(d.code).toUpperCase() === String(code).toUpperCase()) ls(DRAFT, null); }
+    function draftHref(d) { return 'admin.html?game=' + encodeURIComponent(d.code) + '&draft=1'; }
+    function draftLine(d) {
+        var bits = [];
+        if (d.course) bits.push(String(d.course).split(' (')[0]);
+        if (d.golfers) bits.push(d.golfers + ' golfer' + (d.golfers === 1 ? '' : 's'));
+        return bits.join(' \u00b7 ');
+    }
+    function draftHtml(d) {
+        var line = draftLine(d);
+        return '<div class="hp-draft" style="margin:0 0 14px;">'
+            + '<button type="button" class="hp-resume hp-draft-resume" data-hp-draft="' + esc(d.code) + '" style="margin:0;">\u25B6 Resume your unsaved round setup?'
+            + (line ? '<span style="display:block;font-weight:600;font-size:13px;margin-top:3px;">' + esc(line) + '</span>' : '') + '</button>'
+            + '<button type="button" class="hp-link muted" data-hp-draft-discard="' + esc(d.code) + '" style="display:block;margin:2px auto 0;">Discard it</button></div>';
+    }
+    // Home: inside #hp-resume (under a round's own Resume). Games: above YOUR ROUND.
+    function draftPaint() {
+        var d = draftRead();
+        var m = $('hp-draft-m'), g = $('hp-draft-g'), today = $('hp-today');
+        if (m) m.innerHTML = d ? draftHtml(d) : '';
+        if (!g && today && today.parentNode) { g = W.document.createElement('div'); g.id = 'hp-draft-g'; today.parentNode.insertBefore(g, today); }
+        if (g) g.innerHTML = d ? draftHtml(d) : '';
+    }
+    // Start a round with a draft waiting: asked first. Resolves true when it went to the draft.
+    function draftAsk() {
+        var d = draftRead();
+        if (!d || typeof W.uiConfirm !== 'function') return Promise.resolve(false);
+        var line = draftLine(d);
+        return W.uiConfirm({ title: 'Resume your unsaved round setup?', body: (line ? line + '. ' : '') + 'It was never saved - it is kept on this phone.',
+            confirmText: 'Resume it', cancelText: 'Start a new one', danger: false }).then(function (yes) {
+            if (yes) { W.location.href = draftHref(d); return true; }
+            draftClear(d.code);
+            return false;
+        }, function () { return false; });
+    }
+
     // GPS-4's quick starts: Round Setup's own templates (admin.html gpsApplyTemplate).
     var QUICK_STARTS = [
         { tpl: 'nassau', name: 'Nassau', sub: '$5 front \u00b7 back \u00b7 total' },
@@ -1825,7 +2018,9 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+        draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
+        holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
