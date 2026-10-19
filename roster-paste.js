@@ -147,6 +147,61 @@ function fixPastedRows(list) {
     return { list: out, fixed, anyFlight };
 }
 
+// ---- SPLIT BY HANDICAP (URGENT-009, 013-3) ---------------------------------
+//
+// Flights switched on with a roster that carries NO letters put every golfer in
+// A - twenty in A, none in B. The Players step then asks once: "Split by
+// handicap? A = up to [cutoff], B = above", the cutoff defaulting to the
+// MEDIAN handicap and editable. These are the numbers behind that question;
+// admin.html owns the asking and never moves a flight set by hand.
+//
+// A PLUS HANDICAP IS BETTER THAN SCRATCH: "+2" counts as -2 through handicap.js's
+// parseHcp (the page's own parse; the fallback below is the same rule, for a
+// caller that loads this file alone). An empty or unreadable box is NOT a
+// handicap here - that golfer is not counted and is not moved.
+function flightHcpNumber(h) {
+    const s = String(h == null ? '' : h).trim();
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return null;
+    const parse = (typeof parseHcp === 'function') ? parseHcp
+        : (x => (String(x).trim().startsWith('+') ? -Math.abs(parseFloat(String(x).trim().substring(1))) : (parseFloat(x) || 0)));
+    const n = parse(s);
+    return isFinite(n) ? n : null;
+}
+function formatFlightCutoff(n) {
+    if (n == null || !isFinite(n)) return '';
+    const r = Math.round(n * 10) / 10;
+    return r < 0 ? '+' + Math.abs(r) : String(r);
+}
+// Which flight each golfer goes to for a cutoff: A up to and including it, B
+// above. keep(p) true -> the golfer's own flight stays (set by hand). A golfer
+// with no handicap keeps the flight they have (A by default).
+function flightSplitAssign(list, cutoff, keep) {
+    return (list || []).map(p => {
+        if (keep && keep(p)) return p.flight === 'B' ? 'B' : 'A';
+        const n = flightHcpNumber(p && p.hcp);
+        if (n == null) return (p && p.flight === 'B') ? 'B' : 'A';
+        return n <= cutoff ? 'A' : 'B';
+    });
+}
+// The question's default: the median handicap, moved down a step if the median
+// is the top value (ties), so the split always leaves somebody in each flight.
+// null when there is nothing to split (fewer than two handicaps, all the same).
+function flightSplitSuggestion(list) {
+    const nums = (list || []).map(p => flightHcpNumber(p && p.hcp)).filter(n => n != null).sort((a, b) => a - b);
+    if (nums.length < 2) return null;
+    const mid = nums.length / 2;
+    let cutoff = nums.length % 2 ? nums[Math.floor(mid)] : (nums[mid - 1] + nums[mid]) / 2;
+    cutoff = Math.round(cutoff * 10) / 10;
+    const top = nums[nums.length - 1];
+    if (cutoff >= top) {
+        const below = nums.filter(n => n < top);
+        if (!below.length) return null;
+        cutoff = below[below.length - 1];
+    }
+    const a = nums.filter(n => n <= cutoff).length;
+    return { cutoff, a, b: nums.length - a, counted: nums.length };
+}
+
 // SAME NAME TWICE (URGENT-004): two "Matt"s are two golfers - never merged - but
 // the card and the board can't tell them apart, so the review names them and asks
 // for a last initial. Case-insensitive on the whole name; returns [{ name, count }].
@@ -583,5 +638,6 @@ if (typeof module !== 'undefined' && module.exports) {
     }
     module.exports = { rosterPasteCheckLines, rosterPasteEmptyCellFlight, rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
-        TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
+        TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote,
+        flightHcpNumber, formatFlightCutoff, flightSplitAssign, flightSplitSuggestion };
 }
