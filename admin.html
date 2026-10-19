@@ -11090,6 +11090,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             });
             if (!ok) return;
         }
+        // THE GROUPS ARE POSITIONAL (grouping.js), so a removed golfer must take one seat out of
+        // HIS group (mailbox 013): left alone, the overrides kept their sizes and every golfer after
+        // him slid one seat up - deleting the first of 21 ({0:1, 1:4, ...}) re-cut five foursomes
+        // as 1 / 4 / 4 / 4 / 4 / 3, every group wrong.
+        const allRows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
+        const at = allRows.indexOf(row);
+        if (at !== -1 && groupSizeOverrides && Object.keys(groupSizeOverrides).length) {
+            const sizes = computeGroupSizes(allRows.length, groupSizeOverrides);
+            let seen = 0;
+            for (let g = 0; g < sizes.length; g++) { if (at < seen + sizes[g]) { sizes[g]--; break; } seen += sizes[g]; }
+            groupSizeOverrides = {};
+            sizes.filter(n => n > 0).forEach((n, i) => { groupSizeOverrides[i] = n; });
+        }
         row.remove();
         const existingData = captureCurrentPlayerInputs();
         document.getElementById("player-list").innerHTML = "";
