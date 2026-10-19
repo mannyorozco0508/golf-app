@@ -93,7 +93,9 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
     const base = round(code), par1 = Number((base.courseData || []).find((h) => Number(h.hole) === 1).par);
     const saved = Object.assign({}, base, { scores: Object.assign({}, base.scores || {}, { ['p' + base.players[0].id + '_h1']: par1 }) });
     // The par of hole 1 decides the score: par, so 2 putts is on in par - 2 = GIR.
-    const r1 = J(await go({ url, db: DB({ [code]: round(code) }), pre: SIDE(code), steps: steps.concat([
+    // URGENT-005: the stats line is only for the golfer this phone IS - "This is me" set to Ann.
+    const ME = (c, id) => "try { localStorage.setItem('golfapp_me_" + c + "', '" + id + "'); } catch (e) {}";
+    const r1 = J(await go({ url, db: DB({ [code]: round(code) }), pre: SIDE(code) + ME(code, base.players[0].id), steps: steps.concat([
         EVAL("(function(){ var m = /Par (\\d)/.exec((document.querySelector('#hole-view-card .hv-hole-meta') || {}).textContent || ''); window.__par = m ? Number(m[1]) : 4; return 'par'; })()"),
         EVAL("(function(){ var i = document.querySelector('#hole-view-card .score-input[data-hole]:not([disabled])'); if (!i) return 'no box'; i.focus(); i.value = String(window.__par); i.dispatchEvent(new Event('input', { bubbles: true })); return 'typed'; })()"),
         { tap: '#hole-view-card .hv-qs [data-qs="putts"][data-qs-v="2"]' }, { sleep: 300 }, EVAL(CARD),
@@ -104,7 +106,7 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
     ]) }));
     const [c0, c1, c2, m1, m2] = r1;
     report.subscriber = { before: c0 && c0.text, afterPutts: c1 && c1.text, afterSave: c2 && c2.text, my: m1 && m1.tiles };
-    f(c0 && c0.rows === 2 && c0.strips === 2, 'subscriber: a quick stats line under each golfer: ' + JSON.stringify(c0 && { rows: c0.rows, strips: c0.strips }));
+    f(c0 && c0.rows === 2 && c0.strips === 1, 'subscriber: a quick stats line under this phone\'s own golfer only (URGENT-005): ' + JSON.stringify(c0 && { rows: c0.rows, strips: c0.strips }));
     f(c0 && c0.inRow && c0.under === true && c0.stripShown, 'subscriber: the line is inside the row, under the score box: ' + JSON.stringify(c0 && { inRow: c0.inRow, under: c0.under, shown: c0.stripShown }));
     f(c0 && /putts/i.test(c0.text) && /4\+/.test(c0.text) && c0.gir === null, 'subscriber: the untouched line: ' + (c0 && c0.text));
     f(c0 && /Par [45]/.test(c0.par) ? /FW/.test(c0.text) : true, 'subscriber: no fairway on a par 4 / 5: ' + (c0 && c0.text));
@@ -126,6 +128,37 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
     f(m1 && m1.tiles.avg === '—', 'scoring average from a 1-hole round: ' + (m1 && m1.tiles.avg));
     f(m2 && m2.last === 'Last 20' && m2.tiles.putts === '36.0', 'Last 20: ' + JSON.stringify(m2));
     [c0, c1, c2, m1].forEach((s, i) => s && clean('subscriber[' + i + ']', s));
+
+    // ---- 1b. WHOSE STATS LINE (URGENT-005) -----------------------------------------------
+    // Only the golfer this phone is; nobody's when the phone is nobody (an organizer scoring a
+    // group they are not in); everyone's with "Track stats for others" on; and stats already
+    // tapped for another golfer stay stored on the phone, only hidden.
+    {
+        const WHO = `JSON.stringify((function () {
+          var strips = Array.prototype.slice.call(document.querySelectorAll('#hole-view-card .hv-qs'));
+          return { pids: strips.map(function (x) { return x.getAttribute('data-qs-pid'); }), boxes: document.querySelectorAll('#hole-view-card .score-input[data-hole]').length,
+            kept: localStorage.getItem('hardpan_qstats_v1_QSTB01_p' + window.__other), e: window.__e };
+        })())`;
+        const ids = base.players.map((p) => String(p.id));
+        const c2code = 'QSTB01';
+        const seedOther = "window.__other = '" + ids[1] + "'; try { localStorage.setItem('hardpan_qstats_v1_QSTB01_p" + ids[1] + "', JSON.stringify({ v: 1, code: 'QSTB01', pid: '" + ids[1] + "', course: 'X', at: 1, holes: { '1': { putts: 2 } } })); } catch (e) {}";
+        const arm = async (pre) => J(await go({ url: fileUrl('index.html', 'game=' + c2code + '&group=1'), db: DB({ [c2code]: round(c2code) }), pre: SIDE(c2code) + seedOther + pre, steps: [{ sleep: 1200 }, EVAL(WHO)] }))[0];
+        const meAnn = await arm(ME(c2code, ids[0]));
+        const meBob = await arm(ME(c2code, ids[1]));
+        const nobody = await arm('');
+        const others = await arm(ME(c2code, ids[0]) + "try { localStorage.setItem('hardpan_stats_others', '1'); } catch (e) {}");
+        const nobodyOthers = await arm("try { localStorage.setItem('hardpan_stats_others', '1'); } catch (e) {}");
+        const gpsTag = await arm("try { localStorage.setItem('hardpan_gps_golfer_" + c2code + "', '" + ids[1] + "'); } catch (e) {}");
+        report.who = { meAnn, meBob, nobody, others, nobodyOthers, gpsTag };
+        f(meAnn && JSON.stringify(meAnn.pids) === JSON.stringify([ids[0]]) && meAnn.boxes === 2, 'who: "This is me" = Ann -> only Ann\'s stats line, both score boxes: ' + JSON.stringify(meAnn));
+        f(meBob && JSON.stringify(meBob.pids) === JSON.stringify([ids[1]]), 'who: me = Bob -> only Bob\'s line: ' + JSON.stringify(meBob));
+        f(nobody && nobody.pids.length === 0 && nobody.boxes === 2, 'who: a phone that is nobody (organizer not in the group) -> no stats lines, score boxes only: ' + JSON.stringify(nobody));
+        f(others && others.pids.length === 2, 'who: Track stats for others ON -> every golfer\'s line: ' + JSON.stringify(others));
+        f(nobodyOthers && nobodyOthers.pids.length === 2, 'who: nobody + Track stats for others -> every line: ' + JSON.stringify(nobodyOthers));
+        f(gpsTag && JSON.stringify(gpsTag.pids) === JSON.stringify([ids[1]]), 'who: the GPS screen\'s "Who are you?" tag counts as me: ' + JSON.stringify(gpsTag));
+        f(meAnn && meAnn.kept && /"putts":2/.test(meAnn.kept), 'who: stats already tapped for Bob were not kept on the phone: ' + JSON.stringify(meAnn && meAnn.kept));
+        [meAnn, meBob, nobody, others, nobodyOthers, gpsTag].forEach((s, i) => s && clean('who[' + i + ']', s));
+    }
 
     // ---- 2. THE SWITCH OFF -------------------------------------------------------------
     const [o0] = J(await go({ url: fileUrl('index.html', 'game=QSTB01&group=1'), db: DB({ QSTB01: round('QSTB01') }), pre: SIDE('QSTB01'), stats: false,

@@ -3722,7 +3722,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // GPS:BEGIN
             // QUICK STATS (008): putts / fairway / GIR, one tap each, as the row's last line - under
             // the score box. A golfer this phone may score, not Out; GPS Map only (qsOn).
-            if (hvPlayer && hvPlayer.out !== true && qsOn() && canWritePlayer(hvPlayer.id)) html = html.slice(0, -'</div>'.length) + qsHtml(hvPlayer.id, Number(holeNum), Number(par)) + '</div>';
+            if (hvPlayer && hvPlayer.out !== true && qsOn() && canWritePlayer(hvPlayer.id) && qsShowFor(hvPlayer.id)) html = html.slice(0, -'</div>'.length) + qsHtml(hvPlayer.id, Number(holeNum), Number(par)) + '</div>';
             // GPS:END
         }
 
@@ -6556,6 +6556,31 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         try { if (roundOwnerHere()) return String(d.players[0].id); } catch (e) {}
         return null;
     }
+    // WHOSE STATS ROWS (URGENT-005, 2026-10-18). Putts / FW show ONLY for the golfer this phone
+    // is: "This is me" (resolvedMeId), else the GPS screen's "Who are you?" tag, else the round's
+    // only golfer. Not the round owner's player 1 - an organizer scoring a group they are not in
+    // gets no stats rows. Everyone else gets the score box only, unless "Track stats for others"
+    // (hardpan_stats_others = '1' on this phone; the Tools sheet's switch, off by default) is on.
+    // Stats already tapped for others stay stored on the phone; they are just not shown.
+    function qsOwnId() {
+        const d = currentData;
+        if (!d || !Array.isArray(d.players) || !d.players.length) return null;
+        const has = id => id != null && d.players.some(p => String(p.id) === String(id));
+        let id = null;
+        try { id = typeof resolvedMeId === 'function' ? resolvedMeId() : null; } catch (e) { id = null; }
+        if (has(id)) return String(id);
+        try { id = localStorage.getItem('hardpan_gps_golfer_' + currentMode); } catch (e) { id = null; }
+        if (has(id)) return String(id);
+        if (d.players.length === 1) return String(d.players[0].id);
+        return null;
+    }
+    function qsTrackOthers() {
+        try { return localStorage.getItem('hardpan_stats_others') === '1'; } catch (e) { return false; }
+    }
+    function qsShowFor(pid) {
+        const own = qsOwnId();
+        return (own != null && String(pid) === own) || qsTrackOthers();
+    }
     function qsSync() {
         if (!qsOn() || !currentMode || !currentData) return;
         const holes = ((currentData && currentData.courseData) || []).filter(h => h && h.hole).map(h => ({ n: String(h.hole), par: Number(h.par) || 0 }));
@@ -6593,7 +6618,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!b || !qsOn()) return;
         const strip = b.closest('.hv-qs');
         const p = ((currentData && currentData.players) || []).find(x => String(x.id) === strip.getAttribute('data-qs-pid'));
-        if (!p || !canWritePlayer(p.id)) return;
+        if (!p || !canWritePlayer(p.id) || !qsShowFor(p.id)) return;
         const hole = Number(strip.getAttribute('data-qs-hole')), par = Number(strip.getAttribute('data-qs-par'));
         const kind = b.getAttribute('data-qs'), val = b.getAttribute('data-qs-v');
         const patch = {};
