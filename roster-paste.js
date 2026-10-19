@@ -509,9 +509,11 @@ function rosterPasteEmptyCellFlight(raw) {
 // before - only a dash with spaces on BOTH sides is a separator. A dash glued to
 // letters ("Smith-Jones") is a name. A digit before a colon is a time ("8:10"),
 // not a separator.
-const ROSTER_HCP_AHEAD = '(?=\\(?[+-]?\\d{1,2}(?:\\.\\d)?\\)?(?:\\s|$|[\\/,|:\\-\\u2013\\u2014]))';
+// (Dashes as single escapes in these strings: a doubled backslash-u is the defect
+// course_import_name_test.js scans every shipped file for.)
+const ROSTER_HCP_AHEAD = '(?=\\(?[+-]?\\d{1,2}(?:\\.\\d)?\\)?(?:\\s|$|[\\/,|:\\-\u2013\u2014]))';
 const ROSTER_SEP_BEFORE_HCP = new RegExp('([^\\d\\s])\\s*[|\\/:]\\s*' + ROSTER_HCP_AHEAD, 'g');
-const ROSTER_DASH_BEFORE_HCP = new RegExp('\\s+[-\\u2013\\u2014]+\\s+' + ROSTER_HCP_AHEAD, 'g');
+const ROSTER_DASH_BEFORE_HCP = new RegExp('\\s+[-\u2013\u2014]+\\s+' + ROSTER_HCP_AHEAD, 'g');
 const ROSTER_SEP_BEFORE_FLIGHT = /(\d\)?)\s*[|:\-\u2013\u2014]\s*([ABab])\s*$/;
 // THE WORD "HCP" (URGENT-008): "Skeens hcp 12", "Glenn HCP: 12.0", "Paul 3 hdcp",
 // "Al (hcp 5)". Before, "hcp 12" became part of the NAME ("Skeens hcp", 12) and
