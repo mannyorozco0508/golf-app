@@ -85,9 +85,49 @@
   .hp-su-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
   .hp-su-acts button { min-height: 54px; border-radius: 16px; font: 800 16px inherit; font-family: inherit; cursor: pointer; }
   .hp-su-acts .p { background: var(--hp-green); color: #fff; border: 0; } .hp-su-acts .s { background: #fff; color: var(--hp-green); border: 2px solid var(--hp-green); }
+  /* SIMPLER HARDPAN HOME (mailbox 017, features.simpleFlow): four doors + Resume + a More row. */
+  :root { --hs-lime: #d4f27c; --hs-lime-ink: #10392d; --hs-ink: #12392e; --hs-bg: #f2f4ef; }
+  #v-simple { background: var(--hs-bg); gap: 12px; }
+  #v-simple .hs-hello { font-size: 26px; font-weight: 800; margin: 26px 0 6px; color: #13241d; }
+  .hs-same { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; border: 0; border-radius: 18px; background: var(--hs-lime); color: var(--hs-lime-ink); padding: 18px 16px; font-family: inherit; cursor: pointer; min-height: 92px; justify-content: center; }
+  .hs-same .t { font-size: 21px; font-weight: 800; } .hs-same .s { font-size: 14px; line-height: 1.35; text-align: center; opacity: .85; }
+  .hs-new { width: 100%; min-height: 58px; border: 0; border-radius: 16px; background: var(--hp-green); color: #fff; font-size: 19px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .hs-out { width: 100%; min-height: 54px; border: 2px solid var(--hp-green); border-radius: 16px; background: #fff; color: var(--hp-green); font-size: 17px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .hs-join { background: #fff; border: 2px solid var(--hp-green); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .hs-join .row { display: flex; gap: 8px; }
+  .hs-join input { flex: 1; min-width: 0; height: 50px; border: 1px solid var(--hp-line); border-radius: 12px; padding: 0 12px; font-size: 17px; font-family: inherit; letter-spacing: 1px; }
+  .hs-join button { height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--hp-green); color: #fff; font-size: 16px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .hs-join .hint { font-size: 13px; color: var(--hp-muted); line-height: 1.4; }
+  #hs-progress .hp-resume { margin: 0; } #hs-progress .hp-note { margin: 6px 0 0 !important; }
+  .hs-prog { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 14px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); }
+  .hs-prog .h { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--hp-muted); }
+  .hs-prog .r { display: flex; justify-content: space-between; align-items: center; gap: 10px; } .hs-prog .n { font-size: 17px; font-weight: 800; } .hs-prog .go { font-size: 16px; font-weight: 800; color: var(--hp-green); white-space: nowrap; }
+  .hs-more { margin-top: auto; padding-top: 18px; }
+  .hs-more .h { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-muted); text-align: center; margin-bottom: 6px; }
+  .hs-more .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .hs-more button { border: 1px solid var(--hp-line); background: #fff; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--hs-ink); cursor: pointer; }
 </style>
 </head>
 <body>
+<!-- SIMPLER HARDPAN HOME (mailbox 017): four doors + Resume. Shown instead of MAIN when
+     features.simpleFlow is on (front-door.js simpleView); off, MAIN below exactly as before. -->
+<div class="hp-view" id="v-simple">
+  <div class="hs-hello" id="hs-hello">Good morning</div>
+  <div id="hs-same" style="display:none;"></div>
+  <button type="button" class="hs-new" data-hp-act="snew">+ New round</button>
+  <button type="button" class="hs-out" data-hp-act="sjoinopen">Join with a code</button>
+  <div class="hs-join" id="hs-join" style="display:none;">
+    <div class="row"><input type="text" id="hs-code" placeholder="Code, link or QR" aria-label="Game code, link or QR" maxlength="300" autocapitalize="characters" autocorrect="off" spellcheck="false"><button type="button" data-hp-act="sjoin">Join</button></div>
+    <div class="hint">The code (QNXF83), the code and your group (QNXF83 2), or paste the link. A QR: point the camera at it - it opens the round.</div>
+    <div id="hs-code-msg" class="hp-status" role="status"></div>
+  </div>
+  <button type="button" class="hs-out" data-hp-act="sgps">📍 Just GPS (no games)</button>
+  <div id="hs-progress"></div>
+  <div class="hs-more"><div class="h">MORE</div><div class="row">
+    <button type="button" data-hp-act="strip">Trip</button><button type="button" data-hp-act="shistory">History</button><button type="button" data-hp-act="show">How it works</button><button type="button" data-hp-act="sstats">My stats</button>
+  </div></div>
+</div>
+
 <!-- MAIN: two doors -->
 <div class="hp-view" id="v-main">
   <div class="hp-brand" style="margin-top:24px;">HARDPAN</div>

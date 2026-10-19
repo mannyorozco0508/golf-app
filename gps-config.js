@@ -96,8 +96,9 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // 014: layupFromYou = the Hazards sheet's layups count from the golfer ("Lay up to 100 -> hit 135 · 9i",
         // plays-like'd, club from My bag) or the target ring - off: the 008 rows ("= 393 from the tee").
         layupFromYou: true,
-        // 017: simpleFlow = the simpler HardPan flow (one "+ Bet" sheet on GPS and the card, the
-        // live money chip, the 6-tile Round Menu, GPS <-> Card <-> Bets without leaving the map) -
+        // 017: simpleFlow = the simpler HardPan flow - Home's four doors + Resume, the 3-step New
+        // round (Course / Players / Games, one-tap Start, share sheet), one "+ Bet" sheet on GPS and
+        // the card, the live money chip, the 6-tile Round Menu, Card/Bets as sheets over the map -
         // off: today's screens exactly. On in dev while Manny tries it.
         simpleFlow: true },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
