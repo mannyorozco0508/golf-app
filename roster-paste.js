@@ -196,7 +196,17 @@ function duplicateNamesNote(list) {
 // name after the number and stays a golfer, which is the direction this must err
 // in. A golfer is never silently dropped; at worst a header nobody listed stays a
 // golfer, and that is visible on the review.
-var ROSTER_HEADER_WORDS = /^(?:group|grp|flight|foursome|team|tee\s*time|tee)\s*[:#.\-\u2013\u2014]?\s*(?:[0-9]{1,2}|[A-Za-z])?$/i;
+// URGENT-008: a header may end in its own punctuation ("Group 1:", "Group 1 -",
+// "Team 2.", "Foursome 3)") - the fuzzer found "Group 1:" read as a GOLFER.
+var ROSTER_HEADER_WORDS = /^(?:group|grp|flight|foursome|team|tee\s*time|tee)\s*[:#.\-\u2013\u2014]?\s*(?:[0-9]{1,2}|[A-Za-z])?\s*[:.)\-\u2013\u2014]?$/i;
+// "A Flight", "B flight:" - the letter first. Only A and B (the flights that exist).
+var ROSTER_FLIGHT_FIRST_HEADER = /^([AB])\s*[-\u2013\u2014]?\s*flight\s*[:.\-\u2013\u2014]?$/i;
+// A list number on a line by itself: "1.", "2)", "#3", "4:", "(5)". A BARE number
+// ("12") is not one - it stays a golfer line, so it shows on the review.
+var ROSTER_NUMBER_HEADER = /^(?:#\s?\d{1,2}[.:)]?|\(?\d{1,2}[.:)])$/;
+// A spreadsheet's column headings: every word is a heading word, and one of them
+// names the golfer column ("Name<TAB>HCP<TAB>Flight", "Player Handicap").
+var ROSTER_COLUMN_WORDS = /^(?:name|names|player|players|golfer|golfers|first|last|full|hcp|hdcp|hcap|handicap|handicaps|index|hi|flight|flt|tee|tees|group|grp|no|#)\.?$/i;
 var ROSTER_TRAILING_TIME = /[\s\-\u2013\u2014(,:]*\d{1,2}[:.]\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)?\s*\)?$/i;
 
 // '' for a golfer line; 'blank', 'header' or 'time' for a separator.
@@ -206,7 +216,21 @@ function rosterPasteSeparator(line) {
     var head = t.replace(ROSTER_TRAILING_TIME, '').trim();
     if (!head) return 'time';                       // the whole line was a tee time
     if (ROSTER_HEADER_WORDS.test(head)) return 'header';
+    if (ROSTER_FLIGHT_FIRST_HEADER.test(head)) return 'header';
+    if (ROSTER_NUMBER_HEADER.test(t)) return 'header';
+    var words = t.split(/[\s,|\/]+/).filter(Boolean);
+    if (words.length >= 2 && words.length <= 6 && words.every(function (w) { return ROSTER_COLUMN_WORDS.test(w); })
+        && words.some(function (w) { return /^(?:name|names|player|players|golfer|golfers|first|last)$/i.test(w); })) return 'header';
     return '';
+}
+
+// THE FLIGHT A HEADER NAMES (URGENT-008): "Flight A", "A Flight", "flight b:" -> 'A' / 'B'.
+// The golfers under it, with no letter of their own, play in that flight. null for
+// any other line.
+function rosterFlightHeader(line) {
+    var t = String(line == null ? '' : line).trim().replace(ROSTER_TRAILING_TIME, '').trim();
+    var m = /^flight\s*[:#.\-\u2013\u2014]?\s*([AB])\s*[:.)\-\u2013\u2014]?$/i.exec(t) || ROSTER_FLIGHT_FIRST_HEADER.exec(t);
+    return m ? m[1].toUpperCase() : null;
 }
 
 // ---- A TEE AT THE END OF A LINE, AND ONLY A REAL ONE (2026-10-05) --------
@@ -272,24 +296,46 @@ function splitTrailingTee(text, teeNames) {
     // "Mary - blue" splits as "Mary -" + " " + "blue" without this.
     const trimmed = m[1].replace(/[\s]*[\u00B7\u2022\u2013\u2014-]$/, '').trim();
     const setOff = (trimmed !== m[1].trim()) || /[\u00B7\u2022\u2013\u2014-]/.test(m[2]);
-    if (!setOff && !BARE_HCP_RE.test(m[1])) return { tee: undefined, rest: text };
+    // URGENT-008: "after the handicap" includes the other ways a handicap ends a line -
+    // with its flight ("Zoe +4/A blue"), bracketed ("Skeens (8) white"), or in the
+    // comma form ("Ray, 9.0 white").
+    const afterHcp = BARE_HCP_RE.test(m[1]) || /,\s*[+-]?\d{1,2}(?:\.\d)?$/.test(m[1]) || !!splitTrailingHcpFlight(m[1])
+        || (typeof rosterPasteNormalizeGolfer === 'function' && !!splitTrailingHcpFlight(rosterPasteNormalizeGolfer(m[1])));
+    if (!setOff && !afterHcp) return { tee: undefined, rest: text };
     return { tee: (teeNames || [])[hit], rest: setOff ? trimmed : m[1] };
 }
 
 function parsePlayerPasteText(text, teeNames) {
-    const lines = text.split('\n');
+    // \r\n (Excel, Windows) and a lone \r (old Mac exports) end a line too.
+    const lines = String(text == null ? '' : text).split(/\r\n|\r|\n/);
     let validPlayers = [];
+    let playerLines = [];        // URGENT-008: the 1-based line each golfer came from (parallel to validPlayers)
+    let playerTexts = [];        // ... and that line as typed (cleaned), for checkLines
     let flaggedLines = [];
     let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
     let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
     let groups = [];
     let inGroup = false;     // true while inside a run of non-empty lines
+    let headerFlight = null; // set by a "Flight A" / "B Flight" header line
     lines.forEach((rawLine, idx) => {
-        const line = rawLine.trim();
+        // URGENT-008: tabs, non-breaking spaces and runs of spaces are one space;
+        // a bullet or a list number in front of the line is not part of the name.
+        // A SPREADSHEET ROW WITH AN EMPTY HANDICAP CELL (URGENT-008): "Zack<TAB>Carrano
+        // <TAB><TAB>A". The empty cell says the A is a column of its own - the flight
+        // column - not a last initial; "Matt<TAB>B" (no empty cell) stays a name.
+        const cellRow = rosterPasteEmptyCellFlight(rawLine);
+        const cellFlight = cellRow.flight;
+        const line = rosterPasteCleanLine(cellRow.rest);
         // A BLANK LINE, A GROUP HEADER OR A BARE TEE TIME all close the current run.
         // See rosterPasteSeparator above for why a header must not be a golfer: six
         // "Group N" lines became six phantom golfers, each with a handicap.
-        if (rosterPasteSeparator(line)) { inGroup = false; return; }
+        if (rosterPasteSeparator(line)) {
+            // "Flight A" over a block of golfers gives them A (URGENT-008); another
+            // header or a blank line leaves the flight as it is.
+            const fh = rosterFlightHeader(line);
+            if (fh) headerFlight = fh;
+            inGroup = false; return;
+        }
         if (!inGroup) { groups.push(0); inGroup = true; }
 
         // v194: a trailing period comes off a pasted name ("Anthony." -> "Anthony";
@@ -303,18 +349,37 @@ function parsePlayerPasteText(text, teeNames) {
         // review says what it ignored.
         // "Skeens 2.0/A", "Glenn 12 B", "Matt (12) b": a trailing handicap and flight
         // (URGENT-004). Read first - the note stripper would take "(12)" as a note.
-        const trail = splitTrailingHcpFlight(line);
+        // URGENT-008: "Manny - 28.0", "Colm: 4.0", "Paul | 12 | A" - the separators
+        // organizers type between the name, the handicap and the flight - are spaces
+        // for the reading below. The line as typed (line) is what the preview shows.
+        // A NOTE AT THE END COMES OFF FIRST (URGENT-008): "Hugh 17.4 A (guest)" and
+        // "Skeens 2.0/A (captain)" kept the whole line as the name, because the note
+        // sat after the flight. A bracket holding a handicap "(12)", a flight "(A)" or
+        // "(hcp 12)" is not a note and stays for the rules below.
+        const notes = rosterPasteTakeNotes(line);
+        notes.notes.forEach(n => notedLines.push({ lineNumber: idx + 1, text: line, note: n }));
+        const bracketed = rosterPasteBracketFlight(notes.text);
+        const lineFlight = cellFlight || bracketed.flight;
+        // THE TEE COMES OFF BEFORE the trailing handicap/flight is read (URGENT-008):
+        // "Zoe +4/A blue" kept the whole line as the name, because the tee sat after
+        // the flight. Same rule as ever - a tee this round has, after the handicap.
+        const teedFirst = splitTrailingTee(rosterPasteNormalizeGolfer(bracketed.rest), teeNames);
+        const work = rosterPasteNormalizeGolfer(teedFirst.rest);
+        const trail = splitTrailingHcpFlight(work);
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
-            const fl = trail.flight || lead.flight;
+            const fl = trail.flight || lead.flight || lineFlight || headerFlight;
             if (fl) tp.flight = fl;
+            if (teedFirst.tee) tp.teeName = teedFirst.tee;
             validPlayers.push(tp);
+            playerLines.push(idx + 1);
+            playerTexts.push(line);
             groups[groups.length - 1]++;
             return;
         }
         const noted = (typeof stripTrailingNote === 'function')
-            ? stripTrailingNote(line) : { text: line, note: '' };
+            ? stripTrailingNote(work) : { text: work, note: '' };
         if (noted.note) notedLines.push({ lineNumber: idx + 1, text: line, note: noted.note });
         const { flight, rest, notAFlight } = splitLeadingFlight(noted.text);
         // THE TEE COMES OFF AFTER the flight and the note, and BEFORE the name and
@@ -336,8 +401,11 @@ function parsePlayerPasteText(text, teeNames) {
         // accepted. Stored names are never rewritten; this is the paste only.
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
-        if (teed.tee) player.teeName = teed.tee;
+        else if (lineFlight || headerFlight) player.flight = lineFlight || headerFlight;
+        if (teed.tee || teedFirst.tee) player.teeName = teed.tee || teedFirst.tee;
         validPlayers.push(player);
+        playerLines.push(idx + 1);
+        playerTexts.push(line);
         groups[groups.length - 1]++;
     });
     groups = groups.filter(n => n > 0);   // a run made only of flagged lines is not a group
@@ -346,7 +414,162 @@ function parsePlayerPasteText(text, teeNames) {
         ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
         : null;
     const duplicates = duplicateRosterNames(validPlayers);
-    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, duplicates };
+    const checkLines = rosterPasteCheckLines(validPlayers, playerLines, playerTexts, anyFlight);
+    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, duplicates, playerLines, checkLines };
+}
+
+// ---- CHECK THESE LINES (URGENT-008, 2026-10-18) -------------------------------
+//
+// Whatever this parser cannot read with certainty it must SAY, before the roster
+// is saved - never silently put "12.0 B" or "hcp 12" into a name. After a line is
+// read, it is listed here when what is left still looks like something else:
+//
+//   a digit in the NAME          "12 Skeens A", "Jimmy 12 (fire)", "1 - Paul 9" -
+//                                a handicap or a list number the rules did not take
+//   the word hcp / flight left   "Skeens hcp twelve", "Bo Flight"
+//   a handicap that is not one   "Orozco, Manny 12" (the comma form put "Manny 12"
+//                                in the handicap box)
+//   a lone A or B ending a name  "Glenn B 12" - flight or last initial? Said only
+//   with no flight read off it   when the paste uses flights elsewhere, or when
+//                                most lines end that way (a whole list written
+//                                "Name A 12"). "Matt B 12" in an ordinary list is
+//                                a last initial and is not nagged about.
+//
+// Nothing is changed by this: the golfer is added as read, and the preview names
+// the line so the organizer can fix it first. [{ lineNumber, text, name, hcp, why }]
+function rosterPasteCheckLines(players, lineNos, texts, anyFlight) {
+    const out = [];
+    const loneLetter = (n) => /\s[ABab]$/.test(String(n || ''));
+    const letterLines = players.filter(p => !p.flight && loneLetter(p.name)).length;
+    const askLetters = anyFlight || (letterLines >= 2 && letterLines * 2 >= players.length);
+    players.forEach((p, i) => {
+        const name = String(p.name || ''), hcp = String(p.hcp == null ? '' : p.hcp).trim();
+        let why = '';
+        if (hcp !== '' && !/^[+-]?\d{1,2}(?:\.\d)?$/.test(hcp)) why = 'the handicap box would get "' + hcp + '"';
+        else if (/\d/.test(name)) why = 'a number is still in the name - is it a handicap?';
+        else if (/(?:^|[\s,(])(?:hcp|hdcp|handicap|flight|flt)(?:$|[\s,.:)])/i.test(name)) why = '"hcp" or "flight" is still in the name';
+        else if (/\s&\s|\/|\s\+\s|\sand\s/i.test(name)) why = 'two golfers on one line? Put each on its own line';
+        else if (askLetters && !p.flight && loneLetter(name)) why = 'is the ' + name.slice(-1).toUpperCase() + ' a flight or a last initial?';
+        if (why) out.push({ lineNumber: lineNos[i], text: texts[i], name, hcp, why });
+    });
+    return out;
+}
+
+// ---- THE LINE AS PASTED, CLEANED (URGENT-008, 2026-10-18) -------------------
+//
+// The paste fuzzer (tools/sim/paste-fuzz.js) pasted lists the ways organizers do
+// and found the line itself was never cleaned beyond trim():
+//
+//   Excel / Sheets   "Zack\tCarrano\t6\tA" -> a golfer named "Zack<TAB>Carrano"
+//   iMessage / Notes "Big\u00A0Jim 12"      -> a name holding a non-breaking space,
+//                                             which never matches "Big Jim" again
+//   Notes bullets    "\u2022 Skeens 2.0/A"   -> a golfer named "\u2022 Skeens"
+//   numbered lists   "1) Skeens 2.0 A"      -> a golfer named "1) Skeens"
+//
+// So, before anything reads the line: every run of whitespace (tab, NBSP, the
+// narrow NBSP iOS puts before AM) is one space; invisible zero-width marks go;
+// and ONE leading bullet (\u2022 * \u25AA \u25CF \u25E6 \u2023 \u00B7, or a
+// dash with a space after it) or list number ("1)", "1.", "(1)", "#1") comes off.
+//
+// WHAT IS NOT A LIST NUMBER: a number with no bracket or dot after it. "12 Skeens"
+// may be a handicap written first; it stays on the line, and checkLines below
+// says so. A dash glued to a word ("-Rod") is not a bullet. A dot followed by a
+// digit ("1.5 Skeens") is not a list number.
+const ROSTER_BULLET_RE = /^(?:[\u2022\u2023\u2043\u2219\u25AA\u25AB\u25CF\u25E6\u25A0\u25A1\u00B7*>]+\s*|[-\u2013\u2014]\s+)/;
+const ROSTER_LIST_NUMBER_RE = /^(?:\(?\d{1,2}[.)]|#\s?\d{1,2}[.):]?)\s+/;
+function rosterPasteCleanLine(raw) {
+    let t = String(raw == null ? '' : raw)
+        .replace(/[\u200B\u200C\u2060\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    for (let i = 0; i < 2; i++) {
+        const b = t.replace(ROSTER_BULLET_RE, '');
+        const n = b.replace(ROSTER_LIST_NUMBER_RE, '');
+        if (n === t) break;
+        t = n.trim();
+    }
+    return t;
+}
+
+function rosterPasteEmptyCellFlight(raw) {
+    const t = String(raw == null ? '' : raw);
+    const m = /\t[ \u00A0]*\t[ \t\u00A0]*([ABab])[ \t\u00A0]*$/.exec(t);
+    if (!m || !t.slice(0, m.index).trim()) return { flight: null, rest: t };
+    return { flight: m[1].toUpperCase(), rest: t.slice(0, m.index) };
+}
+
+// ---- WHAT SITS BETWEEN THE NAME, THE HANDICAP AND THE FLIGHT (URGENT-008) ----
+//
+// Measured by the fuzzer: "Manny - 28.0" read as a golfer named "Manny -";
+// "Colm: 4.0" as "Colm:"; "Paul/12" and "Paul | 12" kept the whole line as the
+// name. A dash, colon, bar or slash between the name and a handicap-shaped
+// number is a separator, and so is one between the handicap and a final A/B.
+//
+// THE SIGN IS KEPT: "Steve -3" (no space after the dash) is a handicap of -3, as
+// before - only a dash with spaces on BOTH sides is a separator. A dash glued to
+// letters ("Smith-Jones") is a name. A digit before a colon is a time ("8:10"),
+// not a separator.
+// (Dashes as single escapes in these strings: a doubled backslash-u is the defect
+// course_import_name_test.js scans every shipped file for.)
+const ROSTER_HCP_AHEAD = '(?=\\(?[+-]?\\d{1,2}(?:\\.\\d)?\\)?(?:\\s|$|[\\/,|:\\-\u2013\u2014]))';
+const ROSTER_SEP_BEFORE_HCP = new RegExp('([^\\d\\s])\\s*[|\\/:]\\s*' + ROSTER_HCP_AHEAD, 'g');
+const ROSTER_DASH_BEFORE_HCP = new RegExp('\\s+[-\u2013\u2014]+\\s+' + ROSTER_HCP_AHEAD, 'g');
+const ROSTER_SEP_BEFORE_FLIGHT = /(\d\)?)\s*[|:\-\u2013\u2014]\s*([ABab])\s*$/;
+// THE WORD "HCP" (URGENT-008): "Skeens hcp 12", "Glenn HCP: 12.0", "Paul 3 hdcp",
+// "Al (hcp 5)". Before, "hcp 12" became part of the NAME ("Skeens hcp", 12) and
+// "(hcp 12)" was taken off as a note, losing the handicap. The word goes only when
+// a handicap-shaped number is right beside it; anywhere else it stays as typed (and
+// checkLines says so).
+const ROSTER_HCP_WORD = '(?:hcp|hdcp|hcap|hndcp|handicap|hc|idx|index)';
+const ROSTER_HCP_WORD_BEFORE = new RegExp('(^|[\\s,|\\/:])[(\\[]?\\s*' + ROSTER_HCP_WORD + '\\.?\\s*[:#=\\-]?\\s*([+-]?\\d{1,2}(?:\\.\\d)?)\\s*[)\\]]?(?=\\s|$|[\\/,|])', 'gi');
+const ROSTER_HCP_WORD_AFTER = new RegExp('([+-]?\\d{1,2}(?:\\.\\d)?)\\s*' + ROSTER_HCP_WORD + '\\b\\.?', 'gi');
+// THE WORD "FLIGHT" (URGENT-008): "Glenn 12 B flight", "Glenn 12 Flight B",
+// "Glenn 12 (B)", "Flight A Skeens 2". The word, or the brackets, go when a lone A or
+// B sits right beside them; the letter is then read by the ordinary rules (leading,
+// or trailing AFTER a handicap). At the END of a line a bracketed letter "(B)" or the
+// word ("Flight B", "B flight") makes the flight explicit, so it is read even with no
+// handicap - nobody writes a last initial that way. "(B)" used to be taken off as a
+// note, and the flight lost (rosterPasteBracketFlight).
+const ROSTER_FLIGHT_WORD_BEFORE = /(^|[\s,])\s*(?:flight|flt)\.?\s*[:#\-]?\s*([AB])(?=\s|$|[,\/|])/gi;
+const ROSTER_FLIGHT_WORD_AFTER = /(^|[\s,])\s*([AB])\s*-?\s*(?:flight|flt)\b\.?:?/gi;
+// At the END of a line the flight is EXPLICIT - "(B)", "Flight B", "B flight" - and
+// is read even with no handicap before it.
+const ROSTER_FLIGHT_BRACKETS = /(?:^|[\s,\/|])\s*(?:[(\[]\s*([AB])\s*[)\]]|(?:flight|flt)\.?\s*[:#\-]?\s*([AB])|([AB])\s*-?\s*(?:flight|flt)\.?)\s*$/i;
+// "(captain)", "[sub]", "(cart 3)" - taken off the END of a line, as many as there
+// are, until the last bracket is one the reading needs: a handicap, a flight letter,
+// or the hcp / flight words with one ("(12)", "(+2.0)", "(B)", "(hcp 12)", "(A flight)").
+const ROSTER_NOT_A_NOTE = /^(?:(?:hcp|hdcp|hcap|handicap|hc|idx|index)\.?\s*[:#=]?\s*)?[+-]?\d{1,2}(?:\.\d)?(?:\s*(?:hcp|hdcp|hcap|handicap|hc|idx))?$|^(?:(?:flight|flt)\s*)?[AB](?:\s*(?:flight|flt))?$/i;
+function rosterPasteTakeNotes(line) {
+    let t = String(line == null ? '' : line);
+    const notes = [];
+    if (typeof stripTrailingNote !== 'function') return { text: t, notes };
+    for (let i = 0; i < 3; i++) {
+        const n = stripTrailingNote(t);
+        if (!n.note || ROSTER_NOT_A_NOTE.test(n.note.trim())) break;
+        notes.unshift(n.note);
+        t = n.text;
+    }
+    return { text: t, notes };
+}
+function rosterPasteBracketFlight(line) {
+    const t = String(line == null ? '' : line);
+    const m = ROSTER_FLIGHT_BRACKETS.exec(t);
+    if (!m || !t.slice(0, m.index).trim()) return { flight: null, rest: t };
+    return { flight: (m[1] || m[2] || m[3]).toUpperCase(), rest: t.slice(0, m.index).replace(/[\s,\/|:\-\u2013\u2014]+$/, '').trim() };
+}
+// "NO HANDICAP YET" (URGENT-008): "Glenn -", "Glenn ?", "Glenn N/A", "Glenn NH",
+// "Glenn, tbd" - the organizer's mark for a golfer with no handicap. It was kept as
+// part of the name ("Glenn N/A"); it is an empty handicap. Only at the end of a
+// line, only these marks, and never the whole line.
+const ROSTER_NO_HCP_MARK = /([^\s,:|\/\u2013\u2014-])(?:\s*[,:|\/\u2013\u2014-]\s*|\s+)(?:-{1,3}|\?{1,3}|n\/a|n\.a\.?|nh|tbd|no hcp|no handicap)$/i;
+function rosterPasteNormalizeGolfer(line) {
+    let t = String(line == null ? '' : line).replace(ROSTER_NO_HCP_MARK, '$1');
+    t = t.replace(ROSTER_FLIGHT_WORD_BEFORE, '$1 $2').replace(ROSTER_FLIGHT_WORD_AFTER, '$1 $2');
+    t = t.replace(ROSTER_HCP_WORD_BEFORE, '$1 $2').replace(ROSTER_HCP_WORD_AFTER, '$1');
+    t = t.replace(ROSTER_SEP_BEFORE_HCP, '$1 ')
+        .replace(ROSTER_DASH_BEFORE_HCP, ' ')
+        .replace(ROSTER_SEP_BEFORE_FLIGHT, '$1 $2');
+    return t.replace(/\s+/g, ' ').trim();
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -358,7 +581,7 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+    module.exports = { rosterPasteCheckLines, rosterPasteEmptyCellFlight, rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }

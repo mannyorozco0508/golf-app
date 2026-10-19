@@ -10417,7 +10417,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text, roundTeeNames());
+        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, checkLines } = parsePlayerPasteText(text, roundTeeNames());
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -10449,8 +10449,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const lineList = flaggedFlights.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">\u26A0\uFE0F Only A and B are flights \u2014 ${flaggedFlights.length === 1 ? 'this line was' : 'these lines were'} added as typed, so fix the name after adding:<br>${lineList}</div>`;
         }
+        // CHECK THESE LINES (URGENT-008): a line that still holds a handicap-looking
+        // number, the word hcp/flight, or a lone A/B where flights are in use, after
+        // it was read. Added as read - said here, BEFORE saving, so it is fixed first.
+        if (checkLines && checkLines.length > 0) {
+            const lineList = checkLines.map(c => `Line ${c.lineNumber}: "${escapeHtml(c.text)}" \u2192 ${escapeHtml(c.name)}${c.hcp ? ' / ' + escapeHtml(c.hcp) : ''} \u2014 ${escapeHtml(c.why)}`).join('<br>');
+            html += `<div class="paste-flagged-line paste-check-line">\u26A0\uFE0F Check ${checkLines.length === 1 ? 'this line' : 'these ' + checkLines.length + ' lines'} before adding \u2014 ${checkLines.length === 1 ? 'it was' : 'they were'} read as shown; fix the name or handicap after adding if it is wrong:<br>${lineList}</div>`;
+        }
+        // NOTES TAKEN OFF THE LINES ("(captain)", "[sub]"): said, not swallowed - the
+        // same line trip.html's review has always shown (URGENT-008).
+        if (notedLines && notedLines.length > 0) {
+            html += `<div class="paste-noted-line" style="margin-top:4px; color:var(--text-muted);">\u2139\uFE0F Notes left off the names: ${notedLines.map(n => `"${escapeHtml(n.note)}" (line ${n.lineNumber})`).join(', ')}</div>`;
+        }
         if (flaggedLines.length > 0) {
-            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
+            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
         }
         // THE LONE "Me" OF A GPS-FIRST ROUND (mailbox 013, 2026-10-18). A round started from the GPS

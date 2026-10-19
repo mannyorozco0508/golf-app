@@ -1351,6 +1351,12 @@ html {
                 + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
                 + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
         }
+        if (parsed.checkLines && parsed.checkLines.length) {
+            // URGENT-008: lines read, but still holding a number or a stray flight letter.
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">Check '
+                + (parsed.checkLines.length === 1 ? 'this line' : 'these lines') + ': '
+                + escapeHtml(parsed.checkLines.map(c => '"' + c.text + '" (' + c.why + ')').join(' / ')) + '</p>';
+        }
         if (parsed.notedLines.length) {
             html += '<p style="font-size:0.8rem; color:var(--text-muted);">Notes ignored: '
                 + escapeHtml(parsed.notedLines.map(l => l.note).join(', ')) + '</p>';
@@ -2907,6 +2913,12 @@ html {
                 + parsed.flaggedLines.length + ' line'
                 + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
                 + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.checkLines && parsed.checkLines.length) {
+            // URGENT-008: lines read, but still holding a number or a stray flight letter.
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">Check '
+                + (parsed.checkLines.length === 1 ? 'this line' : 'these lines') + ': '
+                + escapeHtml(parsed.checkLines.map(c => '"' + c.text + '" (' + c.why + ')').join(' / ')) + '</p>';
         }
         if (parsed.notedLines.length) {
             // Said, not swallowed: the note came off the line so the handicap could
