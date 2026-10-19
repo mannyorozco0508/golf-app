@@ -4733,6 +4733,8 @@ const SHELL_FILES = [
     './hp-index.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
+    // Simpler HardPan (017): the 3-step New round on Round Setup.
+    './simple-flow.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
