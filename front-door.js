@@ -231,8 +231,9 @@
     // ---- HOME (home.html) ----------------------------------------------------------
     var H = { db: null };
     function show(view) {
-        ['main', 'gps', 'games'].forEach(function (v) { var el = $('v-' + v); if (el) el.classList.toggle('on', v === view); });
+        ['main', 'gps', 'games', 'simple'].forEach(function (v) { var el = $('v-' + v); if (el) el.classList.toggle('on', v === view); });
         try {
+            if (view === 'simple') simpleView();
             if (view === 'gps') gpsView();
             if (view === 'games') gamesView();
         } catch (e) {
@@ -767,10 +768,11 @@
             var a = b.getAttribute('data-hp-act');
             if (a === 'code') { setDoor('games'); show('games'); var i = $('hp-code'); if (i) i.focus(); }
             else if (a === 'signin') W.location.href = 'admin.html?account=1';
-            else if (a === 'start') { ss(QUICK, null); W.location.href = 'admin.html?start=quick'; }
-            else if (a === 'same') { ss(QUICK, null); W.location.href = 'admin.html?start=same'; }
+            else if (a === 'start') { if (simpleOn()) { simpleAct('snew', b); return; } ss(QUICK, null); ss(SIMPLE, null); W.location.href = 'admin.html?start=quick'; }
+            else if (a === 'same') { if (simpleOn()) { simpleAct('ssame', b); return; } ss(QUICK, null); ss(SIMPLE, null); W.location.href = 'admin.html?start=same'; }
             else if (a === 'build') W.location.href = 'trip.html#build';
             else if (a === 'join') join();
+            else if (simpleAct(a, b)) return;
             else if (a === 'tripcode') { var tci = $('hp-trip-code'), tcv = String((tci && tci.value) || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (tcv.length >= 4) W.location.href = 'trip.html?trip=' + encodeURIComponent(tcv); }
         }
     }
@@ -835,8 +837,8 @@
         }
         return Promise.resolve(null);
     }
-    function join() {
-        var i = $('hp-code'), msg = $('hp-code-msg');
+    function join(inputId, msgId) {
+        var i = $(inputId || 'hp-code'), msg = $(msgId || 'hp-code-msg');
         var j = joinTarget(i && i.value);
         var say = function (t, err) { if (msg) { msg.className = err ? 'hp-status hp-err' : 'hp-status'; msg.textContent = t; } };
         if (!j) { say('Type the game code (letters and numbers), or paste the round link.', true); return; }
@@ -908,6 +910,8 @@
         if (q) q.addEventListener('input', search);
         var code = $('hp-code');
         if (code) code.addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+        var scode = $('hs-code');
+        if (scode) scode.addEventListener('keydown', function (e) { if (e.key === 'Enter') join('hs-code', 'hs-code-msg'); });
         // EVERY LAUNCH OPENS MAIN (Manny, 2026-10-12): the last door is highlighted and a
         // round in progress offers Resume; #gps / #games are the in-app links' own.
         var h = (W.location.hash || '').replace('#', '');
@@ -916,13 +920,13 @@
         if (h === 'pick') {
             var lrp = null; try { lrp = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lrp = null; }
             if (lrp && lrp.code) forgetRound(lrp.code, false);
-            show('main');
+            show(homeView());
             gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); });
         }
-        else if (h === 'gps') { show('main'); gpsGate(homeCourse(), function () { if (backToGpsRound()) return; show('gps'); }); }
-        else show(h === 'games' ? h : 'main');
+        else if (h === 'gps') { show(homeView()); gpsGate(homeCourse(), function () { if (backToGpsRound()) return; show('gps'); }); }
+        else show(h === 'games' ? h : homeView());
         mainDecor();
-        backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show('main'); mainDecor(); });
+        backFromBackground(function () { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); show(homeView()); mainDecor(); });
         // A round saved with no signal goes up from here as soon as there is signal (URGENT-009).
         armHeld(db);
     }
@@ -967,6 +971,7 @@
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return;
         var tile = function (course, thru) {
+            if (simpleOn()) return simpleProgress(lr.code, course || lr.course, thru);
             return '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(course || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
         };
         // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
@@ -1000,6 +1005,96 @@
             box.innerHTML = tile(d.courseName, pr.thru);
         }, function () {});
     }
+    // ---- SIMPLER HARDPAN: HOME (mailbox 017, features.simpleFlow) ---------------------
+    // Four doors + Resume, from Manny's mockup (~/Desktop/claude-code-reports/017):
+    //   ↻ Same as last week   (lime, big) last round's course · golfers · games -> Round Setup's own
+    //                          copier (admin.html sameAsLastWeek), then the 3-step New round on Step 3
+    //   + New round            the lobby's own path (createRoom), then the 3-step New round
+    //   Join with a code       ONE box: CODE, CODE G, CODE-G-KEY, a link, or what a QR holds (joinTarget)
+    //   📍 Just GPS (no games) the GPS course picker (GPS-1), as the GPS door
+    //   IN PROGRESS            mainDecor's Resume, drawn as a card (offline from the phone's copy)
+    //   More                   Trip · History · How it works · My stats
+    // OFF (features.simpleFlow false, or no #v-simple): Main exactly as before. The 3-step screens
+    // themselves are simple-flow.js on Round Setup; this page only marks the session for them.
+    var SIMPLE = 'hardpan_simple_flow';
+    function simpleOn() { try { return !!$('v-simple') && typeof W.HardPanFeature === 'function' && W.HardPanFeature('simpleFlow'); } catch (e) { return false; } }
+    function homeView() { return simpleOn() ? 'simple' : 'main'; }
+    function hello() {
+        var h = new Date().getHours(), n = meName();
+        return (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening') + (n && n !== 'Me' ? ', ' + n : '');
+    }
+    // The games a round plays, in a few words (Home's cards).
+    function gamesOf(d) {
+        var games = [];
+        if (!d) return games;
+        if (d.moneyPool && d.moneyPool.enabled) games.push('Weekly Game');
+        if (d.gameFormat && d.gameFormat !== 'stroke') games.push(d.gameFormat.replace(/^\w/, function (x) { return x.toUpperCase(); }));
+        var sm = d.sideMatches || {};
+        Object.keys(sm).forEach(function (k) { var f = sm[k] && sm[k].format; var L = f === 'nassau' ? (Number(sm[k].frontStake) || Number(sm[k].backStake) ? 'Nassau' : 'Match') : f === 'hilo' ? 'Hi-Lo' : null; if (L && games.indexOf(L) === -1) games.push(L); });
+        var inst = d.additionalGameInstances || {};
+        Object.keys(inst).forEach(function (k) { var f = inst[k] && inst[k].format; var L = { skins: 'skins', dots: 'dots', vegas: 'Vegas', bbb: 'BBB' }[f]; if (L && games.indexOf(L) === -1) games.push(L); });
+        return games;
+    }
+    function simpleView() {
+        var v = $('v-simple');
+        if (!v) return;
+        var hi = $('hs-hello'); if (hi) hi.textContent = hello();
+        // GPS-1 and Games (History) get a way back to this Home.
+        ['gps', 'games'].forEach(function (n) {
+            var view = $('v-' + n);
+            if (!view || view.querySelector('[data-hp-act="shome"]')) return;
+            var b = W.document.createElement('button'); b.type = 'button'; b.className = 'hp-link'; b.setAttribute('data-hp-act', 'shome'); b.textContent = '\u2039 Home'; b.style.alignSelf = 'flex-start';
+            view.insertBefore(b, view.firstChild);
+        });
+        // The IN PROGRESS card is mainDecor's Resume (one painter), moved here once.
+        var prog = $('hs-progress'), res = $('hp-resume');
+        if (prog && res && res.parentNode !== prog) prog.appendChild(res);
+        var st = W.document.querySelector('[data-hp-act="sstats"]');
+        if (st) st.style.display = W.HardPanGpsStats && typeof W.HardPanFeature === 'function' && W.HardPanFeature('quickStats') ? '' : 'none';
+        simpleSame();
+    }
+    // SAME AS LAST WEEK: offered only when this phone saved a round that still has golfers (as Games').
+    function simpleSame() {
+        var box = $('hs-same');
+        if (!box) return;
+        var last = ls('lastRoomCode');
+        var paint = function (d) {
+            var ps = d && Array.isArray(d.players) ? d.players.filter(function (p) { return p && String(p.name || '').trim(); }) : [];
+            if (!d || !ps.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+            var g = gamesOf(d);
+            box.style.display = '';
+            box.innerHTML = '<button type="button" class="hs-same" data-hp-act="ssame" data-hs-from="' + esc(last) + '"><span class="t">↻ Same as last week</span>'
+                + '<span class="s">' + esc(shownName(String(d.courseName || 'Your last round').split(' (')[0])) + ' · ' + ps.length + ' golfer' + (ps.length === 1 ? '' : 's') + (g.length ? ' · ' + esc(g.join(' + ')) : '') + '</span></button>';
+        };
+        if (!last) { paint(null); return; }
+        var local = localRound(last);
+        if (local) paint(local.data);
+        if (!H.db) return;
+        timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = s && s.val ? s.val() : null; if (d || !local) paint(d); }, function () {});
+    }
+    function simpleProgress(code, course, thru) {
+        return '<button type="button" class="hs-prog" data-hp-open="' + esc(code) + '"><span class="h">IN PROGRESS</span>'
+            + '<span class="r"><span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' · ' + (thru ? 'Thru ' + thru : 'Not started') + '</span><span class="go">Resume ›</span></span></button>';
+    }
+    function simpleAct(a, b) {
+        if (a === 'snew') { ss(QUICK, null); ss(SIMPLE, 'new'); W.location.href = 'admin.html?start=quick'; return true; }
+        if (a === 'ssame') { ss(QUICK, null); ss(SIMPLE, 'same'); W.location.href = 'admin.html?start=same'; return true; }
+        if (a === 'sjoinopen') { var jb = $('hs-join'); if (jb) { jb.style.display = ''; b.style.display = 'none'; var ji = $('hs-code'); if (ji) ji.focus(); } return true; }
+        if (a === 'sjoin') { join('hs-code', 'hs-code-msg'); return true; }
+        if (a === 'sgps') { gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); }); return true; }
+        if (a === 'shome') { show('simple'); mainDecor(); return true; }
+        if (a === 'strip') { var t = myTrips(); W.location.href = t.length ? 'trip.html?trip=' + encodeURIComponent(t[0]) : 'trip.html#build'; return true; }
+        if (a === 'shistory') { setDoor('games'); show('games'); return true; }
+        if (a === 'show') { W.location.href = 'instructions.html'; return true; }
+        if (a === 'sstats') {
+            var S = W.HardPanGpsStats;
+            if (S && typeof S.openMy === 'function' && W.HardPanGps && typeof W.HardPanGps.requireGps === 'function') W.HardPanGps.requireGps({}, function () { S.openMy(); }, function () {});
+            else if (S && typeof S.openMy === 'function') S.openMy();
+            return true;
+        }
+        return false;
+    }
+
     // BACK FROM THE BACKGROUND AFTER A WHILE (60 min): Main again, like a launch.
     var AWAY_MS = 60 * 60 * 1000;
     function backFromBackground(go) {
@@ -1134,6 +1229,8 @@
     }
     // Round Setup's Round Ready screen calls this first: a quick GPS start skips it.
     function afterSave(code) {
+        // THE 3-STEP NEW ROUND (017): its own share sheet instead of Round Ready.
+        if (W.HardPanSimpleFlow && typeof W.HardPanSimpleFlow.afterSave === 'function' && W.HardPanSimpleFlow.afterSave(code)) return true;
         var nx = agNext();
         if (nx && nx.code === String(code).toUpperCase() && Date.now() - (nx.at || 0) < 2 * 3600 * 1000) {
             if (nx.stage === 'players') {
@@ -1957,6 +2054,7 @@
     }
 
     W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+        position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
