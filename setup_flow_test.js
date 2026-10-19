@@ -288,8 +288,10 @@ describe('BATCH A MOVED NO MONEY', () => {
     // skipping itself is proved in format_first_wizard_test.js.
     test('navigation moves through the workflow, never by a hardcoded offset', () => {
         const src = adm();
-        assert.match(src, /goToWizardStep\(wizardNeighbourStep\(fromStep, 1\)\)/);
-        assert.match(src, /goToWizardStep\(wizardNeighbourStep\(fromStep, -1\)\)/);
+        // Through wizardGoOrSay since mailbox 015 (it goes, or says on screen why not).
+        assert.match(src, /wizardGoOrSay\(wizardNeighbourStep\(fromStep, 1\)\)/);
+        assert.match(src, /wizardGoOrSay\(wizardNeighbourStep\(fromStep, -1\)\)/);
+        assert.match(src, /function wizardGoOrSay\(target\) \{[\s\S]{0,400}goToWizardStep\(target\)/);
         assert.ok(!src.includes('goToWizardStep(fromStep + 1)'), 'no numeric Next');
         assert.ok(!src.includes('goToWizardStep(fromStep - 1)'), 'no numeric Back');
     });

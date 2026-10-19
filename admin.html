@@ -3963,12 +3963,77 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const formatVal = document.getElementById('game-format-select').value;
             if (!formatVal) { uiRefuse('⚠️ Please select a game format before continuing.'); return; }
         }
-        goToWizardStep(wizardNeighbourStep(fromStep, 1));
+        wizardGoOrSay(wizardNeighbourStep(fromStep, 1));
     }
 
     function wizardBack(fromStep) {
-        goToWizardStep(wizardNeighbourStep(fromStep, -1));
+        wizardGoOrSay(wizardNeighbourStep(fromStep, -1));
     }
+
+    // ONE TAP ON NEXT IS ONE STEP, OR A REASON ON SCREEN (mailbox 015).
+    //
+    // Manny, Round Setup on a 20-golfer Weekly Game: his first tap on "Review & Save"
+    // left him on Money with the page jumped, and the second tap went through.
+    // Measured in Chrome with a real tap: a field on Money still had the keyboard up;
+    // the press took focus from it, the keyboard closed, the taller screen clamped the
+    // scroll (the button sits near the bottom of a long page) and the button moved
+    // ~300px out from under the finger before it lifted. The release landed on
+    // something else, so no click - only the jump.
+    //
+    // Two parts. A press on a wizard Back/Next no longer takes focus from the field
+    // (no keyboard close mid-tap); the step change blurs it instead, after the tap.
+    // And a press that STARTED on the button and lifted without the finger moving is
+    // a tap on that button even if the page moved under it - whatever moved it.
+    // If the step still does not change, the reason is said beside the button.
+    function wizardGoOrSay(target) {
+        const ae = document.activeElement;
+        if (ae && ae !== document.body && typeof ae.blur === 'function') ae.blur();
+        const before = currentWizardStep;
+        try {
+            goToWizardStep(target);
+        } catch (e) {
+            try { console.error('[wizard] step change', e); } catch (x) {}
+            if (currentWizardStep === before) {
+                uiRefuse('⚠️ Could not open the next step: ' + String((e && e.message) || e));
+                return;
+            }
+        }
+        if (currentWizardStep === before && target !== before) {
+            uiRefuse('⚠️ Could not open the next step. Tap it again; if it still stays here, go back a step and forward.');
+        }
+    }
+    (function wizardNavTapGuard() {
+        if (typeof document === 'undefined' || !document.addEventListener) return;
+        const NAV = '.wizard-btn-next, .wizard-btn-back';
+        const navOf = (t) => (t && t.closest ? t.closest(NAV) : null);
+        let press = null;
+        try {
+            document.addEventListener('mousedown', (e) => { if (navOf(e.target)) e.preventDefault(); }, true);
+            document.addEventListener('pointerdown', (e) => {
+                const btn = navOf(e.target);
+                press = (btn && e.isPrimary !== false) ? { btn, x: e.clientX, y: e.clientY, t: Date.now(), clicked: false } : null;
+            }, true);
+            document.addEventListener('click', (e) => {
+                if (press && press.btn.contains(e.target)) press.clicked = true;
+            }, true);
+            document.addEventListener('pointerup', (e) => {
+                const p = press;
+                if (!p) return;
+                if (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12 || Date.now() - p.t > 1500) { press = null; return; }
+                const under = document.elementFromPoint(e.clientX, e.clientY);
+                if (under && p.btn.contains(under)) return;   // still under the finger: the browser's own click follows
+                // Moved away: the click (if any) goes to whatever is there now - not wanted.
+                const stray = (ev) => { if (!p.btn.contains(ev.target)) { ev.preventDefault(); ev.stopPropagation(); } };
+                document.addEventListener('click', stray, true);
+                setTimeout(() => {
+                    document.removeEventListener('click', stray, true);
+                    if (press === p) press = null;
+                    if (!p.clicked && !p.btn.disabled && p.btn.isConnected) p.btn.click();
+                }, 0);
+            }, true);
+            document.addEventListener('pointercancel', () => { press = null; }, true);
+        } catch (e) { /* no document events in a bare realm */ }
+    })();
 
     // HARDWARE BACK on the wizard: a step after the first goes to the previous
     // one through the same neighbour rule as the on-screen Back. Nothing on the
