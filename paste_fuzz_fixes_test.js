@@ -43,3 +43,33 @@ describe('FIX 1: the line is cleaned before it is read', () => {
         assert.deepEqual(r.playerLines, [2, 4]);
     });
 });
+
+describe('FIX 2: headers are boundaries, not golfers', () => {
+    test('"Group 1:" / "Group 2 -" / "Team 3." are headers (the fuzzer found "Group 1:" read as a golfer)', () => {
+        const r = P('Group 1:\nMarty 9\nScott 7\nGroup 2 -\nLance 14\nTeam 3.\nPaul 3');
+        assert.deepEqual(r.validPlayers.map(p => p.name), ['Marty', 'Scott', 'Lance', 'Paul']);
+        assert.deepEqual(r.groups, [2, 1, 1]);
+    });
+    test('a list number alone on a line is a header: "1." "2)" "#3" "(4)"; a bare "12" is still a golfer line', () => {
+        const r = P('1.\nMarty 9\n2)\nScott 7\n#3\nLance 14\n(4)\nPaul 3');
+        assert.deepEqual(r.groups, [1, 1, 1, 1]);
+        assert.equal(r.validPlayers.length, 4);
+        assert.equal(R.rosterPasteSeparator('12'), '');
+    });
+    test('a spreadsheet heading row is not a golfer: "Name<TAB>HCP<TAB>Flight", "Player Handicap"', () => {
+        assert.deepEqual(rows('Name\tHCP\tFlight\r\nSkeens\t2.0\tA\r\nGlenn\t12.0\tB'), [['Skeens', '2.0', 'A'], ['Glenn', '12.0', 'B']]);
+        assert.deepEqual(rows('Player Handicap\nMarty 9'), [['Marty', '9', null]]);
+        // a golfer whose name happens to be a heading word is still a golfer
+        assert.deepEqual(rows('Name 12'), [['Name', '12', null]]);
+    });
+    test('"A Flight" / "Flight B:" headers give the golfers under them that flight; a letter on the line wins', () => {
+        const r = P('A Flight\nSkeens 2\nManny +2\n\nFlight B:\nGlenn 12\nPaul 3 A');
+        assert.deepEqual(r.validPlayers.map(p => [p.name, p.flight]), [['Skeens', 'A'], ['Manny', 'A'], ['Glenn', 'B'], ['Paul', 'A']]);
+        assert.deepEqual(r.groups, [2, 2]);
+        assert.deepEqual(r.flights, { A: 3, B: 1, unlettered: 0 });
+    });
+    test('the old headers still work, and "Group Captain Smith 8" is still a golfer', () => {
+        ['Group 4', 'GROUP 4', 'Grp 2', 'Flight A', 'Team 1', 'Tee Time', 'Group 4 - 8:24 AM'].forEach(l => assert.equal(R.rosterPasteSeparator(l), 'header', l));
+        assert.equal(R.rosterPasteSeparator('Group Captain Smith 8'), '');
+    });
+});

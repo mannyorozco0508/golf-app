@@ -196,7 +196,17 @@ function duplicateNamesNote(list) {
 // name after the number and stays a golfer, which is the direction this must err
 // in. A golfer is never silently dropped; at worst a header nobody listed stays a
 // golfer, and that is visible on the review.
-var ROSTER_HEADER_WORDS = /^(?:group|grp|flight|foursome|team|tee\s*time|tee)\s*[:#.\-\u2013\u2014]?\s*(?:[0-9]{1,2}|[A-Za-z])?$/i;
+// URGENT-008: a header may end in its own punctuation ("Group 1:", "Group 1 -",
+// "Team 2.", "Foursome 3)") - the fuzzer found "Group 1:" read as a GOLFER.
+var ROSTER_HEADER_WORDS = /^(?:group|grp|flight|foursome|team|tee\s*time|tee)\s*[:#.\-\u2013\u2014]?\s*(?:[0-9]{1,2}|[A-Za-z])?\s*[:.)\-\u2013\u2014]?$/i;
+// "A Flight", "B flight:" - the letter first. Only A and B (the flights that exist).
+var ROSTER_FLIGHT_FIRST_HEADER = /^([AB])\s*[-\u2013\u2014]?\s*flight\s*[:.\-\u2013\u2014]?$/i;
+// A list number on a line by itself: "1.", "2)", "#3", "4:", "(5)". A BARE number
+// ("12") is not one - it stays a golfer line, so it shows on the review.
+var ROSTER_NUMBER_HEADER = /^(?:#\s?\d{1,2}[.:)]?|\(?\d{1,2}[.:)])$/;
+// A spreadsheet's column headings: every word is a heading word, and one of them
+// names the golfer column ("Name<TAB>HCP<TAB>Flight", "Player Handicap").
+var ROSTER_COLUMN_WORDS = /^(?:name|names|player|players|golfer|golfers|first|last|full|hcp|hdcp|hcap|handicap|handicaps|index|hi|flight|flt|tee|tees|group|grp|no|#)\.?$/i;
 var ROSTER_TRAILING_TIME = /[\s\-\u2013\u2014(,:]*\d{1,2}[:.]\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)?\s*\)?$/i;
 
 // '' for a golfer line; 'blank', 'header' or 'time' for a separator.
@@ -206,7 +216,21 @@ function rosterPasteSeparator(line) {
     var head = t.replace(ROSTER_TRAILING_TIME, '').trim();
     if (!head) return 'time';                       // the whole line was a tee time
     if (ROSTER_HEADER_WORDS.test(head)) return 'header';
+    if (ROSTER_FLIGHT_FIRST_HEADER.test(head)) return 'header';
+    if (ROSTER_NUMBER_HEADER.test(t)) return 'header';
+    var words = t.split(/[\s,|\/]+/).filter(Boolean);
+    if (words.length >= 2 && words.length <= 6 && words.every(function (w) { return ROSTER_COLUMN_WORDS.test(w); })
+        && words.some(function (w) { return /^(?:name|names|player|players|golfer|golfers|first|last)$/i.test(w); })) return 'header';
     return '';
+}
+
+// THE FLIGHT A HEADER NAMES (URGENT-008): "Flight A", "A Flight", "flight b:" -> 'A' / 'B'.
+// The golfers under it, with no letter of their own, play in that flight. null for
+// any other line.
+function rosterFlightHeader(line) {
+    var t = String(line == null ? '' : line).trim().replace(ROSTER_TRAILING_TIME, '').trim();
+    var m = /^flight\s*[:#.\-\u2013\u2014]?\s*([AB])\s*[:.)\-\u2013\u2014]?$/i.exec(t) || ROSTER_FLIGHT_FIRST_HEADER.exec(t);
+    return m ? m[1].toUpperCase() : null;
 }
 
 // ---- A TEE AT THE END OF A LINE, AND ONLY A REAL ONE (2026-10-05) --------
@@ -286,6 +310,7 @@ function parsePlayerPasteText(text, teeNames) {
     let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
     let groups = [];
     let inGroup = false;     // true while inside a run of non-empty lines
+    let headerFlight = null; // set by a "Flight A" / "B Flight" header line
     lines.forEach((rawLine, idx) => {
         // URGENT-008: tabs, non-breaking spaces and runs of spaces are one space;
         // a bullet or a list number in front of the line is not part of the name.
@@ -293,7 +318,13 @@ function parsePlayerPasteText(text, teeNames) {
         // A BLANK LINE, A GROUP HEADER OR A BARE TEE TIME all close the current run.
         // See rosterPasteSeparator above for why a header must not be a golfer: six
         // "Group N" lines became six phantom golfers, each with a handicap.
-        if (rosterPasteSeparator(line)) { inGroup = false; return; }
+        if (rosterPasteSeparator(line)) {
+            // "Flight A" over a block of golfers gives them A (URGENT-008); another
+            // header or a blank line leaves the flight as it is.
+            const fh = rosterFlightHeader(line);
+            if (fh) headerFlight = fh;
+            inGroup = false; return;
+        }
         if (!inGroup) { groups.push(0); inGroup = true; }
 
         // v194: a trailing period comes off a pasted name ("Anthony." -> "Anthony";
@@ -311,7 +342,7 @@ function parsePlayerPasteText(text, teeNames) {
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
-            const fl = trail.flight || lead.flight;
+            const fl = trail.flight || lead.flight || headerFlight;
             if (fl) tp.flight = fl;
             validPlayers.push(tp);
             playerLines.push(idx + 1);
@@ -341,6 +372,7 @@ function parsePlayerPasteText(text, teeNames) {
         // accepted. Stored names are never rewritten; this is the paste only.
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
+        else if (headerFlight) player.flight = headerFlight;
         if (teed.tee) player.teeName = teed.tee;
         validPlayers.push(player);
         playerLines.push(idx + 1);
@@ -400,7 +432,7 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { rosterPasteCleanLine, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+    module.exports = { rosterPasteCleanLine, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }
