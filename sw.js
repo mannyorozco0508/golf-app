@@ -4733,6 +4733,8 @@ const SHELL_FILES = [
     './hp-index.js',
     // 017: the + Bet sheet and the money chip (simpleFlow).
     './gps-bet.js',
+    // 017: the Round Menu, Settle up, Bets and the Card as sheets (simpleFlow).
+    './gps-round.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
     // GPS:END

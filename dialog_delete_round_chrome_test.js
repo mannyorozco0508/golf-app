@@ -50,7 +50,8 @@ const DB = { events: { DELE1: round() }, global_courses: {}, trips: {}, tourname
 // The delete button lives behind the organizer view (no ?group= in the URL) and
 // inside the Finish Round area, so the round is opened and the control rendered
 // the way the page itself renders it.
-const PRE = 'window.__STUBDB = ' + JSON.stringify(DB) + ';' + `
+// The old flow's Round Menu (017 simpleFlow off on this phone; the new menu reaches the same sheet as Round settings).
+const PRE = "try { localStorage.setItem('hardpan_simple_flow', 'off'); } catch (e) {}" + 'window.__STUBDB = ' + JSON.stringify(DB) + ';' + `
 (function () {
     window.__removed = [];
     window.__nativeDialog = 0;
