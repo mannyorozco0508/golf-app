@@ -9826,6 +9826,46 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             + 'still plays every whole-field game, and Side Matches pick their own players separately.';
     }
 
+    // ROWS THAT HOLD A WHOLE PASTED LINE AS THEIR NAME (URGENT-004). A list pasted
+    // before roster-paste.js read "Glenn 12.0/B" left that whole string in the name
+    // box, the handicap empty and no flight. Every redraw of the roster (Flights
+    // switched on, the step reopened, a format change) now splits such a row into
+    // name / handicap / flight - only when its handicap box is empty - turns Flights
+    // on if a flight was read, and says how many golfers it fixed. Nothing is saved
+    // until the organizer saves, as with any edit on this step.
+    let fixingPastedRows = false;
+    function fixPastedRowsOnRoster(list) {
+        if (fixingPastedRows || typeof fixPastedRows !== 'function') return list;
+        const r = fixPastedRows(list);
+        if (!r.fixed) return list;
+        if (r.anyFlight && !flightsEnabledNow()) {
+            // setFlightsEnabled redraws the roster from the rows on screen; the
+            // guard keeps that inner redraw from fixing (and noting) a second time.
+            fixingPastedRows = true;
+            try { setFlightsEnabled(true); } finally { fixingPastedRows = false; }
+        }
+        showRosterFixNote('Fixed ' + r.fixed + ' golfer' + (r.fixed === 1 ? "'s handicap" : "s' handicaps") + (r.anyFlight ? ' and flights' : '') + '.');
+        return r.list;
+    }
+    // One line above the roster: the fix count and, when two golfers share a name,
+    // the ask for a last initial. Replaced on every redraw.
+    function showRosterFixNote(fixText) {
+        const list = document.getElementById('player-list');
+        if (!list || !list.parentNode) return;
+        let el = document.getElementById('roster-fix-note');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'roster-fix-note';
+            el.className = 'paste-flagged-line';
+            el.setAttribute('role', 'status');
+            list.parentNode.insertBefore(el, list);
+        }
+        if (fixText != null) el.setAttribute('data-fix', fixText);
+        const fix = el.getAttribute('data-fix') || '';
+        const dup = (typeof duplicateNamesNote === 'function') ? duplicateNamesNote(captureCurrentPlayerInputs()) : '';
+        el.textContent = [fix, dup].filter(Boolean).join(' ');
+        el.style.display = el.textContent ? '' : 'none';
+    }
     function renderPlayerList(forceLoad = false) {
         const listContainer = document.getElementById("player-list");
         
@@ -9835,12 +9875,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } else {
             existingData = captureCurrentPlayerInputs(); 
         }
+        existingData = fixPastedRowsOnRoster(existingData);
 
         listContainer.innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p) => appendPlayerFrom(p, !!forceLoad, existingData.length));
         updateCount();
+        showRosterFixNote();
     }
 
     // The box shows the Handicap Index. A round saved before conversion has no
@@ -10396,6 +10438,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             html += `<div style="margin-top:4px;">\u{1F170}\u{1F171} ${flights.A} in A, ${flights.B} in B${flightsEnabledNow() ? '' : ' \u2014 flights will be turned on'}`;
             if (flights.unlettered > 0) html += `. ${flights.unlettered} ${flights.unlettered === 1 ? 'golfer has' : 'golfers have'} no letter and ${flights.unlettered === 1 ? 'goes' : 'go'} in A \u2014 tap a golfer's A/B to move them.`;
             html += `</div>`;
+        }
+        // SAME NAME TWICE (URGENT-004): kept as two golfers, never merged - said here.
+        if (typeof duplicateNamesNote === 'function') {
+            const dupNote = duplicateNamesNote(validPlayers);
+            if (dupNote) html += `<div class="paste-flagged-line">\u2139\uFE0F ${escapeHtml(dupNote)}</div>`;
         }
         if (flaggedFlights.length > 0) {
             const lineList = flaggedFlights.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
@@ -10969,6 +11016,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         existingData.forEach(p => appendPlayerFrom(p, false, existingData.length));
         updateCount();
 
+        showRosterFixNote();
         document.getElementById('paste-players-textarea').value = '';
         document.getElementById('paste-preview-summary').innerHTML = '';
         closePastePlayersModal();
