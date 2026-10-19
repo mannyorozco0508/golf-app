@@ -26,7 +26,9 @@ const run = (sb, e) => vm.runInContext(e, sb);
 const J = v => JSON.parse(JSON.stringify(v));
 const TOKEN = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6';
 const CD = makeCourseData(18);
-const GPS_SKIP = /function hpSpectating\(/.test(SRC) ? {} : { skip: 'Consumer tree: ?spectate=1 is HardPan (GPS) only' };
+// HardPan only: the row and the move sit in GPS blocks, so the Consumer build's
+// index.html stays byte-identical to the pinned pre-GPS one (gps_flag_test.js).
+const GPS_SKIP = /function openOrganizerClaim\(/.test(SRC) ? {} : { skip: 'Consumer tree: the "I\'m the organizer" row is HardPan (GPS) only' };
 
 function round(ownerUid) {
     const r = wizardSavedRound({ code: 'ORG1', courseData: CD, thru: 9, ownerUid });
@@ -49,10 +51,13 @@ const rowOnclick = (sb, role) => {
 };
 const STUCK = () => round('a-different-browser');   // the token is on the round; this device is not the owner
 
-describe('URGENT-011: the box is in the joining sheet, not on the card', () => {
+describe('URGENT-011: the box is in the joining sheet, not on the card', GPS_SKIP, () => {
     test('#organizer-claim-mount is inside #group-pick-overlay and nowhere above the card', () => {
-        const at = SRC.indexOf('id="organizer-claim-mount"');
-        assert.equal(SRC.split('id="organizer-claim-mount"').length, 2, 'one mount');
+        // the Consumer line sits commented out in a GPS:ELSE ("// <div id=...>") inside an
+        // HTML comment; only the live element counts
+        const live = SRC.split('\n').map((l, i) => [l, i]).filter(([l]) => /id="organizer-claim-mount"/.test(l) && !/^\s*\/\//.test(l));
+        assert.equal(live.length, 1, 'one live mount');
+        const at = SRC.indexOf(live[0][0]);
         const overlay = SRC.indexOf('id="group-pick-overlay"');
         const overlayEnd = SRC.indexOf('<!-- WHICH GOLFER ARE YOU?', overlay);
         assert.ok(overlay > 0 && at > overlay && at < overlayEnd, 'the mount sits in the "How are you joining this round?" sheet');
@@ -107,7 +112,7 @@ describe('URGENT-011: the box is in the joining sheet, not on the card', () => {
         const sb = await scorecard(d);
         assert.equal(rowOnclick(sb, 'organizer'), null);
     });
-    test('a SPECTATOR (?spectate=1): no sheet, no row, no box', GPS_SKIP, async () => {
+    test('a SPECTATOR (?spectate=1): no sheet, no row, no box', async () => {
         const sb = await scorecard(STUCK(), '?game=org1&spectate=1');
         assert.ok(!shown(sb));
         assert.equal(rowOnclick(sb, 'organizer'), null);

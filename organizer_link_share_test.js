@@ -156,10 +156,14 @@ async function scorecard(data, search) {
     h.cb({ val: () => J(data), exists: () => true });
     return sb;
 }
-// URGENT-011 (013-11): the box is no longer on the card's top. It opens from the
-// "I'm the organizer" row of the "How are you joining this round?" sheet, so a
-// claim starts with that tap - the row's own onclick, run as written.
+// URGENT-011 (013-11): in HardPan the box is no longer on the card's top. It opens
+// from the "I'm the organizer" row of the "How are you joining this round?" sheet,
+// so a claim starts with that tap - the row's own onclick, run as written. The
+// Consumer build (GPS blocks removed; its index.html is pinned byte for byte by
+// gps_flag_test.js) keeps the box on the card, so there is no row to tap there.
+const ROW_TREE = /function openOrganizerClaim\(/.test(read('index.html'));
 function tapOrganizerRow(sb) {
+    if (!ROW_TREE) return;
     const body = String(run(sb, "document.getElementById('group-pick-body').innerHTML || ''"));
     const m = /<button[^>]*data-role="organizer"[^>]*onclick="([^"]+)"/.exec(body);
     assert.ok(m, 'the joining sheet offers "I\'m the organizer": ' + body.slice(0, 300));
@@ -183,7 +187,7 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
     test('ANOTHER DEVICE on the bare link (the 2026-09-21 case): the doors are hidden and the claim box is offered', async () => {
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }));
         assert.ok(!/Edit round setup|👥 Players/.test(html(sb, 'group-filter-container')), 'no doors');
-        assert.equal(html(sb, 'organizer-claim-mount'), '', 'not on arrival: the box waits behind the row');
+        if (ROW_TREE) assert.equal(html(sb, 'organizer-claim-mount'), '', 'not on arrival: the box waits behind the row');
         tapOrganizerRow(sb);
         const box = html(sb, 'organizer-claim-mount');
         assert.match(box, /Are you the organizer\? Paste your organizer link\./);
@@ -249,7 +253,7 @@ describe('THE SCORECARD: Share on the organizer row, the claim box on a stuck ba
         const fn = src.slice(src.indexOf('function renderGroupFilters(playersCount)'), src.indexOf('\n    function filterGroup'));
         assert.ok(fn.indexOf("if (hasGroupLock) {") < fn.indexOf('renderOrganizerClaim();'), 'the early return comes first');
         const sb = await scorecard(round({ ownerUid: 'a-different-browser' }), '?game=org1&group=2');
-        run(sb, 'organizerClaimOpen = true; renderOrganizerClaim();');
+        run(sb, (ROW_TREE ? 'organizerClaimOpen = true; ' : '') + 'renderOrganizerClaim();');
         assert.equal(html(sb, 'organizer-claim-mount'), '', 'called directly on a locked link (even with the row "tapped"): still nothing');
         // and a CLEAN case still renders, so the isolation test cannot be satisfied
         // by a renderer that simply refuses everything
@@ -467,7 +471,7 @@ const PROBE1 = `(() => JSON.stringify({
 const C = {};
 before(async () => {
     const r = await arriveCold({ url: fileUrl('index.html', 'game=ORG1'), db: DB, settleMs: 4000, steps: [
-        { tap: '#group-pick-overlay [data-role="organizer"]', nth: 0 }, { sleep: 250 },
+        { tap: '#group-pick-overlay [data-role="' + (ROW_TREE ? 'organizer' : 'watching') + '"]', nth: 0 }, { sleep: 250 },
         { expression: PROBE0 },
         { tap: '#oc-input', nth: 0 }, { sleep: 150 },
         ...(ORIGIN + '/index.html?game=ORG1&organizer=' + TOKEN).split('').map(ch => ({ cdp: { method: 'Input.insertText', params: { text: ch } } })),
