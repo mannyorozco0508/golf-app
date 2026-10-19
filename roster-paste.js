@@ -277,15 +277,19 @@ function splitTrailingTee(text, teeNames) {
 }
 
 function parsePlayerPasteText(text, teeNames) {
-    const lines = text.split('\n');
+    // \r\n (Excel, Windows) and a lone \r (old Mac exports) end a line too.
+    const lines = String(text == null ? '' : text).split(/\r\n|\r|\n/);
     let validPlayers = [];
+    let playerLines = [];        // URGENT-008: the 1-based line each golfer came from (parallel to validPlayers)
     let flaggedLines = [];
     let flaggedFlights = [];     // a leading letter that is not A or B - kept as typed, said in the preview
     let notedLines = [];         // "(captain)" and the like: taken off the line, reported in the preview
     let groups = [];
     let inGroup = false;     // true while inside a run of non-empty lines
     lines.forEach((rawLine, idx) => {
-        const line = rawLine.trim();
+        // URGENT-008: tabs, non-breaking spaces and runs of spaces are one space;
+        // a bullet or a list number in front of the line is not part of the name.
+        const line = rosterPasteCleanLine(rawLine);
         // A BLANK LINE, A GROUP HEADER OR A BARE TEE TIME all close the current run.
         // See rosterPasteSeparator above for why a header must not be a golfer: six
         // "Group N" lines became six phantom golfers, each with a handicap.
@@ -310,6 +314,7 @@ function parsePlayerPasteText(text, teeNames) {
             const fl = trail.flight || lead.flight;
             if (fl) tp.flight = fl;
             validPlayers.push(tp);
+            playerLines.push(idx + 1);
             groups[groups.length - 1]++;
             return;
         }
@@ -338,6 +343,7 @@ function parsePlayerPasteText(text, teeNames) {
         if (flight) player.flight = flight;
         if (teed.tee) player.teeName = teed.tee;
         validPlayers.push(player);
+        playerLines.push(idx + 1);
         groups[groups.length - 1]++;
     });
     groups = groups.filter(n => n > 0);   // a run made only of flagged lines is not a group
@@ -346,7 +352,43 @@ function parsePlayerPasteText(text, teeNames) {
         ? { A: validPlayers.filter(p => p.flight === 'A').length, B: validPlayers.filter(p => p.flight === 'B').length, unlettered: validPlayers.filter(p => !p.flight).length }
         : null;
     const duplicates = duplicateRosterNames(validPlayers);
-    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, duplicates };
+    return { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, duplicates, playerLines };
+}
+
+// ---- THE LINE AS PASTED, CLEANED (URGENT-008, 2026-10-18) -------------------
+//
+// The paste fuzzer (tools/sim/paste-fuzz.js) pasted lists the ways organizers do
+// and found the line itself was never cleaned beyond trim():
+//
+//   Excel / Sheets   "Zack\tCarrano\t6\tA" -> a golfer named "Zack<TAB>Carrano"
+//   iMessage / Notes "Big\u00A0Jim 12"      -> a name holding a non-breaking space,
+//                                             which never matches "Big Jim" again
+//   Notes bullets    "\u2022 Skeens 2.0/A"   -> a golfer named "\u2022 Skeens"
+//   numbered lists   "1) Skeens 2.0 A"      -> a golfer named "1) Skeens"
+//
+// So, before anything reads the line: every run of whitespace (tab, NBSP, the
+// narrow NBSP iOS puts before AM) is one space; invisible zero-width marks go;
+// and ONE leading bullet (\u2022 * \u25AA \u25CF \u25E6 \u2023 \u00B7, or a
+// dash with a space after it) or list number ("1)", "1.", "(1)", "#1") comes off.
+//
+// WHAT IS NOT A LIST NUMBER: a number with no bracket or dot after it. "12 Skeens"
+// may be a handicap written first; it stays on the line, and checkLines below
+// says so. A dash glued to a word ("-Rod") is not a bullet. A dot followed by a
+// digit ("1.5 Skeens") is not a list number.
+const ROSTER_BULLET_RE = /^(?:[\u2022\u2023\u2043\u2219\u25AA\u25AB\u25CF\u25E6\u25A0\u25A1\u00B7*>]+\s*|[-\u2013\u2014]\s+)/;
+const ROSTER_LIST_NUMBER_RE = /^(?:\(?\d{1,2}[.)]|#\s?\d{1,2}[.):]?)\s+/;
+function rosterPasteCleanLine(raw) {
+    let t = String(raw == null ? '' : raw)
+        .replace(/[\u200B\u200C\u2060\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    for (let i = 0; i < 2; i++) {
+        const b = t.replace(ROSTER_BULLET_RE, '');
+        const n = b.replace(ROSTER_LIST_NUMBER_RE, '');
+        if (n === t) break;
+        t = n.trim();
+    }
+    return t;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -358,7 +400,7 @@ if (typeof module !== 'undefined' && module.exports) {
         try { stripTrailingNote = require('./my-groups.js').stripTrailingNote; }
         catch (e) { /* a caller without it gets the guard's own answer: no note */ }
     }
-    module.exports = { BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
+    module.exports = { rosterPasteCleanLine, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote };
 }
