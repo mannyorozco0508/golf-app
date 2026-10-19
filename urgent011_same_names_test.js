@@ -124,7 +124,11 @@ describe('Save / Save & Start waits until the names differ', () => {
     });
     test('the draft dry run is not refused (it must keep the whole round while a name is being fixed)', () => {
         const src = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
-        assert.match(src, /if \(typeof hpDry === 'undefined' \|\| !hpDry\) \{\s*const same = rosterSameNames\(\);/);
+        // The refusal always runs; only the GPS build's draft dry run (hpDry, inside a GPS block)
+        // switches it off. The Consumer build carries no draft code at all.
+        assert.match(src, /let refuseSameNames = true;[\s\S]{0,200}if \(refuseSameNames\) \{\s*const same = rosterSameNames\(\);/);
+        if (fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'))) assert.match(src, /\/\/ GPS:BEGIN\s*if \(hpDry\) refuseSameNames = false;[^\n]*\n\s*\/\/ GPS:END/);
+        else assert.ok(!/hpDry/.test(src), 'no draft code in the Consumer admin.html');
     });
 });
 
