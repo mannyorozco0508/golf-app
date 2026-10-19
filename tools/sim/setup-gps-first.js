@@ -391,19 +391,14 @@ async function checkPlayers(s, want) {
 // ---- THE GAMES (path A) ----------------------------------------------------------------------------
 const GOLFERS = ['Joe Russo', 'Randy Tate', 'Mike Lane'];
 const GAMES = {
-    // Quick start Skins: Players first -> back to the round with the Skins sheet -> Add Skins ->
-    // Round Setup Money (filled in) -> Review -> Save.
+    // All games > Skins (URGENT-010: the quick-start tiles are gone): Players first -> Round Setup
+    // Money (Round Setup's own Skins template) -> Review -> Save.
     skins: async (s) => {
-        await s.tap('#fd-addgame [data-ag-q="skins"]', null, 'skins', { settle: 1500 });
-        if (await playersFirst(s, GOLFERS, 'Skins')) await s.waitNav(/index\.html\?game=/, 15000);
-        await s.waitNav("!!document.getElementById('fd-ag-cta')", 12000);
-        await s.mark('skins-config');
-        const cta = await s.j.evaluate("(document.getElementById('fd-ag-cta') || {}).textContent || ''");
-        await s.tap('#fd-ag-cta', null, 'add-skins', { wait: /admin\.html/ });
+        await s.tap('#fd-addgame [data-ag-all="skins"]', null, 'skins', { settle: 1500 });
+        await playersFirst(s, GOLFERS, 'Skins');
+        await s.waitNav(/admin\.html\?game=[^&]+&tpl=skins/, 15000);
         await s.waitNav("typeof skinsInstances !== 'undefined' && skinsInstances.length > 0", 10000);
-        const amt = await s.j.evaluate("(function(){ var i = document.querySelector('#skins-instances input[type=tel], .skins-buyin input, input[id*=skins][id*=buy]'); var t = document.body.innerText; var m = /Buy-in per golfer[^$]*?\\$?(\\d+)/.exec(t); var pot = /\\$(\\d+) total pot/.exec(t); return JSON.stringify({ buyin: m && m[1], pot: pot && pot[1] }); })()");
-        const a = JSON.parse(amt);
-        if (/\$2 a skin/.test(cta) && a.pot) s.find('HIGH', 'Skins quick start says "$2 a skin"; Round Setup makes it a $2-a-golfer pot ($' + a.pot + ' total)', 'the tile and its button promise a per-skin price; the saved game is a buy-in pot - a different bet', { known: 'K-SKIN$' });
+        await s.mark('skins-money');
         await saveRoundSetup(s);
         return 'skins';
     },
@@ -449,14 +444,16 @@ const GAMES = {
         await backFromMatches(s);
         return 'side';
     },
+    // All games > Nassau (URGENT-010: no quick-start tile): Players first -> Side Bets' Add form on
+    // Nassau -> pick two golfers -> Save -> back on the round.
     nassau: async (s) => {
-        await s.tap('#fd-addgame [data-ag-q="nassau"]', null, 'nassau', { settle: 1500 });
-        if (await playersFirst(s, GOLFERS, 'Nassau')) await s.waitNav(/index\.html\?game=/, 15000);
-        await s.waitNav("!!document.getElementById('fd-ag-cta')", 12000);
-        await s.mark('nassau-config');
-        await s.tap('#fd-ag-cta', null, 'add-nassau', { wait: /sidematches\.html/ });
+        await s.tap('#fd-addgame [data-ag-all="nassau"]', null, 'nassau', { settle: 1500 });
+        if (await playersFirst(s, GOLFERS, 'Nassau')) await s.waitNav(/sidematches\.html|index\.html/, 15000);
+        await s.waitNav(/sidematches\.html/, 15000);
         await s.waitNav("!!document.getElementById('sm-save-btn')", 12000);
         await s.mark('nassau-sidebets');
+        await s.tap('#sm-player-picker-a button, #sm-player-picker-a .sm-chip, #sm-player-picker-a > *', null, 'pick-golfer-1', { index: 0, settle: 300 });
+        await s.tap('#sm-player-picker-a button, #sm-player-picker-a .sm-chip, #sm-player-picker-a > *', null, 'pick-golfer-2', { index: 1, settle: 300 });
         await s.tap('#sm-save-btn', null, 'start-action', { settle: 2500 });
         await backFromMatches(s);
         return 'nassau';
@@ -465,7 +462,7 @@ const GAMES = {
     // From GPS: Games -> Add a game has no flights row; the golfer goes Card -> ≡ Round Menu ->
     // Edit round setup -> Players.
     flights: async (s) => {
-        const rows = await s.j.evaluate("Array.prototype.map.call(document.querySelectorAll('#fd-addgame .ag-row, #fd-addgame .ag-tile'), function (b) { return b.textContent; }).join(' | ')");
+        const rows = await s.j.evaluate("Array.prototype.map.call(document.querySelectorAll('#fd-addgame .ag-row'), function (b) { return b.textContent; }).join(' | ')");
         if (!/flight/i.test(rows)) s.find('MEDIUM', 'Flights cannot be found from the Games pill', 'Add a game lists no Flights (A/B); it lives on Round Setup > Players, reached only by Card > ≡ Round Menu > Edit round setup', { known: 'K-FLIGHT' });
         // KP pool / Weekly game is the game flights split; Players first is where the switch is.
         await s.tap('#fd-addgame [data-ag-all="kp"]', null, 'kp-weekly', { settle: 1500 });
@@ -654,7 +651,7 @@ async function pathF(returning) {
 
 // ---- RUN ----------------------------------------------------------------------------------------------
 // The ranked list handed back (2026-10-18): a finding with one of these keys is KNOWN, not a regression.
-const KNOWN = new Set(['K-JOIN', 'K-SIDE', 'K-SKIN$', 'K-FLIGHT', 'K-DENY1', 'K-DENY2', 'K-SMBACK']);
+const KNOWN = new Set(['K-JOIN', 'K-SIDE', 'K-FLIGHT', 'K-DENY1', 'K-DENY2', 'K-SMBACK']);
 (async () => {
     const plan = [];
     for (const g of ['skins', 'dots', 'kp', 'weekly', 'side', 'nassau', 'flights']) {

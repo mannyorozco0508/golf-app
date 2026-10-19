@@ -1788,18 +1788,9 @@ html {
              which is how "Ryder Cup" in a dropdown came to mean the legacy team money
              game and walked the organizer into 1v1 betting controls. -->
         <!-- GPS:BEGIN -->
-        <!-- BET TEMPLATES (HardPan, gps-features): one tap picks an EXISTING game and
-             fills its EXISTING settings - no new game, no engine change. -->
-        <div id="gps-bet-templates" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 12px;">
-            <span style="font-size:0.78rem; font-weight:800; color:var(--text-muted);">Quick start:</span>
-            <button type="button" class="gps-tpl" data-tpl="nassau" onclick="gpsApplyTemplate('nassau')">$5 Nassau</button>
-            <button type="button" class="gps-tpl" data-tpl="skins" onclick="gpsApplyTemplate('skins')">$2 Skins</button>
-            <button type="button" class="gps-tpl" data-tpl="wolf" onclick="gpsApplyTemplate('wolf')">$1 Wolf</button>
-            <button type="button" class="gps-tpl" data-tpl="bbb" onclick="gpsApplyTemplate('bbb')">$1 Bingo Bango Bongo</button>
-            <button type="button" class="gps-tpl" data-tpl="vegas" onclick="gpsApplyTemplate('vegas')">$1 Vegas</button>
-            <div id="gps-tpl-note" role="status" style="flex-basis:100%; font-size:0.78rem; color:var(--brand-green); font-weight:700;"></div>
-        </div>
-        <style>.gps-tpl{min-height:40px; padding:8px 14px; border-radius:999px; border:1px solid var(--brand-green); background:var(--bg-card); color:var(--brand-green); font-weight:800; cursor:pointer;}</style>
+        <!-- (The GPS "Quick start:" chips - $5 Nassau, $2 Skins, $1 Wolf, $1 BBB, $1 Vegas - are
+             gone, URGENT-010: Manny never uses them. gpsApplyTemplate stays: Add a game >
+             All games opens Skins / Vegas / BBB / Wolf through it, ?tpl=.) -->
         <!-- GPS:END -->
         <div class="fmt-grid" id="format-card-grid" role="radiogroup" aria-labelledby="format-question-label">
 
@@ -3146,8 +3137,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function gpsTemplateArrive(n) {
         const id = gpsPendingTemplate;
         if (!id || n !== WIZARD_STEP_OF.action) return;
-        // From GPS-4's Quick start (front-door.js): the $ and the golfers chosen there
-        // (Vegas: Team A then Team B). Without them, the template's own defaults.
+        // window.__hpTplOpts: the $ and golfers a caller may hand over (the GPS-4 Quick start
+        // did, until URGENT-010 removed it; nothing sets it now). Without them, the template's own defaults.
         const o = window.__hpTplOpts || null;
         window.__hpTplOpts = null;
         const all = collectWizardPlayers();

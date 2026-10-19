@@ -63,7 +63,10 @@ Rules that would need ADDING (additive; nothing existing changes):
 - After the trip (same pattern as stats): `player_stats/<uid>/shots/<round>/h<n>` =
   list of points — owner-only rule. It is location data: only with the golfer's opt-in.
 
-## 5. Bet templates (Games step → "Quick start")
+## 5. Bet templates (reached from Add a game > All games, ?tpl=)
+- URGENT-010: the "Quick start" chips on Round Setup and the Add a game quick-start tiles are
+  removed (Manny never uses them). The templates below stay: All games > Skins / Vegas / BBB /
+  Wolf opens Round Setup through them.
 - Nassau, Skins, Wolf EXIST. Templates only pre-fill the existing setup:
   - **$5 Nassau**: Nassau card; on Money: front / back / overall $5 (pick golfers).
   - **$2 Skins**: Stroke Play; on Money: one Skins game, $2/skin, carry over, everyone in.
@@ -147,7 +150,7 @@ Rules that would need ADDING (additive; nothing existing changes):
 - Stored as `events/<round>/additionalGameInstances/<id>` with format `bbb` / `vegas` - the map
   the Action tab and Round Setup already write. The only new write: a BBB point,
   `.../<id>/points/h<n>/<bingo|bango|bongo>` = golfer id. No rule change.
-- Set up: Round Setup -> Quick start "$1 Bingo Bango Bongo" / "$1 Vegas", or Money step ->
+- Set up: Add a game > All games > Bingo Bango Bongo / Vegas, or Money step ->
   Also Playing -> "+ Bingo Bango Bongo" / "+ Vegas": $ per point, golfers (BBB), Team A /
   Team B (Vegas, tap to cycle), Birdie flip. Paste the whole trip / round reads both names
   ("vegas $1 birdie flip", "$2 bbb", "bingo bango bongo").
@@ -237,7 +240,7 @@ Rules that would need ADDING (additive; nothing existing changes):
   Build a trip from one paste). The pick is kept (hardpan_front_door); the next open goes straight there.
 - GPS: a GPS READY course starts an ordinary round through Round Setup's own Save (you as the golfer)
   and opens it on GPS (GPS-2, unchanged + "Score", "+ Game", a "Games" chip). + Game = GPS-4: the
-  round's golfers, quick start Nassau / Skins / Vegas / BBB (Round Setup's own templates, on Money),
+  round's golfers (no quick-start tiles since URGENT-010),
   Paste the whole round, Full game setup, Not now. GPS-3: the card of a no-money round offers
   + Add a player / + Add a game / Save · back to map (typed score boxes unchanged).
 - Games: today's screens; a round stays on the card (no location) until the green 📍 GPS pill.
@@ -262,10 +265,8 @@ Rules that would need ADDING (additive; nothing existing changes):
   Vegas): first two tapped = Team A, next two = Team B, a re-tap un-picks, "Team A: __ & __ / Team B:
   __ & __" and Swap teams; asked only when the paste doesn't name the sides ("GROUP 1 - $5 NASSAU
   (Manny & Joe vs Mike & Dave)", "A/B v C/D": matched to the group's golfers), pre-filled 1+2 v 3+4.
-  ADD A GAME (front-door.js, one sheet from GPS +, Tools, the card and ≡ Round Menu): Quick start
-  sets the $ and golfers / teams, then opens that game's own setup filled in (Side Bets' Add form for
-  a Nassau via the paste-bets queue; Round Setup's Money for Skins / Vegas / BBB via &amt &ids
-  &carry); All games lists every game, each to its normal setup (Side Bets add=1&fmt=, Round Setup
+  ADD A GAME (front-door.js, one sheet from GPS +, Tools, the card and ≡ Round Menu): (the Quick
+  start tiles were removed, URGENT-010); All games lists every game, each to its normal setup (Side Bets add=1&fmt=, Round Setup
   tpl= / fmt= / step=money); Paste the whole round; Paste a multi-round match = trip.html#build with
   today as Day 1, this course, these golfers - Confirm makes every day a NEW round (Day 1 too); the
   round it came from keeps its scores. Nothing in the sheet writes to Firebase.

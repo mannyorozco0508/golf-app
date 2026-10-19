@@ -10,7 +10,7 @@
 //               ?account=1    the lobby with the account panel open
 //               a GPS course pick: Round Setup in quick mode, saved by its own
 //               Save with you as the golfer, opened on the GPS side (GPS-2)
-//               ?tpl=nassau|skins|vegas|bbb  a Quick start on this round (GPS-4)
+//               ?tpl=skins|vegas|bbb|wolf  Add a game > All games: that game on this round (GPS-4)
 //               ?paste=1      Paste the whole round on this round (GPS-4)
 //               ?step=players the Players step of this round (GPS-3)
 // index.html    the scorecard: a green GPS button in the header (Games-3); a GPS
@@ -1008,10 +1008,6 @@
                     // ALL GAMES > a round format: its card picked on the Format step.
                     if (fmt) { if (typeof W.selectFormatCard === 'function') W.selectFormatCard(fmt); W.goToWizardStep(SO.format); return; }
                     if (tpl && typeof W.gpsApplyTemplate === 'function') {
-                        // A QUICK START set up on GPS-4: its $ and golfers / teams (Vegas:
-                        // A, A, B, B) for the Money step to fill in.
-                        var amt = parseFloat(p.get('amt')), ids = (p.get('ids') || '').split(',').filter(Boolean), carry = p.get('carry');
-                        W.__hpTplOpts = amt > 0 || ids.length ? { amt: amt > 0 ? amt : null, ids: ids, carry: carry == null ? null : carry === '1' } : null;
                         W.gpsApplyTemplate(tpl);
                         // Money, where the template fills in (its golfers are the round's).
                         W.goToWizardStep(typeof WIZARD_STEP_OF !== 'undefined' ? WIZARD_STEP_OF.action : 6);   /* global WIZARD_STEP_OF */
@@ -1095,7 +1091,7 @@
             if (nx.stage === 'players') {
                 // Players saved: on into the game's setup, the same round.
                 nx.stage = 'game'; nx.at = Date.now(); agNext(nx);
-                W.location.href = nx.next && nx.next.url ? nx.next.url : 'index.html?game=' + encodeURIComponent(code) + '&agq=' + encodeURIComponent((nx.next && nx.next.q) || nx.id);
+                W.location.href = nx.next && nx.next.url ? nx.next.url : 'index.html?game=' + encodeURIComponent(code);
                 return true;
             }
             if (nx.stage === 'game') {
@@ -1156,20 +1152,9 @@
         placeGpsPill();
         placeMenuItems();
         placeShareButton();
-        // Back from Players for a QUICK START (URGENT-001): its $ / golfers sheet, once the
-        // round (with its new golfers) is on the card. Back at the round otherwise: done.
-        var agq = pr.get('agq'), nx = agNext();
-        if (agq && nx && nx.code === String(code).toUpperCase()) {
-            try { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'index.html?game=' + encodeURIComponent(code)); } catch (e) {}
-            var tries = 0, t = setInterval(function () {
-                if (++tries > 80 || agPlayers().length) {
-                    clearInterval(t);
-                    if (!agPlayers().length) return;
-                    openAddGame();
-                    if (QUICK_STARTS.some(function (q) { return q.tpl === agq; })) agQuick(agq);
-                }
-            }, 150);
-        } else if (nx && nx.stage === 'game' && nx.code === String(code).toUpperCase()) agNext(null);
+        // Back at the round after a game's own Save: done.
+        var nx = agNext();
+        if (nx && nx.stage === 'game' && nx.code === String(code).toUpperCase()) agNext(null);
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
@@ -1220,18 +1205,12 @@
     // ---- GPS-4 "ADD A GAME" (gps-doors-fix, Manny 2026-10-12) -------------------------
     // One sheet, from the GPS screen's + (next to the score box), its Tools menu, the
     // card's "+ Add a game" and the ≡ Round Menu:
-    //   QUICK START  Nassau / Skins / Vegas / BBB: the $ and the golfers / teams first
-    //                (the betting side's 2v2 picker), then that game's normal setup for
-    //                THIS round opens filled in - Side Bets for a Nassau, Round Setup's
-    //                Money step for the others - and its own Save adds it.
+    //   (The QUICK START tiles - "$2 a skin" and the like - are gone, URGENT-010: Manny
+    //   never uses them. Every game is in ALL GAMES.)
     //   ALL GAMES    every game the betting side has, each opening its normal setup.
     //   PASTE        the whole round (Round Setup's paste), or a multi-round match /
     //                trip (the trip builder, today = Day 1, this course, these golfers).
     // Nothing here writes to Firebase: every game is saved by the screen it opens.
-    var AG = { q: null };
-    var AG_AMTS = { nassau: [2, 5, 10, 20], skins: [1, 2, 5, 10], vegas: [0.25, 0.5, 1, 2], bbb: [0.5, 1, 2, 5] };
-    var AG_DEF = { nassau: 5, skins: 2, vegas: 1, bbb: 1 };
-    var BETS_KEY = 'hardpan_paste_bets_v1_';   // setup-paste-ui.js's queue: Side Bets "Fill it in"
     var ALL_GAMES = [
         { id: 'points', ico: '\uD83C\uDFC5', name: 'Points game', sub: 'Individual points over this round or several \u00b7 a pot for the top places', go: 'points' },
         { id: 'nassau', ico: '💵', name: 'Nassau', sub: 'Front · back · total, 1 v 1 or 2 v 2, presses', go: 'sm', fmt: 'nassau' },
@@ -1257,7 +1236,7 @@
     function agPlayers() { try { return ((typeof currentData !== 'undefined' && currentData && currentData.players) || []).filter(function (p) { return p && p.name; }); } catch (e) { return []; } }   /* global currentData */
     function agRound() { try { return (typeof currentData !== 'undefined' && currentData) || {}; } catch (e) { return {}; } }
     function first(n) { return String(n || '').split(' ')[0]; }
-    // ENOUGH GOLFERS FIRST (URGENT-001, Manny 2026-10-17). A GPS quick start has one golfer
+    // ENOUGH GOLFERS FIRST (URGENT-001, Manny 2026-10-17). A GPS course-tap round has one golfer
     // ("Me"): a game picked here that needs more opened its setup with nobody to put in it (KP pool
     // went straight to Money). Now a game with too few golfers opens Round Setup's Players step
     // first, with one line saying why; Players' Save carries on into that game's setup (the same
@@ -1267,7 +1246,7 @@
     var AG_NEXT = 'hardpan_ag_next';
     function agNeed(id) { return AG_NEED[id] || 0; }
     function agGameName(id) {
-        var g = ALL_GAMES.filter(function (x) { return x.id === id; })[0] || QUICK_STARTS.filter(function (x) { return x.tpl === id; })[0];
+        var g = ALL_GAMES.filter(function (x) { return x.id === id; })[0];
         return g ? g.name : 'the game';
     }
     function agNext(v) {
@@ -1275,7 +1254,7 @@
         ss(AG_NEXT, v ? JSON.stringify(v) : null);
         return v;
     }
-    // Too few golfers for `id`? Then Players first, and `next` ({ url } or { q: tpl }) after it.
+    // Too few golfers for `id`? Then Players first, and `next` ({ url }) after it.
     function agPlayersFirst(id, next) {
         if (agPlayers().length >= agNeed(id)) return false;
         var code = agCode();
@@ -1328,7 +1307,6 @@
         if (cb && !cb.checked) cb.click();
         try { if (cb && cb.scrollIntoView) cb.scrollIntoView({ block: 'start' }); } catch (e) {}
     }
-    function agMoney(v) { v = Number(v); return '$' + (v % 1 ? v.toFixed(2).replace(/0$/, '') : v); }
     function agSheet() {
         var el = $('fd-addgame');
         if (el) return el;
@@ -1337,19 +1315,12 @@
         el.style.cssText = 'display:none;position:fixed;inset:0;z-index:2147483000;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#f0f4f2;color:#1a1a1a;color-scheme:light;font-family:inherit;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box;';
         var st = W.document.createElement('style');
         st.textContent = '#fd-addgame *{box-sizing:border-box;} #fd-addgame .ag-h{font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#5b6b64;margin:16px 0 6px;}'
-            + '#fd-addgame .ag-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;} #fd-addgame .ag-tile{background:#fff;border:1px solid #d0e1db;border-radius:14px;padding:12px;text-align:left;min-height:64px;color:#1a1a1a;}'
-            + '#fd-addgame .ag-tile b{display:block;color:#0f4c3a;font-size:1rem;} #fd-addgame .ag-tile span{font-size:.76rem;color:#5b6b64;}'
             + '#fd-addgame .ag-row{display:flex;width:100%;align-items:center;gap:10px;background:#fff;border:1px solid #d0e1db;border-radius:12px;padding:10px 12px;margin:0 0 6px;text-align:left;min-height:52px;color:#1a1a1a;}'
             + '#fd-addgame .ag-row b{display:block;font-size:.95rem;} #fd-addgame .ag-row small{display:block;font-size:.74rem;color:#5b6b64;} #fd-addgame .ag-row .ag-go{margin-left:auto;color:#0f4c3a;font-weight:800;}'
-            + '#fd-addgame .ag-chip{min-height:40px;padding:6px 14px;margin:4px 6px 0 0;border-radius:999px;border:2px solid #d0e1db;background:#fff;color:#1a1a1a;font-weight:800;}'
-            + '#fd-addgame .ag-chip.on{background:#0f4c3a;border-color:#0f4c3a;color:#fff;} #fd-addgame .ag-chip.b{background:#1d3557;border-color:#1d3557;color:#fff;}'
-            + '#fd-addgame .ag-cta{width:100%;min-height:54px;margin-top:16px;border:0;border-radius:14px;background:#0f4c3a;color:#fff;font-weight:800;font-size:1.02rem;} #fd-addgame .ag-cta:disabled{opacity:.45;}'
-            + '#fd-addgame .ag-not{width:100%;min-height:48px;margin-top:10px;border:0;background:none;color:#1d3557;font-weight:700;} #fd-addgame .ag-note{font-size:.8rem;color:#5b6b64;margin-top:6px;}'
-            + '#fd-addgame .ag-warn{font-size:.82rem;color:#9a3412;font-weight:700;margin-top:8px;}';
+            + '#fd-addgame .ag-not{width:100%;min-height:48px;margin-top:10px;border:0;background:none;color:#1d3557;font-weight:700;}';
         el.appendChild(st);
         var body = W.document.createElement('div'); body.className = 'ag-body'; el.appendChild(body);
         el.addEventListener('click', agClick);
-        el.addEventListener('input', function (ev) { if (ev.target && ev.target.classList.contains('ag-other') && AG.q) { var v = parseFloat(ev.target.value); if (v > 0) { AG.q.amt = v; agSummary(); } } });
         W.document.body.appendChild(el);
         return el;
     }
@@ -1360,12 +1331,11 @@
     function openAddGame() {
         if (!agCode()) return false;
         if (spectating()) return true;   // a spectator adds nothing (the sheet does not open)
-        AG.q = null;
         agList();
         agSheet().style.display = '';
         return true;
     }
-    function closeAddGame() { var el = $('fd-addgame'); if (el) el.style.display = 'none'; AG.q = null; }
+    function closeAddGame() { var el = $('fd-addgame'); if (el) el.style.display = 'none'; }
     // TODAY'S GAMES, ON THE CARD (012, Manny): the GPS screen's Games pill lands on this card in
     // a round that has games - and there was no way to add another from it. "+ Add game" at its
     // top runs the one Add a game sheet above (Players first still applies in it). The app only
@@ -1387,9 +1357,6 @@
         var ps = agPlayers();
         var h = agHead('Add a game', 'To this round · your scores carry over', 'close')
             + '<div class="ag-h">PLAYING</div><div style="font-weight:700;">' + (ps.length ? esc(ps.map(function (p) { return first(p.name); }).join(' · ')) : 'Just you so far') + '</div>'
-            + '<div class="ag-h">QUICK START</div><div class="ag-grid">'
-            + QUICK_STARTS.map(function (q) { return '<button type="button" class="ag-tile" data-ag-q="' + q.tpl + '"><b>' + esc(q.name) + '</b><span>' + esc(q.sub) + '</span></button>'; }).join('') + '</div>'
-            + '<div class="ag-note">Tap one to set the $ and who plays whom first.</div>'
             + '<div class="ag-h">PASTE</div>'
             + '<button type="button" class="ag-row" data-ag-go="paste"><span>📋</span><span><b>Paste the whole round</b><small>Groups, teams and games from one text</small></span><span class="ag-go">›</span></button>'
             + '<button type="button" class="ag-row" data-ag-go="trip"><span>🗓️</span><span><b>Paste a multi-round match / trip</b><small>Today is Day 1 · this course · these golfers</small></span><span class="ag-go">›</span></button>'
@@ -1398,88 +1365,6 @@
             + '<button type="button" class="ag-not" data-ag="close">Not now · back to the round</button>';
         agSheet().querySelector('.ag-body').innerHTML = h;
         agSheet().scrollTop = 0;
-    }
-    // A QUICK START: the $ and the golfers / teams, then its normal setup.
-    function agQuick(tpl) {
-        if (agPlayersFirst(tpl, { q: tpl })) return;
-        var ps = agPlayers(), ids = ps.map(function (p) { return String(p.id); });
-        AG.q = { tpl: tpl, amt: AG_DEF[tpl], order: ids.slice(0, 4), ids: ids.slice(), carry: true, mode: ps.length === 2 || ps.length === 3 ? '1v1' : '2v2' };
-        if (AG.q.mode === '1v1') AG.q.order = ids.slice(0, 2);
-        agConfig();
-    }
-    function agName(id) { var p = agPlayers().filter(function (x) { return String(x.id) === String(id); })[0]; return p ? p.name : '?'; }
-    function agSides() {
-        var q = AG.q, o = q.order;
-        return q.mode === '1v1' ? { a: o.slice(0, 1), b: o.slice(1, 2) } : { a: o.slice(0, 2), b: o.slice(2, 4) };
-    }
-    function agValid() {
-        var q = AG.q, s = agSides();
-        if (!(q.amt > 0)) return false;
-        if (q.tpl === 'nassau') return s.a.length && s.b.length && (q.mode === '1v1' || (s.a.length === 2 && s.b.length >= 1));
-        if (q.tpl === 'vegas') return s.a.length === 2 && s.b.length === 2;
-        return q.ids.length >= 2;
-    }
-    function agSummary() {
-        var q = AG.q, s = agSides(), qs = QUICK_STARTS.filter(function (x) { return x.tpl === q.tpl; })[0] || { name: q.tpl };
-        var who = q.tpl === 'nassau' || q.tpl === 'vegas' ? s.a.map(function (i) { return first(agName(i)); }).join(' & ') + ' v ' + s.b.map(function (i) { return first(agName(i)); }).join(' & ')
-            : q.ids.map(function (i) { return first(agName(i)); }).join(', ');
-        var per = q.tpl === 'nassau' ? ' each (front · back · total)' : q.tpl === 'skins' ? ' a skin' : ' a point';
-        var cta = $('fd-ag-cta');
-        if (cta) { cta.disabled = !agValid(); cta.textContent = 'Add ' + qs.name + ' · ' + agMoney(q.amt) + per; }
-        var sm = $('fd-ag-sum'); if (sm) sm.textContent = who;
-    }
-    function agConfig() {
-        var q = AG.q, ps = agPlayers(), qs = QUICK_STARTS.filter(function (x) { return x.tpl === q.tpl; })[0];
-        var h = agHead(qs.name, 'For this round · change anything first', 'list');
-        h += '<div class="ag-h">' + (q.tpl === 'nassau' ? '$ EACH: FRONT · BACK · TOTAL' : q.tpl === 'skins' ? '$ A SKIN' : '$ A POINT') + '</div><div>'
-            + AG_AMTS[q.tpl].map(function (v) { return '<button type="button" class="ag-chip' + (Number(q.amt) === v ? ' on' : '') + '" data-ag-amt="' + v + '">' + agMoney(v) + '</button>'; }).join('')
-            + '<input type="number" inputmode="decimal" min="0" step="0.25" class="ag-other" placeholder="Other $" value="' + (AG_AMTS[q.tpl].indexOf(Number(q.amt)) === -1 ? esc(q.amt) : '') + '" style="width:96px;min-height:40px;margin-top:4px;border:2px solid #d0e1db;border-radius:999px;padding:4px 12px;font-weight:800;background:#fff;color:#1a1a1a;"></div>';
-        if (q.tpl === 'nassau' || q.tpl === 'vegas') {
-            var s = agSides();
-            h += '<div class="ag-h">WHO PLAYS WHOM</div>';
-            if (q.tpl === 'nassau' && ps.length >= 3) h += '<div style="margin-bottom:6px;">' + ['1v1', '2v2'].map(function (m) { return '<button type="button" class="ag-chip' + (q.mode === m ? ' on' : '') + '" data-ag-mode="' + m + '">' + (m === '1v1' ? '1 v 1' : '2 v 2') + '</button>'; }).join('') + '</div>';
-            h += '<div class="ag-note">' + (q.mode === '1v1' ? 'First golfer tapped = side A, the next = side B.' : 'First two tapped = Team A, next two = Team B.') + ' Tap again to un-pick.</div><div>'
-                + ps.map(function (p) {
-                    var id = String(p.id), i = q.order.indexOf(id), inA = s.a.indexOf(id) !== -1, inB = s.b.indexOf(id) !== -1;
-                    return '<button type="button" class="ag-chip' + (inA ? ' on' : inB ? ' b' : '') + '" data-ag-pick="' + esc(id) + '" aria-pressed="' + (i !== -1) + '">' + (inA ? 'A ' : inB ? 'B ' : '') + esc(first(p.name)) + '</button>';
-                }).join('') + '</div>'
-                + '<div style="margin-top:8px;font-weight:800;color:#0f4c3a;">' + (q.mode === '1v1' ? 'Side A: ' : 'Team A: ') + esc(agTeam(s.a, q.mode)) + '</div>'
-                + '<div style="font-weight:800;color:#1d3557;">' + (q.mode === '1v1' ? 'Side B: ' : 'Team B: ') + esc(agTeam(s.b, q.mode)) + '</div>'
-                + '<button type="button" class="ag-chip" data-ag-swap="1" style="margin-top:8px;">⇄ Swap teams</button>';
-            if (q.tpl === 'vegas' && ps.length < 4) h += '<div class="ag-warn">Vegas needs four golfers — add players first (≡ Round Menu › Edit round setup).</div>';
-        } else {
-            h += '<div class="ag-h">GOLFERS IN</div><div>' + ps.map(function (p) { var on2 = q.ids.indexOf(String(p.id)) !== -1; return '<button type="button" class="ag-chip' + (on2 ? ' on' : '') + '" data-ag-in="' + esc(String(p.id)) + '">' + (on2 ? '✓ ' : '') + esc(first(p.name)) + '</button>'; }).join('') + '</div>';
-            if (q.tpl === 'skins') h += '<label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:700;"><input type="checkbox" data-ag-carry="1"' + (q.carry ? ' checked' : '') + ' style="width:22px;height:22px;"> Ties carry over</label>';
-            if (ps.length < 2) h += '<div class="ag-warn">This needs two golfers or more — add players first.</div>';
-        }
-        h += '<div id="fd-ag-sum" class="ag-note" style="margin-top:14px;"></div>'
-            + '<button type="button" class="ag-cta" id="fd-ag-cta">Add</button>'
-            + '<div class="ag-note">' + (q.tpl === 'nassau' ? 'Opens Side Bets with this filled in — check it and tap Save.' : 'Opens Round Setup’s Money step with this filled in — check it and Save.') + '</div>'
-            + '<button type="button" class="ag-not" data-ag="list">‹ All games</button>';
-        agSheet().querySelector('.ag-body').innerHTML = h;
-        agSummary();
-    }
-    function agTeam(ids, mode) { var n = ids.map(agName); if (mode === '1v1') return n[0] || '__'; return (n[0] || '__') + ' & ' + (n[1] || '__'); }
-    function agPickTap(id) {
-        var q = AG.q, o = q.order.slice(), i = o.indexOf(id), max = q.mode === '1v1' ? 2 : 4;
-        if (i !== -1) o.splice(i, 1); else if (o.length < max) o.push(id);
-        q.order = o;
-    }
-    function agAdd() {
-        var q = AG.q, code = agCode(), base = '?game=' + encodeURIComponent(code), s = agSides();
-        if (!q || !agValid()) return;
-        if (q.tpl === 'nassau') {
-            var key = BETS_KEY + String(code).toUpperCase(), cur = null;
-            try { cur = JSON.parse(ls(key) || 'null'); } catch (e) { cur = null; }
-            var bets = cur && Array.isArray(cur.bets) ? cur.bets : [];
-            bets.push({ group: 'This round', a: s.a.map(agName), b: s.b.map(agName), front: q.amt, back: q.amt, overall: q.amt, press: null });
-            ls(key, JSON.stringify({ at: Date.now(), bets: bets }));
-            W.location.href = 'sidematches.html' + base + '&hpfill=1&hpback=1';
-            return;
-        }
-        var ids = q.tpl === 'vegas' ? s.a.concat(s.b) : q.ids;
-        agBackAfter(q.tpl);
-        W.location.href = 'admin.html' + base + '&tpl=' + q.tpl + '&amt=' + encodeURIComponent(q.amt) + '&ids=' + encodeURIComponent(ids.join(',')) + (q.tpl === 'skins' ? '&carry=' + (q.carry ? 1 : 0) : '');
     }
     function agRoute(g) {
         var code = agCode(), base = '?game=' + encodeURIComponent(code);
@@ -1514,8 +1399,7 @@
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
         var b;
-        if ((b = t.closest('[data-ag]'))) { var a = b.getAttribute('data-ag'); if (a === 'close') closeAddGame(); else { AG.q = null; agList(); } return; }
-        if ((b = t.closest('[data-ag-q]'))) { agQuick(b.getAttribute('data-ag-q')); return; }
+        if ((b = t.closest('[data-ag]'))) { var a = b.getAttribute('data-ag'); if (a === 'close') closeAddGame(); else agList(); return; }
         if ((b = t.closest('[data-ag-go]'))) { var go = b.getAttribute('data-ag-go'); if (go === 'trip') agTrip(); else W.location.href = 'admin.html?game=' + encodeURIComponent(agCode()) + '&paste=1'; return; }
         if ((b = t.closest('[data-ag-all]'))) {
             var g = ALL_GAMES.filter(function (x) { return x.id === b.getAttribute('data-ag-all'); })[0];
@@ -1527,19 +1411,6 @@
             if (url) W.location.href = url;
             return;
         }
-        if (!AG.q) return;
-        if ((b = t.closest('[data-ag-amt]'))) { AG.q.amt = Number(b.getAttribute('data-ag-amt')); agConfig(); return; }
-        if ((b = t.closest('[data-ag-mode]'))) { var m = b.getAttribute('data-ag-mode'), ids = agPlayers().map(function (p) { return String(p.id); }); AG.q.mode = m; AG.q.order = ids.slice(0, m === '1v1' ? 2 : 4); agConfig(); return; }
-        if ((b = t.closest('[data-ag-pick]'))) { agPickTap(b.getAttribute('data-ag-pick')); agConfig(); return; }
-        if (t.closest('[data-ag-swap]')) { var s = agSides(); AG.q.order = s.b.concat(s.a); agConfig(); return; }
-        if ((b = t.closest('[data-ag-in]'))) {
-            var id = b.getAttribute('data-ag-in'), all = agPlayers().map(function (p) { return String(p.id); });
-            var cur = AG.q.ids.indexOf(id) !== -1 ? AG.q.ids.filter(function (x) { return x !== id; }) : AG.q.ids.concat([id]);
-            AG.q.ids = all.filter(function (x) { return cur.indexOf(x) !== -1; });
-            agConfig(); return;
-        }
-        if (t.closest('[data-ag-carry]')) { AG.q.carry = !!t.closest('[data-ag-carry]').checked; return; }
-        if (t.closest('#fd-ag-cta')) { agAdd(); return; }
     }
     // ≡ ROUND MENU: Add a game, Paste the whole round, Paste a multi-round match.
     function placeMenuItems() {
@@ -2011,14 +1882,7 @@
         }, function () { return false; });
     }
 
-    // GPS-4's quick starts: Round Setup's own templates (admin.html gpsApplyTemplate).
-    var QUICK_STARTS = [
-        { tpl: 'nassau', name: 'Nassau', sub: '$5 front \u00b7 back \u00b7 total' },
-        { tpl: 'skins', name: 'Skins', sub: '$2 a skin \u00b7 carry over' },
-        { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
-        { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
-    ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld };
     W.HardPanHome = { start: homeStart, show: show };

@@ -1047,13 +1047,6 @@ html {
                     pgDraw();
                 } catch (e) { /* Side Bets draws as before */ }
             }
-            // GPS-4's Nassau quick start (front-door.js): the bet it queued opens in the
-            // ordinary Add form, filled in - the golfer checks it and taps Save.
-            if (urlParams.get('hpfill') === '1' && !window.__hpFilled && (currentData.players || []).length && window.HardPanSetupPaste) {
-                window.__hpFilled = true;
-                const qb = window.HardPanSetupPaste.betsFor(currentMode);
-                if (qb.length) { window.HardPanSetupPaste.setBets(currentMode, qb.slice(0, -1)); spBetsOffer(); spFillBet(qb[qb.length - 1]); }
-            }
             // GPS:END
             if (urlParams.get('add') === '1' && !window.__smAutoOpened && (currentData.players || []).length) {
                 window.__smAutoOpened = true;

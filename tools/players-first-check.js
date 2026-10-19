@@ -11,8 +11,8 @@
 //      first, then we'll set up KP pool / Weekly game." -> add 3 -> Save golfers -> the
 //      Money step, same code, the Weekly Game section open -> Save -> back on the round,
 //      GPS, hole 5.
-//   2  the same for Nassau (a QUICK START): Players first -> back on the round with the
-//      Nassau $ / who-plays-whom sheet open, the new golfers in it.
+//   2  the same for Nassau (All games; the quick-start tiles are gone, URGENT-010): Players
+//      first -> Side Bets' Add form on Nassau, the new golfer in it.
 //   3  a 4-golfer round: KP pool goes straight to the Money step (no Players detour).
 // ============================================================================
 'use strict';
@@ -93,22 +93,24 @@ async function addGolfers(j, names) {
         [s0, s1, s2, s3].forEach((s) => errs(s, '1'));
     } finally { await j.close(); }
 
-    // 2: Nassau quick start, one golfer.
+    // 2: All games > Nassau, one golfer.
     j = await openJourney({ db: { events: { PF1NA1: round('PF1NA1', ['Me']) }, trips: {}, global_courses: {}, organizers: {}, tournaments: {} }, preScript: PRE, webgl: true });
     try {
         await onGpsAt(j, 'PF1NA1', 7);
         await j.evaluate('HardPanDoors.openAddGame()');
         await sleep(400);
-        await j.click('#fd-addgame [data-ag-q="nassau"]');
+        await j.click('#fd-addgame [data-ag-all="nassau"]');
         const s1 = await waitFor(j, (s) => /admin\.html/.test(s.url) && s.need, 15000);
         report.nassau = [s1.url, s1.need && s1.need.split('\n')[0]];
         f(/step=players$/.test(s1.url) && /set up Nassau\./.test(s1.need || ''), '2: Nassau did not open Players first: ' + JSON.stringify(s1));
         await addGolfers(j, ['Ben Bravo']);
         await j.click('#fd-need .fd-need-go');
-        const s2 = await waitFor(j, (s) => /index\.html\?game=PF1NA1$/.test(s.url) && s.sheet, 20000);
-        report.nassauBack = [s2.url, s2.side, s2.hole, s2.sheet && s2.sheet.replace(/\s+/g, ' ').slice(0, 90)];
-        f(s2.sheet && /Nassau/.test(s2.sheet) && /Ben/.test(s2.sheet), '2: back on the round without the Nassau sheet and the new golfer: ' + JSON.stringify(s2));
-        f(s2.hole === 7 && s2.ls === 'gps|PF1NA1', '2: not the same hole / side: ' + JSON.stringify([s2.hole, s2.ls]));
+        const s2 = await waitFor(j, (s) => /sidematches\.html\?game=PF1NA1&add=1&fmt=nassau&hpback=1$/.test(s.url), 20000);
+        await sleep(1500);
+        const sm = JSON.parse(await j.evaluate("JSON.stringify({ modal: (function(){ var m = document.getElementById('sidematch-modal'); return m ? getComputedStyle(m).display : null; })(), fmt: (document.getElementById('sm-format') || {}).value || null, ben: (currentData.players || []).some(function (p) { return /^Ben Bravo$/.test(p && p.name); }), picks: (document.getElementById('sm-player-picker-a') || { children: [] }).children.length, txt: ((document.getElementById('sidematch-modal') || {}).innerText || '').replace(/\\s+/g, ' ').slice(0, 120) })"));
+        report.nassauBack = [s2.url, s2.ls, sm];
+        f(/sidematches\.html\?game=PF1NA1&add=1&fmt=nassau&hpback=1$/.test(s2.url) && sm.modal === 'flex' && sm.fmt === 'nassau' && sm.ben && /Who's this bet between/.test(sm.txt), '2: Players Save did not go on to the Nassau setup with the new golfer: ' + JSON.stringify([s2, sm]));
+        f(s2.ls === 'gps|PF1NA1', '2: the round no longer reopens on GPS: ' + JSON.stringify(s2.ls));
         [s1, s2].forEach((s) => errs(s, '2'));
     } finally { await j.close(); }
 

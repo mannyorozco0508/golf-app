@@ -239,14 +239,6 @@
         var box = sh.querySelector('.gps-ag-players');
         box.textContent = '';
         roundPlayers().forEach(function (p) { var sp = document.createElement('span'); sp.textContent = String(p.name || '').split(' ')[0]; box.appendChild(sp); });
-        // The quick starts (and their amounts) are the front door's (front-door.js).
-        var grid = sh.querySelector('.gps-ag-grid');
-        grid.textContent = '';
-        ((window.HardPanDoors && window.HardPanDoors.QUICK_STARTS) || []).forEach(function (q) {
-            var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-ag-tpl', q.tpl);
-            var t = document.createElement('b'); t.textContent = q.name; var d = document.createElement('span'); d.textContent = q.sub;
-            b.appendChild(t); b.appendChild(d); grid.appendChild(b);
-        });
         sh.style.display = '';
     }
     function closeAddGame() { var sh = S && S.el.querySelector('.gps-addgame'); if (sh) sh.style.display = 'none'; }
@@ -4755,12 +4747,11 @@
         + '</div>'
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
-        // GPS-4 "Add a game" - this round's golfers, a quick start, paste, full setup.
+        // GPS-4 "Add a game" - this round's golfers, paste, full setup (no quick-start tiles, URGENT-010).
         + '<button type="button" class="gps-door-games" style="display:none" aria-label="Games home">Games</button>'
         + '<div class="gps-addgame" style="display:none" role="dialog" aria-label="Add a game">'
         +   '<div class="gps-ag-head"><button type="button" class="gps-ag-back" aria-label="Back to map">\u2039</button><div><div class="gps-ag-title">Add a game</div><div class="gps-ag-sub">To this round \u00b7 your scores carry over</div></div></div>'
         +   '<div class="gps-ag-h">PLAYING</div><div class="gps-ag-players"></div>'
-        +   '<div class="gps-ag-h">QUICK START</div><div class="gps-ag-grid"></div>'
         +   '<div class="gps-ag-h">MORE</div>'
         +   '<button type="button" class="gps-ag-row" data-ag-go="paste"><span><b>Paste the whole round</b><span>Groups, teams and games from one text</span></span><span>\u203A</span></button>'
         +   '<button type="button" class="gps-ag-row" data-ag-go="full"><span><b>Full game setup</b><span>Every game, presses, side bets</span></span><span>\u203A</span></button>'
@@ -4958,9 +4949,8 @@
         + '#gps-overlay .gps-ag-title{font-size:20px;font-weight:800;} #gps-overlay .gps-ag-sub{font-size:13px;color:#555;}'
         + '#gps-overlay .gps-ag-h{font-size:13px;font-weight:800;letter-spacing:1px;color:#555;margin:18px 0 8px;}'
         + '#gps-overlay .gps-ag-players{display:flex;flex-wrap:wrap;gap:8px;} #gps-overlay .gps-ag-players span{background:#fff;border:1px solid #d0e1db;border-radius:999px;padding:8px 14px;font-size:15px;font-weight:600;}'
-        + '#gps-overlay .gps-ag-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}'
-        + '#gps-overlay .gps-ag-grid button,#gps-overlay .gps-ag-row{display:flex;flex-direction:column;gap:4px;text-align:left;background:#fff;border:0;border-radius:16px;padding:16px;color:#1a1a1a;font:inherit;cursor:pointer;}'
-        + '#gps-overlay .gps-ag-grid b,#gps-overlay .gps-ag-row b{font-size:17px;font-weight:800;} #gps-overlay .gps-ag-grid span,#gps-overlay .gps-ag-row span span{font-size:14px;color:#555;}'
+        + '#gps-overlay .gps-ag-row{display:flex;flex-direction:column;gap:4px;text-align:left;background:#fff;border:0;border-radius:16px;padding:16px;color:#1a1a1a;font:inherit;cursor:pointer;}'
+        + '#gps-overlay .gps-ag-row b{font-size:17px;font-weight:800;} #gps-overlay .gps-ag-row span span{font-size:14px;color:#555;}'
         + '#gps-overlay .gps-ag-row{flex-direction:row;justify-content:space-between;align-items:center;width:100%;margin-bottom:10px;} #gps-overlay .gps-ag-row > span:first-child{display:flex;flex-direction:column;gap:3px;}'
         + '#gps-overlay .gps-ag-not{display:block;margin:18px auto 0;border:0;background:none;font:700 15px ' + FONT + ';color:#555;padding:12px;cursor:pointer;}'
         + '#gps-overlay .gps-side-bets,#gps-overlay .gps-tools{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}'
@@ -5517,14 +5507,10 @@
         on(el, '.gps-ag-back', function () { closeAddGame(); });
         on(el, '.gps-ag-not', function () { closeAddGame(); });
         el.addEventListener('click', function (ev) {
-            var b = ev.target && ev.target.closest ? ev.target.closest('[data-ag-tpl],[data-ag-go]') : null;
+            var b = ev.target && ev.target.closest ? ev.target.closest('[data-ag-go]') : null;
             if (!b || !S) return;
             var base = 'admin.html?game=' + encodeURIComponent(S.eventCode);
-            var tpl = b.getAttribute('data-ag-tpl'), go = b.getAttribute('data-ag-go');
-            // Too few golfers for the game: Players first (URGENT-001), then the game.
-            var D = window.HardPanDoors;
-            if (tpl && D && typeof D.playersFirst === 'function' && D.playersFirst(tpl, { url: base + '&tpl=' + tpl })) return;
-            window.location.href = tpl ? base + '&tpl=' + tpl : go === 'paste' ? base + '&paste=1' : base;
+            window.location.href = b.getAttribute('data-ag-go') === 'paste' ? base + '&paste=1' : base;
         });
         on(el, '.gps-replay', function () {
             if (!S) return;

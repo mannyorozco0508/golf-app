@@ -23,9 +23,8 @@ describe('013-4: a game added from the GPS Games pill comes back to the GPS', ()
 
 describe('013-5 / 013-12: Side Matches Save goes back to the round', () => {
     const fd = read('front-door.js'), sm = read('sidematches.html');
-    test('Add a game hands Side Matches &hpback=1 (All games rows and the Nassau quick start)', () => {
+    test('Add a game hands Side Matches &hpback=1 (All games rows; the Nassau quick start is gone, URGENT-010)', () => {
         assert.match(fd, /'sidematches\.html' \+ base \+ '&add=1' \+ \(g\.fmt \? '&fmt=' \+ g\.fmt : ''\) \+ '&hpback=1'/);
-        assert.match(fd, /'sidematches\.html' \+ base \+ '&hpfill=1&hpback=1'/);
         // the Presses list is a list, not a Save: no hpback
         assert.match(fd, /if \(g\.go === 'smlist'\) return 'sidematches\.html' \+ base;/);
     });

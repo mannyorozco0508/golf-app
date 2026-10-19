@@ -114,7 +114,7 @@ test('Round Setup save guards: held BBB points follow the round; a copied round 
     assert.ok(!('points' in held.b));
 });
 
-test('wiring: scorecard, settlement and Round Setup load it in GPS blocks; Quick start has BBB + Vegas; nothing outside a block names it', { skip }, () => {
+test('wiring: scorecard, settlement and Round Setup load it in GPS blocks; Add a game > All games has BBB + Vegas; nothing outside a block names it', { skip }, () => {
     const flag = require('./tools/gps-flag.js');
     ['index.html', 'settlement.html', 'admin.html'].forEach((f) => {
         const s = read(f);
@@ -122,8 +122,11 @@ test('wiring: scorecard, settlement and Round Setup load it in GPS blocks; Quick
         assert.ok(!/HardPanExtraGames|bbb-engine|vegas-engine|extra-games-ui|exgRender|exgAfterLoad/.test(flag.applyFlag(s, false)), f + ': all inside GPS blocks');
     });
     const admin = read('admin.html');
-    assert.match(admin, /onclick="gpsApplyTemplate\('bbb'\)">\$1 Bingo Bango Bongo</);
-    assert.match(admin, /onclick="gpsApplyTemplate\('vegas'\)">\$1 Vegas</);
+    // URGENT-010: no Quick start chips; BBB / Vegas are reached from Add a game > All games (?tpl=).
+    assert.match(admin, /if \(id === 'bbb' \|\| id === 'vegas'\) \{/);
+    const fd = read('front-door.js');
+    assert.match(fd, /\{ id: 'vegas', [^}]*go: 'tpl', tpl: 'vegas' \}/);
+    assert.match(fd, /\{ id: 'bbb', [^}]*go: 'tpl', tpl: 'bbb' \}/);
     assert.match(admin, /if \(typeof exgAfterLoad === 'function'\) exgAfterLoad\(!!copyFromCode\);/);
     assert.match(read('index.html'), /const rest = \[dotsBoard, ryder, skins, matches, points, hilo, strokeBets\];\n\s*\/\/ GPS:BEGIN[\s\S]{0,300}rest\.splice\(1, 0, window\.HardPanExtraGames\.liveHtml\(/, 'the cards join the grid inside the GPS block; the Consumer line is untouched');
     assert.match(read('index.html'), /requireOnlineForMoney\('POINT NOT SAVED'/);

@@ -35,7 +35,7 @@ test('routes to existing screens; the ONE write is a new GPS round, through the 
     assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card, opts\), uid\)/);
     assert.match(s, /W\.issueUniqueCode\(\{ db: H\.db, root: 'events' \}\)/);
     assert.match(s, /W\.selectHomeWidget\('quick'\)/, 'Start a round = the lobby\u2019s own new-round path');
-    assert.match(s, /W\.gpsApplyTemplate\(tpl\)/, 'quick starts = Round Setup\u2019s own templates');
+    assert.match(s, /W\.gpsApplyTemplate\(tpl\)/, 'All games > Skins / Vegas / BBB / Wolf = Round Setup\u2019s own templates');
     assert.match(s, /W\.spRoundOpen\(\)/, 'Paste the whole round = the existing paste');
 });
 
@@ -58,7 +58,7 @@ test('HardPan only: home.html and front-door.js are GPS files; every page loads 
     const sync = read('sync-mobile-web.js');
     const gps = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
     assert.ok(/'front-door\.js'/.test(gps) && /'home\.html'/.test(gps));
-    assert.ok(!/\$\d/.test(read('gps-view.js')), 'no price in gps-view.js (the quick-start amounts are front-door.js’s)');
+    assert.ok(!/\$\d/.test(read('gps-view.js')), 'no price in gps-view.js');
 });
 
 test('gps-doors-fix: a launch goes straight to the doors; Main every launch; light only; GPS READY = what GPS draws; a course tap never opens Round Setup', { skip }, () => {
