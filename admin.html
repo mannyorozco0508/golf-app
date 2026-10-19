@@ -9942,6 +9942,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
 
     function openPastePlayersModal() {
+        pasteReplaceMeChoice = null;
         document.getElementById('paste-players-modal').classList.add('open');
         document.getElementById('paste-players-textarea').focus();
     }
@@ -10464,8 +10465,40 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
         }
+        // THE LONE "Me" OF A GPS-FIRST ROUND (mailbox 013, 2026-10-18). A round started from the GPS
+        // door has one golfer, the phone's owner, named "Me" (or a first name) at HCP 0. An organizer
+        // who then pastes the whole field - himself in it under his real name - got that golfer TWICE:
+        // 21 for a 20-golfer weekly game, "Me" alone in a group of one, and an extra buy-in in the
+        // pot. Said here, with a choice; ticked when the list plainly includes him.
+        const me = pasteLoneMeRow(validPlayers);
+        if (me) {
+            const on = pasteReplaceMeChoice === null ? me.likely : pasteReplaceMeChoice;
+            html += `<label class="paste-replace-me" style="display:flex; gap:8px; align-items:flex-start; margin-top:8px; font-weight:600; color:var(--text-main);">`
+                + `<input type="checkbox" id="paste-replace-me"${on ? ' checked' : ''} onchange="pasteReplaceMeChoice = this.checked" style="width:20px; height:20px; flex:0 0 auto;">`
+                + `<span>I\u2019m in this list \u2014 replace \u201C${escapeHtml(me.name)}\u201D with it (${validPlayers.length} golfers, not ${validPlayers.length + 1})</span></label>`;
+        }
         summaryEl.innerHTML = html;
         commitBtn.disabled = validPlayers.length === 0;
+    }
+    // null = not chosen yet (the default above decides); true / false = the organizer's tick.
+    let pasteReplaceMeChoice = null;
+    // The roster's ONLY golfer, when it is the GPS-first placeholder: one row, no handicap or 0,
+    // no score posted. { row, name, likely } - likely when the name is "Me" and the paste is a whole
+    // group or more, or the paste has a golfer with that first name ("Manny" / "Manny Orozco").
+    function pasteLoneMeRow(validPlayers) {
+        const rows = document.querySelectorAll('#player-list .player-row');
+        if (rows.length !== 1 || !validPlayers || validPlayers.length < 2) return null;
+        const row = rows[0];
+        const name = ((row.querySelector('.p-name-input') || {}).value || '').trim();
+        const hcp = ((row.querySelector('.p-hcp-input') || {}).value || '').trim();
+        if (!name || (hcp !== '' && hcp !== '0')) return null;
+        const id = row.getAttribute('data-player-id');
+        if (id && holesScoredFor(id) > 0) return null;
+        const first = name.split(/\s+/)[0].toLowerCase();
+        const named = validPlayers.some(p => String(p.name || '').trim().split(/\s+/)[0].toLowerCase() === first);
+        const isMe = /^me$/i.test(name);
+        if (!isMe && !named) return null;
+        return { row, name, likely: named || (isMe && validPlayers.length >= 4) };
     }
 
     // ===== MY GROUPS (v260, extended v261) ================================
@@ -10993,6 +11026,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // name is left exactly as it was (the save names it "Player N", as before).
         // Only the paste path does this.
         const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        // "I'm in this list" (the lone GPS-first "Me", above): that row is replaced by the paste, so
+        // the field is exactly the list and its groups start at the first pasted golfer.
+        const replaceMe = !!(pasteLoneMeRow(validPlayers) && document.getElementById('paste-replace-me') && document.getElementById('paste-replace-me').checked);
+        pasteReplaceMeChoice = null;
+        if (replaceMe) { groupSizeOverrides = {}; document.getElementById('player-list').innerHTML = ''; }
         const existingData = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
 
         // FLIGHT LETTERS IN THE PASTE turn flights on for the round (if they were
@@ -11063,6 +11101,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 danger: true
             });
             if (!ok) return;
+        }
+        // THE GROUPS ARE POSITIONAL (grouping.js), so a removed golfer must take one seat out of
+        // HIS group (mailbox 013): left alone, the overrides kept their sizes and every golfer after
+        // him slid one seat up - deleting the first of 21 ({0:1, 1:4, ...}) re-cut five foursomes
+        // as 1 / 4 / 4 / 4 / 4 / 3, every group wrong.
+        const allRows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
+        const at = allRows.indexOf(row);
+        if (at !== -1 && groupSizeOverrides && Object.keys(groupSizeOverrides).length) {
+            const sizes = computeGroupSizes(allRows.length, groupSizeOverrides);
+            let seen = 0;
+            for (let g = 0; g < sizes.length; g++) { if (at < seen + sizes[g]) { sizes[g]--; break; } seen += sizes[g]; }
+            groupSizeOverrides = {};
+            sizes.filter(n => n > 0).forEach((n, i) => { groupSizeOverrides[i] = n; });
         }
         row.remove();
         const existingData = captureCurrentPlayerInputs();

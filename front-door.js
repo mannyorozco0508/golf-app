@@ -744,7 +744,8 @@
         var u = /[?&]game=([A-Za-z0-9]{4,10})/.exec(t);
         if (u) {
             var c = u[1].toUpperCase(), g = /[?&]group=(\d{1,2})/.exec(t), k = /[?&]sk=([A-Za-z0-9]{4,12})/.exec(t);
-            if (/leaderboard\.html/i.test(t) || /[?&]spectate=1/.test(t) || !g) return { code: c, href: 'index.html?game=' + c + '&spectate=1' };
+            if (/leaderboard\.html/i.test(t) || /[?&]spectate=1/.test(t)) return { code: c, href: 'index.html?game=' + c + '&spectate=1' };
+            if (!g) return { code: c, bare: true, href: 'index.html?game=' + c + '&spectate=1' };
             return { code: c, group: g[1], sk: k ? k[1].toUpperCase() : null, href: 'index.html?game=' + c + '&group=' + g[1] + (k ? '&sk=' + k[1].toUpperCase() : '') };
         }
         var sk = /^([A-Z0-9]{4,10})\s*-\s*(\d{1,2})\s*-\s*([A-Z0-9]{4,12})$/i.exec(t);
@@ -755,7 +756,19 @@
         if (code.length < 4 || code.length > 10) return null;
         // A GAME CODE OPENS THE ROUND AS A SPECTATOR (view-only, with GPS); the round's own
         // organizer and golfers keep their access (the scorecard decides).
-        return { code: code, href: 'index.html?game=' + code + '&spectate=1' };
+        return { code: code, bare: true, href: 'index.html?game=' + code + '&spectate=1' };
+    }
+    // THE CODE OF A ROUND WITH GROUPS ASKS WHICH GROUP (013 setup sims, 2026-10-18). Round Ready
+    // tells the organizer "One link for the whole round - each golfer picks their group when they
+    // open it. Or tell them the code: ... pick your group." - and the bare link does open the
+    // scorecard's "How are you joining this round?" sheet (Keep score for Group N / I'm playing /
+    // Just watching). Join turned that same code (or that same pasted link) into a read-only
+    // spectator with no sheet and no way to a group: 19 golfers typing the weekly game's code
+    // could not keep score. A round with more than one group now opens its own link, the sheet;
+    // a one-group round still opens as a spectator (its scorekeeper is the phone that made it).
+    function joinHref(j, d) {
+        if (j && j.bare && groupCount(d) > 1) return 'index.html?game=' + j.code;
+        return j.href;
     }
     // JOIN NEVER OPENS A ROUND IT HAS NOT CHECKED (URGENT-002, 2026-10-17). Manny pasted
     // "ABCDEF-2-K7Q9X" (no such round): the scorekeeper form (CODE-G-KEY) skipped the check and
@@ -795,7 +808,7 @@
             var d = s && typeof s.val === 'function' ? s.val() : null;
             return joinProblem(j, d).then(function (why) {
                 if (why) { forgetRound(j.code, false); say(why, true); return; }
-                W.location.href = j.href;
+                W.location.href = joinHref(j, d);
             });
         }, function () {
             // No answer (no signal): a round this phone already has a copy of still opens (the
@@ -1769,7 +1782,7 @@
         { tpl: 'vegas', name: 'Vegas', sub: '$1 a point \u00b7 2 v 2' },
         { tpl: 'bbb', name: 'Bingo Bango Bongo', sub: '$1 a point' }
     ];
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
+    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, QUICK_STARTS: QUICK_STARTS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready };
     W.HardPanHome = { start: homeStart, show: show };
     // A LAUNCH LANDS ON THE DOORS AT ONCE (Manny, 2026-10-12: the cold launch showed the
     // scorecard's "Connecting to game..." on the way). The app opens index.html with no
