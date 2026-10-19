@@ -5922,6 +5922,26 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const st = (typeof window !== 'undefined' && window.__scScoringType) || 'net';
         return { label: label, fromWager: false, scoring: st === 'gross' ? 'Gross' : 'Net' };
     }
+    // GPS:BEGIN
+    // THE HEADER NAMES THE ROUND'S GAMES, NOT "GPS round" (mailbox 015). A round started
+    // from the GPS door is saved as "GPS round"; Manny then set up a Weekly Game on it and
+    // the header still read "GPS round • STROKE PLAY (NET)". That placeholder gives way to
+    // the round's games, named as Home's YOUR ROUND card names them ("Weekly Game",
+    // "Nassau", "Skins"...). A name the organizer gave the round is kept as it is, and a
+    // GPS round with no games keeps "GPS round". Display only.
+    function roundHeaderName(d) {
+        d = d || {};
+        const name = d.eventName || 'Live Round';
+        if (String(name).trim().toLowerCase() !== 'gps round') return name;
+        const games = [];
+        if (d.moneyPool && d.moneyPool.enabled) games.push('Weekly Game');
+        if (Object.values(d.sideMatches || {}).some((sm) => sm && sm.format === 'nassau')) games.push('Nassau');
+        const L = { skins: 'Skins', dots: 'Dots', vegas: 'Vegas', bbb: 'BBB' };
+        Object.values(d.additionalGameInstances || {}).forEach((g) => { const n = L[g && g.format]; if (n && games.indexOf(n) === -1) games.push(n); });
+        Object.keys(d.additionalGames || {}).forEach((k) => { const g = d.additionalGames[k]; const n = L[k]; if (n && g && g.enabled !== false && games.indexOf(n) === -1) games.push(n); });
+        return games.length ? games.join(', ') : name;
+    }
+    // GPS:END
 
     // ---- LIVE NET FINISH ---------------------------------------------------
     //
@@ -7140,6 +7160,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             'dot-context-row',          // the Dots: selector, on rounds that have one
             'view-mode-toggle',         // Hole View / Full Card
             'group-filter-container',   // All Players, Edit round setup, Players
+            // GPS:BEGIN
+            // SCOREKEEPER LINKS, right under the "Group Links" button that opens it
+            // (mailbox 015). It stayed on the page BEHIND the open sheet, so the
+            // button looked dead: the panel opened where nobody could see it.
+            // (HardPan only for now: the Consumer index.html is pinned byte for
+            // byte by gps_flag_test.js.)
+            'group-links-panel',
+            // GPS:END
             'qr-share-mount',           // Show QR code (every golfer, not just the organizer)
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
@@ -8999,6 +9027,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!canReachSetup()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
         renderGroupLinksPanel();
+        // GPS:BEGIN
+        // In view when it opens (mailbox 015) - the Round Menu's body scrolls, and
+        // the panel can start below its fold.
+        const panel = document.getElementById('group-links-panel');
+        if (groupLinksPanelOpen && panel && panel.style.display !== 'none' && typeof panel.scrollIntoView === 'function') {
+            try { panel.scrollIntoView({ block: 'nearest' }); } catch (e) { /* older engines: the panel is still open */ }
+        }
+        // GPS:END
     }
 
     function renderGroupLinksPanel() {
@@ -12232,8 +12268,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // "Match Play · Net" three lines down the same screen. scoringType itself is
         // untouched and still exported for the parity guard; only this label moved.
         const subtitleBasis = roundScoringBasis();
+        // GPS:BEGIN
         document.getElementById("format-subtitle").textContent =
-            `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
+            `${roundHeaderName(currentData)} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
+        // GPS:ELSE
+        // document.getElementById("format-subtitle").textContent =
+        //     `${currentData.eventName || "Live Round"} • ${subtitleBasis.label.toUpperCase()} (${subtitleBasis.scoring.toUpperCase()})`;
+        // GPS:END
 
         renderGroupFilters(players.length);
 

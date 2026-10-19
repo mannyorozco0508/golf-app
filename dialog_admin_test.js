@@ -448,15 +448,19 @@ describe('4. THE PAGE SPEAKS FOR ITSELF NOW', () => {
         // refuses a roster with two golfers of one name - "Two golfers named Matt:
         // add a last initial. Save waits until the names differ." - a refusal,
         // because nothing is written, and in both builds.
+        // 71 SINCE MAILBOX 015 (2026-10-19, was 69; Consumer 69, was 67): a wizard Back/Next
+        // whose step does not change says why beside the button (wizardGoOrSay) - one
+        // refusal for a step change that threw, one for a step that stayed put - in both
+        // builds. Before it, the tap that did nothing said nothing.
         const GPS = fs.existsSync(path.join(REPO_ROOT, 'gps-view.js'));
-        const want = GPS ? 69 : 67;
+        const want = GPS ? 71 : 69;
         assert.equal(refuse + fail + toast, want,
             'the alerts should still be ' + want + ' messages, got '
             + refuse + ' + ' + fail + ' + ' + toast);
         if (GPS) {
             const off = codeOf(require('./tools/gps-flag.js').applyFlag(ADMIN, false));
             const m = (k) => (off.match(new RegExp('(?<![\\w.$])' + k + '\\s*\\(', 'g')) || []).length;
-            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 67, 'the Consumer build of admin.html says 67');
+            assert.equal(m('uiRefuse') + m('uiFail') + m('uiToast'), 69, 'the Consumer build of admin.html says 69');
             assert.deepEqual([refuse - m('uiRefuse'), fail - m('uiFail'), toast - m('uiToast')], [0, 1, 1], 'the two GPS-only ones: one failure, one receipt');
         }
         // Receipts are the minority and always will be: most of what a setup
