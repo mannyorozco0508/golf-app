@@ -296,7 +296,11 @@ function splitTrailingTee(text, teeNames) {
     // "Mary - blue" splits as "Mary -" + " " + "blue" without this.
     const trimmed = m[1].replace(/[\s]*[\u00B7\u2022\u2013\u2014-]$/, '').trim();
     const setOff = (trimmed !== m[1].trim()) || /[\u00B7\u2022\u2013\u2014-]/.test(m[2]);
-    if (!setOff && !BARE_HCP_RE.test(m[1])) return { tee: undefined, rest: text };
+    // URGENT-008: "after the handicap" includes the other ways a handicap ends a line -
+    // with its flight ("Zoe +4/A blue"), bracketed ("Skeens (8) white"), or in the
+    // comma form ("Ray, 9.0 white").
+    const afterHcp = BARE_HCP_RE.test(m[1]) || /,\s*[+-]?\d{1,2}(?:\.\d)?$/.test(m[1]) || !!splitTrailingHcpFlight(m[1]);
+    if (!setOff && !afterHcp) return { tee: undefined, rest: text };
     return { tee: (teeNames || [])[hit], rest: setOff ? trimmed : m[1] };
 }
 
@@ -355,13 +359,18 @@ function parsePlayerPasteText(text, teeNames) {
         notes.notes.forEach(n => notedLines.push({ lineNumber: idx + 1, text: line, note: n }));
         const bracketed = rosterPasteBracketFlight(notes.text);
         const lineFlight = cellFlight || bracketed.flight;
-        const work = rosterPasteNormalizeGolfer(bracketed.rest);
+        // THE TEE COMES OFF BEFORE the trailing handicap/flight is read (URGENT-008):
+        // "Zoe +4/A blue" kept the whole line as the name, because the tee sat after
+        // the flight. Same rule as ever - a tee this round has, after the handicap.
+        const teedFirst = splitTrailingTee(rosterPasteNormalizeGolfer(bracketed.rest), teeNames);
+        const work = rosterPasteNormalizeGolfer(teedFirst.rest);
         const trail = splitTrailingHcpFlight(work);
         if (trail && trail.name) {
             const lead = splitLeadingFlight(trail.name);
             const tp = { name: (lead.flight ? lead.rest : trail.name).replace(/\.+$/, '').trim(), hcp: trail.hcp };
             const fl = trail.flight || lead.flight || lineFlight || headerFlight;
             if (fl) tp.flight = fl;
+            if (teedFirst.tee) tp.teeName = teedFirst.tee;
             validPlayers.push(tp);
             playerLines.push(idx + 1);
             playerTexts.push(line);
@@ -392,7 +401,7 @@ function parsePlayerPasteText(text, teeNames) {
         const player = { name: (notAFlight ? name.replace(/\u0000/g, ',') : name).replace(/\.+$/, '').trim(), hcp };
         if (flight) player.flight = flight;
         else if (lineFlight || headerFlight) player.flight = lineFlight || headerFlight;
-        if (teed.tee) player.teeName = teed.tee;
+        if (teed.tee || teedFirst.tee) player.teeName = teed.tee || teedFirst.tee;
         validPlayers.push(player);
         playerLines.push(idx + 1);
         playerTexts.push(line);

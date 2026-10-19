@@ -222,3 +222,16 @@ describe('FIX 9: a note at the end of the line comes off before the handicap and
         assert.match(html, /Notes left off the names: "guest" \(line 1\)/);
     });
 });
+
+describe('FIX 10: a tee after the handicap/flight, a bracketed handicap or the comma form', () => {
+    const TEES = ['Blue', 'White', 'Gold', 'Pintail Black'];
+    const T = (text) => R.parsePlayerPasteText(text, TEES).validPlayers.map(p => [p.name, p.hcp, p.flight || null, p.teeName || null]);
+    test('"Zoe +4/A blue", "Shay +4.2/A pintail black", "Ray,9.0 white", "B: Skeens (8) white"', () => {
+        assert.deepEqual(T('Zoe +4/A blue\nShay +4.2/A pintail black\nRay,9.0 white\nB: Skeens (8) white'),
+            [['Zoe', '+4', 'A', 'Blue'], ['Shay', '+4.2', 'A', 'Pintail Black'], ['Ray', '9.0', null, 'White'], ['Skeens', '8', 'B', 'White']]);
+    });
+    test('unchanged: "Mary Blue" is a golfer named Mary Blue; with no tee list nothing is a tee', () => {
+        assert.deepEqual(T('Mary Blue'), [['Mary Blue', '', null, null]]);
+        assert.deepEqual(rows('Zoe +4/A blue'), [['Zoe +4/A blue', '', null]]);
+    });
+});
