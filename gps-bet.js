@@ -254,6 +254,10 @@
         + '#hp-card-bet .hp-bar-icon{flex:0 0 48px;font-size:20px;}'
         + '#hp-card-bet .hp-bar-score{flex:2 1 0;background:#c8f075;color:#0f1f17;font-size:16px;}'
         + '#hp-card-bet .hp-bet-btn{flex:0 0 auto;min-height:50px;padding:0 14px;}'
+        // Over Bets the bar has five: Enter score gives up the room so GPS and Card read whole.
+        + 'body.hp-bets-open #hp-card-bet .hp-bar-score{flex:1.3 1 0;font-size:14px;white-space:normal;}'
+        + 'body.hp-bets-open #hp-card-bet .hp-bar-btn{padding:0 4px;font-size:14px;}'
+        + 'body.hp-bets-open #hp-card-bet .hp-bar-icon{flex:0 0 44px;font-size:20px;}'
         + '#hp-card-bet .hp-money-chip{position:absolute;right:10px;bottom:calc(100% + 8px);}'
         + '.hp-money-chip{border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}'
         + '.hp-money-chip b{color:#c8f075;font-weight:800;}.hp-money-chip b.neg{color:#ff9b8a;}'

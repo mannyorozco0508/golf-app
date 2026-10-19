@@ -125,7 +125,9 @@ function makeStubSandbox() {
         // in a browser.
         setTimeout, clearTimeout, setInterval, clearInterval,
         location: { search: '', href: 'https://golf-app-5a5.pages.dev/index.html', pathname: '/index.html' },
-        localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+        // ONE remembered answer (017): this phone has the simpler flow OFF, so every suite here
+        // reads today's screens; the new flow has its own Chrome tests (gps017_*_chrome_test.js).
+        localStorage: { getItem(k) { return k === 'hardpan_simple_flow' ? 'off' : null; }, setItem() {}, removeItem() {} },
         // A REAL one, unlike the localStorage stub above. sessionStorage is used to
         // remember UI state that must survive a re-render or a reload, so a test
         // that cannot read back what production wrote proves nothing about it.
