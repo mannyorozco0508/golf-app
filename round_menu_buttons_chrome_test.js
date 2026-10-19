@@ -10,9 +10,8 @@
 // real href. The one button already showing its state (Hole View on the Hole View) is
 // exempt. Organizer on a two-group round (past the group picker); stub db only.
 'use strict';
-// HardPan only for now: the Consumer index.html is pinned byte for byte (gps_flag_test.js), so
-// the Group Links fix is in a GPS block and the Consumer build still has the dead button.
-if (!require('fs').existsSync(require('path').join(__dirname, 'gps-view.js'))) { console.log('Consumer tree (GPS_ENABLED=0): Round Menu fix is HardPan-only - skipped.'); process.exit(0); }
+// Runs in BOTH trees: the Group Links fix is shared code (2026-10-19, Manny OK), so the
+// Consumer build's Round Menu is held to the same rule.
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { openJourney, fileUrl } = require('./tools/lib/journey.js');

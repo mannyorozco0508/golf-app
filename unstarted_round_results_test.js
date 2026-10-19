@@ -155,7 +155,7 @@ describe('2. THE ENGINE IS UNCHANGED, AND STILL ANSWERS WHAT IT ANSWERED', () =>
         const GOLDEN = {
             'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '9f6a4fa7e4def756',
             'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
-            'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': '399ba26f0025b8d1',
+            'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': 'f67a7b4390f5776f', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */
             'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
             'hole-events.js': '6fd7f7edf41e848b', 'bet-strip.js': '3b2dd5fb785e16f3'
         };
