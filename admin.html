@@ -2214,6 +2214,23 @@ html {
         <input type="hidden" id="flights-enabled" value="false">
         <div id="flights-detail" style="display:none; margin-top:8px;">
             <div id="flights-count" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;"></div>
+            <!-- SPLIT BY HANDICAP (URGENT-009, 013-3). Flights switched on over a roster
+                 with NO letters put the whole field in A. Asked ONCE, here, beside the
+                 count it changes: the cutoff defaults to the median handicap (a plus
+                 handicap counts below scratch) and is editable; Split applies it in one
+                 tap and never moves a golfer whose A/B was tapped by hand. -->
+            <div id="flights-split-ask" role="group" aria-label="Split flights by handicap" style="display:none; border:1px solid var(--brand-green); border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:0.85rem;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
+                    <span>Split by handicap? A = up to</span>
+                    <input type="text" id="flights-split-cutoff" inputmode="decimal" aria-label="Flight A cutoff handicap" oninput="refreshFlightSplitPreview()" style="width:4.5em; min-height:36px; text-align:center;">
+                    <span>, B = above</span>
+                </div>
+                <div id="flights-split-preview" style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 6px 0;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn-primary" id="flights-split-yes" onclick="applyFlightSplit()" style="min-height:40px; padding:6px 14px; width:auto;">Split</button>
+                    <button type="button" class="btn-outline" id="flights-split-no" onclick="declineFlightSplit()" style="min-height:40px; padding:6px 14px; width:auto;">No thanks</button>
+                </div>
+            </div>
             <div id="flights-scopes">
                 <div class="toggle-row" style="margin:0 0 6px 0;">
                     <span style="font-size:0.75rem; min-width:52px;">Skins</span>
@@ -3372,7 +3389,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!rows.length) throw new Error('the paste has no golfers');
             const kept = pool.slice();
             if (kept.length) { sizes.push(kept.length); kept.forEach((p) => rows.push(p)); }
-            if (rows.some((p) => p.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+            if (rows.some((p) => p.flight)) { noteFlightLetters(); if (!flightsEnabledNow()) setFlightsEnabled(true); }
             const list = document.getElementById('player-list');
             list.innerHTML = '';
             groupSizeOverrides = {};
@@ -3734,6 +3751,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (data.birdieGameEnabled) actionLines.push('Birdie Game');
 
+        // THE WEEKLY GAME IS ACTION (URGENT-009, 013-7). A money pool is a pot, not
+        // a game in getRoundGames()'s model, so a round whose only money was the
+        // Weekly Game read "Just keeping score — no side games". DISPLAY ONLY: the
+        // line reads the saved moneyPool; nothing here computes or moves money.
+        const roundPool = data.moneyPool;
+        if (roundPool && roundPool.enabled) {
+            const buyIn = Number(roundPool.buyIn) || 0;
+            const parts = [];
+            if (roundPool.kp && (Number(roundPool.kp.amount) || 0) > 0) parts.push('KP');
+            if (roundPool.net) parts.push('Net');
+            if (roundPool.skins && roundPool.skins.mode && roundPool.skins.mode !== 'none') parts.push('Skins');
+            actionLines.push('\uD83C\uDFC6 ' + (buyIn > 0 ? '$' + buyIn + ' ' : '') + 'Weekly Game' + (parts.length ? ' \u2014 ' + parts.join(' \u00B7 ') : ''));
+        }
+
         const sideMatchCount = Object.keys(data.sideMatches || {}).length;
         if (sideMatchCount > 0) {
             actionLines.push(`${sideMatchCount} Side Bet${sideMatchCount === 1 ? '' : 's'}`);
@@ -4039,6 +4070,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return bits.join(' \u00B7 ');
     }
 
+    // [label, value] lines for the Review's PLAYERS section: groups ("5 × 4", or
+    // the sizes when they differ), flights ("A 10 · B 10") when on, and the tee
+    // (with how many golfers play another tee). Nothing here writes.
+    function reviewPlayerLines(n) {
+        const out = [];
+        if (n > 0 && typeof computeGroupSizes === 'function') {
+            const sizes = computeGroupSizes(n, groupSizeOverrides || {});
+            if (sizes.length > 1) {
+                const same = sizes.every((x) => x === sizes[0]);
+                out.push(['Groups', same ? sizes.length + ' \u00D7 ' + sizes[0] : sizes.length + ' groups (' + sizes.join(', ') + ')']);
+            } else if (sizes.length === 1) {
+                out.push(['Groups', '1 group of ' + sizes[0]]);
+            }
+        }
+        if (flightsEnabledNow()) {
+            const list = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim() || String(p.hcp || '').trim());
+            const a = list.filter((p) => p.flight !== 'B').length;
+            out.push(['Flights', 'A ' + a + ' \u00B7 B ' + (list.length - a)]);
+        }
+        const tee = (typeof readTeeRatingFromDom === 'function') ? readTeeRatingFromDom() : null;
+        if (tee && tee.teeKey && String(tee.teeName || '').trim()) {
+            let other = 0;
+            document.querySelectorAll('.player-row').forEach((row) => {
+                const k = row.getAttribute('data-tee-key') || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
+                if (k && k !== tee.teeKey) other++;
+            });
+            out.push(['Tee', escapeHtml(String(tee.teeName).trim()) + (other ? ' (' + other + ' golfer' + (other === 1 ? '' : 's') + ' on another tee)' : '')]);
+        }
+        return out;
+    }
+
     function renderWizardReview() {
         renderOrganizerStanding();
         const container = document.getElementById('wizard-review-summary');
@@ -4129,6 +4191,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         rows.push(['Tee rating', handicapReviewLine(), 1, SEC_SCORING]);
         rows.push(['Players', `${playerCount} added`, 5, SEC_PLAYERS]);
+        // GROUPS, FLIGHTS AND THE TEE (URGENT-009, 013-8). After a paste the Review
+        // said "20 added" and nothing else - not the five foursomes, not A 10 / B 10,
+        // not which tee. DISPLAY ONLY, each read the way the save reads it.
+        reviewPlayerLines(parseInt(playerCount, 10) || 0).forEach((r) => rows.push(r.concat([5, SEC_PLAYERS])));
         rows.push(['Extras', sideGamesText, 6, SEC_ACTION]);
         // A side match set up in the Games step is written by this same Save, so it
         // belongs on the last screen before playing. Read from what will be written -
@@ -9227,7 +9293,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function refreshFlightsCount() {
         const el = document.getElementById('flights-count');
         if (!el) return;
-        if (!flightsEnabledNow()) { el.textContent = ''; return; }
+        if (!flightsEnabledNow()) { el.textContent = ''; maybeOfferFlightSplit(); return; }
         const list = captureCurrentPlayerInputs();
         const a = list.filter(p => p.flight !== 'B').length;
         const b = list.length - a;
@@ -9236,13 +9302,86 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // the switches are noise there. Hidden, not removed - the hidden inputs
         // still hold a value and the payload still writes it.
         const scopes = document.getElementById('flights-scopes');
-        if (scopes && typeof wizardWorkflow === 'function') scopes.style.display = wizardWorkflow().indexOf('action') === -1 ? 'none' : '';
+        if (scopes && typeof wizardWorkflow === 'function') scopes.style.display = wizardWorkflow().indexOf('action') === -1 ? 'none' : '';        maybeOfferFlightSplit();
     }
     function toggleRowFlight(btn) {
         const next = btn.getAttribute('data-flight') === 'B' ? 'A' : 'B';
         btn.setAttribute('data-flight', next);
         btn.textContent = next;
+        // SET BY HAND: the split-by-handicap question never moves this golfer.
+        const row = btn.closest ? btn.closest('.player-row') : null;
+        if (row) flightHandSet.add(String(playerIdOfRow(row)));
         refreshFlightsCount();
+    }
+
+    // ---- SPLIT BY HANDICAP (URGENT-009, 013-3) -------------------------------
+    // ASKED ONCE. Not asked at all when the roster brought its own letters (a
+    // paste, a typed "Glenn 12/B", My Groups, a saved or copied round with
+    // flights) - those are the organizer's flights already. flightHandSet holds
+    // the player ids whose A/B was tapped by hand; Split never moves them.
+    let flightSplitAsked = false;
+    const flightHandSet = new Set();
+    function noteFlightLetters() {
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
+    }
+    function flightSplitRoster() {
+        return captureCurrentPlayerInputs().filter(p => String(p.name || '').trim() || String(p.hcp || '').trim());
+    }
+    function maybeOfferFlightSplit() {
+        const box = document.getElementById('flights-split-ask');
+        if (!box) return;
+        const hide = () => { box.style.display = 'none'; box.removeAttribute('data-shown'); };
+        if (flightSplitAsked || !flightsEnabledNow() || typeof flightSplitSuggestion !== 'function') return hide();
+        const list = flightSplitRoster();
+        // A B that nobody tapped is a letter the roster brought: nothing to ask.
+        if (list.some(p => p.flight === 'B' && !flightHandSet.has(String(p.id)))) return hide();
+        const s = flightSplitSuggestion(list.filter(p => !flightHandSet.has(String(p.id))));
+        if (!s) return hide();
+        const input = document.getElementById('flights-split-cutoff');
+        if (input && (!box.getAttribute('data-shown') || !String(input.value || '').trim())) input.value = formatFlightCutoff(s.cutoff);
+        box.setAttribute('data-shown', '1');
+        box.style.display = 'block';
+        refreshFlightSplitPreview();
+    }
+    function flightSplitCutoffNow() {
+        const input = document.getElementById('flights-split-cutoff');
+        return flightHcpNumber(input ? input.value : '');
+    }
+    function refreshFlightSplitPreview() {
+        const el = document.getElementById('flights-split-preview');
+        if (!el) return;
+        const cut = flightSplitCutoffNow();
+        if (cut == null) { el.textContent = 'Type a handicap for the cutoff (+2 is a plus handicap).'; return; }
+        const list = flightSplitRoster();
+        const f = flightSplitAssign(list, cut, p => flightHandSet.has(String(p.id)));
+        const a = f.filter(x => x === 'A').length;
+        el.textContent = 'A ' + a + ' \u00B7 B ' + (f.length - a);
+    }
+    function applyFlightSplit() {
+        const cut = flightSplitCutoffNow();
+        // SAID INLINE, under the box (the preview line), not in a dialog.
+        if (cut == null) { refreshFlightSplitPreview(); const i = document.getElementById('flights-split-cutoff'); if (i && i.focus) i.focus(); return; }
+        document.querySelectorAll('.player-row').forEach(row => {
+            const btn = row.querySelector('.p-flight-input');
+            if (!btn || flightHandSet.has(String(playerIdOfRow(row)))) return;
+            const box = row.querySelector('.p-hcp-input');
+            const n = flightHcpNumber(box ? box.value : '');
+            if (n == null) return;
+            const f = n <= cut ? 'A' : 'B';
+            btn.setAttribute('data-flight', f);
+            btn.textContent = f;
+        });
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
+        refreshFlightsCount();
+    }
+    function declineFlightSplit() {
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
     }
     // The control, one element for both placements: a sixth column on a plain
     // row (explicit grid column 3, so the auto-placed delete button moves to
@@ -9838,6 +9977,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (fixingPastedRows || typeof fixPastedRows !== 'function') return list;
         const r = fixPastedRows(list);
         if (!r.fixed) return list;
+        if (r.anyFlight) noteFlightLetters();
         if (r.anyFlight && !flightsEnabledNow()) {
             // setFlightsEnabled redraws the roster from the rows on screen; the
             // guard keeps that inner redraw from fixing (and noting) a second time.
@@ -9846,6 +9986,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         showRosterFixNote('Fixed ' + r.fixed + ' golfer' + (r.fixed === 1 ? "'s handicap" : "s' handicaps") + (r.anyFlight ? ' and flights' : '') + '.');
         return r.list;
+    }
+    // A TYPED ROW READS LIKE A PASTED ONE (URGENT-009, 013-3). "Glenn 12/B" typed
+    // into a name box used to sit there whole until something redrew the roster;
+    // leaving the box now redraws it, which runs the same fix as a paste - name,
+    // handicap and flight split, Flights switched on for a letter. Only when the
+    // handicap box is empty, so a typed number is never replaced.
+    function typedRowChanged(input) {
+        const row = input && input.closest ? input.closest('.player-row') : null;
+        const hcp = row ? row.querySelector('.p-hcp-input') : null;
+        if (hcp && String(hcp.value || '').trim() !== '') return;
+        if (typeof splitTrailingHcpFlight !== 'function' || !splitTrailingHcpFlight(input.value)) return;
+        renderPlayerList();
     }
     // One line above the roster: the fix count and, when two golfers share a name,
     // the ask for a last initial. Replaced on every redraw.
@@ -10810,7 +10962,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (rows.length === 0) return uiRefuse('Tick at least one golfer.');
         const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
         const existing = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
-        if (rows.some(r => r.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        if (rows.some(r => r.flight)) { noteFlightLetters(); if (!flightsEnabledNow()) setFlightsEnabled(true); }
         rows.forEach(r => existing.push({
             name: r.name, hcp: r.hcp, team: '',
             squad: existing.length % 2 === 0 ? 'red' : 'blue',
@@ -11037,7 +11189,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // off). Captured BEFORE the switch, so the golfers already on the roster
         // keep their names and handicaps; they get A on the rebuild below, the same
         // as switching flights on by hand. The pasted golfers carry their letter.
-        if (validPlayers.some(p => p.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        if (validPlayers.some(p => p.flight)) { noteFlightLetters(); if (!flightsEnabledNow()) setFlightsEnabled(true); }
 
         // GROUPS FROM THE PASTE, only when the paste drew a boundary. The golfers
         // already on the roster keep the groups they are in - each of those is
@@ -12088,6 +12240,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // resetting it to headcount here is exactly the default-state slip
             // skins_even_split_test.js's first setup test exists to catch.
             setFlightsSkinsSplit(!flOn ? 'even' : (fl.skinsSplit === 'even' ? 'even' : 'headcount'));
+            // A saved (or copied) round with flights brings its own A/B: not asked.
+            if (flOn) noteFlightLetters();
             setFlightsEnabled(flOn);
 
             } catch (err) {
@@ -12334,7 +12488,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         void baseColumns; void flightColumn;
         row.innerHTML = `
             <button type="button" class="p-drag" aria-label="Move ${escapeHtml(name || 'this golfer')}: drag, or tap for Move up, Move down and Move to group" title="Drag to reorder - tap for more">&#8801;</button>
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}" onchange="typedRowChanged(this)">
             <input type="text" class="p-hcp-input" placeholder="${handicapSetupBoxLabel()}" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
             ${squadFieldHtml}
