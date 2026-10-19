@@ -57,7 +57,9 @@ const ST = "JSON.stringify({ url: document.URL.split('/').pop(), msg: (document.
         ['REAL01-2-GOODK2', /index\.html\?game=REAL01&group=2&sk=GOODK2$/, null, 'the right key'],
         ['REAL01 2', /index\.html\?game=REAL01&group=2$/, null, '"CODE 2"'],
         ['https://app.example/index.html?game=REAL01&group=1&sk=GOODK1', /index\.html\?game=REAL01&group=1&sk=GOODK1$/, null, 'a pasted link'],
-        ['real01', /index\.html\?game=REAL01&spectate=1$/, null, 'a bare code (spectator)'],
+        // A ROUND WITH GROUPS (REAL01 has two): the bare code opens the round's own link, whose
+        // "How are you joining?" sheet picks the group (013 setup sims; join_code_groups_test.js).
+        ['real01', /index\.html\?game=REAL01$/, null, 'a bare code on a two-group round (the group sheet)'],
     ];
     for (const [typed, want, msgRe, what] of CASES) {
         const j = await openJourney({ db: DB(), preScript: PRE });

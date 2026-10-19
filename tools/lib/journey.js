@@ -353,6 +353,9 @@ async function openJourney(opts) {
     const api = {
         get db() { return db; },
         log,
+        // A RAW DevTools command (013 setup sims): a real tap (Input.dispatchMouseEvent),
+        // a screenshot (Page.captureScreenshot). Calls nothing the page defines.
+        cdp(method, params) { return rpc(ws, id++, method, params || {}); },
         evaluate,
         harvest,
         async goto(url, settleMs) {

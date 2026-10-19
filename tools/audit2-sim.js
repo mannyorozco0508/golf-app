@@ -56,7 +56,7 @@ const f = (c, m) => { if (!c) fails.push(m); };
 
     // B8: Join. Three groups of two (URGENT-002: Join checks the group exists, so Groups 2 and 3
     // need a round that has them).
-    for (const [typed, want] of [['AUD2J1-2-K7Q9XM', /game=AUD2J1&group=2&sk=K7Q9XM$/], ['https://app.example/index.html?game=AUD2J1&group=3&sk=ABCDEF', /game=AUD2J1&group=3&sk=ABCDEF$/], ['AUD2J1 2', /game=AUD2J1&group=2$/], ['aud2j1', /game=AUD2J1&spectate=1$/]]) {
+    for (const [typed, want] of [['AUD2J1-2-K7Q9XM', /game=AUD2J1&group=2&sk=K7Q9XM$/], ['https://app.example/index.html?game=AUD2J1&group=3&sk=ABCDEF', /game=AUD2J1&group=3&sk=ABCDEF$/], ['AUD2J1 2', /game=AUD2J1&group=2$/], ['aud2j1', /game=AUD2J1$/]]) {
         r = await go({ url: fileUrl('home.html', '') + '#games', db: DB({ AUD2J1: round('AUD2J1', 6, null, { groupSizeOverrides: { 0: 2, 1: 2 } }) }), preScript: APP + ERR, steps: [{ sleep: 1500 },
             { expression: "(function(){ var i = document.getElementById('hp-code'); i.value = " + JSON.stringify(typed) + "; return i.value.length + ''; })()" },
             { expression: "(function(){ document.querySelector('[data-hp-act=\"join\"]').click(); return 'join'; })()" }, { sleep: 2000 }, URL_NOW] });
