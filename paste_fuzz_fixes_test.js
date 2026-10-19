@@ -15,7 +15,7 @@ describe('FIX 1: the line is cleaned before it is read', () => {
         assert.deepEqual(rows('Zack\tCarrano\t6\tA\r\nSean\tBurke\t21\tB'), [['Zack Carrano', '6', 'A'], ['Sean Burke', '21', 'B']]);
     });
     test('a non-breaking space (iMessage, Notes) is a space: "Big\\u00A0Jim\\u00A012" is Big Jim, 12', () => {
-        assert.deepEqual(rows('Big Jim 12\nTommy  Chen  +2'), [['Big Jim', '12', null], ['Tommy Chen', '+2', null]]);
+        assert.deepEqual(rows('Big\u00A0Jim\u00A012\nTommy  Chen\u00A0 +2'), [['Big Jim', '12', null], ['Tommy Chen', '+2', null]]);
     });
     test('\\r\\n and a lone \\r both end a line', () => {
         assert.deepEqual(rows('Marty 9\r\nScott 7\rLance 14.3').map(r => r[0]), ['Marty', 'Scott', 'Lance']);
@@ -35,8 +35,8 @@ describe('FIX 1: the line is cleaned before it is read', () => {
         assert.equal(R.rosterPasteCleanLine('-Rod 4'), '-Rod 4');
     });
     test('zero-width marks go; the emoji joiner stays inside an emoji name', () => {
-        assert.deepEqual(rows('​Marty 9﻿'), [['Marty', '9', null]]);
-        assert.equal(rows('Jimmy \u{1F3CC}️‍♂️ 12')[0][0], 'Jimmy \u{1F3CC}️‍♂️');
+        assert.deepEqual(rows('\u200BMarty 9\uFEFF'), [['Marty', '9', null]]);
+        assert.equal(rows('Jimmy \u{1F3CC}\uFE0F\u200D♂\uFE0F 12')[0][0], 'Jimmy \u{1F3CC}\uFE0F\u200D♂\uFE0F');
     });
     test('playerLines: the line each golfer came from, parallel to validPlayers', () => {
         const r = P('Group 1\nMarty 9\n\nScott 7');
@@ -191,5 +191,34 @@ describe('FIX 8: separators around an explicit flight or the word hcp', () => {
     });
     test('a bar or slash glued to the word: "SKEENS|hcp +5", "Pat Morrissey/HCP 21", "Old Tom|hdcp 15 / A"', () => {
         assert.deepEqual(rows('B SKEENS|hcp +5\nPat Morrissey/HCP 21\nOld Tom|hdcp 15 / A'), [['SKEENS', '+5', 'B'], ['Pat Morrissey', '21', null], ['Old Tom', '15', 'A']]);
+    });
+});
+
+describe('FIX 9: a note at the end of the line comes off before the handicap and flight are read', () => {
+    test('"Hugh 17.4 A (guest)", "Skeens 2.0/A (captain)", "Big Jim, +0.5, B [sub]", "Jeremy (25) (cart 3)"', () => {
+        const r = P('Hugh 17.4 A (guest)\nSkeens 2.0/A (captain)\nBig Jim, +0.5, B [sub]\nJeremy (25) (cart 3)');
+        assert.deepEqual(r.validPlayers.map(p => [p.name, p.hcp, p.flight || null]),
+            [['Hugh', '17.4', 'A'], ['Skeens', '2.0', 'A'], ['Big Jim', '+0.5', 'B'], ['Jeremy', '25', null]]);
+        assert.deepEqual(r.notedLines.map(n => [n.lineNumber, n.note]), [[1, 'guest'], [2, 'captain'], [3, 'sub'], [4, 'cart 3']]);
+    });
+    test('a bracket the reading needs is not a note: "(12)", "(B)", "(hcp 5)", and "(A) (new)" keeps the A', () => {
+        const r = P('Al (12)\nGlenn (B)\nBo (hcp 5)\nmartín 19.4 (A) (new)');
+        assert.deepEqual(r.validPlayers.map(p => [p.name, p.hcp, p.flight || null]), [['Al', '12', null], ['Glenn', '', 'B'], ['Bo', '5', null], ['martín', '19.4', 'A']]);
+        assert.deepEqual(r.notedLines.map(n => n.note), ['new']);
+    });
+    test('"B Jimmy 11 (captain)" is still Jimmy, B, 11, with the note reported once', () => {
+        const r = P('B Jimmy 11 (captain)');
+        assert.deepEqual(r.validPlayers, [{ name: 'Jimmy', hcp: '11', flight: 'B' }]);
+        assert.deepEqual(r.notedLines.map(n => n.note), ['captain']);
+    });
+    test('admin preview says which notes were left off', () => {
+        const vm = require('vm');
+        const { loadHtmlInlineScript } = require('./helpers/load-script.js');
+        const sb = loadHtmlInlineScript('admin.html', ['course-data.js', 'action-model.js']);
+        vm.runInContext(`document.__mount(document.getElementById('player-list'));`, sb);
+        sb.__text = 'Hugh 17.4 A (guest)\nMarty 9';
+        vm.runInContext(`document.getElementById('paste-players-textarea').value = __text; previewPastedPlayers();`, sb);
+        const html = String(vm.runInContext("document.getElementById('paste-preview-summary').innerHTML", sb));
+        assert.match(html, /Notes left off the names: "guest" \(line 1\)/);
     });
 });

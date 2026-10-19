@@ -107,6 +107,17 @@ const CLASS = {
     'src:plain': 'COMMON', 'src:imessage': 'COMMON', 'src:notes': 'COMMON', 'src:excel': 'COMMON', 'src:sheets': 'COMMON',
     'ws:crlf': 'COMMON', 'ws:cr_only': 'RARE', 'ws:nbsp': 'COMMON', 'ws:trailing': 'COMMON', 'ws:smart_quotes': 'COMMON',
     'ws:zero_width': 'RARE',
+    // MESSY PASTES: one list, written by hand, is not uniform
+    'mess:mixed_sep': 'COMMON',  // "Marty 9" then "Scott - 7" then "Lance: 14"
+    'mess:lowercase': 'COMMON',  // "marty 9"
+    'mess:note': 'COMMON',       // "Jimmy 11 (captain)", "Skeens 2.0/A (guest)"
+    'mess:mixed_order': 'COMMON',// "A Marty 9" and "Scott 7 B" in one list
+    'name:jr_dot': 'COMMON',     // "Mike Jr. 12" -> "Mike Jr" (v194: a trailing dot comes off)
+    'hcp:placeholder': 'RARE',   // "Glenn -", "Glenn ?", "Glenn N/A": no handicap yet
+    'hcp:two_dec': 'RARE',       // "Glenn 12.45" (not a handicap shape): must be flagged
+    'hcp:comma_dec': 'RARE',     // "Glenn 12,4" (European decimal): must be flagged
+    'tee:named': 'COMMON',       // "Zack Carrano 6 blue" with the round's tees passed in
+    'multi:per_line': 'RARE',    // "Manny 8, Jimmy 11" - two golfers on one line: must be flagged
     'xl:header_row': 'COMMON', 'xl:first_last_cols': 'COMMON', 'xl:index_col': 'RARE', 'xl:empty_hcp_with_flight': 'COMMON',
 };
 
@@ -121,9 +132,10 @@ const POOL = {
     hyphen: ['Smith-Jones', 'Jean-Luc', 'Mary-Kate Ross', 'Al Jones-Hart'],
     accented: ['José', 'Zoë', 'Ñico', 'Renée', 'Müller', 'Martín García', 'Björn'],
     caps: ['SKEENS', 'BIG JIM', 'MATT B', 'GLENN', 'TOMMY CHEN'],
-    initials: ['B.J. Smith', 'A.J. Cole', 'J.R. Ewing', 'T.J.'],      // "T.J." loses its trailing dot (v194) - see expectName
+    initials: ['B.J. Smith', 'A.J. Cole', 'J.R. Ewing', 'T.J.'],
+    jr_dot: ['Mike Jr.', 'Bob Sr.', 'Dr. Smith', 'St. James'],      // "T.J." loses its trailing dot (v194) - see expectName
     nickname_quotes: ['Jim "Doc" Smith', 'Bobby "The Hammer" Lee'],
-    emoji: ['Jimmy 🏌️', '⛳ Paul', 'Marty 🔥', '🦅 Eagle Eddie'],
+    emoji: ['Jimmy 🏌\uFE0F', '⛳ Paul', 'Marty 🔥', '🦅 Eagle Eddie'],
     last_first: ['Orozco, Manny', 'Smith, John', 'Kelly, Tom'],
 };
 function expectName(n) {
@@ -149,13 +161,20 @@ function genPaste() {
     if (order === 'hcp_name' || order === 'name_flight_hcp') sep = pick(['sp1', 'spN']);
     // HANDICAP
     let hcp = sheet ? wpick([['int', 3], ['dec0', 2], ['dec1', 2], ['plus', 1]])
-        : wpick([['int', 5], ['dec0', 2], ['dec1', 3], ['plus', 1.5], ['plusdec', 1], ['paren', 1.2], ['word_before', 0.7], ['word_after', 0.5], ['none', 0.8]]);
-    if (order === 'hcp_name' && /word|paren|none/.test(hcp)) hcp = 'int';
+        : wpick([['int', 5], ['dec0', 2], ['dec1', 3], ['plus', 1.5], ['plusdec', 1], ['paren', 1.2], ['word_before', 0.7], ['word_after', 0.5], ['none', 0.8], ['two_dec', 0.15], ['comma_dec', 0.15]]);
+    if (hcp === 'comma_dec' && sep === 'comma') hcp = 'dec1';
+    if (order === 'hcp_name' && /word|paren|none|_dec/.test(hcp)) hcp = 'int';
     if (order === 'name_flight_hcp' && hcp === 'none') hcp = 'int';
     if (sep === 'comma' && /word|paren/.test(hcp)) hcp = 'dec1';
     T('hcp:' + hcp);
     const someMissing = hcp !== 'none' && order !== 'hcp_name' && order !== 'name_flight_hcp' && chance(0.2);
     if (someMissing) T('hcp:some_missing');
+    const placeholder = someMissing && !sheet && chance(0.2);
+    if (placeholder) T('hcp:placeholder');
+    // messy: per-line variation (tagged when a line actually varies)
+    const mess = !sheet && order !== 'hcp_name' && order !== 'name_flight_hcp' && chance(0.3);
+    const tees = !sheet && (order === 'name_hcp' || order === 'lead_flight') && hcp !== 'none' && chance(0.12);
+    const multi = !sheet && order === 'name_hcp' && sep === 'sp1' && /^(int|dec0|dec1|plus)$/.test(hcp) && chance(0.04);
     // FLIGHT
     let flight = !flightsOn ? 'none'
         : (order === 'lead_flight' || sheet) ? wpick([['upper', 4], ['lower', 1]])
@@ -204,7 +223,7 @@ function genPaste() {
 
     // NAMES
     const kinds = sheet ? [['plain', 5], ['two_word', 3], ['last_initial', 1], ['accented', 0.5], ['caps', 0.5]]
-        : [['plain', 6], ['two_word', 3], ['three_word', 1], ['last_initial', 2], ['apostrophe', 1], ['hyphen', 1], ['accented', 1],
+        : [['plain', 6], ['two_word', 3], ['jr_dot', 0.3], ['three_word', 1], ['last_initial', 2], ['apostrophe', 1], ['hyphen', 1], ['accented', 1],
             ['caps', 0.8], ['initials', 0.6], ['nickname_quotes', 0.4], ['emoji', 0.25], ['trailing_emoji', 0.2], ['last_first', 0.2]];
     const players = [];
     const used = new Set();
@@ -214,6 +233,8 @@ function genPaste() {
         if (order === 'name_flight_hcp' && kind === 'last_initial') kind = 'plain';
         if (kind === 'last_first' && sep === 'comma') kind = 'plain';
         if (kind === 'trailing_emoji' && order !== 'name_hcp') kind = 'plain';
+        if (kind === 'trailing_emoji' && tees) kind = 'plain';
+        if (kind === 'jr_dot' && hcp === 'none') kind = 'plain';
         if (kind === 'emoji' && order === 'lead_flight') kind = 'plain';
         if (xlFirstLast && kind !== 'two_word') kind = 'two_word';
         let name = kind === 'trailing_emoji' ? pick(POOL.plain) : pick(POOL[kind]);
@@ -242,7 +263,8 @@ function genPaste() {
     players.forEach(p => T('name:' + p.kind));
     if (order === 'trail_flight' && players.some(p => !p.hasHcp && p.flight)) T(sheet ? 'xl:empty_hcp_with_flight' : 'order:trail_flight_nohcp');
 
-    const style = { single: size === 1, src, sheet, order, sep, hcp, flight, brk, num, bullet, crlf, crOnly, nbsp, trailing, smart, zw, xlHeader, xlFirstLast, xlIndex };
+    if (multi) T('multi:per_line');
+    const style = { tags, mess, placeholder, tees, multi, single: size === 1, src, sheet, order, sep, hcp, flight, brk, num, bullet, crlf, crOnly, nbsp, trailing, smart, zw, xlHeader, xlFirstLast, xlIndex };
     return { style, tags, players, groupSizes, dups };
 }
 
@@ -275,15 +297,34 @@ const SEPS = { sp1: () => ' ', spN: () => pick(['  ', '   ']), tab: () => '\t', 
     colon: () => ': ', pipe: () => pick([' | ', '|']), slash: () => pick(['/', ' / ']) };
 
 // one golfer line + what it must parse to
-function renderGolfer(p, style, lineNo) {
-    const H = hcpText(p, style);
+const TEES = ['Blue', 'White', 'Gold', 'Pintail Black'];
+function renderGolfer(p, style0, lineNo) {
+    // A MESSY LIST varies line by line: another separator, the name in lower case,
+    // the other flight position, a bracketed note at the end.
+    const style = Object.assign({}, style0);
+    const tag = (t) => style0.tags && style0.tags.add(t);
+    let lower = false, note = '', tee = null;
+    if (style0.mess) {
+        if (style.sep !== 'comma' && chance(0.25)) { const ns = pick(['sp1', 'spN', 'tab', 'dash', 'colon']); if (ns !== style.sep) { style.sep = ns; tag('mess:mixed_sep'); } }
+        if (chance(0.15)) { lower = true; tag('mess:lowercase'); }
+        if (chance(0.12)) { note = pick([' (captain)', ' (guest)', ' [sub]', ' (cart 3)', ' (new)']); tag('mess:note'); }
+        if (p.flight && p.hasHcp && (style.order === 'lead_flight' || style.order === 'trail_flight') && style.flight !== 'paren' && !/word/.test(style.flight) && chance(0.2)) {
+            style.order = style.order === 'lead_flight' ? 'trail_flight' : 'lead_flight'; tag('mess:mixed_order');
+        }
+    }
+    if (style0.tees && p.hasHcp && chance(0.4)) { tee = pick(TEES); tag('tee:named'); }
+    let H = hcpText(p, style);
     const F = flightText(p.flight, style);
-    let N = p.name;
+    let N = lower ? p.name.toLowerCase() : p.name;
+    let oddHcp = false;
+    if (H && style.hcp === 'two_dec') { H = H.replace(/^([+]?\d+)(?:\.\d)?$/, (m, a) => a + '.' + int(10, 99)); oddHcp = true; }
+    if (H && style.hcp === 'comma_dec') { H = H.replace(/^([+]?\d+)(?:\.\d)?$/, (m, a) => a + ',' + int(1, 9)); oddHcp = true; }
+    if (!H && style0.placeholder && !p.flight) H = pick(['-', '?', 'N/A', 'n/a', 'NH', 'tbd', '--']);
     if (p.kind === 'last_first') N = p.name;      // "Orozco, Manny"
     let body;
     const sep = SEPS[style.sep]();
-    const expect = { name: expectName(p.kind === 'trailing_emoji' ? p.name : p.name), hcp: p.hasHcp ? (p.plus ? '+' : '') + p.v : '', plus: p.plus, flight: p.flight };
-    let safeOk = false, flagOk = false, alt = null;
+    const expect = { name: expectName(N), hcp: p.hasHcp ? (p.plus ? '+' : '') + p.v : '', plus: p.plus, flight: p.flight, teeName: tee || undefined };
+    let safeOk = false, flagOk = oddHcp, alt = null;
     if (style.sheet) {
         const cells = [];
         if (style.xlIndex) cells.push(String(lineNo));
@@ -313,13 +354,15 @@ function renderGolfer(p, style, lineNo) {
         case 'hcp_name': body = H + ' ' + N + (F ? ' ' + F : ''); flagOk = true; break;
     }
     if (p.kind === 'trailing_emoji') {
-        const e = pick(['🔥', '⛳', '🏌️‍♂️']);
+        const e = pick(['🔥', '⛳', '🏌\uFE0F\u200D♂\uFE0F']);
         body = body + ' ' + e;
         // after a handicap the emoji hides it ("Zack 12 🔥"): flagged. With no handicap
         // it is simply part of the name as typed.
-        if (H) flagOk = true; else expect.name = p.name + ' ' + e;
+        if (H) flagOk = true; else expect.name = N + ' ' + e;
     }
     if (p.kind === 'emoji' || p.kind === 'last_first') flagOk = true;
+    if (tee) body += ' ' + (chance(0.5) ? tee.toLowerCase() : tee);
+    if (note) body += note;
     // numbering / bullets
     if (style.num === 'paren') body = lineNo + ') ' + body;
     else if (style.num === 'dot') body = lineNo + '. ' + body;
@@ -329,10 +372,11 @@ function renderGolfer(p, style, lineNo) {
     else if (style.bullet === 'dash') body = '- ' + body;
     else if (style.bullet === 'star') body = '* ' + body;
     else if (style.bullet === 'dot_tab') body = '\t•\t' + body;
-    if (style.nbsp) body = body.replace(/ /g, () => chance(0.5) ? ' ' : ' ');
-    if (style.zw) { body = body.replace(/^/, '​'); flagOk = true; }
-    if (style.trailing && !style.sheet) body += pick([' ', '  ', '\t', ' ']);
+    if (style.nbsp) body = body.replace(/ /g, () => chance(0.5) ? '\u00A0' : ' ');
+    if (style.zw) { body = body.replace(/^/, '\u200B'); flagOk = true; }
+    if (style.trailing && !style.sheet) body += pick([' ', '  ', '\t', '\u00A0']);
     if (style.order === 'hcp_name') safeOk = false;
+    if (oddHcp) alt = null;
     return { text: body, kind: 'golfer', expect, safeOk, flagOk, alt, player: p };
 }
 
@@ -343,7 +387,7 @@ function header(style, gi) {
             return pick(['Group ' + n, 'Group ' + n + ':', 'GROUP ' + n, 'Group ' + n + ' -', 'Group #' + n, 'Grp ' + n + ':', 'Foursome ' + n, 'Group ' + n + ' - 8:' + mm + ' AM', 'Group ' + n + ': 8:' + mm, 'group ' + n, 'Team ' + n + ':']); }
         case 'number_header': return pick([n + '.', n + ')', '#' + n, n + ':']);
         case 'teetime_header': { const mm = String(10 + (n * 8) % 50).padStart(2, '0'); const h = 7 + Math.floor(n / 6);
-            return pick(['Tee time ' + h + ':' + mm, h + ':' + mm, h + ':' + mm + ' AM', h + ':' + mm + ' AM', h + ':' + mm + 'am', 'Tee Time: ' + h + ':' + mm + ' AM', 'Tee time - ' + h + ':' + mm]); }
+            return pick(['Tee time ' + h + ':' + mm, h + ':' + mm, h + ':' + mm + ' AM', h + ':' + mm + '\u202FAM', h + ':' + mm + 'am', 'Tee Time: ' + h + ':' + mm + ' AM', 'Tee time - ' + h + ':' + mm]); }
         case 'flight_header': return pick(['A Flight', 'Flight A', 'A flight:', 'Flight A:']).replace(/A/g, gi % 2 ? 'B' : 'A');
     }
     return null;
@@ -358,14 +402,20 @@ function buildText(G) {
         if (gi > 0) {
             if (s.brk === 'blank') lines.push({ text: '', kind: 'sep' });
             else if (s.brk === 'multi_blank') { lines.push({ text: '', kind: 'sep' }); lines.push({ text: pick(['', ' ']), kind: 'sep' }); }
-            else if (s.brk === 'ws_blank') lines.push({ text: pick([' ', '  ', '\t', ' ', '   ']), kind: 'sep' });
+            else if (s.brk === 'ws_blank') lines.push({ text: pick([' ', '  ', '\t', '\u00A0', ' \u00A0 ']), kind: 'sep' });
             else if (/header/.test(s.brk) && chance(0.4)) lines.push({ text: '', kind: 'sep' });
         }
-        if (/header/.test(s.brk)) { let h = header(s, gi); if (s.nbsp) h = h.replace(/ /g, ' '); lines.push({ text: h, kind: 'sep', flightHeader: s.brk === 'flight_header' ? (gi % 2 ? 'B' : 'A') : null }); }
+        if (/header/.test(s.brk)) { let h = header(s, gi); if (s.nbsp) h = h.replace(/ /g, '\u00A0'); lines.push({ text: h, kind: 'sep', flightHeader: s.brk === 'flight_header' ? (gi % 2 ? 'B' : 'A') : null }); }
         for (let k = 0; k < gs; k++) {
             const p = G.players[pi++];
             const ln = renderGolfer(p, s, s.num !== 'none' && chance(0.5) ? k + 1 : lineNo);
-            lines.push(ln);
+            if (s.multi && k + 1 < gs && chance(0.6)) {
+                // TWO GOLFERS ON ONE LINE ("Manny 8, Jimmy 11"): the roster paste reads one
+                // golfer a line, so this can only be flagged.
+                const p2 = G.players[pi++]; k++;
+                const ln2 = renderGolfer(p2, s, lineNo);
+                lines.push({ text: ln.text + pick([', ', ' & ', ' / ']) + ln2.text, kind: 'golfer', multi: true, expect: { name: '\u0000' }, flagOk: true, safeOk: false, alt: null, player: p });
+            } else lines.push(ln);
             lineNo++;
         }
     });
@@ -374,7 +424,7 @@ function buildText(G) {
     lines.forEach(l => { if (l.kind === 'sep' && l.flightHeader) cur = l.flightHeader; else if (l.kind === 'golfer' && cur && !l.expect.flight) l.expect.flight = cur; });
     if (chance(0.15)) lines.push({ text: '', kind: 'sep' });     // a trailing newline
     const eol = s.crlf ? '\r\n' : s.crOnly ? '\r' : '\n';
-    return { lines, text: lines.map(l => l.text).join(eol) };
+    return { lines, text: lines.map(l => l.text).join(eol), teeNames: s.tees ? TEES : [] };
 }
 
 // ---- the oracle ------------------------------------------------------------------
@@ -386,7 +436,8 @@ function hcpMatches(got, e) {
     if (plusGot !== !!e.plus) return false;
     return Math.abs(Math.abs(parseFloat(g)) - Math.abs(parseFloat(e.hcp))) < 1e-9;
 }
-const same = (got, e) => got && got.name === e.name && hcpMatches(got.hcp, e) && (got.flight || undefined) === (e.flight || undefined);
+const same = (got, e) => got && got.name === e.name && hcpMatches(got.hcp, e) && (got.flight || undefined) === (e.flight || undefined)
+    && (got.teeName || undefined) === (e.teeName || undefined);
 
 function judge(G, built, r) {
     const flagged = new Set();
@@ -421,7 +472,8 @@ function judge(G, built, r) {
         if (flagged.has(ln)) why += '+flagged_but_common';
         out.push({ ln, l, res: 'fail', why, got });
     });
-    const groupsOk = JSON.stringify(r.groups) === JSON.stringify(G.groupSizes);
+    // two golfers on one line are one parsed golfer, so the sizes cannot match there
+    const groupsOk = G.style.multi || JSON.stringify(r.groups) === JSON.stringify(G.groupSizes);
     // the review names the same name twice - checked where both lines read exactly
     const dupOk = G.dups.every(d => out.filter(x => x.res === 'exact' && x.l.expect.name.toLowerCase() === d).length < 2
         || (r.duplicates || []).some(x => x.name.toLowerCase() === d));
@@ -444,7 +496,7 @@ for (let n = 0; n < COUNT; n++) {
     const G = genPaste();
     const built = buildText(G);
     let r;
-    try { r = R.parsePlayerPasteText(built.text, []); }
+    try { r = R.parsePlayerPasteText(built.text, built.teeNames); }
     catch (e) { r = { validPlayers: [], groups: [], flaggedLines: [], error: String(e) }; }
     const J = judge(G, built, r);
     const isCommon = [...G.tags].every(t => CLASS[t] === 'COMMON');

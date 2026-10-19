@@ -10455,6 +10455,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const lineList = checkLines.map(c => `Line ${c.lineNumber}: "${escapeHtml(c.text)}" \u2192 ${escapeHtml(c.name)}${c.hcp ? ' / ' + escapeHtml(c.hcp) : ''} \u2014 ${escapeHtml(c.why)}`).join('<br>');
             html += `<div class="paste-flagged-line paste-check-line">\u26A0\uFE0F Check ${checkLines.length === 1 ? 'this line' : 'these ' + checkLines.length + ' lines'} before adding \u2014 ${checkLines.length === 1 ? 'it was' : 'they were'} read as shown; fix the name or handicap after adding if it is wrong:<br>${lineList}</div>`;
         }
+        // NOTES TAKEN OFF THE LINES ("(captain)", "[sub]"): said, not swallowed - the
+        // same line trip.html's review has always shown (URGENT-008).
+        if (notedLines && notedLines.length > 0) {
+            html += `<div class="paste-noted-line" style="margin-top:4px; color:var(--text-muted);">\u2139\uFE0F Notes left off the names: ${notedLines.map(n => `"${escapeHtml(n.note)}" (line ${n.lineNumber})`).join(', ')}</div>`;
+        }
         if (flaggedLines.length > 0) {
             const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;

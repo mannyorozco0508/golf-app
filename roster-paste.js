@@ -347,7 +347,13 @@ function parsePlayerPasteText(text, teeNames) {
         // URGENT-008: "Manny - 28.0", "Colm: 4.0", "Paul | 12 | A" - the separators
         // organizers type between the name, the handicap and the flight - are spaces
         // for the reading below. The line as typed (line) is what the preview shows.
-        const bracketed = rosterPasteBracketFlight(line);
+        // A NOTE AT THE END COMES OFF FIRST (URGENT-008): "Hugh 17.4 A (guest)" and
+        // "Skeens 2.0/A (captain)" kept the whole line as the name, because the note
+        // sat after the flight. A bracket holding a handicap "(12)", a flight "(A)" or
+        // "(hcp 12)" is not a note and stays for the rules below.
+        const notes = rosterPasteTakeNotes(line);
+        notes.notes.forEach(n => notedLines.push({ lineNumber: idx + 1, text: line, note: n }));
+        const bracketed = rosterPasteBracketFlight(notes.text);
         const lineFlight = cellFlight || bracketed.flight;
         const work = rosterPasteNormalizeGolfer(bracketed.rest);
         const trail = splitTrailingHcpFlight(work);
@@ -516,6 +522,22 @@ const ROSTER_FLIGHT_WORD_AFTER = /(^|[\s,])\s*([AB])\s*-?\s*(?:flight|flt)\b\.?:
 // At the END of a line the flight is EXPLICIT - "(B)", "Flight B", "B flight" - and
 // is read even with no handicap before it.
 const ROSTER_FLIGHT_BRACKETS = /(?:^|[\s,\/|])\s*(?:[(\[]\s*([AB])\s*[)\]]|(?:flight|flt)\.?\s*[:#\-]?\s*([AB])|([AB])\s*-?\s*(?:flight|flt)\.?)\s*$/i;
+// "(captain)", "[sub]", "(cart 3)" - taken off the END of a line, as many as there
+// are, until the last bracket is one the reading needs: a handicap, a flight letter,
+// or the hcp / flight words with one ("(12)", "(+2.0)", "(B)", "(hcp 12)", "(A flight)").
+const ROSTER_NOT_A_NOTE = /^(?:(?:hcp|hdcp|hcap|handicap|hc|idx|index)\.?\s*[:#=]?\s*)?[+-]?\d{1,2}(?:\.\d)?(?:\s*(?:hcp|hdcp|hcap|handicap|hc|idx))?$|^(?:(?:flight|flt)\s*)?[AB](?:\s*(?:flight|flt))?$/i;
+function rosterPasteTakeNotes(line) {
+    let t = String(line == null ? '' : line);
+    const notes = [];
+    if (typeof stripTrailingNote !== 'function') return { text: t, notes };
+    for (let i = 0; i < 3; i++) {
+        const n = stripTrailingNote(t);
+        if (!n.note || ROSTER_NOT_A_NOTE.test(n.note.trim())) break;
+        notes.unshift(n.note);
+        t = n.text;
+    }
+    return { text: t, notes };
+}
 function rosterPasteBracketFlight(line) {
     const t = String(line == null ? '' : line);
     const m = ROSTER_FLIGHT_BRACKETS.exec(t);
