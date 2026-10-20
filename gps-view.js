@@ -2835,7 +2835,8 @@
         box.classList.toggle('gps-wind-tagged', has);
         if (!has) { txt('.gps-wind-mph', 'Wind –'); txt('.gps-wind-tag', ''); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
         w = ew;
-        txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + (w.gustMph ? ' g ' + w.gustMph : '') + ' mph');
+        // POLISH #18: "7 mph · gusts 17", never the cryptic "7 g 17 mph".
+        txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + ' mph' + (w.gustMph ? ' \u00b7 gusts ' + w.gustMph : ''));
         txt('.gps-wind-tag', w.manual ? 'Manual' : 'Live · ' + ageText(w.at).replace(/^updated /, ''));
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
