@@ -51,25 +51,8 @@
         return hit || '#c4c9c4';
     }
     function arr(v) { return Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; }
-    function yardsOf(t) {
-        var y = Number(t && (t.totalYards != null ? t.totalYards : t.total_yards));
-        if (!(y > 0)) y = arr(t && t.holes).reduce(function (s, h) { return s + (Number(h && (h.yardage != null ? h.yardage : h.yards)) || 0); }, 0);
-        return y > 0 ? Math.round(y) : 0;
-    }
-    function teeRowsOf(rec) {
-        var out = [], seen = {};
-        ['male', 'female'].forEach(function (g) {
-            arr(rec && rec.tees && rec.tees[g]).forEach(function (t, i) {
-                if (!t || !t.name) return;
-                var y = yardsOf(t), id = String(t.name).trim().toLowerCase() + '|' + y;
-                if (seen[id]) return;
-                seen[id] = 1;
-                out.push({ key: g + ':' + i, name: String(t.name).replace(/\s+tees?$/i, ''), full: String(t.name), gender: g, yards: y,
-                    rating: Number(t.rating != null ? t.rating : t.courseRating), slope: Number(t.slope), par: Number(t.parTotal != null ? t.parTotal : t.par) || null });
-            });
-        });
-        return out;
-    }
+    // The tee rows are the course resolver's (front-door.js HardPanCourse.teeRows) - the same rows everywhere.
+    function teeRowsOf(rec) { var C = W.HardPanCourse; return C && C.teeRows ? C.teeRows(rec) : []; }
     function roundTee() { var d = data() || {}; return d.teeRating || null; }
     function roundTeeKey(rows) {
         var t = roundTee(); if (!t) return rows.length ? rows[0].key : '';

@@ -446,6 +446,11 @@
     // The course's point: this phone's copy, the bundled holes, or the directory.
     function courseCenter() {
         if (S && S.courseLoc) return S.courseLoc;
+        // The course resolver's place (front-door.js HardPanCourse) - the same course every screen shows.
+        try {
+            var CR = window.HardPanCourse, rv = CR && S && S.courseKey ? CR.resolve({ key: S.courseKey, name: S.round && S.round.courseName }) : null;
+            if (rv && rv.loc) return rv.loc;
+        } catch (e) {}
         var rec = S && osmRecord(S.courseKey), pts = [];
         if (rec && rec.holes) Object.keys(rec.holes).forEach(function (n) { var o = rec.holes[n].osm; if (o && o.mid) pts.push(o.mid); });
         if (!pts.length) return clubPoint();
@@ -1657,21 +1662,11 @@
         setData('acc', showDot && isFinite(fix.acc) && fix.acc > 0 ? circlePoly(fix.pt, fix.acc) : EMPTY);
         marker('dot', showDot ? fix.pt : null, function () { var e = document.createElement('div'); e.className = 'gps-dot'; e.style.pointerEvents = 'none'; return e; });
         if (fix && !S.framed && S.map) {
-            // A hole with no data: the golfer has to see the ground around them to
-            // tap the green - but ONLY when they are AT the course (build 5: never a
-            // map of their street). Off the course: the course itself.
-            // URGENT-022 (Papago, Manny at home 1.4 mi away: "a satellite map of apartments"): this ran
-            // while the hole's data was still on its way, the golfer within 3 km counted as "at the
-            // course", and the map stayed on their street once the hole came in. Now: only a hole with
-            // NO data (none on its way), and only on the course itself (800 m).
+            // NEVER THE GOLFER'S LOCATION (Manny, 2026-10-20: "If a course has no greens, the map shows
+            // the course area with 'Tap the middle of the green', never the golfer's location"): a hole
+            // with no data shows the COURSE (the resolver's place); the golfer taps the green there.
             var cc = courseCenter();
-            if (cc && !S.loadingCourses && G.haversineMeters(fix.pt, cc) <= 800) {
-                S.map.jumpTo({ center: ll(fix.pt), zoom: 17, bearing: 0 });
-                S.framed = 'dot';
-            } else if (cc) {
-                S.map.jumpTo({ center: ll(cc), zoom: 15.5, bearing: 0 });
-                S.framed = 'course';
-            }
+            if (cc) { S.map.jumpTo({ center: ll(cc), zoom: 15.5, bearing: 0 }); S.framed = 'course'; }
         }
     }
 
@@ -3375,6 +3370,7 @@
     }
 
     // ---- TAPS ---------------------------------------------------------------
+    function canTapGreen() { try { var r = resolved(); return !!(S && S.pro && !(r && r.mid) && !S.loadingCourses && !readOnlyHere() && !S.shotMode && !S.shotAdjust && !S.replay); } catch (e) { return false; } }
     function onMapTap(pt) {
         if (!S) return;
         var tm = S.el.querySelector('.gps-tools-menu');
@@ -3384,6 +3380,9 @@
         if (S.mode === 'setFront') { S.draft.front = pt; S.mode = 'setBack'; render(); return; }
         if (S.mode === 'setBack') { S.draft.back = pt; S.mode = 'confirmAll'; render(); return; }
         if (S.mode !== 'measure') return;
+        // NO GREEN ON THIS HOLE: the tap IS its middle ("Tap the middle of the green") - then the
+        // same "Save this green for hole N?" as Tools > Set the green.
+        if (canTapGreen()) { S.draft = { mid: pt }; S.mode = 'confirmMid'; render(); return; }
         // MOVING THE LAST SHOT ("Move it on the map" after a one-tap Mark shot).
         if (S.shotAdjust) { moveLastShot(pt); return; }
         // MARKING SHOTS: a tap is where the ball finished (gps-shots.js, this phone only).
@@ -3516,7 +3515,7 @@
         else if (S.holeAsk && S.holeAsk.length) banner = 'More than one course here - tap YOUR hole 1';
         // Never a dead end: it says what to do (anyone on the round can set it).
         // 017 (simpleFlow): no "Tools" on the bar any more - the short line (Round settings > GPS tools sets it).
-        else if (noGreen) banner = S.pro && !sfOn() ? 'No green mapped for this hole yet - Tools \u203a Set the green' : 'No green mapped for this hole yet';
+        else if (noGreen) banner = canTapGreen() ? 'Tap the middle of the green' : 'No green mapped for this hole yet';
         // OFF THE COURSE (URGENT-022): the map is the hole, and the numbers are from the tee - say why.
         else if (fix && r && o && o.from === 'tee' && courseCenter() && G.haversineMeters(fix.pt, courseCenter()) > 1500) {
             var away = G.haversineMeters(fix.pt, courseCenter());

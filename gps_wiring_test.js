@@ -347,7 +347,9 @@ test('build 5, no data = no GPS landing; never centred on the golfer off the cou
     assert.ok(/if \(!holeHasData\(S\.hole\)\) return;/.test(v), 'no green for this hole: the round stays on the Card');
     // URGENT-022 (Papago from home, 1.4 mi: the map sat on the golfer's street): only a hole with no data
     // on its way, and only on the course itself (800 m) - and the hole is framed when its data lands.
-    assert.ok(/if \(cc && !S\.loadingCourses && G\.haversineMeters\(fix\.pt, cc\) <= 800\)/.test(v), 'the dot framing only ON the course, never while the hole is loading');
+    // The course resolver (Manny, 2026-10-20): a hole with no data shows the COURSE - never the golfer's location.
+    assert.ok(/if \(cc\) \{ S\.map\.jumpTo\(\{ center: ll\(cc\), zoom: 15\.5, bearing: 0 \}\); S\.framed = 'course'; \}/.test(v), 'no data: the course area');
+    assert.ok(!/jumpTo\(\{ center: ll\(fix\.pt\)/.test(v), 'never the golfer\'s location');
     assert.ok(/S\.framed !== 'hole' && !S\.userMoved && !S\.zoomStep && S\.view !== 'green' && holeView\(\)\) \{ frameHole\(false\); \}/.test(v), 'a hole that resolves late is framed');
     assert.ok(/No GPS map for this course yet/.test(v), 'no location: a note, not a map of the street');
     const blocks = read('index.html').split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
