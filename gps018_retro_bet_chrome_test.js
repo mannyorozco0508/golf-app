@@ -39,9 +39,19 @@ function round(code, thru) {
     [5, 7].filter((h) => h <= thru).forEach((h) => { r.scores['p103_h' + h] += 1; });
     return r;
 }
-const DB = { events: { R18: round('R18', 18), R9: round('R9', 9) }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} };
+// OFF THE 10TH: holes 10-18 played (Bob and Manny birdie 10-12), 1-9 still to play.
+function round10() {
+    const r = round('R10', 18);
+    r.startingHole = 10;
+    Object.keys(r.scores).forEach((k) => { const h = Number(k.split('_h')[1]); if (h <= 9) delete r.scores[k]; });
+    r.scores.p103_h5 = undefined; r.scores.p103_h7 = undefined;
+    Object.keys(r.scores).forEach((k) => { if (r.scores[k] === undefined) delete r.scores[k]; });
+    [10, 11, 12].forEach((h) => { r.scores['p101_h' + h] -= 1; r.scores['p102_h' + h] -= 1; });
+    return r;
+}
+const DB = { events: { R18: round('R18', 18), R9: round('R9', 9), R10: round10() }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} };
 const PRE = 'window.__hardpanDoors = true;' + iapStub({ active: true })
-    + "try{['R18','R9'].forEach(function(c){ localStorage.setItem('golfapp_me_' + c,'102'); sessionStorage.setItem('groupPickDismissed:' + c,'1'); localStorage.setItem('hardpan_round_side','bets'); });}catch(e){}";
+    + "try{['R18','R9','R10'].forEach(function(c){ localStorage.setItem('golfapp_me_' + c,'102'); sessionStorage.setItem('groupPickDismissed:' + c,'1'); localStorage.setItem('hardpan_round_side','bets'); });}catch(e){}";
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 let j;
 const ev = async (x) => j.evaluate(x);
@@ -72,7 +82,8 @@ test('1: Match 2v2 on 18 for holes 1-18 - the played line, the result, one confi
     assert.equal(await ev('document.querySelectorAll("#hp-bet .hb-from option").length'), 18, 'every hole is offered');
     const p = await panel();
     assert.match(p, /Holes 1-18 already played: this bet settles from the scores already in\./);
-    assert.match(p, /Result: Bob \+ Manny win → \+\$5 each · Skeens \+ Paul −\$5 each/);
+    // The Bets strip's own status line, then the money (018 follow-up wording).
+    assert.match(p, /Result: Bob\/Manny \S+ → Bob \+ Manny \+\$5 each · Skeens \+ Paul −\$5 each/);
     assert.doesNotMatch(p, /Worst case/, 'a fully played bet shows its result, not a worst case');
     assert.equal(await ev('document.querySelector("#hp-bet [data-hb=start]").disabled'), false);
     await shot('retro-terms');
@@ -110,7 +121,7 @@ test('2: Hi-Lo on 18 for 1-18 = the Hi-Lo made on hole 1 (the real engine, its r
     await tapIn('#hp-bet [data-hb="next"]');
     await tapIn('#hp-bet [data-hb-stake="5"]');
     await tapIn('#hp-bet [data-hb-scoring="gross"]');
-    assert.match(await panel(), /Result: Bob \+ Manny win → \+\$\d+ each · Skeens \+ Paul −\$\d+ each/);
+    assert.match(await panel(), /Result: Bob \+ Manny \+\d+ \(Low \d+-\d+, High \d+-\d+\) → Bob \+ Manny \+\$\d+ each · Skeens \+ Paul −\$\d+ each/);
     const b = JSON.parse(await ev('JSON.stringify(HardPanBet.buildBet({ game: "hilo", picks: ["101","102","103","104"], stake: 5, scoring: "gross", startHole: 1 }))'));
     const onHole1 = CH.sideMatchPayloadFromTerms({ format: 'hilo', scoring: 'gross', startHole: 1, stake: 5, pressRule: 'none' },
         { teamAIds: ['101', '102'], teamBIds: ['103', '104'], startHole: 1, now: 1, scope: 'group', ownerGroup: 1 });
@@ -133,7 +144,7 @@ test('3: a Nassau added after the front nine, from hole 1 = the Nassau made on h
     await ev('(function(){ var s = document.querySelector("#hp-bet .hb-from"); s.value = "1"; s.dispatchEvent(new Event("change", { bubbles: true })); return 1; })()');
     const p = await panel();
     assert.match(p, /Holes 1-9 already played: this bet settles from the scores already in\./);
-    assert.match(p, /So far: /);
+    assert.match(p, /So far: Front 9 .+ · Back 9 .+ · Total .+ → /);
     assert.match(p, /Worst case for you: /, 'the back nine is still to play');
     await shot('retro-nassau');
     const b = JSON.parse(await ev('JSON.stringify(HardPanBet.buildBet({ game: "nassau", picks: ["102","103"], stake: 5, scoring: "net", startHole: 1 }))'));
@@ -160,6 +171,43 @@ test('4: skins added mid-round counting from hole 1 = the skins made on hole 1; 
     // A start on the current hole: Start writes at once (no confirm).
     await ev('HardPanBet.open("skins")');
     await pick(['101', '102', '103']);
+    await tapIn('#hp-bet [data-hb="next"]');
+    await tapIn('#hp-bet [data-hb="start"]');
+    await sleep(300);
+    assert.equal(await ev('HardPanBet.isOpen()'), false, 'a start on now asked a confirm');
+});
+
+test('5: off the 10th - play order: the list starts at 10, now is 1, "Holes 10-18 already played", the confirm; from 10 = the whole round', { timeout: 90000 }, async () => {
+    await j.goto(fileUrl('index.html', 'game=R10&group=1'), 4500);
+    await ev('HardPanBet.open("match")');
+    await pick(['101', '102', '103', '104']);
+    await tapIn('#hp-bet [data-hb="next"]');
+    await tapIn('#hp-bet [data-hb-scoring="gross"]');
+    const opts = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-from option"), function(o){ return o.value; }))'));
+    assert.deepEqual(opts, ['10', '11', '12', '13', '14', '15', '16', '17', '18', '1', '2', '3', '4', '5', '6', '7', '8', '9'], 'the holes in play order');
+    assert.equal(await ev('document.querySelector("#hp-bet .hb-from").value'), '1', 'now (the next hole played) is 1');
+    assert.doesNotMatch(await panel(), /already played/, 'hole 1 is still to play');
+    await ev('(function(){ var s = document.querySelector("#hp-bet .hb-from"); s.value = "13"; s.dispatchEvent(new Event("change", { bubbles: true })); return 1; })()');
+    assert.match(await panel(), /Holes 13-18 already played: this bet settles from the scores already in\./);
+    await ev('(function(){ var s = document.querySelector("#hp-bet .hb-from"); s.value = "10"; s.dispatchEvent(new Event("change", { bubbles: true })); return 1; })()');
+    const p = await panel();
+    assert.match(p, /Holes 10-18 already played: this bet settles from the scores already in\./);
+    assert.match(p, /So far: Bob\/Manny .+ → /);
+    assert.match(p, /Worst case for you: /, 'holes 1-9 are still to play');
+    await shot('retro-10th');
+    await tapIn('#hp-bet [data-hb="start"]');
+    assert.match(await panel(), /Add this bet for holes already played\?/, 'a start before now (in play order) asks');
+    await tapIn('#hp-bet [data-hb="confirm-add"]');
+    await sleep(400);
+    const got = JSON.parse(await ev("JSON.stringify((function(){ var sm = window.__DB.events.R10.sideMatches || {}; var k = Object.keys(sm).sort().pop(); return sm[k]; })())"));
+    const whole = CH.sideMatchPayloadFromTerms({ format: 'match', scoring: 'gross', startHole: 1, stake: 10, pressRule: 'none' },
+        { teamAIds: ['101', '102'], teamBIds: ['103', '104'], startHole: 1, now: 1, scope: 'group', ownerGroup: 1 });
+    assert.deepEqual(strip(got), strip(whole), 'from the first hole played = the whole round (startHole 1)');
+    const m = JSON.parse(await ev(MONEY('sideMatches', got)));
+    assert.equal(m.sum, 0);
+    // From now (hole 1 on this round): no played line, no confirm.
+    await ev('HardPanBet.open("match")');
+    await pick(['102', '103']);
     await tapIn('#hp-bet [data-hb="next"]');
     await tapIn('#hp-bet [data-hb="start"]');
     await sleep(300);
