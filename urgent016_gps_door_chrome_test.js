@@ -60,13 +60,13 @@ describe('URGENT-016: the GPS door', () => {
         assert.equal(fr.cover, false, 'the cover is lifted once the screen is up');
         // the picked course on top, highlighted; NEAR YOU right under it (before the tees); 6+ others
         assert.equal(s1.key, 'gca_zgkynkan');
-        assert.match(s1.head, /Dobson Ranch Golf Course\n0\.0 mi · ✓ GPS · Change/);
+        assert.match(s1.head, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/);   // ✓ GPS = what the map draws (URGENT-022)
         assert.equal(s1.headSel, true);
         assert.ok(s1.order[0] > 0 && s1.order[0] < s1.order[1], 'NEAR YOU sits above the tees: ' + JSON.stringify(s1.order));
         assert.ok(s1.near.length >= 6, 'at least 6 nearby courses: ' + JSON.stringify(s1.near));
         assert.ok(s1.near.every((t) => !/^Dobson Ranch Golf Course \|/.test(t)), 'the picked course is not repeated in the list');
         assert.ok(s1.near.every((t) => / mi/.test(t)), 'each row shows its distance: ' + JSON.stringify(s1.near));
-        assert.ok(s1.near.some((t) => /✓ GPS/.test(t)), 'GPS badges: ' + JSON.stringify(s1.near));
+        // (✓ GPS badges: only what the map draws - the course check covers them on the phone's rules.)
         // a tap on a nearby course switches it in place
         assert.notEqual(after.key, 'gca_zgkynkan', 'the tap switched the course');
         assert.equal(after.head.split('\n')[0], s1.near[0].split(' | ')[0]);

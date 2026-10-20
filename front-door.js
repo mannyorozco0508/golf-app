@@ -135,15 +135,15 @@
     // ✓ GPS ON EVERY COURSE WITH LIVE GPS (021, Manny: "YES, show it on every course with live GPS"):
     // besides the GolfAPI file and the OSM holes, a course linked to its GolfAPI GPS (gps_links -
     // Dobson, Legacy...) and a course whose greens golfers have set (course_gps). Read once, small.
-    var GPSK = { links: null, own: null, asked: false };
+    var GPSK = { links: null, own: null, gc: null, asked: false };
     function loadGpsKeys(done, again) {
         var fin = typeof done === 'function' ? done : function () {};
-        if (again) { GPSK = { links: null, own: null, asked: false }; }   // a course was just set up (URGENT-021)
+        if (again) { GPSK = { links: null, own: null, gc: null, asked: false }; }   // a course was just set up (URGENT-021)
         if (GPSK.links && GPSK.own) { fin(); return; }
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }
         GPSK.asked = true;
-        var left = 2, end = function () { if (--left === 0) { C.list = null; fin(); } };
+        var left = 3, end = function () { if (--left === 0) { C.list = null; GA.t = null; fin(); } };
         var read = function (path, put) {
             var t = setTimeout(function () { put({}); t = null; end(); }, 6000);
             try {
@@ -153,10 +153,42 @@
         };
         read('gps_links', function (v) { GPSK.links = v; });
         read('course_gps', function (v) { var o = {}; Object.keys(v || {}).forEach(function (k) { o[k] = 1; }); GPSK.own = o; });
+        // Every course set up online, for everyone (~50 KB): what the map will draw for a linked course.
+        read('gps_courses', function (v) {
+            var o = {};
+            Object.keys(v || {}).forEach(function (id) {
+                var c = v[id]; if (!c || !c.h) return;
+                var h = {}; Object.keys(c.h).forEach(function (n) { var x = c.h[n]; if (x && typeof x === 'object' && Number(n) >= 1) h[String(Number(n))] = x; });
+                o[id] = Object.assign({}, c, { h: h });
+            });
+            GPSK.gc = o;
+        });
     }
-    function ready(key) {
+    // ✓ GPS = WHAT THE MAP WILL DRAW (URGENT-022: one answer for the list and the map). gps-geo
+    // courseGps is the map's own rule; here it reads the GolfAPI courses the phone has (the app's
+    // file, every course pulled online) plus every course set up for everyone (gps_courses + the
+    // gps_links to them), and ✓ only when hole 1's green is within 2 km of the course.
+    var GA = { t: null, at: '' };
+    function gaTable() {
+        var d = W.HardPanGolfApi || {}, sig = Object.keys(d.courses || {}).length + '|' + Object.keys(GPSK.gc || {}).length + '|' + Object.keys(GPSK.links || {}).length;
+        if (GA.t && GA.at === sig) return GA.t;
+        var courses = {}, links = {};
+        Object.keys(GPSK.gc || {}).forEach(function (id) { var c = GPSK.gc[id]; if (c && c.h) courses[id] = Object.assign({ id: id }, c); });
+        Object.keys(d.courses || {}).forEach(function (id) { courses[id] = d.courses[id]; });
+        Object.keys(GPSK.links || {}).forEach(function (k) { links[k] = String(GPSK.links[k]); });
+        Object.keys(d.links || {}).forEach(function (k) { links[k] = d.links[k]; });
+        GA.t = { courses: courses, links: links }; GA.at = sig;
+        return GA.t;
+    }
+    function ready(key, name, loc) {
         if (!key) return false;
-        if (GPSK.own && GPSK.own[key]) return true;
+        var G = W.HardPanGeo, c = W.HARDPAN_GPS_CONFIG || {};
+        if (G && G.courseGps) {
+            var lk = null; try { var v = JSON.parse(W.localStorage.getItem('hardpan_osm_v1_' + key) || 'null'); lk = v && v.holes && Object.keys(v.holes).length ? v : null; } catch (e) {}
+            var gaOn = live() || !!c.golfapiFile;
+            var rec = G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: gaOn ? gaTable() : null, osmOn: c.osm !== false, osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });
+            return !!rec && G.holeOneNear(rec, loc || null);
+        }
         if (live()) return !!golfapiLink(key) || /^gapi_\d+$/.test(key) || !!(GPSK.links && GPSK.links[key]);
         var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length);
     }
@@ -192,7 +224,7 @@
                 if (!i || !i.id || seen[i.id]) return;
                 seen[i.id] = 1;
                 var ga = golfapiCourse(i.id);
-                out.push({ key: i.id, name: i.name, ready: ready(i.id), pt: coursePoint(i.id), state: stateOf(i.name) || (ga && ga.state) || '', city: (ga && ga.city) || '' });
+                out.push({ key: i.id, name: i.name, ready: ready(i.id, i.name, coursePoint(i.id)), pt: coursePoint(i.id), state: stateOf(i.name) || (ga && ga.state) || '', city: (ga && ga.city) || '' });
             });
         });
         // THE APP'S GOLFAPI COURSES no directory row names (a course pulled for the app): by
@@ -204,7 +236,7 @@
             if (!c || linked[id] || !isFinite(c.lat) || !/^\d+$/.test(String(id))) return;
             var nm = String(c.club || '') + (c.course && c.holes >= 18 && String(c.course).toLowerCase() !== String(c.club).toLowerCase() ? ' (' + c.course + ')' : '');
             if (!nm || out.some(function (o) { return nameKey(o.name) === nameKey(nm); })) return;
-            out.push({ key: 'gapi_' + id, name: nm, ready: true, pt: [c.lat, c.lng], state: c.state || '', city: c.city || '' });
+            out.push({ key: 'gapi_' + id, name: nm, ready: ready('gapi_' + id, nm, [c.lat, c.lng]), pt: [c.lat, c.lng], state: c.state || '', city: c.city || '' });
         });
         var cov = W.HardPanGpsCoverage || {};
         Object.keys(cov).forEach(function (st) {
@@ -331,6 +363,7 @@
             position(function (p, why) { if (!p && C.here) return; C.here = p; C.why = why || null; nearDraw(); draw(); });
         };
         var needs = [];
+        if (!W.HardPanGeo) needs.push('gps-geo.js');   // URGENT-022: ✓ GPS is the map's own rule (gps-geo courseGps)
         if (!W.HardPanGpsCourses) needs.push('gps-courses.js');
         // The app's GolfAPI file (in the iOS build only; a 404 on the web is fine).
         if (!W.HardPanGolfApi && !W.__fdGolfApiTried) { W.__fdGolfApiTried = 1; needs.push('gps-golfapi.js'); }
@@ -2180,7 +2213,7 @@
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-019: the course list is worked out once; a page that loads the GPS course files after
         // that (simple-flow's Course & Tees) asks for it again, as the GPS-1 picker does (C.list = null).
-        refreshCourses: function () { C.list = null; }, loadGpsKeys: loadGpsKeys,
+        refreshCourses: function () { C.list = null; }, loadGpsKeys: loadGpsKeys, gpsLinks: function () { return GPSK.links || {}; },
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };

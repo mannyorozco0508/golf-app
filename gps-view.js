@@ -352,6 +352,9 @@
         try { localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(rec || {})); } catch (e) {}
     }
     function osmRecord(key) {
+        // URGENT-022: the ONE rule (gps-geo courseGps) - the Course & Tees list asks the same thing.
+        if (G.courseGps) return G.courseGps({ key: key, name: S && S.courseKey === key && S.round ? S.round.courseName : null, loc: S && S.courseLoc ? S.courseLoc : null,
+            ga: golfapiFor(key) || null, osmOn: osmOn(), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
         var ga = golfapiFor(key);
         if (ga) return ga;
         if (!osmOn()) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
@@ -828,7 +831,7 @@
                     if (!L || !S) { done(); return; }
                     L.merge();
                     L.ensure(S.courseKey).then(function (got) {
-                        if (got && S === mine) S.gaCache = null;
+                        if (got && S === mine) { S.gaCache = null; S.needsFrame = true; }   // URGENT-022: frame the hole it brought
                         done();
                     });
                 });
@@ -1657,8 +1660,12 @@
             // A hole with no data: the golfer has to see the ground around them to
             // tap the green - but ONLY when they are AT the course (build 5: never a
             // map of their street). Off the course: the course itself.
+            // URGENT-022 (Papago, Manny at home 1.4 mi away: "a satellite map of apartments"): this ran
+            // while the hole's data was still on its way, the golfer within 3 km counted as "at the
+            // course", and the map stayed on their street once the hole came in. Now: only a hole with
+            // NO data (none on its way), and only on the course itself (800 m).
             var cc = courseCenter();
-            if (cc && G.haversineMeters(fix.pt, cc) <= 3000) {
+            if (cc && !S.loadingCourses && G.haversineMeters(fix.pt, cc) <= 800) {
                 S.map.jumpTo({ center: ll(fix.pt), zoom: 17, bearing: 0 });
                 S.framed = 'dot';
             } else if (cc) {
@@ -3437,6 +3444,9 @@
         // plugin exists and the 'watch' switch is on. Never allowed to break the screen.
         try { watchSync(nums, aim, o, u); } catch (e) {}
 
+        // URGENT-022: the hole is in and the map is still on the course / the golfer / the world (it was
+        // framed before the hole's data landed): the hole, tee to green - unless the golfer moved it.
+        if (r && S.map && S.styleReady && S.framed !== 'hole' && !S.userMoved && !S.zoomStep && S.view !== 'green' && holeView()) { frameHole(false); }
         dropStaleFix();
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
         // OFF THE HOLE (more than 1,000 yds from the green) or NO GPS: everything is
@@ -3507,6 +3517,11 @@
         // Never a dead end: it says what to do (anyone on the round can set it).
         // 017 (simpleFlow): no "Tools" on the bar any more - the short line (Round settings > GPS tools sets it).
         else if (noGreen) banner = S.pro && !sfOn() ? 'No green mapped for this hole yet - Tools \u203a Set the green' : 'No green mapped for this hole yet';
+        // OFF THE COURSE (URGENT-022): the map is the hole, and the numbers are from the tee - say why.
+        else if (fix && r && o && o.from === 'tee' && courseCenter() && G.haversineMeters(fix.pt, courseCenter()) > 1500) {
+            var away = G.haversineMeters(fix.pt, courseCenter());
+            banner = (u === 'm' ? (away / 1000).toFixed(1) + ' km' : (away / 1609.344).toFixed(1) + ' mi') + ' from the course \u00b7 yards from the tee';
+        }
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
 
@@ -6122,6 +6137,16 @@
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
+        // URGENT-022 (the GPS course check): what the map frames on this hole - the tee and the green,
+        // whether each is in view, and the course's own point.
+        holeCheck: function () {
+            try {
+                var r = resolved(); if (!S || !S.map || !r) return null;
+                var g = (r.green && r.green.length) ? r.green[Math.floor(r.green.length / 2)] : r.mid, b = S.map.getBounds();
+                var inV = function (p) { return !!(p && b && b.contains(ll(p))); };
+                return { tee: r.tee || null, green: g || null, teeIn: inV(r.tee), greenIn: inV(g), framed: S.framed || null, course: courseCenter() || null, center: S.map.getCenter() };
+            } catch (e) { return { err: String(e && e.message || e) }; }
+        },
         side: function () { return S ? S.side : null; },
         isWatching: isWatching,
         // Build 5: does hole n have a green (or tee) to measure to? The card asks

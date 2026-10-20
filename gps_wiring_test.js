@@ -345,7 +345,10 @@ test('build 5, any course: the OpenStreetMap lookup asks from the COURSE point, 
 test('build 5, no data = no GPS landing; never centred on the golfer off the course', { skip }, () => {
     const v = read('gps-view.js');
     assert.ok(/if \(!holeHasData\(S\.hole\)\) return;/.test(v), 'no green for this hole: the round stays on the Card');
-    assert.ok(/if \(cc && G\.haversineMeters\(fix\.pt, cc\) <= 3000\)/.test(v), 'the dot framing only at the course');
+    // URGENT-022 (Papago from home, 1.4 mi: the map sat on the golfer's street): only a hole with no data
+    // on its way, and only on the course itself (800 m) - and the hole is framed when its data lands.
+    assert.ok(/if \(cc && !S\.loadingCourses && G\.haversineMeters\(fix\.pt, cc\) <= 800\)/.test(v), 'the dot framing only ON the course, never while the hole is loading');
+    assert.ok(/S\.framed !== 'hole' && !S\.userMoved && !S\.zoomStep && S\.view !== 'green' && holeView\(\)\) \{ frameHole\(false\); \}/.test(v), 'a hole that resolves late is framed');
     assert.ok(/No GPS map for this course yet/.test(v), 'no location: a note, not a map of the street');
     const blocks = read('index.html').split('// GPS:BEGIN').slice(1).map((b) => b.split('// GPS:END')[0]).join('\n');
     assert.ok(/window\.HardPanGps\.holeHasData\(currentViewedHole\)/.test(blocks), 'after Enter Score: back to GPS only with data');
@@ -808,7 +811,10 @@ test('GolfAPI in the app: one source per course, no OSM pull for it, the setup b
     const off = mk({ golfapi: false });
     assert.equal(off.known('az_talking_piipaash', 18, 'Talking Stick Golf Club (Piipaash)').source, 'bundle');
     const v = read('gps-view.js'), a = read('admin.html'), c = read('gps-config.js');
-    assert.ok(/function osmRecord\(key\) \{\s*\n\s*var ga = golfapiFor\(key\);\s*\n\s*if \(ga\) return ga;/.test(v), 'GolfAPI is the only source when there is one');
+    // URGENT-022: the ONE rule (gps-geo courseGps, also the Course & Tees ✓ GPS) - the GolfAPI match first.
+    assert.ok(/function osmRecord\(key\) \{[\s\S]{0,200}?G\.courseGps\(\{[^}]*ga: golfapiFor\(key\) \|\| null/.test(v), 'the map asks the one rule, with its GolfAPI match');
+    const geoSrc = fs.readFileSync(path.join(__dirname, 'gps-geo.js'), 'utf8');
+    assert.ok(/if \(ga && ga\.record\) return ga\.record;\s*\n\s*if \(ga && ga\.holes\) return ga;\s*\n\s*if \(!o\.osmOn\) return null;/.test(geoSrc), 'GolfAPI is the only source when there is one');
     assert.ok(/function golfapiOn\(\) \{ var c = cfg\(\); return c\.golfapi !== false && \(isNative\(\) \|\| !!c\.golfapiFile \|\| !!c\.liveTest\); \}/.test(v), 'in the app only; off with the switch');
     assert.ok(/golfapi: true,/.test(c), 'the switch, on');
     assert.ok(/function drawHazards\(\)/.test(v) && /'B ' : 'W '|\(z\.type === 'w' \? 'W ' : 'B '\)/.test(v), 'bunker / water carries');

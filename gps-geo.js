@@ -2031,7 +2031,36 @@
         return out;
     }
 
+    // ---- HAS THIS COURSE GPS? ONE ANSWER FOR THE COURSE LIST AND THE MAP (URGENT-022) -----------
+    // Manny: "the GPS badge/message disagrees with the real map" (Chambers Bay: "No GPS" on the
+    // Course screen, a working map after Start Round; Legacy ✓ in one list, none in the next). The
+    // map's own rule (gps-view osmRecord): the GolfAPI course (a link, a 27-hole pairing, or the
+    // name within 5 km - the app's file and every course pulled online), else - only with OSM on -
+    // the bundled OpenStreetMap holes or this phone's / the shared lookup, the newer winning. The
+    // map calls this; the course list calls it with the same inputs.
+    //   o: { key, name, loc: [lat, lng] | null, holes: 18 | 9, golfapi: table | null, ga: a match
+    //        already made (the map's cache) | undefined, osmOn, osmTable, lookedUp }
+    function courseGps(o) {
+        o = o || {};
+        var ga = o.ga !== undefined ? o.ga : (o.golfapi ? golfapiMatch(o.golfapi, o.key, o.name, o.loc || null, o.holes === 9 ? 9 : 18, o.osmTable || null) : null);
+        if (ga && ga.record) return ga.record;
+        if (ga && ga.holes) return ga;
+        if (!o.osmOn) return null;
+        var t = o.osmTable || {}, b = osmCourse(t, bundleKeyFor(t, o.key, o.name || null, o.loc || null)), l = o.lookedUp || null;
+        var ta = Date.parse((l && l.osmBase) || ''), tb = Date.parse((b && b.osmBase) || '');
+        if (b && l && isFinite(ta) && isFinite(tb) && ta > tb) return l;
+        return b || l;
+    }
+    // ✓ GPS only when it is REAL (URGENT-022): hole 1 has a green, and it is within 2 km of where the
+    // course is (data in the wrong place - or for another course - never shows ✓).
+    function holeOneNear(rec, loc, maxM) {
+        var h = rec && rec.holes && (rec.holes['1'] || rec.holes[1]), x = h && (h.osm || h), g = x && (x.mid || (x.green && x.green[0]));
+        if (!g) return false;
+        if (!loc) return true;
+        return haversineMeters(loc, g) <= (maxM || 2000);
+    }
     var api = {
+        courseGps: courseGps, holeOneNear: holeOneNear,
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,

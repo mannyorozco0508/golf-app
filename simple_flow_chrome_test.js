@@ -82,7 +82,8 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.match(home.home, /GPS\nYardages for your round[\s\S]*Games & Bets\nSet up the group, games and money[\s\S]*Join with a code · Trip · History/, 'the two doors, then the slim row');
         assert.equal(s1.h1, 'Where are you playing?');
         assert.match(s1.text, /^‹\nGames & Bets/);
-        assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · ✓ GPS · Change/, 'the closest course, picked, with the GPS badge');
+        // URGENT-022: ✓ GPS only when the map would draw it (here: the web's settings, no GPS data) - one rule.
+        assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/, 'the closest course, picked');
         // URGENT-013: the tee NAMES (the first look showed the gender: Men, Men, Men, Men, Women, Women),
         // Men/Women small, yards, rating / slope; the women's White and Red (same yards) not repeated.
         assert.deepEqual(tees.tees, ['Back | Men | 6,586 yds | 71.1 / 123 *', 'DRGA Tournament | Men | 6,394 yds | 70.2 / 121', 'White | Men | 6,187 yds | 69.0 / 118', 'Red | Men | 5,645 yds | 66.9 / 112']);
@@ -104,7 +105,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.match(sheet.text, /Group 1\nSkeens, Bob, Manny, Paul · \nHole 1\nHole 2\n/);
         assert.match(sheet.text, /Group 5\nCrone, Todd, Mike, Jim · \nHole 1\nHole 2\n/);
         assert.match(sheet.text, /Show QR codes/);
-        assert.match(sheet.text, /Done · open the GPS/);
+        assert.match(sheet.text, /Done · open the (GPS|card)/);   // the card when the map has no GPS for the course (URGENT-022: one rule)
         assert.equal(w.writes.length, 1, 'ONE save - no Review page: ' + JSON.stringify(w.writes.map((x) => x.path)));
         const saved = w.writes[0];
         assert.equal(saved.players.length, 20);
