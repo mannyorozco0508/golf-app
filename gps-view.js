@@ -5823,10 +5823,33 @@
         // (a game link, a spectator) never does.
         if (!S.pro) { if (storedSide() === 'gps' && !sheetSeen()) showSide('gps'); return; }
         if (storedSide() === 'bets') return;
-        // THE GAMES FRONT DOOR (gps-doors): the round opens on the card, and location is
-        // not asked for until the golfer taps 📍 GPS (or this round was left on GPS).
-        if (frontDoor() === 'games' && storedSide() !== 'gps') return;
         var mine = S;
+        // THE MAP FIRST (URGENT-021, Manny: the card covered the map on hole 1 before it was played).
+        // Simple flow: a round started or left on GPS (Start Round, Resume, Change course) opens ON THE
+        // MAP at once - not the card while the course reads (on a phone, seconds); a course whose hole
+        // is already here lands the same way. Only a course with no GPS data at all goes back to the
+        // card ("Just scores"), with the note. The card / score sheet opens on Enter score or Card.
+        if (sfOn() && (storedSide() === 'gps' || holeHasData(S.hole))) {
+            S.autoLanded = true;
+            showSide('gps');
+            loadCourses(function () {
+                if (S !== mine) return;
+                S.loadingCourses = false;
+                if (S.userChoseSide || S.side !== 'gps') { render(); return; }
+                var noData = function () { return window.HardPanGpsCourses && !courseHasAnyData() && !courseCenter(); };
+                if (!noData()) { render(); return; }
+                loadCourseLocation(function () { lookupCourse(function () {
+                    if (S !== mine || S.userChoseSide || S.side !== 'gps') return;
+                    if (noData()) { showSide('bets', { remember: false }); cardNote('No GPS map for this course yet - its location is not in the course list.'); }
+                    else render();
+                }); });
+            });
+            return;
+        }
+        // THE GAMES FRONT DOOR (gps-doors): the round opens on the card, and location is
+        // not asked for until the golfer taps 📍 GPS (or this round was left on GPS). Not in the
+        // simple flow: every round start there lands on the map (URGENT-021).
+        if (!sfOn() && frontDoor() === 'games' && storedSide() !== 'gps') return;
         locationDenied(function (denied) {
             if (S !== mine || denied || S.userChoseSide) return;
             loadCourses(function () {
