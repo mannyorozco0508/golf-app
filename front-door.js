@@ -1470,8 +1470,25 @@
         return v;
     }
     // Too few golfers for `id`? Then Players first, and `next` ({ url }) after it.
+    // URGENT-018 (simpleFlow): Players first is the Add golfer sheet IN PLACE (gps-add-golfer.js) -
+    // never Round Setup's steps - and `next` runs once enough golfers are in: a function (the
+    // + Bet sheet, the Weekly Game sheet) or the url. Off: Round Setup's Players step, as before.
     function agPlayersFirst(id, next) {
         if (agPlayers().length >= agNeed(id)) return false;
+        if (agInPlace() && W.HardPanAddGolfer && typeof W.HardPanAddGolfer.open === 'function') {
+            closeAddGame();
+            W.HardPanAddGolfer.open({ onDone: function () {
+                // The round's listener lands the new golfers a moment after the write.
+                var n = 0, t = setInterval(function () {
+                    if (agPlayers().length >= agNeed(id) || ++n > 20) {
+                        clearInterval(t);
+                        if (agPlayers().length < agNeed(id)) { openAddGame(); return; }
+                        if (next && typeof next.run === 'function') next.run(); else if (next && next.url) { if (/^admin\.html/.test(next.url)) agBackAfter(id); W.location.href = next.url; }
+                    }
+                }, 150);
+            } });
+            return true;
+        }
         var code = agCode();
         agNext({ code: String(code).toUpperCase(), id: id, name: agGameName(id), need: agNeed(id), next: next, stage: 'players', at: Date.now() });
         W.location.href = 'admin.html?game=' + encodeURIComponent(code) + '&step=players';
@@ -1592,6 +1609,16 @@
         if (g.go === 'points') return 'points.html' + base + '&setup=1';
         return null;
     }
+    // IN PLACE (URGENT-018): the simple flow's sheets are here (gps-bet.js on).
+    function agInPlace() { var B = W.HardPanBet; return !!(B && typeof B.on === 'function' && B.on()); }
+    var AG_BET = { nassau: 'nassau', match: 'match', strokebet: 'stroke', skins: 'skins', hilo: 'hilo', side: '' };
+    function agSheetFor(id) {
+        if (!agInPlace()) return null;
+        var B = W.HardPanBet;
+        if (id === 'kp' && typeof B.openWeekly === 'function') return function () { B.openWeekly({ turnOn: true }); };
+        if (AG_BET[id] !== undefined && (id !== 'hilo' || (typeof B.hiloHere === 'function' && B.hiloHere()))) return function () { B.open(AG_BET[id] || null); };
+        return null;
+    }
     // A MULTI-ROUND MATCH / TRIP: the trip builder, filled in with today as Day 1.
     function tripPrefill() {
         var d = agRound(), ps = agPlayers(), now = new Date();
@@ -1620,6 +1647,14 @@
             var g = ALL_GAMES.filter(function (x) { return x.id === b.getAttribute('data-ag-all'); })[0];
             if (!g) return;
             if (g.go === 'trip') { agTrip(); return; }
+            // URGENT-018 (simpleFlow): a game a sheet can do opens that sheet over the round - the
+            // + Bet sheet (Nassau, Match, Stroke play, Skins, Hi-Lo) or the Weekly Game sheet -
+            // never Round Setup's wizard (its Money step) or another page.
+            var sheet = agSheetFor(g.id);
+            if (sheet) {
+                if (agPlayersFirst(g.id, { run: sheet })) return;
+                closeAddGame(); sheet(); return;
+            }
             var url = agRoute(g);
             if (url && agPlayersFirst(g.id, { url: url })) return;
             if (url && /^admin\.html/.test(url)) agBackAfter(g.id);

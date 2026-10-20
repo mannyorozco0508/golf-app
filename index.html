@@ -4464,6 +4464,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const dir = loc.pathname.replace(/\/[^\/]*$/, '/');
         let href = loc.origin + dir + 'sidematches.html?game=' + encodeURIComponent(currentMode);
         if (typeof hasGroupLock !== 'undefined' && hasGroupLock) href += '&group=' + lockedGroup;
+        // GPS:BEGIN
+        // URGENT-018 (simpleFlow): the press is made on the Matches page, then straight back to
+        // the round - the side (GPS or card) and hole this phone was on (&hpback=1).
+        if (window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()) href += '&hpback=1';
+        // GPS:END
         return href + '&press=' + encodeURIComponent(wagerId);
     }
 

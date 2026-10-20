@@ -413,6 +413,8 @@
         items.push(['start', 'Start', 'Hole 1 / 10, shotgun']);
         if (hasNines(d)) items.push(['nines', 'Nines', 'Front / back']);
         items.push(['tee', 'Tee for everyone', 'And the handicaps']);
+        // 018-E: the Weekly Game (pot, KP, net, skins) - gps-bet.js's sheet, in place.
+        if (W.HardPanBet && typeof W.HardPanBet.openWeekly === 'function') items.push(['weekly', 'Weekly Game', d.moneyPool && d.moneyPool.enabled !== false ? 'Pot, KP, net, skins' : 'Off - tap to set up']);
         q.innerHTML = '<div class="hq-h">QUICK EDITS</div>' + items.map(function (x) { return '<button type="button" data-hq="' + x[0] + '">' + esc(x[1]) + '<span>' + esc(x[2]) + '</span></button>'; }).join('');
         q.addEventListener('click', function (ev) {
             var b = ev.target.closest ? ev.target.closest('[data-hq]') : null;
@@ -420,6 +422,7 @@
             var k = b.getAttribute('data-hq');
             if (k === 'addgolfer') { closeSettings(); W.HardPanAddGolfer.open(); return; }
             if (k === 'players') { closeSettings(); W.openPlayersSheet(); return; }
+            if (k === 'weekly') { closeSettings(); W.HardPanBet.openWeekly(); return; }
             open(k);
         });
         body.insertBefore(q, body.firstChild);

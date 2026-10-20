@@ -5563,6 +5563,11 @@
             var b = ev.target && ev.target.closest ? ev.target.closest('[data-ag-go]') : null;
             if (!b || !S) return;
             var base = 'admin.html?game=' + encodeURIComponent(S.eventCode);
+            // URGENT-018 (simpleFlow): "Full game setup" is the one Add a game list (front-door.js),
+            // over the map - its games open the + Bet / Weekly Game sheets in place (Add golfer
+            // first when the round needs more), never Round Setup's wizard. Off: as before.
+            var B = window.HardPanBet, D = window.HardPanDoors;
+            if (b.getAttribute('data-ag-go') === 'full' && B && typeof B.on === 'function' && B.on() && D && typeof D.openAddGame === 'function') { closeAddGame(); D.openAddGame(); return; }
             window.location.href = b.getAttribute('data-ag-go') === 'paste' ? base + '&paste=1' : base;
         });
         on(el, '.gps-replay', function () {
