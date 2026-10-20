@@ -93,6 +93,7 @@
         var rec = load(ctx.code) || { v: 1, code: ctx.code, course: ctx.course || '', at: Date.now(), player: null, holes: {} };
         if (!rec.player) rec.player = meFor(ctx.code);
         snapshot(rec, ctx);
+        if (skipped(ctx.code)) return rec;   // 020: a practice / removed round - shown, never kept
         lsSet(KEY + ctx.code, rec);
         return rec;
     }
@@ -100,7 +101,7 @@
         var rec = ensure(ctx);
         var h = rec.holes[n] = rec.holes[n] || {};
         Object.keys(patch).forEach(function (k) { if (patch[k] === undefined) delete h[k]; else h[k] = patch[k]; });
-        lsSet(KEY + ctx.code, rec);
+        if (!skipped(ctx.code)) lsSet(KEY + ctx.code, rec);
         return rec;
     }
     // A round changed (a score saved): keep the snapshot current - quietly.
@@ -203,6 +204,69 @@
     // ============================================================================
     var QKEY = 'hardpan_qstats_v1_';
     function qKey(code, pid) { return QKEY + code + '_p' + pid; }
+
+    // ---- 020: PRACTICE ROUND, REMOVE ONE ROUND, START FRESH (this phone only) ------------
+    // A round can be kept OUT of My stats: hardpan_nostats_<code> = 'practice' (the Tools sheet's
+    // "Practice round" switch - nothing from it is saved) or 'removed' ("Remove from my stats", and
+    // every round "Start fresh" cleared - so reopening an old round does not bring it back). The
+    // HardPan Index (hp-index.js) reads the same key. What is cleared: this phone's stats stores only
+    // (hardpan_qstats_v1_*, hardpan_stats_v1_*, the Index's rounds). Never a round record, a score
+    // or money - nothing here reads or writes Firebase.
+    var NOSTATS = 'hardpan_nostats_';
+    function lsKeys(test) { var out = []; try { for (var i = 0; i < W.localStorage.length; i++) { var k = W.localStorage.key(i); if (k && test(k)) out.push(k); } } catch (e) {} return out; }
+    function lsDel(k) { try { W.localStorage.removeItem(k); } catch (e) {} }
+    // THE HARDPAN INDEX'S STORE (hp-index.js), also where that file is not loaded (Home): its own
+    // calls when it is in the page, else the same localStorage record ({ v: 1, rounds: [...] }).
+    var IKEY = 'hardpan_hp_index_v1';
+    function idx() {
+        var I = W.HardPanIndex;
+        if (I && typeof I.rounds === 'function' && typeof I.removeRound === 'function' && typeof I.clear === 'function') return I;
+        var read = function () { var v = lsGet(IKEY); return v && v.v === 1 && Array.isArray(v.rounds) ? v : { v: 1, rounds: [] }; };
+        return {
+            rounds: function () { return read().rounds; },
+            removeRound: function (code) { var st = read(), n = st.rounds.length; st.rounds = st.rounds.filter(function (r) { return !r || String(r.code) !== String(code); }); return st.rounds.length !== n ? lsSet(IKEY, st) : false; },
+            clear: function () { lsDel(IKEY); return true; }
+        };
+    }
+    function skipOf(code) { try { return code ? W.localStorage.getItem(NOSTATS + code) || null : null; } catch (e) { return null; } }
+    function skipped(code) { return !!skipOf(code); }
+    function practiceOn(code) { return skipOf(code) === 'practice'; }
+    // Every on-phone stats record of one round, and its Index round. Returns how many keys went.
+    function dropStats(code) {
+        code = String(code || '');
+        if (!code) return 0;
+        var ks = lsKeys(function (k) { return k.indexOf(QKEY + code + '_p') === 0 || k === KEY + code; });
+        ks.forEach(lsDel);
+        idx().removeRound(code);
+        return ks.length;
+    }
+    function removeRound(code) {
+        if (!code) return false;
+        try { W.localStorage.setItem(NOSTATS + code, 'removed'); } catch (e) {}
+        dropStats(code);
+        return true;
+    }
+    function setPractice(code, on) {
+        if (!code) return false;
+        try { if (on) W.localStorage.setItem(NOSTATS + code, 'practice'); else if (practiceOn(code)) W.localStorage.removeItem(NOSTATS + code); } catch (e) {}
+        if (on) dropStats(code);
+        if (ss && ssIsOpen()) ssRender();
+        return practiceOn(code);
+    }
+    // Every round with stats or an Index entry on this phone (their codes).
+    function statCodes() {
+        var codes = {};
+        lsKeys(function (k) { return k.indexOf(QKEY) === 0 || k.indexOf(KEY) === 0; }).forEach(function (k) { var r = lsGet(k); if (r && r.code) codes[String(r.code)] = 1; });
+        try { idx().rounds().forEach(function (r) { if (r && r.code) codes[String(r.code)] = 1; }); } catch (e) {}
+        return Object.keys(codes);
+    }
+    function clearAll() {
+        var codes = statCodes();
+        codes.forEach(function (c) { if (!skipped(c)) { try { W.localStorage.setItem(NOSTATS + c, 'removed'); } catch (e) {} } });
+        lsKeys(function (k) { return k.indexOf(QKEY) === 0 || k.indexOf(KEY) === 0; }).forEach(lsDel);
+        idx().clear();
+        return codes.length;
+    }
     function qLoad(code, pid) { var r = lsGet(qKey(code, pid)); return r && r.v === 1 ? r : null; }
     function qNew(ctx, pid) { return { v: 1, code: String(ctx.code), pid: String(pid), course: ctx.course || '', at: Date.now(), holes: {}, snap: {} }; }
     // 4 means "4+".
@@ -241,7 +305,7 @@
         if (g == null) delete h.gir; else h.gir = g;
         if (Number(strokes) > 0) rec.snap[n] = { s: Number(strokes), par: Number(par) };
         if (Object.keys(h).length) rec.holes[n] = h; else delete rec.holes[n];
-        lsSet(qKey(ctx.code, pid), rec);
+        if (!skipped(ctx.code)) lsSet(qKey(ctx.code, pid), rec);   // 020: a practice / removed round keeps nothing
         return qCell(h, strokes, par);
     }
     // The round as this phone sees it: the golfer this phone is (meId) gets a record (so
@@ -249,7 +313,7 @@
     // already has one gets their scores copied and GIR worked out again.
     // ctx: { code, course, round: { players, scores }, holes: [{ n, par }] }
     function qSync(ctx, meId) {
-        if (!ctx || !ctx.code) return;
+        if (!ctx || !ctx.code || skipped(ctx.code)) return;
         var round = ctx.round || {};
         (round.players || []).forEach(function (p) {
             var mine = meId != null && String(p.id) === String(meId);
@@ -339,6 +403,7 @@
         var out = [];
         var codes = Object.keys(byCode).concat(Object.keys(legacy).filter(function (c) { return !byCode[c]; }));
         codes.forEach(function (code) {
+            if (skipped(code)) return;
             var recs = byCode[code] || [], me = recs.filter(function (r) { return r.me === true; })[0];
             if (!me) {
                 var id = null; try { id = W.localStorage.getItem('golfapp_me_' + code) || W.localStorage.getItem('hardpan_gps_golfer_' + code); } catch (e) {}
@@ -382,7 +447,18 @@
                 + '#hp-my-stats .ms-seg button{flex:1;min-height:40px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}#hp-my-stats .ms-seg button.on{background:#0f4c3a;color:#fff;}'
                 + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-saved{font-size:12px;color:#6b7280;margin:4px 2px 0;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
                 + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}'
-                + '#hp-my-stats .ms-miss{display:grid;gap:10px;margin-top:10px;}#hp-my-stats .ms-miss-line{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;color:#555;}#hp-my-stats .ms-miss-c b{font-size:20px;color:#0f4c3a;}';
+                + '#hp-my-stats .ms-miss{display:grid;gap:10px;margin-top:10px;}#hp-my-stats .ms-miss-line{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;color:#555;}#hp-my-stats .ms-miss-c b{font-size:20px;color:#0f4c3a;}'
+                // 020: the rounds behind the numbers (each removable), Start fresh, and the app-drawn question.
+                + '#hp-my-stats .ms-h{font-size:12px;font-weight:800;letter-spacing:.08em;color:#555;margin:18px 2px 8px;}'
+                + '#hp-my-stats .ms-round{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:14px;padding:10px 6px 10px 14px;margin-bottom:8px;}'
+                + '#hp-my-stats .ms-round .n{font-weight:800;}#hp-my-stats .ms-round .s{font-size:13px;color:#555;font-weight:600;}'
+                + '#hp-my-stats .ms-rm{min-width:44px;min-height:44px;border:0;background:none;color:#8a1c1c;font:700 13px/1.1 -apple-system,system-ui,sans-serif;cursor:pointer;}'
+                + '#hp-my-stats .ms-fresh{display:block;margin:22px auto 0;min-height:44px;padding:0 16px;border:1px solid #c9d3cd;border-radius:12px;background:none;color:#555;font:700 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}'
+                + '#hp-my-stats .ms-ask{position:fixed;inset:0;background:rgba(5,20,12,.5);display:flex;align-items:flex-end;justify-content:center;z-index:2;}'
+                + '#hp-my-stats .ms-ask>div{background:#fff;border-radius:20px 20px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 16px);width:100%;max-width:520px;box-sizing:border-box;}'
+                + '#hp-my-stats .ms-ask .t{font-size:18px;font-weight:800;margin-bottom:6px;}#hp-my-stats .ms-ask .b{font-size:15px;color:#444;font-weight:600;margin-bottom:14px;}'
+                + '#hp-my-stats .ms-ask button{display:block;width:100%;min-height:50px;border-radius:14px;font:800 16px/1 -apple-system,system-ui,sans-serif;cursor:pointer;margin-top:8px;}'
+                + '#hp-my-stats .ms-ask .ok{border:0;background:#8a1c1c;color:#fff;}#hp-my-stats .ms-ask .no{border:1px solid #c9d3cd;background:#fff;color:#1a1a1a;}';
             page.appendChild(st);
             var top = el('div', 'ms-top');
             var back = el('button', 'ms-back', '‹'); back.type = 'button'; back.setAttribute('aria-label', 'Back'); back.onclick = closeMy;
@@ -428,6 +504,59 @@
             });
         body.appendChild(miss);
         body.appendChild(el('div', 'ms-note', 'Putts, fairways and greens come from rounds with stats entered. Scoring average: complete 18-hole rounds. Kept on this phone only.'));
+        // 020: THE ROUNDS behind these numbers - a test round can go on its own.
+        var list = historyRounds();
+        if (list.length) {
+            body.appendChild(el('div', 'ms-h', 'ROUNDS ON THIS PHONE'));
+            list.forEach(function (r) {
+                var row = el('div', 'ms-round'); row.setAttribute('data-ms-round', r.code);
+                var l = el('div');
+                l.appendChild(el('div', 'n', r.course || ('Round ' + r.code)));
+                l.appendChild(el('div', 's', [r.at ? new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '', r.holes ? r.strokes + ' thru ' + r.holes : ''].filter(Boolean).join(' \u00b7 ')));
+                row.appendChild(l);
+                var x = el('button', 'ms-rm', 'Remove'); x.type = 'button'; x.setAttribute('data-ms-remove', r.code); x.setAttribute('aria-label', 'Remove ' + (r.course || r.code) + ' from my stats');
+                x.onclick = function () {
+                    ask('Remove this round from my stats?', (r.course || 'This round') + ' leaves My stats on this phone. The round and its scores in games are NOT deleted.', 'Remove', function () { removeRound(r.code); renderMy(); });
+                };
+                row.appendChild(x);
+                body.appendChild(row);
+            });
+        }
+        var fresh = el('button', 'ms-fresh', 'Start fresh'); fresh.type = 'button'; fresh.setAttribute('data-ms-fresh', '1');
+        fresh.onclick = function () { ask('Clear all my stats on this phone?', 'Your rounds and scores in games are NOT deleted.', 'Clear', function () { clearAll(); renderMy(); }); };
+        body.appendChild(fresh);
+    }
+    // 020: each round in My stats - the scorecard's (myRounds) and the HardPan Index's - newest first.
+    function historyRounds() {
+        var by = {};
+        myRounds().forEach(function (r) {
+            var st = 0, n = 0;
+            Object.keys(r.snap || {}).forEach(function (k) { var x = r.snap[k]; if (x && x.s > 0) { st += x.s; n++; } });
+            by[r.code] = { code: r.code, course: r.course, at: r.at || 0, strokes: st, holes: n };
+        });
+        try {
+            idx().rounds().forEach(function (r) {
+                if (!r || !r.code || by[r.code] || skipped(r.code)) return;
+                var st = (r.holes || []).reduce(function (a, h) { return a + (Number(h.gross) || 0); }, 0);
+                by[r.code] = { code: r.code, course: r.course, at: r.at || 0, strokes: st, holes: (r.holes || []).length };
+            });
+        } catch (e) {}
+        return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    }
+    // The question, drawn by the page itself (Home has no dialog library): [ok] [Cancel].
+    function ask(title, text, okText, yes) {
+        if (!page) return;
+        var o = page.querySelector('.ms-ask'); if (o) o.remove();
+        o = el('div', 'ms-ask'); o.setAttribute('role', 'alertdialog');
+        var box = el('div');
+        box.appendChild(el('div', 't', title)); box.appendChild(el('div', 'b', text));
+        var ok = el('button', 'ok', okText); ok.type = 'button'; ok.setAttribute('data-ms-ask', 'ok');
+        var no = el('button', 'no', 'Cancel'); no.type = 'button'; no.setAttribute('data-ms-ask', 'cancel');
+        ok.onclick = function () { o.remove(); yes(); };
+        no.onclick = function () { o.remove(); };
+        o.onclick = function (e) { if (e.target === o) o.remove(); };
+        box.appendChild(ok); box.appendChild(no); o.appendChild(box);
+        page.appendChild(o);
     }
     // HOME (the GPS app): "My stats" - only with GPS Map, asked quietly (never a paywall),
     // and only when the switch is on.
@@ -497,7 +626,7 @@
     function ssStrokes(pid) { return ss.pend[pid] || ssSaved(pid); }
     // URGENT-005: the stats rows are for the golfer this phone IS (ctx.own - index.html qsOwnId), not
     // whoever's chip is picked; nobody's when the phone is nobody; everyone's with Track stats for others.
-    function ssStatsFor(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && ((me != null && String(pid) === String(me)) || othersOn())); }
+    function ssStatsFor(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
     function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
     function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
     function ssClose() { if (ss && ss.wrap) { ss.wrap.style.display = 'none'; ss.wrap.querySelector('.hp-ss').style.transform = ''; } if (ss) { ss.pend = {}; ss.ctx = null; } }
@@ -795,6 +924,8 @@
         // Quick stats on the scorecard (008) and My stats.
         quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked },
         aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome,
+        // 020: Start fresh, Remove one round, the Practice round switch (keyed by the round's code).
+        clearAll: clearAll, removeRound: removeRound, historyRounds: historyRounds, practiceOn: practiceOn, setPractice: setPractice, skipped: skipped,
         // "Track stats for others" (this phone, off by default): the state and its setter, for any Tools
         // surface (the old drop-down via sheet.placeToggle, the Tools bottom sheet's ROUND switch). The
         // setter redraws an open score sheet.
