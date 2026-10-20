@@ -109,7 +109,7 @@ for (const [pg, tag] of [['skins.html', 'bets'], ['settlement.html', 'results'],
         const txt = await ev('document.body.innerText');
         distinct(pg, txt);
         if (tag === 'bets') assert.match(linesOf(txt).join('\n'), /Test A: \+\$15\.00 \| Test B: -\$15\.00/);
-        if (tag === 'results') assert.match(linesOf(txt).join('\n'), /Test A vs Test B/);
+        if (tag === 'results') assert.match(txt, /Test[\s\u00a0]A[\s\u00a0]vs?[\s\u00a0]Test[\s\u00a0]B/i);   // the old receipt says 'vs'; the #31 receipt card head says 'v' (upper-cased by CSS)
         await shot('2-after-' + tag);
     });
 }

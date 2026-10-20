@@ -34,7 +34,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl, REPO_ROOT } = require('./tools/lib/cold-arrival.js');
 
-const BASE = '70bd31e';
+const BASE = process.env.P31_BASE || 'dcb90df';   // on a branch that also has the #2 name fix, use the commit just before #31 (P31_BASE) so only the look differs
 const OUT_DIR = process.env.P31_OUT || '';          // where the proof table / shots go (the report run)
 
 // ---- the rounds -------------------------------------------------------------
