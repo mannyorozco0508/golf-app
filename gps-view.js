@@ -487,8 +487,11 @@
             S.db.ref('global_courses/' + key + '/location').once('value').then(function (snap) {
                 var L = snap && typeof snap.val === 'function' ? snap.val() : null;
                 var lat = L && Number(L.latitude != null ? L.latitude : L.lat), lng = L && Number(L.longitude != null ? L.longitude : (L.lng != null ? L.lng : L.lon));
+                // URGENT-030: its city / state too, for the course line (and kept with the point).
+                var city = L && typeof L.city === 'string' ? L.city : '', st = L && typeof L.state === 'string' ? L.state : '';
+                if ((city || st) && S === mine) S.coursePlace = { city: city, state: st };
                 if (L && isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng)) {
-                    lsSet(COURSE_LOC + key, { lat: lat, lng: lng });
+                    lsSet(COURSE_LOC + key, city || st ? { lat: lat, lng: lng, city: city, state: st } : { lat: lat, lng: lng });
                     if (S === mine) S.courseLoc = [lat, lng];
                 }
                 fin();
@@ -4407,7 +4410,9 @@
         plays.appendChild(mk('div', 'gps-lc-acc', { style: 'display:none' }));
         var acts = mk('div', 'gps-lc-acts');
         put(acts, '.gps-green-view'); put(acts, '.gps-hz-btn'); put(acts, '.gps-mark-shot'); put(acts, '.gps-fly-btn');
-        panel.appendChild(handle); panel.appendChild(nums); panel.appendChild(plays); panel.appendChild(acts);
+        panel.appendChild(handle); panel.appendChild(nums);
+        panel.appendChild(mk('div', 'gps-lc-course'));   // URGENT-030: the course line, under the yardages
+        panel.appendChild(plays); panel.appendChild(acts);
         put(panel, '.gps-bottom'); put(panel, '.gps-actions');
         var credit = q('.gps-credit');
         el.insertBefore(top, credit); el.insertBefore(panel, credit);
@@ -4503,6 +4508,7 @@
         var par = m.par != null ? m.par : S.par;
         txt('.gps-lc-l1', holeLabel() + (par != null ? ' · Par ' + par : '') + ' ▾');
         txt('.gps-lc-meta', holeMetaLine(r).replace(/^Par \d+( · )?/, ''));
+        syncCourseLine();
         // No front / back for this hole: MIDDLE alone, no blank columns.
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
         show('.gps-num-f', edges); show('.gps-num-b', edges);
@@ -4599,6 +4605,8 @@
         var mid = put(top, '.gps-num-mid'); var ml = mid && mid.querySelector('.gps-lbl'); if (ml) ml.textContent = 'MIDDLE';
         var fb = mk('div', 'gps-ld-fb'); put(fb, '.gps-num-b'); put(fb, '.gps-num-f'); top.appendChild(fb);
         var par = mk('div', 'gps-ld-par'); par.appendChild(mk('span', 'gps-ld-par1')); par.appendChild(mk('span', 'gps-ld-hcp')); top.appendChild(par);
+        // URGENT-030: under a thin divider, the course line - its own row, the bar's full width.
+        top.appendChild(mk('div', 'gps-ld-course'));
         // UNDER IT: Games (left), the round chip (right; tap = the scorecard).
         var row2 = mk('div', 'gps-ld-row2');
         put(row2, '.gps-door-games');
@@ -4664,6 +4672,85 @@
         setTimeout(function () { if (S === mine) { S.nameUntil = 0; render(); } }, 2000);
     }
     function holeLabel() { return (S.nameUntil && Date.now() < S.nameUntil ? S.nameText + ' \u00b7 ' : '') + 'Hole ' + S.hole; }
+    // ---- URGENT-030 THE COURSE LINE (Manny, option A of ~/Desktop/claude-code-reports/029/mockup-course-name.png) ----
+    // One small centred gray line under a thin divider at the bottom of the yardage bar:
+    // "Aguila Golf Course \u00b7 Laveen, AZ"; a club with more than one course says which one
+    // ("Talking Stick \u00b7 Piipaash (South)"). No city known: the name alone - never "undefined".
+    // Read from what the phone already has (the round, the course resolver, the GolfAPI course,
+    // the course's own global_courses location) - nothing is asked for, nothing leaves the phone.
+    var CL_GENERIC = /\s+(golf\s*(?:&|and)\s*(?:fish|country|tennis|yacht)\s+club|golf\s+(?:club|course|links|resort|center|centre)|country\s+club|g\.?c\.?|c\.?c\.?)$/i;
+    function clStr(v) { return v == null || typeof v === 'object' ? '' : String(v).replace(/\s+/g, ' ').trim().replace(/^(undefined|null)$/i, ''); }
+    function clState(v) {
+        var t = clStr(v); if (!t) return '';
+        if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+        try { var L = typeof window !== 'undefined' && window.HardPanGpsLive; if (L && L.stateCode) { var c = clStr(L.stateCode(t)); if (/^[A-Z]{2}$/.test(c)) return c; } } catch (e) {}
+        return t;
+    }
+    // "South - Piipaash" -> "Piipaash (South)"; "Piipaash Course" -> "Piipaash"; "O Odham" -> "O'odham".
+    function clPart(p) {
+        var s = clStr(p).replace(/\s+course$/i, '').replace(/\bO\s+Odham\b/i, 'O\u2019odham');
+        var m = /^(north|south|east|west)\s*[-\u2013\u2014:]\s*(.+)$/i.exec(s);
+        return m ? m[2] + ' (' + m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase() + ')' : s;
+    }
+    function courseLine(name, city, state) {
+        var nm = clStr(name).replace(/\s*\((?:[A-Z]{2})\b[^)]*\)\s*$/, '');   // "(NC - 27 Hole)": the directory's note
+        var m = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(nm), shown = nm;
+        if (m && clStr(m[1])) {
+            var club = clStr(m[1]), part = clPart(m[2]);
+            var short = club.replace(CL_GENERIC, '').replace(/^the\s+/i, '').trim() || club;
+            var flat = function (x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+            // "Papago Golf Club (Papago)", "Caledonia Golf & Fish Club (Caledonia)": one course - the club's name.
+            shown = !part || flat(part) === flat(short) || flat(part) === flat(club) ? club : short + ' \u00b7 ' + part;
+        }
+        var place = [clStr(city), clState(state)].filter(Boolean);
+        if (!place.length || !shown) return shown;
+        return shown + ' \u00b7 ' + place.join(', ');
+    }
+    // Where the round's course is: city / state from the first source that has them.
+    function clPlace() {
+        var out = { city: '', state: '' };
+        var take = function (c, s) { if (!out.city && clStr(c)) out.city = clStr(c); if (!out.state && clStr(s)) out.state = clStr(s); };
+        var r = (S && S.round) || {}, key = S && S.courseKey;
+        take(r.courseCity, r.courseState);
+        // A GolfAPI course (gps_courses / the app's file): read as they are - the record the map already
+        // matched (S.gaCache), the key's own id (gapi_<id>) or its link. Never asks the resolver or the
+        // matcher here: an early ask would fill their caches before the course data is in (URGENT-030).
+        try {
+            var d = window.HardPanGolfApi, ids = [];
+            var rec = S && S.gaCache && S.gaCache.v;
+            if (rec && rec.golfapiIds) ids = ids.concat(rec.golfapiIds);
+            var m = /^gapi_(\d+)$/.exec(String(key || '')); if (m) ids.push(m[1]);
+            if (d && d.links && key && d.links[key]) ids.push(d.links[key]);
+            ids.forEach(function (id) { var c = d && d.courses && d.courses[String(id).split('#')[0]]; if (c) take(c.city, c.state); });
+        } catch (e) {}
+        // global_courses' own location fields (Round Setup's copy on this page, when it has one).
+        try { var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses[key] : null; if (gc && gc.location) take(gc.location.city, gc.location.state); } catch (e) {}   /* global globalCourses */
+        if (S && S.coursePlace) take(S.coursePlace.city, S.coursePlace.state);
+        if (key) {
+            var c1 = lsGet(COURSE_LOC + key); if (c1) take(c1.city, c1.state);
+            var c2 = lsGet('hardpan_courseloc_v1_' + key); if (c2) take(c2.city, c2.state);
+        }
+        return out;
+    }
+    function courseLineNow() {
+        if (!S || !S.round) return '';
+        var nm = clStr(S.round.courseName);
+        if (!nm) return '';
+        // Kept once it has a place; without one, asked again at most every 5 s (the GolfAPI course
+        // and the location read can land later).
+        var now = Date.now(), k = S.courseKey + '|' + nm;
+        if (S.cl && S.cl.k === k && (S.cl.placed || now - S.cl.at < 5000)) return S.cl.v;
+        var p = clPlace();
+        S.cl = { k: k, at: now, placed: !!p.city, v: courseLine(nm, p.city, p.state) };
+        return S.cl.v;
+    }
+    function syncCourseLine() {
+        var e = S && S.el.querySelector('.gps-ld-course, .gps-lc-course');
+        if (!e) return;
+        var t = courseLineNow();
+        if (e.textContent !== t) e.textContent = t;
+        if (e.getAttribute('title') !== t) e.setAttribute('title', t);
+    }
     // What render fills in layout D only.
     function syncLayoutD(r, o, nums) {
         if (!ldOn()) return;
@@ -4672,6 +4759,7 @@
         txt('.gps-ld-par1', par != null ? 'Par ' + par : '');
         txt('.gps-ld-hcp', m.si != null && isFinite(m.si) ? 'HCP ' + m.si : '');
         txt('.gps-ld-holelbl', holeLabel());
+        syncCourseLine();
         txt('.gps-side-bets .gps-cap', 'Card');
         // No front / back for this hole: MIDDLE alone.
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
@@ -5622,6 +5710,10 @@
         + '#gps-overlay.gps-lc .gps-lc-nums .gps-num-mid{flex:1.3 1 0;}'
         + '#gps-overlay.gps-lc .gps-lc-nums .gps-num-mid .gps-big{font-size:48px;line-height:1;color:#d9f99d;}'
         + '#gps-overlay.gps-lc .gps-lc-nums .gps-plays:empty{display:none;}'
+        // URGENT-030: layout C's course line, under the yardages; its margins take back the panel's extra
+        // 6px gap, so the panel grows by 13px, less than the line's own 14px.
+        + '#gps-overlay .gps-lc-course{box-sizing:border-box;min-width:0;margin:-7px 8px -3px;padding:2px 4px 0;border-top:1px solid rgba(244,244,239,.16);'
+        +   'font:600 11px/14px ' + FONT + ';color:#b9c4b5;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}'
         + '#gps-overlay.gps-lc .gps-panel:has(.gps-pl-line:not([style*="none"])) .gps-plays{display:none;}'
         + '#gps-overlay .gps-lc-plays{display:flex;flex-direction:column;align-items:center;gap:2px;}'
         + '#gps-overlay.gps-lc .gps-lc-plays .gps-pl-line,#gps-overlay.gps-lc .gps-lc-plays .gps-suggest{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0 4px;justify-content:center;text-align:center;color:#fbbf24;max-width:100%;}'
@@ -5677,6 +5769,14 @@
         + '#gps-overlay.gps-ld .gps-ld-fb .gps-big{font-size:17px;font-weight:700;color:#f4f4ef;}'
         + '#gps-overlay .gps-ld-par{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:1px solid rgba(244,244,239,.2);font:600 15px/1.2 ' + FONT + ';color:#f4f4ef;white-space:nowrap;}'
         + '#gps-overlay .gps-ld-par span:empty{display:none;}'
+        // URGENT-030 THE COURSE LINE: the bar's own second row (flex-wrap; MIDDLE grows from 0, so the
+        // first row never wraps), a thin divider over one centred 11px semibold gray line, … when long.
+        // The bar's bottom padding gives back 4px: the bar grows by 13px, less than the line's own 14px.
+        + '#gps-overlay.gps-ld .gps-ld-top:has(> .gps-ld-course:not(:empty)){flex-wrap:wrap;row-gap:0;padding-bottom:2px;}'
+        + '#gps-overlay.gps-ld .gps-ld-top:has(> .gps-ld-course:not(:empty)) .gps-num-mid{flex-basis:0;}'
+        + '#gps-overlay .gps-ld-course{flex:0 0 calc(100% - 10px);margin:0 0 0 10px;box-sizing:border-box;min-width:0;padding:2px 4px 0;border-top:1px solid rgba(244,244,239,.16);'
+        +   'font:600 11px/14px ' + FONT + ';color:#b9c4b5;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}'
+        + '#gps-overlay .gps-ld-course:empty,#gps-overlay .gps-lc-course:empty{display:none;}'
         + '#gps-overlay .gps-ld-row2{display:flex;align-items:center;gap:8px;min-height:0;pointer-events:none;}'
         + '#gps-overlay .gps-ld-row2 > *{pointer-events:auto;}'
         + '#gps-overlay .gps-ld-gap{flex:1 1 auto;pointer-events:none !important;}'
@@ -5755,6 +5855,7 @@
         + '#gps-overlay.gps-sun .gps-lbl,#gps-overlay.gps-sun .gps-hole-lbl,#gps-overlay.gps-sun .gps-hole-num,#gps-overlay.gps-sun.gps-ld .gps-hole-caret,#gps-overlay.gps-sun.gps-ld .gps-back,'
         +   '#gps-overlay.gps-sun .gps-ld-par,#gps-overlay.gps-sun .gps-lc-l1,#gps-overlay.gps-sun .gps-lc-l2,#gps-overlay.gps-sun .gps-lc-acc{color:#fff !important;opacity:1 !important;}'
         + '#gps-overlay.gps-sun .gps-ld-div,#gps-overlay.gps-sun .gps-ld-par{border-color:#fff;}#gps-overlay.gps-sun .gps-ld-div{background:#fff;}'
+        + '#gps-overlay.gps-sun .gps-ld-course,#gps-overlay.gps-sun .gps-lc-course{color:#fff;border-top-color:rgba(255,255,255,.6);}'   // URGENT-030: white in Sun
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-top .gps-num-mid .gps-big{color:#fff;font-size:clamp(46px,15.5vw,60px);}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl,#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{color:#ffe600 !important;font-weight:800;}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:19px;}'
@@ -5776,7 +5877,7 @@
         + '#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-pl-line,#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-suggest,#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-pl-info{color:#ffe600;}'
         + '#gps-overlay.gps-sun .gps-credit{background:#000;color:#fff;}'
         // A small phone (SE): the MIDDLE keeps its ~30% - the hole number, F / B and Par give it room.
-        + '@media (max-width:389px){#gps-overlay.gps-sun.gps-ld .gps-ld-top{gap:4px;padding-right:8px;}#gps-overlay.gps-sun.gps-ld .gps-back{width:30px;font-size:26px;}'
+        + '@media (max-width:389px){#gps-overlay.gps-sun.gps-ld .gps-ld-top{column-gap:4px;padding-right:8px;}#gps-overlay.gps-sun.gps-ld .gps-back{width:30px;font-size:26px;}'
         +   '#gps-overlay.gps-sun.gps-ld .gps-hole-num{font-size:28px;}#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:16px;}#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl{font-size:12px;}'
         +   '#gps-overlay.gps-sun .gps-ld-par{font-size:13px;padding-left:6px;}}'
         // The round map buttons (Recenter, zoom, back in C): black with a white outline too.
@@ -6662,6 +6763,8 @@
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
         clubShort: clubShort,
+        // URGENT-030: the course line - pure ("Talking Stick · Piipaash (South) · Scottsdale, AZ"), and what shows now.
+        courseLine: courseLine, courseLineNow: function () { return courseLineNow(); },
         // 014: the target ring's point (the layups count from it on the tee box), or null.
         target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
