@@ -745,7 +745,7 @@ html {
             // startHole covers the whole round, exactly as before. Declared ABOVE the
             // format branch because both branches settle over the same range.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
             if (sm.format === 'stroke') {
@@ -816,7 +816,7 @@ html {
                     && !!computeRoundFinish(data, courseData, savedScores).finished;
                 const smlDone = (typeof sideMatchRangeComplete === 'function')
                     && sideMatchRangeComplete(sm, players, courseData, savedScores,
-                        { roundFinished: smlFinished });
+                        { roundFinished: smlFinished, round: data });
                 // DECIDED money for the two totals as well. They read
                 // calc.t1TotalMoney, which books a leading OPEN segment's stake as
                 // though it were won - so a bet through 6 of 18 printed a figure

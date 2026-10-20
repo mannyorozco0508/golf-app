@@ -80,8 +80,9 @@ function sideMatchRangeComplete(sm, players, courseData, savedScores, opts) {
     // It costs nothing in accuracy: calculateMatchEngine only scores a hole both
     // sides posted, so a blank hole was never in the money to begin with.
     if (opts && opts.roundFinished) return true;
+    // opts.round (2026-10-19): the round, so a range off another tee is the play-order one.
     const holes = (typeof sideMatchHoles === 'function')
-        ? sideMatchHoles(sm, courseData || [])
+        ? sideMatchHoles(sm, courseData || [], opts && opts.round)
         : (courseData || []).filter(h => h.hole >= ((sm && sm.startHole) || 1));
     if (!holes || holes.length === 0) return false;
     const ids = [].concat(sm.teamAIds || [], sm.teamBIds || []).map(String);
@@ -358,7 +359,7 @@ function sideMatchLiveFinals(data, courseData, savedScores, states, opts) {
             ? sideMatches[st.wagerId]
             : (typeof legacyMainAsSideMatch === 'function' ? legacyMainAsSideMatch(d) : null);
         const complete = sideMatchRangeComplete(sm, d.players || [], courseData, savedScores,
-            { roundFinished: roundFinished });
+            { roundFinished: roundFinished, round: d });
         out[matchId] = {
             complete: complete,
             total: sideMatchFinalTotal(receipt, { complete: complete }),

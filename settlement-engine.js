@@ -1066,7 +1066,7 @@
             // or a mid-round match would print "Holes 1-18" beside money that only ever
             // came from holes 6 onward.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
             // IN PLAY ORDER (2026-10-04, approved). "Started Hole 10" is what a
             // golfer who teed off the 10th sees on the Receipt, and the first hole
@@ -1577,7 +1577,7 @@
             // round, so nothing already settled moves. The engines are untouched: they
             // are simply handed the holes this wager is played over.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
             // HI-LO (016, ADDITIVE): hilo-engine.js decides every point and every

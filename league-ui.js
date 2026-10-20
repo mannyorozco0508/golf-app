@@ -42,7 +42,7 @@
     }
     function holesFor(sm, data) {
         var cd = data.courseData || [];
-        return typeof sideMatchHoles === 'function' ? sideMatchHoles(sm, cd) : cd;   /* global sideMatchHoles */
+        return typeof sideMatchHoles === 'function' ? sideMatchHoles(sm, cd, data) : cd;   /* global sideMatchHoles */
     }
     // A CUP ROUND's own matches, from the Ryder engine (ryder-cup.js, read-only): who played
     // whom and the 18-hole result once decided. null when the round has no Cup.

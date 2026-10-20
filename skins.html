@@ -1190,7 +1190,7 @@ html {
 
         // Only holes from this match's own start hole forward.
         const smCourse = (typeof sideMatchHoles === 'function')
-            ? sideMatchHoles(sm, courseData)
+            ? sideMatchHoles(sm, courseData, currentData)
             : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
         const rangeText = (typeof sideMatchRangeText === 'function') ? sideMatchRangeText(sm, courseData) : '';
         const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
@@ -1275,7 +1275,7 @@ html {
             const hlFinished = (typeof computeRoundFinish === 'function')
                 && !!computeRoundFinish(currentData, courseData, savedScores).finished;
             const hlDone = (typeof sideMatchRangeComplete === 'function')
-                && sideMatchRangeComplete(sm, players, courseData, savedScores, { roundFinished: hlFinished });
+                && sideMatchRangeComplete(sm, players, courseData, savedScores, { roundFinished: hlFinished, round: currentData });
             if (hlRc && typeof sideMatchBetLines === 'function') {
                 sideMatchBetLines(hlRc, { complete: hlDone }).forEach(l => {
                     if (!l.moneyText) return;
@@ -1335,7 +1335,7 @@ html {
                 && !!computeRoundFinish(currentData, courseData, savedScores).finished;
             const smlDone = (typeof sideMatchRangeComplete === 'function')
                 && sideMatchRangeComplete(sm, players, courseData, savedScores,
-                    { roundFinished: smlFinished });
+                    { roundFinished: smlFinished, round: currentData });
             if (smlRc && typeof sideMatchBetLines === 'function') {
                 sideMatchBetLines(smlRc, { complete: smlDone }).forEach(l => {
                     if (!l.moneyText) return;

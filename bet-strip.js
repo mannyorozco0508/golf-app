@@ -811,7 +811,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
         if (sm.format === 'hilo') {
             const hl = (typeof hiloForSideMatch === 'function')
                 ? hiloForSideMatch(sm, teamA, teamB,
-                    (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, courseData) : courseData,
+                    (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, courseData, data) : courseData,
                     savedScores) : null;
             if (!hl) return;
             const nmA = hiloSideName(teamA), nmB = hiloSideName(teamB);
@@ -822,7 +822,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                     try { roundDone = !!computeRoundFinish(data, courseData, savedScores).finished; }
                     catch (e) { roundDone = false; }
                 }
-                hlDone = !!sideMatchRangeComplete(sm, allPlayers, courseData, savedScores, { roundFinished: roundDone });
+                hlDone = !!sideMatchRangeComplete(sm, allPlayers, courseData, savedScores, { roundFinished: roundDone, round: data });
             }
             const meSide = iAmInB ? -1 : 1;
             const lead = hl.diff * meSide;
@@ -961,7 +961,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
                                 catch (e) { roundDone = false; }
                             }
                             overAll = !!sideMatchRangeComplete(sm, data.players || [], courseData,
-                                savedScores, { roundFinished: roundDone });
+                                savedScores, { roundFinished: roundDone, round: data });
                         }
                         if (overAll && typeof sideMatchOrderedSegments === 'function') {
                             const ordered = sideMatchOrderedSegments(rec)

@@ -167,10 +167,10 @@ describe('1. A PLAYED ROUND KEEPS ITS ROSTER, ITS SCORES AND ITS MONEY', () => {
     });
 
     test('the money engines are the ones that were signed off', () => {
-        assert.equal(sha12('money-engine.js'), '12bfa41c2c8e');
-        assert.equal(sha12('settlement-engine.js'), '88c8b8a76c24');   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+        assert.equal(sha12('money-engine.js'), 'ae0bfcd9805c');   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)
+        assert.equal(sha12('settlement-engine.js'), '2b75e349bae7');   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
         assert.equal(sha12('pool-engine.js'), '1530a0b955e2');
-        assert.equal(sha12('action-model.js'), 'f67a7b4390f5');   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
+        assert.equal(sha12('action-model.js'), 'bb89aa4c1be8');   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');
     });
 });

@@ -182,6 +182,18 @@ function amPlayOrderFns() {
     return null;
 }
 
+// The holes (sorted by number) in PLAY order when the round goes off another tee than its
+// first hole; null otherwise (no round, a first-tee round, no play-order.js) - the caller
+// then keeps its original by-number walk.
+function amPlayedOrder(round, sortedHoles) {
+    if (!round || !sortedHoles || !sortedHoles.length) return null;
+    const po = amPlayOrderFns();
+    if (!po) return null;
+    const tee = po.teeStartHole(round, sortedHoles);
+    if (Number(tee) === Number(sortedHoles[0].hole)) return null;
+    return po.playOrder(sortedHoles, tee);
+}
+
 function gameHoles(game, courseData) {
     const holes = courseData || [];
     const start = (game && game.startHole) || 1;
@@ -204,8 +216,32 @@ function gameHoles(game, courseData) {
 // gameHoles() rather than growing a second range implementation. A match with no
 // startHole - every side match saved before this existed - covers the whole round, so
 // nothing already settled moves.
-function sideMatchHoles(sm, courseData) {
-    return gameHoles({ startHole: (sm && sm.startHole) || 1 }, courseData);
+//
+// IN PLAY ORDER, NOT BY NUMBER (2026-10-19 Manny OK: "side matches use play order
+// (sideMatchHoles), hole-1 rounds unchanged"). `round` (optional) is the round record.
+// On a round off another tee (play-order.js teeStartHole - the round's startingHole) the
+// holes come back in the order they are PLAYED: a whole-round match (startHole absent, or
+// the card's first hole - the record every whole-round bet has) is 10..18 then 1..9, so a
+// match closes out ("3&2") and presses on the holes as they were played, never on 10..18
+// first-by-number with 1..9 still to come; a match "from H13" covers 13..18 then 1..9 (the
+// holes still to PLAY), not 13..18 alone. A round off its first hole - or a caller that
+// passes no round, or a page without play-order.js - takes exactly the original path, so
+// every such round's range, order and money are byte-identical.
+function sideMatchHoles(sm, courseData, round) {
+    const start = (sm && sm.startHole) || 1;
+    const holes = courseData || [];
+    const po = (round && holes.length) ? amPlayOrderFns() : null;
+    if (po) {
+        const sorted = holes.slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+        const tee = po.teeStartHole(round, sorted);
+        if (Number(tee) !== Number(sorted[0].hole)) {
+            const ordered = po.playOrder(sorted, tee);
+            if (Number(start) <= Number(sorted[0].hole)) return ordered;
+            const at = ordered.findIndex(h => Number(h.hole) === Number(start));
+            if (at !== -1) return ordered.slice(at);
+        }
+    }
+    return gameHoles({ startHole: start }, courseData);
 }
 
 // WHERE A NEW SIDE MATCH SHOULD BEGIN.
@@ -222,12 +258,27 @@ function sideMatchHoles(sm, courseData) {
 // Before anybody tees off this returns the first hole, so a bet made in the car park
 // covers the whole round exactly as it always has. Returns null once no holes remain -
 // there is nothing left to bet on, and the caller should say so rather than invent one.
-function sideMatchStartHole(participants, courseData, savedScores) {
+//
+// `round` (optional): on a round off another tee the holes are walked in PLAY order (the
+// same rule as sideMatchHoles) - after 10..12 are in, the bet starts on 13 and covers
+// 13..18, 1..9. Once the walk wraps past the last hole by number onto the card's first
+// hole, that start would be read as "the whole round" (the record a whole-round bet has),
+// so it returns null there - nothing changes from before for that one case (it was null:
+// "no holes left" by number). Without a round, or off the first tee: as before, exactly.
+function sideMatchStartHole(participants, courseData, savedScores, round) {
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     if (holes.length === 0) return 1;
     const players = participants || [];
     if (players.length === 0) return holes[0].hole;
     const scores = savedScores || {};
+    const ordered = amPlayedOrder(round, holes);
+    if (ordered) {
+        let last = -1;
+        ordered.forEach((h, i) => { if (players.some(p => { const v = scores[`p${p.id}_h${h.hole}`]; return v && v > 0; })) last = i; });
+        if (last === -1) return holes[0].hole;
+        const nx = ordered[last + 1];
+        return nx && Number(nx.hole) !== Number(holes[0].hole) ? nx.hole : null;
+    }
 
     let highestPosted = null;
     holes.forEach(h => {
@@ -298,12 +349,25 @@ function gameRangeText(game, courseData) {
 // completed. Derived from the highest such hole, never from a count, so out-of-order
 // entry and non-standard starts stay correct. Returns null when the round has no
 // future hole left, which is what disables Add Action at the end.
+//
+// IN PLAY ORDER on a round off another tee (2026-10-19, with sideMatchHoles): the hole after
+// the last one everybody has finished, as the holes are PLAYED - and null where the walk
+// would wrap onto the card's first hole (that number is read as "the whole round"). Off the
+// first tee: exactly as before.
 function nextAddActionHole(data, courseData, savedScores) {
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     if (holes.length === 0) return null;
     const players = (data.players || []);
     if (players.length === 0) return holes[0].hole;
     const scores = savedScores || {};
+    const ordered = amPlayedOrder(data, holes);
+    if (ordered) {
+        let last = -1;
+        ordered.forEach((h, i) => { if (players.every(p => { const v = scores[`p${p.id}_h${h.hole}`]; return v && v > 0; })) last = i; });
+        if (last === -1) return holes[0].hole;
+        const nx = ordered[last + 1];
+        return nx && Number(nx.hole) !== Number(holes[0].hole) ? nx.hole : null;
+    }
 
     let lastComplete = null;
     holes.forEach(h => {

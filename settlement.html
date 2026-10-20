@@ -1197,7 +1197,7 @@ html {
             && !!computeRoundFinish(data, courseData, savedScores).finished;
         const rDone = (typeof sideMatchRangeComplete === 'function')
             ? !!(sm && sideMatchRangeComplete(sm, data.players || [], courseData, savedScores,
-                { roundFinished: rFinished }))
+                { roundFinished: rFinished, round: data }))
             : true;
         const rLines = (typeof sideMatchBetLines === 'function')
             ? sideMatchBetLines(r, { complete: rDone }) : [];
@@ -1301,7 +1301,7 @@ html {
             // startHole covers the whole round, exactly as before. Declared ABOVE the
             // format branch because both branches settle over the same range.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
             if (sm.format === 'stroke') {

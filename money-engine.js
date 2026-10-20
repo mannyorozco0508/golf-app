@@ -711,8 +711,13 @@ function buildLiveMatchStates(data, courseData, savedScores, visiblePlayerIds) {
         if (players.length < 2) return;
 
         // A wager struck on the 6th tee does not retroactively own holes 1-5.
+        // action-model.js sideMatchHoles when it is here: the same range settlement uses,
+        // IN PLAY ORDER on a round off another tee (2026-10-19 OK) - the live "2 UP / 3&2"
+        // then closes out on the holes as played. Off the first tee: the same filter as before.
         const start = Number(sm.startHole) || 1;
-        const holes = (courseData || []).filter(h => h.hole >= start);
+        const holes = (typeof sideMatchHoles === 'function')   /* global sideMatchHoles */
+            ? sideMatchHoles(sm, courseData || [], d)
+            : (courseData || []).filter(h => h.hole >= start);
         if (holes.length === 0) return;
 
         const st = buildLiveMatchState(Object.assign({}, d, {
@@ -1122,9 +1127,12 @@ function buildLiveStrokeBetStates(data, courseData, savedScores, visiblePlayerId
         const p1 = byId[a[0]], p2 = byId[b[0]];
         if (!p1 || !p2) return;
 
-        // A wager struck on the 6th tee does not own holes 1-5.
+        // A wager struck on the 6th tee does not own holes 1-5 (in play order off another
+        // tee - action-model.js sideMatchHoles, 2026-10-19).
         const start = Number(sm.startHole) || 1;
-        const range = holes.filter(h => h.hole >= start);
+        const range = (typeof sideMatchHoles === 'function')
+            ? sideMatchHoles(sm, holes, d)
+            : holes.filter(h => h.hole >= start);
         if (range.length === 0) return;
 
         const scoring = sm.scoring || 'net';

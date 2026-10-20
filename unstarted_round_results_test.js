@@ -153,11 +153,11 @@ describe('2. THE ENGINE IS UNCHANGED, AND STILL ANSWERS WHAT IT ANSWERED', () =>
         // pinned at the value the four-bug wave left it at (it was re-pinned
         // there with its reason), not at build 8's.
         const GOLDEN = {
-            'money-engine.js': '12bfa41c2c8e6b8a', 'settlement-engine.js': '88c8b8a76c24f6f3',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+            'money-engine.js': 'ae0bfcd9805c06d6', 'settlement-engine.js': '2b75e349bae77554',   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
             'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
-            'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': 'f67a7b4390f5776f', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */
+            'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': 'bb89aa4c1be878fc', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)
             'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
-            'hole-events.js': '6fd7f7edf41e848b', 'bet-strip.js': 'bca47bb80a6ea845'   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
+            'hole-events.js': '6fd7f7edf41e848b', 'bet-strip.js': 'e2fcf72d5a9d1b19'   // 2026-10-19 Manny OK: side matches in play order (was bca47bb8)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
         };
         const moved = Object.keys(GOLDEN).filter((f) => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex').slice(0, 16) !== GOLDEN[f]);
