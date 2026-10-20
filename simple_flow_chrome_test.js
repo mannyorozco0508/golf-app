@@ -99,8 +99,10 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.match(s3.text, /Weekly Game\n\$40/);
         assert.match(s3.text, /Nassau\n\$5 a bet/);
         assert.match(sheet.text, /Round ready/);
-        assert.match(sheet.text, /Group 1\nSkeens, Bob, Manny, Paul · Hole 1/);
-        assert.match(sheet.text, /Group 5\nCrone, Todd, Mike, Jim · Hole 1/);
+        // Each group's first hole is a picker now (Manny's OK, 2026-10-19 - its value is held in
+        // gps018_share_holes_chrome_test.js); the row reads the names, then the holes.
+        assert.match(sheet.text, /Group 1\nSkeens, Bob, Manny, Paul · \nHole 1\nHole 2\n/);
+        assert.match(sheet.text, /Group 5\nCrone, Todd, Mike, Jim · \nHole 1\nHole 2\n/);
         assert.match(sheet.text, /Show QR codes/);
         assert.match(sheet.text, /Done · open the GPS/);
         assert.equal(w.writes.length, 1, 'ONE save - no Review page: ' + JSON.stringify(w.writes.map((x) => x.path)));

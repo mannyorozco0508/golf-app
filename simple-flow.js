@@ -886,7 +886,15 @@
             + '<div class="sf-h">' + (g.length > 1 ? 'EACH GROUP’S LINK' : 'SCOREKEEPER LINK') + '</div>'
             + g.map(function (b) {
                 var names = ps.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return String(p.name || '').trim(); }).join(', ');
-                return '<div class="sf-row" style="cursor:default;" data-sf-group="' + b.group + '"><span><span class="n">Group ' + b.group + '</span><span class="s" style="display:block;white-space:normal;">' + esc(names) + ' · Hole ' + startOf(b.group) + '</span></span>'
+                // SHOTGUN / TWO-TEE (Manny, 2026-10-19: "let me change a group's hole on the share sheet"):
+                // with more than one group each row's first hole is a picker - groupStartingHoles/<g>,
+                // the field the shotgun and Round Ready's two-tee start already write.
+                var holes = ((d.courseData || []).map(function (h) { return Number(h.hole); })).filter(function (n) { return n > 0; }).sort(function (a, b2) { return a - b2; });
+                var at = g.length > 1 && holes.length
+                    ? ' · <select class="sf-ghole" data-sf-ghole="' + b.group + '" aria-label="Group ' + b.group + ' first hole" style="font:inherit;font-size:14px;height:34px;border:1px solid #dfe5df;border-radius:10px;background:#fff;color:#13241d;">'
+                        + holes.map(function (h) { return '<option value="' + h + '"' + (h === startOf(b.group) ? ' selected' : '') + '>Hole ' + h + '</option>'; }).join('') + '</select>'
+                    : ' · Hole ' + startOf(b.group);
+                return '<div class="sf-row" style="cursor:default;" data-sf-group="' + b.group + '"><span><span class="n">Group ' + b.group + '</span><span class="s" style="display:block;white-space:normal;">' + esc(names) + at + '</span></span>'
                     + '<button type="button" class="sf-btn" data-sf-share="' + b.group + '">Share</button></div>';
             }).join('')
             + '<button type="button" class="sf-btn" data-sf="qr" style="width:100%;min-height:50px;margin-top:4px;">📷 Show QR codes</button>'
@@ -896,7 +904,9 @@
     }
     function done() {
         var m = meIn(), d = S.round || {};
-        var gps = S.mode === 'gps' || ready(courseKey() || d.activeCourseKey);
+        // "JUST SCORES" (Manny, 2026-10-19: yes): a course with no GPS opens the card - from either door.
+        // (Only once the GPS course files are read - until then a GPS-door round keeps the map.)
+        var gps = S.gpsFiles ? ready(courseKey() || d.activeCourseKey) : (S.mode === 'gps' || ready(courseKey() || d.activeCourseKey));
         ls('hardpan_round_side', (gps ? 'gps|' : 'bets|') + S.code);
         ss(MARK, null);
         var h = 'index.html?game=' + encodeURIComponent(S.code) + (m.group ? '&group=' + m.group : '') + (m.me ? '&me=' + encodeURIComponent(m.me.id) : '');
@@ -1033,6 +1043,14 @@
     }
     function onChange(ev) {
         var t = ev.target;
+        if (t.getAttribute && t.getAttribute('data-sf-ghole')) {
+            var gk = t.getAttribute('data-sf-ghole'), hn = Number(t.value), dbg = wizDb();
+            if (!(hn > 0) || !S.round) return;
+            S.round.groupStartingHoles = Object.assign({}, S.round.groupStartingHoles || {});
+            S.round.groupStartingHoles[gk] = hn;
+            if (dbg) dbg.ref('events/' + S.code + '/groupStartingHoles/' + gk).set(hn).catch(function () { S.round.groupStartingHoles[gk] = null; render(); });
+            render(); return;
+        }
         if (t.id === 'sf-me') { S.meName = t.value; S.who = { nassau: null, match: null, hilo: null }; render(); return; }
         if (t.getAttribute('data-sf-rename')) {
             if (fn('renderDuplicateNamesBlock')) try { W.renderDuplicateNamesBlock(); } catch (e) {}
