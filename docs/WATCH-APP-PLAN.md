@@ -1,6 +1,14 @@
 # HardPan GPS on Apple Watch - plan (feature 10)
 
-Status (2026-10-18, branch `gps-plus-watch`): **plan + scaffold only.** No Xcode target exists.
+Status (2026-10-20, branch `022-watch`): **ON.** The `HardPanWatch` watchOS target is in
+`gps-beta/ios/App/App.xcodeproj` (bundle `com.rattlegolf.gpsbeta.watchkitapp`, watchOS 10+, embedded
+in the iPhone app), the PhoneBridge files are in the App target, SceneDelegate uses
+`HardPanBridgeViewController`, AppDelegate activates `PhoneWatchSession`, `features.watch` is `true`
+and index.html hands its `saveScore` to the GPS screen. Built and run on paired iPhone 17 + Apple Watch
+Series 11 simulators: hole 1 F/C/B + plays-like on the watch, a watch score saved in the round.
+Steps A/B below are now done in the project; only the LLC team / TestFlight steps remain.
+
+(Old status, 2026-10-18, branch `gps-plus-watch`: plan + scaffold only.)
 The Swift files below are on the branch but are **not in `project.pbxproj`**, have **never been
 compiled** (no xcodebuild / simulator was allowed while the developer account moves to the LLC),
 and the JS hook in `gps-view.js` does nothing until both the native plugin exists **and**

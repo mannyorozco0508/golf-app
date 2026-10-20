@@ -60,7 +60,7 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // Connect and RevenueCat; the ids here must match them exactly.
     // THE 008 GPS FEATURES (Manny, 2026-10-18): each behind its own switch, so a broken one is
     // turned off here without touching code. Read through HardPanFeature('<name>') (below).
-    // watch (feature 10, docs/WATCH-APP-PLAN.md): OFF - no watch app or plugin ships yet.
+    // watch (feature 10, docs/WATCH-APP-PLAN.md): ON (022) - the HardPanWatch target and the HardPanWatch plugin are in the app; no plugin (web) = nothing sent.
     // 009 (mailbox 009 part B): bagSetup = My bag's first-time "Enter your carry for each club";
     // playsBreakdown = the one-line "Plays 168: +6 uphill, +9 into wind (12 mph) -> 6-iron";
     // playsInfo = the (i) "How plays-like works" sheet on that line;
@@ -82,7 +82,7 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // bagAltitude (part 5) = My bag's "My distances are from: Sea level | A course I pick | Don't
     // adjust" (default Don't adjust) + typical temperature; plays-like adjusts ~2% per 1,000 ft
     // of altitude vs that baseline (on this phone only) - off: no section, no altitude.
-    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: false, bagSetup: true,
+    features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: true, bagSetup: true,
         // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
         // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
         // the old layout exactly. gpsRoundScore = the "Thru 3 · 14 (+2) · Net 13 (+1)" chip.

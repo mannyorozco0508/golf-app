@@ -6626,7 +6626,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 writeRoundPin: (k, pin) => durableWrite(base + k, 'set', pin, base + k),
                 openScore: gpsOpenScore,
                 holeMeta: gpsHoleMeta, holeList: gpsHoleList, gotoHole: gpsGotoHole,
-                stepHole: gpsStepHole
+                stepHole: gpsStepHole,
+                // 022 (the Apple Watch): a score typed on the watch is written by the card's OWN save
+                // (permissions, offline queue, rules) - gps-view.js watchScore hands it here.
+                saveScore: (pid, hole, val) => saveScore(pid, hole, val)
             });
         } else if (typeof g.courseKey === 'function' && g.courseKey() && g.courseKey() !== key) {
             // THE COURSE CHANGED UNDER AN OPEN GPS (audit 2026-10-16): Round Setup saved another course

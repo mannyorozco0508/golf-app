@@ -58,8 +58,13 @@ struct ContentView: View {
                 }
                 // v1: the phone is the GPS. A locked / backgrounded phone stops measuring (gps-view.js
                 // stops location when hidden), so the watch says these are the LAST numbers.
+                // 022: plays-like to the center (the phone's own number - wind, elevation).
+                if let p = s.plays, !s.onGreen, p != s.center {
+                    Text("Plays \(p)").font(.footnote.weight(.semibold)).foregroundStyle(.yellow)
+                        .accessibilityLabel("Plays like \(p) \(spoken)")
+                }
                 Text(session.reachable ? unit : "\(unit) · last from iPhone")
-                    .font(.caption2).foregroundStyle(session.reachable ? .secondary : .orange)
+                    .font(.caption2).foregroundStyle(session.reachable ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.orange))
                     .accessibilityLabel(session.reachable ? "" : "These are the last yardages from your iPhone")
                 if s.tournament {
                     Label("Tournament", systemImage: "trophy").font(.caption2).foregroundStyle(.secondary)

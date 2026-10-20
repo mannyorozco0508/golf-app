@@ -40,11 +40,11 @@ public class HardPanWatchPlugin: CAPPlugin, CAPBridgedPlugin {
                                 WatchKey.tournament: call.getBool("tournament") ?? false,
                                 WatchKey.round: call.getString("round") ?? ""]
         // JS null = absent here (a property list has no nil). Numbers only - never a coordinate.
-        for k in [WatchKey.par, WatchKey.front, WatchKey.center, WatchKey.back, WatchKey.score] {
+        for k in [WatchKey.par, WatchKey.front, WatchKey.center, WatchKey.back, WatchKey.plays, WatchKey.score] {
             if let n = call.getInt(k) { d[k] = n }
         }
         if d[WatchKey.entitled] as? Bool != true {   // GPS Map (007): no numbers for an unentitled phone
-            d[WatchKey.front] = nil; d[WatchKey.center] = nil; d[WatchKey.back] = nil
+            d[WatchKey.front] = nil; d[WatchKey.center] = nil; d[WatchKey.back] = nil; d[WatchKey.plays] = nil
         }
         PhoneWatchSession.shared.sendHole(d)
         call.resolve()

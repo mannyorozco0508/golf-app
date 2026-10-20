@@ -17,6 +17,7 @@ enum WatchKey {
     static let hole = "hole", par = "par", front = "front", center = "center", back = "back"
     static let units = "units", onGreen = "onGreen", entitled = "entitled", tournament = "tournament"
     static let score = "score", round = "round", strokes = "strokes", id = "id", at = "at"
+    static let plays = "plays"   // 022: plays-like to the center (wind / elevation), golfer's units
     static let v = "v"   // protocol version
 }
 
@@ -35,6 +36,7 @@ struct HoleState: Equatable, Codable {
     var front: Int?
     var center: Int?
     var back: Int?
+    var plays: Int?            // 022: plays-like to the center, when the phone has it
     var units: String          // "yd" | "m"
     var onGreen: Bool
     var entitled: Bool         // GPS Map (007): false = the watch shows no numbers
@@ -49,13 +51,14 @@ struct HoleState: Equatable, Codable {
         front = d[WatchKey.front] as? Int
         center = d[WatchKey.center] as? Int
         back = d[WatchKey.back] as? Int
+        plays = d[WatchKey.plays] as? Int
         units = (d[WatchKey.units] as? String) == "m" ? "m" : "yd"
         onGreen = (d[WatchKey.onGreen] as? Bool) ?? false
         entitled = (d[WatchKey.entitled] as? Bool) ?? false
         tournament = (d[WatchKey.tournament] as? Bool) ?? false
         score = d[WatchKey.score] as? Int
         round = (d[WatchKey.round] as? String) ?? ""
-        if !entitled { front = nil; center = nil; back = nil }   // belt and braces: the phone already sends none
+        if !entitled { front = nil; center = nil; back = nil; plays = nil }   // belt and braces: the phone already sends none
     }
 
     var dictionary: [String: Any] {
@@ -67,6 +70,7 @@ struct HoleState: Equatable, Codable {
         if let front { d[WatchKey.front] = front }
         if let center { d[WatchKey.center] = center }
         if let back { d[WatchKey.back] = back }
+        if let plays { d[WatchKey.plays] = plays }
         if let score { d[WatchKey.score] = score }
         return d
     }

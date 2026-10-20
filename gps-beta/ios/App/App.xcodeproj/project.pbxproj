@@ -18,7 +18,41 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		D022A0000000000000000065 /* HardPanWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000001 /* HardPanWatchApp.swift */; };
+		D022A0000000000000000066 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000002 /* ContentView.swift */; };
+		D022A0000000000000000067 /* ScoreEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000003 /* ScoreEntryView.swift */; };
+		D022A0000000000000000068 /* WatchSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000004 /* WatchSessionManager.swift */; };
+		D022A0000000000000000069 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000005 /* WatchProtocol.swift */; };
+		D022A000000000000000006A /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000005 /* WatchProtocol.swift */; };
+		D022A000000000000000006B /* HardPanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000006 /* HardPanBridgeViewController.swift */; };
+		D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000007 /* HardPanWatchPlugin.swift */; };
+		D022A000000000000000006D /* PhoneWatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000008 /* PhoneWatchSession.swift */; };
+		D022A000000000000000006E /* HardPanWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000009 /* HardPanWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D022A00000000000000000D2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D022A000000000000000012C;
+			remoteInfo = HardPanWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D022A00000000000000000C8 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				D022A000000000000000006E /* HardPanWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		C4B10A012F00000000000004 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -36,6 +70,15 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		D022A0000000000000000001 /* HardPanWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanWatchApp.swift; sourceTree = "<group>"; };
+		D022A0000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D022A0000000000000000003 /* ScoreEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreEntryView.swift; sourceTree = "<group>"; };
+		D022A0000000000000000004 /* WatchSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
+		D022A0000000000000000005 /* WatchProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProtocol.swift; sourceTree = "<group>"; };
+		D022A0000000000000000006 /* HardPanBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanBridgeViewController.swift; sourceTree = "<group>"; };
+		D022A0000000000000000007 /* HardPanWatchPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanWatchPlugin.swift; sourceTree = "<group>"; };
+		D022A0000000000000000008 /* PhoneWatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWatchSession.swift; sourceTree = "<group>"; };
+		D022A0000000000000000009 /* HardPanWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HardPanWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +90,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D022A00000000000000000C9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -55,6 +105,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				D022A0000000000000000190 /* PhoneBridge */,
+				D022A0000000000000000191 /* Watch */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				D022A0000000000000000009 /* HardPanWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,6 +140,44 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		D022A0000000000000000190 /* PhoneBridge */ = {
+			isa = PBXGroup;
+			children = (
+				D022A0000000000000000006 /* HardPanBridgeViewController.swift */,
+				D022A0000000000000000007 /* HardPanWatchPlugin.swift */,
+				D022A0000000000000000008 /* PhoneWatchSession.swift */,
+			);
+			path = PhoneBridge;
+			sourceTree = "<group>";
+		};
+		D022A0000000000000000191 /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				D022A0000000000000000192 /* HardPanWatch */,
+				D022A0000000000000000193 /* Shared */,
+			);
+			path = ../Watch;
+			sourceTree = "<group>";
+		};
+		D022A0000000000000000192 /* HardPanWatch */ = {
+			isa = PBXGroup;
+			children = (
+				D022A0000000000000000001 /* HardPanWatchApp.swift */,
+				D022A0000000000000000002 /* ContentView.swift */,
+				D022A0000000000000000003 /* ScoreEntryView.swift */,
+				D022A0000000000000000004 /* WatchSessionManager.swift */,
+			);
+			path = HardPanWatch;
+			sourceTree = "<group>";
+		};
+		D022A0000000000000000193 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D022A0000000000000000005 /* WatchProtocol.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -98,10 +189,12 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				C4B10A052F00000000000004 /* Firebase config is for this app */,
+				D022A00000000000000000C8 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D022A00000000000000000D3 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -109,6 +202,23 @@
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D022A000000000000000012C /* HardPanWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D022A00000000000000001F4 /* Build configuration list for PBXNativeTarget "HardPanWatch" */;
+			buildPhases = (
+				D022A00000000000000000CA /* Sources */,
+				D022A00000000000000000C9 /* Frameworks */,
+				D022A00000000000000000CB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HardPanWatch;
+			productName = HardPanWatch;
+			productReference = D022A0000000000000000009 /* HardPanWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -124,6 +234,9 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+					};
+					D022A000000000000000012C = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -144,6 +257,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				D022A000000000000000012C /* HardPanWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -161,6 +275,13 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D022A00000000000000000CB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -191,10 +312,34 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
+				D022A000000000000000006B /* HardPanBridgeViewController.swift in Sources */,
+				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
+				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D022A00000000000000000CA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D022A0000000000000000065 /* HardPanWatchApp.swift in Sources */,
+				D022A0000000000000000066 /* ContentView.swift in Sources */,
+				D022A0000000000000000067 /* ScoreEntryView.swift in Sources */,
+				D022A0000000000000000068 /* WatchSessionManager.swift in Sources */,
+				D022A0000000000000000069 /* WatchProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D022A00000000000000000D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D022A000000000000000012C /* HardPanWatch */;
+			targetProxy = D022A00000000000000000D2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -373,6 +518,69 @@
 			};
 			name = Release;
 		};
+		D022A00000000000000001F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = HardPan;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.rattlegolf.gpsbeta;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		D022A00000000000000001F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = HardPan;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.rattlegolf.gpsbeta;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -390,6 +598,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D022A00000000000000001F4 /* Build configuration list for PBXNativeTarget "HardPanWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D022A00000000000000001F5 /* Debug */,
+				D022A00000000000000001F6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
