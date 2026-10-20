@@ -106,6 +106,20 @@ describe('Weekly Game, Add a game, bet edit / remove - in place', () => {
         assert.deepEqual([s.url, s.nav], [s0.url, 1]);
     });
 
+    test('the map\'s Add a game › Full game setup: the Add a game list over the map (no Round Setup)', { timeout: 60000 }, async () => {
+        const s0 = await h.st();
+        await h.ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
+        assert.ok(await h.until("!!document.querySelector('#gps-overlay .gps-addgame [data-ag-go=\"full\"]')", 10000), 'the map is up');
+        await h.ev("(function(){ var g=document.querySelector('#gps-overlay .gps-addgame'); g.style.display=''; g.querySelector('[data-ag-go=\"full\"]').click(); return 1; })()");
+        await sleep(400);
+        assert.equal(await h.ev("getComputedStyle(document.getElementById('fd-addgame')).display !== 'none'"), true, 'the Add a game list');
+        const s = await h.st();
+        assert.deepEqual([s.url, s.nav], [s0.url, 1]);
+        await h.ev('HardPanDoors.closeAddGame()');
+        await h.ev("(function(){ var b=document.querySelector('[data-hp-gpsbar=card]') || document.querySelector('[data-hp-bar=card]'); if (b) b.click(); else HardPanGps.showSide('bets'); return 1; })()");
+        await sleep(500);
+    });
+
     test('a bet from the Bets sheet: Change saves at the same key; Remove takes it off; back on the same screen', { timeout: 60000 }, async () => {
         const s0 = await h.st();
         await h.ev("HardPanRound.openBets ? HardPanRound.openBets('bets') : HardPanBet.openBets()");
