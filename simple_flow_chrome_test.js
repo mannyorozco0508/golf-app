@@ -223,6 +223,50 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.equal(end.tee, 'White', 'the last-used tee is remembered for this course');
     });
 
+    test('URGENT-015: the course picked before Round Setup finishes loading holds, and Start GPS waits for a slow card (Dobson shaped as live)', { timeout: 90000 }, async () => {
+        // global_courses/gca_zgkynkan as it is live: name, source, location, tees, data (18 holes).
+        const LIVE = { name: 'Dobson Ranch Golf Course', source: { provider: 'golfcourseapi', id: 1 }, location: { city: 'Mesa', state: 'AZ' },
+            data: CD.map((h) => ({ hcpIndex: h.hcpIndex, hole: h.hole, par: h.par })), tees: TEES };
+        // The phone's position answers at once; the round read (events/<new code>) and the card read are slow,
+        // as on a phone's first open of the preview.
+        const SLOW = "(function(){var d0=firebase.database; firebase.database=function(){var d=d0.apply(this,arguments); if(d.__slow) return d; d.__slow=1; var r=d.ref; d.ref=function(p){var x=r.call(d,p), o=x.once; var ms=/^events\\//.test(String(p)) ? 2500 : /^global_courses\\/gca_/.test(String(p)) ? 3000 : 0; if(ms) x.once=function(){var a=arguments; return new Promise(function(res,rej){ setTimeout(function(){ o.apply(x,a).then(res,rej); }, ms); }); }; return x}; return d}})();";
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: { events: {}, global_courses: { gca_zgkynkan: LIVE }, trips: {}, tournaments: {}, organizers: {} }, settleMs: 1500, viewport: { width: 393, height: 852 }, preScript: BASE + SLOW, steps: [
+            { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
+            { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+            { tap: '[data-hp-act="sgpsdoor"]' },
+            { waitFor: "/game=/.test(location.search) && !!document.querySelector('[data-sf=\"startgps\"]') && !!document.getElementById('course-select').value", timeout: 30000 },
+            X("JSON.stringify({ early: document.getElementById('course-select').value })"),
+            { tap: '[data-sf="startgps"]' },
+            { waitFor: "/index\\.html/.test(location.pathname) || /no hole card|Course card problem|No scorecard/.test(document.body.innerText)", timeout: 40000 },
+            X("JSON.stringify({ at: location.pathname.split('/').pop(), text: /index/.test(location.pathname) ? '' : document.body.innerText.slice(0, 300) })")] });
+        assert.equal(r.ok, true, r.reason);
+        const [early, end] = J(r);
+        assert.equal(early.early, 'gca_zgkynkan', 'the closest GPS course is picked before the round load lands');
+        assert.equal(end.at, 'index.html', 'Start GPS opened the map, no "Course card problem": ' + end.text);
+    });
+
+    test('URGENT-015: a tap on the Course & Tees screen never swaps the picked course for another record with the same name (no tee list, "no hole card")', { timeout: 90000 }, async () => {
+        const LIVE = { name: 'Dobson Ranch Golf Course', source: { provider: 'golfcourseapi', id: 1 }, location: { city: 'Mesa', state: 'AZ' },
+            data: CD.map((h) => ({ hcpIndex: h.hcpIndex, hole: h.hole, par: h.par })), tees: TEES };
+        // A second shared record with the very same name and no card (an older import) - Round Setup's
+        // page-wide click handler resolves the typed name to the LAST record that carries it.
+        const db = { events: {}, global_courses: { gca_zgkynkan: LIVE, zz_dobson_old: { name: 'Dobson Ranch Golf Course' } }, trips: {}, tournaments: {}, organizers: {} };
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db, settleMs: 1500, viewport: { width: 393, height: 852 }, preScript: BASE, steps: [
+            { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
+            { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+            { tap: '[data-hp-act="sgpsdoor"]' },
+            { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 500 },
+            { tap: '#sf [data-sf-tee]', nth: 1 }, { sleep: 400 },
+            X("JSON.stringify({ key: document.getElementById('course-select').value, tees: document.querySelectorAll('#sf [data-sf-tee]').length })"),
+            { tap: '[data-sf="startgps"]' },
+            { waitFor: "/index\\.html/.test(location.pathname) || /no hole card|Course card problem|No scorecard/.test(document.body.innerText)", timeout: 30000 },
+            X("JSON.stringify({ at: location.pathname.split('/').pop() })")] });
+        assert.equal(r.ok, true, r.reason);
+        const [afterTap, end] = J(r);
+        assert.deepEqual(afterTap, { key: 'gca_zgkynkan', tees: 4 });
+        assert.equal(end.at, 'index.html');
+    });
+
     test('switch off: today\'s Home (two doors) and Round Setup\'s own wizard - no 3-step screen', { timeout: 90000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + OFF, steps: [
             { sleep: 800 }, X("JSON.stringify({ main: document.getElementById('v-main').classList.contains('on'), simple: document.getElementById('v-simple').classList.contains('on') })"),

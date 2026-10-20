@@ -126,7 +126,11 @@
         var st = D.createElement('style'); st.id = 'sf-css'; st.textContent = CSS; D.head.appendChild(st);
         e = D.createElement('div'); e.id = 'sf'; e.setAttribute('role', 'dialog'); e.setAttribute('aria-label', 'New round');
         D.body.appendChild(e);
-        e.addEventListener('click', onClick);
+        // URGENT-015: a tap on this screen is not a tap on Round Setup's page. Its document click
+        // handler re-resolves the course from the TYPED NAME on every click outside its search
+        // box (last record with that exact name wins, or a brand-new "comm_" course) - so a tap
+        // here could quietly swap the picked course for another record. Taps stop here.
+        e.addEventListener('click', function (ev) { onClick(ev); ev.stopPropagation(); });
         e.addEventListener('input', onInput);
         e.addEventListener('change', onChange);
         e.addEventListener('keydown', typeKey);
@@ -148,6 +152,7 @@
     }
     function render() {
         if (!S.open) return;
+        if (S.step === 1) holdPick();
         var e = el(), y = e.scrollTop, html;
         if (S.step === 1) html = step1();
         else if (S.step === 2) html = step2();
@@ -206,22 +211,86 @@
         if (S.near || typeof H.position !== 'function') return;
         S.near = 'asking';
         gpsFiles(function () {
-            H.position(function (p) {
-                if (!p) { if (S.near === 'asking') S.near = 'none'; if (S.step === 1) render(); return; }
+            H.position(function (p, why) {
+                if (!p) { if (S.near === 'asking') { S.near = 'none'; S.nearWhy = why || 'none'; } if (S.step === 1) render(); return; }
                 S.here = p;
                 S.near = nearList(p);
                 // THE CLOSEST, ALREADY PICKED (a round with no course yet).
-                if (!courseKey() && !courseName() && S.near.length) pick(S.near[0].c.key, S.near[0].c.name);
+                var cand = S.mode === 'gps' ? S.near.filter(function (x) { return x.c.ready; }).concat(S.near) : S.near;
+                if (!courseKey() && !courseName() && cand.length) pick(cand[0].c.key, cand[0].c.name);
                 if (S.step === 1) render();
             });
         });
     }
+    // URGENT-015: THE PICK HOLDS, AND THE CARD IS IN HAND BEFORE ANYTHING USES IT.
+    // Measured on the preview: the phone's position can come back before Round Setup has
+    // finished reading the new round, and that read ends by blanking the course fields
+    // (loadModeData: a round with no course yet) - after the closest course was already
+    // picked. The screen kept drawing "Dobson Ranch ✓ GPS" while Round Setup underneath
+    // held nothing, or a key whose card had not landed: no tee list, and Start answered
+    // "Course card problem: this course has no hole card yet". Now the pick is remembered
+    // and put back if the load blanks it, the tee list waits on the card read itself (not a
+    // fixed 8 s), and Next / Start GPS / Start round wait for the card (reading it again
+    // once if the first read came back empty) and say so in place if there is none.
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;
+        S.picked = { key: key, name: name };
         f(key, name);
         S.shotgun = false;
+        S.card = null;
         watchTees();
+        cardFor(key).then(function () { if (S.step === 1 && courseKey() === key) render(); });
+    }
+    function holdPick() {
+        if (!S.picked || S.step !== 1) return;
+        if (courseKey() !== S.picked.key) { var p = S.picked; S.picked = null; pick(p.key, p.name); }
+    }
+    function cardInHand(key) { return !key || (fn('courseCardInHand') ? !!W.courseCardInHand(key) : true); }
+    // Resolves { ok } once the picked course has its hole card (and tees, when it has any).
+    function cardFor(key) {
+        if (!key) return Promise.resolve({ ok: !!courseName() });
+        if (cardInHand(key)) return Promise.resolve({ ok: true });
+        var ens = typeof ensureCourseCard === 'function' ? ensureCourseCard : null;   /* global ensureCourseCard */
+        var landed = function () {
+            if (courseKey() !== key) return;
+            if (fn('handleCourseChange')) try { W.handleCourseChange(); } catch (e) {}
+            if (fn('syncTeeRatingFromCourse')) try { W.syncTeeRatingFromCourse(key, { keepSelection: true }); } catch (e) {}
+        };
+        var direct = function () {
+            var dbr = wizDb();
+            if (!dbr) return Promise.resolve(null);
+            return new Promise(function (res) {
+                var done = false, t = setTimeout(function () { if (!done) { done = true; res(null); } }, 15000);
+                dbr.ref('global_courses/' + key).once('value').then(function (s) {
+                    if (done) return; done = true; clearTimeout(t);
+                    var rec = s && s.val ? s.val() : null;
+                    if (rec && Array.isArray(rec.data) && rec.data.length && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[key] = rec;
+                    res(rec);
+                }, function () { if (!done) { done = true; clearTimeout(t); res(null); } });
+            });
+        };
+        var first = ens ? Promise.race([ens(key), new Promise(function (r) { setTimeout(function () { r(null); }, 15000); })]) : Promise.resolve(null);
+        return first.then(function () {
+            if (cardInHand(key)) { landed(); return { ok: true }; }
+            return direct().then(function () { landed(); return { ok: cardInHand(key) }; });
+        }, function () { return { ok: false }; });
+    }
+    function needCard(errKey, then) {
+        holdPick();
+        var key = courseKey(), nm = courseName();
+        if (!nm) return;
+        S.cardWait = true; S[errKey] = ''; render();
+        cardFor(key).then(function (r) {
+            S.cardWait = false;
+            var pv = fn('previewCourseData') ? W.previewCourseData(key) : { ok: r.ok };
+            if (!r.ok || !pv.ok) {
+                S[errKey] = 'No scorecard for ' + String(nm).split(' (')[0] + ' yet \u2014 tap "Not listed? Search online or add a course" to set it up, or pick another course.';
+                if (S.step !== 1) go(1); else render();
+                return;
+            }
+            then();
+        });
     }
     // The tees come with the course record, one read after the pick: drawn when they land.
     var teeTimer = null;
@@ -231,7 +300,8 @@
         teeTimer = setInterval(function () {
             var sel = $('tee-rating-select'), now = sel ? sel.options.length + '|' + sel.value : '';
             if (now !== was) { was = now; if (S.step === 1) render(); }
-            if (++n > 40) clearInterval(teeTimer);
+            holdPick();
+            if (++n > 150) clearInterval(teeTimer);
         }, 200);
     }
     function chip(label, on, attrs) { return '<button type="button" class="sf-chip' + (on ? ' on' : '') + '" ' + attrs + '>' + esc(label) + '</button>'; }
@@ -281,7 +351,7 @@
     }
     function teeList(key) {
         var rows = teeRows(key), sel = $('tee-rating-select');
-        if (!rows.length) return '';
+        if (!rows.length) return cardInHand(key) ? '' : '<div class="sf-h">TEES</div><div class="sf-note" style="margin:0 2px 12px;">Loading the course card\u2026</div>';
         if (S.mode !== 'same') preferTee(key);
         return '<div class="sf-h">TEES</div>' + rows.map(function (r) {
             var on = sel && sel.value === r.key, col = teeColor(r.name);
@@ -332,16 +402,35 @@
         if (q.length < 2 && (S.changing || !courseName())) {
             body += '<div class="sf-h">NEAR YOU</div>';
             if (S.near === 'asking' || S.near === null) body += '<div class="sf-note">Finding courses near you…</div>';
-            else if (S.near === 'none') body += '<div class="sf-note">Turn on location to see courses near you. Search works without it.</div>';
+            else if (S.near === 'none') {
+                // NO POSITION (Safari asked and was told no, or it never answered): say which, offer a
+                // retry, and list this phone's own courses instead of nothing.
+                body += '<div class="sf-note">' + (S.nearWhy === 'denied' ? 'Location is off for this page. To see courses near you, allow it (Safari: aA \u203a Website Settings \u203a Location), or search above.'
+                    : 'Couldn\u2019t get your location yet. Search above, or try again.') + ' <button type="button" class="sf-link" data-sf="relocate" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
+                var rec = recentCourses().filter(function (c) { return c.key !== key; });
+                if (rec.length) body += '<div class="sf-h">YOUR COURSES</div>' + rec.map(function (c) { return rowHtml(c, null, false); }).join('');
+            }
             else if (!S.near.length) body += '<div class="sf-note">No courses we know of within 25 miles — search above.</div>';
             else body += S.near.slice(0, 6).map(function (x) { return rowHtml(x.c, x.d, x.c.key === key); }).join('');
         }
         body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Search online or add a course ›</button>';
         var ok = courseName() ? '' : ' disabled';
         var foot = S.mode === 'gps'
-            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : '📍 Start GPS') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
-            : '<button type="button" class="sf-cta" data-sf="next"' + ok + '>Next: Players ›</button>';
+            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : '📍 Start GPS') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
+            : '<button type="button" class="sf-cta" data-sf="next"' + (ok || (S.cardWait ? ' disabled' : '')) + '>' + (S.cardWait ? 'Loading the course card\u2026' : 'Next: Players \u203a') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '');
         return shell('Where are you playing?', body, foot, S.mode === 'gps' ? 0 : 1);
+    }
+    // This phone's own courses: the GPS recents and the last round's course, matched to the list.
+    function recentCourses() {
+        var all = courses(), out = [], seen = {}, H = HD();
+        var add = function (key, name) {
+            var c = all.filter(function (x) { return key ? x.key === key : nk(x.name) === nk(name); })[0];
+            if (c && !seen[c.key]) { seen[c.key] = 1; out.push(c); }
+        };
+        try { (typeof H.recents === 'function' ? H.recents() : []).forEach(function (r) { add(r.key, r.name); }); } catch (e) {}
+        try { var lr = JSON.parse(ls('hardpan_last_round') || 'null'); if (lr && lr.course) add(null, String(lr.course).split(' (')[0] === lr.course ? lr.course : lr.course); } catch (e) {}
+        Object.keys(W.localStorage || {}).forEach(function (k) { if (k.indexOf(TEE_MEM) === 0) add(k.slice(TEE_MEM.length), ''); });
+        return out.slice(0, 6);
     }
     function rowHtml(c, d, on) {
         return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"><span class="n">' + esc(nameOf(c)) + '</span>'
@@ -660,6 +749,7 @@
         if (bad.length) { S.err3 = 'Pick who’s in the ' + bad.map(function (k) { return k === 'hilo' ? 'Hi-Lo' : k.replace(/^\w/, function (c) { return c.toUpperCase(); }); }).join(' and ') + '.'; render(); return; }
         apply();
         ls(PMODE, pmode());
+        if (!cardInHand(courseKey())) { needCard('err1', function () { go(3); start(); }); return; }
         runSave('err3');
     }
     function runSave(errKey) {
@@ -785,6 +875,7 @@
     // ---- AWAY TO THE FULL SETUP, AND BACK ------------------------------------------
     function away(n, label) {
         placePool(false);
+        S.picked = null;   // a course picked on the full setup is the one that holds
         S.away = true;
         show(false);
         try { W.goToWizardStep(n); } catch (e) {}
@@ -804,7 +895,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
-        if ((b = t.closest('[data-sf-course]'))) { pick(b.getAttribute('data-sf-course'), b.getAttribute('data-sf-name')); S.q = ''; S.changing = false; render(); el().scrollTop = 0; return; }
+        if ((b = t.closest('[data-sf-course]'))) { pick(b.getAttribute('data-sf-course'), b.getAttribute('data-sf-name')); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
             setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
@@ -852,11 +943,12 @@
             W.location.href = 'home.html';
             return;
         }
-        if (a === 'next') { S.err2 = ''; if (S.step === 2 && pmode() === 'paste') readPaste(); if (S.step === 2) pruneEmpty(); if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
+        if (a === 'next') { S.err2 = ''; if (S.step === 2 && pmode() === 'paste') readPaste(); if (S.step === 2) pruneEmpty(); if (S.step === 1 && !courseName()) return; if (S.step === 1) { needCard('err1', function () { go(2); }); return; } if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
         if (a === 'pastedone') { readPaste(); render(); return; }
         if (a === 'addgolfer') { addGolfer(); return; }
         if (a === 'change') { S.changing = true; render(); var q = $('sf-q'); if (q) q.focus(); return; }
-        if (a === 'startgps') { startGps(); return; }
+        if (a === 'relocate') { S.near = null; S.nearWhy = null; locate(); render(); return; }
+        if (a === 'startgps') { needCard('err1', startGps); return; }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
         if (a === 'roster') { away(step('players'), 'Roster done'); return; }
