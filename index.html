@@ -6502,19 +6502,33 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     }
     function gpsOpenSheet(hole, playerId) {
         const S = window.HardPanGpsStats.sheet;
-        const golfers = gpsScoreGolfers(hole);
-        if (!golfers.length) return false;
-        const n = Number(hole), meta = gpsHoleMeta(n) || {}, order = gpsHoleList();
+        const n = Number(hole), order = gpsHoleList(), here = gpsSheetHole(n);
+        if (!here.golfers.length) return false;
         const overlay = document.getElementById('gps-overlay');
-        return S.open({
-            code: currentMode, course: (currentData && currentData.courseName) || '', hole: n, par: Number(meta.par || gpsHolePar(n)) || 0, si: meta.si, yards: meta.yards,
-            golfers: golfers, pick: playerId != null ? playerId : qsMeId(), own: qsOwnId(), stats: qsOn(),
-            score: pid => Number(((currentData && currentData.scores) || {})['p' + pid + '_h' + n]) || 0,
-            save: (pid, v) => { const p = golfers.find(x => String(x.id) === String(pid)); saveScore(p ? p.id : pid, n, String(v)); },
+        // The holes played so far, in play order (a 10th-tee round: 10..18, 1..), for the sheet's ‹.
+        const played = order.slice(0, Math.max(0, order.indexOf(n)) + 1);
+        return S.open(Object.assign(here, {
+            code: currentMode, course: (currentData && currentData.courseName) || '', hole: n, home: n,
+            pick: playerId != null ? playerId : qsMeId(), own: qsOwnId(), stats: qsOn(),
+            holes: played, at: h => gpsSheetHole(Number(h), here.golfers),
             next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
             last: order.indexOf(n) === order.length - 1,
             host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
-        });
+        }));
+    }
+    // One hole's part of the score sheet: its par / SI / yards, its golfers, its scores and the
+    // card's own save for it. 018: also an EARLIER hole's (the sheet's ‹ - the hole the map or
+    // the card is on does not move), its golfers those of the hole the sheet opened on when the
+    // card has not drawn that hole's boxes.
+    function gpsSheetHole(n, fallback) {
+        const meta = gpsHoleMeta(n) || {};
+        let golfers = gpsScoreGolfers(n);
+        if (!golfers.length && fallback) golfers = fallback;
+        return {
+            par: Number(meta.par || gpsHolePar(n)) || 0, si: meta.si, yards: meta.yards, golfers: golfers,
+            score: pid => Number(((currentData && currentData.scores) || {})['p' + pid + '_h' + n]) || 0,
+            save: (pid, v) => { const p = golfers.find(x => String(x.id) === String(pid)); saveScore(p ? p.id : pid, n, String(v)); }
+        };
     }
     // Tools > "Track stats for others" (this phone; off by default) - with the sheet and quick stats.
     function gpsSheetPlace() {
