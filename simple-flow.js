@@ -577,12 +577,35 @@
     }
     // THE ROUND'S / LAST-USED TEE: remembered by name per course on this phone.
     var TEE_MEM = 'hardpan_last_tee_';
+    // POLISH 029 #11: the first time at a course it is a MIDDLE tee, never the tips (Papago
+    // pre-picked Black, 7,419 yds): the men's tees, the combos ("Black/Blue") left out when
+    // there are plain ones, longest first, the one at the middle (5 -> the 3rd, 4 -> the 3rd,
+    // 2 -> the shorter). After that, the tee this phone last started a round on there.
     function preferTee(key) {
-        var want = ls(TEE_MEM + key), sel = $('tee-rating-select');
-        if (!want || !sel || S.teeChosen === key) return;
-        var rows = teeRows(key), hit = rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0];
-        if (hit && sel.value !== hit.key) { sel.value = hit.key; if (fn('applySelectedTee')) W.applySelectedTee(); }
-        S.teeChosen = key;
+    function middleTee(rows) {
+        var men = (rows || []).filter(function (r) { return r.gender !== 'female'; }), list = men.length ? men : (rows || []);
+        var plain = list.filter(function (r) { return !/\//.test(r.name); });
+        if (plain.length >= 2) list = plain;
+        list = list.map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) { return ((b.r.yards || 0) - (a.r.yards || 0)) || (a.i - b.i); }).map(function (x) { return x.r; });
+        return list.length ? list[Math.floor(list.length / 2)] : null;
+    }
+        var sel = $('tee-rating-select');
+        if (!sel || S.teeChosen === key) return;   // the golfer's own tap (or Full setup) holds
+        var rows = teeRows(key);
+        if (!rows.length) return;
+        var want = ls(TEE_MEM + key);
+        var hit = want ? rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0] : null;
+        if (!hit) hit = middleTee(rows);
+        // Only once the round select holds THIS course's tees (it fills one read after the pick).
+        if (!hit || !Array.prototype.some.call(sel.options, function (o) { return o.value === hit.key; })) return;
+        if (sel.value !== hit.key) { sel.value = hit.key; if (fn('applySelectedTee')) W.applySelectedTee(); }
+    }
+    // The tee a round starts on is the one remembered for that course.
+    function rememberTee() {
+        var k = courseKey(), sel = $('tee-rating-select');
+        if (!k || !sel || !sel.value) return;
+        var r = teeRows(k).filter(function (x) { return x.key === sel.value; })[0];
+        if (r) ls(TEE_MEM + k, r.name);
     }
     function teeList(key) {
         var rows = teeRows(key), sel = $('tee-rating-select');
@@ -655,7 +678,8 @@
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
         if (pendOld) body += pendHead(pend);
-        else if (!S.changing) body += courseHead() + lookupBox(key, courseName());
+        // POLISH 029 #11: the TEES (and the start) sit right under the picked course, above NEAR YOU.
+        else if (!S.changing) body += courseHead() + lookupBox(key, courseName()) + courseCard();
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
         // course and "Change"). The picked course is the card above; the list under it is the
         // others, closest first; a tap switches the course and its tees redraw in place.
@@ -681,7 +705,6 @@
                 else body += others.map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
             }
         }
-        if (!S.changing && !pendOld) body += courseCard();
         if (q.length < 2) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';
         var ok = courseName() && !pend ? '' : ' disabled';
         var pendLbl = pend ? (pend.state === 'busy' || pend.state === 'offline' || pend.state === 'card' ? 'Loading ' + tidy(pend.name) + '\u2026' : 'Start Round') : '';
@@ -1036,6 +1059,7 @@
         if (!save) { S[errKey] = 'Round Setup is not ready \u2014 reload and try again.'; render(); return; }
         S.saving = true; render();
         var pr;
+        rememberTee();
         try { pr = save(); } catch (e) { S.saving = false; S[errKey] = 'Could not start: ' + (e && e.message || e); render(); return; }
         Promise.resolve(pr).then(function () {
             // A refusal (a sentence in a dialog) gives the button back; a write in flight keeps it.
@@ -1215,6 +1239,7 @@
         show(false);
         try { W.goToWizardStep(n); } catch (e) {}
         try { W.scrollTo(0, 0); } catch (e) {}
+        S.teeChosen = courseKey();   // ...and so does a tee set there
         var b = $('sf-return');
         if (!b) { b = D.createElement('button'); b.type = 'button'; b.id = 'sf-return'; D.body.appendChild(b); b.onclick = back; }
         b.textContent = '✓ ' + (label || 'Done') + ' — back to New round';
