@@ -61,7 +61,14 @@
         var me = meId(), m = groupMap();
         return me && m[me] != null ? Number(m[me]) : 1;
     }
-    function first(p) { return String((p && p.name) || '').trim().split(/\s+/)[0]; }
+    // A golfer's short name - the first name, or "Test A." when two golfers in the round share it
+    // (URGENT-015 walk: "Test vs Test" on a round of Test Alpha, Test Bravo ...).
+    function first(p) {
+        var parts = String((p && p.name) || '').trim().split(/\s+/), f = parts[0] || '';
+        if (parts.length < 2) return f;
+        var same = players().filter(function (q) { return String((q && q.name) || '').trim().split(/\s+/)[0].toLowerCase() === f.toLowerCase(); }).length;
+        return same > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : f;
+    }
     function byId(id) { return players().filter(function (p) { return String(p.id) === String(id); })[0] || null; }
     function holes() { var d = data() || {}; return (d.courseData || []).slice().sort(function (a, b) { return a.hole - b.hole; }); }
     function money(n) { var v = Math.round(Math.abs(n)); return (n > 0.005 ? '+' : (n < -0.005 ? '−' : '')) + '$' + v; }
