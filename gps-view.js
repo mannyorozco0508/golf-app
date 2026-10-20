@@ -1309,6 +1309,9 @@
         // 012: the top bar's own bottom - the Tools sheet never reaches over it.
         if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-bar-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
         if (tB != null) S.el.style.setProperty('--gps-top-b', Math.round(tB - S.el.getBoundingClientRect().top + 8) + 'px');
+        // POLISH #19: the same line for the page (the overlay is fixed at 0,0) - the toasts sit
+        // under the top bar and the Menu row, clear of the Plays-like pill (gps-round.js CSS).
+        if (tB != null) { try { document.documentElement.style.setProperty('--gps-top-b', Math.round(tB + 8) + 'px'); } catch (e) {} }
         if (ldOn()) ldPlace();
     }
     // LAYOUT D, MEASURED: the pill and Recenter ride above the credit line (however tall the

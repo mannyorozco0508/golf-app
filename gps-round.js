@@ -119,8 +119,9 @@
         + 'body.hp-sf-card #round-sheet:not(.open){transform:translateY(100%);visibility:hidden;}'
         // Over the map: the toasts and the QR codes come up above it.
         + 'body.hp-sf-card.gps-side-gps .ui-toast-wrap,body.hp-sf-card .qr-sheet{z-index:10300 !important;}'
-        // Toasts clear the bottom bar (the card's, and the GPS's Mark shot + bar).
-        + 'body.hp-sf-card .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 84px);}body.hp-sf-card.gps-side-gps .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 200px);}'
+        // Toasts clear the bottom bar (the card's); on the map (POLISH #19) they sit under the top bar and
+        // the Menu row (--gps-top-b, gps-view.js), never over the Plays-like pill.
+        + 'body.hp-sf-card .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 84px);}body.hp-sf-card.gps-side-gps .ui-toast-wrap{bottom:auto;top:var(--gps-top-b,calc(env(safe-area-inset-top) + 150px));}'
         + '#hp-gps-tools{display:block;width:100%;margin:0 0 10px;min-height:44px;border-radius:12px;border:1.5px solid #0f4d3a;background:#fff;color:#0f4d3a;font-weight:800;font-size:.95rem;cursor:pointer;}';
     function ensureCss() {
         if (document.getElementById('hp-round-css')) return;
