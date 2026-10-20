@@ -103,11 +103,34 @@
         var half = (picks.length >= 3 || game === 'hilo') ? 2 : 1;
         return '<b>' + esc(nm(picks.slice(0, half))) + '</b>' + (picks.length > half ? ' vs <b>' + esc(nm(picks.slice(half))) + '</b>' : ' vs …');
     }
-    // Where the bet starts: the first hole nobody in it has posted (action-model.js, as New Action).
+    // THE HOLES IN PLAY ORDER (018 follow-up): play-order.js, as the carry-order and gameHoles
+    // fixes - a round off the 10th is 10..18 then 1..9 (this group's own tee on a two-tee start).
+    /* global playOrder, teeStartHole, groupStartHole */
+    function ordered() {
+        var d = data() || {}, hs = holes();
+        if (!hs.length || typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return hs;
+        var tee;
+        try { tee = (locked() && typeof groupStartHole === 'function') ? groupStartHole(d, hs, locked()) : teeStartHole(d, hs); } catch (e) { return hs; }
+        return playOrder(hs, tee);
+    }
+    function at(list, hole) { for (var i = 0; i < list.length; i++) if (Number(list[i].hole) === Number(hole)) return i; return -1; }
+    // Where the bet starts NOW: the hole after the last one anybody in it has posted, in play
+    // order (action-model.js sideMatchStartHole's rule - New Action's - walked in play order);
+    // null once every hole is in.
     function startHole(ids) {
+        var o = ordered(); if (!o.length) return 1;
         var parts = players().filter(function (p) { return ids.indexOf(String(p.id)) > -1; });
-        var d = data() || {};
-        try { return typeof sideMatchStartHole === 'function' ? sideMatchStartHole(parts.length ? parts : players(), holes(), d.scores || {}) : 1; } catch (e) { return 1; }
+        if (!parts.length) parts = players();
+        var sc = (data() || {}).scores || {}, last = -1;
+        o.forEach(function (h, i) { if (parts.some(function (p) { var v = sc['p' + p.id + '_h' + h.hole]; return v && v > 0; })) last = i; });
+        if (last === -1) return o[0].hole;
+        return last + 1 < o.length ? o[last + 1].hole : null;
+    }
+    // Holes as the golfer reads them: runs in play order - "10-18", "10-18, 1-9", "4".
+    function holesText(list) {
+        var runs = [], cur = null;
+        list.forEach(function (h) { h = Number(h); if (cur && h === cur.b + 1) cur.b = h; else { cur = { a: h, b: h }; runs.push(cur); } });
+        return runs.map(function (r) { return r.a === r.b ? String(r.a) : r.a + '-' + r.b; }).join(', ');
     }
     // WORST CASE, per golfer, before presses - words only, never money that moves.
     // Match: the side's stake, split between its golfers (settlement splits per side).
@@ -117,7 +140,7 @@
         var me = meId(), side = null;
         if (sh.ok && sh.a && me) side = sh.a.indexOf(me) > -1 ? sh.a : (sh.b.indexOf(me) > -1 ? sh.b : null);
         var per = (side || (sh.a || [1])).length || 1;
-        var left = holes().filter(function (h) { return h.hole >= from; }).length;
+        var o = ordered(), fi = at(o, from), left = fi < 0 ? o.length : o.length - fi;
         var amt;
         if (game === 'skins') amt = stake;
         else if (game === 'nassau') amt = stake * 3 / per;
@@ -159,8 +182,14 @@
         if (!(stake > 0)) return { refuse: 'Pick an amount.' };
         var why = refuseWhy(game, ids); if (why) return { refuse: why };
         // 018: any hole, the played ones included (the engines settle a range from the scores in).
-        var from = Number(o.startHole) || startHole(ids) || ((holes()[0] || {}).hole);
+        var ord = ordered();
+        var from = Number(o.startHole) || startHole(ids) || ((ord[0] || {}).hole);
         if (!from) return { refuse: 'This round has no holes yet.' };
+        // FROM THE FIRST HOLE PLAYED = THE WHOLE ROUND. On a round off the 10th that is hole 10,
+        // stored as the card's first hole - the record every whole-round bet has (startHole 1),
+        // which the engines read as all 18. (A start on 10 stored as 10 would be holes 10-18 by
+        // number in sideMatchHoles - see the 018 report.)
+        if (ord.length && Number(from) === Number(ord[0].hole)) from = Number(holes()[0].hole);
         var sc = scopeOf(ids), now = Number(o.now) || Date.now(), c = code();
         if (game === 'skins') {
             var mode = o.scoring === 'net' ? 'net' : 'gross';
@@ -329,7 +358,7 @@
             }
         } else {
             var g = GAMES[st.game], ids = st.picks.slice(), shp = shapeOf(st.game, ids);
-            var hs = holes(), nowHole = startHole(ids);
+            var hs = ordered(), nowHole = startHole(ids);   // play order: the list reads 10..18, 1..9 off the 10th
             // 018: ANY hole, the played ones too; the default is still now (the first hole once all are played).
             if (st.from == null) st.from = nowHole || (hs[0] && hs[0].hole) || 1;
             if (st.stake == null) st.stake = g.chips[1];
@@ -356,11 +385,12 @@
     // The holes of [from ..] that are already played (before "now" - the first hole nobody in
     // the bet has posted; every hole once all are in): { a, b, full } or null.
     function playedRange(ids, from) {
-        var hs = holes(); if (!hs.length) return null;
-        var now = startHole(ids), last = hs[hs.length - 1].hole;
-        var end = now == null ? last : (hs.filter(function (h) { return h.hole < now; }).pop() || {}).hole;
-        if (end == null || from > end) return null;
-        return { a: from, b: end, full: now == null };
+        var o = ordered(); if (!o.length) return null;
+        var now = startHole(ids);
+        var endI = now == null ? o.length - 1 : at(o, now) - 1, fromI = at(o, from);
+        if (fromI < 0 || endI < fromI) return null;
+        var list = o.slice(fromI, endI + 1).map(function (h) { return Number(h.hole); });
+        return { a: list[0], b: list[list.length - 1], list: list, text: holesText(list), single: list.length === 1, full: now == null };
     }
     // THE RESULT SO FAR, read only: the round with this bet added, through the SAME
     // computeCombinedNetTotals every bet settles by, minus the round without it - per golfer,
@@ -381,6 +411,21 @@
                 var v = ((after[k] || {}).net || 0) - ((before[k] || {}).net || 0);
                 if (Math.abs(v) > 0.004) out[String(p.id)] = v;
             });
+            // THE WORDS, from the screens that already say them: the Bets strip's status line
+            // (bet-strip.js buildSideActionRows - "Bob/Manny 2&1", "Hi-Lo: ... (Low 5-3, High 4-3)")
+            // and, for a Nassau, each segment's result off the receipt (buildSideMatchReceipts).
+            var words = '';
+            if (slot === 'sideMatches') {
+                try {
+                    var row = (typeof buildSideActionRows === 'function' ? buildSideActionRows(d2, cd, d2.scores || {}, d2.players || [], meId()) : []).filter(function (r) { return r && r.key === '__preview018'; })[0];
+                    words = row ? String(row.status || '').replace(/^Hi-Lo:\s*/, '') : '';
+                    if (b.value.format === 'nassau' && typeof buildSideMatchReceipts === 'function') {
+                        var rc = buildSideMatchReceipts(d2, cd, d2.scores || {}).filter(function (r) { return r && r.matchId === '__preview018'; })[0];
+                        if (rc && rc.segments && rc.segments.length) words = rc.segments.map(function (sg) { return sg.label + ' ' + (sg.result || 'All square'); }).join(' \u00b7 ');
+                    }
+                } catch (e) { words = ''; }
+            }
+            Object.defineProperty(out, '__words', { value: words, enumerable: false });
             return out;
         } catch (e) { return null; }
     }
@@ -390,11 +435,12 @@
         var sh = shapeOf(game, ids);
         var nm = function (list) { return list.map(function (id) { return first(byId(id)); }).join(' + '); };
         if (sh.ok && sh.a) {
+            var words = pv.__words ? esc(pv.__words) + ' \u2192 ' : '';
             var va = pv[sh.a[0]] || 0;
-            if (Math.abs(va) < 0.005) return 'All square → $0';
+            if (Math.abs(va) < 0.005) return (words || 'All square \u2192 ') + '$0';
             var win = va > 0 ? sh.a : sh.b, lose = va > 0 ? sh.b : sh.a, amt = Math.abs(va);
-            return esc(nm(win)) + (win.length > 1 ? ' win' : ' wins') + ' → ' + moneyWord(amt) + (win.length > 1 ? ' each' : '')
-                + ' · ' + esc(nm(lose)) + ' ' + moneyWord(-Math.abs(pv[lose[0]] || amt)) + (lose.length > 1 ? ' each' : '');
+            return words + esc(nm(win)) + ' ' + moneyWord(amt) + (win.length > 1 ? ' each' : '')
+                + ' \u00b7 ' + esc(nm(lose)) + ' ' + moneyWord(-Math.abs(pv[lose[0]] || amt)) + (lose.length > 1 ? ' each' : '');
         }
         var rows = Object.keys(pv).map(function (id) { return { id: id, v: pv[id] }; }).sort(function (x, y) { return y.v - x.v; });
         if (!rows.length) return 'Nobody has won anything yet → $0';
@@ -407,7 +453,7 @@
         var pr = playedRange(ids, from);
         var html = '';
         if (pr) {
-            html += '<div class="hb-played">' + (pr.a === pr.b ? 'Hole ' + pr.a : 'Holes ' + pr.a + '-' + pr.b) + ' already played: this bet settles from the scores already in.</div>';
+            html += '<div class="hb-played">' + (pr.single ? 'Hole ' : 'Holes ') + pr.text + ' already played: this bet settles from the scores already in.</div>';
             var pv = stake > 0 ? preview({ game: st.game, picks: ids, stake: stake, scoring: st.scoring, startHole: from }) : null;
             var t = previewText(st.game, ids, pv);
             if (t) html += '<div class="hb-result">' + (pr.full ? 'Result: ' : 'So far: ') + '<b>' + t + '</b></div>';
