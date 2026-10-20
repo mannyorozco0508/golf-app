@@ -2814,6 +2814,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!q || !offline) { box.style.display = 'none'; box.innerHTML = ''; return; }
         var rounds = [];
         try { rounds = q.localRounds(localStorage) || []; } catch (e) { rounds = []; }
+        // POLISH 029 #5: EACH ROUND ONCE, AND NEVER A FINISHED ONE. The walk listed "Resume Dobson"
+        // twice (the Resume line above AND this row) and "Resume Papago", a finished round.
+        var D = window.HardPanDoors, seenCodes = {};
+        rounds = rounds.filter(function (r) {
+            var c = String(r && r.code || '').toUpperCase();
+            if (!c || seenCodes[c]) return false;
+            seenCodes[c] = 1;
+            var lr = null;
+            try { lr = D && typeof D.localRound === 'function' ? D.localRound(c) : null; } catch (e) { lr = null; }
+            return !(lr && lr.finished);
+        });
+        var lastRoomNow = '';
+        try { lastRoomNow = String(localStorage.getItem('lastRoomCode') || '').toUpperCase(); } catch (e) { lastRoomNow = ''; }
+        var resumeBox = document.getElementById('resume-container');
+        // The Resume line above is the same round as a row here (or a finished one): shown once.
+        if (resumeBox && lastRoomNow && seenCodes[lastRoomNow]) resumeBox.style.display = 'none';
         if (!rounds.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
         // NEWEST FIRST AND CAPPED AT FOUR: a phone that has opened thirty rounds
         // does not need thirty rows on a screen with no signal, it needs the one
@@ -6652,6 +6668,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // phone says it is offline), so the reason is said plainly. A new round needs a code checked
         // against the server, so with no signal it cannot be started here: try again with signal.
         // Only when it is KNOWN - a timeout on a live socket keeps the words below.
+        // POLISH 029 #5: THE GPS DOOR NEVER FALLS BACK TO THIS LOBBY. Its Course & Tees screen
+        // (simple-flow.js) stays up with the reason on it and asks again when the signal is back.
+        try {
+            const SF = window.HardPanSimpleFlow;
+            if (what === 'round' && SF && typeof SF.noCode === 'function'
+                && SF.noCode(hpNoSignal() ? 'offline' : 'error')) return;
+        } catch (e) { /* the lobby's own words below */ }
         if (err && err.code === 'timeout' && hpNoSignal()) {
             uiFail('\uD83D\uDCF4 No signal \u2014 try again when you have a connection.\n'
                 + 'The new ' + what + ' was not started; nothing was saved.');
