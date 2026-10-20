@@ -633,7 +633,7 @@
         }
         h += '<div class="sf-line"><span class="l">Start</span><span class="sf-chips">'
             + chip('Hole 1', !S.shotgun && at !== '10', 'data-sf-start="1"')
-            + (full ? chip('10', !S.shotgun && at === '10', 'data-sf-start="10"') : '')
+            + (full ? chip('Hole 10', !S.shotgun && at === '10', 'data-sf-start="10"') : '')
             + chip('Shotgun', S.shotgun, 'data-sf-start="shotgun"') + '</span></div></div>';
         if (S.shotgun) h += '<div class="sf-note" style="margin:-4px 2px 10px;">Shotgun: Group 1 goes off hole 1, Group 2 hole 2, and so on.</div>';
         return h;
