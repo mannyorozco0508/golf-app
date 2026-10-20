@@ -1420,6 +1420,21 @@ html {
             hpToast(t);
         } catch (e) {}
     })();
+    // URGENT-018: "No Skins game in this round ... add it in Round Setup" -> the + Bet sheet's
+    // Skins, over the round (never Round Setup's wizard). Any other admin.html link is unchanged.
+    document.addEventListener('click', function (e) {
+        if (!hpSimpleFlow()) return;
+        var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a || !/(^|\/)admin\.html(\?|$)/.test(a.getAttribute('href') || '') || /[?&]step=|[?&]account=/.test(a.getAttribute('href') || '')) return;
+        if (!a.closest('#skins-engine-box, .skins-engine-box') && !/Round Setup/.test(a.textContent || '')) return;
+        try {
+            var P = window.parent !== window ? window.parent.HardPanBet : null;
+            if (P && P.on()) { e.preventDefault(); e.stopImmediatePropagation(); P.open('skins', { returnTo: 'bets' }); return; }
+        } catch (x) {}
+        var q = new URLSearchParams(location.search), g = q.get('group'), page = location.pathname.split('/').pop() || 'skins.html';
+        e.preventDefault();
+        location.href = 'index.html?game=' + encodeURIComponent(q.get('game') || '') + (g ? '&group=' + encodeURIComponent(g) : '') + '&hpbet=1&hpret=' + encodeURIComponent(page + location.search);
+    }, true);
     // THE BETS TAB: "+ Add a bet" at the top, and a tap on a match opens it in the sheet (Edit / Remove).
     function hpTagBets(ids) {
         if (!hpSimpleFlow()) return;

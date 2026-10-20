@@ -480,6 +480,7 @@
     function open(opts) {
         var o = opts || {};
         if (!data() || !code()) return false;
+        if (teesCode !== code()) { teesCode = code(); S.tees = null; }
         S = { open: true, mode: 'add', why: o.why || '', from: null, edit: null, out: false, list: [], name: o.name || '', hcp: '', tee: '', group: o.group || myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: o.onDone || null };
         if (S.tees && S.tees.length) S.tee = roundTeeKey(S.tees);
         loadTees(); loadChips();
@@ -492,6 +493,7 @@
     // EDIT ONE GOLFER in place (a tap on a golfer's name on the card, or a row of the Golfers list).
     function openEdit(id) {
         if (!data() || !code() || !playerById(id)) return false;
+        if (teesCode !== code()) { teesCode = code(); S.tees = null; }
         S = { open: true, mode: 'edit', from: null, edit: null, out: false, list: [], name: '', hcp: '', tee: '', group: 1, err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: S.chips, onDone: null };
         loadTees();
         root().classList.add('open');
@@ -502,6 +504,7 @@
     // THE GOLFERS LIST (Round settings > Golfers): every golfer -> Edit, and + Add golfer.
     function openGolfers() {
         if (!data() || !code()) return false;
+        if (teesCode !== code()) { teesCode = code(); S.tees = null; }
         S = { open: true, mode: 'list', from: null, edit: null, out: false, list: [], name: '', hcp: '', tee: '', group: myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: null };
         loadTees(); loadChips();
         root().classList.add('open');
@@ -511,9 +514,10 @@
     }
     function close() { S.open = false; var e = D.getElementById('hp-addg'); if (e) { e.classList.remove('open'); e.innerHTML = ''; } }
     function isOpen() { return !!S.open; }
-    // A NEW ROUND'S TEES ARE THE COURSE'S: forget them when the round changes (a new code).
-    var lastCode = null;
-    setInterval(function () { var c = code(); if (c !== lastCode) { lastCode = c; S.tees = null; } }, 2000);
+    // A NEW ROUND'S TEES ARE THE COURSE'S: forgotten when the sheet opens on another round (a new
+    // code) - checked on open, not on a timer (a never-ending interval kept every harness test that
+    // loads this page from exiting).
+    var teesCode = null;
 
     // Every "+ Add a player" in a GPS round (the card's "Just scores" box, anywhere a link
     // still points at Round Setup's Players step for THIS round) opens the sheet instead.

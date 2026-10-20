@@ -4744,6 +4744,8 @@ const SHELL_FILES = [
     './gps-round.js',
     // URGENT-017: Add golfer, one sheet in place (simpleFlow).
     './gps-add-golfer.js',
+    // URGENT-018: round edits in place - groups, start, nines, tee (simpleFlow).
+    './gps-round-edit.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).

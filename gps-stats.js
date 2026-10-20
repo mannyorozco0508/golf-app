@@ -534,6 +534,9 @@
         // Save moves up onto its own line above Notes - never wrapped or cut.
         + '#hp-score-sheet .hp-ss-foot{flex:0 0 auto;display:flex;flex-wrap:wrap-reverse;gap:12px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #262c26;}'
         + '#hp-score-sheet .hp-ss-notes-btn{flex:1 1 28%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#262c26;color:#f4f4ef;font-size:18px;font-weight:600;}#hp-score-sheet .hp-ss-notes-btn.on{box-shadow:inset 0 0 0 2px #c8f07a;}'
+        // 018: the hole stepper - an EARLIER hole's score in this same sheet, the map / card left on its hole.
+        + '#hp-score-sheet .hp-ss-step{display:flex;align-items:center;gap:6px;}#hp-score-sheet .hp-ss-step button{min-width:40px;min-height:40px;border-radius:12px;background:#262c26;color:#f4f4ef;font-size:22px;font-weight:800;}#hp-score-sheet .hp-ss-step button[disabled]{opacity:.3;}'
+        + '#hp-score-sheet .hp-ss-earlier{margin:2px 18px 0;font-size:14px;color:#c8f07a;}'
         + '#hp-score-sheet .hp-ss-save{flex:2 1 60%;min-width:max-content;padding:0 16px;white-space:nowrap;min-height:56px;border-radius:16px;background:#c8f07a;color:#0b0f0c;font-size:clamp(17px,5vw,21px);font-weight:800;}';
     function ssEl(tag, cls, text, attrs) { var e = el(tag, cls, text); if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (tag === 'button') e.type = 'button'; return e; }
     function ssBuild(host) {
@@ -545,7 +548,13 @@
         var st = el('style'); st.textContent = SS_CSS; wrap.appendChild(st);
         var card = el('div', 'hp-ss');
         card.appendChild(el('div', 'hp-ss-handle'));
-        var head = el('div', 'hp-ss-head'); head.appendChild(el('h2', 'hp-ss-title')); head.appendChild(el('div', 'hp-ss-meta')); card.appendChild(head);
+        var head = el('div', 'hp-ss-head');
+        var step = el('div', 'hp-ss-step');
+        step.appendChild(ssEl('button', 'hp-ss-back', '\u2039', { 'data-ss-step': '-1', 'aria-label': 'Earlier hole' }));
+        step.appendChild(el('h2', 'hp-ss-title'));
+        step.appendChild(ssEl('button', 'hp-ss-fwd', '\u203a', { 'data-ss-step': '1', 'aria-label': 'Later hole' }));
+        head.appendChild(step); head.appendChild(el('div', 'hp-ss-meta')); card.appendChild(head);
+        card.appendChild(el('div', 'hp-ss-earlier'));
         card.appendChild(el('div', 'hp-ss-body'));
         var foot = el('div', 'hp-ss-foot');
         foot.appendChild(ssEl('button', 'hp-ss-notes-btn', 'Notes', { 'data-ss-notes': '1' }));
@@ -589,6 +598,7 @@
         var host = ctx.host || W.document.body;
         if (ss.wrap.parentNode !== host) host.appendChild(ss.wrap);
         ss.ctx = ctx; ss.pend = {}; ss.more = false; ss.notes = false;
+        if (ctx.home == null) ctx.home = ctx.hole;
         var pick = ctx.golfers.filter(function (g) { return String(g.id) === String(ctx.pick); })[0];
         ss.sel = String((pick || ctx.golfers[0]).id);
         ss.wrap.style.display = '';
@@ -600,6 +610,14 @@
         if (!ss || !ss.ctx) return;
         var c = ss.ctx, w = ss.wrap, pid = ss.sel, par = Number(c.par) || 0;
         w.querySelector('.hp-ss-title').textContent = 'Hole ' + c.hole + (par ? ' · Par ' + par : '');
+        // 018: EARLIER HOLES, IN THIS SHEET. ‹ / › step through the holes played so far (play order, up
+        // to the hole the sheet opened on); the map and the card stay where they are.
+        var rng = ssRange(), at = rng.indexOf(Number(c.hole));
+        var bk = w.querySelector('[data-ss-step="-1"]'), fw = w.querySelector('[data-ss-step="1"]');
+        bk.style.display = fw.style.display = rng.length > 1 ? '' : 'none';
+        bk.disabled = at <= 0; fw.disabled = at < 0 || at >= rng.length - 1;
+        var away = Number(c.hole) !== Number(c.home);
+        w.querySelector('.hp-ss-earlier').textContent = away ? 'An earlier hole \u2014 Save goes back to hole ' + c.home + '.' : '';
         w.querySelector('.hp-ss-meta').textContent = [c.si ? 'HCP ' + c.si : '', c.yards ? c.yards + 'y' : ''].filter(Boolean).join(' · ');
         var body = w.querySelector('.hp-ss-body'), keep = body.scrollTop;
         body.textContent = '';
@@ -638,7 +656,7 @@
         var showStats = ssStatsFor(pid);
         foot.querySelector('[data-ss-notes]').style.display = showStats ? '' : 'none';
         foot.querySelector('[data-ss-notes]').classList.toggle('on', !!ss.notes);
-        foot.querySelector('[data-ss-save]').textContent = c.last ? 'Save' : 'Save · Next hole ›';
+        foot.querySelector('[data-ss-save]').textContent = away ? 'Save · back to hole ' + c.home : (c.last ? 'Save' : 'Save · Next hole ›');
         if (showStats) {
             var cell = ssCell(pid);
             var row = function (title, sub, key, cols, opts, on) {
@@ -676,6 +694,7 @@
         if (t === ss.wrap) { ssClose(); return; }
         var c = ss.ctx, pid = ss.sel;
         if ((b = t.closest('[data-ss-golfer]'))) { ss.sel = b.getAttribute('data-ss-golfer'); ss.more = false; ss.notes = false; ssRender(); return; }
+        if ((b = t.closest('[data-ss-step]'))) { ssStep(Number(b.getAttribute('data-ss-step'))); return; }
         if ((b = t.closest('[data-ss-more]'))) { ss.more = !ss.more; ssRender(); return; }
         if ((b = t.closest('[data-ss-score]'))) {
             var n = Number(b.getAttribute('data-ss-score'));
@@ -700,8 +719,43 @@
     }
     // SAVE: each score typed here, through the card's own save; then the next hole (the card's
     // own Next - play order, the KP question) unless this is the last one.
+    // The holes the stepper walks: play order (ctx.holes) up to the hole the sheet opened on.
+    function ssRange() {
+        var c = ss && ss.ctx;
+        if (!c || !Array.isArray(c.holes) || typeof c.at !== 'function') return [];
+        var hs = c.holes.map(Number), i = hs.indexOf(Number(c.home));
+        return i < 0 ? [] : hs.slice(0, i + 1);
+    }
+    // To an earlier (or back to a later) hole: what was typed here is saved first, through the
+    // card's own save; then the sheet shows that hole (ctx.at: its par, its golfers, its scores).
+    function ssStep(dir) {
+        var c = ss.ctx, rng = ssRange(), i = rng.indexOf(Number(c.hole)), to = rng[i + dir];
+        if (to == null) return;
+        var nx = c.at(to);
+        if (!nx || !nx.golfers || !nx.golfers.length) return;
+        ssKeep();
+        Object.keys(nx).forEach(function (k) { c[k] = nx[k]; });
+        c.hole = to;
+        ss.pend = {}; ss.more = false; ss.notes = false;
+        if (!nx.golfers.some(function (g) { return String(g.id) === String(ss.sel); })) ss.sel = String(nx.golfers[0].id);
+        ssRender();
+    }
+    function ssKeep() {
+        var c = ss.ctx, pend = ss.pend;
+        Object.keys(pend).forEach(function (pid) {
+            var n = pend[pid];
+            if (!(n > 0)) return;
+            if (n !== Number(c.score ? c.score(pid) : 0)) c.save(pid, n);
+            ssDone[c.code + '|' + pid + '|' + c.hole] = n;
+            var rec = qLoad(c.code, pid);
+            if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
+        });
+        ss.pend = {};
+    }
     function ssSave() {
         var c = ss.ctx, pend = ss.pend;
+        // AN EARLIER HOLE (018): saved, and the sheet closes - back on the hole it opened on, never Next.
+        if (Number(c.hole) !== Number(c.home)) { ssKeep(); var back = c.back; ssClose(); if (typeof back === 'function') back(); return; }
         Object.keys(pend).forEach(function (pid) {
             var n = pend[pid];
             if (!(n > 0)) return;
@@ -750,5 +804,5 @@
         get setTrackOthers() { return trackShown() ? setTrackOthers : undefined; },
         trackOthersShown: function () { return trackShown(); },
         // The score sheet (012).
-        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
+        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();
