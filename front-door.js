@@ -1477,7 +1477,7 @@
         if (agPlayers().length >= agNeed(id)) return false;
         if (agInPlace() && W.HardPanAddGolfer && typeof W.HardPanAddGolfer.open === 'function') {
             closeAddGame();
-            W.HardPanAddGolfer.open({ onDone: function () {
+            W.HardPanAddGolfer.open({ why: agGameName(id) + ' needs ' + agNeed(id) + ' golfers - add ' + (agNeed(id) - agPlayers().length) + ' more.', onDone: function () {
                 // The round's listener lands the new golfers a moment after the write.
                 var n = 0, t = setInterval(function () {
                     if (agPlayers().length >= agNeed(id) || ++n > 20) {
@@ -1490,18 +1490,6 @@
             return true;
         }
         var code = agCode();
-        // URGENT-018: in a round (simpleFlow) the golfers are added IN PLACE - the Add golfer sheet
-        // over this screen, saying why - and the game carries on once there are enough of them.
-        var AG = W.HardPanAddGolfer;
-        if (AG && typeof AG.open === 'function' && W.HardPanBet && W.HardPanBet.on && W.HardPanBet.on() && agRound().players) {
-            closeAddGame();
-            AG.open({ why: agGameName(id) + ' needs ' + agNeed(id) + ' golfers - add ' + (agNeed(id) - agPlayers().length) + ' more.', onDone: function () {
-                if (agPlayers().length < agNeed(id) || !next || !next.url) return;
-                if (/^admin\.html/.test(next.url)) agBackAfter(id);
-                W.location.href = next.url;
-            } });
-            return true;
-        }
         agNext({ code: String(code).toUpperCase(), id: id, name: agGameName(id), need: agNeed(id), next: next, stage: 'players', at: Date.now() });
         W.location.href = 'admin.html?game=' + encodeURIComponent(code) + '&step=players';
         return true;
