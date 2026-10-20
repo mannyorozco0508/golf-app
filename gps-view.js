@@ -4360,7 +4360,9 @@
         if (!S) return;
         var sf = sfOn();
         S.el.classList.toggle('gps-sf', sf);
-        show('.gps-bet-btn', sf && S.mode === 'measure');
+        // URGENT-023 (Manny): no "+ Bet" on the map's bar (it is in the Menu and on Bets), and no money
+        // chip on the map (it covered the Plays-like pill) - money lives on the Bets tab.
+        show('.gps-bet-btn', false);
         // The mockup's bar: Card | Enter score | + Bet. Tools moves to Round Menu > Round settings
         // (HardPanGps.openTools); the Games pill opens the Round Menu.
         var gp = S.el.querySelector('.gps-door-games');
@@ -4368,7 +4370,7 @@
         var chip = S.el.querySelector('.gps-money');
         if (!chip) return;
         var m = sf ? (window.HardPanBet.money() || window.HardPanBet.refresh()) : null;
-        if (!sf || !m) { chip.style.display = 'none'; return; }
+        chip.style.display = 'none'; if (true) return;   // URGENT-023: no money chip on the map
         window.HardPanBet.paintChip(chip, m);
         // Just above the bottom controls (D: the Mark shot bar; C: the panel), at the right.
         var bot = S.el.querySelector(S.ld ? '.gps-ld-bottom' : '.gps-panel');
@@ -4794,7 +4796,7 @@
         +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (<span class="gps-plinfo-pos">never your position</span>), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
         // 017 (simpleFlow): "You: +$N \u00b7 3 bets" over the bottom, right. Tap = Bets.
-        + '<button type="button" class="gps-money hp-money-chip" style="display:none" aria-label="Your money - open Bets"></button>'
+        // URGENT-023: no money chip on the map (it covered the Plays-like pill) - the money is on Bets.
         + '<div class="gps-who-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Whose score"><div class="gps-who-card"><div class="gps-who-title"></div><div class="gps-who-list"></div><button type="button" class="gps-who-skip" style="display:none">Skip</button></div></div>'
         // THE TWO FRONT DOORS (gps-doors, the app only): a Games chip at the top, and
         // GPS-4 "Add a game" - this round's golfers, paste, full setup (no quick-start tiles, URGENT-010).

@@ -57,25 +57,34 @@ before(async () => {
 });
 after(async () => { if (j) await j.close(); });
 
-test('the card and the GPS have "+ Bet" and the money chip', { timeout: 60000 }, async () => {
-    const card = JSON.parse(await ev('(function(){' + VIS + ' return JSON.stringify({ bet: vis(document.querySelector("#hp-card-bet .hp-bet-btn")), chip: (document.querySelector("#hp-card-bet .hp-money-chip")||{}).innerText, on: HardPanBet.on() }); })()'));
+test('URGENT-023: no "+ Bet" and no money chip on the card or the GPS bar - "+ Bet" is the Menu\'s first tile and "+ Add a bet" on Bets', { timeout: 60000 }, async () => {
+    const card = JSON.parse(await ev('(function(){' + VIS + ' return JSON.stringify({ bet: vis(document.querySelector("#hp-card-bet .hp-bet-btn")), chip: !!document.querySelector("#hp-card-bet .hp-money-chip"), bar: Array.prototype.filter.call(document.querySelectorAll("#hp-card-bet button"), vis).map(function(b){ return b.innerText.trim(); }), on: HardPanBet.on() }); })()'));
     assert.equal(card.on, true, 'simpleFlow is on in dev');
-    assert.equal(card.bet, true, 'no + Bet on the card');
-    assert.match(card.chip, /^You: \$0 · \d+ bets?$/);
+    assert.equal(card.bet, false, 'no + Bet on the card bar');
+    assert.equal(card.chip, false, 'no money chip in the DOM');
+    assert.deepEqual(card.bar, ['☰', '📍 GPS', 'Enter score'], 'card bar: [≡] [GPS] [Enter score]');
     await shot('card');
     await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(3000);
-    const g = JSON.parse(await ev('(function(){' + VIS + ' var b=document.querySelector("#gps-overlay .gps-bet-btn"); var c=document.querySelector("#gps-overlay .gps-money"); return JSON.stringify({ side: HardPanGps.side(), layout: HardPanGps.layout(), bet: vis(b), text: b && b.innerText, bg: b && getComputedStyle(b).backgroundColor, chip: vis(c) && c.innerText, cardBar: vis(document.querySelector("#hp-card-bet .hp-bet-btn")) }); })()'));
+    const g = JSON.parse(await ev('(function(){' + VIS + ' var b=document.querySelector("#gps-overlay .gps-bet-btn"); var c=document.querySelector("#gps-overlay .gps-money"); return JSON.stringify({ side: HardPanGps.side(), layout: HardPanGps.layout(), bet: vis(b), chip: vis(c) }); })()'));
     assert.equal(g.side, 'gps'); assert.equal(g.layout, 'd');
-    assert.equal(g.bet, true, 'no + Bet on the GPS bottom bar'); assert.equal(g.text, '+ Bet');
-    assert.equal(g.bg, 'rgb(255, 214, 10)', '+ Bet is yellow');
-    assert.match(g.chip, /^You: \$0 · \d+ bets?$/);
-    assert.equal(g.cardBar, false, 'the card bar stays off the map');
+    assert.equal(g.bet, false, 'no + Bet on the GPS bar');
+    assert.equal(g.chip, false, 'no money chip on the map');
+    // The Menu: "+ Bet" first; it opens the ONE sheet.
+    await ev('HardPanRound.openMenu ? HardPanRound.openMenu() : HardPanRound.go("menu")');
+    await sleep(400);
+    const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-sheet [data-hs-tile]"), function(b){ return b.getAttribute("data-hs-tile"); }))'));
+    assert.equal(tiles[0], 'bet', '+ Bet is the Menu\'s first tile: ' + JSON.stringify(tiles));
+    await ev("HardPanRound.closeSheet ? HardPanRound.closeSheet(true) : (document.querySelector('#hp-sheet [data-hs=close]') || {click:function(){}}).click()");
+    await sleep(300);
     await shot('gps');
 });
 
 test('+ Bet Match 2v2 mid-round writes New Action\'s record (sideMatchPayloadFromTerms)', { timeout: 60000 }, async () => {
-    await tapIn('#gps-overlay .gps-bet-btn');
+    // URGENT-023: from the Menu's "+ Bet" (no button on the map any more).
+    await ev('HardPanRound.openMenu ? HardPanRound.openMenu() : HardPanRound.go("menu")');
+    await sleep(400);
+    await tapIn('#hp-sheet [data-hs-tile="bet"]');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(b){return b.innerText;}))'));
     // Hi-Lo is in the tree (gps-features 3e7654b): the first row is Match · Nassau · Hi-Lo · Skins (018).
     assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Stroke play', 'More ›'], 'URGENT-014: 2 v 2 (a group of four) - Match · Nassau · Hi-Lo · Stroke play · More');
@@ -100,7 +109,7 @@ test('+ Bet Match 2v2 mid-round writes New Action\'s record (sideMatchPayloadFro
     assert.deepEqual(got, want);
     assert.ok(got.createdAt >= t0 - 5000);
     assert.equal(await ev('HardPanBet.isOpen()'), false, 'the sheet closes');
-    assert.match(await ev('document.querySelector("#gps-overlay .gps-money").innerText'), /· \d+ bets?$/);
+    assert.equal(await ev('HardPanGps.side()'), 'gps', 'back on the map, the same hole');
     await shot('gps-after-bet');
 });
 
@@ -149,8 +158,7 @@ test('Hi-Lo: a tile only with the Hi-Lo module (the real hilo-engine.js); four g
         { teamAIds: ['101', '102'], teamBIds: ['103', '104'], startHole: 4, now: got.createdAt, scope: 'group', ownerGroup: 1 }));
 });
 
-test('a score entered on the card moves the money chip on the card and the GPS', { timeout: 60000 }, async () => {
-    // A fresh $20 1v1 between Manny and Bob from hole 4; Manny birdies 4, Bob bogeys - Manny is 1 UP.
+test('a score entered on the card moves the money (on the Bets tab - no chip on the card or the map, URGENT-023)', { timeout: 60000 }, async () => {
     await ev("(function(){ var sm = window.__DB.events['" + CODE + "'].sideMatches; Object.keys(sm).forEach(function(k){ db.ref('events/" + CODE + "/sideMatches/' + k).remove(); }); return 1; })()");
     await sleep(300);
     await ev('HardPanBet.open("match")');
@@ -161,17 +169,12 @@ test('a score entered on the card moves the money chip on the card and the GPS',
     await tapIn('#hp-bet [data-hb-stake="20"]');
     await tapIn('#hp-bet [data-hb="start"]');
     await sleep(400);
-    await ev("HardPanGps.showSide('bets')");
-    await sleep(300);
-    const before0 = await ev('document.querySelector("#hp-card-bet .hp-money-chip").innerText');
+    const before0 = JSON.stringify(await ev('JSON.stringify(HardPanBet.moneyNow())'));
     await ev("saveScore('102', 4, 4); saveScore('101', 4, 6); 1");
     await sleep(800);
-    const after = JSON.parse(await ev('JSON.stringify({ card: document.querySelector("#hp-card-bet .hp-money-chip").innerText, m: HardPanBet.moneyNow() })'));
-    assert.notEqual(after.card, before0, 'the chip did not move: ' + before0);
-    assert.equal(after.card.replace(/\s+/g, ' '), after.m.text);
-    await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
-    await sleep(1200);
-    assert.equal(await ev('document.querySelector("#gps-overlay .gps-money").innerText'), after.card, 'GPS chip = card chip');
+    const after = await ev('JSON.stringify(HardPanBet.moneyNow())');
+    assert.notEqual(JSON.stringify(after), before0, 'the money did not move');
+    assert.equal(await ev('!!document.querySelector(".hp-money-chip") || !!(document.querySelector("#gps-overlay .gps-money") && document.querySelector("#gps-overlay .gps-money").offsetParent)'), false, 'no chip anywhere');
 });
 
 test('simpleFlow OFF: no + Bet and no chip anywhere', { timeout: 60000 }, async () => {

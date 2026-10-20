@@ -78,7 +78,7 @@ test('☰ Menu on the GPS and on the card: six tiles and Finish & settle up; the
     assert.equal(await ev('(function(){' + VIS + ' return vis(document.querySelector("#gps-overlay .gps-bottom .gps-tools")); })()'), false, 'Tools left the GPS bar');
     await click('#gps-overlay .gps-door-games');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-sheet .hs-tile b"), function(b){ return b.innerText.replace(/^\\S+\\s/, ""); }))'));
-    assert.deepEqual(tiles, ['Card', 'Bets', 'GPS', 'Bet', 'Share', 'Round settings']);
+    assert.deepEqual(tiles, ['Bet', 'Card', 'Bets', 'GPS', 'Share', 'Round settings']);   // URGENT-023: "+ Bet" first
     assert.match(await ev('document.querySelector("#hp-sheet .hs-finish").innerText'), /Finish & settle up/);
     assert.equal((await st()).side, 'gps', 'the menu opens over the map');
     await shot('menu-gps');
@@ -101,7 +101,7 @@ test('Bets tile: a sheet with the Bets page (kept frame) and the Leaderboard; th
     await click('#hp-sheet [data-hs-tile="bets"]');
     await sleep(2500);
     const b = JSON.parse(await ev('(function(){' + VIS + ' var f=document.querySelector("#hp-bets iframe[data-k=bets]"); var t=""; try { t=f.contentDocument.body.innerText; } catch(e){} '
-        + 'return JSON.stringify({ open: document.body.classList.contains("hp-bets-open"), text: t.slice(0, 400), nav: vis(f && f.contentDocument.getElementById("app-nav-wrap")), bar: vis(document.querySelector("#hp-card-bet .hp-bet-btn")), gpsBtn: vis(document.querySelector("#hp-card-bet [data-hp-bar=gps]")), cardBtn: vis(document.querySelector("#hp-card-bet [data-hp-bar=card]")), side: HardPanGps.side() }); })()'));
+        + 'return JSON.stringify({ open: document.body.classList.contains("hp-bets-open"), text: t.slice(0, 400), nav: vis(f && f.contentDocument.getElementById("app-nav-wrap")), bar: !!(f && f.contentDocument.getElementById("hp-add-bet")), gpsBtn: vis(document.querySelector("#hp-card-bet [data-hp-bar=gps]")), cardBtn: vis(document.querySelector("#hp-card-bet [data-hp-bar=card]")), side: HardPanGps.side() }); })()'));
     assert.equal(b.open, true);
     assert.match(b.text, /Bets/);
     assert.deepEqual([b.nav, b.bar, b.gpsBtn, b.cardBtn, b.side], [false, true, true, true, 'gps'], JSON.stringify(b));

@@ -72,8 +72,9 @@ after(async () => { if (j) await j.close(); });
 
 test('1a: on the round - GPS, card, Round Menu, Finish & settle up, the Bets sheet - all open the ONE sheet', { timeout: 90000 }, async () => {
     const ways = {
-        gps: 'HardPanRound.toGps(); document.querySelector("#gps-overlay .gps-bet-btn").click()',
-        card: 'HardPanRound.toCard(); document.querySelector("#hp-card-bet .hp-bet-btn").click()',
+        // URGENT-023: no "+ Bet" on the GPS / card bars - the Menu's first tile, from either side.
+        gps: 'HardPanRound.toGps(); HardPanRound.openMenu(); document.querySelector("#hp-sheet [data-hs-tile=bet]").click()',
+        card: 'HardPanRound.toCard(); HardPanRound.openMenu(); document.querySelector("#hp-sheet [data-hs-tile=bet]").click()',
         menu: 'HardPanRound.openMenu(); document.querySelector("#hp-sheet [data-hs-tile=bet]").click()',
         finish: 'HardPanRound.openFinish(); document.querySelector("#hp-sheet [data-hs=add-bet]").click()'
     };

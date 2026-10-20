@@ -871,12 +871,12 @@
         bar = document.createElement('div');
         bar.id = 'hp-card-bet';
         bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Round');
-        bar.innerHTML = '<button type="button" class="hp-money-chip" data-hp-money="card" style="display:none" aria-label="Your money - open Bets"></button>'
-            + '<button type="button" class="hp-bar-btn hp-bar-icon" data-hp-bar="menu" style="display:none" aria-label="Round Menu">☰</button>'
+        // URGENT-023 (Manny): no money chip and no "+ Bet" on this bar - [≡] [GPS] [Enter score];
+        // "+ Bet" is in the Menu and on Bets, the money on Bets.
+        bar.innerHTML = '<button type="button" class="hp-bar-btn hp-bar-icon" data-hp-bar="menu" style="display:none" aria-label="Round Menu">☰</button>'
             + '<button type="button" class="hp-bar-btn" data-hp-bar="card" style="display:none" aria-label="Scorecard">Card</button>'
             + '<button type="button" class="hp-bar-btn" data-hp-bar="gps" style="display:none" aria-label="Back to the map">📍 GPS</button>'
-            + '<button type="button" class="hp-bar-btn hp-bar-score" data-hp-bar="score" style="display:none" aria-label="Enter score">Enter score</button>'
-            + '<button type="button" class="hp-bet-btn" aria-label="Add a bet">+ Bet</button>';
+            + '<button type="button" class="hp-bar-btn hp-bar-score" data-hp-bar="score" style="display:none" aria-label="Enter score">Enter score</button>';
         bar.addEventListener('click', function (e) {
             var b = e.target && e.target.closest ? e.target.closest('button') : null;
             if (!b) return;
@@ -923,13 +923,12 @@
         var m = moneyNow();
         last = m;
         var bar = cardBar();
-        paintChip(bar.querySelector('.hp-money-chip'), m);
         var R = window.HardPanRound;
         if (R && typeof R.barFor === 'function') {
             var want = R.barFor();   // { menu, gps, card }
             ['menu', 'gps', 'card', 'score'].forEach(function (k) { var e = bar.querySelector('[data-hp-bar="' + k + '"]'); if (e) e.style.display = want[k] ? '' : 'none'; });
         }
-        Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-money'), function (el) { paintChip(el, m); });
+        Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-money'), function (el) { el.style.display = 'none'; });   // URGENT-023
         // Part D: the Bets / Leaderboard frames get this round at once too (gps-round.js feed).
         if (R && typeof R.feed === 'function') { try { R.feed(); } catch (e) {} }
         return m;

@@ -152,10 +152,11 @@
 
     // ---- 4. THE ROUND MENU --------------------------------------------------------
     var TILES = [
+        // URGENT-023: "+ Bet" lives here now (first), not on the map's / the card's bottom bar.
+        { k: 'bet', ico: '＋', t: 'Bet', s: 'Side bet: 1v1 or 2v2' },
         { k: 'card', ico: '📝', t: 'Card', s: 'Scores, hole by hole' },
         { k: 'bets', ico: '💰', t: 'Bets', s: 'Live money + leaderboard' },
         { k: 'gps', ico: '📍', t: 'GPS', s: 'Back to the map' },
-        { k: 'bet', ico: '＋', t: 'Bet', s: 'Add a game' },
         { k: 'share', ico: '🔗', t: 'Share', s: 'Group links, code, QR' },
         { k: 'settings', ico: '⚙️', t: 'Round settings', s: 'Players, tees, groups…' }
     ];
