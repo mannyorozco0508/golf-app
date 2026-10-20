@@ -1119,6 +1119,166 @@ html {
 </head>
 <body>
 
+<!-- GPS:BEGIN -->
+<!-- GAMES & BETS, HOME-STYLE DOOR CARDS (polish #29, option B, Manny 2026-10-20). Home's Games & Bets
+     door opens admin.html?start=lobby. In the HardPan app (front-door.js on(), the doors flag) that
+     page is this view instead of the old lobby (HARDPAN banner, moon, "Open something else", no way
+     back). A LOOK CHANGE ONLY: every card calls what the old lobby's own control called -
+       Game Day          selectHomeWidget('quick')  (createRoom on #hw-quick)
+       Road Trip         selectHomeWidget('trip')
+       Same as last week sameAsLastWeek(#same-as-last-week)   (lastRoomCode, Round Setup's copier)
+       Have a game code? the lobby's own "Open a round" card (#open-round-card: openRoundByCode),
+                         moved here when tapped - the same field, button and refusal line
+       Resume            resumeGame()               (lastRoomCode), shown only while that round is
+                         in progress (HardPanDoors.localRound / progressOf, then the server's copy)
+     The old lobby stays in the page, hidden, so those functions find their elements. The Consumer
+     build drops this block and keeps its lobby as it is. -->
+<style>
+    #gl-view { display: none; }
+    html.gl-on #lobby-screen { display: none !important; }
+    html.gl-on, html.gl-on body { background: #f2f4ef !important; }
+    html.gl-on body { padding-left: 0 !important; padding-right: 0 !important; }
+    html.gl-on #gl-view { display: block; }
+    #gl-view { --gl-line: #dfe5df; --gl-ink: #13241d; --gl-green: #0f4c3a; --gl-muted: #5d6b64; --gl-lime: #d4f27c; --gl-lime-ink: #10392d;
+        box-sizing: border-box; max-width: 480px; margin: 0 auto; color: var(--gl-ink); text-align: left;
+        padding: max(8px, env(safe-area-inset-top, 0px)) 16px max(20px, env(safe-area-inset-bottom, 0px));
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    #gl-view *, #gl-view *::before, #gl-view *::after { box-sizing: border-box; }
+    #gl-view button { font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer; }
+    #gl-view .gl-top { display: flex; align-items: center; min-height: 44px; }
+    #gl-view .gl-back { border: 0; background: none; color: var(--gl-green); font-weight: 700; font-size: 17px; line-height: 1; display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0; margin: 0; width: auto; }
+    #gl-view .gl-back b { font-size: 28px; font-weight: 400; line-height: 20px; margin-top: -3px; }
+    #gl-view .gl-h1 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 4px 2px 12px; line-height: 1.15; color: var(--gl-ink); }
+    #gl-view .gl-hero { display: flex; flex-direction: column; justify-content: flex-end; width: 100%; min-height: 150px; margin: 0 0 12px; padding: 22px 20px;
+        border: 0; border-radius: 22px; color: #fff; text-align: left; }
+    #gl-view .gl-hero.g { background: linear-gradient(160deg, #2a6a4f, #0f4c3a); }
+    #gl-view .gl-hero.n { background: #1d3557; }
+    #gl-view .gl-hero .em { font-size: 30px; line-height: 1.1; margin-bottom: auto; padding-bottom: 14px; }
+    #gl-view .gl-hero .t { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+    #gl-view .gl-hero .d { font-size: 15px; opacity: .85; margin-top: 4px; line-height: 1.3; }
+    #gl-view .gl-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    #gl-view .gl-tile { display: flex; flex-direction: column; gap: 4px; min-height: 96px; margin: 0; padding: 14px; width: 100%;
+        background: #fff; border: 1px solid var(--gl-line); border-radius: 16px; color: var(--gl-ink); text-align: left; }
+    #gl-view .gl-tile .t { font-size: 17px; font-weight: 800; line-height: 1.2; }
+    #gl-view .gl-tile .d { font-size: 13px; color: var(--gl-muted); line-height: 1.3; overflow-wrap: anywhere; }
+    #gl-view .gl-tile.lime { background: var(--gl-lime); border-color: var(--gl-lime); color: var(--gl-lime-ink); }
+    #gl-view .gl-tile.lime .d { color: var(--gl-lime-ink); opacity: .8; }
+    #gl-view .gl-tiles.one { grid-template-columns: 1fr; }
+    #gl-view [aria-disabled="true"] { opacity: .6; pointer-events: none; }
+    #gl-view .gl-join { margin: 0 0 12px; }
+    #gl-view .gl-join .w-card { margin: 0; text-align: left; }
+    #gl-view .gl-foot { display: block; width: 100%; border: 0; background: none; min-height: 44px; margin: 4px 0 0; padding: 8px 4px;
+        text-align: center; font-size: 15px; line-height: 1.35; color: var(--gl-muted); }
+    #gl-view .gl-foot b { color: var(--gl-green); }
+</style>
+<div id="gl-view" aria-label="Games and Bets">
+    <div class="gl-top"><button type="button" class="gl-back" id="gl-back"><b>&lsaquo;</b>Home</button></div>
+    <div class="gl-h1" role="heading" aria-level="1">Games &amp; Bets</div>
+    <button type="button" class="gl-hero g" id="gl-gameday"><span class="em" aria-hidden="true">&#x1F3CC;&#xFE0F;</span><span class="t">Game Day</span><span class="d">One round today &middot; group, games and money</span></button>
+    <button type="button" class="gl-hero n" id="gl-trip"><span class="em" aria-hidden="true">&#x1F690;</span><span class="t">Road Trip</span><span class="d">Several rounds &middot; teams, money across days</span></button>
+    <div class="gl-tiles one" id="gl-tiles">
+        <button type="button" class="gl-tile lime" id="gl-same" style="display:none;"><span class="t">&#x21BB; Same as last week</span><span class="d" id="gl-same-d"></span></button>
+        <button type="button" class="gl-tile" id="gl-code"><span class="t">&#x0023;&#xFE0F;&#x20E3; Have a game code?</span><span class="d">Join with a code, link or QR</span></button>
+    </div>
+    <div class="gl-join" id="gl-join" style="display:none;"></div>
+    <button type="button" class="gl-foot" id="gl-resume" style="display:none;"></button>
+</div>
+<script>
+(function () {
+    'use strict';
+    var W = window, D = W.document;
+    var p; try { p = new URLSearchParams(W.location.search); } catch (e) { return; }
+    var HP = W.HardPanDoors;
+    if (p.get('start') !== 'lobby' || p.get('game') || !HP || typeof HP.on !== 'function' || !HP.on()) return;
+    D.documentElement.classList.add('gl-on');
+    function $(id) { return D.getElementById(id); }
+    function short(n) { return String(n || '').split(' (')[0].trim(); }
+    function code() { try { return typeof W.lastWeekCode === 'function' ? W.lastWeekCode() : String(W.localStorage.getItem('lastRoomCode') || '').trim().toUpperCase(); } catch (e) { return ''; } }
+    function within(pr, ms) { return Promise.race([pr, new Promise(function (_, no) { setTimeout(function () { no(new Error('timeout')); }, ms); })]); }
+    function serverRound(c) { try { return typeof db !== 'undefined' && db ? within(db.ref('events/' + c).once('value'), 6000).then(function (s) { return s && s.val ? s.val() : null; }) : Promise.reject(new Error('no db')); } catch (e) { return Promise.reject(e); } }   /* global db */
+    function localData(c) {
+        try { var q = W.OfflineQueue, s = q && q.loadSnapshot(W.localStorage, c); return s && s.data ? s.data : null; } catch (e) { return null; }
+    }
+    // THE OLD CONTROL'S PENDING STATE, SHOWN ON THE NEW CARD. The old functions mark the control they
+    // were handed (setControlPending: aria-disabled, then restored on a refusal); this card follows it.
+    function mirror(src, card, text) {
+        if (!src || !card) return;
+        var d = card.querySelector('.d'), was = d ? d.textContent : '';
+        var sync = function () {
+            var on = src.getAttribute('aria-disabled') === 'true';
+            if (on) { card.setAttribute('aria-disabled', 'true'); if (d) d.textContent = text; }
+            else { card.removeAttribute('aria-disabled'); if (d) d.textContent = was; }
+        };
+        try { new MutationObserver(sync).observe(src, { attributes: true, attributeFilter: ['aria-disabled'] }); } catch (e) {}
+        sync();
+    }
+    // SAME AS LAST WEEK: offered when the old lobby offers it (syncSameAsLastWeek: lastRoomCode), with
+    // what that round was - course, golfers, games.
+    function sameText(d) {
+        var ps = d && Array.isArray(d.players) ? d.players.filter(function (x) { return x && String(x.name || '').trim(); }).map(function (x) { return String(x.name).trim(); }) : [];
+        var bits = [];
+        if (d && (d.courseName || d.eventName)) bits.push(short(d.courseName || d.eventName));
+        if (ps.length) bits.push(ps.length <= 3 ? ps.join(', ') : ps.slice(0, 2).join(', ') + ' +' + (ps.length - 2));
+        var g = [];
+        try { g = typeof HP.gamesOf === 'function' ? HP.gamesOf(d) : []; } catch (e) { g = []; }
+        var sm = (d && d.sideMatches) || {}, stake = null;
+        Object.keys(sm).forEach(function (k) { var m = sm[k]; if (m && m.format === 'nassau' && Number(m.frontStake) && stake === null) stake = Number(m.frontStake); });
+        g = g.map(function (x) { return x === 'Nassau' && stake ? 'Nassau $' + stake : x; });
+        if (g.length) bits.push(g.join(', '));
+        return bits.join(' · ');
+    }
+    function paintSame() {
+        var c = code(), b = $('gl-same'), dEl = $('gl-same-d');
+        if (!b) return;
+        b.style.display = c ? '' : 'none';
+        $('gl-tiles').classList.toggle('one', !c);
+        if (!c) return;
+        var put = function (d) { if (b.getAttribute('aria-disabled') !== 'true') dEl.textContent = (d && sameText(d)) || ('Copies round ' + c + ' — same course, games and money'); };
+        put(localData(c));
+        serverRound(c).then(function (d) { if (d) put(d); }, function () {});
+    }
+    // RESUME <course> · thru N: the old lobby's Resume (resumeGame, lastRoomCode), only while that
+    // round is in progress - this phone's copy first (works with no signal), then the server's.
+    function paintResume() {
+        var c = code(), b = $('gl-resume');
+        if (!b || !c) return;
+        var put = function (course, thru) { b.innerHTML = '▶︎ <b></b> · ' + (thru ? 'thru ' + thru : 'not started'); b.querySelector('b').textContent = 'Resume ' + (short(course) || c); b.style.display = ''; };
+        var hide = function () { b.style.display = 'none'; b.textContent = ''; };
+        var local = null; try { local = typeof HP.localRound === 'function' ? HP.localRound(c) : null; } catch (e) { local = null; }
+        if (local && !local.finished) put(local.data.courseName || local.data.eventName, local.thru);
+        serverRound(c).then(function (d) {
+            if (!d) { var held = false; try { held = typeof HP.heldFor === 'function' && !!HP.heldFor(c); } catch (e) {} if (!held) hide(); return; }
+            if (!d.players || !d.courseData) return;
+            var pr = HP.progressOf(d);
+            if (pr.finished) hide(); else put(d.courseName || d.eventName, pr.thru);
+        }, function () {});
+    }
+    // "Have a game code?": the old lobby's own Open-a-round card, here.
+    function openJoin() {
+        var box = $('gl-join'), card = $('open-round-card');
+        if (!box || !card) return;
+        if (card.parentNode !== box) box.appendChild(card);
+        var show = box.style.display === 'none';
+        box.style.display = show ? '' : 'none';
+        var i = $('join-code-input');
+        if (show && i) { try { i.focus(); } catch (e) {} }
+    }
+    function wire() {
+        $('gl-back').addEventListener('click', function () { W.location.href = 'home.html'; });
+        $('gl-gameday').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
+        $('gl-trip').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('trip'); });
+        $('gl-same').addEventListener('click', function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); });
+        $('gl-code').addEventListener('click', openJoin);
+        $('gl-resume').addEventListener('click', function () { if (typeof W.resumeGame === 'function') W.resumeGame(); });
+        mirror($('hw-quick'), $('gl-gameday'), '⏳ Starting…');
+        mirror($('same-as-last-week'), $('gl-same'), '⏳ Checking…');
+        paintSame();
+        paintResume();
+    }
+    if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', wire); else wire();
+})();
+</script>
+<!-- GPS:END -->
 <div class="container" id="lobby-screen">
     <!-- ACCOUNT. The email-link flow used to own this screen as a tall "Keep this
          organizer" card above Resume. It is the same flow, behind this link. -->
