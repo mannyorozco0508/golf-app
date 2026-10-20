@@ -2,8 +2,8 @@
 // THE APPLE WATCH, PHONE SIDE (feature 10 - plan + scaffold, docs/WATCH-APP-PLAN.md)
 //   gps-view.js sends the CURRENT hole's front / center / back to
 //   window.Capacitor.Plugins.HardPanWatch.sendHole(...) when the plugin exists AND the
-//   'watch' switch (gps-config.js features.watch) is on. Today neither is true: no plugin
-//   ships and the switch is false, so nothing happens. A stubbed plugin proves the payload,
+//   'watch' switch (gps-config.js features.watch) is on - both true from 022 (the HardPanWatch
+//   target + plugin in the app, the switch on); the web has no plugin, so nothing happens there. A stubbed plugin proves the payload,
 //   that only numbers (never a coordinate) go to the watch, that an unentitled phone sends no
 //   numbers (007), and that a score from the watch goes through the host's own saveScore.
 // ============================================================================
@@ -61,8 +61,8 @@ function world(o) {
     return { V, sent, listeners, saved, sb, round: opts.round, pendingAsked: () => pendingAsked };
 }
 
-test('the switch ships off, and there is no plugin: nothing is sent, nothing is listened for', () => {
-    assert.match(read('gps-config.js'), /features: \{[^}]*\bwatch: false\b[^}]*\}/);
+test('the switch is on (022), and with no plugin (the web): nothing is sent, nothing is listened for', () => {
+    assert.match(read('gps-config.js'), /features: \{[^}]*\bwatch: true\b[^}]*\}/);
     const shipped = world({ watch: undefined, plugin: false });
     assert.strictEqual(shipped.sent.length, 0);
     assert.strictEqual(shipped.V.watchSent(), null);
@@ -80,8 +80,11 @@ test('the switch on but no plugin (every build today): nothing happens, nothing 
 test('switch on + plugin: the current hole\'s F / C / B, in the golfer\'s units', () => {
     const w = world();
     const last = w.sent[w.sent.length - 1];
-    assert.deepStrictEqual(last, { hole: 4, par: 5, front: 231, center: 243, back: 255, units: 'yd', onGreen: false, entitled: true, tournament: false, score: 5, round: 'ABC' });
-    assert.deepStrictEqual(Object.keys(last).sort(), ['back', 'center', 'entitled', 'front', 'hole', 'onGreen', 'par', 'round', 'score', 'tournament', 'units']);
+    // 022: plays (the phone's own plays-like to the center) rides along - a number, or null when the phone has none.
+    assert.ok(last.plays === null || (Number.isInteger(last.plays) && last.plays > 0), 'plays: ' + last.plays);
+    const { plays, ...rest } = last;
+    assert.deepStrictEqual(rest, { hole: 4, par: 5, front: 231, center: 243, back: 255, units: 'yd', onGreen: false, entitled: true, tournament: false, score: 5, round: 'ABC' });
+    assert.deepStrictEqual(Object.keys(last).sort(), ['back', 'center', 'entitled', 'front', 'hole', 'onGreen', 'par', 'plays', 'round', 'score', 'tournament', 'units']);
     // NO LOCATION DATA LEAVES THE PHONE: numbers only - no lat / lng, no point, no accuracy.
     assert.ok(!/lat|lng|lon|pt|acc|33\.4|79\.1/i.test(JSON.stringify(last)), JSON.stringify(last));
     assert.deepStrictEqual(w.V.watchSent(), last);
@@ -147,8 +150,34 @@ test('a spectator\'s phone never writes a score from the watch', () => {
     assert.strictEqual(w.V.watchScore({ hole: 4, strokes: 4 }), false);
     assert.strictEqual(w.saved.length, 0);
 });
-test('the scaffold is not in the Xcode project (the current build is unaffected)', () => {
+test('022: the watch app is in the Xcode project - its own watchOS target, embedded in the iPhone app, the bridge and the session in the App target', () => {
     const pbx = read('gps-beta/ios/App/App.xcodeproj/project.pbxproj');
-    assert.ok(!/HardPanWatch|WatchSession|PhoneBridge|watchkitapp|WatchConnectivity/.test(pbx));
-    for (const f of ['gps-beta/ios/Watch/HardPanWatch/HardPanWatchApp.swift', 'gps-beta/ios/App/PhoneBridge/HardPanWatchPlugin.swift', 'docs/WATCH-APP-PLAN.md']) assert.ok(fs.existsSync(path.join(__dirname, f)), f);
+    assert.ok(/name = HardPanWatch;/.test(pbx) && /SDKROOT = watchos;/.test(pbx), 'a watchOS target');
+    assert.ok(/PRODUCT_BUNDLE_IDENTIFIER = com\.rattlegolf\.gpsbeta\.watchkitapp;/.test(pbx), 'its bundle id');
+    assert.ok(/INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com\.rattlegolf\.gpsbeta;/.test(pbx), 'a companion of the GPS app');
+    assert.ok(/Embed Watch Content/.test(pbx) && /dstPath = "\$\(CONTENTS_FOLDER_PATH\)\/Watch";/.test(pbx), 'embedded in the iPhone app');
+    for (const f of ['HardPanWatchPlugin.swift in Sources', 'PhoneWatchSession.swift in Sources', 'HardPanBridgeViewController.swift in Sources', 'WatchSessionManager.swift in Sources']) assert.ok(pbx.indexOf(f) !== -1, f);
+    assert.strictEqual((pbx.match(/WatchProtocol\.swift in Sources \*\/ = /g) || []).length, 2, 'WatchProtocol.swift in BOTH targets');
+    assert.ok(/rootViewController = HardPanBridgeViewController\(\)/.test(read('gps-beta/ios/App/App/SceneDelegate.swift')), 'the bridge that registers the plugin');
+    assert.ok(/PhoneWatchSession\.shared\.activate\(\)/.test(read('gps-beta/ios/App/App/AppDelegate.swift')), 'WatchConnectivity at launch');
+});
+test('022: the card hands its own saveScore to the GPS screen (the round trip ends in index.html saveScore)', () => {
+    const ix = read('index.html');
+    const m = /g\.mount\(\{[\s\S]*?\}\);/.exec(ix);
+    assert.ok(m && /saveScore: \(pid, hole, val\) => saveScore\(pid, hole, val\)/.test(m[0]), 'mount gets saveScore');
+});
+test('022 round trip: hole -> watch (numbers + plays), watch score -> the card\'s save, the next numbers carry the saved score', () => {
+    const w = world();
+    const first = w.sent[w.sent.length - 1];
+    assert.strictEqual(first.hole, 4); assert.strictEqual(first.score, 5);
+    // The watch saves a 4 on hole 4 (sendMessage / transferUserInfo -> plugin -> 'watchScore').
+    w.listeners.watchScore[0]({ kind: 'score', hole: 4, strokes: 4, round: 'ABC', id: 'w1', at: 1 });
+    assert.deepStrictEqual(w.saved, [[1, 4, '4']]);
+    // The card writes it; the round comes back with it; the watch is told (its "sending" clears).
+    w.sb.currentData.scores.p1_h4 = '4';
+    w.V.roundUpdated({ gpsPins: {} }, {});
+    w.V.setHole(5, 4); w.V.setHole(4, 5);
+    const back = w.sent[w.sent.length - 1];
+    assert.strictEqual(back.hole, 4);
+    assert.strictEqual(back.score, 4, 'the watch gets the saved score back');
 });

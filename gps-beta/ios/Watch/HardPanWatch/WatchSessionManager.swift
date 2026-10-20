@@ -66,10 +66,27 @@ final class WatchSessionManager: NSObject, ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// TESTS ONLY (Debug builds): `-hpAutoScore N` on the watch app's launch arguments saves N for the
+    /// first hole the phone sends - the same saveScore as the Save button (simulators cannot tap the watch).
+    private var autoScoreDone = false
+    private var autoScore: Int? {
+        let a = ProcessInfo.processInfo.arguments
+        guard let i = a.firstIndex(of: "-hpAutoScore"), i + 1 < a.count, let n = Int(a[i + 1]), (1...20).contains(n) else { return nil }
+        return n
+    }
+    #endif
+
     fileprivate func apply(_ d: [String: Any]) {
         if (d[WatchKey.kind] as? String) == WatchKind.clear { state = nil; pendingHole = nil; return }
         guard let s = HoleState(d) else { return }
         state = s
+        #if DEBUG
+        if !autoScoreDone, let n = autoScore, !s.round.isEmpty {
+            autoScoreDone = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.saveScore(hole: s.hole, strokes: n) }
+        }
+        #endif
         if pendingHole == s.hole { pendingHole = nil }
         // The phone's saved score is the truth: the watch stops showing its own copy as "sending".
         if let saved = s.score, unsent[s.hole] == saved { unsent[s.hole] = nil }

@@ -7,7 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // 022 (Watch): WatchConnectivity up at launch, so a score the watch sent while the app was
+        // closed is kept until the GPS screen asks for it (PhoneWatchSession.takePending).
+        PhoneWatchSession.shared.activate()
         return true
     }
 

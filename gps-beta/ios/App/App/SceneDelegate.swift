@@ -8,7 +8,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        // HardPan's local plugins (the Live Activity; the Watch when it is in) - PhoneBridge/HardPanBridgeViewController.swift.
+        // HardPan's local plugins - the Live Activity and the Watch (022) - PhoneBridge/HardPanBridgeViewController.swift.
         window?.rootViewController = HardPanBridgeViewController()
         window?.makeKeyAndVisible()
 

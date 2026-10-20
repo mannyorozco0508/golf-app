@@ -6012,19 +6012,22 @@
         var v = G.distanceIn(m, u);
         return (v == null || !isFinite(v) || v < 0 || v > 9999) ? null : Math.round(v);
     }
-    // The payload: { hole, par, front, center, back, units, onGreen, entitled, tournament, score, round }.
+    // The payload: { hole, par, front, center, back, plays, units, onGreen, entitled, tournament, score, round }.
+    // plays (022): the phone's own plays-like to the center (the same number as the Plays-like pill).
     // round is the round's code: a score the watch queued for another round is never written here.
     function watchPayload(nums, aim, o, u) {
         var pro = hasGpsPro(), hole = Number(S.hole);
         var par = Number((typeof S.holeMeta === 'function' && (S.holeMeta(hole) || {}).par) || S.par) || null;
-        var front = null, center = null, back = null, onGreen = false;
+        var front = null, center = null, back = null, plays = null, onGreen = false;
         if (pro && nums) {
             onGreen = !!nums.onGreen;
             front = onGreen ? null : watchNum(nums.frontM, u);
             center = (aim && o) ? watchNum(G.haversineMeters(o.pt, aim), u) : null;
             back = watchNum(nums.backM, u);
+            var pl = null; try { pl = playsNow(); } catch (e) { pl = null; }
+            if (pl && isFinite(pl.exact) && !onGreen) { var pv = Math.round(pl.exact * (u === 'm' ? G.M_PER_YD : 1)); plays = pv > 0 && pv <= 9999 ? pv : null; }
         }
-        return { hole: hole, par: par, front: front, center: center, back: back, units: u === 'm' ? 'm' : 'yd',
+        return { hole: hole, par: par, front: front, center: center, back: back, plays: plays, units: u === 'm' ? 'm' : 'yd',
             onGreen: onGreen, entitled: pro, tournament: tournament(), score: myScore(hole), round: String(S.eventCode || '') };
     }
     function watchSync(nums, aim, o, u) {
