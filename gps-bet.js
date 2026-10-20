@@ -65,10 +65,12 @@
     // A golfer's short name - the first name, or "Test A." when two golfers in the round share it
     // (URGENT-015 walk: "Test vs Test" on a round of Test Alpha, Test Bravo ...).
     function first(p) {
+        // polish #2/#16: text-safe.js's one rule ("Test A", "Randy T.", the full name past that).
+        if (typeof golferShortName === 'function' && p && p.name) return golferShortName(p, players());
         var parts = String((p && p.name) || '').trim().split(/\s+/), f = parts[0] || '';
         if (parts.length < 2) return f;
         var same = players().filter(function (q) { return String((q && q.name) || '').trim().split(/\s+/)[0].toLowerCase() === f.toLowerCase(); }).length;
-        return same > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : f;
+        return same > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + (parts[parts.length - 1].length > 1 ? '.' : '') : f;
     }
     function byId(id) { return players().filter(function (p) { return String(p.id) === String(id); })[0] || null; }
     function holes() { var d = data() || {}; return (d.courseData || []).slice().sort(function (a, b) { return a.hole - b.hole; }); }

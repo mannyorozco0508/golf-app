@@ -451,6 +451,9 @@ var o = opts || {};
 var pressHref = o.pressHref || function () { return ""; };
 var maySee = o.maySee || function () { return true; };
     if (typeof buildLiveMatchStates !== 'function') return '';
+    // Two golfers with one first name read as two names (polish #2): the
+    // engines label from the first word, so they get the round's display copy.
+    if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);
     // EVERY wager visible to this viewer, not just the round format. A real
     // Nassau is created from Action and lives in sideMatches, so reading only
     // the round format left the supported path invisible on the scorecard.

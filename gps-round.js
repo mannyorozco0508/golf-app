@@ -208,7 +208,7 @@
             + '<button type="button" class="hs-btn alt" data-hs="qr">📷 Show QR code</button>';
         if (gs.length > 1 && organizer()) {
             html += '<div class="hs-h">Scorekeeper links · one per group</div>' + gs.map(function (b) {
-                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return String(p.name || '').split(' ')[0]; }).join(', ');
+                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return typeof golferShortName === 'function' ? golferShortName(p, players) : String(p.name || '').split(' ')[0]; }).join(', ');
                 return '<div class="hs-row"><div class="hs-grow"><b>Group ' + b.group + '</b><small>' + esc(names) + '</small></div>'
                     + '<button type="button" data-hs-copy="' + b.group + '">Copy</button><button type="button" data-hs-sharegroup="' + b.group + '">Share</button></div>';
             }).join('');

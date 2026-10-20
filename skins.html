@@ -1136,7 +1136,7 @@ html {
                 if (head) head.textContent = hasGroupLock ? `⚔️ Group ${lockedGroup}’s Matches` : '⚔️ Matches';
                 // Progress and waiting-on text from the presenter, one row per match.
                 const rowsById = {};
-                buildSideActionRows(currentData, courseData, savedScores, players).forEach(r => { rowsById[r.key] = r; });
+                buildSideActionRows(shownRound(), courseData, savedScores, shownList(players)).forEach(r => { rowsById[r.key] = r; });
                 document.getElementById('bets-matches').innerHTML =
                     visible.map(id => buildBetsMatchCard(id, sideMatches[id], rowsById[id], players, courseData, savedScores)).join('');
                 // GPS:BEGIN
@@ -1157,7 +1157,7 @@ html {
                 const g = games.find(x => x.key === key);
                 return (g && g.config && Array.isArray(g.config.participantIds)) ? g.config.participantIds : [];
             };
-            const rows = buildActionRows(currentData, courseData, savedScores, players)
+            const rows = buildActionRows(shownRound(), courseData, savedScores, shownList(players))
                 .filter(r => !(r.role === 'main' && !(r.stake > 0)))
                 .filter(r => r.key === 'birdie' ? true : canLinkSeeWager(participantsOf(r.key), lock, groupOf));
             if (rows.length === 0) {
@@ -1180,7 +1180,16 @@ html {
     // ONE MATCH, IN FULL: the segment rows, the presses, the money position - what
     // the Matches tab used to draw beside its buttons. No buttons here: pressing and
     // removing are the Matches tab's job.
+    // POLISH #2: the round's display copy for the presenters - "Test A" / "Test B" when two
+    // golfers share a first name (text-safe.js). Labels only; never saved.
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function buildBetsMatchCard(matchId, sm, row, players, courseData, savedScores) {
+        // TWO GOLFERS, ONE FIRST NAME (polish #2): every line on this card is cut from
+        // a name's first word, so the card reads the round's display copy - "Test A v
+        // Test B", never "Test v Test". Labels only: same ids, same scores, same money.
+        const shownData = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData;
+        if (typeof playersForDisplay === 'function') players = playersForDisplay(players, currentData.players);
         const teamAPlayers = players.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 1" }));
         const teamBPlayers = players.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 2" }));
         const virtualPlayers = teamAPlayers.concat(teamBPlayers);
@@ -1270,7 +1279,7 @@ html {
             // prints, gated the same way, so nothing here computes money.
             body += `<div class="bets-row"><span class="status-pill pill-main">${escapeHtml(row ? row.status : '')}</span></div>`;
             const hlRc = (typeof buildSideMatchReceipts === 'function')
-                ? (buildSideMatchReceipts(currentData, courseData, savedScores) || []).find(x => x.matchId === matchId)
+                ? (buildSideMatchReceipts(shownData, courseData, savedScores) || []).find(x => x.matchId === matchId)
                 : null;
             const hlFinished = (typeof computeRoundFinish === 'function')
                 && !!computeRoundFinish(currentData, courseData, savedScores).finished;
@@ -1324,7 +1333,7 @@ html {
             // into sentences. Nothing here computes money, and the pills above are
             // untouched - they are match STATE, this is what it is worth.
             const smlRc = (typeof buildSideMatchReceipts === 'function')
-                ? (buildSideMatchReceipts(currentData, courseData, savedScores) || [])
+                ? (buildSideMatchReceipts(shownData, courseData, savedScores) || [])
                     .find(x => x.matchId === matchId)
                 : null;
             // FINISHED MEANS EVERY HOLE IN RANGE IS POSTED, not `closed`. A segment

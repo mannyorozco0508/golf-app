@@ -238,7 +238,7 @@
         if (!sh) return;
         var box = sh.querySelector('.gps-ag-players');
         box.textContent = '';
-        roundPlayers().forEach(function (p) { var sp = document.createElement('span'); sp.textContent = String(p.name || '').split(' ')[0]; box.appendChild(sp); });
+        roundPlayers().forEach(function (p) { var sp = document.createElement('span'); sp.textContent = (typeof golferShortName === 'function' ? golferShortName(p, roundPlayers()) : String(p.name || '').split(' ')[0]); box.appendChild(sp); });
         sh.style.display = '';
     }
     function closeAddGame() { var sh = S && S.el.querySelector('.gps-addgame'); if (sh) sh.style.display = 'none'; }
@@ -3535,9 +3535,11 @@
         } catch (e) { return null; }
     }
     function shortName(d, p) {
+        // polish #2/#16: text-safe.js's one rule ("Test A", not "Test A.").
+        if (typeof golferShortName === 'function' && p && p.name && String(p.name).trim()) return golferShortName(p, d.players || []);
         var parts = String((p && p.name) || '').trim().split(/\s+/), first = parts[0] || 'Golfer';
         var same = (d.players || []).filter(function (q) { return q !== p && String(q.name || '').trim().split(/\s+/)[0] === first; }).length;
-        return same && parts[1] ? first + ' ' + parts[1].charAt(0) + '.' : first;
+        return same && parts[1] ? first + ' ' + parts[1].charAt(0) + (parts[1].length > 1 ? '.' : '') : first;
     }
     function setPick(id, dir) {
         try { localStorage.setItem(pickKey(), String(id)); } catch (e) {}

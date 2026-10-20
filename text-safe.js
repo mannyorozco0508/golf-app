@@ -75,6 +75,61 @@ function getSmartDisplayName(player, allPlayers) {
     return `${first} ${last}`;
 }
 
+// ---- SAME FIRST NAME, EVERY SCREEN (polish #2, 2026-10-20) ---------------
+// Two Mikes in one round read "Mike v Mike" / "Mike +$5" on the hole sheet,
+// the Nassau strip, LIVE MATCHES, Bets and Round Complete, because every one
+// of those lines is cut from player.name's FIRST WORD - most of them inside
+// the engines (match-engine t1Name, money-engine statusText, settlement-engine
+// nameA), which this change does not touch.
+//
+// golferShortName: the name a short line shows - getSmartDisplayName against
+// the round's roster ("Mike" alone; "Mike R." / "Mike S." when two Mikes;
+// the full name when the initials collide too). Pure; does not escape.
+//
+// roundDataForDisplay: the SAME round, for a renderer to hand to an engine,
+// with only the colliding golfers' names swapped for that label joined by
+// no-break spaces ("Test\u00a0A"). Every engine label is
+// name.split(' ')[0], and a no-break space is not ' ', so the engine's own
+// label comes out "Test A" - without one line of engine code changing. The
+// engines' arithmetic never reads a name (ids, handicaps, scores), so no
+// figure can move. NO COLLISION -> THE SAME OBJECT BACK, so every round
+// without two same first names is untouched byte for byte. A COPY, NEVER
+// SAVED: callers pass it to presenters only; nothing writes it back.
+function golferShortName(player, allPlayers) {
+    if (!player || typeof player.name !== 'string' || !player.name.trim()) return String((player && player.name) || '').trim();
+    const roster = (Array.isArray(allPlayers) ? allPlayers : []).filter(p => p && typeof p.name === 'string' && p.name.trim());
+    if (!roster.includes(player)) roster.push(player);
+    return getSmartDisplayName(player, roster);
+}
+
+// Short labels for a whole roster, keyed by id. Only names that change are in it.
+function golferShortNameMap(players) {
+    const list = Array.isArray(players) ? players : [];
+    const out = {};
+    list.forEach(p => {
+        if (!p || typeof p.name !== 'string' || !p.name.trim()) return;
+        const label = golferShortName(p, list);
+        if (label !== p.name.trim().split(/\s+/)[0]) out[String(p.id)] = label;
+    });
+    return out;
+}
+
+// roster: the whole round (optional) - a group-scoped list still collides
+// against every golfer in the round, not only the ones on screen.
+function playersForDisplay(players, roster) {
+    if (!Array.isArray(players)) return players;
+    const map = golferShortNameMap(Array.isArray(roster) ? roster : players);
+    if (!Object.keys(map).length) return players;
+    return players.map(p => (p && map[String(p.id)] !== undefined)
+        ? Object.assign({}, p, { name: map[String(p.id)].replace(/ /g, '\u00a0') }) : p);
+}
+
+function roundDataForDisplay(data) {
+    if (!data || !Array.isArray(data.players)) return data;
+    const ps = playersForDisplay(data.players);
+    return ps === data.players ? data : Object.assign({}, data, { players: ps });
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { escapeHtml, getSmartDisplayName };
+    module.exports = { escapeHtml, getSmartDisplayName, golferShortName, golferShortNameMap, playersForDisplay, roundDataForDisplay };
 }
