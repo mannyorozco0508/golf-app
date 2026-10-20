@@ -6522,6 +6522,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             holes: played, at: h => gpsSheetHole(Number(h), here.golfers),
             next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
             last: order.indexOf(n) === order.length - 1,
+            // POLISH #10: the last hole saved (every golfer scored) - "Finish & settle up" opens. It
+            // only shows the money (writes nothing); the round is finished by the golfer, never here.
+            finish: () => {
+                const R = window.HardPanRound;
+                if (R && typeof R.openFinish === 'function' && R.openFinish()) return;
+                if (typeof uiToast === 'function') uiToast('\uD83C\uDFC1 Last hole saved \u2014 \u2630 Menu \u203A Finish & settle up', 5000);
+            },
             host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
         }));
     }

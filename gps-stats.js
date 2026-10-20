@@ -749,7 +749,8 @@
         var away = Number(c.hole) !== Number(c.home);
         w.querySelector('.hp-ss-earlier').textContent = away ? 'An earlier hole \u2014 Save goes back to hole ' + c.home + '.' : '';
         w.querySelector('.hp-ss-meta').textContent = [c.si ? 'HCP ' + c.si : '', c.yards ? c.yards + 'y' : ''].filter(Boolean).join(' · ');
-        var body = w.querySelector('.hp-ss-body'), keep = body.scrollTop;
+        var body = w.querySelector('.hp-ss-body'), keep = ss.toTop ? 0 : body.scrollTop;
+        ss.toTop = false;
         body.textContent = '';
         // GOLFERS
         var chips = el('div', 'hp-ss-chips');
@@ -916,9 +917,13 @@
             var rec = qLoad(c.code, pid);
             if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
         });
-        var last = c.last, next = c.next;
+        var last = c.last, next = c.next, finish = c.finish;
+        // POLISH #10: the last hole saved with every golfer on the sheet scored - "Finish & settle
+        // up" opens (ctx.finish: display only, nothing is finished or written by it).
+        var allIn = last && (c.golfers || []).every(function (g) { return ssStrokes(String(g.id)) > 0; });
         ssClose();
         if (!last && typeof next === 'function') next();
+        else if (allIn && typeof finish === 'function') { try { finish(); } catch (e) {} }
     }
     // TOOLS: "Track stats for others" - this phone only, off by default.
     function ssPlaceToggle(menu) {
