@@ -220,7 +220,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.equal(r.ok, true, r.reason);
         const [s1, tees, end] = J(r);
         assert.match(s1.text, /^‹\nGPS\nWhere are you playing\?/);
-        assert.match(s1.text, /📍 Start GPS/);
+        assert.match(s1.text, /Start Round/);
         assert.doesNotMatch(s1.text, /Next: Players/);
         assert.ok(tees.tees[2].endsWith('*'), 'White picked: ' + tees.tees[2]);
         assert.match(end.at, /^index\.html\?game=\w+&group=1&me=\d+$/, 'straight to the round (the map), as its golfer');

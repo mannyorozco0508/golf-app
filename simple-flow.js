@@ -225,7 +225,7 @@
         var twin = function (a, b) {
             if (club(a.name) !== club(b.name) || !near(a, b)) return false;
             var x = part(a.name), y = part(b.name);
-            return x === y || (!!x && !!y && (x.indexOf(y) !== -1 || y.indexOf(x) !== -1));
+            return x === y || !x || !y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
         };
         return out.filter(function (e) {
             if (SH.test(e.key)) return true;
@@ -279,7 +279,7 @@
                 // you are standing on (on the phone, ✓ GPS is only the app's GolfAPI courses).
                 var c0 = S.near[0], cand = c0 ? S.near.filter(function (x) { return x.c.ready && x.d - c0.d <= 1; }).concat(S.near) : S.near;
                 if (S.mode !== 'gps') cand = S.near;
-                if (!courseKey() && !courseName() && cand.length) pick(cand[0].c.key, cand[0].c.name);
+                if (!courseKey() && !courseName() && cand.length) { pick(cand[0].c.key, cand[0].c.name); if (S.mode === 'gps') lookup(cand[0].c.key, cand[0].c.name); }
                 if (S.step === 1) render();
             });
         });
@@ -294,6 +294,80 @@
     // and put back if the load blanks it, the tee list waits on the card read itself (not a
     // fixed 8 s), and Next / Start GPS / Start round wait for the card (reading it again
     // once if the first read came back empty) and say so in place if there is none.
+    // ---- NO SCORECARD OR NO GPS: LOOK IT UP, BY ITSELF (URGENT-021, Manny 8:40 AM: "This is what I
+    // don't want to do. Enter pars.") --------------------------------------------------------------
+    // A picked course with no card or no GPS: the same online lookup as Round Setup's "Search online"
+    // (gps-live find -> gpsCourse, our Cloud Functions - the phone never calls GolfAPI), once, with
+    // "Getting <course>'s scorecard…". The function saves it for everyone: its card
+    // (global_courses/gapi_<id>), its GPS (gps_courses), and the link from our record when we have
+    // one (gps_links). Its own guards hold the credits (a floor, per-day caps, one pull per course);
+    // this phone asks once per course per 30 days. Not found: said plainly, with Pick another course
+    // and Request this course first, and "Enter pars yourself" last and small.
+    var LOOK = 'hardpan_autolook_', LOOK_MS = 30 * 24 * 3600 * 1000;
+    function hasCard(key) {
+        try { if (typeof coursePresets !== 'undefined' && coursePresets[key] && (coursePresets[key].data || []).length) return true; } catch (e) {}   /* global coursePresets */
+        var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses : {};
+        return !!(gc[key] && (gc[key].data ? (gc[key].data.length || Object.keys(gc[key].data).length) : gc[key].name));
+    }
+    function liveOn() { var L = W.HardPanGpsLive; try { return !!(L && L.on && L.on()); } catch (e) { return false; } }
+    function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
+    function lookup(key, name) {
+        var L = W.HardPanGpsLive;
+        if (!key || !liveOn() || !L.find || !L.course) return false;
+        if (ready(key) && hasCard(key)) return false;
+        var at = Number(ls(LOOK + key) || 0);
+        if (at && Date.now() - at < LOOK_MS) { if (!hasCard(key)) S.lookup = { key: key, state: 'none' }; return false; }
+        ls(LOOK + key, String(Date.now()));
+        try { (W.__sfLook = W.__sfLook || []).push(key); } catch (e) {}   // (the tests count the lookups made)
+        var c = courses().filter(function (x) { return x.key === key; })[0] || {};
+        S.lookup = { key: key, state: 'busy' };
+        if (S.step === 1) render();
+        L.find(name, { city: c.city || '', state: c.state || '' }).then(function (f) {
+            var hit = null;
+            if (f && f.status === 'ok') {
+                hit = f.clear || ((f.matches || []).length === 1 ? f.matches[0] : null);
+                // Two at one club (O'odham / Piipaash): the one whose name holds ours in (...).
+                var pt = partOf(name);
+                if (!hit && pt) { var ms = (f.matches || []).filter(function (m) { return nk(String(m.club || '') + String(m.course || '')).indexOf(pt) !== -1; }); if (ms.length === 1) hit = ms[0]; }
+            }
+            if (!hit) return { status: f && f.status === 'ok' ? 'ambiguous' : ((f && f.status) || 'none') };
+            return L.course(hit.id, key);
+        }).then(function (r) {
+            if (!S.lookup || S.lookup.key !== key) return;
+            // Setting up a NEW course needs a signed-in golfer (the function's rule): say that, and ask
+            // again after sign-in (the 30-day mark is cleared).
+            if (r && (r.status === 'account' || r.status === 'signin')) { ls(LOOK + key, null); S.lookup = { key: key, state: 'signin' }; if (S.step === 1) render(); return; }
+            if (!(r && r.status === 'ready')) { S.lookup = { key: key, state: 'none', why: r && r.status }; if (S.step === 1) render(); return; }
+            var H = HD(), fin = function () {
+                S.lookup = null;
+                if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
+                else if (S.step === 1) render();
+            };
+            // Its card is a new shared record (no card of ours): read it, and that record is the pick.
+            if (r.cardKey && !hasCard(key) && wizDb()) {
+                wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
+                    var rec = snap && snap.val ? snap.val() : null;
+                    if (rec && rec.name && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;
+                    if (rec && rec.name && courseKey() === key) pick(r.cardKey, rec.name);
+                    fin();
+                }, fin);
+            } else fin();
+        }, function () { if (S.lookup && S.lookup.key === key) { S.lookup = { key: key, state: 'none' }; if (S.step === 1) render(); } });
+        return true;
+    }
+    function lookupBox(key, name) {
+        var lk = S.lookup && S.lookup.key === key ? S.lookup : null;
+        var nm = esc(String(name || '').split(' (')[0]);
+        if (lk && lk.state === 'busy') return '<div class="sf-card" id="sf-lookup" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + nm + '\u2019s scorecard\u2026</span></div>';
+        if (lk && lk.state === 'signin') return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:6px;">Sign in to load ' + nm + '.</div><div class="sf-note" style="margin-bottom:10px;">Its scorecard and GPS are online - setting up a new course needs a signed-in golfer (Apple, Google or email). Once, for everyone.</div>'
+            + '<button type="button" class="sf-cta" data-sf="signin" style="margin-bottom:8px;">Sign in</button><button type="button" class="sf-btn" data-sf="change" style="width:100%;min-height:46px;">Pick another course</button></div>';
+        if (lk && lk.state === 'none' && hasCard(key) && S.noCard !== key) return '<div class="sf-note" id="sf-lookup" style="margin:-4px 2px 10px;">No GPS for ' + nm + ' in our data yet \u2014 its card and scores work; on the map, \u201cTap the middle of the green\u201d sets each green.</div>';
+        if ((lk && lk.state === 'none') || S.noCard === key) return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">' + nm + ' isn\u2019t in our course data yet.</div>'
+            + '<button type="button" class="sf-cta" data-sf="change" style="margin-bottom:8px;">Pick another course</button>'
+            + '<button type="button" class="sf-btn" data-sf="request" style="width:100%;min-height:46px;">Request this course</button>'
+            + '<div style="text-align:center;margin-top:6px;"><button type="button" class="sf-link muted" data-sf="enterpars" style="font-size:13px;">Enter pars yourself</button></div></div>';
+        return '';
+    }
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;
@@ -349,8 +423,8 @@
             if (!r.ok || !pv.ok) {
                 // URGENT-019 (Papago): not a dead end - the pars once (Round Setup's own scorecard entry,
                 // saved for everyone), then Start; on the map, "Tap the middle of the green" sets each green.
-                S[errKey] = String(nm).split(' (')[0] + ' has no scorecard in HardPan yet. Enter its pars once (about a minute, saved for everyone), then Start \u2014 or pick another course.';
                 S.noCard = key;
+                if (lookup(key, nm)) { S[errKey] = ''; return; }
                 if (S.step !== 1) go(1); else render();
                 return;
             }
@@ -416,7 +490,7 @@
     }
     function teeList(key) {
         var rows = teeRows(key), sel = $('tee-rating-select');
-        if (!rows.length) return cardInHand(key) || S.noCard === key ? '' : '<div class="sf-h">TEES</div><div class="sf-note" style="margin:0 2px 12px;">Loading the course card\u2026</div>';
+        if (!rows.length) return cardInHand(key) || S.noCard === key || (S.lookup && S.lookup.key === key) ? '' : '<div class="sf-h">TEES</div><div class="sf-note" style="margin:0 2px 12px;">Loading the course card\u2026</div>';
         if (S.mode !== 'same') preferTee(key);
         return '<div class="sf-h">TEES</div>' + rows.map(function (r) {
             var on = sel && sel.value === r.key, col = teeColor(r.name);
@@ -468,7 +542,7 @@
                 .sort(function (a, b) { return (b.ready - a.ready) || (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)); }).slice(0, 10);
             body += '<div class="sf-h">RESULTS</div>' + (hits.length ? hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') : '<div class="sf-note">No course in the list by that name.</div>');
         }
-        if (!S.changing) body += courseHead();
+        if (!S.changing) body += courseHead() + lookupBox(key, courseName());
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
         // course and "Change"). The picked course is the card above; the list under it is the
         // others, closest first; a tap switches the course and its tees redraw in place.
@@ -498,8 +572,8 @@
         body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Search online or add a course ›</button>';
         var ok = courseName() ? '' : ' disabled';
         var foot = S.mode === 'gps'
-            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : '📍 Start GPS') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
-                + (S.noCard && S.noCard === courseKey() ? '<button type="button" class="sf-cta" data-sf="enterpars" style="margin-top:8px;">Enter the pars \u203a</button>' : '')
+            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving || (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') || (S.noCard === key && !hasCard(key)) ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') ? 'Getting the course\u2026' : 'Start Round') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
+
             : '<button type="button" class="sf-cta" data-sf="next"' + (ok || (S.cardWait ? ' disabled' : '')) + '>' + (S.cardWait ? 'Loading the course card\u2026' : 'Next: Players \u203a') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '');
         return shell('Where are you playing?', body, foot, S.mode === 'gps' ? 0 : 1);
     }
@@ -517,7 +591,7 @@
     }
     function rowHtml(c, d, on) {
         return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"><span class="n">' + esc(nameOf(c)) + '</span>'
-            + '<span class="s">' + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
+            + '<span class="s">' + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : (!hasCard(c.key) && liveOn() ? (d != null ? ' · ' : '') + 'Tap to load' : '')) + '</span></button>';
     }
 
     // ---- STEP 2: PLAYERS ----------------------------------------------------------
@@ -998,7 +1072,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
-        if ((b = t.closest('[data-sf-course]'))) { pick(b.getAttribute('data-sf-course'), b.getAttribute('data-sf-name')); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; return; }
+        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
             setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
@@ -1054,6 +1128,13 @@
         if (a === 'startgps') { needCard('err1', startGps); return; }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
+        if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
+        if (a === 'request') {
+            var rc = courses().filter(function (x) { return x.key === courseKey(); })[0] || {};
+            var subj = 'Please add ' + courseName() + (rc.city || rc.state ? ' (' + [rc.city, rc.state].filter(Boolean).join(', ') + ')' : '');
+            try { W.location.href = 'mailto:support@rattlegolf.com?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent('Course key: ' + courseKey() + '\nFrom the HardPan GPS app.'); } catch (e) {}
+            return;
+        }
         if (a === 'enterpars') { S.err1 = ''; S.noCard = null; away(step('course'), 'Pars entered'); return; }
         if (a === 'roster') { away(step('players'), 'Roster done'); return; }
         if (a === 'moregames') { apply(); away(step('action'), 'Games done'); return; }

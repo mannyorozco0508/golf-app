@@ -136,8 +136,9 @@
     // besides the GolfAPI file and the OSM holes, a course linked to its GolfAPI GPS (gps_links -
     // Dobson, Legacy...) and a course whose greens golfers have set (course_gps). Read once, small.
     var GPSK = { links: null, own: null, asked: false };
-    function loadGpsKeys(done) {
+    function loadGpsKeys(done, again) {
         var fin = typeof done === 'function' ? done : function () {};
+        if (again) { GPSK = { links: null, own: null, asked: false }; }   // a course was just set up (URGENT-021)
         if (GPSK.links && GPSK.own) { fin(); return; }
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }

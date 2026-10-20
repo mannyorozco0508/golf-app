@@ -52,19 +52,20 @@ test('Talking Stick: the GolfAPI course is picked (✓ GPS, Black / Gold / Jade)
     assert.ok(ood && !/✓ GPS/.test(ood), 'O\'odham listed, honestly without ✓ GPS: ' + JSON.stringify(s.rows));
 });
 
-test('Papago (no card): Start GPS says so and offers "Enter the pars ›", and the tees do not sit on "Loading"', { timeout: 120000 }, async () => {
+test('Papago (no card, no online lookup here): said plainly - Pick another course · Request this course · small "Enter pars yourself"; never an endless "Loading"', { timeout: 120000 }, async () => {
     const r = await open(33.4560, -111.9480, [
         X("(function(){ var b=document.querySelector('#sf [data-sf-course=\"az_papago\"]'); if(!b) return 'NO ROW'; b.click(); return 'tapped'; })()"), { sleep: 1500 },
         X("(function(){ var b=document.querySelector('[data-sf=\"startgps\"]'); if(b) b.click(); return 'start'; })()"),
-        { waitFor: "!!document.querySelector('[data-sf=enterpars]')", timeout: 45000 }, X(ROWS),
+        { waitFor: "/isn.t in our course data yet/.test((document.getElementById('sf-lookup')||{}).innerText||'')", timeout: 45000 }, X(ROWS),
         { tap: '[data-sf="enterpars"]' }, { sleep: 800 },
         X("JSON.stringify({ away: getComputedStyle(document.getElementById('sf')).display === 'none', ret: !!document.getElementById('sf-return'), step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null })")]);
     assert.equal(r.ok, true, r.reason);
     const [s0, s, away] = J(r);
     assert.ok(!/✓ GPS/.test(s0.rows.filter((x) => /^az_papago /.test(x))[0] || ''), 'Papago never shows ✓ GPS');
     assert.equal(s.key, 'az_papago');
-    assert.match(s.text, /Papago Golf Club has no scorecard in HardPan yet\. Enter its pars once/);
+    assert.match(s.text, /Papago Golf Club isn’t in our course data yet\.\nPick another course\nRequest this course\nEnter pars yourself/);
+    assert.ok(!/Enter the pars ›/.test(s.text), 'no big "Enter the pars" button');
     assert.doesNotMatch(s.text, /Loading the course card/);
-    assert.equal(away.away, true, 'Enter the pars opens Round Setup\'s own course card');
+    assert.equal(away.away, true, '"Enter pars yourself" still opens Round Setup\'s own course card');
     assert.equal(away.ret, true, 'with the way back to Start');
 });
