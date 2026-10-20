@@ -104,7 +104,12 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // "Same as last week" landing on its Games step. OFF (Manny, 2026-10-19): the Games & Bets
         // door opens the ORIGINAL setup ("What are you setting up?" Road Trip / Game Day) unchanged;
         // the GPS door's "Where are you playing?" -> Start GPS stays the new flow.
-        simpleFlow: true, simpleGames: false },
+        simpleFlow: true, simpleGames: false,
+        // URGENT-026: lineSave = "Save this line for this hole?" after a drag on a hole with NO path
+        // data (course_gps/<key>/lines/hN, for everyone). OFF until the rules addition
+        // (docs/gps-lines-rules-proposal.json) is deployed with Manny's typed OK - the live rules
+        // refuse the write today, so the button must not appear. Exactly true turns it on.
+        lineSave: false },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the

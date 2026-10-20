@@ -157,12 +157,14 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     // founding cap; no price (the store's own price only).
     assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
-    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'simpleFlow', 'simpleGames', 'toolsSheet', 'watch']);
+    assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'lineSave', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'simpleFlow', 'simpleGames', 'toolsSheet', 'watch']);
     // Feature 10 (the Apple Watch): ON from 022 (the HardPanWatch target + plugin are in the app); every 008 switch stays on.
     assert.strictEqual(cfg.features.watch, true, 'the watch switch is on (022)');
-    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'elevMyCell' && k !== 'simpleGames').every(([, v]) => v === true));
+    assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'elevMyCell' && k !== 'simpleGames' && k !== 'lineSave').every(([, v]) => v === true));
     // URGENT-016: the 3-step Games setup ships OFF (Games & Bets = the original setup).
     assert.strictEqual(cfg.features.simpleGames, false, 'simpleGames ships off');
+    // URGENT-026: "Save this line" ships OFF until its rules addition is deployed (Manny's typed OK).
+    assert.strictEqual(cfg.features.lineSave, false, 'lineSave ships off');
     // 012: the golfer's ~10 m cell height fetch ships OFF (the location rule - Manny's own OK).
     assert.strictEqual(cfg.features.elevMyCell, false, 'elevMyCell ships off');
     // 009: the My bag account sync is built but ships OFF (its rule is phase 2, not live).
